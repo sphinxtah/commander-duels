@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:commander-duels:engine-command:v1",
+  "title": "EngineCommand",
+  "description": "Draft internal adapter envelope. No operations execute in v0.0.1. Authentication, authorization and controller lease are server context, never client-selected seats.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "game_id", "action_id", "expected_revision", "type", "payload"],
+  "properties": {
+    "v": {"const": 1},
+    "game_id": {"type": "string", "format": "uuid"},
+    "action_id": {"type": "string", "format": "uuid"},
+    "expected_revision": {"type": "integer", "minimum": 0},
+    "prompt_id": {"type": "string", "format": "uuid"},
+    "type": {"enum": ["create_game", "submit_choice", "get_authorized_view", "checkpoint", "restore", "advance_bot", "validate_deck", "close_game"]},
+    "payload": {"type": "object", "maxProperties": 32}
+  }
+}

@@ -1,0 +1,39 @@
+name: Framework checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      CD_TEST_POSTGRES_URL: postgresql+psycopg://commander:commander@localhost:5432/commander
+    services:
+      postgres:
+        image: postgres:17.5-alpine
+        env:
+          POSTGRES_USER: commander
+          POSTGRES_PASSWORD: commander
+          POSTGRES_DB: commander
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U commander"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24.19.0'}
+      - uses: pnpm/action-setup@v4
+        with: {version: '11.25.0'}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21'}
+      - run: pip install -r requirements.lock && pip install --no-deps -e .
+      - run: ruff check api catalog tests scripts && ruff format --check api catalog tests scripts && mypy && pytest
+      - run: alembic upgrade head && alembic check
+      - run: pnpm install --frozen-lockfile
+      - run: python scripts/export_contracts.py && pnpm contracts && git diff --exit-code -- contracts/openapi.json web/src/generated/api.d.ts
+      - run: pnpm test && pnpm build
+      - run: mkdir -p engine/out && javac -Xlint:all -Werror -d engine/out engine/src/main/java/com/commanderduels/*.java engine/src/test/java/com/commanderduels/*.java && java -cp engine/out com.commanderduels.EngineServerTest
+      - run: pnpm --dir web exec playwright install --with-deps chromium
+      - run: uvicorn api.main:create_app --factory --host 127.0.0.1 --port 8000 &
+      - run: pnpm test:e2e
+      - run: docker compose config --quiet && docker compose build

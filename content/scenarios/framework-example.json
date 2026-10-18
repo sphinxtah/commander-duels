@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "framework-example",
+  "title": "Scenario authoring example",
+  "status": "draft",
+  "rules_bundle_id": null,
+  "objectives": [{"type": "win_game"}]
+}

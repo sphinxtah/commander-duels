@@ -1,0 +1,11 @@
+.git
+.venv
+.local
+**/node_modules
+**/dist
+**/__pycache__
+.env
+**/*.db
+**/*.egg-info
+**/test-results
+**/playwright-report

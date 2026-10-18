@@ -1,0 +1,53 @@
+name: commander-duels
+services:
+  db:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_USER: commander
+      POSTGRES_PASSWORD: commander
+      POSTGRES_DB: commander
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commander -d commander"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build: {context: ., dockerfile: api/Dockerfile}
+    environment: &api_environment
+      CD_DATABASE_URL: postgresql+psycopg://commander:commander@db:5432/commander
+      CD_ENGINE_URL: http://engine:8090
+      CD_PUBLIC_URL: http://localhost:8080
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    build: {context: ., dockerfile: api/Dockerfile}
+    environment: *api_environment
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      engine: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/ready', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  worker:
+    build: {context: ., dockerfile: api/Dockerfile}
+    environment: *api_environment
+    command: ["python", "-m", "catalog.worker"]
+    stop_grace_period: 10s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  engine:
+    build: {context: ., dockerfile: engine/Dockerfile}
+    expose: ["8090"]
+  web:
+    build: {context: ., dockerfile: web/Dockerfile}
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      api: {condition: service_healthy}
+volumes:
+  postgres_data:

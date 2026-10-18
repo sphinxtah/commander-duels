@@ -1,0 +1,179 @@
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from uuid import uuid4
+
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from starlette.exceptions import HTTPException
+from starlette.responses import Response
+
+from api.config import Settings
+from api.database import build_engine
+from api.schemas import Bootstrap, Capability, EngineStatus, Error, Format, Health, Readiness
+
+CAPABILITIES = [
+    Capability(
+        id="authentication",
+        name="Google sign-in",
+        milestone="M1",
+        reason="Identity verification and application sessions are not implemented.",
+    ),
+    Capability(
+        id="catalog",
+        name="Card catalog",
+        milestone="M1",
+        reason="No Scryfall snapshot has been imported or certified.",
+    ),
+    Capability(
+        id="decks",
+        name="Deck builder",
+        milestone="M1",
+        reason="Requires catalog identities and versioned construction validation.",
+    ),
+    Capability(
+        id="gameplay",
+        name="Connected play",
+        milestone="M0–M3",
+        reason="The XMage adapter and authorized player views require engine proof.",
+    ),
+    Capability(
+        id="campaign",
+        name="Campaign and lessons",
+        milestone="M4",
+        reason="Reference audit and authorized scenario content are outstanding.",
+    ),
+    Capability(
+        id="offline",
+        name="Offline practice",
+        milestone="M5",
+        reason="Browser-local rules and AI execution have not been demonstrated.",
+    ),
+]
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    config = settings or Settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.database = build_engine(config.database_url)
+        async with httpx.AsyncClient(timeout=2.0, trust_env=False) as client:
+            app.state.http = client
+            yield
+        app.state.database.dispose()
+
+    app = FastAPI(
+        title="Commander Duels",
+        version="0.0.1",
+        lifespan=lifespan,
+        openapi_url="/api/v1/openapi.json",
+        docs_url="/api/v1/docs",
+        redoc_url=None,
+        responses={503: {"model": Error}},
+    )
+
+    @app.middleware("http")
+    async def correlation(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        request.state.request_id = str(uuid4())
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request.state.request_id
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
+        return JSONResponse(
+            status_code=status,
+            content=Error(
+                code=code, message=message, request_id=request.state.request_id
+            ).model_dump(),
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
+        return error_response(request, exc.status_code, f"http_{exc.status_code}", str(exc.detail))
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+        return error_response(
+            request, 422, "invalid_request", "Request does not match the API contract."
+        )
+
+    @app.get("/api/v1/health", response_model=Health)
+    def health() -> Health:
+        return Health()
+
+    @app.get("/api/v1/ready", response_model=Readiness, responses={503: {"model": Readiness}})
+    def ready(request: Request, response: Response) -> Readiness:
+        state = "unavailable"
+        try:
+            with request.app.state.database.connect() as connection:
+                connection.execute(text("SELECT 1"))
+                state = "migration_required"
+                revision = connection.execute(
+                    text("SELECT version_num FROM alembic_version")
+                ).scalar()
+                if revision == "0001_foundation":
+                    return Readiness(status="ready", database="ready")
+        except SQLAlchemyError:
+            pass
+        response.status_code = 503
+        return Readiness(status="not_ready", database=state)  # type: ignore[arg-type]
+
+    @app.get("/api/v1/bootstrap", response_model=Bootstrap)
+    def bootstrap() -> Bootstrap:
+        return Bootstrap(capabilities=CAPABILITIES)
+
+    @app.get("/api/v1/formats", response_model=list[Format])
+    def formats() -> list[Format]:
+        return [
+            Format(
+                id="commander",
+                name="Commander",
+                seats=[2, 3, 4],
+                default_seats=4,
+                description="Build around your commander. A shared table, a singular strategy.",
+            ),
+            Format(
+                id="legacy",
+                name="Legacy",
+                seats=[2],
+                default_seats=2,
+                description="Two players. Deep card history. Your next decisive play.",
+            ),
+            Format(
+                id="two_headed_giant",
+                name="Two-Headed Giant",
+                seats=[4],
+                default_seats=4,
+                description="Two teams of two. Plan together and share the victory.",
+            ),
+        ]
+
+    @app.get("/api/v1/engine/status", response_model=EngineStatus)
+    async def engine_status(request: Request) -> EngineStatus:
+        try:
+            response = await request.app.state.http.get(
+                f"{str(config.engine_url).rstrip('/')}/health"
+            )
+            response.raise_for_status()
+            return EngineStatus.model_validate(response.json())
+        except (httpx.HTTPError, ValueError):
+            return EngineStatus(status="unavailable")
+
+    @app.get("/api/v1/me", response_model=Error, status_code=401)
+    def me(request: Request) -> JSONResponse:
+        return error_response(
+            request,
+            401,
+            "authentication_unavailable",
+            "Google sign-in is not available in this framework release.",
+        )
+
+    return app

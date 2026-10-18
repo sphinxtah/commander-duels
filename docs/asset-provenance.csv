@@ -1,0 +1,6 @@
+asset,origin,license_or_permission,status
+web/public/mark.svg,Original geometry created for Commander Duels,Project-authored,framework
+web/src/App.module.css,Original CSS card-back illustration,Project-authored,framework
+Reference campaign media,Not provided,Authorization and inventory required,unresolved
+XMage source,Not bundled,Pin upstream commit and preserve MIT notices in M0,unresolved
+Scryfall catalog and card art,Not imported,Record provider terms and provenance during integration,unresolved
