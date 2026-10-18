@@ -1,6 +1,6 @@
 FROM python:3.12.10-slim
 WORKDIR /app
-COPY requirements.lock pyproject.toml alembic.ini ./
+COPY requirements.lock pyproject.toml alembic.ini VERSION ./
 COPY api ./api
 COPY catalog ./catalog
 RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .

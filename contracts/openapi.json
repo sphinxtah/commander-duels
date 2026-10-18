@@ -30,7 +30,6 @@
             "type": "integer"
           },
           "version": {
-            "const": "0.0.1",
             "default": "0.0.1",
             "title": "Version",
             "type": "string"
@@ -187,7 +186,6 @@
             "type": "string"
           },
           "version": {
-            "const": "0.0.1",
             "default": "0.0.1",
             "title": "Version",
             "type": "string"

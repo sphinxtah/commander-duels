@@ -135,9 +135,8 @@ export interface components {
             /**
              * Version
              * @default 0.0.1
-             * @constant
              */
-            version: "0.0.1";
+            version: string;
         };
         /** Capability */
         Capability: {
@@ -216,9 +215,8 @@ export interface components {
             /**
              * Version
              * @default 0.0.1
-             * @constant
              */
-            version: "0.0.1";
+            version: string;
         };
         /** Readiness */
         Readiness: {

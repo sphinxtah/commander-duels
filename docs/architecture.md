@@ -2,7 +2,7 @@
 
 The browser renders user intent. FastAPI will own identity, ownership, deck persistence and match orchestration. The Java adapter will own rules, AI and private authoritative game state. Python must never become a second implementation of card effects. PostgreSQL owns durable records; the worker owns scheduled tasks.
 
-v0.0.1 implements infrastructure only. `/api/v1/bootstrap` exposes feature availability. `/api/v1/formats` describes planned modes, all unavailable. `/api/v1/health` is process liveness; `/api/v1/ready` checks the database and exact migration revision. Neither means games are playable. `/api/v1/engine/status` validates the Java boundary response, with a two-second timeout. `/api/v1/me` fails with 401; there is no development identity bypass.
+v0.0.1 implements infrastructure only. `/api/v1/bootstrap` exposes feature availability. `/api/v1/formats` describes planned modes, all unavailable. `/api/v1/health` is process liveness; `/api/v1/ready` checks the database and requires the exact Alembic head revision, read from the migration scripts at startup. Neither means games are playable. `/api/v1/engine/status` validates the Java boundary response, with a two-second timeout. `/api/v1/me` fails with 401; there is no development identity bypass.
 
 API resources close on shutdown through FastAPI lifespan. Request IDs are generated server-side, returned in headers, and included in HTTP error bodies. Error responses omit submitted credentials and validation payloads. No permissive CORS is configured: local Vite and the web container forward same-origin API requests.
 

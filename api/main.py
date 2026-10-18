@@ -12,8 +12,9 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from api.config import Settings
-from api.database import build_engine
+from api.database import build_engine, migration_head
 from api.schemas import Bootstrap, Capability, EngineStatus, Error, Format, Health, Readiness
+from api.version import APP_VERSION
 
 CAPABILITIES = [
     Capability(
@@ -57,6 +58,7 @@ CAPABILITIES = [
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     config = settings or Settings()
+    expected_revision = migration_head()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -68,7 +70,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Commander Duels",
-        version="0.0.1",
+        version=APP_VERSION,
         lifespan=lifespan,
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/v1/docs",
@@ -119,7 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 revision = connection.execute(
                     text("SELECT version_num FROM alembic_version")
                 ).scalar()
-                if revision == "0001_foundation":
+                if revision == expected_revision:
                     return Readiness(status="ready", database="ready")
         except SQLAlchemyError:
             pass

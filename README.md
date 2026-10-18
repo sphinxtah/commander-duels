@@ -58,14 +58,23 @@ pnpm contracts
 pnpm test
 pnpm build
 pnpm --dir web exec playwright install chromium
-# Start the API first; Playwright starts Vite automatically.
+# Playwright starts the API (from the activated Python environment) and Vite, or reuses running ones.
 pnpm test:e2e
 docker compose config --quiet
 ```
 
 Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also runs Java smoke tests, migration checks against PostgreSQL, browser journeys, and container builds.
 
-To run browser tests against the built Compose app, set `CD_BROWSER_URL=http://127.0.0.1:8080` before `pnpm test:e2e`. Without this override, the tests start Vite and use the API on port 8000.
+To run browser tests against the built Compose app, set `CD_BROWSER_URL=http://127.0.0.1:8080` before `pnpm test:e2e`. Without this override, the tests start the API on port 8000 and Vite on port 5173.
+
+## Versioning
+
+Each development thread is one version, and `VERSION` is the only file that holds the number. Python packaging and the API read it directly; the web build injects it as `__APP_VERSION__`. To bump a release:
+
+1. Edit `VERSION`.
+2. Run `python scripts/export_contracts.py` and `pnpm contracts`. The OpenAPI document embeds the version, so the drift test fails until both are regenerated.
+3. Run `pip install --no-deps -e .` so the installed package metadata matches.
+4. Add `docs/releases/<version>.md`.
 
 ## Repository map
 

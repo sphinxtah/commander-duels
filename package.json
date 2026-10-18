@@ -1,7 +1,6 @@
 {
   "name": "commander-duels-workspace",
   "private": true,
-  "version": "0.0.1",
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "dev": "pnpm --dir web dev",

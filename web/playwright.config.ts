@@ -5,11 +5,22 @@ export default defineConfig({
     baseURL: process.env.CD_BROWSER_URL || "http://127.0.0.1:5173",
     viewport: { width: 1366, height: 900 },
   },
+  // Both servers must answer before any test runs. The API command uses the active Python
+  // environment; an API or Vite server that is already running is reused outside CI.
   webServer: process.env.CD_BROWSER_URL
     ? undefined
-    : {
-        command: "pnpm dev",
-        url: "http://127.0.0.1:5173",
-        reuseExistingServer: !process.env.CI,
-      },
+    : [
+        {
+          command:
+            "python -m uvicorn api.main:create_app --factory --host 127.0.0.1 --port 8000",
+          cwd: "..",
+          url: "http://127.0.0.1:8000/api/v1/health",
+          reuseExistingServer: !process.env.CI,
+        },
+        {
+          command: "pnpm dev",
+          url: "http://127.0.0.1:5173",
+          reuseExistingServer: !process.env.CI,
+        },
+      ],
 });

@@ -46,6 +46,6 @@ public final class EngineServer {
         var server = create(port);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(2)));
         server.start();
-        System.out.println("Commander Duels engine boundary v0.0.1; gameplay unavailable");
+        System.out.println("Commander Duels engine boundary; gameplay unavailable");
     }
 }

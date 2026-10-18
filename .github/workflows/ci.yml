@@ -34,6 +34,5 @@ jobs:
       - run: pnpm test && pnpm build
       - run: mkdir -p engine/out && javac -Xlint:all -Werror -d engine/out engine/src/main/java/com/commanderduels/*.java engine/src/test/java/com/commanderduels/*.java && java -cp engine/out com.commanderduels.EngineServerTest
       - run: pnpm --dir web exec playwright install --with-deps chromium
-      - run: uvicorn api.main:create_app --factory --host 127.0.0.1 --port 8000 &
       - run: pnpm test:e2e
       - run: docker compose config --quiet && docker compose build

@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from api.version import APP_VERSION
+
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -15,7 +17,7 @@ class Error(Contract):
 
 class Health(Contract):
     status: Literal["ok"] = "ok"
-    version: Literal["0.0.1"] = "0.0.1"
+    version: str = APP_VERSION
 
 
 class Readiness(Contract):
@@ -33,7 +35,7 @@ class Capability(Contract):
 
 class Bootstrap(Contract):
     name: Literal["Commander Duels"] = "Commander Duels"
-    version: Literal["0.0.1"] = "0.0.1"
+    version: str = APP_VERSION
     protocol_version: Literal[1] = 1
     collection_policy: Literal["open_collection"] = "open_collection"
     capabilities: list[Capability]

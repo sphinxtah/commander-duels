@@ -1,4 +1,10 @@
+import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
+
+const version = readFileSync(
+  new URL("../../VERSION", import.meta.url),
+  "utf8",
+).trim();
 
 test("connected shell, all navigation, format dialog and saved preferences", async ({
   page,
@@ -26,7 +32,9 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
       .getByRole("navigation")
       .getByRole("link", { name, exact: true })
       .click();
-    await expect(page.getByText("NOT AVAILABLE IN v0.0.1")).toBeVisible();
+    await expect(
+      page.getByText(`NOT AVAILABLE IN v${version}`),
+    ).toBeVisible();
   }
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("checkbox", { name: "Larger text" }).check();

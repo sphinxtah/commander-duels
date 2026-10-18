@@ -209,7 +209,7 @@ export function App() {
                     ? "Service connected"
                     : "Service unavailable"}
             </span>
-            <span className={styles.version}>v0.0.1</span>
+            <span className={styles.version}>v{__APP_VERSION__}</span>
           </div>
         </header>
         <main id="main" className={styles.main} tabIndex={-1}>
@@ -388,7 +388,7 @@ export function App() {
               <section className={styles.release}>
                 <h2>
                   Release status{" "}
-                  <span className={styles.tag}>v0.0.1 · FRAMEWORK</span>
+                  <span className={styles.tag}>v{__APP_VERSION__} · FRAMEWORK</span>
                 </h2>
                 <p>
                   The application shell is available. These features are planned
@@ -425,7 +425,7 @@ export function App() {
                 <span aria-hidden="true">{glyphs[pages.indexOf(page)]}</span>
                 <h2>{page} is on the horizon.</h2>
                 <p>{details[page].next}</p>
-                <span className={styles.tag}>NOT AVAILABLE IN v0.0.1</span>
+                <span className={styles.tag}>NOT AVAILABLE IN v{__APP_VERSION__}</span>
                 <a className={styles.primary} href="#play">
                   Return to the table <span aria-hidden="true">→</span>
                 </a>
@@ -435,7 +435,7 @@ export function App() {
           <footer className={styles.footer}>
             <span>COMMANDER DUELS</span>
             <span>
-              Framework preview <span aria-hidden="true">·</span> v0.0.1
+              Framework preview <span aria-hidden="true">·</span> v{__APP_VERSION__}
             </span>
           </footer>
         </main>

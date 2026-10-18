@@ -6,5 +6,7 @@ from pathlib import Path
 from api.main import create_app
 
 Path("contracts/openapi.json").write_text(
-    json.dumps(create_app().openapi(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    json.dumps(create_app().openapi(), indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+    newline="\n",
 )
