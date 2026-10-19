@@ -39,7 +39,8 @@ COPY --from=engine-build /build/engine/target/licenses/THIRD-PARTY.txt ./license
 COPY engine/decks ./decks
 COPY --from=engine-build /build/engine/target/engine.jar ./engine.jar
 USER 10001:10001
+# h2.bindAddress keeps the TCP listener that XMage's H2 AUTO_SERVER setting starts on loopback.
 ENV CD_ENGINE_DECKS=/app/decks \
-    JDK_JAVA_OPTIONS="-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+    JDK_JAVA_OPTIONS="-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
 EXPOSE 8090
 CMD ["java", "-cp", "/app/engine.jar:/app/lib/*", "com.commanderduels.EngineServer"]

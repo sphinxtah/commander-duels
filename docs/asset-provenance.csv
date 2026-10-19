@@ -2,5 +2,8 @@ asset,origin,license_or_permission,status
 web/public/mark.svg,Original geometry created for Commander Duels,Project-authored,framework
 web/src/App.module.css,Original CSS card-back illustration,Project-authored,framework
 Reference campaign media,Not provided,Authorization and inventory required,unresolved
-XMage source,Not bundled,Pin upstream commit and preserve MIT notices in M0,unresolved
+XMage engine (github.com/magefree/mage),"Built from tag xmage_1.4.62V1, commit eb69d05b88142b5c4eec4869bcb23a0fec13c091 (2026-10-03), inside the engine image; no source in this repository; no patches","MIT; LICENSE.txt and notice shipped in /app/licenses",pinned
+XMage third-party Java dependencies,"32 jars on the engine classpath, listed in docs/engine/xmage-dependencies.csv; THIRD-PARTY.txt shipped in /app/licenses","Declared licences recorded; several undeclared and LGPL items need review (SEC06)",review
+XMage card database (/app/db in the engine image),"Generated at image build from the pinned XMage card classes: 93,992 printings","XMage code is MIT; card names and rules text are third-party game content; not a certified catalog",generated
+engine/decks fixture decklists,Project-authored lists of card names for engine tests,"Project-authored lists; card names are third-party game content",framework
 Scryfall catalog and card art,Not imported,Record provider terms and provenance during integration,unresolved

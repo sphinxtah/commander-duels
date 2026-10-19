@@ -49,10 +49,12 @@ services:
       # Development-only POST /v1/bot_match, reachable from other Compose services.
       CD_ENGINE_DEV_ENDPOINTS: "true"
       # One match peaks near 200 MB of heap; the limit leaves room for metaspace and threads.
-      JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+      # XMage opens its card database with H2 AUTO_SERVER, which starts a TCP listener; bind it to
+      # loopback so other services cannot reach it.
+      JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
     mem_limit: 1536m
     healthcheck:
-      # Ready once the card database is open (about 1.5 s; a stale database is rebuilt in ~30 s).
+      # Ready once the card database is open (about 1 s; a stale database is rebuilt in ~30 s).
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8090/ready"]
       interval: 10s
       timeout: 3s

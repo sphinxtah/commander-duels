@@ -1,0 +1,33 @@
+artifact,version,licence_declared_in_pom,via,notes
+org.mage:mage,1.4.62,not declared,engine,XMage core; MIT per the XMage repository LICENSE.txt (shipped in /app/licenses)
+org.mage:mage-common,1.4.62,not declared,mage-player-ai,XMage; MIT per repository licence
+org.mage:mage-sets,1.4.62,not declared,engine,XMage card implementations; MIT per repository licence; card names and rules text are third-party content
+org.mage:mage-player-ai,1.4.62,not declared,mage-player-ai-mad,XMage; MIT per repository licence
+org.mage:mage-player-ai-mad,1.4.62,not declared,engine,XMage; MIT per repository licence
+org.mage:mage-game-twoplayerduel,1.4.62,not declared,engine,XMage; MIT per repository licence
+org.mage:mage-game-commanderfreeforall,1.4.62,not declared,engine,XMage; MIT per repository licence; built for later milestones and not used yet
+org.mage:mage-deck-constructed,1.4.62,not declared,engine,XMage; MIT per repository licence
+com.google.code.gson:gson,2.13.2,Apache-2.0,engine and mage,
+com.google.guava:guava,33.4.8-jre,Apache-2.0,mage,
+com.google.guava:failureaccess,1.0.3,Apache-2.0,guava,
+com.google.guava:listenablefuture,9999.0-empty-to-avoid-conflict-with-guava,Apache-2.0,guava,Empty placeholder artifact
+com.google.errorprone:error_prone_annotations,2.41.0,Apache-2.0,guava,
+com.google.j2objc:j2objc-annotations,3.0.0,Apache-2.0,guava,
+org.jspecify:jspecify,1.0.0,Apache-2.0,guava,
+com.google.protobuf:protobuf-java,3.25.8,BSD-3-Clause,mage,
+org.jsoup:jsoup,1.21.2,MIT,mage,Trivy: CVE-2026-75140 (high) and CVE-2026-71497 (medium); fixed in 1.23.2
+org.apache.commons:commons-lang3,3.18.0,Apache-2.0,mage-common,
+org.slf4j:slf4j-api,2.0.17,MIT,XMage root POM,
+org.slf4j:slf4j-reload4j,2.0.17,MIT,XMage root POM,
+ch.qos.reload4j:reload4j,1.2.22,Apache-2.0,slf4j-reload4j,Maintained fork of log4j 1.2 with its known CVEs fixed
+com.j256.ormlite:ormlite-core,5.7,ISC,XMage root POM,
+com.j256.ormlite:ormlite-jdbc,5.7,ISC,XMage root POM,
+com.h2database:h2,1.4.197,MPL-2.0 or EPL-1.0,XMage root POM,"Trivy: CVE-2021-42392 and CVE-2022-23221 (critical); XMage pins this version deliberately; see xmage-spike.md, Security"
+com.googlecode.jspf:jspf-core,0.9.1,not declared,mage-common,Served from XMage's in-repository Maven repository; licence needs review
+org.jboss.remoting:jboss-remoting,2.5.4.SP5,LGPL,mage-common,Trivy: CVE-2020-35510 (high); XMage client-server transport; not started by the engine
+org.jboss:jboss-common-core,2.5.0.Final,Apache-2.0,mage-common,
+org.jboss.logging:jboss-logging-spi,2.1.2.GA,LGPL,jboss-remoting,
+jboss:jboss-serialization,4.2.2.GA,not declared,mage-common,Licence needs review
+org.ocpsoft.prettytime:prettytime,4.0.6.Final,Apache-2.0,mage-common,
+concurrent:concurrent,1.3.4,Public domain,mage-common,Doug Lea's util.concurrent
+trove:trove,1.0.2,not declared,mage-common,Licence needs review
