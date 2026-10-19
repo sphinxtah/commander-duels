@@ -20,6 +20,16 @@ Validated locally on Windows on October 18, 2026.
 
 The CI smoke command was first run locally: a `python:3.12.10-slim` container sharing the engine's network namespace, installing pinned `jsonschema` with its dependencies.
 
+### Hosted CI
+
+GitHub Actions ("Framework checks") run #10 (`3e19b71`) passed:
+- **Duration and cache.** 9 m 16 s on a cold engine cache: adding `Mage.Player.Human` changed `engine/xmage/`, so XMage was recompiled.
+- **Jobs.** Verify took 2 m 13 s: Python, contracts, Vitest, the production build and the browser journeys. The engine job took 9 m 12 s: the image build with all 45 JUnit tests took 8 m 26 s, and the Compose smoke 32 s.
+- **Bot match.** Completed, 17 turns, 14.3 s.
+- **Human-seat game.** Completed, 13 turns, 106 prompts and 240 payloads, every one validated against the seat-view contract, with both refusals verified and no problems. It was the same game as the local run with the same seed.
+
+The close-out commit's run is listed in [the release notes](releases/0.0.3.md).
+
 ## v0.0.2
 
 Validated locally on Windows on October 18, 2026. CI evidence is in [the release notes](releases/0.0.2.md).

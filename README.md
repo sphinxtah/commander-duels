@@ -43,6 +43,15 @@ In a second terminal, run `pnpm dev` and open http://localhost:5173. Vite proxie
 docker compose build engine
 ```
 
+For faster engine iterations, build the XMage and card database stages once, then compile and test against them in a throwaway container. The source is copied inside, so build output stays out of the repository:
+
+```sh
+docker build -f engine/Dockerfile --target carddb -t commander-duels-carddb .
+docker run --rm -v "$PWD/engine:/src:ro" -v commander-duels-m2:/root/.m2/repository commander-duels-carddb sh -c 'cp -r /src /build && cd /build && ln -s /xmage/carddb/db db && mvn -B -ntp -Dmaven.repo.local.tail=/xmage/m2 test'
+```
+
+Add `-Dtest=HumanGameTest` to run one test class. Rebuild the stage only when `engine/xmage/` changes.
+
 With the stack running, play one development bot match (Legacy rules, two XMage "Computer - mad" players, fixture decks from `engine/decks`). The engine has no published port, so the request runs from the API container:
 
 ```sh
