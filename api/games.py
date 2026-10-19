@@ -27,6 +27,7 @@ from functools import partial
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
+import anyio
 import httpx
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -217,6 +218,7 @@ class Connection:
     )
     revision: int = -1
     close_code: int | None = None
+    ended: anyio.Event = field(default_factory=anyio.Event)
 
     def send(self, message: dict[str, Any]) -> None:
         if self.close_code is not None:
@@ -233,6 +235,7 @@ class Connection:
             while not self.queue.empty():
                 self.queue.get_nowait()
             self.queue.put_nowait(None)
+            self.ended.set()
 
 
 @dataclass(eq=False)
@@ -935,35 +938,51 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
         inspect=hello.inspect,
     )
     game.connections[connection.id] = connection
-    sender = asyncio.get_running_loop().create_task(send_loop(websocket, connection))
-    watcher = asyncio.get_running_loop().create_task(watch_session(database, websocket, connection))
     try:
-        for action in (["game.observed"] if not owner else []) + (
-            ["game.inspection_opened"] if hello.inspect else []
-        ):
-            await run_in_threadpool(audited, database, websocket, principal, game_id, action)
-        connection.send(
-            {
-                "type": "welcome",
-                "game_id": str(game_id),
-                "connection_id": connection.id,
-                "seat": game.seat if owner else None,
-                "role": "observer",
-                "controlled": game.controller is not None,
-            }
-        )
-        if hello.control:
-            claim(hub, game, connection)
-        await resync(hub, game, connection, hello.since)
-        if hello.inspect:
-            hub.inspect_soon(game)
-        await receive_loop(hub, game, connection, websocket)
+        # Structured: the writer and the session watcher end with the connection, and a
+        # cancellation from the server unwinds all three together.
+        async with anyio.create_task_group() as tasks:
+            tasks.start_soon(send_loop, websocket, connection)
+            tasks.start_soon(watch_session, database, websocket, connection)
+            try:
+                await converse(hub, game, connection, websocket, principal, owner, hello)
+            finally:
+                connection.close(1000)
     finally:
         game.connections.pop(connection.id, None)
         hub.release(game, connection, "disconnected")
-        watcher.cancel()
-        connection.close(1000)
-        await asyncio.gather(sender, watcher, return_exceptions=True)
+
+
+async def converse(
+    hub: GameHub,
+    game: LiveGame,
+    connection: Connection,
+    websocket: WebSocket,
+    principal: Principal,
+    owner: bool,
+    hello: Hello,
+) -> None:
+    """Welcomes the connection, then serves its messages until it closes."""
+    for action in (["game.observed"] if not owner else []) + (
+        ["game.inspection_opened"] if hello.inspect else []
+    ):
+        await run_in_threadpool(audited, hub.database, websocket, principal, game.id, action)
+    connection.send(
+        {
+            "type": "welcome",
+            "game_id": str(game.id),
+            "connection_id": connection.id,
+            "seat": game.seat if owner else None,
+            "role": "observer",
+            "controlled": game.controller is not None,
+        }
+    )
+    if hello.control:
+        claim(hub, game, connection)
+    await resync(hub, game, connection, hello.since)
+    if hello.inspect:
+        hub.inspect_soon(game)
+    await receive_loop(hub, game, connection, websocket)
 
 
 def audited(
@@ -1048,9 +1067,13 @@ async def send_loop(websocket: WebSocket, connection: Connection) -> None:
 
 
 async def watch_session(database: Engine, websocket: WebSocket, connection: Connection) -> None:
-    """Signing out, a revoked session or an expired one ends the connection."""
+    """Signing out, a revoked session or an expired one ends the connection. Returns when the
+    connection ends."""
     while connection.close_code is None:
-        await asyncio.sleep(SESSION_CHECK_SECONDS)
+        with anyio.move_on_after(SESSION_CHECK_SECONDS):
+            await connection.ended.wait()
+        if connection.close_code is not None:
+            return
         principal = await run_in_threadpool(connection_principal, database, websocket)
         if isinstance(principal, str) or principal.session.id != connection.session_id:
             connection.close(CLOSE_UNAUTHENTICATED)

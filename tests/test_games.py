@@ -476,14 +476,13 @@ def test_one_tab_controls_the_seat_and_resends_run_once(
         again = second.until("command_result", action_id=sent["action_id"])
         assert again == accepted and fake.applied == 1
 
-        # A command whose tab drops before reading the reply is applied once, however often it
-        # is resent.
+        # A command whose tab drops without acting on the reply is applied once, however often
+        # it is resent. The tab closes only after the server has answered: closing mid-command
+        # makes Starlette's test client cancel the handler and, rarely, fail its own teardown
+        # (uvicorn never cancels a WebSocket handler on disconnect).
         lost_action = str(uuid.uuid4())
         second.command(after, action_id=lost_action)
-        for _ in range(100):
-            if fake.applied == 2:
-                break
-            time.sleep(0.02)
+        second.until("command_result", action_id=lost_action)
         assert fake.applied == 2
     with ada.socket(game_id) as third_socket:
         third = Tab(third_socket, seen)
