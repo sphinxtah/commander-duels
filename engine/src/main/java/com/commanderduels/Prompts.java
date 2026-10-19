@@ -1,0 +1,363 @@
+package com.commanderduels;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import mage.MageObject;
+import mage.abilities.ActivatedAbility;
+import mage.abilities.PlayLandAbility;
+import mage.abilities.SpellAbility;
+import mage.abilities.mana.ActivatedManaAbilityImpl;
+import mage.cards.Card;
+import mage.constants.Constants;
+import mage.constants.ManaType;
+import mage.constants.MultiAmountType;
+import mage.constants.Zone;
+import mage.game.Game;
+import mage.game.events.PlayerQueryEvent;
+import mage.game.permanent.Permanent;
+import mage.player.human.HumanPlayer;
+import mage.players.ManaPool;
+import mage.players.Player;
+import mage.util.MultiAmountMessage;
+
+/**
+ * Turns XMage's {@link PlayerQueryEvent}s for the human seat into typed prompts. Each option maps to
+ * the answer XMage's {@code HumanPlayer} expects (a UUID, boolean or string), so the seat never
+ * sends XMage identifiers itself. XMage validates the answer again and asks again if it rejects it.
+ * Runs on the game thread, while XMage is about to wait for the answer.
+ */
+final class Prompts {
+    private static final String LEFT_BUTTON = "UI.left.btn.text";
+    private static final String RIGHT_BUTTON = "UI.right.btn.text";
+
+    /** An open prompt: what the seat sees and the XMage answer behind each option id. */
+    record Prompt(PromptView view, Map<String, Answer> answers) {
+        boolean supported() {
+            return !view.kind().equals("unsupported");
+        }
+
+        /** The answer for a custom split, or null when this prompt takes none or the split breaks a limit. */
+        Answer amounts(List<Integer> values) {
+            if (view.amounts() == null || !view.amounts().accepts(values)) {
+                return null;
+            }
+            return new StringAnswer(encode(values));
+        }
+    }
+
+    /** One way to answer XMage's waiting {@code HumanPlayer}. Called from a request thread. */
+    sealed interface Answer {
+        void apply(Player player);
+    }
+
+    record UuidAnswer(UUID id) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseUUID(id);
+        }
+    }
+
+    record BooleanAnswer(boolean value) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseBoolean(value);
+        }
+    }
+
+    record StringAnswer(String value) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseString(value);
+        }
+    }
+
+    record ManaAnswer(UUID poolOwner, ManaType type) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseManaType(poolOwner, type);
+        }
+    }
+
+    private final Game game;
+    private final HumanPlayer human;
+    private final SeatViews views;
+    private final List<PromptView.Option> options = new ArrayList<>();
+    private final Map<String, Answer> answers = new LinkedHashMap<>();
+
+    private Prompts(Game game, HumanPlayer human, SeatViews views) {
+        this.game = game;
+        this.human = human;
+        this.views = views;
+    }
+
+    static Prompt build(PlayerQueryEvent event, Game game, HumanPlayer human, SeatViews views, String promptId) {
+        return new Prompts(game, human, views).from(event, promptId);
+    }
+
+    private Prompt from(PlayerQueryEvent event, String promptId) {
+        Map<String, Serializable> extra = event.getOptions() == null ? Map.of() : event.getOptions();
+        String message = SeatViews.plain(event.getMessage());
+        PromptView.Amounts amounts = null;
+        String detail = extra.get(Constants.Option.SECOND_MESSAGE) instanceof String second
+            && !SeatViews.plain(second).isEmpty() ? SeatViews.plain(second) : null;
+        String kind;
+        switch (event.getQueryType()) {
+            case SELECT:
+                if (extra.containsKey(Constants.Option.POSSIBLE_ATTACKERS)) {
+                    kind = "declare_attackers";
+                    combatants(uuids(extra.get(Constants.Option.POSSIBLE_ATTACKERS)),
+                        game.getCombat().getAttackers(), "toggle_attacker");
+                    if (extra.containsKey(Constants.Option.SPECIAL_BUTTON)) {
+                        add("all_attack", "All attack", null, null, false, new StringAnswer("special"));
+                    }
+                    add("done", "Done", null, null, false, new BooleanAnswer(true));
+                } else if (extra.containsKey(Constants.Option.POSSIBLE_BLOCKERS)) {
+                    kind = "declare_blockers";
+                    combatants(uuids(extra.get(Constants.Option.POSSIBLE_BLOCKERS)),
+                        game.getCombat().getBlockers(), "toggle_blocker");
+                    add("done", "Done", null, null, false, new BooleanAnswer(true));
+                } else {
+                    kind = "priority";
+                    priority();
+                }
+                break;
+            case ASK:
+                ask(extra);
+                kind = "Mulligan".equals(extra.get(LEFT_BUTTON)) && "Keep".equals(extra.get(RIGHT_BUTTON))
+                    ? "mulligan" : "yes_no";
+                break;
+            case PICK_TARGET:
+                kind = "choose_target";
+                target(event, extra);
+                break;
+            case PLAY_MANA:
+                kind = "pay_mana";
+                payMana();
+                break;
+            case MULTI_AMOUNT:
+                kind = "assign_amounts";
+                if (message.isEmpty()) {
+                    message = extra.get("header") instanceof String header ? SeatViews.plain(header) : "";
+                }
+                if (detail == null && extra.get("title") instanceof String title && !SeatViews.plain(title).isEmpty()) {
+                    detail = SeatViews.plain(title);
+                }
+                amounts = amounts(event, extra);
+                break;
+            default:
+                options.clear();
+                answers.clear();
+                return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null,
+                    event.getQueryType().name()), Map.of());
+        }
+        return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, null),
+            Map.copyOf(answers));
+    }
+
+    private void priority() {
+        add("pass", "Pass priority", null, null, false, new BooleanAnswer(true));
+        Map<UUID, List<ActivatedAbility>> byObject = new LinkedHashMap<>();
+        for (ActivatedAbility ability : human.getPlayable(game, true, Zone.ALL, false)) {
+            byObject.computeIfAbsent(clickTarget(ability.getSourceId()), id -> new ArrayList<>()).add(ability);
+        }
+        List<UUID> objects = new ArrayList<>(byObject.keySet());
+        objects.sort(Comparator.comparingInt(this::zoneRank).thenComparing(this::label,
+            Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(views::objectRef));
+        for (UUID id : objects) {
+            add(action(byObject.get(id)), label(id), views.objectRef(id), null, false, new UuidAnswer(id));
+        }
+    }
+
+    /** The object XMage expects a click on: the main card of a card part, or the spell on the stack. */
+    private UUID clickTarget(UUID sourceId) {
+        Card card = game.getCard(sourceId);
+        if (card != null && game.getSpell(sourceId) == null) {
+            return card.getMainCard().getId();
+        }
+        return sourceId;
+    }
+
+    private static String action(List<ActivatedAbility> abilities) {
+        if (abilities.stream().anyMatch(PlayLandAbility.class::isInstance)) {
+            return "play_land";
+        }
+        if (abilities.stream().anyMatch(SpellAbility.class::isInstance)) {
+            return "cast";
+        }
+        if (abilities.stream().allMatch(ActivatedAbility::isManaActivatedAbility)) {
+            return "activate_mana";
+        }
+        return "activate";
+    }
+
+    private void ask(Map<String, Serializable> extra) {
+        boolean mulligan = "Mulligan".equals(extra.get(LEFT_BUTTON)) && "Keep".equals(extra.get(RIGHT_BUTTON));
+        add(mulligan ? "mulligan" : "yes", button(extra.get(LEFT_BUTTON), "Yes"), null, null, false,
+            new BooleanAnswer(true));
+        add(mulligan ? "keep" : "no", button(extra.get(RIGHT_BUTTON), "No"), null, null, false,
+            new BooleanAnswer(false));
+    }
+
+    private void target(PlayerQueryEvent event, Map<String, Serializable> extra) {
+        Set<UUID> chosen = uuids(extra.get("chosenTargets"));
+        Set<UUID> candidates = new LinkedHashSet<>();
+        // Cards listed in the request are shown to this seat by the request itself (a search of its
+        // own library, for instance); only the selectable ones become options.
+        boolean shownByRequest = event.getCards() != null;
+        if (event.getCards() != null) {
+            Set<UUID> selectable = extra.containsKey("possibleTargets")
+                ? uuids(extra.get("possibleTargets")) : event.getCards();
+            for (UUID id : event.getCards()) {
+                if (selectable.contains(id)) {
+                    candidates.add(id);
+                }
+            }
+        } else if (event.getPerms() != null) {
+            event.getPerms().forEach(permanent -> candidates.add(permanent.getId()));
+        } else if (event.getTargets() != null) {
+            candidates.addAll(event.getTargets());
+        }
+        candidates.addAll(chosen);
+
+        List<UUID> players = candidates.stream().filter(id -> game.getPlayer(id) != null)
+            .sorted(Comparator.comparingInt(views::seatOf)).toList();
+        List<UUID> objects = candidates.stream().filter(id -> game.getPlayer(id) == null)
+            .sorted(Comparator.comparing((UUID id) -> visibleLabel(id, shownByRequest),
+                Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(views::objectRef)).toList();
+        for (UUID id : players) {
+            add("choose", game.getPlayer(id).getName(), null, views.seatOf(id), chosen.contains(id),
+                new UuidAnswer(id));
+        }
+        for (UUID id : objects) {
+            add("choose", visibleLabel(id, shownByRequest), views.objectRef(id), null, chosen.contains(id),
+                new UuidAnswer(id));
+        }
+        if (!event.isRequired()) {
+            add("done", "Done", null, null, false, new BooleanAnswer(true));
+        }
+    }
+
+    private void payMana() {
+        List<Permanent> sources = new ArrayList<>();
+        for (Permanent permanent : game.getBattlefield().getAllActivePermanents(human.getId())) {
+            if (canProduceMana(permanent)) {
+                sources.add(permanent);
+            }
+        }
+        sources.sort(Comparator.comparing(Permanent::getName).thenComparing(views::ref));
+        for (Permanent permanent : sources) {
+            add("tap_source", permanent.getName(), views.ref(permanent), null, false,
+                new UuidAnswer(permanent.getId()));
+        }
+        ManaPool pool = human.getManaPool();
+        for (ManaType type : ManaType.values()) {
+            int amount = pool.get(type);
+            if (amount > 0) {
+                add("use_pool", amount + " " + type + " mana in pool", null, null, false,
+                    new ManaAnswer(human.getId(), type));
+            }
+        }
+        add("cancel", "Cancel", null, null, false, new BooleanAnswer(false));
+    }
+
+    /** Splitting an amount, such as combat damage among blockers: XMage's suggestion or a custom split. */
+    private PromptView.Amounts amounts(PlayerQueryEvent event, Map<String, Serializable> extra) {
+        List<PromptView.AmountEntry> entries = new ArrayList<>();
+        List<Integer> suggested = new ArrayList<>();
+        List<MultiAmountMessage> messages = event.getMessages() == null ? List.of() : event.getMessages();
+        List<Integer> defaults = MultiAmountType.prepareDefaultValues(messages, event.getMin(), event.getMax());
+        for (int i = 0; i < messages.size(); i++) {
+            MultiAmountMessage entry = messages.get(i);
+            entries.add(new PromptView.AmountEntry(SeatViews.plain(entry.message), entry.min, entry.max,
+                defaults.get(i)));
+            suggested.add(defaults.get(i));
+        }
+        add("suggested", "Use the suggested split " + suggested, null, null, false,
+            new StringAnswer(encode(suggested)));
+        if (Boolean.TRUE.equals(extra.get("canCancel"))) {
+            add("cancel", "Cancel", null, null, false, new BooleanAnswer(true));
+        }
+        return new PromptView.Amounts(event.getMin(), event.getMax(), List.copyOf(entries));
+    }
+
+    /** XMage's answer format for a split: the amounts separated by spaces. */
+    static String encode(List<Integer> values) {
+        return String.join(" ", values.stream().map(String::valueOf).toList());
+    }
+
+    private boolean canProduceMana(Permanent permanent) {
+        if (!permanent.canUseActivatedAbilities(game)) {
+            return false;
+        }
+        for (ActivatedManaAbilityImpl ability : permanent.getAbilities().getActivatedManaAbilities(Zone.BATTLEFIELD)) {
+            if (ability.canActivate(human.getId(), game).canActivate()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Creatures the seat may toggle, including those already declared. */
+    private void combatants(Set<UUID> possible, Set<UUID> declared, String action) {
+        Set<UUID> creatures = new LinkedHashSet<>(possible);
+        for (UUID id : declared) {
+            Permanent permanent = game.getPermanent(id);
+            if (permanent != null && human.getId().equals(permanent.getControllerId())) {
+                creatures.add(id);
+            }
+        }
+        List<UUID> sorted = new ArrayList<>(creatures);
+        sorted.sort(Comparator.comparing(this::label, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(views::objectRef));
+        for (UUID id : sorted) {
+            add(action, label(id), views.objectRef(id), null, declared.contains(id), new UuidAnswer(id));
+        }
+    }
+
+    private String visibleLabel(UUID id, boolean shownByRequest) {
+        return shownByRequest || Visibility.identityVisible(game, id, human.getId()) ? label(id) : null;
+    }
+
+    private String label(UUID id) {
+        MageObject object = game.getObject(id);
+        return object == null ? null : object.getName();
+    }
+
+    private int zoneRank(UUID id) {
+        Zone zone = game.getState().getZone(id);
+        if (zone == Zone.HAND) {
+            return 0;
+        }
+        return zone == Zone.BATTLEFIELD ? 1 : 2;
+    }
+
+    private void add(String action, String label, String objectId, Integer seat, boolean selected, Answer answer) {
+        String id = String.valueOf(options.size() + 1);
+        options.add(new PromptView.Option(id, action, label, objectId, seat, selected));
+        answers.put(id, answer);
+    }
+
+    private static String button(Serializable text, String fallback) {
+        return text instanceof String value && !SeatViews.plain(value).isEmpty() ? SeatViews.plain(value) : fallback;
+    }
+
+    private static Set<UUID> uuids(Object value) {
+        Set<UUID> ids = new LinkedHashSet<>();
+        if (value instanceof Collection<?> collection) {
+            for (Object item : collection) {
+                if (item instanceof UUID id) {
+                    ids.add(id);
+                }
+            }
+        }
+        return ids;
+    }
+}

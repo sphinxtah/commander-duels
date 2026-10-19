@@ -1,5 +1,25 @@
 # Verification
 
+## v0.0.3
+
+Validated locally on Windows on October 18, 2026.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting | Passed (API, catalog, tests and scripts) |
+| mypy strict checks | Passed, 13 Python source files; `scripts/engine_human_game.py` also passes `mypy --strict` |
+| Python suite | 11 passed, including PostgreSQL parallel claims and the two contract tests: the command envelope, and a seat-view contract that rejects an opponent's hand, library contents, the seed, XMage UUIDs and named hidden cards |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated; only the version changed |
+| Alembic | `alembic check` against PostgreSQL: no new upgrade operations |
+| Engine image build | XMage fetched at the pinned SHA with `Mage.Player.Human` added; compile 177 s, peak 4.6 GB; card database rebuilt (93,992 printings) |
+| JUnit (during the image build) | 45 passed. `HumanGameTest`: 6 complete scripted games (3 per deck, AI skill 1) and about 1,400 published views checked against XMage's state with no leak; every fixture prompt family seen and none unsupported; stale, forged, repeated and reused answers refused. Concede, close, idle timeout and the game cap; HTTP tokens, 404s and envelope refusals; parsers |
+| Compose | All services healthy; engine log reports human games enabled (at most 2) |
+| Human-seat games | `docker compose exec -T api python - < scripts/engine_human_game.py`: 13 turns, 106 prompts, 300 payloads checked, refusals verified. Six more games at skill 4 (3 per deck) with every payload validated against the seat-view contract: no problems. The same seed replayed the same game twice |
+| Resource check | After the human games, a bot match reported 0 game threads, 44 live threads (one more than v0.0.2: the game watchdog) and 57 MB heap after GC with 7 finished games retained |
+| Vitest, build, browser journeys | Not run locally this version; only the generated API types' version comment changed. CI runs them |
+
+The CI smoke command was first run locally: a `python:3.12.10-slim` container sharing the engine's network namespace, installing pinned `jsonschema` with its dependencies.
+
 ## v0.0.2
 
 Validated locally on Windows on October 18, 2026. CI evidence is in [the release notes](releases/0.0.2.md).

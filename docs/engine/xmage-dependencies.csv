@@ -4,6 +4,7 @@ org.mage:mage-common,1.4.62,not declared,mage-player-ai,XMage; MIT per repositor
 org.mage:mage-sets,1.4.62,not declared,engine,XMage card implementations; MIT per repository licence; card names and rules text are third-party content
 org.mage:mage-player-ai,1.4.62,not declared,mage-player-ai-mad,XMage; MIT per repository licence
 org.mage:mage-player-ai-mad,1.4.62,not declared,engine,XMage; MIT per repository licence
+org.mage:mage-player-human,1.4.62,not declared,engine,"XMage HumanPlayer, the human seat since v0.0.3; MIT per repository licence"
 org.mage:mage-game-twoplayerduel,1.4.62,not declared,engine,XMage; MIT per repository licence
 org.mage:mage-game-commanderfreeforall,1.4.62,not declared,engine,XMage; MIT per repository licence; built for later milestones and not used yet
 org.mage:mage-deck-constructed,1.4.62,not declared,engine,XMage; MIT per repository licence

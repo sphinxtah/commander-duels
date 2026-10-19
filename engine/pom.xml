@@ -40,6 +40,11 @@
         </dependency>
         <dependency>
             <groupId>org.mage</groupId>
+            <artifactId>mage-player-human</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
             <artifactId>mage-game-twoplayerduel</artifactId>
             <version>${xmage.version}</version>
         </dependency>

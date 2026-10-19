@@ -7,8 +7,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * Engine lifecycle (loading, ready, failed) and the single-slot gate for development bot matches.
- * Gameplay for players is not available in any state.
+ * Engine lifecycle (loading, ready, failed), the single-slot gate for development bot matches and,
+ * when development endpoints are on, the development human games. Gameplay for players is not
+ * available in any state.
  */
 public final class Engine {
     public enum Status { LOADING, READY, FAILED }
@@ -17,6 +18,7 @@ public final class Engine {
     private final boolean botMatchEnabled;
     private final Supplier<CardDatabase.Stats> loader;
     private final Function<BotMatchRequest, BotMatchRunner.Outcome> matchRunner;
+    private final HumanGames humanGames;
     // Held from the start of a match until its game thread has exited, so a game that ignores the
     // stop request keeps further matches out instead of piling up.
     private final Semaphore matchSlot = new Semaphore(1);
@@ -25,10 +27,17 @@ public final class Engine {
 
     public Engine(XmagePin pin, boolean botMatchEnabled, Supplier<CardDatabase.Stats> loader,
                   Function<BotMatchRequest, BotMatchRunner.Outcome> matchRunner) {
+        this(pin, botMatchEnabled, loader, matchRunner, null);
+    }
+
+    /** {@code humanGames} is null unless development endpoints are enabled. */
+    Engine(XmagePin pin, boolean botMatchEnabled, Supplier<CardDatabase.Stats> loader,
+           Function<BotMatchRequest, BotMatchRunner.Outcome> matchRunner, HumanGames humanGames) {
         this.pin = pin;
         this.botMatchEnabled = botMatchEnabled;
         this.loader = loader;
         this.matchRunner = matchRunner;
+        this.humanGames = humanGames;
     }
 
     /** Loads the card database on a background thread; health stays available meanwhile. */
@@ -66,6 +75,10 @@ public final class Engine {
 
     public boolean botMatchEnabled() {
         return botMatchEnabled;
+    }
+
+    HumanGames humanGames() {
+        return humanGames;
     }
 
     /** Runs a bot match on the caller's thread, or returns empty when one is already running. */

@@ -1,17 +1,19 @@
 # Scope and remaining work
 
-The user requested v0.0.1 as the initial framework, the foundation before M0. v0.0.2 is the first slice of M0: the XMage engine builds from a pinned commit on Java 21 and plays internal bot-versus-bot Legacy games ([findings](engine/xmage-spike.md)). Document content supplies requirements, not permission to claim investigations or product functionality have been completed.
+The user requested v0.0.1 as the initial framework, the foundation before M0. v0.0.2 is the first slice of M0: the XMage engine builds from a pinned commit on Java 21 and plays internal bot-versus-bot Legacy games ([findings](engine/xmage-spike.md)). v0.0.3 adds a human seat through XMage's `HumanPlayer`, with typed prompts, stale-answer refusal and authorized per-seat views, on development engine endpoints driven by scripts ([the human seat](engine/human-seat.md)). [The next version's plan](plans/0.0.4.md) sets out the route to v0.1.0, the first version with a testing UI. Document content supplies requirements, not permission to claim investigations or product functionality have been completed.
 
 | Priority | Milestone | Required next work | Exit evidence |
 | --- | --- | --- | --- |
 | P0 | M0 | Legitimate reference-installation audit; complete reference inventory | Captures and traceable feature/test mapping |
-| P0 | M0 | Human seat through XMage's `HumanPlayer`: `PlayerQueryEvent` bridge, typed prompts with IDs and stale-answer rejection, per-seat authorized views (v0.0.3) | Browser Legacy game against a bot, no concealed-state leaks |
+| P0 | M0 | Browser control of the v0.0.3 human seat (engine side done: typed prompts, stale-answer refusal, per-seat views, scripted leak checks). Remaining: authenticated routing through the API and a testing UI (v0.1.0) | Browser Legacy game against a bot, no concealed-state leaks |
+| P0 | M0 | Prompt families the fixture decks never reach: modes, X and amounts, named choices, ability choice, trigger ordering, piles. Each pauses the game as `unsupported` today | Typed prompts with fixtures that reach them |
 | P0 | M0 | Four-seat Commander and Two-Headed Giant choices on the same bridge | Four-seat choices |
-| P0 | M0 | AI hidden-information audit (the MAD AI searches a copy of the full game state) and AI budgets per decision | AI02/AI05 evidence |
+| P0 | M0 | AI hidden-information audit (the MAD AI searches a copy of the full game state, including a human seat's hand since v0.0.3) and AI budgets per decision | AI02/AI05 evidence |
 | P0 | M0 | Recovery, deterministic RNG, fencing and replay proof; XMage is not reproducible from a seed alone (random object IDs, global RNG), so journal decisions and draws | Worker-kill/restart fixtures with matching state and views |
 | P0 | M0 | Browser-local compilation proof and asset/licensing inventory | Measured offline feasibility report, explicit blockers |
 | P1 | M0 | Engine dependency hygiene: H2 1.4.197 CVEs (upstream pin), JBoss Remoting exclusion, jsoup, base image refresh, licence review of undeclared jars | SEC06 scan and notice set |
 | P1 | M1 | Google verification, CSRF, private sessions, roles, approval policy | AUTH01–07, T01/T02/T29 |
+| P1 | M1 | SysOp local administrator (requested 2026-10-18): a local account, separate from Google sign-in, that signs in only from the operator's production network and holds every root-level ability in the interface. Open questions in [the plan](plans/0.0.4.md#sysop-local-administrator), including how it fits SEC05 and NET14, which forbid viewing concealed live-game information | Sign-in refused outside the allowed network; every SysOp action audited; AUTH/SEC tests |
 | P1 | M1 | Streaming Scryfall imports, durable scheduling, revisions, identity mappings | CAT01–10, T17–20 |
 | P1 | M1 | Deck lifecycle, versioning, format validation, import/export, search | DECK01–11, T03–05 |
 | P1 | M2 | Authoritative game UI and protocol, Legacy BO1/BO3, bots and recovery | T06/T10–16/T21–22 |

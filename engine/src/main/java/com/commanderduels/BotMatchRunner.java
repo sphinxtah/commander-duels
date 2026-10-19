@@ -1,36 +1,19 @@
 package com.commanderduels;
 
 import java.lang.management.ManagementFactory;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
-import mage.cards.Card;
 import mage.cards.decks.Deck;
-import mage.cards.decks.DeckCardLists;
-import mage.cards.decks.DeckValidator;
-import mage.cards.decks.DeckValidatorError;
-import mage.cards.decks.importer.DeckImporter;
-import mage.constants.MultiplayerAttackOption;
-import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
-import mage.deck.Legacy;
 import mage.game.Game;
 import mage.game.GameException;
-import mage.game.GameOptions;
-import mage.game.TwoPlayerDuel;
-import mage.game.TwoPlayerMatch;
 import mage.game.match.Match;
-import mage.game.match.MatchOptions;
-import mage.game.mulligan.MulliganType;
 import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.players.Player;
 import mage.util.RandomUtil;
@@ -48,12 +31,9 @@ import mage.util.ThreadUtils;
  * search and clears the flag, so the stop path keeps interrupting until the thread exits.
  */
 public final class BotMatchRunner {
-    public static final List<String> DECKS = List.of("legacy-mono-red-burn", "legacy-mono-green-creatures");
+    public static final List<String> DECKS = LegacyDuel.DECKS;
     static final String[] SEAT_NAMES = {"Bot A", "Bot B"};
     static final long STOP_GRACE_MILLIS = 15_000;
-    private static final int LEGACY_MIN_DECK = 60;
-    private static final int START_LIFE = 20;
-    private static final int START_HAND = 7;
 
     /** The result plus the game thread, which may still be alive if it ignored the stop request. */
     public record Outcome(BotMatchResult result, Thread gameThread) {}
@@ -152,35 +132,13 @@ public final class BotMatchRunner {
             decks.add(loadLegacyDeck(deck));
         }
 
-        Game game = new TwoPlayerDuel(MultiplayerAttackOption.LEFT, RangeOfInfluence.ONE,
-            MulliganType.LONDON.getMulligan(0), LEGACY_MIN_DECK, START_LIFE, START_HAND);
-        var options = new GameOptions();
-        options.stopOnTurn = request.turnCap() + 1; // stop at the untap step after the last allowed turn
-        options.stopAtStep = PhaseStep.UNTAP;
-        options.rollbackTurnsAllowed = false;
-        game.setGameOptions(options);
-
-        var matchOptions = new MatchOptions("Commander Duels bot match", "Two Player Duel", false);
-        matchOptions.setDeckType("Constructed - Legacy");
-        matchOptions.setWinsNeeded(1);
-        Match match = new TwoPlayerMatch(matchOptions);
-
+        Game game = LegacyDuel.newGame(request.turnCap());
+        Match match = LegacyDuel.newMatch("Commander Duels bot match");
         List<Player> players = new ArrayList<>();
         for (int seat = 0; seat < DECKS.size(); seat++) {
             Player player = new ComputerPlayerControllableProxy(SEAT_NAMES[seat], RangeOfInfluence.ONE,
                 request.skill());
-            Deck deck = decks.get(seat);
-            game.loadCards(deck.getCards(), player.getId());
-            game.loadCards(deck.getSideboard(), player.getId());
-            game.addPlayer(player, deck);
-            match.addPlayer(player, deck);
-            // addPlayer fills the library from Deck.getMaindeckCards(), a HashSet of identity-hashed
-            // cards, so the order before the opening shuffle differs on every run. Restore deck-list
-            // order so the seeded shuffle deals the same hands.
-            Set<Card> maindeck = deck.getCards().stream().filter(card -> !card.isExtraDeckCard())
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-            player.getLibrary().clear();
-            player.getLibrary().addAll(maindeck, game);
+            LegacyDuel.seat(game, match, player, decks.get(seat));
             players.add(player);
         }
         List<UUID> seatIds = players.stream().map(Player::getId).toList();
@@ -206,22 +164,7 @@ public final class BotMatchRunner {
 
     /** Loads a fixture deck and checks it with XMage's Legacy validator. */
     Deck loadLegacyDeck(String name) throws GameException {
-        Path file = deckDirectory.resolve(name + ".txt");
-        if (!Files.isRegularFile(file)) {
-            throw new GameException("Deck file not found: " + file);
-        }
-        var errors = new StringBuilder();
-        DeckCardLists lists = DeckImporter.importDeckFromFile(file.toString(), errors, false);
-        if (!errors.isEmpty()) {
-            throw new GameException("Deck " + name + " did not import: " + errors.toString().trim());
-        }
-        Deck deck = Deck.load(lists, false, false);
-        DeckValidator validator = new Legacy();
-        if (!validator.validate(deck)) {
-            throw new GameException("Deck " + name + " is not Legacy-legal: " + validator.getErrorsListSorted()
-                .stream().map(DeckValidatorError::getMessage).collect(Collectors.joining("; ")));
-        }
-        return deck;
+        return LegacyDuel.loadDeck(deckDirectory, name);
     }
 
     private static List<BotMatchResult.Seat> unknownSeats() {
@@ -232,7 +175,7 @@ public final class BotMatchRunner {
         return seats;
     }
 
-    private static boolean join(Thread thread, long millis) {
+    static boolean join(Thread thread, long millis) {
         try {
             return thread.join(Duration.ofMillis(millis));
         } catch (InterruptedException e) {
@@ -250,7 +193,7 @@ public final class BotMatchRunner {
         }
     }
 
-    private static String describe(Throwable error) {
+    static String describe(Throwable error) {
         Throwable root = error;
         while (root.getCause() != null && root.getCause() != root) {
             root = root.getCause();

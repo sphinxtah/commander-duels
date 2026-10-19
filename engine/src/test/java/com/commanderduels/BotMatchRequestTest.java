@@ -40,6 +40,6 @@ class BotMatchRequestTest {
         "not json", "[]", "7", "{\"unknown\":1}", "{\"turn_cap\":1.5}", "{\"seed\":\"7\"}",
         "{\"seed\":9223372036854775808}", "{\"skill\":null}", "{\"include_log\":1}", "{\"turn_cap\":[1]}"})
     void invalidBodiesAreRejected(String body) {
-        assertThrows(BotMatchRequest.InvalidRequest.class, () -> BotMatchRequest.parse(body, () -> 0L));
+        assertThrows(JsonRequest.Invalid.class, () -> BotMatchRequest.parse(body, () -> 0L));
     }
 }

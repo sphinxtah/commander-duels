@@ -222,6 +222,8 @@ The 32 third-party jars and their declared licences are in [xmage-dependencies.c
 
 ## How XMage's human player waits for choices (design input for v0.0.3)
 
+v0.0.3 built the human seat on this design; see [the human seat](human-seat.md).
+
 `mage.player.human.HumanPlayer` (in `Mage.Server.Plugins/Mage.Player.Human`, not built in v0.0.2) bridges a blocking rules engine to an asynchronous client:
 
 1. **The game thread asks.** Every choice method calls `prepareForResponse(game)`, which marks the player as the priority player. It then calls a `game.fire*Event(...)` method, which emits a `PlayerQueryEvent` to the listener registered with `game.addPlayerQueryEventListener`. In XMage that listener is the server's `GameController`, which sends a callback to the client. Then it calls `waitForResponse(game)`.

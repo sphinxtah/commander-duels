@@ -1,0 +1,150 @@
+# Human seat and per-seat views (v0.0.3)
+
+v0.0.3 is the second slice of milestone M0. A human seat plays a Legacy Two Player Duel against an XMage computer player through XMage's own `HumanPlayer`. Each blocking choice becomes a typed prompt with an ID, stale answers are refused, and the seat receives only an authorized view. Development endpoints on the internal engine carry it; FastAPI still refuses game actions, and there is no game UI. [The engine spike](xmage-spike.md) records how XMage's human player waits for answers; this document records what was built on that.
+
+What it proves:
+- XMage's unmodified `HumanPlayer` can be driven headless through its query events and response setters.
+- Every request the two fixture decks produce has a typed prompt.
+- Per-seat views can be built field by field without disclosing concealed cards. Scripted games check this against XMage's own state at every published view.
+
+What it does not prove:
+- Anything about a browser client, sign-in or seat ownership.
+- Recovery, timers, multiplayer, or prompt families the fixture decks never reach.
+- That the bot plays fairly. The bot still searches a full copy of the game state, including the human's hand (AI02, unchanged).
+
+## How a prompt works
+
+1. **XMage asks.** On the game thread, `HumanPlayer` fires a `PlayerQueryEvent` and then blocks in `waitForResponse`.
+2. **The engine publishes.** A listener on the same thread builds the typed prompt and the seat's view. It publishes both at a new revision with a fresh prompt ID (a UUID). XMage's own server builds its views on the game thread too, because the state is only consistent there.
+3. **The seat answers.** The answer names the prompt ID, the expected revision and one option ID. The engine checks it under a lock in this order:
+   - a repeated action ID returns its first result, or `action_id_reused` if the body differs;
+   - a finished game returns `game_over`;
+   - a prompt that is not the open one returns `stale_prompt`;
+   - a wrong revision returns `stale_revision`;
+   - an unsupported prompt returns `unsupported_prompt`;
+   - an unknown option returns `invalid_option` (or `invalid_amounts`).
+   Refusals leave the prompt open. An accepted answer closes it and bumps the revision.
+4. **XMage receives.** Outside the lock, the option's mapped answer goes to XMage through one of `setResponseUUID`, `setResponseBoolean`, `setResponseString` or `setResponseManaType`. XMage validates it again and, if it disagrees, asks again, which publishes a new prompt.
+
+The seat never sends XMage identifiers. Option IDs are numbers scoped to one prompt, and each maps to the exact value `HumanPlayer` expects.
+
+### Prompt kinds
+
+| Kind | XMage request | Options | Answer sent to XMage |
+| --- | --- | --- | --- |
+| `priority` | `SELECT` from `firePriorityEvent` | `pass`; one option per playable object (`play_land`, `cast`, `activate`, `activate_mana`), from `getPlayable` | boolean; object UUID |
+| `mulligan` | `ASK` with Mulligan/Keep buttons | `mulligan`, `keep` | boolean |
+| `yes_no` | `ASK` (optional effects, "mana will be lost" confirmations) | `yes`, `no`, with XMage's button labels | boolean |
+| `choose_target` | `PICK_TARGET` (targets, the starting player, the attacker to block, cards to put on the bottom or discard) | `choose` per candidate (players by seat, objects by opaque ID, already chosen ones marked `selected`); `done` when not required | UUID; boolean |
+| `pay_mana` | `PLAY_MANA` | `tap_source` per permanent with a usable mana ability; `use_pool` per mana type in the pool; `cancel` | UUID; mana type; boolean |
+| `declare_attackers` | `SELECT` with possible attackers | `toggle_attacker` per creature; `all_attack`; `done` | UUID; "special"; boolean |
+| `declare_blockers` | `SELECT` with possible blockers | `toggle_blocker` per creature; `done` | UUID; boolean |
+| `assign_amounts` | `MULTI_AMOUNT` (combat damage among blockers, with or without trample) | `suggested` (XMage's default split); `cancel` when allowed; or a payload of one amount per entry | space-separated amounts; boolean |
+| `unsupported` | `CHOOSE_CHOICE`, `CHOOSE_ABILITY`, `CHOOSE_MODE`, `PICK_ABILITY`, `PLAY_X_MANA`, `AMOUNT`, `CHOOSE_PILE` | none | The game waits until the seat concedes or the game is closed |
+
+None of the unsupported families occurred in the scripted games: the fixture decks have no modal spells, X costs, named choices, piles or simultaneous triggers that need ordering. XMage's `PERSONAL_MESSAGE` events ("You have to attack with...") become the view's `messages`, not prompts.
+
+## Authorized views
+
+`SeatView` is built field by field from the game state; nothing is a filtered copy of a full snapshot. [The contract](../../contracts/engine-seat-view.schema.json) closes every object, so it cannot carry these:
+
+- the opponent's hand or either library: each player shows counts only;
+- the shuffle seed;
+- XMage identifiers.
+
+| Shown | Rule |
+| --- | --- |
+| Your hand | Full cards |
+| Battlefield, stack, graveyards | Public, except face-down objects, which only their controller sees (none in the fixture decks) |
+| Exile | Face-up cards; face-down exiled cards are hidden |
+| Revealed cards | Everyone, while XMage keeps them revealed (it clears them at each human priority prompt) |
+| Looked-at cards | Only the player who looked |
+| Players | Life, counters, library and hand counts, mana pool, lost/won |
+| Combat | Attackers, the defender and blockers |
+| Log | XMage's public log, with HTML and XMage's short object IDs removed. Engine error lines stay in the engine's own log, because their details are not seat-safe |
+
+Objects get opaque IDs (`o` and 16 hex digits) from `SecureRandom`. The key is the XMage UUID plus its zone-change counter, so a card that changes zones becomes a new object (rule 400.7) and gets a new ID. IDs are minted only when an object is first shown.
+
+Two deliberate differences from XMage's own client views:
+
+- XMage's `PlayerView` shows a computer opponent's sideboard to the human. The seat view never shows a sideboard.
+- XMage's `GameView` carries raw object UUIDs. The seat view never does.
+
+## Engine endpoints
+
+These exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. The engine publishes no port, and the web proxy forwards nothing to it.
+
+| Request | Purpose | Responses |
+| --- | --- | --- |
+| `POST /v1/games` | Start a game: optional `seed`, `human_deck`, `bot_deck` (fixture names), `skill` (1–6), `turn_cap` (1–200) and `idle_timeout_seconds` (5–3600); out-of-range numbers are clamped | 201 `game_id`, `seat` (0), `seat_token` (returned once) and `settings`; 429 `games_busy` with `Retry-After` |
+| `GET /v1/games/{id}/view` | The seat's snapshot. `since` and `wait_ms` (up to 30 s) long-poll for a newer revision; `log_from` pages the log (up to 200 lines) | 200 snapshot |
+| `POST /v1/games/{id}/commands` | `submit_choice` or `concede`, in the [command envelope](../../contracts/engine-command.schema.json) | 200 accepted; 400 `invalid_command`; 409 or 422 refusals as listed above |
+| `POST /v1/games/{id}/close` | End the game: the seat concedes, and the result records `closed` | 200 `finished` or `closing` |
+
+Every game request needs `Authorization: Bearer <seat_token>`, and the token alone selects the seat. No body field can choose one: the envelope rejects unknown fields such as `seat`. An unknown game and a wrong token both return 404 `not_found`.
+
+The seed is never returned. It decides every shuffle, so knowing it would reveal library order (SEC03). The seed input exists for reproducible development tests only.
+
+A command:
+
+```json
+{"v": 1, "game_id": "…", "action_id": "…", "expected_revision": 184, "prompt_id": "…",
+ "type": "submit_choice", "payload": {"option_id": "2"}}
+```
+
+The snapshot's `status` is one of `starting`, `your_prompt`, `unsupported_prompt`, `waiting` (the bot is acting or XMage is processing) or `finished`. A finished game has a `result`:
+- `kind` is `completed`, `turn_limit`, `closed`, `idle_timeout` or `error`;
+- for a completed game, also `winner_seat`, `draw` and `conceded`.
+
+## Lifecycle and threads
+
+- **Seats.** The human always sits in seat 0, and a seeded coin decides who chooses the starting player. The human seat uses XMage's default user settings: it stops in both main phases, at declare attackers and blockers, and whenever something new is on the stack, and it confirms before passing with mana in the pool. Configurable stops (UI07) are later work.
+- **Threads.** Each game runs on its own `GAME human_game <id>` platform thread, which blocks while it waits for the seat. Views are built on that thread; request threads only read the published snapshot.
+- **Capacity.** At most `CD_ENGINE_MAX_GAMES` games run at once (default 2, at most 8). XMage's AI shares one search pool and one random generator across games, and each game holds a thread. Bot matches keep their own single slot.
+- **Watchdog.** It checks every second. A game with no activity for its idle timeout (default 15 minutes) is closed with `idle_timeout`. Finished games stay readable for 10 minutes (at most 16), then are dropped.
+- **Concede and close.** These go through XMage's `setConcedingPlayer`, as its server does, and wake a waiting choice with `signalPlayerConcede`. If the game thread has not ended 5 seconds after a close, the engine ends the game and interrupts the thread until it exits, as bot matches do.
+- **Memory only.** Games live in memory. There is no journal, snapshot or recovery yet, and a restart loses them.
+
+## Verification
+
+Leak checks run on the game thread for every published view, against XMage's own state, in the scripted JUnit games (`HumanGameTest`):
+
+1. **No XMage UUIDs.** No UUID appears in a view or prompt other than the prompt's own ID.
+2. **IDs by zone.** Every opaque ID in a payload resolves to an object visible to the human by an independent zone check. The opponent's hand and both libraries, minus revealed and looked-at cards, are concealed.
+3. **Names.** A card name that only the opponent's deck contains appears in a payload only once a card of that name has been public. The fixture decks share no card names, so this catches a concealed card by name.
+4. **Log lines.** Every log line naming an opponent-only card must name a card that is public by the next event. XMage logs a discard just before moving the card.
+5. **Counts.** Hand and library counts, and the human's hand contents, match XMage.
+
+Results:
+- **JUnit `HumanGameTest`:** 6 complete games, 3 with each deck, at AI skill 1. About 1,400 views checked per run, with no failures. Every fixture prompt family seen: `priority`, `mulligan`, `yes_no`, `choose_target`, `pay_mana`, `declare_attackers`, `declare_blockers` and `assign_amounts`, the last both suggested and custom. No unsupported request. The first answer of each game also probes a forged prompt, a stale revision, an unknown option, a repeated action ID and a reused action ID.
+- **JUnit, other human-game tests:**
+  - concede (the bot wins, `conceded` is true);
+  - close while the seat is waiting;
+  - idle timeout;
+  - the game cap;
+  - HTTP: tokens, 404s, envelope refusals including a `seat` field, long-polling, concede and close;
+  - parsers.
+- **Compose:**
+  - `scripts/engine_human_game.py` played 6 games at the default skill 4, 3 with each deck. Every payload was validated against the seat-view contract plus client-side checks, with no problems.
+  - The documented one-liner played a 13-turn game: 106 prompts and 300 payloads.
+  - Afterwards the engine had no game threads, and the heap after GC was 57 MB, with 7 finished games retained.
+- **CI:** the engine job now runs one scripted game with schema validation after the bot match.
+
+## Findings
+
+- **XMage settings.** `HumanPlayer` needs `UserData`. XMage's server sets it when a user connects, and without it the first priority throws. The engine sets `UserData.getDefaultUserDataView()`.
+- **Damage assignment.** It is reachable with simple decks: a trampler, or an attacker blocked by two creatures, makes XMage ask for a `MULTI_AMOUNT` split. It is typed as `assign_amounts`.
+- **Pool mana.** XMage spends usable pool mana automatically. Answering a payment with pool mana that cannot pay the cost repeats the request indefinitely, so a client must offer a land or cancel.
+- **Cancelled casting.** `done` on a required target with nothing chosen cancels the spell. XMage treats it as cancelling the cast.
+- **No active player before turn 1.** Seat lookups must tolerate nulls (`List.of` throws on `indexOf(null)`).
+- **Revealed cards are cleared at each human priority prompt.** The view built for that prompt still shows them.
+- **Reproducibility.** With the same seed, the scripted client replayed the same game twice: 13 turns and 106 prompts. That is consistent but not guaranteed; the AI's tie-breaks still depend on random UUIDs (see the spike's determinism section).
+
+## Open items
+
+- **AI hidden information (AI02).** The bot's search reads the human's hand. Its own backlog row.
+- **Recovery.** Journals, snapshots, reconnect and worker fencing (NET08–10).
+- **Seats.** The human is always seat 0, with no seat ownership, sign-in or controller lease. FastAPI does not route game actions yet.
+- **Timers and stops.** No timers or clocks (NET11–12), and no configurable stops (UI07).
+- **Prompt families.** The unsupported families above, plus multiplayer and watcher views.
+- **Browser interface.** That is v0.1.0, the first version with a UI you can use.

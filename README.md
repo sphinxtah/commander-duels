@@ -1,8 +1,8 @@
 # Commander Duels
 
-**v0.0.2: XMage headless engine spike.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
+**v0.0.3: human seat and per-seat views.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
 
-The engine loads XMage's card database and plays complete Legacy games between two XMage computer players. That is an internal development check only. There are no human seats, player views or game UI yet, and gameplay is unavailable to players. The application shows unavailable features and their milestones. The source scope remains the full product backlog.
+The engine loads XMage's card database and plays complete Legacy games, either between two XMage computer players or with a human seat against one. The human seat runs through XMage's own human player: every choice becomes a typed prompt, stale answers are refused, and the seat sees only an authorized view. These are internal development games, driven by scripts. There is no sign-in or game UI yet, and gameplay is unavailable to players. The application shows unavailable features and their milestones. The source scope remains the full product backlog.
 
 ## Start with Docker
 
@@ -55,7 +55,15 @@ Optional inputs: `seed`, `turn_cap` (1–200, default 60), `time_budget_seconds`
 docker compose exec -T api python - --count 10 < scripts/engine_bot_matches.py
 ```
 
-The bot match endpoint exists only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets for development.
+Play one development game with a human seat. A scripted player answers every prompt for seat 0 through the seat API, prints the prompts, options and answers alongside the game log, and checks every payload for concealed information:
+
+```sh
+docker compose exec -T api python - < scripts/engine_human_game.py
+```
+
+Options go after `-`: `--deck legacy-mono-green-creatures`, `--seed`, `--skill` (default 1), `--turn-cap` (default 30) and `--quiet` (summary only). The last line is a JSON summary. See [the human seat](docs/engine/human-seat.md) for the endpoints, prompt kinds and view rules.
+
+Both development endpoints exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. At most `CD_ENGINE_MAX_GAMES` human games (default 2) run at once.
 
 ## Verify changes
 
@@ -79,7 +87,7 @@ pnpm test:e2e
 docker compose config --quiet
 ```
 
-Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also builds the engine image (Maven, JUnit and a Compose smoke match), runs migration checks against PostgreSQL and browser journeys, and builds the other containers.
+Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also builds the engine image (Maven and JUnit), smoke-tests it in Compose with a bot match and a schema-checked human-seat game, runs migration checks against PostgreSQL and browser journeys, and builds the other containers.
 
 To run browser tests against the built Compose app, set `CD_BROWSER_URL=http://127.0.0.1:8080` before `pnpm test:e2e`. Without this override, the tests start the API on port 8000 and Vite on port 5173.
 
@@ -98,11 +106,11 @@ Each development thread is one version, and `VERSION` is the only file that hold
 | --- | --- |
 | `web` | Accessible eight-section shell, format details, device preferences, API client |
 | `api` | HTTP contracts, configuration, lifecycle, persistence models and Alembic migrations |
-| `engine` | Java 21 XMage engine service: pinned build, card database, development bot matches |
+| `engine` | Java 21 XMage engine service: pinned build, card database, development bot matches and human-seat games |
 | `catalog` | PostgreSQL lease claim, generation fencing and bounded worker loop |
-| `contracts` | Generated public OpenAPI and draft internal command envelope |
+| `contracts` | Generated public OpenAPI, the internal command envelope and the seat-view contract |
 | `content` | Constrained draft scenario schema and example |
 | `tests` | API, migration, contract and job lifecycle regressions |
 | `docs` | Architecture, scope ledger, reference inventory and release evidence |
 
-See [architecture](docs/architecture.md), [remaining work](docs/backlog.md), and release notes for [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md). No production VM, host nginx, certificate, firewall, or routing configuration is included.
+See [architecture](docs/architecture.md), [remaining work](docs/backlog.md), [the next version's plan](docs/plans/0.0.4.md), and release notes for [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md). No production VM, host nginx, certificate, firewall, or routing configuration is included.
