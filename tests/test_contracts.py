@@ -111,6 +111,7 @@ def snapshot() -> dict[str, Any]:
             "skill": 4,
             "turn_cap": 60,
             "idle_timeout_seconds": 900,
+            "spectator_delay_seconds": 0,
         },
         "prompt": {
             "id": str(uuid4()),
@@ -136,6 +137,7 @@ def snapshot() -> dict[str, Any]:
                 },
             ],
             "amounts": None,
+            "piles": None,
             "xmage_query": None,
         },
         "view": {
@@ -194,6 +196,42 @@ def test_seat_view_contract_cannot_carry_concealed_information():
         with pytest.raises(ValidationError):
             validator.validate(leaked)
             pytest.fail(f"schema accepted {description}")
+
+
+def spectator() -> dict[str, Any]:
+    watched = snapshot()
+    watched.update(seat=None, status="spectating", prompt=None)
+    watched["view"].update(seat=None, you=None, hand=[])
+    watched["view"]["opponents"] = [player(0), player(1), player(2), player(3)]
+    for entry in watched["settings"]["seats"]:
+        entry["deck"] = None
+    return watched
+
+
+def test_spectator_snapshots_carry_public_information_only():
+    validator = validator_for("contracts/engine-seat-view.schema.json")
+    validator.validate(spectator())
+    piles = copy.deepcopy(snapshot())
+    piles["prompt"].update(kind="choose_pile", piles=[["o0123456789abcdef"], []])
+    validator.validate(piles)
+
+    secret = card("o1111111111111111", "Giant Growth")
+    leaks: list[tuple[str, Any]] = [
+        ("a spectator's hand", lambda view: view["view"].update(hand=[secret])),
+        ("a spectator's prompt", lambda view: view.update(prompt=snapshot()["prompt"])),
+        ("a spectator's you", lambda view: view["view"].update(you=player(0))),
+        ("looked-at cards", lambda v: v["view"].update(looked_at=[{"name": "x", "cards": []}])),
+    ]
+    for description, mutate in leaks:
+        leaked = spectator()
+        mutate(leaked)
+        with pytest.raises(ValidationError):
+            validator.validate(leaked)
+            pytest.fail(f"schema accepted {description}")
+    bad_pile = copy.deepcopy(piles)
+    bad_pile["prompt"]["piles"] = [[str(uuid4())], []]
+    with pytest.raises(ValidationError):
+        validator.validate(bad_pile)
 
 
 def test_scenario_vocabulary_is_constrained():

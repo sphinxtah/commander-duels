@@ -33,22 +33,31 @@ final class HumanGames {
     static final int MAX_FINISHED = 16;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    /** @param seatTokens each human seat's token, by seat, in seat order */
-    record Created(HumanGame game, Map<Integer, String> seatTokens) {}
+    /**
+     * @param seatTokens     each human seat's token, by seat, in seat order
+     * @param spectatorToken a read-only token for the public, possibly delayed, view
+     */
+    record Created(HumanGame game, Map<Integer, String> seatTokens, String spectatorToken) {}
 
-    /** A game and the seat a token selects. */
-    record SeatHandle(HumanGame game, int seat) {}
+    /** A game and the seat a token selects; a null seat is the spectator. */
+    record SeatHandle(HumanGame game, Integer seat) {
+        boolean spectator() {
+            return seat == null;
+        }
+    }
 
     private static final class Entry {
         final HumanGame game;
         /** SHA-256 of each human seat's token, by seat. */
         final Map<Integer, byte[]> tokenHashes;
+        final byte[] spectatorHash;
         final AtomicBoolean closing = new AtomicBoolean();
         volatile long finishedAtNanos;
 
-        Entry(HumanGame game, Map<Integer, byte[]> tokenHashes) {
+        Entry(HumanGame game, Map<Integer, byte[]> tokenHashes, byte[] spectatorHash) {
             this.game = game;
             this.tokenHashes = tokenHashes;
+            this.spectatorHash = spectatorHash;
         }
     }
 
@@ -83,18 +92,23 @@ final class HumanGames {
         Map<Integer, String> tokens = new LinkedHashMap<>();
         Map<Integer, byte[]> hashes = new LinkedHashMap<>();
         for (int seat : game.humanSeats()) {
-            byte[] bytes = new byte[32];
-            RANDOM.nextBytes(bytes);
-            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            String token = newToken();
             tokens.put(seat, token);
             hashes.put(seat, hash(token));
         }
-        games.put(id, new Entry(game, Map.copyOf(hashes)));
+        String spectatorToken = newToken();
+        games.put(id, new Entry(game, Map.copyOf(hashes), hash(spectatorToken)));
         game.start();
-        return Optional.of(new Created(game, tokens));
+        return Optional.of(new Created(game, tokens, spectatorToken));
     }
 
-    /** The game and seat, if the id exists and the token is one of its seat tokens. */
+    private static String newToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /** The game and seat (null for the spectator), if the id exists and the token is one of its tokens. */
     Optional<SeatHandle> find(String id, String token) {
         Entry entry = id == null ? null : games.get(id);
         if (entry == null) {
@@ -102,13 +116,17 @@ final class HumanGames {
         }
         byte[] presented = hash(token == null ? "" : token);
         List<Integer> matches = new ArrayList<>();
-        // Every seat's hash is compared, in constant time, so timing does not say which seat matched.
+        // Every hash is compared, in constant time, so timing does not say which seat matched.
         entry.tokenHashes.forEach((seat, hash) -> {
             if (MessageDigest.isEqual(hash, presented)) {
                 matches.add(seat);
             }
         });
-        return matches.size() == 1 ? Optional.of(new SeatHandle(entry.game, matches.get(0))) : Optional.empty();
+        boolean spectator = MessageDigest.isEqual(entry.spectatorHash, presented);
+        if (matches.size() == 1 && !spectator) {
+            return Optional.of(new SeatHandle(entry.game, matches.get(0)));
+        }
+        return spectator && matches.isEmpty() ? Optional.of(new SeatHandle(entry.game, null)) : Optional.empty();
     }
 
     synchronized int active() {

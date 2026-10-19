@@ -8,38 +8,41 @@ Validated locally on Windows on October 18–19, 2026 (UTC).
 | --- | --- |
 | Ruff lint and formatting | Passed (API, catalog, tests and scripts) |
 | mypy strict checks | Passed, 13 Python source files; `scripts/engine_human_game.py` also passes `mypy --strict` |
-| Python suite | 11 passed, including PostgreSQL parallel claims and the contract tests. The seat-view contract now also rejects a fifth seat, a hidden commander's object id, an odd commander tax and leftover Legacy deck fields |
+| Python suite | 12 passed, including PostgreSQL parallel claims and the contract tests. The seat-view contract now also rejects a fifth seat, a hidden commander's object id, an odd commander tax and leftover Legacy deck fields. For spectators, it rejects a prompt, a `you`, a hand or looked-at cards, and a pile holding an XMage id |
 | Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated; only the version changed |
 | Alembic | `alembic check` against PostgreSQL: no new upgrade operations |
-| Engine image build | XMage fetched at the pinned SHA with `Mage.Game.CommanderDuel` added: fetch 12 s, compile 185 s (177 s in v0.0.3), peak 4.5 GB. Card database rebuilt in 22 s (93,992 printings, 32,739 names). Later image builds reused the XMage layers: 2 m 15 s in total |
-| Fixture decks | The four Commander decks pass XMage's `mage.deck.Commander` validator (99 cards and one commander each) and share no card name; checked again by JUnit |
-| JUnit (during the image build) | 61 passed, up from 45, in 118 s. See below |
+| Engine image build | XMage fetched at the pinned SHA with `Mage.Game.CommanderDuel` added: fetch 12 s, compile 185 s (177 s in v0.0.3), peak 4.5 GB. Card database rebuilt in 22 s (93,992 printings, 32,739 names). Later image builds reused the XMage layers: 1 m 44 s in total for the final one |
+| Fixture decks | The four Commander decks, including the seven cards added for the rarer prompts, pass XMage's `mage.deck.Commander` validator (99 cards and one commander each) and share no card name; checked again by JUnit |
+| JUnit (during the image build) | 64 passed, up from 45. See below |
 | Compose | All services healthy. The engine reports ready with the same card counts |
 | Bot match | Seed 1 completed in 19 turns (17 in v0.0.3: XMage's AI is not reproducible from a seed alone, see the spike's determinism section) |
-| Scripted Legacy game | The CI command: 11 turns, 100 prompts, 211 payloads, all validated against the seat-view contract, both refusals verified, no problems |
-| Scripted four-seat Commander game | The CI command, two humans and two bots: 24 turns, 330 prompts, 1,110 payloads, all schema-validated. Refusals verified: stale revision, stale prompt, and another seat's token answering the open prompt. No problems |
-| Four-human one-liner | `docker compose exec -T api python - --format commander --seats human,human,human,human --turn-cap 20 < scripts/engine_human_game.py`: 20 turns and 505 prompts across the four seats, each printed with its seat; 2,910 payloads checked client-side, no problems |
-| Resource check | After those games, a bot match reported 0 game threads, 49 live threads and 62 MB of heap in use |
-| Vitest and production build | 2 Vitest tests passed and the production build passed, in a `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository |
+| Scripted Legacy game | The CI command: 11 turns, 100 prompts, 345 payloads (149 of them the spectator's), all validated against the seat-view contract, both refusals verified, no problems |
+| Scripted four-seat Commander game | The CI command, two humans and two bots: 24 turns, 350 prompts (one `choose_mode`), 1,620 payloads (465 of them the spectator's), all schema-validated. Refusals verified: stale revision, stale prompt, and another seat's token answering the open prompt. No problems |
+| Four-human one-liner | `docker compose exec -T api python - --format commander --seats human,human,human,human --turn-cap 20 --spectator-delay 2 < scripts/engine_human_game.py`: 20 turns and 541 prompts across the four seats, each printed with its seat; 3,263 payloads checked client-side, including 9 delayed spectator views (about one per second of play), no problems |
+| Resource check | After those games, a bot match reported 0 game threads, 51 live threads and 64 MB of heap in use |
+| Vitest and production build | 2 Vitest tests passed and the production build passed, in a `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository (the web code has not changed since) |
 | Browser journeys | Not run locally; only the generated API types' version comment changed. CI runs them |
 
 JUnit details:
 - **Legacy (`HumanGameTest`).** The six v0.0.3 scripted games pass on the multi-seat API, with stale, forged, repeated and reused answers refused.
 - **Commander tables (`CommanderGameTest`).**
   - Nine scripted tables, every one finished, with no leak or state failure: human/bot, bot/human and human/human at two seats; human/bot/bot and bot/human/human at three; human with three bots, two humans with two bots, and two four-human games.
-  - 6,113 prompts answered and 24,288 views checked, every human seat's against XMage's state.
-  - Every prompt kind was reached: `choose_defender` 84 times, `choose_ability` 18, `choose_choice` 2 and Commander `yes_no` 8. No request was unsupported.
-  - Commanders were seen in the command zone, on the stack, on the battlefield, in the graveyard and in exile. Commanders reached a tax of {4} and dealt up to 14 commander damage, always equal to XMage's watchers.
+  - 4,160 prompts answered and 16,602 seat views checked against XMage's state, plus every spectator view.
+  - Reached by the random games: `choose_defender` 70 times, `choose_ability` 17, `choose_mode` 1 and Commander `yes_no` 10. `choose_choice` (Mother of Runes) came up in an earlier run of the same suite, not this one. No request was unsupported.
+  - Commanders were seen in the command zone, on the stack, on the battlefield, in the graveyard and in exile. Commanders reached a tax of {6} and dealt up to 14 commander damage, always equal to XMage's watchers.
+  - A spectator with a 1-second delay never saw a view younger than the delay, and saw the result only after it.
 - **Rules profile.** At two, three and four seats, the game class, free mulligans, first-draw rule, 40 starting life and seat-order turns all match.
 - **All humans out.** The game ends as `humans_eliminated`.
 - **Scenario (`CommanderScenarioTest`).** The four-human game finishes in 3 s and reaches all five steps listed in [Commander tables](engine/commander-tables.md#the-scenario-test).
-- **HTTP (`HumanGameHttpTest`).** A new test proves that each seat's token reads and answers only its own seat and sees only its own deck.
+- **Prompt families (`PromptFamiliesTest`).** The four-human game reaches `choose_mode` twice, a custom `choose_amount` twice, `order_triggers` and `choose_pile` (five revealed cards split between the piles), with no leak or state failure for any seat or the spectator.
+- **HTTP (`HumanGameHttpTest`).** New tests prove that each seat's token reads and answers only its own seat and sees only its own deck, and that the spectator token reads the public view and nothing else.
 
-Earlier local runs found four problems, all fixed before this record:
+Earlier local runs found five problems, all fixed before this record:
 - answers sent to a stale player object after an XMage state restore, which stalled and hung games;
 - a race caused by XMage treating JUnit's `main` thread as a game thread;
 - turns passing in reverse seat order;
-- prompts slowed by about 100 ms each at multi-human tables, because other seats' views were built after the prompt had opened.
+- prompts slowed by about 100 ms each at multi-human tables, because other seats' views were built after the prompt had opened;
+- a delayed spectator stuck on an old view during continuous play, because merging near-simultaneous views kept refreshing the newest one's time.
 
 They are described in [Commander tables](engine/commander-tables.md#findings).
 

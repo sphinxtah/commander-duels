@@ -23,7 +23,7 @@ The engine drives XMage's game objects directly, as XMage's test framework does,
 The same flag enables development games. Their routes are `POST /v1/games`, plus `GET .../view`, `POST .../commands` and `POST .../close` under `/v1/games/{id}`. A game is Legacy at two seats or Commander at two to four, and each seat is XMage's unmodified `HumanPlayer` or a computer player:
 - **Prompts.** Each of XMage's blocking requests becomes a typed prompt with an ID, published with that seat's view at a new revision of that seat. XMage asks one player at a time, so at most one prompt is open per game.
 - **Answers.** An answer must name the seat's open prompt and the seat's current revision. Repeated action IDs return their first result.
-- **Seats.** Each human seat's token, returned once at creation, alone selects that seat.
+- **Seats.** Each human seat's token, returned once at creation, alone selects that seat. A read-only spectator token reads the public view, optionally delayed.
 - **Views.** These are built field by field on the game thread, with opaque object IDs, never XMage UUIDs, and counts in place of every concealed zone. Commander tax and commander damage come from XMage's own watchers.
 - **Lifecycle.** Games live in memory. At most `CD_ENGINE_MAX_GAMES` run at once (default 2), and idle games are closed.
 

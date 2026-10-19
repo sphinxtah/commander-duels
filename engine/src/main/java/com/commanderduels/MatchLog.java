@@ -107,6 +107,11 @@ public final class MatchLog {
         return List.copyOf(entries);
     }
 
+    /** How many entries are kept: a spectator's delayed log stops at the count when its view was published. */
+    synchronized int size() {
+        return entries.size();
+    }
+
     private MessageDigest cloneDigest() {
         try {
             return (MessageDigest) digest.clone();

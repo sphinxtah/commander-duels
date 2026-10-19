@@ -76,7 +76,7 @@ A four-seat Commander game with two human seats and two bots:
 docker compose exec -T api python - --format commander --seats human,human,bot,bot < scripts/engine_human_game.py
 ```
 
-Options go after `-`: `--format` (`legacy` or `commander`), `--seats` (default `human,bot` for Legacy and `human,bot,bot,bot` for Commander), `--deck` (the first human seat's deck), `--seed`, `--skill` (default 1), `--turn-cap` (default 30) and `--quiet` (summary only). The last line is a JSON summary. See [the human seat](docs/engine/human-seat.md) for the endpoints, prompt kinds and view rules, and [Commander tables](docs/engine/commander-tables.md) for tables, seats and commander fields.
+A spectator thread watches every game through the read-only spectator token. Options go after `-`: `--format` (`legacy` or `commander`), `--seats` (default `human,bot` for Legacy and `human,bot,bot,bot` for Commander), `--deck` (the first human seat's deck), `--seed`, `--skill` (default 1), `--turn-cap` (default 30), `--spectator-delay` (seconds, default 0) and `--quiet` (summary only). The last line is a JSON summary. See [the human seat](docs/engine/human-seat.md) for the endpoints, prompt kinds and view rules, and [Commander tables](docs/engine/commander-tables.md) for tables, seats and commander fields.
 
 Both development endpoints exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. At most `CD_ENGINE_MAX_GAMES` development games (default 2) run at once.
 

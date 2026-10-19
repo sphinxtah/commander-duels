@@ -5,7 +5,7 @@
 SB: 1 Isamaru, Hound of Konda
 38 Plains
 1 Mother of Runes
-1 Eager Cadet
+1 Attended Knight
 1 Elite Vanguard
 1 Savannah Lions
 1 Segovian Angel
@@ -25,14 +25,14 @@ SB: 1 Isamaru, Hound of Konda
 1 Oreskos Swiftclaw
 1 Raptor Companion
 1 Silvercoat Lion
-1 Squire
+1 Valorous Stance
 1 Stormfront Pegasus
 1 Sungrace Pegasus
 1 Youthful Knight
 1 Aerial Responder
 1 Griffin Sentinel
 1 Loxodon Line Breaker
-1 Pearled Unicorn
+1 Soul Warden
 1 Pegasus Charger
 1 Skyhunter Prowler
 1 Skyhunter Skirmisher

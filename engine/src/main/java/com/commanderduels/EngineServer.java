@@ -175,6 +175,7 @@ public final class EngineServer {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("game_id", game.id());
         response.put("seats", seats);
+        response.put("spectator_token", created.get().spectatorToken());
         response.put("settings", game.settings());
         respond(exchange, 201, response);
     }
@@ -188,7 +189,11 @@ public final class EngineServer {
             return;
         }
         HumanGame game = found.get().game();
-        int seat = found.get().seat();
+        Integer seat = found.get().seat();
+        if (seat == null && !matcher.group(2).equals("view")) {
+            respond(exchange, 403, Map.of("code", "read_only", "message", "A spectator token can only read the view"));
+            return;
+        }
         switch (matcher.group(2)) {
             case "view" -> view(exchange, game, seat);
             case "commands" -> command(exchange, game, seat);
@@ -196,7 +201,8 @@ public final class EngineServer {
         }
     }
 
-    private static void view(HttpExchange exchange, HumanGame game, int seat) throws IOException {
+    /** A seat's snapshot, or the spectator's when {@code seat} is null. */
+    private static void view(HttpExchange exchange, HumanGame game, Integer seat) throws IOException {
         if (!exchange.getRequestMethod().equals("GET")) {
             methodNotAllowed(exchange, "GET");
             return;
@@ -214,7 +220,8 @@ public final class EngineServer {
             return;
         }
         try {
-            respond(exchange, 200, game.snapshot(seat, since, waitMillis, logFrom));
+            respond(exchange, 200, seat == null ? game.spectatorSnapshot(since, waitMillis, logFrom)
+                : game.snapshot(seat, since, waitMillis, logFrom));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             respond(exchange, 503, Map.of("code", "interrupted"));

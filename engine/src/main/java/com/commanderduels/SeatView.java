@@ -7,10 +7,11 @@ import java.util.Map;
  * What one seat is authorized to see, built field by field from the game state rather than by
  * filtering a full snapshot. Every other player's hand, and every library, appear only as counts.
  * Object ids are opaque {@link ObjectRefs}; players are referred to by seat. {@code opponents} lists
- * every other player in seat order, including eliminated ones.
+ * every other player in seat order, including eliminated ones. A spectator's view has no seat and
+ * no {@code you}, its {@code opponents} lists every player, and it shows public information only.
  */
 public record SeatView(
-    int seat,
+    Integer seat,
     int turn,
     Integer activeSeat,
     Integer prioritySeat,

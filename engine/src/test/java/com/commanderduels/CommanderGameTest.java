@@ -205,6 +205,68 @@ class CommanderGameTest {
         }
     }
 
+    /**
+     * NET14: a spectator sees public information only, and sees it late. Every spectator snapshot
+     * must be a public view published at least the delay before it was read, and the result arrives
+     * only after the same delay.
+     */
+    @Test
+    void spectatorsSeeThePublicGameLate() throws Exception {
+        List<HumanGameRequest.Seat> seats = List.of(Tables.human(GameFormat.COMMANDER.decks().get(0)),
+            Tables.bot(GameFormat.COMMANDER.decks().get(1)));
+        var request = new HumanGameRequest(61L, GameFormat.COMMANDER, seats, 1, 40, 900, 1);
+        var check = new SeatChecks(request);
+        HumanGame game = Tables.start(request, check);
+        long delay = TimeUnit.SECONDS.toNanos(1);
+        List<String> problems = new CopyOnWriteArrayList<>();
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        Thread spectator = Thread.ofPlatform().name("spectator-client").start(() -> {
+            long since = -1;
+            try {
+                while (true) {
+                    long asked = System.nanoTime();
+                    HumanGame.Snapshot snapshot = game.spectatorSnapshot(since, 2_000, -1);
+                    reads.incrementAndGet();
+                    if (snapshot.seat() != null || snapshot.prompt() != null) {
+                        problems.add("a spectator snapshot has a seat or a prompt");
+                    }
+                    if (snapshot.view() != null) {
+                        // The view must have been published at least the delay before this read began.
+                        boolean oldEnough = check.spectatorHistory.stream().anyMatch(entry ->
+                            entry.getValue().equals(snapshot.view())
+                                && entry.getKey() <= System.nanoTime() - delay + TimeUnit.MILLISECONDS.toNanos(50));
+                        if (!oldEnough) {
+                            problems.add("a spectator saw a view younger than the delay at revision "
+                                + snapshot.revision() + " (asked " + asked + ")");
+                        }
+                    }
+                    if (snapshot.result() != null) {
+                        return;
+                    }
+                    since = snapshot.revision();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        Map<Integer, ScriptedPlayer> scripted = new ConcurrentHashMap<>();
+        Tables.Played played = Tables.play(game, (seat, prompt, view) ->
+            scripted.computeIfAbsent(seat, s -> new ScriptedPlayer(61 + s)).choose(prompt, view), 4, COVERAGE);
+        HumanGame.Snapshot early = game.spectatorSnapshot(Long.MAX_VALUE - 1, 0, -1);
+        assertNull(early.result(), "the result reaches spectators only after the delay");
+        assertTrue(BotMatchRunner.join(spectator, 10_000), "the spectator saw the result");
+        HumanGame.Snapshot last = game.spectatorSnapshot(-1, 0, -1);
+        assertEquals("finished", last.status());
+        assertEquals(played.last().result(), last.result());
+        assertEquals(1, last.settings().spectatorDelaySeconds());
+        assertTrue(last.settings().seats().stream().allMatch(entry -> entry.deck() == null), "no deck names");
+        check.settle();
+        assertTrue(check.failures.isEmpty(), "leaks or wrong views: " + check.failures);
+        assertTrue(problems.isEmpty(), "spectator problems: " + problems);
+        assertTrue(reads.get() > 2 && check.spectatorViewsChecked.get() > 2, "the spectator read " + reads.get()
+            + " snapshots of " + check.spectatorViewsChecked.get() + " views");
+    }
+
     /** With bots left but no human, the engine stops the game instead of letting the bots play on. */
     @Test
     void aTableWhoseHumansAreAllOutStops() throws Exception {

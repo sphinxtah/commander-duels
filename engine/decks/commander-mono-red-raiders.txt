@@ -14,9 +14,9 @@ SB: 1 Jeska, Warrior Adept
 1 Fearless Halberdier
 1 Goblin Cavaliers
 1 Goblin Chariot
-1 Goblin Hero
+1 Abrade
 1 Goblin Sky Raider
-1 Gray Ogre
+1 Blaze
 1 Hurloon Minotaur
 1 Sabretooth Tiger
 1 Canyon Minotaur

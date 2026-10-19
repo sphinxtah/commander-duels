@@ -2,7 +2,8 @@
 
 A scripted player answers every prompt for every human seat the way a client would: each seat uses
 its own seat token, reads its authorized view, picks an option id and submits it with the prompt id
-and revision. Every payload any seat receives is checked for concealed information. Standard library
+and revision. A spectator thread watches the public view with the game's spectator token. Every
+payload any seat or the spectator receives is checked for concealed information. Standard library
 only, so it runs inside the API container without copying files into it:
 
     docker compose exec -T api python - < scripts/engine_human_game.py
@@ -55,6 +56,7 @@ class Checks:
     def __init__(self, schema_path: str | None) -> None:
         self.lock = threading.Lock()
         self.payloads = 0
+        self.spectator_payloads = 0
         self.problems: list[str] = []
         self.validator: Any = None
         if schema_path:
@@ -64,7 +66,16 @@ class Checks:
             with open(schema_path, encoding="utf-8") as handle:
                 self.validator = Draft202012Validator(json.load(handle))
 
-    def snapshot(self, seat: int, snapshot: dict[str, Any]) -> None:
+    def spectator(self, snapshot: dict[str, Any]) -> None:
+        """A spectator sees no seat, prompt, hand or deck: public information only."""
+        with self.lock:
+            self.spectator_payloads += 1
+        view = snapshot.get("view") or {}
+        if snapshot.get("prompt") is not None or view.get("you") is not None or view.get("hand"):
+            self.problem("a spectator was sent a prompt, a seat's state or a hand")
+        self.snapshot(None, snapshot)
+
+    def snapshot(self, seat: int | None, snapshot: dict[str, Any]) -> None:
         with self.lock:
             self.payloads += 1
         if self.validator is not None:
@@ -159,11 +170,28 @@ class ScriptedSeat:
             return pick(unchosen or options)
         if kind == "choose_ability" and by("use_ability"):
             return pick(by("use_ability"))
+        if kind == "choose_mode":
+            if by("done") and (not by("choose_mode") or self.random.random() < 0.5):
+                return by("done")[0]
+            return pick(by("choose_mode") or options)
+        if kind == "order_triggers":
+            return pick(by("put_first"))
+        if kind == "choose_pile":
+            return pick(by("choose_pile"))
         if kind == "choose_choice" and by("choose"):
             return pick(by("choose"))
         if kind == "assign_amounts":
             return by("suggested")[0]
         return pick(options)
+
+    def payload(self, prompt: dict[str, Any], choice: dict[str, Any]) -> dict[str, Any]:
+        """The answer: the option, or for choose_amount sometimes a number above the minimum."""
+        if prompt["kind"] == "choose_amount" and prompt["amounts"]:
+            entry = prompt["amounts"]["entries"][0]
+            value = entry["min"] + self.random.randint(0, min(2, entry["max"] - entry["min"]))
+            if value != entry["min"]:
+                return {"amounts": [value]}
+        return {"option_id": choice["id"]}
 
 
 def describe(option: dict[str, Any]) -> str:
@@ -190,10 +218,13 @@ def command(
 class Table:
     """The game's human seats, each played on its own thread."""
 
-    def __init__(self, args: argparse.Namespace, game_id: str, tokens: dict[int, str]) -> None:
+    def __init__(
+        self, args: argparse.Namespace, game_id: str, tokens: dict[int, str], spectator: str
+    ) -> None:
         self.args = args
         self.game_id = game_id
         self.tokens = tokens
+        self.spectator_token = spectator
         self.checks = Checks(args.schema)
         self.output = threading.Lock()
         self.kinds: Counter[str] = Counter()
@@ -251,9 +282,8 @@ class Table:
                 engine.call("POST", commands, command(self.game_id, since, None, "concede", {}))
                 continue
             choice = player.choose(prompt, view)
-            answer = command(
-                self.game_id, since, prompt["id"], "submit_choice", {"option_id": choice["id"]}
-            )
+            payload = player.payload(prompt, choice)
+            answer = command(self.game_id, since, prompt["id"], "submit_choice", payload)
             self.probe_before(seat, engine, answer)
             status, reply = engine.call("POST", commands, answer)
             if status == 409 and reply.get("code") == "stale_revision":
@@ -263,9 +293,25 @@ class Table:
                 break
             with self.output:
                 self.answered[seat] += 1
-            self.say(f"    -> seat {seat}: {describe(choice)}")
+            chosen = f"amount {payload['amounts'][0]}" if "amounts" in payload else describe(choice)
+            self.say(f"    -> seat {seat}: {chosen}")
             self.probe_after(engine, answer)
         self.results[seat] = snapshot
+
+    def watch(self) -> None:
+        """The spectator: long-polls the public view until the game's result reaches it."""
+        engine = Engine(self.args.url, self.spectator_token)
+        since = -1
+        while True:
+            query = f"?since={since}&wait_ms=10000"
+            status, snapshot = engine.call("GET", f"/v1/games/{self.game_id}/view{query}")
+            if status != 200:
+                self.checks.problem(f"spectator view returned {status}: {snapshot}")
+                return
+            self.checks.spectator(snapshot)
+            since = snapshot["revision"]
+            if snapshot["result"] is not None:
+                return
 
     def probe_before(self, seat: int, engine: Engine, answer: dict[str, Any]) -> None:
         """Once per game: refuse a stale revision, and another seat answering this prompt."""
@@ -320,6 +366,9 @@ def main() -> int:
     )
     parser.add_argument("--skill", type=int, default=1)
     parser.add_argument("--turn-cap", type=int, default=30)
+    parser.add_argument(
+        "--spectator-delay", type=int, default=0, help="seconds the spectator view runs behind"
+    )
     parser.add_argument("--schema", help="validate payloads against this JSON Schema file")
     parser.add_argument("--quiet", action="store_true", help="print only the summary")
     args = parser.parse_args()
@@ -335,6 +384,7 @@ def main() -> int:
         "seats": seats,
         "skill": args.skill,
         "turn_cap": args.turn_cap,
+        "spectator_delay_seconds": args.spectator_delay,
     }
     status, created = Engine(args.url).call("POST", "/v1/games", body)
     if status != 201:
@@ -344,9 +394,10 @@ def main() -> int:
     tokens = {
         entry["seat"]: entry["seat_token"] for entry in created["seats"] if entry["seat_token"]
     }
-    table = Table(args, game_id, tokens)
+    table = Table(args, game_id, tokens, created["spectator_token"])
     table.say(f"Game {game_id}: {args.format}, seats {players}; {created['settings']}")
     threads = [threading.Thread(target=table.play, args=(seat,), daemon=True) for seat in tokens]
+    threads.append(threading.Thread(target=table.watch, daemon=True))
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -366,13 +417,18 @@ def main() -> int:
         "prompts_by_seat": {str(seat): count for seat, count in sorted(table.answered.items())},
         "prompt_kinds": dict(sorted(table.kinds.items())),
         "payloads_checked": table.checks.payloads,
+        "spectator_payloads": table.checks.spectator_payloads,
         "schema_validated": table.checks.validator is not None,
         "refusals_verified": table.verified,
         "problems": table.checks.problems,
     }
     print(json.dumps(summary))
     expected = {"stale_revision", "stale_prompt"} | ({"other_seat"} if len(tokens) > 1 else set())
-    clean = result.get("kind") in FINISHED and not table.checks.problems
+    clean = (
+        result.get("kind") in FINISHED
+        and not table.checks.problems
+        and table.checks.spectator_payloads > 0
+    )
     return 0 if clean and expected <= set(table.verified) else 1
 
 

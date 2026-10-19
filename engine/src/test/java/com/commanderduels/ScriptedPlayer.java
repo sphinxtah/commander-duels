@@ -94,6 +94,20 @@ class ScriptedPlayer {
                 var choices = byAction(options, "choose");
                 yield choices.isEmpty() ? pick(options) : pick(choices);
             }
+            case "choose_mode" -> {
+                var done = byAction(options, "done");
+                var modes = byAction(options, "choose_mode");
+                yield !done.isEmpty() && (modes.isEmpty() || random.nextBoolean()) ? done.get(0).id()
+                    : modes.isEmpty() ? byAction(options, "cancel").get(0).id() : pick(modes);
+            }
+            case "choose_amount" -> {
+                // A small number: the minimum as the option, or a custom amount just above it.
+                PromptView.AmountEntry entry = prompt.amounts().entries().get(0);
+                int value = entry.min() + random.nextInt(Math.min(3, entry.max() - entry.min()) + 1);
+                yield value == entry.min() ? byAction(options, "suggested").get(0).id() : Tables.AMOUNTS + value;
+            }
+            case "order_triggers" -> pick(byAction(options, "put_first"));
+            case "choose_pile" -> pick(byAction(options, "choose_pile"));
             case "choose_target" -> {
                 var done = byAction(options, "done");
                 boolean anySelected = options.stream().anyMatch(PromptView.Option::selected);

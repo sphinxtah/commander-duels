@@ -2,19 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:commander-duels:engine-seat-view:v1",
   "title": "EngineSeatSnapshot",
-  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand, library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players.",
+  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat, or to a spectator: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand, library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players. A spectator's snapshot has no seat, no prompt and no \"you\", and shows public information only, possibly delayed.",
   "type": "object",
   "additionalProperties": false,
   "required": ["game_id", "revision", "status", "seat", "settings", "prompt", "view", "result", "log_count", "log_from", "log"],
   "properties": {
     "game_id": {"type": "string", "format": "uuid"},
     "revision": {"type": "integer", "minimum": 0},
-    "status": {"enum": ["starting", "your_prompt", "unsupported_prompt", "waiting", "eliminated", "finished"]},
-    "seat": {"$ref": "#/$defs/seat"},
+    "status": {
+      "enum": ["starting", "your_prompt", "unsupported_prompt", "waiting", "eliminated", "spectating", "finished"]
+    },
+    "seat": {"$ref": "#/$defs/nullableSeat"},
     "settings": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["format", "rules_profile", "seats", "skill", "turn_cap", "idle_timeout_seconds"],
+      "required": ["format", "rules_profile", "seats", "skill", "turn_cap", "idle_timeout_seconds", "spectator_delay_seconds"],
       "properties": {
         "format": {"enum": ["legacy", "commander"]},
         "rules_profile": {"enum": ["legacy_two_player_duel", "commander_two_seat", "commander_free_for_all"]},
@@ -36,7 +38,8 @@
         },
         "skill": {"type": "integer", "minimum": 1, "maximum": 6},
         "turn_cap": {"type": "integer", "minimum": 1, "maximum": 200},
-        "idle_timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 3600}
+        "idle_timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 3600},
+        "spectator_delay_seconds": {"type": "integer", "minimum": 0, "maximum": 300}
       }
     },
     "prompt": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/prompt"}]},
@@ -45,6 +48,27 @@
     "log_count": {"type": "integer", "minimum": 0},
     "log_from": {"type": "integer", "minimum": 0},
     "log": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/logLine"}}
+  },
+  "if": {"properties": {"seat": {"type": "null"}}},
+  "then": {
+    "description": "A spectator: no prompt, and a view with no you, hand, looked-at cards or messages.",
+    "properties": {
+      "prompt": {"type": "null"},
+      "view": {
+        "oneOf": [
+          {"type": "null"},
+          {
+            "type": "object",
+            "properties": {
+              "you": {"type": "null"},
+              "hand": {"maxItems": 0},
+              "looked_at": {"maxItems": 0},
+              "messages": {"maxItems": 0}
+            }
+          }
+        ]
+      }
+    }
   },
   "$defs": {
     "seat": {"type": "integer", "minimum": 0, "maximum": 3},
@@ -55,16 +79,28 @@
     "prompt": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "message", "detail", "options", "amounts", "xmage_query"],
+      "required": ["id", "kind", "message", "detail", "options", "amounts", "piles", "xmage_query"],
       "properties": {
         "id": {"type": "string", "format": "uuid"},
         "kind": {
-          "enum": ["priority", "mulligan", "yes_no", "choose_target", "choose_defender", "choose_ability", "choose_choice", "pay_mana", "declare_attackers", "declare_blockers", "assign_amounts", "unsupported"]
+          "enum": ["priority", "mulligan", "yes_no", "choose_target", "choose_defender", "choose_ability", "choose_choice", "choose_mode", "choose_amount", "order_triggers", "choose_pile", "pay_mana", "declare_attackers", "declare_blockers", "assign_amounts", "unsupported"]
         },
         "message": {"type": "string"},
         "detail": {"$ref": "#/$defs/nullableString"},
         "options": {"type": "array", "items": {"$ref": "#/$defs/option"}},
         "amounts": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/amounts"}]},
+        "piles": {
+          "description": "For choose_pile: each pile's objects the seat may see.",
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {"type": "array", "items": {"$ref": "#/$defs/objectId"}}
+            }
+          ]
+        },
         "xmage_query": {"$ref": "#/$defs/nullableString"}
       }
     },
@@ -75,7 +111,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9]{1,16}$"},
         "action": {
-          "enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability"]
+          "enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "choose_mode", "put_first", "choose_pile"]
         },
         "label": {"$ref": "#/$defs/nullableString"},
         "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},
@@ -112,18 +148,18 @@
       "additionalProperties": false,
       "required": ["seat", "turn", "active_seat", "priority_seat", "phase", "step", "you", "opponents", "hand", "battlefield", "stack", "combat", "revealed", "looked_at", "messages"],
       "properties": {
-        "seat": {"$ref": "#/$defs/seat"},
+        "seat": {"$ref": "#/$defs/nullableSeat"},
         "turn": {"type": "integer", "minimum": 0},
         "active_seat": {"$ref": "#/$defs/nullableSeat"},
         "priority_seat": {"$ref": "#/$defs/nullableSeat"},
         "phase": {"$ref": "#/$defs/nullableString"},
         "step": {"$ref": "#/$defs/nullableString"},
-        "you": {"$ref": "#/$defs/player"},
+        "you": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/player"}]},
         "opponents": {
-          "description": "Every other player in seat order, including eliminated ones.",
+          "description": "Every other player in seat order, including eliminated ones; for a spectator, every player.",
           "type": "array",
           "minItems": 1,
-          "maxItems": 3,
+          "maxItems": 4,
           "items": {"$ref": "#/$defs/player"}
         },
         "hand": {"type": "array", "items": {"$ref": "#/$defs/card"}},

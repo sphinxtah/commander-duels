@@ -42,8 +42,8 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 | `declare_attackers` | `SELECT` with possible attackers | `toggle_attacker` per creature; `all_attack`; `done` | UUID; "special"; boolean |
 | `declare_blockers` | `SELECT` with possible blockers | `toggle_blocker` per creature; `done` | UUID; boolean |
 | `assign_amounts` | `MULTI_AMOUNT` (combat damage among blockers, with or without trample) | `suggested` (XMage's default split); `cancel` when allowed; or a payload of one amount per entry | space-separated amounts; boolean |
-| `choose_defender`, `choose_ability`, `choose_choice` | Added in v0.0.4; see [Commander tables](commander-tables.md#prompts) | | |
-| `unsupported` | `CHOOSE_MODE`, `PICK_ABILITY`, `PLAY_X_MANA`, `AMOUNT`, `CHOOSE_PILE`, and `CHOOSE_CHOICE` lists longer than 64 entries | none | The game waits until the seat concedes or the game is closed |
+| `choose_defender`, `choose_ability`, `choose_choice`, `choose_mode`, `choose_amount`, `order_triggers`, `choose_pile` | Added in v0.0.4; see [Commander tables](commander-tables.md#prompts) | | |
+| `unsupported` | `CHOOSE_CHOICE` lists longer than 64 entries, and `PLAY_X_MANA`, which XMage's human player never sends at the pin | none | The game waits until the seat concedes or the game is closed |
 
 None of the unsupported families occurred in the scripted games: the fixture decks have no modal spells, X costs, named choices, piles or simultaneous triggers that need ordering. XMage's `PERSONAL_MESSAGE` events ("You have to attack with...") become the view's `messages`, not prompts.
 
@@ -80,7 +80,7 @@ These exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. The en
 | Request | Purpose | Responses |
 | --- | --- | --- |
 | `POST /v1/games` | Start a game: optional `format` (`legacy` or `commander`), `seats` (players in turn order, each `{"player": "human" or "bot", "deck"?}`), `seed`, `skill` (1–6), `turn_cap` (1–200) and `idle_timeout_seconds` (5–3600); out-of-range numbers are clamped | 201 `game_id`, `seats` (each with its `seat_token`, returned once, or `null` for a bot) and `settings`; 400 for a malformed table; 429 `games_busy` with `Retry-After` |
-| `GET /v1/games/{id}/view` | The seat's snapshot. `since` and `wait_ms` (up to 30 s) long-poll for a newer revision; `log_from` pages the log (up to 200 lines) | 200 snapshot |
+| `GET /v1/games/{id}/view` | The seat's snapshot, or with the spectator token the public one (since v0.0.4). `since` and `wait_ms` (up to 30 s) long-poll for a newer revision; `log_from` pages the log (up to 200 lines) | 200 snapshot |
 | `POST /v1/games/{id}/commands` | `submit_choice` or `concede`, in the [command envelope](../../contracts/engine-command.schema.json) | 200 accepted; 400 `invalid_command`; 409 or 422 refusals as listed above, plus 409 `eliminated` for a second concession |
 | `POST /v1/games/{id}/close` | End the game for every seat: all seats concede, and the result records `closed` | 200 `finished` or `closing` |
 

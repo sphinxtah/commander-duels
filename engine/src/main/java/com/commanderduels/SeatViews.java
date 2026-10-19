@@ -55,9 +55,20 @@ final class SeatViews {
     }
 
     SeatView build(int seat, List<String> messages) {
-        UUID viewer = seatIds.get(seat);
+        return build(seatIds.get(seat), messages);
+    }
+
+    /**
+     * A spectator's view (NET14): public information only. There is no seat, no "you", no hand and no
+     * looked-at cards, and {@code opponents} lists every player.
+     */
+    SeatView buildPublic() {
+        return build(null, List.of());
+    }
+
+    private SeatView build(UUID viewer, List<String> messages) {
         GameState state = game.getState();
-        Player you = game.getPlayer(viewer);
+        Player you = viewer == null ? null : game.getPlayer(viewer);
         List<SeatView.PlayerState> opponents = new ArrayList<>();
         for (UUID playerId : seatIds) {
             if (!playerId.equals(viewer)) {
@@ -66,8 +77,10 @@ final class SeatViews {
         }
 
         List<SeatView.CardInfo> hand = new ArrayList<>();
-        for (Card card : you.getHand().getCards(game)) {
-            hand.add(card(card, true));
+        if (you != null) {
+            for (Card card : you.getHand().getCards(game)) {
+                hand.add(card(card, true));
+            }
         }
         List<SeatView.PermanentInfo> battlefield = new ArrayList<>();
         for (Permanent permanent : state.getBattlefield().getAllPermanents()) {
@@ -88,16 +101,18 @@ final class SeatViews {
         List<SeatView.CardGroup> revealed = new ArrayList<>();
         state.getRevealed().forEach((name, cards) -> revealed.add(group(name, cards)));
         List<SeatView.CardGroup> lookedAt = new ArrayList<>();
-        state.getLookedAt(viewer).forEach((name, cards) -> lookedAt.add(group(name, cards)));
+        if (viewer != null) {
+            state.getLookedAt(viewer).forEach((name, cards) -> lookedAt.add(group(name, cards)));
+        }
 
         return new SeatView(
-            seat,
+            viewer == null ? null : seatIds.indexOf(viewer),
             game.getTurnNum(),
             seatOrNull(game.getActivePlayerId()),
             seatOrNull(state.getPriorityPlayerId()),
             game.getTurnPhaseType() == null ? null : game.getTurnPhaseType().name().toLowerCase(Locale.ROOT),
             game.getTurnStepType() == null ? null : game.getTurnStepType().name().toLowerCase(Locale.ROOT),
-            player(you, viewer),
+            you == null ? null : player(you, viewer),
             List.copyOf(opponents),
             hand,
             battlefield,
@@ -199,7 +214,7 @@ final class SeatViews {
         List<SeatView.CommanderState> commanders = new ArrayList<>();
         for (UUID id : ids) {
             String zone = commanderZone(id);
-            if ((zone.equals("hand") || zone.equals("library")) && !viewer.equals(owner.getId())) {
+            if ((zone.equals("hand") || zone.equals("library")) && !owner.getId().equals(viewer)) {
                 zone = "hidden";
             }
             String objectId = null;
@@ -263,7 +278,7 @@ final class SeatViews {
     }
 
     private SeatView.PermanentInfo permanent(Permanent permanent, UUID viewer) {
-        boolean visible = !permanent.isFaceDown(game) || viewer.equals(permanent.getControllerId());
+        boolean visible = !permanent.isFaceDown(game) || permanent.getControllerId().equals(viewer);
         UUID attachedTo = permanent.getAttachedTo();
         return new SeatView.PermanentInfo(
             ref(permanent),
@@ -293,7 +308,7 @@ final class SeatViews {
             kind = "ability";
             MageObject source = game.getObject(stackObject.getSourceId());
             if (source instanceof Permanent permanent && permanent.isFaceDown(game)
-                    && !viewer.equals(permanent.getControllerId())) {
+                    && !permanent.getControllerId().equals(viewer)) {
                 visible = false;
             }
             name = source == null ? stackObject.getName() : source.getName();

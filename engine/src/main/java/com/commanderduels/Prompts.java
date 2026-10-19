@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.UUID;
 import mage.MageObject;
 import mage.abilities.Ability;
+import mage.abilities.Modes;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.PlayLandAbility;
 import mage.abilities.SpellAbility;
@@ -50,12 +51,16 @@ final class Prompts {
             return !view.kind().equals("unsupported");
         }
 
-        /** The answer for a custom split, or null when this prompt takes none or the split breaks a limit. */
+        /**
+         * The answer for a custom split or number, or null when this prompt takes none or the amounts
+         * break a limit.
+         */
         Answer amounts(List<Integer> values) {
             if (view.amounts() == null || !view.amounts().accepts(values)) {
                 return null;
             }
-            return new StringAnswer(encode(values));
+            return view.kind().equals("choose_amount") ? new IntegerAnswer(values.get(0))
+                : new StringAnswer(encode(values));
         }
     }
 
@@ -82,6 +87,13 @@ final class Prompts {
         @Override
         public void apply(Player player) {
             player.setResponseString(value);
+        }
+    }
+
+    record IntegerAnswer(int value) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.setResponseInteger(value);
         }
     }
 
@@ -114,7 +126,7 @@ final class Prompts {
         if (prompt.view().kind().equals("choose_defender") && prompt.view().detail() == null && attacker != null) {
             PromptView view = prompt.view();
             prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message(), "Attacker: " + attacker,
-                view.options(), view.amounts(), view.xmageQuery()), prompt.answers());
+                view.options(), view.amounts(), view.piles(), view.xmageQuery()), prompt.answers());
         }
         return prompt;
     }
@@ -123,6 +135,7 @@ final class Prompts {
         Map<String, Serializable> extra = event.getOptions() == null ? Map.of() : event.getOptions();
         String message = SeatViews.plain(event.getMessage());
         PromptView.Amounts amounts = null;
+        List<List<String>> piles = null;
         String detail = extra.get(Constants.Option.SECOND_MESSAGE) instanceof String second
             && !SeatViews.plain(second).isEmpty() ? SeatViews.plain(second) : null;
         String kind;
@@ -159,6 +172,22 @@ final class Prompts {
                 kind = "choose_ability";
                 ability(event);
                 break;
+            case CHOOSE_MODE:
+                kind = "choose_mode";
+                modes(event);
+                break;
+            case AMOUNT:
+                kind = "choose_amount";
+                amounts = number(event, message);
+                break;
+            case PICK_ABILITY:
+                kind = "order_triggers";
+                triggers(event);
+                break;
+            case CHOOSE_PILE:
+                kind = "choose_pile";
+                piles = piles(event);
+                break;
             case CHOOSE_CHOICE: {
                 Choice choice = event.getChoice();
                 if (choice == null || !choice(choice)) {
@@ -187,15 +216,73 @@ final class Prompts {
             default:
                 return unsupported(event, promptId, message, detail);
         }
-        return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, null),
-            Map.copyOf(answers));
+        return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, piles,
+            null), Map.copyOf(answers));
     }
 
     private Prompt unsupported(PlayerQueryEvent event, String promptId, String message, String detail) {
         options.clear();
         answers.clear();
-        return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null,
+        return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null, null,
             event.getQueryType().name()), Map.of());
+    }
+
+    /**
+     * A modal spell's or ability's modes, plus XMage's done and cancel entries. Mode ids are XMage's
+     * and stay on the server; XMage asks again for each further mode.
+     */
+    private void modes(PlayerQueryEvent event) {
+        Map<UUID, String> modes = event.getModes() == null ? Map.of() : event.getModes();
+        for (Map.Entry<UUID, String> mode : modes.entrySet()) {
+            UUID id = mode.getKey();
+            String action = Modes.CHOOSE_OPTION_DONE_ID.equals(id) ? "done"
+                : Modes.CHOOSE_OPTION_CANCEL_ID.equals(id) ? "cancel" : "choose_mode";
+            add(action, SeatViews.plain(mode.getValue()), null, null, false, new UuidAnswer(id));
+        }
+    }
+
+    /** A number from min to max (an X value, for instance): the minimum as an option, or any amount. */
+    private PromptView.Amounts number(PlayerQueryEvent event, String message) {
+        int min = event.getMin();
+        int max = Math.max(min, event.getMax());
+        add("suggested", "Choose " + min, null, null, false, new IntegerAnswer(min));
+        return new PromptView.Amounts(min, max, List.of(new PromptView.AmountEntry(message, min, max, min)));
+    }
+
+    /** Several of the seat's triggers at once: the one chosen goes on the stack first, and XMage asks again. */
+    private void triggers(PlayerQueryEvent event) {
+        List<? extends Ability> abilities = event.getAbilities() == null ? List.of() : event.getAbilities();
+        for (Ability ability : abilities) {
+            MageObject source = game.getObject(ability.getSourceId());
+            boolean visible = Visibility.identityVisible(game, ability.getSourceId(), human.getId());
+            String rule = SeatViews.plain(ability.getRule(source == null ? null : source.getName()));
+            add("put_first", rule.isEmpty() ? ability.toString() : rule,
+                visible ? views.objectRef(ability.getSourceId()) : null, null, false, new UuidAnswer(ability.getId()));
+        }
+    }
+
+    /** Two piles of cards (Fact or Fiction, for instance): XMage takes true for the first pile. */
+    private List<List<String>> piles(PlayerQueryEvent event) {
+        List<List<String>> piles = new ArrayList<>();
+        List<List<? extends Card>> sources = new ArrayList<>();
+        sources.add(event.getPile1() == null ? List.of() : event.getPile1());
+        sources.add(event.getPile2() == null ? List.of() : event.getPile2());
+        for (int pile = 0; pile < 2; pile++) {
+            List<String> ids = new ArrayList<>();
+            List<String> names = new ArrayList<>();
+            for (Card card : sources.get(pile)) {
+                if (Visibility.identityVisible(game, card.getId(), human.getId())) {
+                    ids.add(views.ref(card));
+                    names.add(card.getName());
+                }
+            }
+            int hidden = sources.get(pile).size() - ids.size();
+            String label = "Pile " + (pile + 1) + ": " + (names.isEmpty() ? "no visible cards" : String.join(", ", names))
+                + (hidden > 0 ? " and " + hidden + " hidden" : "");
+            add("choose_pile", label, null, null, false, new BooleanAnswer(pile == 0));
+            piles.add(List.copyOf(ids));
+        }
+        return List.copyOf(piles);
     }
 
     /** Which of an object's abilities to use, or how to cast a card with more than one way to cast it. */

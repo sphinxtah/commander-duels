@@ -12,12 +12,12 @@ import java.util.function.LongSupplier;
  * Inputs to a development game: a format and its seats in turn order, each a human or a bot with a
  * fixture deck. Legacy takes exactly two seats (by default a human then a bot), Commander two to
  * four (by default a human and three bots); at least one seat must be human. A seat without a deck
- * gets the format's first fixture deck that no other seat uses. Numbers outside the safe range are
- * clamped. The seed exists for reproducible tests and is never shown to a seat: it determines every
- * shuffle.
+ * gets the format's first fixture deck that no other seat uses. Spectators see the game
+ * {@code spectatorDelaySeconds} late (default 0). Numbers outside the safe range are clamped. The
+ * seed exists for reproducible tests and is never shown to a seat: it determines every shuffle.
  */
 public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
-                               int idleTimeoutSeconds) {
+                               int idleTimeoutSeconds, int spectatorDelaySeconds) {
     public static final int DEFAULT_SKILL = 4;
     public static final int MAX_SKILL = 6;
     public static final int DEFAULT_TURN_CAP = 60;
@@ -25,10 +25,11 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
     public static final int DEFAULT_IDLE_TIMEOUT_SECONDS = 900;
     public static final int MIN_IDLE_TIMEOUT_SECONDS = 5;
     public static final int MAX_IDLE_TIMEOUT_SECONDS = 3600;
+    public static final int MAX_SPECTATOR_DELAY_SECONDS = 300;
     public static final String HUMAN = "human";
     public static final String BOT = "bot";
     private static final Set<String> FIELDS =
-        Set.of("seed", "format", "seats", "skill", "turn_cap", "idle_timeout_seconds");
+        Set.of("seed", "format", "seats", "skill", "turn_cap", "idle_timeout_seconds", "spectator_delay_seconds");
     private static final Set<String> SEAT_FIELDS = Set.of("player", "deck");
 
     /** @param player human or bot */
@@ -40,6 +41,12 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
 
     public HumanGameRequest {
         seats = List.copyOf(seats);
+    }
+
+    /** A request with no spectator delay. */
+    public HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
+                            int idleTimeoutSeconds) {
+        this(seed, format, seats, skill, turnCap, idleTimeoutSeconds, 0);
     }
 
     /** A request with every seat's deck already chosen, as tests build them. */
@@ -113,7 +120,8 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
             JsonRequest.clamped(json, "skill", DEFAULT_SKILL, 1, MAX_SKILL),
             JsonRequest.clamped(json, "turn_cap", DEFAULT_TURN_CAP, 1, MAX_TURN_CAP),
             JsonRequest.clamped(json, "idle_timeout_seconds", DEFAULT_IDLE_TIMEOUT_SECONDS, MIN_IDLE_TIMEOUT_SECONDS,
-                MAX_IDLE_TIMEOUT_SECONDS));
+                MAX_IDLE_TIMEOUT_SECONDS),
+            JsonRequest.clamped(json, "spectator_delay_seconds", 0, 0, MAX_SPECTATOR_DELAY_SECONDS));
     }
 
     private static String deck(JsonObject seat, GameFormat format) throws JsonRequest.Invalid {

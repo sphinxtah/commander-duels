@@ -1,5 +1,6 @@
 package com.commanderduels;
 
+import java.util.Objects;
 import java.util.UUID;
 import mage.cards.Card;
 import mage.cards.Cards;
@@ -13,7 +14,8 @@ import mage.game.stack.StackObject;
  * Whether a seat may see an object's identity, from its zone: public zones are visible, a hand only
  * to its owner, libraries to nobody. Revealed cards are visible to everyone and looked-at cards to
  * the player who looked, while XMage keeps them in its revealed and looked-at lists. Face-down
- * objects are visible to their controller only. Anything unrecognised is treated as hidden.
+ * objects are visible to their controller only. Anything unrecognised is treated as hidden. A null
+ * viewer is a spectator: no hand, face-down object or looked-at card is theirs.
  */
 final class Visibility {
     private Visibility() {}
@@ -35,7 +37,7 @@ final class Visibility {
             case BATTLEFIELD: {
                 Permanent permanent = game.getPermanent(objectId);
                 return permanent != null
-                    && (!permanent.isFaceDown(game) || viewerId.equals(permanent.getControllerId()));
+                    && (!permanent.isFaceDown(game) || Objects.equals(viewerId, permanent.getControllerId()));
             }
             case STACK: {
                 StackObject stackObject = game.getStack().getStackObject(objectId);
@@ -50,7 +52,7 @@ final class Visibility {
             }
             case HAND: {
                 Card card = game.getCard(objectId);
-                return card != null && viewerId.equals(card.getOwnerId());
+                return card != null && viewerId != null && viewerId.equals(card.getOwnerId());
             }
             default:
                 return false;
@@ -59,7 +61,7 @@ final class Visibility {
 
     static boolean stackObjectVisible(Game game, StackObject stackObject, UUID viewerId) {
         if (stackObject instanceof Spell spell && spell.isFaceDown(game)) {
-            return viewerId.equals(spell.getControllerId());
+            return Objects.equals(viewerId, spell.getControllerId());
         }
         return true;
     }
@@ -69,6 +71,9 @@ final class Visibility {
             if (cards.contains(objectId)) {
                 return true;
             }
+        }
+        if (viewerId == null) {
+            return false;
         }
         for (Cards cards : game.getState().getLookedAt(viewerId).values()) {
             if (cards.contains(objectId)) {

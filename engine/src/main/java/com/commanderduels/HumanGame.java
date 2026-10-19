@@ -48,12 +48,12 @@ final class HumanGame {
     record SeatSettings(int seat, String player, String deck) {}
 
     record Settings(String format, String rulesProfile, List<SeatSettings> seats, int skill, int turnCap,
-                    int idleTimeoutSeconds) {
-        /** What one seat is told: other seats' decks are private. */
+                    int idleTimeoutSeconds, int spectatorDelaySeconds) {
+        /** What one seat is told (other seats' decks are private); a spectator, seat -1, sees no deck. */
         Settings forSeat(int seat) {
             return new Settings(format, rulesProfile, seats.stream()
                 .map(entry -> entry.seat() == seat ? entry : new SeatSettings(entry.seat(), entry.player(), null))
-                .toList(), skill, turnCap, idleTimeoutSeconds);
+                .toList(), skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds);
         }
     }
 
@@ -68,12 +68,16 @@ final class HumanGame {
     record LogLine(int index, int turn, Integer activeSeat, String step, String text) {}
 
     /**
-     * What one seat is shown. {@code status} is starting, your_prompt, unsupported_prompt, waiting
-     * (another player is acting or XMage is processing), eliminated (this seat has lost; the game goes
-     * on) or finished.
+     * What one seat, or a spectator, is shown. {@code status} is starting, your_prompt,
+     * unsupported_prompt, waiting (another player is acting or XMage is processing), eliminated (this
+     * seat has lost; the game goes on), spectating (for a spectator, while the game runs) or finished.
+     * A spectator's snapshot has no seat and no prompt.
      */
-    record Snapshot(String gameId, long revision, String status, int seat, Settings settings, PromptView prompt,
+    record Snapshot(String gameId, long revision, String status, Integer seat, Settings settings, PromptView prompt,
                     SeatView view, Result result, int logCount, int logFrom, List<LogLine> log) {}
+
+    /** One public view kept for spectators, with when it was published and the log up to then. */
+    private record Watched(long revision, long publishedNanos, SeatView view, int logEntries, Result result) {}
 
     /** A response to a seat command: an HTTP status and its JSON body. */
     record Reply(int status, Map<String, Object> body) {}
@@ -88,6 +92,9 @@ final class HumanGame {
 
         /** Every view (and prompt, if one opens) published to a human seat. */
         default void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {}
+
+        /** Every public view published for spectators, when it is published (before any delay). */
+        default void spectated(Game game, ObjectRefs refs, SeatView view) {}
     }
 
     /**
@@ -150,6 +157,10 @@ final class HumanGame {
     private String endRequest;
     private final List<Integer> conceded = new ArrayList<>();
     private long lastActivityNanos = System.nanoTime();
+    // Spectators: public views, kept long enough to serve them spectatorDelaySeconds late.
+    private final Deque<Watched> watched = new ArrayDeque<>();
+    private SeatView spectatorView;
+    private long spectatorRevision;
 
     HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished) {
         this(id, request, deckDirectory, onFinished, Hooks.NONE);
@@ -181,7 +192,7 @@ final class HumanGame {
             }
         }
         this.settings = new Settings(format.id(), format.rulesProfile(seated.size()), List.copyOf(seatSettings),
-            request.skill(), request.turnCap(), request.idleTimeoutSeconds());
+            request.skill(), request.turnCap(), request.idleTimeoutSeconds(), request.spectatorDelaySeconds());
         this.players = List.copyOf(seated);
         // Stream.toList tolerates indexOf(null): XMage has no active player before the first turn.
         this.seatIds = seated.stream().map(Player::getId).toList();
@@ -317,6 +328,7 @@ final class HumanGame {
                 publish(other);
             }
         }
+        publishSpectators();
         hooks.published(game, refs, seat.index, seatView, next.view());
         boolean concede;
         boolean closing;
@@ -356,6 +368,7 @@ final class HumanGame {
         for (Seat seat : humans) {
             publish(seat);
         }
+        publishSpectators();
         Game current = game;
         if (current != null && current.getStartTime() != null && !current.hasEnded()
                 && humans.stream().map(this::current).allMatch(human -> human.hasLost() || human.hasLeft())) {
@@ -397,9 +410,64 @@ final class HumanGame {
         hooks.published(game, refs, seat.index, seatView, open);
     }
 
+    /** Game thread: keeps the public view for spectators if it changed. */
+    private void publishSpectators() {
+        SeatView publicView = views.buildPublic();
+        synchronized (this) {
+            if (result != null || publicView.equals(spectatorView)) {
+                return;
+            }
+            spectatorView = publicView;
+            watch(publicView, null);
+        }
+        hooks.spectated(game, refs, publicView);
+    }
+
+    /**
+     * Caller holds the lock. Adds a public view to the spectators' history. The kept views are about
+     * a second apart: a view less than a second after the one before the newest replaces the newest.
+     * Every view keeps its own publication time, so none is shown before the delay has passed. Views
+     * older than the newest one past the delay are dropped, so the history holds about one view per
+     * second of delay.
+     */
+    private void watch(SeatView publicView, Result outcome) {
+        long now = System.nanoTime();
+        if (watched.size() >= 2) {
+            var newestFirst = watched.descendingIterator();
+            Watched last = newestFirst.next();
+            Watched beforeLast = newestFirst.next();
+            if (last.result() == null && now - beforeLast.publishedNanos() < TimeUnit.SECONDS.toNanos(1)) {
+                watched.pollLast();
+            }
+        }
+        watched.addLast(new Watched(++spectatorRevision, now, publicView, log.size(), outcome));
+        long delay = TimeUnit.SECONDS.toNanos(settings.spectatorDelaySeconds());
+        while (watched.size() > 1) {
+            Watched next = watched.stream().skip(1).findFirst().orElseThrow();
+            if (now - next.publishedNanos() < delay) {
+                break;
+            }
+            watched.pollFirst();
+        }
+        notifyAll();
+    }
+
+    /** Caller holds the lock. The newest public view at least the spectator delay old, or null. */
+    private Watched matured(long now) {
+        long delay = TimeUnit.SECONDS.toNanos(settings.spectatorDelaySeconds());
+        Watched shown = null;
+        for (Watched entry : watched) {
+            if (now - entry.publishedNanos() >= delay) {
+                shown = entry;
+            }
+        }
+        return shown;
+    }
+
     private void finish(Throwable failure) {
         Game finished = game;
         List<SeatView> finalViews = new ArrayList<>();
+        SeatView finalPublic = null;
         if (finished != null && views != null) {
             try {
                 for (Seat seat : humans) {
@@ -407,12 +475,17 @@ final class HumanGame {
                     hooks.published(finished, refs, seat.index, seatView, null);
                     finalViews.add(seatView);
                 }
+                finalPublic = views.buildPublic();
+                hooks.spectated(finished, refs, finalPublic);
             } catch (RuntimeException e) {
                 finalViews.clear(); // keep the last published views
+                finalPublic = null;
             }
         }
         Result outcome = outcome(finished, failure);
         synchronized (this) {
+            // Spectators learn the result after the same delay as everything else.
+            watch(finalPublic != null ? finalPublic : spectatorView, outcome);
             result = outcome;
             for (int i = 0; i < humans.size(); i++) {
                 Seat seat = humans.get(i);
@@ -655,11 +728,55 @@ final class HumanGame {
             viewNow = seat.view;
             resultNow = result;
         }
+        LogPage page = logPage(Integer.MAX_VALUE, logFrom);
+        return new Snapshot(id, revisionNow, statusNow, seatIndex, settings.forSeat(seatIndex), promptNow, viewNow,
+            resultNow, page.count(), page.start(), page.lines());
+    }
+
+    /**
+     * Request thread: what a spectator is shown, the public view of {@code spectatorDelaySeconds}
+     * ago, newer than {@code since}, waiting up to {@code waitMillis}. The log and the result are
+     * delayed with it.
+     */
+    Snapshot spectatorSnapshot(long since, long waitMillis, int logFrom) throws InterruptedException {
+        Watched shown;
+        synchronized (this) {
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
+            while (true) {
+                long now = System.nanoTime();
+                shown = matured(now);
+                long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - now);
+                if ((shown != null && shown.revision() > since) || remaining <= 0) {
+                    break;
+                }
+                // Sleep until the next view comes of age, or a new one is published.
+                long delay = TimeUnit.SECONDS.toNanos(settings.spectatorDelaySeconds());
+                long nextMaturity = Long.MAX_VALUE;
+                for (Watched entry : watched) {
+                    long age = now - entry.publishedNanos();
+                    if (age < delay) {
+                        nextMaturity = Math.min(nextMaturity, TimeUnit.NANOSECONDS.toMillis(delay - age) + 1);
+                    }
+                }
+                wait(Math.max(1, Math.min(remaining, nextMaturity)));
+            }
+        }
+        if (shown == null) {
+            return new Snapshot(id, 0, "starting", null, settings.forSeat(-1), null, null, null, 0, 0, List.of());
+        }
+        LogPage page = logPage(shown.logEntries(), logFrom);
+        return new Snapshot(id, shown.revision(), shown.result() == null ? "spectating" : "finished", null,
+            settings.forSeat(-1), null, shown.view(), shown.result(), page.count(), page.start(), page.lines());
+    }
+
+    private record LogPage(int count, int start, List<LogLine> lines) {}
+
+    /** The public log up to {@code rawLimit} entries, paged from {@code logFrom} (the last page if negative). */
+    private LogPage logPage(int rawLimit, int logFrom) {
         List<MatchLog.Entry> entries = log.entries();
         List<LogLine> lines = new ArrayList<>();
         int count = 0;
-        int from = logFrom < 0 ? -1 : logFrom;
-        for (MatchLog.Entry entry : entries) {
+        for (MatchLog.Entry entry : entries.subList(0, Math.min(rawLimit, entries.size()))) {
             // Engine errors stay in the engine's own log: their details are not seat-safe.
             if (entry.text().startsWith(ENGINE_ERROR_PREFIX)) {
                 continue;
@@ -668,10 +785,8 @@ final class HumanGame {
                 SeatViews.plain(entry.text())));
             count++;
         }
-        int start = from < 0 ? Math.max(0, count - DEFAULT_LOG_PAGE) : Math.min(from, count);
-        List<LogLine> page = List.copyOf(lines.subList(start, Math.min(count, start + MAX_LOG_PAGE)));
-        return new Snapshot(id, revisionNow, statusNow, seatIndex, settings.forSeat(seatIndex), promptNow, viewNow,
-            resultNow, count, start, page);
+        int start = logFrom < 0 ? Math.max(0, count - DEFAULT_LOG_PAGE) : Math.min(logFrom, count);
+        return new LogPage(count, start, List.copyOf(lines.subList(start, Math.min(count, start + MAX_LOG_PAGE))));
     }
 
     private Seat humanSeat(UUID playerId) {

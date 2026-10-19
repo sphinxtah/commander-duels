@@ -32,7 +32,10 @@ final class Tables {
         }
     }
 
-    /** Chooses a seat's answer; return null to concede instead. */
+    /** A policy's answer that is a custom number, "amounts:3", rather than an option id. */
+    static final String AMOUNTS = "amounts:";
+
+    /** Chooses a seat's answer: an option id, {@link #AMOUNTS} and a number, or null to concede. */
     interface Policy {
         String choose(int seat, PromptView prompt, SeatView view);
     }
@@ -120,9 +123,17 @@ final class Tables {
                 continue;
             }
             String option = policy.choose(seat, prompt, snapshot.view());
-            HumanGame.Reply reply = option == null ? game.concede(seat, concede(game, snapshot.revision()))
-                : game.submit(seat, answer(game, UUID.randomUUID().toString(), snapshot.revision(), prompt.id(),
+            HumanGame.Reply reply;
+            if (option == null) {
+                reply = game.concede(seat, concede(game, snapshot.revision()));
+            } else if (option.startsWith(AMOUNTS)) {
+                reply = game.submit(seat, amounts(game, snapshot.revision(), prompt.id(),
+                    List.of(Integer.parseInt(option.substring(AMOUNTS.length())))));
+                coverage.kinds.merge(prompt.kind() + " (custom)", 1, Integer::sum);
+            } else {
+                reply = game.submit(seat, answer(game, UUID.randomUUID().toString(), snapshot.revision(), prompt.id(),
                     option));
+            }
             if (reply.status() == 409 && "stale_revision".equals(reply.body().get("code"))) {
                 continue; // the seat's view changed while its prompt was open; read it again
             }

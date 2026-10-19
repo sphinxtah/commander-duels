@@ -59,6 +59,9 @@ class SeatChecks implements HumanGame.Hooks {
     final Set<String> everPublic = ConcurrentHashMap.newKeySet();
     final List<String> failures = new CopyOnWriteArrayList<>();
     final AtomicInteger viewsChecked = new AtomicInteger();
+    final AtomicInteger spectatorViewsChecked = new AtomicInteger();
+    /** When each spectator view was published, for the delay checks. */
+    final List<Map.Entry<Long, SeatView>> spectatorHistory = new CopyOnWriteArrayList<>();
     final AtomicInteger logLinesChecked = new AtomicInteger();
     /** Commander situations the views showed, for coverage reports. */
     final Set<String> reached = ConcurrentHashMap.newKeySet();
@@ -84,6 +87,13 @@ class SeatChecks implements HumanGame.Hooks {
             concealedNames.put(seat, names);
             concealedFromSomeone.addAll(names);
         }
+        // A spectator may know no card until it is public.
+        Set<String> all = new HashSet<>();
+        for (HumanGameRequest.Seat seat : request.seats()) {
+            all.addAll(deckNames(seat.deck()));
+        }
+        concealedNames.put(-1, all);
+        concealedFromSomeone.addAll(all);
     }
 
     /** Card names in a fixture deck file, including the commander's SB: line. */
@@ -130,10 +140,27 @@ class SeatChecks implements HumanGame.Hooks {
     @Override
     public void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {
         viewsChecked.incrementAndGet();
+        check(game, refs, seat, view, prompt);
+    }
+
+    /** A spectator's view must show public information only. */
+    @Override
+    public void spectated(Game game, ObjectRefs refs, SeatView view) {
+        spectatorViewsChecked.incrementAndGet();
+        spectatorHistory.add(Map.entry(System.nanoTime(), view));
+        if (view.seat() != null || view.you() != null || !view.hand().isEmpty() || !view.lookedAt().isEmpty()
+                || !view.messages().isEmpty()) {
+            fail("a spectator view has a seat, a hand, looked-at cards or messages");
+        }
+        check(game, refs, -1, view, null);
+    }
+
+    /** Checks one view for a seat, or for a spectator when {@code seat} is -1. */
+    private void check(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {
         everPublic.addAll(publicNames(game));
         settle();
         String json = EngineServer.JSON.toJson(view) + (prompt == null ? "" : EngineServer.JSON.toJson(prompt));
-        UUID viewer = seatIds.get(seat);
+        UUID viewer = seat < 0 ? null : seatIds.get(seat);
 
         Matcher uuids = UUIDS.matcher(json);
         while (uuids.find()) {
@@ -160,10 +187,12 @@ class SeatChecks implements HumanGame.Hooks {
             }
         }
 
-        check(view.seat() == seat, "view seat");
-        check(view.opponents().size() == seatIds.size() - 1, "one entry per opponent");
+        check(seat < 0 ? view.seat() == null : Integer.valueOf(seat).equals(view.seat()), "view seat");
+        check(view.opponents().size() == seatIds.size() - (seat < 0 ? 0 : 1), "one entry per opponent");
         List<SeatView.PlayerState> players = new ArrayList<>(view.opponents());
-        players.add(view.you());
+        if (view.you() != null) {
+            players.add(view.you());
+        }
         int previous = -1;
         for (SeatView.PlayerState opponent : view.opponents()) {
             check(opponent.seat() != seat && opponent.seat() > previous, "opponents in seat order");
@@ -184,12 +213,15 @@ class SeatChecks implements HumanGame.Hooks {
             }
             commanders(game, refs, viewer, state, player);
         }
-        Player you = game.getPlayer(viewer);
-        check(view.hand().size() == you.getHand().getCards(game).size(), "own hand size of seat " + seat + ": view "
-            + view.hand().size() + ", XMage " + you.getHand().getCards(game).size() + " cards of " + you.getHand().size());
-        for (SeatView.CardInfo card : view.hand()) {
-            UUID id = refs.resolve(card.id()).orElse(null);
-            check(id != null && you.getHand().contains(id) && !card.hidden(), "own hand card " + card.name());
+        Player you = viewer == null ? null : game.getPlayer(viewer);
+        if (you != null) {
+            check(view.hand().size() == you.getHand().getCards(game).size(), "own hand size of seat " + seat
+                + ": view " + view.hand().size() + ", XMage " + you.getHand().getCards(game).size() + " cards of "
+                + you.getHand().size());
+            for (SeatView.CardInfo card : view.hand()) {
+                UUID id = refs.resolve(card.id()).orElse(null);
+                check(id != null && you.getHand().contains(id) && !card.hidden(), "own hand card " + card.name());
+            }
         }
         for (SeatView.PermanentInfo permanent : view.battlefield()) {
             UUID id = refs.resolve(permanent.id()).orElse(null);
@@ -319,7 +351,7 @@ class SeatChecks implements HumanGame.Hooks {
                 case LIBRARY -> "library";
                 default -> "outside";
             };
-            boolean owner = viewer.equals(player.getId());
+            boolean owner = player.getId().equals(viewer);
             if (!owner && (zone == Zone.HAND || zone == Zone.LIBRARY)) {
                 check(commander.zone().equals("hidden") && commander.objectId() == null,
                     "a commander in a concealed zone is hidden from other seats");
@@ -370,8 +402,10 @@ class SeatChecks implements HumanGame.Hooks {
         for (Cards cards : game.getState().getRevealed().values()) {
             hidden.removeAll(cards);
         }
-        for (Cards cards : game.getState().getLookedAt(viewer).values()) {
-            hidden.removeAll(cards);
+        if (viewer != null) {
+            for (Cards cards : game.getState().getLookedAt(viewer).values()) {
+                hidden.removeAll(cards);
+            }
         }
         return hidden;
     }

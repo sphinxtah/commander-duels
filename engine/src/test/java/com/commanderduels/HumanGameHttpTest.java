@@ -213,6 +213,40 @@ class HumanGameHttpTest {
             token(game, 0), "").statusCode());
     }
 
+    /** The spectator token reads the public view and nothing else. */
+    @Test
+    void theSpectatorTokenOnlyReadsThePublicView() throws Exception {
+        start(new HumanGames(SeatChecks.DECKS, 1));
+        var created = send("POST", "/v1/games", null, "{\"seed\":35,\"skill\":1,\"format\":\"commander\","
+            + "\"seats\":[{\"player\":\"human\"},{\"player\":\"bot\"},{\"player\":\"bot\"}]}");
+        assertEquals(201, created.statusCode(), created.body());
+        JsonObject game = json(created);
+        String id = game.get("game_id").getAsString();
+        String spectator = game.get("spectator_token").getAsString();
+        assertFalse(spectator.equals(token(game, 0)));
+        assertEquals(0, game.getAsJsonObject("settings").get("spectator_delay_seconds").getAsInt());
+
+        untilPrompt(id, token(game, 0));
+        JsonObject watched = json(send("GET", "/v1/games/" + id + "/view?wait_ms=5000", spectator, null));
+        assertTrue(watched.get("seat").isJsonNull());
+        assertTrue(watched.get("prompt").isJsonNull(), "a spectator never sees a prompt");
+        assertEquals("spectating", watched.get("status").getAsString());
+        JsonObject view = watched.getAsJsonObject("view");
+        assertTrue(view.get("you").isJsonNull());
+        assertEquals(0, view.getAsJsonArray("hand").size());
+        assertEquals(3, view.getAsJsonArray("opponents").size(), "a spectator sees every player");
+        for (var seat : watched.getAsJsonObject("settings").getAsJsonArray("seats")) {
+            assertTrue(seat.getAsJsonObject().get("deck").isJsonNull(), "a spectator sees no deck");
+        }
+
+        String commands = "/v1/games/" + id + "/commands";
+        var refused = send("POST", commands, spectator, command(id, 0, null, "concede", "{}"));
+        assertEquals(403, refused.statusCode(), refused.body());
+        assertEquals("read_only", json(refused).get("code").getAsString());
+        assertEquals(403, send("POST", "/v1/games/" + id + "/close", spectator, "").statusCode());
+        assertEquals(200, send("POST", "/v1/games/" + id + "/close", token(game, 0), "").statusCode());
+    }
+
     private static String token(JsonObject created, int seat) {
         return created.getAsJsonArray("seats").get(seat).getAsJsonObject().get("seat_token").getAsString();
     }

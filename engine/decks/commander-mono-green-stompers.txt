@@ -16,7 +16,7 @@ SB: 1 Lady Zhurong, Warrior Queen
 1 Elvish Archers
 1 Elvish Warrior
 1 Greenwood Sentinel
-1 Runeclaw Bear
+1 Mistcutter Hydra
 1 Thornweald Archer
 1 Daggerback Basilisk
 1 Gorilla Warrior

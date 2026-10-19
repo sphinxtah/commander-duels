@@ -6,10 +6,12 @@ What it proves:
 - XMage's `CommanderDuel` and `CommanderFreeForAll` play complete games through the bridge with up to four `HumanPlayer` seats, bots, or a mix.
 - Views for four seats can be built field by field without disclosing any seat's hand or any library. Scripted games check this against XMage's state at every published view, for every human seat.
 - Commander tax and commander damage in the views are XMage's own numbers, at every view, through death, recasting, control changes and a player leaving.
+- Every XMage request the fixture decks reach is typed, including modes, X values, trigger order and piles, and a scripted game reaches each of those every time.
+- A spectator can follow a game with public information only, optionally delayed (NET14).
 
 What it does not prove:
 - Anything about a browser client, sign-in, seat ownership or lobbies.
-- Recovery, timers, Two-Headed Giant ([the feasibility note](two-headed-giant.md)), or prompt families the fixture decks never reach.
+- Recovery, timers, Two-Headed Giant ([the feasibility note](two-headed-giant.md)), or choices too long to offer (naming a card).
 - That the bots play fairly: they still search a full copy of the game, including every human's hand (AI02).
 
 ## Tables
@@ -26,14 +28,14 @@ The engine image now also builds `Mage.Game.CommanderDuel` from the pinned commi
 
 ### Fixture decks
 
-Four 100-card decks in `engine/decks`, each a commander plus 38 basic lands and 61 simple, singleton cards: vanilla and keyword creatures, burn, removal, bounce, counterspells, pump spells, a few auras and one planeswalker or steal effect. No card name appears in two decks, so the name-based leak check stays meaningful.
+Four 100-card decks in `engine/decks`, each a commander plus 38 basic lands and 61 simple, singleton cards: vanilla and keyword creatures, burn, removal, bounce, counterspells, pump spells, a few auras, a planeswalker or steal effect, and a few cards that reach the rarer prompts. No card name appears in two decks, so the name-based leak check stays meaningful.
 
 | Deck | Commander | Colour identity | Interactions it brings |
 | --- | --- | --- | --- |
-| `commander-mono-white-soldiers` | Isamaru, Hound of Konda | W | Exile and bottom-of-library removal (Swords to Plowshares, Path to Exile, Condemn), Mother of Runes, Ajani Goldmane |
-| `commander-mono-blue-flyers` | Tetsuko Umezawa, Fugitive | U | Bounce, counterspells, Control Magic, Jace Beleren |
-| `commander-mono-red-raiders` | Jeska, Warrior Adept | R | Burn, Act of Treason and Threaten |
-| `commander-mono-green-stompers` | Lady Zhurong, Warrior Queen | G | Library searches (Rampant Growth, Cultivate), fight spells, Overrun, Garruk Wildspeaker |
+| `commander-mono-white-soldiers` | Isamaru, Hound of Konda | W | Exile and bottom-of-library removal (Swords to Plowshares, Path to Exile, Condemn), Mother of Runes, Ajani Goldmane, Valorous Stance (modes), Soul Warden and Attended Knight (trigger order) |
+| `commander-mono-blue-flyers` | Tetsuko Umezawa, Fugitive | U | Bounce, counterspells, Control Magic, Jace Beleren, Fact or Fiction (piles) |
+| `commander-mono-red-raiders` | Jeska, Warrior Adept | R | Burn, Act of Treason and Threaten, Abrade (modes), Blaze (X) |
+| `commander-mono-green-stompers` | Lady Zhurong, Warrior Queen | G | Library searches (Rampant Growth, Cultivate), fight spells, Overrun, Garruk Wildspeaker, Mistcutter Hydra (X) |
 
 ## Seats
 
@@ -48,7 +50,7 @@ Four 100-card decks in `engine/decks`, each a commander plus 38 basic lands and 
 - **Defaults.** Legacy defaults to a human and a bot; Commander to a human and three bots. At least one seat must be human.
 - **Decks.** A seat without a deck gets the format's first fixture that no other seat uses.
 - **Refused.** Unknown formats, players or decks, a deck from another format, the wrong number of seats, and unknown fields (including any `seat` field) return 400.
-- **Response.** The 201 response lists every seat: `{"seat", "player", "seat_token"}`, with a token for each human seat and `null` for bots. Tokens are returned once.
+- **Response.** The 201 response lists every seat: `{"seat", "player", "seat_token"}`, with a token for each human seat and `null` for bots. It also returns one `spectator_token`. Tokens are returned once.
 - **Tokens.** Each token selects its seat; nothing in a request body can choose one. The engine compares the presented token with every seat's hash in constant time. A token that matches no seat, or the wrong game, returns 404.
 - **Players.** Players are named by kind and seat number, seat + 1: "Human 1", "Bot 2".
 - **Turn order.** Turns pass in seat order: 0, 1, 2, 3 (see the findings).
@@ -82,18 +84,30 @@ Rules for the commander fields:
 
 Each seat's snapshot names only its own deck. `settings.seats` lists every seat's player kind, and other seats' decks are `null`. A deck name identifies a whole fixture list.
 
+## Spectators
+
+Every game has one spectator token (NET14). It reads `GET .../view` and nothing else: commands and close return 403 `read_only`.
+- **Public information only.** A spectator's snapshot has no seat, no prompt and no `you`. Its view's `opponents` lists every player, and `hand`, `looked_at` and `messages` are always empty. The view is built field by field like a seat's, with no viewer: no hand, face-down object or looked-at card belongs to a spectator. `settings.seats` shows no deck.
+- **Delay.** `spectator_delay_seconds` (0–300, default 0) makes the spectator's view, log and result run that far behind the game. The engine keeps about one public view per second of delay and serves the newest that is old enough.
+- **Status.** A spectator's status is `spectating` while the game runs and `finished` once the delayed result arrives.
+- **Verification.** Every public view is checked like a seat's, with every hand and library concealed. A JUnit test proves that no spectator snapshot is younger than the delay and that the result arrives only after it. An HTTP test proves the token is read-only.
+
 ## Prompts
 
-Four kinds are new; everything else is as in v0.0.3.
+Eight kinds are new; everything else is as in v0.0.3.
 
 | Kind | XMage request | Options | Answer sent to XMage |
 | --- | --- | --- | --- |
 | `choose_defender` | `PICK_TARGET` from `TargetDefender`, when an attacker has more than one player, planeswalker or battle to attack | `choose` per defender (players by seat, planeswalkers and battles by object id). `detail` names the attacker the seat last toggled, because XMage's request does not | UUID |
 | `choose_ability` | `CHOOSE_ABILITY`: which of an object's abilities to activate (a planeswalker's loyalty abilities, for instance), or which way to cast a card | `use_ability` per ability, labelled with its rules text; `cancel` | UUID; boolean |
 | `choose_choice` | `CHOOSE_CHOICE` with at most 64 entries: a colour (Mother of Runes) or which replacement effect applies first | `choose` per entry; `cancel` when optional. Key choices answer with a key that stays on the server | string |
+| `choose_mode` | `CHOOSE_MODE`: a modal spell or ability (Valorous Stance, Abrade) | `choose_mode` per available mode, labelled with its text; `done` when enough are chosen; `cancel`. XMage asks again for each further mode | UUID |
+| `choose_amount` | `AMOUNT`: a number, such as X for Blaze or Mistcutter Hydra | `suggested` (the minimum), or a payload of one amount within `amounts` | integer |
+| `order_triggers` | `PICK_ABILITY`: several of the seat's triggers at once with different texts, such as Soul Warden and Attended Knight's own trigger | `put_first` per trigger, labelled with its rules text and its source's object id; XMage asks again for the rest | UUID |
+| `choose_pile` | `CHOOSE_PILE`: Fact or Fiction's two piles | `choose_pile` for each, with the visible card names; the prompt's `piles` lists each pile's object ids | boolean |
 | `yes_no` | (unchanged) also covers Commander's "move it to the command zone?": the state-based choice for a graveyard or exile, and the replacement for a hand or library | `yes` moves it, using XMage's button labels | boolean |
 
-Multiplayer targets need nothing new: `choose_target` already lists players by seat. A choice longer than 64 entries, such as naming a card, stays `unsupported`.
+Multiplayer targets need nothing new: `choose_target` already lists players by seat. A choice longer than 64 entries, such as naming a card, stays `unsupported`. So does `PLAY_X_MANA`, which XMage's human player never sends at the pinned commit (X costs arrive as `AMOUNT`).
 
 ## Verification
 
@@ -107,6 +121,8 @@ Every published view and prompt, for every human seat, is checked on the game th
    - Every player's hand and library counts, life and lost flag match XMage. So do the seat's own hand contents, and each permanent's controller and owner.
    - The opponents list is complete and in seat order.
    - Each commander's zone, object, cast count, tax and commander damage match XMage's watchers. Colour identity matches the fixture's.
+
+`PromptFamiliesTest` makes four humans play a scripted game with arranged libraries that reaches `choose_mode` (Valorous Stance, Abrade), a custom `choose_amount` (Blaze, Mistcutter Hydra), `order_triggers` (Attended Knight entering next to Soul Warden) and `choose_pile` (Fact or Fiction, split by another seat) every time. Every seat's and every spectator's views are checked as usual.
 
 Results are in [the release notes](../releases/0.0.4.md) and [verification](../verification.md#v004).
 
@@ -135,6 +151,6 @@ Results are in [the release notes](../releases/0.0.4.md) and [verification](../v
 - **Two-Headed Giant (FMT08–FMT10).** See [the feasibility note](two-headed-giant.md).
 - **AI hidden information (AI02).** Unchanged.
 - **Lobbies and settings.** Readiness (NET02–NET03) and Rule Zero settings (FMT03–FMT04) are not built.
-- **Prompt families.** Modes, X costs, piles, trigger ordering and long named choices are still `unsupported`.
-- **Spectators.** No spectator views yet.
+- **Prompt families.** Only choices longer than 64 entries (naming a card) are still `unsupported`.
+- **Spectator delay.** Delay is in seconds. Delays counted in turns, and replays (NET14), are later work.
 - **Recovery.** Games live in memory only.
