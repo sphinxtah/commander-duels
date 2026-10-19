@@ -1,0 +1,521 @@
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from "react";
+import {
+  client,
+  describe,
+  sysopSignIn,
+  type AdminUser,
+  type AuditEntry,
+  type Me,
+} from "./api";
+import { signInFrom } from "./Account";
+import styles from "./Account.module.css";
+import shell from "./App.module.css";
+
+type Status = AdminUser["status"];
+type GrantableRole = "moderator" | "content_editor" | "administrator";
+const statuses: (Status | "")[] = [
+  "",
+  "pending",
+  "active",
+  "disabled",
+  "denied",
+];
+const statusNames: Record<Status | "", string> = {
+  "": "All accounts",
+  pending: "Waiting for approval",
+  active: "Active",
+  disabled: "Disabled",
+  denied: "Denied",
+};
+const grantable: { role: GrantableRole; name: string }[] = [
+  { role: "moderator", name: "Moderator" },
+  { role: "content_editor", name: "Content editor" },
+  { role: "administrator", name: "Administrator" },
+];
+
+function when(value: string | null | undefined) {
+  return value
+    ? new Date(value).toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "—";
+}
+
+function Users({ me }: { me: Me }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [status, setStatus] = useState<Status | "">("");
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [message, setMessage] = useState("");
+  const manage = me.permissions.includes("admin.users.manage");
+  const roles = me.permissions.includes("admin.roles.manage");
+  const administrators = me.permissions.includes("admin.roles.administrator");
+
+  const load = useCallback(
+    async (after?: string) => {
+      const { data, error } = await client.GET("/api/v1/admin/users", {
+        params: {
+          query: {
+            status: status || undefined,
+            q: search || undefined,
+            cursor: after,
+          },
+        },
+      });
+      if (!data) return setMessage(describe(error));
+      setUsers((current) => (after ? [...current, ...data.items] : data.items));
+      setCursor(data.next_cursor);
+    },
+    [status, search],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  function replace(updated: AdminUser) {
+    setUsers((current) =>
+      current.map((user) => (user.id === updated.id ? updated : user)),
+    );
+  }
+  async function changeStatus(
+    user: AdminUser,
+    next: "active" | "denied" | "disabled",
+  ) {
+    const { data, error } = await client.POST(
+      "/api/v1/admin/users/{user_id}/status",
+      {
+        params: { path: { user_id: user.id } },
+        body: { status: next },
+      },
+    );
+    if (data) {
+      replace(data);
+      setMessage(
+        `${user.handle ?? user.display_name}: ${statusNames[data.status]}.`,
+      );
+    } else setMessage(describe(error));
+  }
+  async function toggleRole(user: AdminUser, role: GrantableRole, on: boolean) {
+    const params = { path: { user_id: user.id, role } };
+    const { data, error } = on
+      ? await client.PUT("/api/v1/admin/users/{user_id}/roles/{role}", {
+          params,
+        })
+      : await client.DELETE("/api/v1/admin/users/{user_id}/roles/{role}", {
+          params,
+        });
+    if (data) replace(data);
+    else setMessage(describe(error));
+  }
+  async function signOut(user: AdminUser) {
+    const { data, error } = await client.POST(
+      "/api/v1/admin/users/{user_id}/sign-out",
+      {
+        params: { path: { user_id: user.id } },
+      },
+    );
+    if (data)
+      setMessage(
+        `${user.handle ?? user.display_name} was signed out everywhere.`,
+      );
+    else setMessage(describe(error));
+  }
+  function find(event: FormEvent) {
+    event.preventDefault();
+    setSearch(query.trim());
+  }
+
+  return (
+    <section className={styles.panel} aria-labelledby="users-title">
+      <h2 id="users-title">Accounts</h2>
+      <form className={styles.filters} onSubmit={find} role="search">
+        <label className={styles.field}>
+          <span>Show</span>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as Status | "")}
+          >
+            {statuses.map((value) => (
+              <option key={value} value={value}>
+                {statusNames[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>Search handle, name or email</span>
+          <input
+            type="search"
+            value={query}
+            maxLength={64}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <button className={styles.secondary} type="submit">
+          Search
+        </button>
+      </form>
+      <p role="status" className={styles.fine}>
+        {message}
+      </p>
+      {users.length === 0 ? (
+        <p className={styles.fine}>No accounts match.</p>
+      ) : (
+        <ul className={styles.users}>
+          {users.map((user) => {
+            const name = user.handle ?? user.display_name;
+            const isAdministrator = user.roles.includes("administrator");
+            const locked = isAdministrator && !administrators;
+            return (
+              <li key={user.id} aria-label={name}>
+                <div className={styles.userHead}>
+                  <div>
+                    <strong>{user.handle ?? "No handle yet"}</strong>
+                    <span>{user.display_name}</span>
+                    <small>
+                      {user.email ?? "No email"} · joined{" "}
+                      {when(user.created_at)} · last seen{" "}
+                      {when(user.last_seen_at)}
+                    </small>
+                  </div>
+                  <span className={shell.tag} data-status={user.status}>
+                    {statusNames[user.status].toUpperCase()}
+                  </span>
+                </div>
+                {roles && user.status === "active" && (
+                  <fieldset className={styles.roleSet} disabled={locked}>
+                    <legend>Roles</legend>
+                    {grantable.map(({ role, name: roleName }) => (
+                      <label key={role}>
+                        <input
+                          type="checkbox"
+                          checked={user.roles.includes(role)}
+                          disabled={role === "administrator" && !administrators}
+                          onChange={(event) =>
+                            void toggleRole(user, role, event.target.checked)
+                          }
+                        />
+                        {roleName}
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
+                {manage && !locked && (
+                  <div className={styles.actions}>
+                    {user.status === "pending" && (
+                      <>
+                        <button
+                          className={shell.primary}
+                          onClick={() => void changeStatus(user, "active")}
+                        >
+                          Approve {name}
+                        </button>
+                        <button
+                          className={styles.secondary}
+                          onClick={() => void changeStatus(user, "denied")}
+                        >
+                          Deny {name}
+                        </button>
+                      </>
+                    )}
+                    {user.status === "active" && (
+                      <>
+                        <button
+                          className={styles.secondary}
+                          onClick={() => void signOut(user)}
+                        >
+                          Sign {name} out everywhere
+                        </button>
+                        <button
+                          className={styles.danger}
+                          onClick={() => void changeStatus(user, "disabled")}
+                        >
+                          Disable {name}
+                        </button>
+                      </>
+                    )}
+                    {(user.status === "disabled" ||
+                      user.status === "denied") && (
+                      <button
+                        className={styles.secondary}
+                        onClick={() => void changeStatus(user, "active")}
+                      >
+                        Restore {name}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {cursor && (
+        <button className={styles.secondary} onClick={() => void load(cursor)}>
+          Show more accounts
+        </button>
+      )}
+    </section>
+  );
+}
+
+function Audit() {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [action, setAction] = useState("");
+  const [filter, setFilter] = useState("");
+  const [message, setMessage] = useState("");
+  const load = useCallback(
+    async (after?: string) => {
+      const { data, error } = await client.GET("/api/v1/admin/audit", {
+        params: { query: { action: filter || undefined, cursor: after } },
+      });
+      if (!data) return setMessage(describe(error));
+      setEntries((current) =>
+        after ? [...current, ...data.items] : data.items,
+      );
+      setCursor(data.next_cursor);
+    },
+    [filter],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+  return (
+    <section className={styles.panel} aria-labelledby="audit-title">
+      <h2 id="audit-title">Audit log</h2>
+      <form
+        className={styles.filters}
+        role="search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setFilter(action.trim());
+        }}
+      >
+        <label className={styles.field}>
+          <span>Action starts with</span>
+          <input
+            value={action}
+            maxLength={64}
+            placeholder="auth., admin., profile."
+            onChange={(event) => setAction(event.target.value)}
+          />
+        </label>
+        <button className={styles.secondary} type="submit">
+          Filter
+        </button>
+      </form>
+      {message && (
+        <p role="alert" className={styles.error}>
+          {message}
+        </p>
+      )}
+      <div className={styles.tableWrap}>
+        <table className={styles.audit}>
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Action</th>
+              <th scope="col">By</th>
+              <th scope="col">Account</th>
+              <th scope="col">Address</th>
+              <th scope="col">Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry) => (
+              <tr key={entry.id}>
+                <td>{when(entry.occurred_at)}</td>
+                <td>
+                  <code>{entry.action}</code>
+                </td>
+                <td>{entry.actor?.label ?? "—"}</td>
+                <td>{entry.target?.label ?? "—"}</td>
+                <td>{entry.source_address ?? "—"}</td>
+                <td>
+                  {Object.entries(entry.details)
+                    .filter(([, value]) => value !== null)
+                    .map(
+                      ([key, value]) =>
+                        `${key}: ${Array.isArray(value) ? value.join(", ") : String(value)}`,
+                    )
+                    .join(" · ") || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {cursor && (
+        <button className={styles.secondary} onClick={() => void load(cursor)}>
+          Show older events
+        </button>
+      )}
+    </section>
+  );
+}
+
+export function canAdminister(me: Me | null | undefined) {
+  return Boolean(
+    me &&
+    me.status === "active" &&
+    (me.permissions.includes("admin.users.read") ||
+      me.permissions.includes("admin.audit.read")),
+  );
+}
+
+export function Admin({
+  me,
+  heading,
+}: {
+  me: Me | null | undefined;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const [tab, setTab] = useState<"users" | "audit">("users");
+  if (!canAdminister(me))
+    return (
+      <>
+        <span className={shell.eyebrow}>ADMINISTRATION</span>
+        <h1 ref={heading} tabIndex={-1}>
+          Administration
+        </h1>
+        <section className={shell.empty}>
+          <span aria-hidden="true">⚖</span>
+          <h2>
+            {me ? "This area is for administrators." : "Sign in to continue."}
+          </h2>
+          <p>
+            {me
+              ? "Your account does not have administrative permissions."
+              : "Administrators sign in with their Google account."}
+          </p>
+          {!me && (
+            <a
+              className={shell.primary}
+              href="#profile"
+              onClick={() => signInFrom("#admin")}
+            >
+              Sign in <span aria-hidden="true">→</span>
+            </a>
+          )}
+        </section>
+      </>
+    );
+  const users = me!.permissions.includes("admin.users.read");
+  const audit = me!.permissions.includes("admin.audit.read");
+  const shown = tab === "audit" && audit ? "audit" : users ? "users" : "audit";
+  return (
+    <>
+      <span className={shell.eyebrow}>ADMINISTRATION</span>
+      <h1 ref={heading} tabIndex={-1}>
+        Keep the table running.
+      </h1>
+      <p className={shell.lead}>
+        Approve new players, assign roles and review what changed, and by whom.
+      </p>
+      <div
+        className={styles.tabs}
+        role="tablist"
+        aria-label="Administration sections"
+      >
+        {users && (
+          <button
+            role="tab"
+            aria-selected={shown === "users"}
+            onClick={() => setTab("users")}
+          >
+            Accounts
+          </button>
+        )}
+        {audit && (
+          <button
+            role="tab"
+            aria-selected={shown === "audit"}
+            onClick={() => setTab("audit")}
+          >
+            Audit log
+          </button>
+        )}
+      </div>
+      <div role="tabpanel">
+        {shown === "users" ? <Users me={me!} /> : <Audit />}
+      </div>
+    </>
+  );
+}
+
+/** SysOp's entrance. The caller renders it only after the server confirms the network. */
+export function SysopSignIn({
+  onSignedIn,
+  heading,
+}: {
+  onSignedIn: (me: Me) => void;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const [username, setUsername] = useState("sysop");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    const { me, error } = await sysopSignIn(username, password);
+    setBusy(false);
+    setPassword("");
+    if (me) {
+      onSignedIn(me);
+      window.location.hash = "#admin";
+    } else setMessage(error ?? "");
+  }
+  return (
+    <>
+      <span className={shell.eyebrow}>LOCAL ADMINISTRATOR</span>
+      <h1 ref={heading} tabIndex={-1}>
+        SysOp sign-in
+      </h1>
+      <section className={styles.panel}>
+        <form
+          className={styles.form}
+          onSubmit={submit}
+          aria-label="SysOp sign-in"
+        >
+          <label className={styles.field}>
+            <span>Username</span>
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              required
+            />
+          </label>
+          <label className={styles.field}>
+            <span>Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+          {message && (
+            <p role="alert" className={styles.error}>
+              {message}
+            </p>
+          )}
+          <button className={shell.primary} type="submit" disabled={busy}>
+            Sign in
+          </button>
+        </form>
+      </section>
+    </>
+  );
+}

@@ -1,8 +1,10 @@
 # Commander Duels
 
-**v0.0.4: Commander tables and the multiplayer seat bridge.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
+**v0.0.5: identity — sign-in, sessions, roles and SysOp.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
 
-The engine loads XMage's card database and plays complete games: Legacy between two seats, and Commander at two, three or four seats, with any mix of human seats and XMage computer players. Human seats run through XMage's own human player: every choice becomes a typed prompt, stale answers are refused, and each seat sees only its own authorized view, including commander tax and commander damage. These are internal development games, driven by scripts. There is no sign-in or game UI yet, and gameplay is unavailable to players. The application shows unavailable features and their milestones. The source scope remains the full product backlog.
+The engine loads XMage's card database and plays complete games: Legacy between two seats, and Commander at two, three or four seats, with any mix of human seats and XMage computer players. Human seats run through XMage's own human player: every choice becomes a typed prompt, stale answers are refused, and each seat sees only its own authorized view, including commander tax and commander damage. These are internal development games, driven by scripts.
+
+Players sign in with Google; the account keeps a handle, an avatar and its accessibility preferences. Administrators approve accounts, assign roles and read an append-only audit log. SysOp, the local root account, signs in with a password only from the operator's network. There is no game UI yet, and gameplay is unavailable to players. The application shows unavailable features and their milestones. The source scope remains the full product backlog.
 
 ## Start with Docker
 
@@ -14,7 +16,26 @@ docker compose up --build
 
 The first build compiles XMage from source inside the engine image (about 3–4 minutes on a fast machine; give Docker Desktop at least 6 GB of memory). Later builds reuse that layer until the XMage pin changes.
 
-Open http://localhost:8080. API documentation is at http://localhost:8000/api/v1/docs. Compose waits for PostgreSQL and applies migrations before starting the API and worker. Only localhost ports are published; the Java boundary is internal. Development credentials are intentionally public and must not be used for deployment. Database data persists in the named volume. `docker compose down` stops the stack without deleting data.
+Open http://localhost:8080. API documentation is at http://localhost:8000/api/v1/docs.
+
+### Sign-in and SysOp
+
+- **Google sign-in.** Off until you set a client ID.
+  1. Create an OAuth client ID of type *Web application* in Google Cloud Console.
+  2. Add `http://localhost` and `http://localhost:8080` as authorized JavaScript origins.
+  3. Put the ID in `.env` as `CD_GOOGLE_CLIENT_ID=…`. It is public and needs no client secret.
+  4. Run `docker compose up -d` again.
+
+  Sign-up is open. Set `CD_SIGNUP_POLICY=approval` to approve new accounts first.
+- **SysOp.** Set its password from the console; the first run creates the account:
+
+  ```sh
+  docker compose exec api python -m api.cli sysop-password
+  ```
+
+  Then open http://localhost:8080/#sysop and sign in as `sysop`. In Compose, SysOp's entrance exists only for this computer's browser. Elsewhere it looks like any unknown page.
+
+See [identity](docs/identity.md) for the flows, roles, sessions and the production network settings. Compose waits for PostgreSQL and applies migrations before starting the API and worker. Only localhost ports are published; the Java boundary is internal. Development credentials are intentionally public and must not be used for deployment. Database data persists in the named volume. `docker compose down` stops the stack without deleting data.
 
 ## Local development
 
@@ -30,7 +51,8 @@ pnpm install --frozen-lockfile
 # Copy .env.example to .env if overriding the defaults.
 docker compose up -d db
 alembic upgrade head
-uvicorn api.main:create_app --factory --reload --host 127.0.0.1 --port 8000
+python -m api.cli sysop-password   # optional: SysOp, from 127.0.0.1 with .env.example's networks
+uvicorn api.main:create_app --factory --reload --host 127.0.0.1 --port 8000 --no-proxy-headers
 ```
 
 In a second terminal, run `pnpm dev` and open http://localhost:5173. Vite proxies `/api` to port 8000. Run `python -m catalog.worker` in a third activated terminal when testing jobs. The worker only supports `health_probe`; it records other kinds as failed instead of pretending to import data.
@@ -98,6 +120,7 @@ pnpm test
 pnpm build
 pnpm --dir web exec playwright install chromium
 # Playwright starts the API (from the activated Python environment) and Vite, or reuses running ones.
+# The SysOp journey runs when CD_E2E_SYSOP_PASSWORD holds SysOp's password in that database.
 pnpm test:e2e
 docker compose config --quiet
 ```
@@ -119,8 +142,8 @@ Each development thread is one version, and `VERSION` is the only file that hold
 
 | Directory | Responsibility |
 | --- | --- |
-| `web` | Accessible eight-section shell, format details, device preferences, API client |
-| `api` | HTTP contracts, configuration, lifecycle, persistence models and Alembic migrations |
+| `web` | Accessible shell, format details, preferences, Google sign-in, profile, administration and SysOp screens, API client |
+| `api` | HTTP contracts, configuration, lifecycle, identity (sign-in, sessions, roles, audit, SysOp), administration, persistence models and Alembic migrations |
 | `engine` | Java 21 XMage engine service: pinned build, card database, fixture decks, development bot matches and multi-seat Legacy and Commander games |
 | `catalog` | PostgreSQL lease claim, generation fencing and bounded worker loop |
 | `contracts` | Generated public OpenAPI, the internal command envelope and the seat-view contract |
@@ -128,4 +151,4 @@ Each development thread is one version, and `VERSION` is the only file that hold
 | `tests` | API, migration, contract and job lifecycle regressions |
 | `docs` | Architecture, scope ledger, reference inventory and release evidence |
 
-See [architecture](docs/architecture.md), [remaining work](docs/backlog.md), [the route to v0.1.0](docs/plans/0.0.4.md), [Two-Headed Giant feasibility](docs/engine/two-headed-giant.md), and release notes for [0.0.4](docs/releases/0.0.4.md), [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md). No production VM, host nginx, certificate, firewall, or routing configuration is included.
+See [architecture](docs/architecture.md), [identity](docs/identity.md), [remaining work](docs/backlog.md), [the route to v0.1.0](docs/plans/0.0.4.md), [Two-Headed Giant feasibility](docs/engine/two-headed-giant.md), and release notes for [0.0.5](docs/releases/0.0.5.md), [0.0.4](docs/releases/0.0.4.md), [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md). No production VM, host nginx, certificate, firewall, or routing configuration is included.

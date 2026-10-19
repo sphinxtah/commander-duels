@@ -21,6 +21,10 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "external_identities",
         "rules_bundles",
         "scheduled_jobs",
+        "sessions",
+        "role_grants",
+        "audit_events",
+        "login_challenges",
     }
     command.downgrade(config, "base")
     assert inspect(engine).get_table_names() == ["alembic_version"]

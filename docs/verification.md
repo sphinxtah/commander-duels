@@ -1,5 +1,55 @@
 # Verification
 
+## v0.0.5
+
+Validated locally on Windows on October 18–19, 2026 (UTC).
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting | Passed (API, catalog, tests and scripts) |
+| mypy strict checks | Passed, 21 Python source files |
+| Python suite | 22 passed against PostgreSQL 17, including nine identity tests and two PostgreSQL tests: parallel job claims, and migrations with the append-only audit trail |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated; regenerating again changes nothing. SysOp's routes are absent from both |
+| Alembic | `upgrade head`, `downgrade base` and `upgrade head` again on SQLite and PostgreSQL; `alembic check` on both: no new upgrade operations |
+| Vitest and production build | 2 Vitest tests and the production build passed in a `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository |
+| Browser journeys | 6 passed (3 new). The API ran in a `python:3.12.10-slim` container against a separate `commander_e2e` database, with a test SysOp from the console command. Playwright and Vite ran in its network namespace, so the API saw loopback addresses as in CI |
+| Compose | API, migrate, worker and web images rebuilt; all services healthy. Migration `0002_identity` applied to the development database |
+| SysOp network in Compose | Through the web proxy from this computer: 204. Straight to the API from this computer: 204. With a forged `X-Forwarded-For: 8.8.8.8` from this computer: 204, because the API takes the gateway hop the proxy appended, not the forged one. From the engine container through the web proxy: 404. From the engine container straight to the API, claiming the gateway in `X-Forwarded-For`: 404 |
+| Security headers | `index.html` now carries the CSP, nosniff and Referrer-Policy headers; before this version its location block's own `add_header` dropped them |
+
+The identity tests (`tests/test_identity.py`) sign Google ID tokens with a test RSA key. The verifier's certificate fetch, through the real caching transport, returns that key, so google-auth's own checks run on every token. The tests cover:
+- **T01 (server side).** A first sign-in creates one active account with a private session cookie (HttpOnly, Secure, SameSite=Lax, path `/api`). A second sign-in with a changed email finds the same account and ends the old session.
+- **T02.** Expired, wrong-audience, wrong-issuer, forged, nonce-less, wrongly-nonced and garbage tokens are refused, as is a valid token without its challenge cookie. A replay of a successful token with its cookie is refused. None created an account or a session. Google certificates were fetched once and then cached. An outage reports 503.
+- **Sessions.** Per-session sign-out, sign out, sign out everywhere, the 14-day idle limit and the 30-day absolute limit under daily use.
+- **Approval mode.** A pending account can choose a handle and nothing else. SysOp approves it, and the account's next request rotates its session. Denial is allowed only for a pending account.
+- **SysOp's entrance.** It answers exactly like a missing path:
+  - from outside;
+  - for an untrusted peer forging `X-Forwarded-For`;
+  - through the proxy for an outside client;
+  - for a malformed chain.
+
+  On the network, the entrance exists before SysOp does, but nobody can sign in. After that:
+  - Five failures lock an address, even for the right password.
+  - SysOp holds every permission and has no email.
+  - A SysOp cookie used off the network is signed out.
+  - A password change needs the current password and ends other sessions.
+  - The console refuses a short password.
+- **Roles and T29 (administrative part).**
+  - A player is refused every administrative operation and cannot end another account's session.
+  - SysOp is never listed and cannot be targeted.
+  - SysOp's administrator grant reaches the account on its next request, with a rotated session.
+  - An administrator can grant moderator but not administrator, and cannot change its own account.
+  - Pagination and search work.
+  - Disabling ends sessions and blocks sign-in.
+  - Others see SysOp as *Site administrator*, without addresses or its sign-in trail.
+  - A role change after 13 hours needs reauthentication.
+- **Origins.** State changes from another origin, or marked cross-site, are refused. Both loopback spellings of the site's origin are accepted.
+
+The new browser journeys:
+- **Signed out.** Administration offers sign-in and remembers to come back. The Google button, with Google's script replaced, gets a fresh challenge after a refused credential. The API fetched Google's real certificates and refused the token as `invalid_token`, which also showed that Chromium sent the Secure, Strict, path-scoped challenge cookie over `http://127.0.0.1`.
+- **Off the network.** `#sysop` renders the Play page with a Play breadcrumb and no mention of SysOp.
+- **SysOp.** A wrong password is refused, then SysOp signs in and lands in Administration. Its audit trail shows the sign-in and the failure. The session survives a reload. The Profile page and Administration fit at 390 px without horizontal scrolling. Sign-out removes Administration from the navigation.
+
 ## v0.0.4
 
 Validated locally on Windows on October 18–19, 2026 (UTC).

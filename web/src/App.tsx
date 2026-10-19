@@ -1,5 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { loadFoundation, type Bootstrap, type Format } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Account, avatars } from "./Account";
+import { Admin, SysopSignIn, canAdminister } from "./Admin";
+import {
+  client,
+  loadFoundation,
+  loadMe,
+  sysopEntrance,
+  type Bootstrap,
+  type Format,
+  type Me,
+} from "./api";
 import {
   readPreferences,
   savePreferences,
@@ -16,11 +26,13 @@ const pages = [
   "Collection",
   "Profile",
   "Settings",
+  "Admin",
 ] as const;
-type Page = (typeof pages)[number];
-const glyphs = ["◇", "▱", "✧", "▤", "▦", "◈", "○", "⚙"];
+// SysOp's entrance has no navigation entry; it opens only from the SysOp networks.
+type Page = (typeof pages)[number] | "SysOp";
+const glyphs = ["◇", "▱", "✧", "▤", "▦", "◈", "○", "⚙", "⚖"];
 const details: Record<
-  Exclude<Page, "Play" | "Settings">,
+  Exclude<Page, "Play" | "Settings" | "Profile" | "Admin" | "SysOp">,
   { title: string; description: string; next: string; milestone: string }
 > = {
   Campaign: {
@@ -55,16 +67,10 @@ const details: Record<
     next: "Collection browsing follows the catalog. Optional earned progression arrives later.",
     milestone: "M1 / M4 · Collection policies",
   },
-  Profile: {
-    title: "Your place at the table.",
-    description:
-      "Your identity, match history, and achievements will come together here.",
-    next: "Google sign-in and private application sessions are planned for M1.",
-    milestone: "M1 · Accounts",
-  },
 };
 function currentPage(): Page {
   const path = window.location.hash.slice(1).toLowerCase();
+  if (path === "sysop") return "SysOp";
   return pages.find((page) => page.toLowerCase() === path) ?? "Play";
 }
 
@@ -80,6 +86,9 @@ export function App() {
   const [preferences, setPreferences] = useState(readPreferences);
   const [saveMessage, setSaveMessage] = useState("");
   const [selected, setSelected] = useState<Format>();
+  // undefined while loading, null when signed out.
+  const [me, setMe] = useState<Me | null>();
+  const [entrance, setEntrance] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
@@ -124,6 +133,13 @@ export function App() {
         if (active) setConnection("unavailable");
       })
       .finally(() => window.clearTimeout(timeout));
+    loadMe()
+      .then((value) => {
+        if (active) changeMe(value);
+      })
+      .catch(() => {
+        if (active) setMe(null);
+      });
     return () => {
       active = false;
       window.clearTimeout(timeout);
@@ -139,15 +155,56 @@ export function App() {
   useEffect(() => {
     if (selected) dialog.current?.showModal();
   }, [selected]);
+  useEffect(() => {
+    let active = true;
+    if (page === "SysOp")
+      void sysopEntrance().then((open) => active && setEntrance(open));
+    return () => {
+      active = false;
+    };
+  }, [page]);
+  // Off the SysOp networks, #sysop is indistinguishable from any unknown address.
+  const shown: Page = page === "SysOp" && !entrance ? "Play" : page;
+  const changeMe = useCallback((value: Me | null) => {
+    setMe(value);
+    // An account's accessibility settings follow it to every device it signs in on.
+    if (value && value.status === "active") {
+      const next = {
+        largeText: value.preferences.large_text,
+        reducedMotion: value.preferences.reduced_motion,
+      };
+      setPreferences(next);
+      savePreferences(next);
+    }
+  }, []);
 
   function updatePreference(key: keyof Preferences, value: boolean) {
     const next = { ...preferences, [key]: value };
     setPreferences(next);
+    const local = savePreferences(next);
     setSaveMessage(
-      savePreferences(next)
+      local
         ? "Preferences saved on this device."
         : "Applied for this visit. Browser storage is unavailable.",
     );
+    if (me?.status === "active")
+      void client
+        .PATCH("/api/v1/me", {
+          body: {
+            preferences: {
+              large_text: next.largeText,
+              reduced_motion: next.reducedMotion,
+            },
+          },
+        })
+        .then(({ data }) => {
+          if (data) {
+            setMe(data);
+            setSaveMessage(
+              "Preferences saved to your account and this device.",
+            );
+          }
+        });
   }
 
   return (
@@ -168,29 +225,48 @@ export function App() {
         </a>
         <div className={styles.navLabel}>YOUR TABLE</div>
         <nav aria-label="Main navigation">
-          {pages.map((item, index) => (
-            <a
-              key={item}
-              href={`#${item.toLowerCase()}`}
-              aria-current={page === item ? "page" : undefined}
-              className={page === item ? styles.active : ""}
-            >
-              <span aria-hidden="true">{glyphs[index]}</span>
-              {item}
-              {item === "Play" && (
-                <span className={styles.navArrow} aria-hidden="true">
-                  ↗
-                </span>
-              )}
-            </a>
-          ))}
+          {pages
+            .filter((item) => item !== "Admin" || canAdminister(me))
+            .map((item) => (
+              <a
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                aria-current={shown === item ? "page" : undefined}
+                className={shown === item ? styles.active : ""}
+              >
+                <span aria-hidden="true">{glyphs[pages.indexOf(item)]}</span>
+                {item}
+                {item === "Play" && (
+                  <span className={styles.navArrow} aria-hidden="true">
+                    ↗
+                  </span>
+                )}
+              </a>
+            ))}
         </nav>
-        <div className={styles.sidebarBottom}>
-          <span className={styles.monogram}>CD</span>
-          <div>
-            Welcome, traveler<small>Accounts coming in M1</small>
-          </div>
-        </div>
+        <a className={styles.sidebarBottom} href="#profile">
+          <span className={styles.monogram} aria-hidden="true">
+            {me ? avatars[me.avatar] : "CD"}
+          </span>
+          {me ? (
+            <div>
+              {me.handle ?? me.display_name}
+              <small>
+                {me.kind === "sysop"
+                  ? "Local administrator"
+                  : me.status === "pending"
+                    ? "Waiting for approval"
+                    : me.status === "denied"
+                      ? "Not approved"
+                      : "Signed in"}
+              </small>
+            </div>
+          ) : (
+            <div>
+              Welcome, traveler<small>{me === null ? "Sign in" : " "}</small>
+            </div>
+          )}
+        </a>
       </aside>
       <div className={styles.workspace}>
         <header className={styles.topbar}>
@@ -214,9 +290,20 @@ export function App() {
         </header>
         <main id="main" className={styles.main} tabIndex={-1}>
           <div className={styles.breadcrumb}>
-            COMMANDER DUELS <span>/</span> {page.toUpperCase()}
+            COMMANDER DUELS <span>/</span> {shown.toUpperCase()}
           </div>
-          {page === "Play" ? (
+          {page === "Profile" ? (
+            <Account
+              me={me}
+              auth={bootstrap?.auth}
+              onChange={changeMe}
+              heading={heading}
+            />
+          ) : page === "Admin" ? (
+            <Admin me={me} heading={heading} />
+          ) : page === "SysOp" && entrance ? (
+            <SysopSignIn onSignedIn={changeMe} heading={heading} />
+          ) : page === "Play" || page === "SysOp" ? (
             <>
               <section className={styles.hero} aria-labelledby="page-title">
                 <div className={styles.heroCopy}>
@@ -388,7 +475,9 @@ export function App() {
               <section className={styles.release}>
                 <h2>
                   Release status{" "}
-                  <span className={styles.tag}>v{__APP_VERSION__} · FRAMEWORK</span>
+                  <span className={styles.tag}>
+                    v{__APP_VERSION__} · FRAMEWORK
+                  </span>
                 </h2>
                 <p>
                   The application shell is available. These features are planned
@@ -425,7 +514,9 @@ export function App() {
                 <span aria-hidden="true">{glyphs[pages.indexOf(page)]}</span>
                 <h2>{page} is on the horizon.</h2>
                 <p>{details[page].next}</p>
-                <span className={styles.tag}>NOT AVAILABLE IN v{__APP_VERSION__}</span>
+                <span className={styles.tag}>
+                  NOT AVAILABLE IN v{__APP_VERSION__}
+                </span>
                 <a className={styles.primary} href="#play">
                   Return to the table <span aria-hidden="true">→</span>
                 </a>
@@ -435,7 +526,8 @@ export function App() {
           <footer className={styles.footer}>
             <span>COMMANDER DUELS</span>
             <span>
-              Framework preview <span aria-hidden="true">·</span> v{__APP_VERSION__}
+              Framework preview <span aria-hidden="true">·</span> v
+              {__APP_VERSION__}
             </span>
           </footer>
         </main>

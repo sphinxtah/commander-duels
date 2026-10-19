@@ -19,6 +19,15 @@ services:
       CD_DATABASE_URL: postgresql+psycopg://commander:commander@db:5432/commander
       CD_ENGINE_URL: http://engine:8090
       CD_PUBLIC_URL: http://localhost:8080
+      # Set CD_GOOGLE_CLIENT_ID in .env (a Web OAuth client ID; public, no secret) to enable
+      # Google sign-in. CD_SIGNUP_POLICY=approval makes new accounts wait for approval.
+      CD_GOOGLE_CLIENT_ID: ${CD_GOOGLE_CLIENT_ID:-}
+      CD_SIGNUP_POLICY: ${CD_SIGNUP_POLICY:-open}
+      # The web proxy is the only trusted proxy. Docker Desktop delivers this computer's browser
+      # requests from the network gateway, and the ports are published on 127.0.0.1 only, so the
+      # gateway is this computer: SysOp's development network.
+      CD_TRUSTED_PROXIES: 172.30.233.10/32
+      CD_SYSOP_NETWORKS: 172.30.233.1/32
     command: ["alembic", "upgrade", "head"]
     depends_on:
       db: {condition: service_healthy}
@@ -64,7 +73,13 @@ services:
   web:
     build: {context: ., dockerfile: web/Dockerfile}
     ports: ["127.0.0.1:8080:8080"]
+    networks:
+      default: {ipv4_address: 172.30.233.10}
     depends_on:
       api: {condition: service_healthy}
+networks:
+  default:
+    ipam:
+      config: [{subnet: 172.30.233.0/24, gateway: 172.30.233.1}]
 volumes:
   postgres_data:

@@ -11,18 +11,24 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
+from api import admin, auth
 from api.config import Settings
 from api.database import build_engine, migration_head
-from api.schemas import Bootstrap, Capability, EngineStatus, Error, Format, Health, Readiness
+from api.google import CachingTransport, GoogleVerifier
+from api.identity import SAFE_METHODS, ApiError
+from api.schemas import (
+    AuthConfig,
+    Bootstrap,
+    Capability,
+    EngineStatus,
+    Error,
+    Format,
+    Health,
+    Readiness,
+)
 from api.version import APP_VERSION
 
 CAPABILITIES = [
-    Capability(
-        id="authentication",
-        name="Google sign-in",
-        milestone="M1",
-        reason="Identity verification and application sessions are not implemented.",
-    ),
     Capability(
         id="catalog",
         name="Card catalog",
@@ -39,9 +45,8 @@ CAPABILITIES = [
         id="gameplay",
         name="Connected play",
         milestone="M0–M3",
-        reason="The XMage engine runs internal development games only: bot against bot, and a "
-        "scripted human seat against a bot. Sign-in, seat ownership and a game interface are "
-        "not built yet.",
+        reason="The XMage engine runs internal development games only, driven by scripts. "
+        "Sign-in exists; seat ownership, game routing and a game interface are not built yet.",
     ),
     Capability(
         id="campaign",
@@ -58,6 +63,19 @@ CAPABILITIES = [
 ]
 
 
+def authentication(config: Settings) -> Capability:
+    configured = bool(config.google_client_id)
+    return Capability(
+        id="authentication",
+        name="Google sign-in",
+        available=configured,
+        milestone="M1",
+        reason="Google sign-in is available."
+        if configured
+        else "Google sign-in needs a Web OAuth client ID in CD_GOOGLE_CLIENT_ID.",
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     config = settings or Settings()
     expected_revision = migration_head()
@@ -65,9 +83,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.database = build_engine(config.database_url)
-        async with httpx.AsyncClient(timeout=2.0, trust_env=False) as client:
-            app.state.http = client
-            yield
+        with httpx.Client(timeout=5.0) as google:
+            if config.google_client_id:
+                app.state.google_verifier = GoogleVerifier(
+                    config.google_client_id, CachingTransport(google)
+                )
+            async with httpx.AsyncClient(timeout=2.0, trust_env=False) as client:
+                app.state.http = client
+                yield
         app.state.database.dispose()
 
     app = FastAPI(
@@ -79,6 +102,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
         responses={503: {"model": Error}},
     )
+    app.state.settings = config
+    allowed_origins = config.allowed_origins
+
+    @app.middleware("http")
+    async def same_origin(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        # Browsers send Origin with every state-changing fetch. Another site's requests stop here,
+        # before any cookie is looked at (CSRF defence in depth; sessions also need a token).
+        if request.method not in SAFE_METHODS and request.url.path.startswith("/api/"):
+            origin = request.headers.get("origin")
+            if (origin and origin not in allowed_origins) or request.headers.get(
+                "sec-fetch-site"
+            ) == "cross-site":
+                return error_response(
+                    request, 403, "origin_refused", "Requests from other sites are refused."
+                )
+        return await call_next(request)
 
     @app.middleware("http")
     async def correlation(
@@ -98,6 +139,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 code=code, message=message, request_id=request.state.request_id
             ).model_dump(),
         )
+
+    @app.exception_handler(ApiError)
+    async def api_error(request: Request, exc: ApiError) -> JSONResponse:
+        response = error_response(request, exc.status, exc.code, exc.message)
+        response.headers.update(exc.headers or {})
+        return response
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
@@ -132,7 +179,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/v1/bootstrap", response_model=Bootstrap)
     def bootstrap() -> Bootstrap:
-        return Bootstrap(capabilities=CAPABILITIES)
+        return Bootstrap(
+            capabilities=[authentication(config), *CAPABILITIES],
+            auth=AuthConfig(
+                google_client_id=config.google_client_id or None,
+                signup_policy=config.signup_policy,
+            ),
+        )
 
     @app.get("/api/v1/formats", response_model=list[Format])
     def formats() -> list[Format]:
@@ -171,13 +224,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except (httpx.HTTPError, ValueError):
             return EngineStatus(status="unavailable")
 
-    @app.get("/api/v1/me", response_model=Error, status_code=401)
-    def me(request: Request) -> JSONResponse:
-        return error_response(
-            request,
-            401,
-            "authentication_unavailable",
-            "Google sign-in is not available in this framework release.",
-        )
-
+    app.include_router(auth.router)
+    app.include_router(admin.router)
     return app

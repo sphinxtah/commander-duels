@@ -31,6 +31,12 @@ jobs:
       - run: python scripts/export_contracts.py && pnpm contracts && git diff --exit-code -- contracts/openapi.json web/src/generated/api.d.ts
       - run: pnpm test && pnpm build
       - run: pnpm --dir web exec playwright install --with-deps chromium
+      # SysOp for the browser journeys: a throwaway password for this run's database only.
+      - run: |
+          password="$(python -c 'import secrets; print(secrets.token_urlsafe(18))')"
+          echo "::add-mask::$password"
+          echo "CD_E2E_SYSOP_PASSWORD=$password" >> "$GITHUB_ENV"
+          printf '%s\n' "$password" | python -m api.cli sysop-password --stdin
       - run: pnpm test:e2e
       # The engine image is built (with its XMage cache) by the engine job.
       - run: docker compose config --quiet && docker compose build migrate api worker web

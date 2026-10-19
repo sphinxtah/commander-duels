@@ -20,21 +20,12 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  for (const name of [
-    "Campaign",
-    "Learn",
-    "Decks",
-    "Cards",
-    "Collection",
-    "Profile",
-  ]) {
+  for (const name of ["Campaign", "Learn", "Decks", "Cards", "Collection"]) {
     await page
       .getByRole("navigation")
       .getByRole("link", { name, exact: true })
       .click();
-    await expect(
-      page.getByText(`NOT AVAILABLE IN v${version}`),
-    ).toBeVisible();
+    await expect(page.getByText(`NOT AVAILABLE IN v${version}`)).toBeVisible();
   }
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("checkbox", { name: "Larger text" }).check();
