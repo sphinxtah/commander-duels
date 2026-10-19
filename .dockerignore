@@ -9,3 +9,5 @@
 **/*.egg-info
 **/test-results
 **/playwright-report
+**/target
+engine/db

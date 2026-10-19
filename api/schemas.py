@@ -50,7 +50,24 @@ class Format(Contract):
     available: bool = False
 
 
+class XmageBuild(Contract):
+    version: str
+    tag: str
+    commit: str
+    commit_date: str
+
+
+class CardCounts(Contract):
+    printings: int
+    distinct_names: int
+
+
 class EngineStatus(Contract):
-    status: Literal["unavailable", "scaffold"]
+    """Engine /health, passed through. "unavailable" means the engine is unreachable or invalid."""
+
+    status: Literal["unavailable", "loading", "ready", "failed"]
     protocol_version: Literal[1] = 1
     gameplay_available: Literal[False] = False
+    xmage: XmageBuild | None = None
+    cards: CardCounts | None = None
+    bot_match_enabled: bool = False

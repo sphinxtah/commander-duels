@@ -8,7 +8,8 @@ __pycache__/
 .mypy_cache/
 .env
 *.db
-engine/out/
+engine/target/
+engine/db/
 test-results/
 playwright-report/
 .local/

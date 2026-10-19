@@ -1,0 +1,13 @@
+// Commander Duels engine fixture: mono-red burn, 60 cards, Legacy-legal.
+// Simple cards only. Keep card lines contiguous: XMage's text importer treats a blank line as the sideboard switch.
+20 Mountain
+4 Goblin Guide
+4 Monastery Swiftspear
+4 Jackal Pup
+4 Goblin Piker
+4 Lightning Bolt
+4 Chain Lightning
+4 Lava Spike
+4 Searing Spear
+4 Incinerate
+4 Shock

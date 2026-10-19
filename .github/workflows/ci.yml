@@ -24,15 +24,36 @@ jobs:
         with: {node-version: '24.19.0'}
       - uses: pnpm/action-setup@v6
         with: {version: '11.25.0'}
-      - uses: actions/setup-java@v6
-        with: {distribution: temurin, java-version: '21'}
       - run: pip install -r requirements.lock && pip install --no-deps -e .
       - run: ruff check api catalog tests scripts && ruff format --check api catalog tests scripts && mypy && pytest
       - run: alembic upgrade head && alembic check
       - run: pnpm install --frozen-lockfile
       - run: python scripts/export_contracts.py && pnpm contracts && git diff --exit-code -- contracts/openapi.json web/src/generated/api.d.ts
       - run: pnpm test && pnpm build
-      - run: mkdir -p engine/out && javac -Xlint:all -Werror -d engine/out engine/src/main/java/com/commanderduels/*.java engine/src/test/java/com/commanderduels/*.java && java -cp engine/out com.commanderduels.EngineServerTest
       - run: pnpm --dir web exec playwright install --with-deps chromium
       - run: pnpm test:e2e
-      - run: docker compose config --quiet && docker compose build
+      # The engine image is built (with its XMage cache) by the engine job.
+      - run: docker compose config --quiet && docker compose build migrate api worker web
+  engine:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      # XMage layers depend only on engine/xmage (the pin, build script and patches), so they come
+      # from the Actions cache unless the pin changes. The build runs Maven and the JUnit suite.
+      - name: Build engine image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: engine/Dockerfile
+          tags: commander-duels-engine:latest
+          load: true
+          cache-from: type=gha,scope=engine
+          cache-to: type=gha,scope=engine,mode=max
+      - name: Engine smoke test in Compose
+        run: |
+          docker compose up -d --wait --no-build --no-deps engine
+          docker compose exec -T engine curl -fsS http://localhost:8090/health
+          docker compose exec -T engine curl -fsS -X POST -d '{"seed": 1}' http://localhost:8090/v1/bot_match \
+            | python3 -c "import json, sys; r = json.load(sys.stdin); print(r['result'], r['turns'], r['duration_ms']); sys.exit(r['result'] != 'completed')"
+          docker compose down

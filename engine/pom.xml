@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.commanderduels</groupId>
+    <artifactId>engine</artifactId>
+    <!-- Not a release number: VERSION is the only version source. -->
+    <version>1</version>
+    <name>Commander Duels engine</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <!-- Must equal xmage.version in xmage/pin.properties; XmagePinTest checks it. -->
+        <xmage.version>1.4.62</xmage.version>
+        <junit.version>5.13.4</junit.version>
+    </properties>
+
+    <dependencies>
+        <!-- XMage is not published to Maven Central; build-xmage.sh installs these from the pinned commit. -->
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage-common</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage-sets</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage-player-ai-mad</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage-game-twoplayerduel</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage-game-commanderfreeforall</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mage</groupId>
+            <artifactId>mage-deck-constructed</artifactId>
+            <version>${xmage.version}</version>
+        </dependency>
+        <dependency>
+            <!-- Same version XMage manages, so only one copy is on the classpath. -->
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.13.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>engine</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>xmage</directory>
+                <includes>
+                    <include>pin.properties</include>
+                </includes>
+                <targetPath>xmage</targetPath>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.15.0</version>
+                <configuration>
+                    <compilerArgs>
+                        <arg>-Xlint:all</arg>
+                        <arg>-Werror</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.3</version>
+                <configuration>
+                    <!-- Tests open ./db (the card database) and ./decks, like the runtime image. -->
+                    <workingDirectory>${project.basedir}</workingDirectory>
+                    <argLine>-Xmx2g</argLine>
+                    <systemPropertyVariables>
+                        <xmage.version>${xmage.version}</xmage.version>
+                    </systemPropertyVariables>
+                    <trimStackTrace>false</trimStackTrace>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>runtime-classpath</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-dependencies</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <outputDirectory>${project.build.directory}/lib</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- Run on demand: mvn license:add-third-party (writes THIRD-PARTY.txt for SEC06). -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>2.5.0</version>
+                <configuration>
+                    <excludedScopes>test,provided,system</excludedScopes>
+                    <thirdPartyFilename>THIRD-PARTY.txt</thirdPartyFilename>
+                    <outputDirectory>${project.build.directory}/licenses</outputDirectory>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

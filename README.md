@@ -1,8 +1,8 @@
 # Commander Duels
 
-**v0.0.1 — initial framework.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and an isolated Java service boundary.
+**v0.0.2: XMage headless engine spike.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
 
-This release is not playable and does not complete M0. It has no mock login, invented card catalog, simulated matches, or claimed offline support. The application displays unavailable features and their milestones. The source scope remains the full product backlog.
+The engine loads XMage's card database and plays complete Legacy games between two XMage computer players. That is an internal development check only. There are no human seats, player views or game UI yet, and gameplay is unavailable to players. The application shows unavailable features and their milestones. The source scope remains the full product backlog.
 
 ## Start with Docker
 
@@ -12,11 +12,13 @@ Install Docker with Compose and start its Linux engine, then run from this direc
 docker compose up --build
 ```
 
+The first build compiles XMage from source inside the engine image (about 3–4 minutes on a fast machine; give Docker Desktop at least 6 GB of memory). Later builds reuse that layer until the XMage pin changes.
+
 Open http://localhost:8080. API documentation is at http://localhost:8000/api/v1/docs. Compose waits for PostgreSQL and applies migrations before starting the API and worker. Only localhost ports are published; the Java boundary is internal. Development credentials are intentionally public and must not be used for deployment. Database data persists in the named volume. `docker compose down` stops the stack without deleting data.
 
 ## Local development
 
-Prerequisites: Python 3.12, Node 24.19, pnpm 11.25, and Java 21 for engine work. PostgreSQL 17 is required for durable workers and integration tests. A UI/API preview can run without PostgreSQL; readiness correctly returns 503.
+Prerequisites: Python 3.12, Node 24.19, pnpm 11.25, and Docker for engine work (Maven and the JDK run inside the engine image build). PostgreSQL 17 is required for durable workers and integration tests. A UI/API preview can run without PostgreSQL; readiness correctly returns 503.
 
 ```sh
 python -m venv .venv
@@ -33,13 +35,27 @@ uvicorn api.main:create_app --factory --reload --host 127.0.0.1 --port 8000
 
 In a second terminal, run `pnpm dev` and open http://localhost:5173. Vite proxies `/api` to port 8000. Run `python -m catalog.worker` in a third activated terminal when testing jobs. The worker only supports `health_probe`; it records other kinds as failed instead of pretending to import data.
 
-The Java boundary can be compiled without Maven:
+### Engine
+
+`engine/` is a Maven project built in Docker. The image fetches exactly the XMage commit in `engine/xmage/pin.properties` (a shallow fetch of that one SHA), installs the XMage modules it needs into a Maven repository inside the image, builds XMage's card database, then compiles the engine and runs its JUnit suite, including real bot games. XMage source and build output never enter this repository. See [the spike findings](docs/engine/xmage-spike.md).
 
 ```sh
-javac -Xlint:all -Werror -d engine/out engine/src/main/java/com/commanderduels/*.java engine/src/test/java/com/commanderduels/*.java
-java -cp engine/out com.commanderduels.EngineServerTest
-java -cp engine/out com.commanderduels.EngineServer
+docker compose build engine
 ```
+
+With the stack running, play one development bot match (Legacy rules, two XMage "Computer - mad" players, fixture decks from `engine/decks`). The engine has no published port, so the request runs from the API container:
+
+```sh
+docker compose exec api python -c "import httpx, json, os; r = httpx.post(os.environ['CD_ENGINE_URL'] + '/v1/bot_match', json={'seed': 42}, timeout=700); print(json.dumps(r.json(), indent=2))"
+```
+
+Optional inputs: `seed`, `turn_cap` (1–200, default 60), `time_budget_seconds` (1–600, default 120), `skill` (1–6, default 4) and `include_log`. Out-of-range values are clamped. One match runs at a time; others get 429. To run several in a row and summarize them:
+
+```sh
+docker compose exec -T api python - --count 10 < scripts/engine_bot_matches.py
+```
+
+The bot match endpoint exists only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets for development.
 
 ## Verify changes
 
@@ -63,7 +79,7 @@ pnpm test:e2e
 docker compose config --quiet
 ```
 
-Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also runs Java smoke tests, migration checks against PostgreSQL, browser journeys, and container builds.
+Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also builds the engine image (Maven, JUnit and a Compose smoke match), runs migration checks against PostgreSQL and browser journeys, and builds the other containers.
 
 To run browser tests against the built Compose app, set `CD_BROWSER_URL=http://127.0.0.1:8080` before `pnpm test:e2e`. Without this override, the tests start the API on port 8000 and Vite on port 5173.
 
@@ -82,11 +98,11 @@ Each development thread is one version, and `VERSION` is the only file that hold
 | --- | --- |
 | `web` | Accessible eight-section shell, format details, device preferences, API client |
 | `api` | HTTP contracts, configuration, lifecycle, persistence models and Alembic migrations |
-| `engine` | Java 21 boundary; XMage adaptation is still outstanding |
+| `engine` | Java 21 XMage engine service: pinned build, card database, development bot matches |
 | `catalog` | PostgreSQL lease claim, generation fencing and bounded worker loop |
 | `contracts` | Generated public OpenAPI and draft internal command envelope |
 | `content` | Constrained draft scenario schema and example |
 | `tests` | API, migration, contract and job lifecycle regressions |
 | `docs` | Architecture, scope ledger, reference inventory and release evidence |
 
-See [architecture](docs/architecture.md), [remaining work](docs/backlog.md), and [release notes](docs/releases/0.0.1.md). No production VM, host nginx, certificate, firewall, or routing configuration is included.
+See [architecture](docs/architecture.md), [remaining work](docs/backlog.md), and release notes for [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md). No production VM, host nginx, certificate, firewall, or routing configuration is included.

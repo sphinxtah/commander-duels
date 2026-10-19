@@ -30,7 +30,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.0.1",
+            "default": "0.0.2",
             "title": "Version",
             "type": "string"
           }
@@ -75,9 +75,44 @@
         "title": "Capability",
         "type": "object"
       },
-      "EngineStatus": {
+      "CardCounts": {
         "additionalProperties": false,
         "properties": {
+          "distinct_names": {
+            "title": "Distinct Names",
+            "type": "integer"
+          },
+          "printings": {
+            "title": "Printings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "printings",
+          "distinct_names"
+        ],
+        "title": "CardCounts",
+        "type": "object"
+      },
+      "EngineStatus": {
+        "additionalProperties": false,
+        "description": "Engine /health, passed through. \"unavailable\" means the engine is unreachable or invalid.",
+        "properties": {
+          "bot_match_enabled": {
+            "default": false,
+            "title": "Bot Match Enabled",
+            "type": "boolean"
+          },
+          "cards": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "gameplay_available": {
             "const": false,
             "default": false,
@@ -93,10 +128,22 @@
           "status": {
             "enum": [
               "unavailable",
-              "scaffold"
+              "loading",
+              "ready",
+              "failed"
             ],
             "title": "Status",
             "type": "string"
+          },
+          "xmage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/XmageBuild"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -186,7 +233,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.0.1",
+            "default": "0.0.2",
             "title": "Version",
             "type": "string"
           }
@@ -221,12 +268,41 @@
         ],
         "title": "Readiness",
         "type": "object"
+      },
+      "XmageBuild": {
+        "additionalProperties": false,
+        "properties": {
+          "commit": {
+            "title": "Commit",
+            "type": "string"
+          },
+          "commit_date": {
+            "title": "Commit Date",
+            "type": "string"
+          },
+          "tag": {
+            "title": "Tag",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "tag",
+          "commit",
+          "commit_date"
+        ],
+        "title": "XmageBuild",
+        "type": "object"
       }
     }
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.0.1"
+    "version": "0.0.2"
   },
   "openapi": "3.1.0",
   "paths": {

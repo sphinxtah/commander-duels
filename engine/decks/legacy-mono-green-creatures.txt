@@ -1,0 +1,13 @@
+// Commander Duels engine fixture: mono-green creatures, 60 cards, Legacy-legal.
+// Simple cards only. Keep card lines contiguous: XMage's text importer treats a blank line as the sideboard switch.
+22 Forest
+4 Llanowar Elves
+4 Elvish Mystic
+4 Grizzly Bears
+4 Kalonian Tusker
+4 Garruk's Companion
+4 Centaur Courser
+4 Leatherback Baloth
+2 Craw Wurm
+4 Giant Growth
+4 Titanic Growth

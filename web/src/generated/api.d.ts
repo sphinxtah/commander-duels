@@ -134,7 +134,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.0.1
+             * @default 0.0.2
              */
             version: string;
         };
@@ -154,8 +154,24 @@ export interface components {
             /** Reason */
             reason: string;
         };
-        /** EngineStatus */
+        /** CardCounts */
+        CardCounts: {
+            /** Distinct Names */
+            distinct_names: number;
+            /** Printings */
+            printings: number;
+        };
+        /**
+         * EngineStatus
+         * @description Engine /health, passed through. "unavailable" means the engine is unreachable or invalid.
+         */
         EngineStatus: {
+            /**
+             * Bot Match Enabled
+             * @default false
+             */
+            bot_match_enabled: boolean;
+            cards?: components["schemas"]["CardCounts"] | null;
             /**
              * Gameplay Available
              * @default false
@@ -172,7 +188,8 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "unavailable" | "scaffold";
+            status: "unavailable" | "loading" | "ready" | "failed";
+            xmage?: components["schemas"]["XmageBuild"] | null;
         };
         /** Error */
         Error: {
@@ -214,7 +231,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.0.1
+             * @default 0.0.2
              */
             version: string;
         };
@@ -230,6 +247,17 @@ export interface components {
              * @enum {string}
              */
             status: "ready" | "not_ready";
+        };
+        /** XmageBuild */
+        XmageBuild: {
+            /** Commit */
+            commit: string;
+            /** Commit Date */
+            commit_date: string;
+            /** Tag */
+            tag: string;
+            /** Version */
+            version: string;
         };
     };
     responses: never;

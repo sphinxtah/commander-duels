@@ -39,7 +39,8 @@ CAPABILITIES = [
         id="gameplay",
         name="Connected play",
         milestone="M0–M3",
-        reason="The XMage adapter and authorized player views require engine proof.",
+        reason="The XMage engine runs internal bot-versus-bot test games only; human seats and "
+        "authorized player views are not built yet.",
     ),
     Capability(
         id="campaign",
