@@ -50,6 +50,15 @@ The engine tests (`ServiceGameHttpTest`, real XMage games):
 - **Inspection against XMage.** At each of six prompts, every player's hand and library match XMage's own: card by card, in order, and each opaque id resolving to that very card. Every seat's deck is shown, and versions increase. After a close, the final inspection carries the result.
 - **Card lookup.** `lightning bo` finds Lightning Bolt first. Bad queries are refused.
 
+### Hosted CI
+
+GitHub Actions ("Framework checks") run #20 (`c686a21`) passed in 9 m 48 s. The XMage layers came from the cache; the engine module was rebuilt and tested.
+- **Verify, 2 m 35 s.** Python checks against PostgreSQL, including the game tests. Contracts without drift, Vitest, the production build, the six browser journeys and the container builds.
+- **Engine, 9 m 43 s.**
+  - **Image build, 4 m 55 s.** 69 JUnit tests passed.
+  - **Development smoke, 1 m 26 s.** A bot match; Legacy in 11 turns with 358 payloads; four-seat Commander in 24 turns with 352 prompts and 1,599 payloads.
+  - **Practice games through the API, 2 m 55 s.** SysOp played a Legacy game, which the bot won in 9 turns: 59 prompts, 193 snapshots and 128 inspections. Then a Commander game against two bots, to the 24-turn limit: 218 prompts, 625 snapshots and 484 inspections. Both results were recorded and both inspections audited. The observer refusal, the lease takeover and the resend were verified, with no problems. This is the first run of that step on GitHub's runners: host networking reached the API from the Compose gateway, SysOp's network, as on this computer.
+
 ## v0.0.5
 
 Validated locally on Windows on October 18–19, 2026 (UTC).
