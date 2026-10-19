@@ -1,0 +1,439 @@
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { client, describe, type Me } from "../api";
+import type { components } from "../generated/api";
+import styles from "./game.module.css";
+
+type Options = components["schemas"]["PracticeOptions"];
+type GameSummary = components["schemas"]["GameSummary"];
+type Request = components["schemas"]["PracticeGameRequest"];
+type Deck = NonNullable<Request["deck"]>;
+
+/** "commander-mono-red-raiders" reads "Mono-red raiders". */
+export function deckName(deck: string | null | undefined): string {
+  if (!deck) return "Custom list";
+  const text = deck.replace(/^(legacy|commander)-/, "").replace(/-/g, " ");
+  return (text.charAt(0).toUpperCase() + text.slice(1)).replace(
+    /^Mono (\w+)/,
+    "Mono-$1",
+  );
+}
+
+const time = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+function ago(iso: string): string {
+  const minutes = Math.round((Date.parse(iso) - Date.now()) / 60000);
+  if (Math.abs(minutes) < 60) return time.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 48) return time.format(hours, "hour");
+  return time.format(Math.round(hours / 24), "day");
+}
+
+function outcome(game: GameSummary): string {
+  if (game.status === "active") return "In progress";
+  if (game.status === "interrupted") return "Interrupted";
+  const result = game.result;
+  if (!result) return "Finished";
+  const turns = `${result.turns} turn${result.turns === 1 ? "" : "s"}`;
+  if (result.draw) return `Draw after ${turns}`;
+  if (result.winner_seat !== null && game.your_seat !== null)
+    return result.winner_seat === game.your_seat
+      ? `Won in ${turns}`
+      : `Lost in ${turns}`;
+  const kinds: Record<string, string> = {
+    turn_limit: "Turn limit",
+    closed: "Closed",
+    idle_timeout: "Timed out",
+    humans_eliminated: "Lost",
+    error: "Engine error",
+  };
+  return `${kinds[result.kind] ?? "Finished"} after ${turns}`;
+}
+
+const refusals: Record<string, string> = {
+  game_limit:
+    "You already have a game running. Resume it or close it below first.",
+  games_busy: "Every table is busy right now. Try again in half a minute.",
+  games_unavailable: "Games are switched off on this server.",
+  engine_unavailable: "The rules engine is not answering. Try again shortly.",
+};
+
+export function PracticeTable({ me }: { me: Me | null | undefined }) {
+  if (me === undefined) return null;
+  if (me === null)
+    return (
+      <section className={styles.table} aria-labelledby="table-title">
+        <h2 id="table-title">Play a practice game</h2>
+        <p>
+          Sign in to sit down against the bots. New accounts are approved by the
+          site's operator during testing.
+        </p>
+        <a className={styles.primaryButton} href="#profile">
+          Sign in
+        </a>
+      </section>
+    );
+  if (me.status !== "active" || !me.permissions.includes("games.play"))
+    return (
+      <section className={styles.table} aria-labelledby="table-title">
+        <h2 id="table-title">Play a practice game</h2>
+        <p>
+          {me.status === "pending"
+            ? "Your account is waiting for approval. You can play once it is approved."
+            : me.status === "denied"
+              ? "This account was not approved for testing."
+              : "This account cannot play games yet."}
+        </p>
+      </section>
+    );
+  return <Table me={me} />;
+}
+
+function Table({ me }: { me: Me }) {
+  const sysop = me.permissions.includes("games.view_concealed");
+  const [options, setOptions] = useState<Options>();
+  const [games, setGames] = useState<GameSummary[]>();
+  const [everyone, setEveryone] = useState(false);
+  const [error, setError] = useState("");
+  const [starting, setStarting] = useState(false);
+  const [format, setFormat] = useState<"legacy" | "commander">("legacy");
+  const [deck, setDeck] = useState<string>("");
+  const [bots, setBots] = useState(1);
+  const [botDecks, setBotDecks] = useState<string[]>(["", "", ""]);
+  const [skill, setSkill] = useState(4);
+  const [turnCap, setTurnCap] = useState(60);
+  const [useList, setUseList] = useState(false);
+  const [deckList, setDeckList] = useState("");
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<string[]>([]);
+
+  const refresh = useCallback(async () => {
+    const { data } = await client.GET("/api/v1/games", {
+      params: { query: { scope: everyone ? "all" : "mine" } },
+    });
+    setGames(data ?? []);
+  }, [everyone]);
+
+  useEffect(() => {
+    void client.GET("/api/v1/practice-games/options").then(({ data }) => {
+      if (data) setOptions(data);
+    });
+  }, []);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+  useEffect(() => {
+    const chosen = options?.formats.find((f) => f.id === format);
+    if (chosen) setBots(chosen.default_bots);
+    setDeck("");
+    setBotDecks(["", "", ""]);
+  }, [format, options]);
+  useEffect(() => {
+    if (!useList || query.trim().length < 2) {
+      setFound([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void client
+        .GET("/api/v1/cards", {
+          params: { query: { q: query.trim(), limit: 12 } },
+        })
+        .then(({ data }) => setFound(data?.names ?? []));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query, useList]);
+
+  const chosenFormat = options?.formats.find((f) => f.id === format);
+
+  async function start(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setStarting(true);
+    const body: Request = {
+      format,
+      bot_skill: skill,
+      turn_cap: turnCap,
+      bots: Array.from({ length: bots }, (_, i) =>
+        botDecks[i] ? { deck: botDecks[i] as Deck } : {},
+      ),
+      ...(useList && deckList.trim()
+        ? { deck_list: deckList }
+        : deck
+          ? { deck: deck as Deck }
+          : {}),
+    };
+    const { data, error: failure } = await client.POST(
+      "/api/v1/practice-games",
+      {
+        body,
+      },
+    );
+    setStarting(false);
+    if (data) {
+      window.location.hash = `#game/${data.id}`;
+      return;
+    }
+    const code = (failure as { code?: string } | undefined)?.code ?? "";
+    const names = (failure as { names?: string[] } | undefined)?.names;
+    setError(
+      names?.length
+        ? `Unknown card names: ${names.join(", ")}`
+        : (refusals[code] ?? describe(failure)),
+    );
+    void refresh();
+  }
+
+  async function close(game: GameSummary) {
+    await client.POST("/api/v1/games/{game_id}/close", {
+      params: { path: { game_id: game.id } },
+    });
+    void refresh();
+  }
+
+  const active = games?.filter((g) => g.status === "active") ?? [];
+  const recent = games?.filter((g) => g.status !== "active").slice(0, 8) ?? [];
+
+  return (
+    <section className={styles.table} aria-labelledby="table-title">
+      <div className={styles.tableHead}>
+        <div>
+          <span className={styles.eyebrow}>PRACTICE TABLE</span>
+          <h2 id="table-title">Sit down against the bots</h2>
+        </div>
+      </div>
+      <form className={styles.startForm} onSubmit={start}>
+        <fieldset>
+          <legend>Format</legend>
+          {(options?.formats ?? []).map((f) => (
+            <label key={f.id} className={styles.choice}>
+              <input
+                type="radio"
+                name="format"
+                value={f.id}
+                checked={format === f.id}
+                onChange={() => setFormat(f.id)}
+              />
+              <span>
+                <strong>{f.name}</strong>
+                <small>
+                  {f.id === "legacy"
+                    ? "One bot, 20 life"
+                    : "One to three bots, 40 life"}
+                </small>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <label className={styles.field}>
+          <span>Your deck</span>
+          <select
+            aria-label="Your deck"
+            value={deck}
+            disabled={useList}
+            onChange={(event) => setDeck(event.target.value)}
+          >
+            <option value="">Any free fixture deck</option>
+            {chosenFormat?.decks.map((d) => (
+              <option key={d} value={d}>
+                {deckName(d)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {chosenFormat && chosenFormat.bots.length > 1 && (
+          <label className={styles.field}>
+            <span>Bots</span>
+            <select
+              aria-label="Bots"
+              value={bots}
+              onChange={(event) => setBots(Number(event.target.value))}
+            >
+              {chosenFormat.bots.map((count) => (
+                <option key={count} value={count}>
+                  {count} {count === 1 ? "bot" : "bots"} ({count + 1} players)
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {Array.from({ length: bots }, (_, i) => (
+          <label key={i} className={styles.field}>
+            <span>{bots === 1 ? "Bot's deck" : `Bot ${i + 1}'s deck`}</span>
+            <select
+              aria-label={bots === 1 ? "Bot's deck" : `Bot ${i + 1}'s deck`}
+              value={botDecks[i]}
+              onChange={(event) =>
+                setBotDecks((current) =>
+                  current.map((value, j) =>
+                    j === i ? event.target.value : value,
+                  ),
+                )
+              }
+            >
+              <option value="">Any free fixture deck</option>
+              {chosenFormat?.decks.map((d) => (
+                <option key={d} value={d}>
+                  {deckName(d)}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+        <label className={styles.field}>
+          <span>
+            Bot skill <small>{skill} of 6</small>
+          </span>
+          <input
+            type="range"
+            min={1}
+            max={6}
+            value={skill}
+            onChange={(event) => setSkill(Number(event.target.value))}
+          />
+        </label>
+        <label className={styles.field}>
+          <span>Turn limit</span>
+          <input
+            type="number"
+            min={1}
+            max={200}
+            value={turnCap}
+            onChange={(event) => setTurnCap(Number(event.target.value) || 60)}
+          />
+        </label>
+        {options?.deck_lists && (
+          <div className={styles.deckList}>
+            <label className={styles.switch}>
+              <input
+                type="checkbox"
+                checked={useList}
+                onChange={(event) => setUseList(event.target.checked)}
+              />
+              <span>
+                Play my own deck list (any card the engine implements)
+              </span>
+            </label>
+            {useList && (
+              <>
+                <label className={styles.field}>
+                  <span>Deck list</span>
+                  <textarea
+                    rows={10}
+                    value={deckList}
+                    placeholder={
+                      format === "commander"
+                        ? "Commander: Tetsuko Umezawa, Fugitive\n38 Island\n1 Fact or Fiction"
+                        : "4 Lightning Bolt\n20 Mountain"
+                    }
+                    onChange={(event) => setDeckList(event.target.value)}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Find a card</span>
+                  <input
+                    type="search"
+                    value={query}
+                    placeholder="Type part of a name"
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                </label>
+                {found.length > 0 && (
+                  <ul className={styles.found} aria-label="Matching cards">
+                    {found.map((name) => (
+                      <li key={name}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeckList(
+                              (list) =>
+                                `${list.replace(/\s*$/, "")}${list.trim() ? "\n" : ""}1 ${name}\n`,
+                            )
+                          }
+                        >
+                          Add {name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        <div className={styles.startRow}>
+          <button
+            type="submit"
+            className={styles.primaryButton}
+            disabled={starting || !options || (useList && !deckList.trim())}
+          >
+            {starting ? "Shuffling…" : "Start the game"}
+          </button>
+          {error && (
+            <p role="alert" className={styles.refusal}>
+              {error}
+            </p>
+          )}
+        </div>
+      </form>
+
+      <div className={styles.gamesHead}>
+        <h3>{everyone ? "Every player's games" : "Your games"}</h3>
+        {sysop && (
+          <label className={styles.switch}>
+            <input
+              type="checkbox"
+              checked={everyone}
+              onChange={(event) => setEveryone(event.target.checked)}
+            />
+            <span>Show every player's games</span>
+          </label>
+        )}
+      </div>
+      {!games ? (
+        <p role="status">Loading games…</p>
+      ) : games.length === 0 ? (
+        <p className={styles.hint}>No games yet.</p>
+      ) : (
+        <ul className={styles.games}>
+          {[...active, ...recent].map((game) => {
+            const players = game.seats
+              .map((seat) =>
+                seat.player === "bot" ? "Bot" : (seat.handle ?? "Player"),
+              )
+              .join(" · ");
+            return (
+              <li key={game.id} data-status={game.status}>
+                <div>
+                  <strong>
+                    {game.format === "commander" ? "Commander" : "Legacy"}
+                  </strong>{" "}
+                  <span>{players}</span>
+                  <small>
+                    {outcome(game)} · started {ago(game.created_at)}
+                    {game.your_seat !== null &&
+                      ` · ${deckName(game.seats.find((s) => s.seat === game.your_seat)?.deck)}`}
+                  </small>
+                </div>
+                {game.status === "active" && (
+                  <div className={styles.gameActions}>
+                    <a
+                      className={styles.primaryButton}
+                      href={`#game/${game.id}`}
+                    >
+                      {game.your_seat === null ? "Observe" : "Resume"}
+                    </a>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => void close(game)}
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}

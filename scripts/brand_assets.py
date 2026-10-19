@@ -20,6 +20,9 @@ from PIL import Image  # type: ignore[import-not-found]
 
 OUT = Path("web/public/brand")
 SIZE = (1254, 1254)
+BANNER = (1916, 821)
+# The banner's logo half, for phones: centred on the logo (about x = 1375).
+BANNER_LOGO = (925, 0, 1825, 821)
 # The site's background (theme-color in web/index.html).
 BACKGROUND = (16, 24, 25, 255)
 
@@ -48,5 +51,27 @@ def main(words: str, nowords: str) -> None:
         print(f"{path} {path.stat().st_size} bytes")
 
 
+def banner(path: str) -> None:
+    image = Image.open(path).convert("RGB")
+    if image.size != BANNER:
+        raise SystemExit(f"Expected a {BANNER[0]} x {BANNER[1]} banner, got {image.size}")
+    OUT.mkdir(parents=True, exist_ok=True)
+    lanczos = Image.Resampling.LANCZOS
+    for width in (1600, 960):
+        height = round(BANNER[1] * width / BANNER[0])
+        image.resize((width, height), lanczos).save(
+            OUT / f"banner-{width}.webp", quality=82, method=6
+        )
+    logo = image.crop(BANNER_LOGO)
+    logo.resize((640, round(logo.height * 640 / logo.width)), lanczos).save(
+        OUT / "banner-logo-640.webp", quality=84, method=6
+    )
+    for name in ("banner-1600.webp", "banner-960.webp", "banner-logo-640.webp"):
+        print(f"{OUT / name} {(OUT / name).stat().st_size} bytes")
+
+
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    if sys.argv[1] == "banner":
+        banner(sys.argv[2])
+    else:
+        main(sys.argv[1], sys.argv[2])

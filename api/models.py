@@ -10,7 +10,9 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    SmallInteger,
     String,
+    Text,
     TypeDecorator,
     UniqueConstraint,
     text,
@@ -203,6 +205,29 @@ class GameSeat(Base):
     deck: Mapped[str] = mapped_column(String(64))
     # The deck list's cards and commanders, as sent to the engine; null for fixture decks.
     deck_list: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+
+
+class CardImage(Base):
+    """What Scryfall answered for a card name: the printing and face whose image is cached on
+    disk, or that it knows no such card (tokens, unknown names)."""
+
+    __tablename__ = "card_images"
+    __table_args__ = (
+        CheckConstraint("status IN ('found', 'missing')", name="ck_card_images_status"),
+        CheckConstraint(
+            "(status = 'found') = (scryfall_id IS NOT NULL)", name="ck_card_images_found"
+        ),
+    )
+    # The exact name the game asked for; several names may lead to one printing.
+    name: Mapped[str] = mapped_column(Text, primary_key=True)
+    status: Mapped[str] = mapped_column(String(16))
+    scryfall_id: Mapped[UUID | None]
+    # Which of the card's faces the image shows; null for the card's own image.
+    face: Mapped[int | None] = mapped_column(SmallInteger)
+    set_code: Mapped[str | None] = mapped_column(Text)
+    collector_number: Mapped[str | None] = mapped_column(Text)
+    artist: Mapped[str | None] = mapped_column(Text)
+    checked_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
 class RulesBundle(Base):

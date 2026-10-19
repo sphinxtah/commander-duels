@@ -38,17 +38,17 @@ The JSON Schema envelope captures protocol, action identity, game identity, expe
 
 ## Browser
 
-React uses CSS Modules and hash navigation so a route refresh stays in the application. Main headings receive keyboard focus on navigation. Format dialogs use native modal focus behavior. Large text and reduced motion preferences persist in a versioned, defensive localStorage record and, for a signed-in account, in its profile; no identities or tokens are stored in the browser. The session cookie is HttpOnly, and the CSRF token lives in memory. Google's sign-in script loads only on the Profile page, and only when a client ID is configured. System reduced-motion settings are respected. The brand images are the owner's logo, resized by `scripts/brand_assets.py` ([provenance](asset-provenance.csv)); the rest is CSS geometry. There are no external images or font requests. The web container's Content Security Policy allows Google's sign-in script, stylesheet and button frame and nothing else from outside.
+React uses CSS Modules and hash navigation so a route refresh stays in the application. Main headings receive keyboard focus on navigation. Format dialogs use native modal focus behavior. Large text and reduced motion preferences persist in a versioned, defensive localStorage record and, for a signed-in account, in its profile; no identities or tokens are stored in the browser. The session cookie is HttpOnly, and the CSRF token lives in memory. Google's sign-in script loads only on the Profile page, and only when a client ID is configured. System reduced-motion settings are respected. The brand images are the owner's logo and banner, resized by `scripts/brand_assets.py` ([provenance](asset-provenance.csv)); the rest is CSS geometry. Card images come from Scryfall through the API's own cache, so the browser makes no external image or font requests ([the game screen](game-screen.md)). The web container's Content Security Policy allows Google's sign-in script, stylesheet and button frame and nothing else from outside.
 
 API availability is explicitly separate from connectivity and feature availability. Failed bootstrap requests expose retry. No service worker or installability claim is present: PWA updates and genuine local gameplay remain M5 work.
 
 ## Configuration
 
-Settings use the `CD_` prefix, `.env` locally and injected environment variables in containers. `.env` is ignored. Invalid enum values, URLs and worker intervals fail validation. Only development/test environments are accepted; production hardening has not been completed.
+Settings use the `CD_` prefix, `.env` locally and injected environment variables in containers. `.env` is ignored. Invalid enum values, URLs and worker intervals fail validation. `production` refuses to start with development credentials or an unsafe proxy setup ([the live site](deployment.md#configuration)).
 
 | Key | Default / purpose |
 | --- | --- |
-| `CD_ENVIRONMENT` | `development`; also accepts `test` |
+| `CD_ENVIRONMENT` | `development`; also `test`, and `production` for the live site, which requires HTTPS, Secure cookies, a generated database password, the service token, a Google client ID and trusted proxies |
 | `CD_DATABASE_URL` | Local PostgreSQL psycopg connection; SQLite only for isolated tests |
 | `CD_ENGINE_URL` | `http://localhost:8090`; server-to-server health probe |
 | `CD_PUBLIC_URL` | `http://localhost:5173`; the site's origin. State-changing requests must come from it (or its loopback twin) |
@@ -64,9 +64,11 @@ Settings use the `CD_` prefix, `.env` locally and injected environment variables
 | `CD_REAUTH_MINUTES` | 720; maximum sign-in age for role and account-status changes |
 | `CD_ENGINE_SERVICE_TOKEN` | Empty (games off); shared with the engine, at least 32 characters |
 | `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 (SysOp unlimited) and 2: running games per account and in the API |
+| `CD_CARD_IMAGE_DIR` | Empty (card images off); where the API keeps the card images it fetches from Scryfall. Compose and the live site: a named volume |
+| `CD_SCRYFALL_URL` | `https://api.scryfall.com`; Scryfall's API, for card-image lookups |
 
 The engine reads its own environment: `CD_ENGINE_PORT` (default 8090), `CD_ENGINE_DEV_ENDPOINTS` (default off, `true` in Compose; enables bot matches and development games), `CD_ENGINE_SERVICE_TOKEN` (the API's service games), `CD_ENGINE_MAX_GAMES` (concurrent games of both kinds, default 2, at most 8), `CD_ENGINE_DECKS` (the fixture deck folder) and `JDK_JAVA_OPTIONS`. Compose sets the heap explicitly (`-Xms256m -Xmx768m`), a 1.5 GB memory limit, and `-Dh2.bindAddress=127.0.0.1`, which keeps the TCP listener that XMage's H2 settings start on loopback. Compose publishes PostgreSQL on `127.0.0.1:${CD_DB_PORT:-5432}`, for host-side tests and Alembic only; move it when Windows reserves 5432.
 
-Dependency versions are recorded in package manifests and lockfiles. Container base images have version tags; digest pinning, SBOM generation and published artifact provenance remain release-hardening work. No host infrastructure is modified.
+Dependency versions are recorded in package manifests and lockfiles. Container base images have version tags; digest pinning, SBOM generation and published artifact provenance remain release-hardening work. CI publishes the images to GitHub's container registry for [the live site](deployment.md).
 
 Implementation references: [FastAPI lifespan](https://fastapi.tiangolo.com/advanced/events/), [SQLAlchemy connection pooling](https://docs.sqlalchemy.org/en/20/core/pooling.html), [Vite setup](https://vite.dev/guide/).

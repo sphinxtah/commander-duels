@@ -1,4 +1,5 @@
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
@@ -98,3 +99,32 @@ def test_engine_status_rejects_claims_and_unknown_shapes(tmp_path):
     ):
         assert engine_status_for(tmp_path, payload) == UNAVAILABLE
     assert engine_status_for(tmp_path, ENGINE_READY, status_code=503) == UNAVAILABLE
+
+
+PRODUCTION = {
+    "environment": "production",
+    "database_url": "postgresql+psycopg://commander:Jd8s0aZq3Lw91XyTkV2m@db:5432/commander",
+    "public_url": "https://duels.example.org",
+    "engine_service_token": "s" * 32,
+    "google_client_id": "client.apps.googleusercontent.com",
+    "trusted_proxies": "10.10.50.2/32,172.30.233.10/32",
+    "sysop_networks": "10.10.1.0/24",
+}
+
+
+def test_production_starts_only_hardened():
+    assert Settings(**PRODUCTION).environment == "production"
+    refused = {
+        "public_url": "http://duels.example.org",
+        "cookie_secure": False,
+        "database_url": "postgresql+psycopg://commander:commander@db:5432/commander",
+        "engine_service_token": "",
+        "google_client_id": "",
+        "trusted_proxies": "",
+        "sysop_networks": "::/0",
+    }
+    for field, value in refused.items():
+        with pytest.raises(ValueError, match="Production settings refused"):
+            Settings(**{**PRODUCTION, field: value})
+    # The same values are fine for development.
+    assert Settings(**{**PRODUCTION, **refused, "environment": "development"})

@@ -19,6 +19,10 @@ let csrfToken: string | undefined;
 export function setCsrfToken(token: string | undefined) {
   csrfToken = token;
 }
+/** The game WebSocket's hello carries the token too. */
+export function currentCsrfToken(): string | undefined {
+  return csrfToken;
+}
 client.use({
   onRequest({ request }) {
     if (csrfToken && !["GET", "HEAD"].includes(request.method))

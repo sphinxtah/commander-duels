@@ -94,3 +94,70 @@ jobs:
               && python scripts/api_practice_game.py --url http://127.0.0.1:8000 --origin http://localhost:8080 --schemas contracts --quiet \
                 --format commander --bots 2 --turn-cap 24"
           docker compose down
+      # The game screen (v0.1.0): Legacy games played to the end by mouse and by keyboard, a
+      # four-player Commander table, and a second tab with a lost reply, in Chromium through the
+      # web proxy against the engine. Every WebSocket frame is checked for concealed cards.
+      - name: Practice games in the browser
+        run: |
+          token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(18))')"
+          echo "::add-mask::$token"
+          echo "::add-mask::$password"
+          export CD_ENGINE_SERVICE_TOKEN="$token"
+          docker compose build migrate api web
+          docker compose up -d --wait --no-build db migrate api engine web
+          printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin
+          # Host networking: the browser reaches the web proxy's published port from this machine,
+          # which the API sees as the Compose gateway, SysOp's network.
+          docker run --rm --network host --ipc=host -e CI=1 -e CD_BROWSER_URL=http://localhost:8080 \
+            -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -v "$PWD:/w" -w /w \
+            mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
+              && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
+              && pnpm --dir web exec playwright test e2e/game.spec.ts --reporter=line"
+          docker compose down
+  # Images for the live site, once both jobs pass: every push to main as sha-<commit> and main,
+  # every version tag as its version (v0.1.0 -> 0.1.0). deploy/push.sh deploys one by its tag.
+  publish:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [verify, engine]
+    runs-on: ubuntu-24.04
+    permissions: {contents: read, packages: write}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+      - name: Image tags
+        id: tags
+        run: |
+          base=ghcr.io/sphinxtah/commander-duels
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then label="${GITHUB_REF#refs/tags/v}"; else label=main; fi
+          for image in api web engine; do
+            echo "$image=$base/$image:sha-${GITHUB_SHA::12},$base/$image:$label" >> "$GITHUB_OUTPUT"
+          done
+      - name: Publish the API image (API, migrations and worker)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: api/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.api }}
+          labels: org.opencontainers.image.source=https://github.com/sphinxtah/commander-duels
+      - name: Publish the web image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.web }}
+          labels: org.opencontainers.image.source=https://github.com/sphinxtah/commander-duels
+      # The engine job's cache holds every layer of this commit's engine build.
+      - name: Publish the engine image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: engine/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.engine }}
+          labels: org.opencontainers.image.source=https://github.com/sphinxtah/commander-duels
+          cache-from: type=gha,scope=engine

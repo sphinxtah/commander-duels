@@ -1,0 +1,30 @@
+# Commander Duels on the TSH nginx proxy: /etc/nginx/sites-available/duels.thesphinx.co.
+# The proxy only terminates TLS; the game runs on the VM (commanderduels). Adding this file changes no other
+# site. Certbot (--nginx) adds the HTTPS listener, the certificate and the HTTP redirect to it.
+
+# Game events use a WebSocket. The variable's name is this site's own, so it cannot clash with a
+# map another site file defines.
+map $http_upgrade $duels_connection_upgrade {
+    default upgrade;
+    ""      close;
+}
+
+server {
+    listen 80;
+    server_name duels.thesphinx.co;
+
+    location / {
+        proxy_pass http://10.10.50.57:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $duels_connection_upgrade;
+        # Replace, never append: the API believes this proxy and its own web container, nothing
+        # else, and takes the visitor's address from here (SysOp's network check depends on it).
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # A game's WebSocket may sit quiet while a player thinks; the API pings it every 20 s.
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+}

@@ -4,6 +4,8 @@ COPY requirements.lock pyproject.toml alembic.ini VERSION ./
 COPY api ./api
 COPY catalog ./catalog
 RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
+# The card image cache; a named volume mounted here starts with this owner.
+RUN install -d -o 10001 -g 10001 /var/lib/commander-duels/card-images
 USER 10001:10001
 EXPOSE 8000
 # The API resolves client addresses itself, from CD_TRUSTED_PROXIES only.

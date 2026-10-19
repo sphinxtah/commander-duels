@@ -10,6 +10,8 @@ import {
   type Format,
   type Me,
 } from "./api";
+import { GameScreen } from "./game/GameScreen";
+import { PracticeTable } from "./game/PracticeTable";
 import {
   readPreferences,
   savePreferences,
@@ -68,6 +70,11 @@ const details: Record<
     milestone: "M1 / M4 · Collection policies",
   },
 };
+const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
+/** #game/<id> opens a game's table, full screen. */
+function currentGame(): string | undefined {
+  return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
+}
 function currentPage(): Page {
   const path = window.location.hash.slice(1).toLowerCase();
   if (path === "sysop") return "SysOp";
@@ -76,6 +83,7 @@ function currentPage(): Page {
 
 export function App() {
   const [page, setPage] = useState<Page>(currentPage);
+  const [game, setGame] = useState(currentGame);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [formats, setFormats] = useState<Format[]>([]);
   const [connection, setConnection] = useState<
@@ -97,6 +105,7 @@ export function App() {
     const change = () => {
       navigated.current = true;
       setPage(currentPage());
+      setGame(currentGame());
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -207,6 +216,16 @@ export function App() {
         });
   }
 
+  // The table waits for the account, whose CSRF token the game's WebSocket needs.
+  if (game)
+    return me === undefined ? (
+      <p className={styles.tableLoading} role="status">
+        Opening the table…
+      </p>
+    ) : (
+      <GameScreen key={game} gameId={game} me={me} />
+    );
+
   return (
     <div className={styles.app}>
       <a className={styles.skip} href="#main">
@@ -306,6 +325,26 @@ export function App() {
           ) : page === "Play" || page === "SysOp" ? (
             <>
               <section className={styles.hero} aria-labelledby="page-title">
+                <picture className={styles.heroBanner}>
+                  <source
+                    media="(max-width: 600px)"
+                    srcSet="/brand/banner-logo-640.webp"
+                    width={640}
+                    height={584}
+                  />
+                  <source
+                    media="(max-width: 1100px)"
+                    srcSet="/brand/banner-960.webp"
+                    width={960}
+                    height={411}
+                  />
+                  <img
+                    src="/brand/banner-1600.webp"
+                    alt="Commander Duels: an armoured warrior with an axe on a battlefield, beside the Commander Duels logo"
+                    width={1600}
+                    height={686}
+                  />
+                </picture>
                 <div className={styles.heroCopy}>
                   <div className={styles.eyebrow}>
                     <span /> A NEW TABLE. ENDLESS POSSIBILITIES.
@@ -320,27 +359,17 @@ export function App() {
                     <br />A new home for Commander, Legacy, and playing
                     together.
                   </p>
-                  <a className={styles.primary} href="#formats">
-                    Explore the formats <span aria-hidden="true">↓</span>
+                  <a className={styles.primary} href="#practice">
+                    Play a practice game <span aria-hidden="true">↓</span>
                   </a>
                   <span className={styles.heroNote}>
-                    Framework preview · Matches are not available yet
+                    Testing preview · Practice games against the bots
                   </span>
                 </div>
-                <div className={styles.heroArt} aria-hidden="true">
-                  <div className={styles.orbit} />
-                  <img
-                    className={styles.logo}
-                    src="/brand/logo.webp"
-                    alt=""
-                    width={296}
-                    height={296}
-                  />
-                  <div className={styles.artCaption}>
-                    THE NEXT CHAPTER IS YOURS
-                  </div>
-                </div>
               </section>
+              <div id="practice" className={styles.practice}>
+                <PracticeTable me={me} />
+              </div>
               <section
                 id="formats"
                 className={styles.formats}
@@ -521,9 +550,15 @@ export function App() {
           <footer className={styles.footer}>
             <span>COMMANDER DUELS</span>
             <span>
-              Framework preview <span aria-hidden="true">·</span> v
+              Testing preview <span aria-hidden="true">·</span> v
               {__APP_VERSION__}
             </span>
+            <p className={styles.legal}>
+              Commander Duels is unofficial Fan Content permitted under the Fan
+              Content Policy. Not approved/endorsed by Wizards. Portions of the
+              materials used are property of Wizards of the Coast. ©Wizards of
+              the Coast LLC. Card images from Scryfall.
+            </p>
           </footer>
         </main>
       </div>
@@ -548,8 +583,9 @@ export function App() {
           Default table: {selected?.default_seats} players.
         </p>
         <p>
-          Matches will open after rules integration, deck validation, and
-          player-view testing are complete.
+          {selected?.id === "two_headed_giant"
+            ? "Two-Headed Giant opens after its engine work is proven."
+            : "Practice games against the bots are open for testing: start one from the practice table."}
         </p>
         <button
           className={styles.primary}

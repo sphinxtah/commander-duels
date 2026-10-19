@@ -1,0 +1,100 @@
+# The live site, on the VM (commanderduels) in /srv/commander-duels (copied there by deploy/push.sh).
+# Images come from GitHub's container registry, built and tested by CI; nothing is built here.
+# Settings and generated secrets are in .env next to this file (see env.example).
+name: commander-duels
+x-logging: &logging
+  driver: json-file
+  options: {max-size: 10m, max-file: "5"}
+x-api: &api
+  image: ${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/api:${CD_VERSION:?set by deploy.sh}
+  restart: unless-stopped
+  logging: *logging
+  environment: &api_environment
+    CD_ENVIRONMENT: production
+    CD_DATABASE_URL: postgresql+psycopg://commander:${CD_DB_PASSWORD:?}@db:5432/commander
+    CD_ENGINE_URL: http://engine:8090
+    CD_PUBLIC_URL: ${CD_PUBLIC_URL:?}
+    CD_GOOGLE_CLIENT_ID: ${CD_GOOGLE_CLIENT_ID:?}
+    CD_SIGNUP_POLICY: ${CD_SIGNUP_POLICY:-approval}
+    # The host proxy (TLS) and the web container: the only addresses whose X-Forwarded-For counts.
+    CD_TRUSTED_PROXIES: ${CD_PROXY_ADDRESS:?}/32,172.30.233.10/32
+    CD_SYSOP_NETWORKS: ${CD_SYSOP_NETWORKS:?}
+    CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:?}
+    CD_GAMES_PER_ACCOUNT: ${CD_GAMES_PER_ACCOUNT:-1}
+    CD_GAMES_MAX: ${CD_GAMES_MAX:-2}
+    CD_CARD_IMAGE_DIR: /var/lib/commander-duels/card-images
+services:
+  db:
+    image: postgres:17.5-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: commander
+      POSTGRES_PASSWORD: ${CD_DB_PASSWORD:?}
+      POSTGRES_DB: commander
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commander -d commander"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    <<: *api
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *api
+    volumes: ["card_images:/var/lib/commander-duels/card-images"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      engine: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/ready', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  worker:
+    <<: *api
+    command: ["python", "-m", "catalog.worker"]
+    stop_grace_period: 10s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+  engine:
+    image: ${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/engine:${CD_VERSION:?}
+    restart: unless-stopped
+    logging: *logging
+    expose: ["8090"]
+    environment:
+      # Service games only; the development routes stay off on the live site.
+      CD_ENGINE_DEV_ENDPOINTS: "false"
+      CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:?}
+      JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
+    mem_limit: 1536m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8090/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 90s
+      start_interval: 2s
+  web:
+    image: ${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/web:${CD_VERSION:?}
+    restart: unless-stopped
+    logging: *logging
+    # The host proxy reaches this port over the LAN; web-access.conf (written by deploy.sh) lets
+    # only the proxy and loopback in.
+    ports: ["${CD_WEB_BIND:-0.0.0.0}:8080:8080"]
+    volumes: ["./web-access.conf:/etc/nginx/access.d/proxy.conf:ro"]
+    networks:
+      default: {ipv4_address: 172.30.233.10}
+    depends_on:
+      api: {condition: service_healthy}
+networks:
+  default:
+    ipam:
+      config: [{subnet: 172.30.233.0/24, gateway: 172.30.233.1}]
+volumes:
+  postgres_data:
+  card_images:

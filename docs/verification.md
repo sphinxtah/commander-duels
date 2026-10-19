@@ -1,5 +1,31 @@
 # Verification
 
+## v0.1.0
+
+Validated locally on Windows on October 19, 2026. The host has no Node, so the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting | Passed (API, catalog, tests and scripts) |
+| mypy strict checks | Passed, 26 Python source files |
+| Python suite | 43 passed against PostgreSQL 17. New: 11 card-image tests (against a fake Scryfall and image host: found, faces, missing and its week, failures, the host guard, sizes, sign-in, the 120 ms spacing, one fetch per name, caching headers, a rotated cookie) and the production-settings test |
+| Alembic | `0004_card_images` upgrade, downgrade to base and upgrade again, then `alembic check`, on SQLite and PostgreSQL |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated with the card-image routes and version 0.1.0 |
+| TypeScript, Prettier, Vitest and the production build | Passed |
+| Browser journeys, existing | Shell and identity: 6 passed, against a throwaway stack (below) |
+| Browser journeys, games | 4 passed against the real engine at bot skill 1, every WebSocket frame leak-checked. Last run: a Legacy game by mouse won in 10 turns (98 prompts: priority, targets, mana payment, attackers and blockers; 276 snapshots in 376 frames); a Legacy game by keyboard alone to its 8-turn limit (67 prompts); a four-player Commander table to its 4-turn limit; and a second tab that watched, took control, lost a reply with its connection and got the first result back on the resend |
+| Sizes | Screenshots at 1920 x 1080, 1366 x 768 and 390 x 844 checked by eye; no horizontal scroll at any size. The hand now stays in view at 1366 x 768 |
+| Card images | Real Scryfall images for the fixture decks, fetched once by the API and served from its volume |
+| Deploy kit | ShellCheck clean (`deploy/*.sh`); the production Compose file renders; actionlint clean on the workflow |
+
+**The throwaway stack.** It had its own database (`commander_e2e` on the Compose server) and a test SysOp whose password was generated for the run. It used the Compose engine and the built API and web images, with the web container on `127.0.0.1:8080`. The Playwright container shared the web container's network, so the browser came from loopback. The developer's database and SysOp were not used.
+
+**Found and fixed while playing:**
+- A cached card image could finish loading before the card reset its state, leaving the image hidden behind the frame. Cards now remount when their name changes.
+- After a reconnect, the snapshot arrives before the lease. The page dropped its unanswered command as if another tab had moved the game on, so it was never resent. It now drops one only when another tab holds the lease.
+- Selects inside their labels took every option's text into their accessible names. They are named explicitly now.
+- The leak check matched XMage's button word "Cancel" against the card Cancel. Like the engine's own check, it now reads only object options' labels.
+
 ## v0.0.6
 
 Validated locally on Windows on October 19, 2026.

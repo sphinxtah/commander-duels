@@ -151,10 +151,11 @@ It asks twice, without echo. For automation, `--stdin` reads one line, and `--pa
 - A SysOp network that overlaps a trusted proxy is refused at startup: it would open SysOp to everyone that proxy forwards for.
 - Uvicorn runs with `--no-proxy-headers`, so only this logic decides.
 - In Compose, the web container is the one trusted proxy (`172.30.233.10`). Docker Desktop delivers this computer's browser requests from the network's gateway (`172.30.233.1`, measured), and the ports are published on 127.0.0.1 only, so the gateway is this computer and the development SysOp network.
-- For the homelab deployment:
-  - Set the LAN's CIDR.
-  - List the host proxy and the web container as trusted proxies.
-  - Re-test the entrance from outside the network: it must answer *not found*.
+- On the live site ([the live site](deployment.md), since v0.1.0):
+  - SysOp's network is the home LAN, 10.10.1.0/24. The UniFi hairpin keeps LAN addresses, so SysOp signs in through the public name.
+  - The trusted proxies are the TSH nginx proxy (10.10.50.2) and the web container. The proxy replaces `X-Forwarded-For`, and the web container appends the proxy's address.
+  - The entrance is re-tested from outside the network at each version: it must answer *not found*.
+  - Sign-up needs approval (`CD_SIGNUP_POLICY=approval`); SysOp approves every account until the site opens to the public at v1.0.0.
 
 ## Audit trail
 

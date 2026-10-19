@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
-from api import admin, auth, games
+from api import admin, auth, card_images, games
 from api.config import Settings
 from api.database import build_engine, migration_head
 from api.google import CachingTransport, GoogleVerifier
@@ -45,8 +45,8 @@ CAPABILITIES = [
         id="gameplay",
         name="Connected play",
         milestone="M0–M3",
-        reason="Signed-in accounts play practice games against bots through the API and its "
-        "WebSocket, from scripts. The game interface arrives in v0.1.0.",
+        reason="Practice games against bots are playable in the browser since v0.1.0. Human "
+        "opponents, lobbies and recovery come later.",
     ),
     Capability(
         id="campaign",
@@ -96,8 +96,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     trust_env=False,
                     transport=getattr(app.state, "engine_transport", None),
                 ) as engine_client,
+                httpx.AsyncClient(
+                    timeout=10.0,
+                    trust_env=False,
+                    follow_redirects=False,
+                    transport=getattr(app.state, "scryfall_transport", None),
+                ) as scryfall,
             ):
                 app.state.http = client
+                app.state.scryfall = scryfall
+                app.state.card_images = card_images.CardImageCache(
+                    config, app.state.database, scryfall
+                )
                 engine = (
                     games.EngineClient(str(config.engine_url), token, engine_client)
                     if token
@@ -146,7 +156,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request.state.request_id = str(uuid4())
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
-        response.headers["Cache-Control"] = "no-store"
+        # Only a route that sets its own caching (card images) keeps it.
+        response.headers.setdefault("Cache-Control", "no-store")
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
@@ -247,4 +258,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(games.router)
+    app.include_router(card_images.router)
     return app

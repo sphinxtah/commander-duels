@@ -16,7 +16,7 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
   await expect(
     page.getByRole("heading", { name: "Commander", exact: true }),
   ).toBeVisible();
-  // The owner's logo: the monogram in the sidebar, the full logo on Play, and the favicon.
+  // The owner's art: the monogram in the sidebar, the banner on Play, and the favicon.
   const brand = page.locator('img[src^="/brand/"]');
   await expect(brand).toHaveCount(2);
   await expect

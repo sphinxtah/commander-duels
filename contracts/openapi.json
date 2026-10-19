@@ -296,7 +296,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.0.6",
+            "default": "0.1.0",
             "title": "Version",
             "type": "string"
           }
@@ -359,6 +359,66 @@
           "distinct_names"
         ],
         "title": "CardCounts",
+        "type": "object"
+      },
+      "CardImageInfo": {
+        "additionalProperties": false,
+        "description": "The printing whose image the cache serves for a name, for crediting its artist.",
+        "properties": {
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "collector_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collector Number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "set_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Code"
+          },
+          "status": {
+            "enum": [
+              "found",
+              "missing"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "artist",
+          "set_code",
+          "collector_number"
+        ],
+        "title": "CardImageInfo",
         "type": "object"
       },
       "CardNames": {
@@ -799,7 +859,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.0.6",
+            "default": "0.1.0",
             "title": "Version",
             "type": "string"
           }
@@ -1520,7 +1580,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.0.6"
+    "version": "0.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2696,6 +2756,251 @@
           }
         },
         "summary": "Bootstrap"
+      }
+    },
+    "/api/v1/card-images": {
+      "get": {
+        "description": "A card's image by its exact name, from Scryfall, cached on this server. The first request\nfor a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not\nknow, such as tokens.",
+        "operationId": "card_image_api_v1_card_images_get",
+        "parameters": [
+          {
+            "description": "The card's exact name, as the game shows it.",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The card's exact name, as the game shows it.",
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": "normal",
+              "enum": [
+                "normal",
+                "large"
+              ],
+              "title": "Size",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The card's image."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Card Image"
+      }
+    },
+    "/api/v1/card-images/info": {
+      "get": {
+        "description": "The printing and artist behind a name's cached image, to credit the artist and Scryfall.\nNever fetches: 404 until the image has been requested.",
+        "operationId": "card_image_info_api_v1_card_images_info_get",
+        "parameters": [
+          {
+            "description": "The card's exact name, as the game shows it.",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The card's exact name, as the game shows it.",
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardImageInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Card Image Info"
       }
     },
     "/api/v1/cards": {

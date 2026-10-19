@@ -33,6 +33,8 @@ services:
       # Shared with the engine; set it in .env (at least 32 random characters). Empty turns
       # games off.
       CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:-}
+      # Card images from Scryfall, cached in the api service's card_images volume.
+      CD_CARD_IMAGE_DIR: /var/lib/commander-duels/card-images
     command: ["alembic", "upgrade", "head"]
     depends_on:
       db: {condition: service_healthy}
@@ -40,6 +42,7 @@ services:
     build: {context: ., dockerfile: api/Dockerfile}
     environment: *api_environment
     ports: ["127.0.0.1:8000:8000"]
+    volumes: ["card_images:/var/lib/commander-duels/card-images"]
     depends_on:
       migrate: {condition: service_completed_successfully}
       engine: {condition: service_started}
@@ -90,3 +93,4 @@ networks:
       config: [{subnet: 172.30.233.0/24, gateway: 172.30.233.1}]
 volumes:
   postgres_data:
+  card_images:

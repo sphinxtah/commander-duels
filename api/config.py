@@ -15,7 +15,8 @@ def parse_networks(value: str) -> list[Network]:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CD_", env_file=".env", extra="ignore")
-    environment: Literal["development", "test"] = "development"
+    # "production" refuses to start with development credentials or an unsafe proxy setup.
+    environment: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://commander:commander@127.0.0.1:5432/commander"
     engine_url: HttpUrl = HttpUrl("http://localhost:8090")
     public_url: HttpUrl = HttpUrl("http://localhost:5173")
@@ -45,6 +46,10 @@ class Settings(BaseSettings):
     # (CD_ENGINE_MAX_GAMES) and games_max bound the total.
     games_per_account: int = Field(default=1, ge=1, le=8)
     games_max: int = Field(default=2, ge=1, le=8)
+    # Card images are fetched from Scryfall once, kept in this folder and served from our own
+    # origin; browsers never contact Scryfall. Empty turns card images off.
+    card_image_dir: str = ""
+    scryfall_url: HttpUrl = HttpUrl("https://api.scryfall.com")
 
     @field_validator("database_url")
     @classmethod
@@ -76,6 +81,32 @@ class Settings(BaseSettings):
             for proxy in self.trusted_proxy_list:
                 if network.version == proxy.version and network.overlaps(proxy):
                     raise ValueError(f"CD_SYSOP_NETWORKS {network} overlaps trusted proxy {proxy}")
+        return self
+
+    @model_validator(mode="after")
+    def production_is_hardened(self) -> "Settings":
+        if self.environment != "production":
+            return self
+        problems = []
+        if self.public_url.scheme != "https":
+            problems.append("CD_PUBLIC_URL must use https")
+        if not self.cookie_secure:
+            problems.append("CD_COOKIE_SECURE must be true")
+        database = make_url(self.database_url)
+        if database.drivername != "postgresql+psycopg":
+            problems.append("CD_DATABASE_URL must be PostgreSQL")
+        if len(database.password or "") < 16 or database.password == "commander":
+            problems.append("the database password must be generated (16 characters or more)")
+        if not self.engine_service_token.get_secret_value():
+            problems.append("CD_ENGINE_SERVICE_TOKEN is required")
+        if not self.google_client_id:
+            problems.append("CD_GOOGLE_CLIENT_ID is required")
+        if not self.trusted_proxy_list:
+            problems.append("CD_TRUSTED_PROXIES must list the host proxy and the web container")
+        if any(network.prefixlen == 0 for network in self.sysop_network_list):
+            problems.append("CD_SYSOP_NETWORKS may not include every address")
+        if problems:
+            raise ValueError("Production settings refused: " + "; ".join(problems))
         return self
 
     @property

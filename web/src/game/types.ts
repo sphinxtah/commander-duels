@@ -1,0 +1,309 @@
+// The engine's seat view and SysOp's inspection, as the API passes them through unchanged.
+// Hand-written from contracts/engine-seat-view.schema.json and engine-inspection.schema.json;
+// keep the two in step.
+
+export type Seat = number;
+export type ObjectId = string;
+
+export type PromptKind =
+  | "priority"
+  | "mulligan"
+  | "yes_no"
+  | "choose_target"
+  | "choose_defender"
+  | "choose_ability"
+  | "choose_choice"
+  | "choose_mode"
+  | "choose_amount"
+  | "order_triggers"
+  | "choose_pile"
+  | "pay_mana"
+  | "declare_attackers"
+  | "declare_blockers"
+  | "assign_amounts"
+  | "unsupported";
+
+export type OptionAction =
+  | "pass"
+  | "cast"
+  | "play_land"
+  | "activate"
+  | "activate_mana"
+  | "mulligan"
+  | "keep"
+  | "yes"
+  | "no"
+  | "choose"
+  | "done"
+  | "tap_source"
+  | "use_pool"
+  | "cancel"
+  | "toggle_attacker"
+  | "all_attack"
+  | "toggle_blocker"
+  | "suggested"
+  | "use_ability"
+  | "choose_mode"
+  | "put_first"
+  | "choose_pile";
+
+export interface PromptOption {
+  id: string;
+  action: OptionAction;
+  label: string | null;
+  object_id: ObjectId | null;
+  seat: Seat | null;
+  selected: boolean;
+}
+
+export interface AmountEntry {
+  label: string;
+  min: number;
+  max: number;
+  suggested: number;
+}
+
+export interface Prompt {
+  id: string;
+  kind: PromptKind;
+  message: string;
+  detail: string | null;
+  options: PromptOption[];
+  amounts: {
+    total_min: number;
+    total_max: number;
+    entries: AmountEntry[];
+  } | null;
+  piles: [ObjectId[], ObjectId[]] | null;
+  xmage_query: string | null;
+}
+
+/** A card face. A hidden card (face down, for instance) carries its id and nothing else. */
+export interface CardView {
+  id: ObjectId;
+  hidden: boolean;
+  name: string | null;
+  mana_cost: string | null;
+  type_line: string | null;
+  power: string | null;
+  toughness: string | null;
+  rules: string[];
+}
+
+export interface PermanentView {
+  id: ObjectId;
+  controller_seat: Seat;
+  owner_seat: Seat;
+  card: CardView;
+  tapped: boolean;
+  summoning_sick: boolean;
+  damage: number;
+  counters: Record<string, number>;
+  attacking: boolean;
+  blocking: boolean;
+  attached_to: ObjectId | null;
+}
+
+export interface TargetRef {
+  kind: "player" | "object";
+  seat: Seat | null;
+  object_id: ObjectId | null;
+  label: string | null;
+}
+
+export interface StackItem {
+  id: ObjectId;
+  kind: "spell" | "ability";
+  controller_seat: Seat;
+  name: string | null;
+  text: string | null;
+  hidden: boolean;
+  targets: TargetRef[];
+}
+
+export interface CombatGroup {
+  attackers: ObjectId[];
+  defender: TargetRef | null;
+  blockers: ObjectId[];
+  blocked: boolean;
+}
+
+export interface CardGroup {
+  name: string;
+  cards: CardView[];
+}
+
+export interface CommanderView {
+  name: string;
+  zone:
+    | "command"
+    | "battlefield"
+    | "stack"
+    | "graveyard"
+    | "exile"
+    | "hand"
+    | "library"
+    | "hidden"
+    | "outside";
+  object_id: ObjectId | null;
+  cast_count: number;
+  tax: number;
+  damage_dealt: { seat: Seat; damage: number }[];
+}
+
+export interface ManaPool {
+  white: number;
+  blue: number;
+  black: number;
+  red: number;
+  green: number;
+  colorless: number;
+}
+
+export interface PlayerView {
+  seat: Seat;
+  name: string;
+  life: number;
+  counters: Record<string, number>;
+  library_count: number;
+  hand_count: number;
+  graveyard: CardView[];
+  exile: CardView[];
+  mana_pool: ManaPool;
+  lost: boolean;
+  won: boolean;
+  color_identity: string | null;
+  command_zone: CardView[];
+  commanders: CommanderView[];
+}
+
+export interface GameView {
+  seat: Seat | null;
+  turn: number;
+  active_seat: Seat | null;
+  priority_seat: Seat | null;
+  phase: string | null;
+  step: string | null;
+  you: PlayerView | null;
+  opponents: PlayerView[];
+  hand: CardView[];
+  battlefield: PermanentView[];
+  stack: StackItem[];
+  combat: CombatGroup[];
+  revealed: CardGroup[];
+  looked_at: CardGroup[];
+  messages: string[];
+}
+
+export interface GameResultView {
+  kind:
+    | "completed"
+    | "turn_limit"
+    | "closed"
+    | "idle_timeout"
+    | "humans_eliminated"
+    | "error";
+  winner_seat: Seat | null;
+  draw: boolean;
+  conceded_seats: Seat[];
+  turns: number;
+  error: string | null;
+}
+
+export interface LogLine {
+  index: number;
+  turn: number;
+  active_seat: Seat | null;
+  step: string | null;
+  text: string;
+}
+
+export interface SeatSettings {
+  format: "legacy" | "commander";
+  rules_profile: string;
+  seats: { seat: Seat; player: "human" | "bot"; deck: string | null }[];
+  skill: number;
+  turn_cap: number;
+  idle_timeout_seconds: number;
+  spectator_delay_seconds: number;
+}
+
+export type SnapshotStatus =
+  | "starting"
+  | "your_prompt"
+  | "unsupported_prompt"
+  | "waiting"
+  | "eliminated"
+  | "spectating"
+  | "finished";
+
+export interface Snapshot {
+  game_id: string;
+  revision: number;
+  status: SnapshotStatus;
+  seat: Seat | null;
+  settings: SeatSettings;
+  prompt: Prompt | null;
+  view: GameView | null;
+  result: GameResultView | null;
+  log_count: number;
+  log_from: number;
+  log: LogLine[];
+}
+
+/** SysOp's inspection: the public view plus every hand and library in order, top first. */
+export interface Inspection {
+  game_id: string;
+  version: number;
+  status: "live" | "finished";
+  settings: SeatSettings;
+  view: GameView;
+  players: {
+    seat: Seat;
+    name: string | null;
+    hand: CardView[];
+    library: CardView[];
+  }[];
+  result: GameResultView | null;
+}
+
+/** A command in the engine's envelope; the API forwards it with the seat's token. */
+export interface CommandEnvelope {
+  v: 1;
+  game_id: string;
+  action_id: string;
+  expected_revision: number;
+  prompt_id?: string;
+  type: "submit_choice" | "concede";
+  payload:
+    { option_id: string } | { amounts: number[] } | Record<string, never>;
+}
+
+export interface CommandResult {
+  type: "command_result";
+  action_id: string | null;
+  status: number;
+  body: { status?: string; code?: string; message?: string; revision?: number };
+}
+
+export type ServerMessage =
+  | {
+      type: "welcome";
+      game_id: string;
+      connection_id: string;
+      seat: Seat | null;
+      role: "controller" | "observer";
+      controlled: boolean;
+    }
+  | { type: "snapshot"; snapshot: Snapshot }
+  | CommandResult
+  | {
+      type: "lease";
+      role: "controller" | "observer";
+      controlled: boolean;
+      reason: "granted" | "taken_over" | "released" | "disconnected";
+    }
+  | { type: "inspection"; inspection: Inspection }
+  | { type: "interrupted"; game_id: string }
+  | { type: "pong" }
+  | { type: "error"; code: string; message?: string };

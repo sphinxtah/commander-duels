@@ -27,6 +27,7 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "login_challenges",
         "games",
         "game_seats",
+        "card_images",
     }
     command.downgrade(config, "base")
     assert inspect(engine).get_table_names() == ["alembic_version"]
