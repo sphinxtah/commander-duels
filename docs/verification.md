@@ -24,6 +24,15 @@ The host still has no Node, pnpm or JDK on PATH:
 - **Web suites:** these ran in a `mcr.microsoft.com/playwright:v1.64.1-noble` container (`CI=1`) on a copy of the repository, attached to the Compose network so the second browser pass could use `http://web:8080`. The container installed `python3-venv` and the locked Python requirements so Playwright could start the API itself.
 - **Engine measurements:** these used `scripts/engine_bot_matches.py`, from the host against a temporary container with a loopback-only port, and from the API container against Compose.
 
+### Hosted CI
+
+GitHub Actions ("Framework checks") passed on every v0.0.2 change before close-out:
+
+- **Run #6** (`c056c16`, checkpoint): cold engine cache, 8 m 55 s. All 29 JUnit tests ran in the engine image build, and the Compose smoke match completed (seed 1, 17 turns).
+- **Run #7** (`e6cd688`, findings and H2 loopback binding): warm engine cache, 2 m 18 s.
+
+Timings per job are in [the release notes](releases/0.0.2.md).
+
 ## v0.0.1
 
 Validated locally on Windows on October 18, 2026.

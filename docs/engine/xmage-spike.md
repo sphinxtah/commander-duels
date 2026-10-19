@@ -73,6 +73,7 @@ These aren't built: `Mage.Server` (users, sessions, tables), `Mage.Client` (Swin
 | Peak memory of the XMage step (cgroup) | 4.42 GB with `-Xmx3g` (5.15 GB with `-Xmx4g`, same time) | 4.04 GB |
 | Build the card database | 21 s, 1.63 GB peak | 30 s, 1.84 GB peak |
 | Engine module and the 29 JUnit tests | 14 s (stage 36 s) | 35 s |
+| Whole engine image | 216 s from scratch | 8 m 7 s cold (including the cache export), 26 s warm |
 
 The Maven heap is set explicitly: `MAVEN_OPTS=-Xmx3g -XX:+UseParallelGC` (override with `XMAGE_MAVEN_OPTS`). A 4 GB heap made no difference to the time. **Give Docker Desktop at least 6 GB of memory** for the first build. This machine gives it 31 GB, so nothing needed changing.
 
@@ -82,7 +83,7 @@ Caching:
 - In CI the same layers come from the GitHub Actions cache (`type=gha`, `mode=max`). BuildKit cache mounts aren't exported to that cache, so the XMage Maven repository lives in a normal layer. The engine stage uses a cache mount only for its own downloads (JUnit and plugins), with `maven.repo.local.tail=/xmage/m2`, so XMage stays read-only.
 - The XMage build doesn't run upstream tests (`-Dmaven.test.skip=true`); upstream CI covers them at this commit.
 
-CI timing: on a cold cache (run #6) the whole workflow took 8 m 55 s. The engine job took 8 m 52 s, of which the image build was 8 m 7 s, including the cache export, and the Compose smoke test 17 s. It runs in parallel with the 2 m 38 s verify job. Warm-cache runs are recorded in [the release notes](../releases/0.0.2.md).
+CI timing: on a cold cache (run #6) the whole workflow took 8 m 55 s. The engine job took 8 m 52 s, of which the image build was 8 m 7 s, including the cache export, and the Compose smoke test 17 s. It runs in parallel with the 2 m 38 s verify job. On a warm cache (run #7) the workflow took 2 m 18 s: the engine job took 1 m 3 s, with a 26 s image build and the 18 s smoke test. That's about 12 billed runner minutes cold and 5 warm. See [the release notes](../releases/0.0.2.md).
 
 Image sizes: the runtime image is 994 MB. That's the Ubuntu 26.04 JRE base (Java alone is 159 MB), the card database (279 MB) and the engine libraries (79 MB, 60 MB of it `mage-sets`). The build-stage image is about 1.5 GB and isn't shipped.
 
