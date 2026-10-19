@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
-from api import admin, auth
+from api import admin, auth, games
 from api.config import Settings
 from api.database import build_engine, migration_head
 from api.google import CachingTransport, GoogleVerifier
@@ -45,8 +45,8 @@ CAPABILITIES = [
         id="gameplay",
         name="Connected play",
         milestone="M0–M3",
-        reason="The XMage engine runs internal development games only, driven by scripts. "
-        "Sign-in exists; seat ownership, game routing and a game interface are not built yet.",
+        reason="Signed-in accounts play practice games against bots through the API and its "
+        "WebSocket, from scripts. The game interface arrives in v0.1.0.",
     ),
     Capability(
         id="campaign",
@@ -83,14 +83,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.database = build_engine(config.database_url)
+        token = config.engine_service_token.get_secret_value()
         with httpx.Client(timeout=5.0) as google:
             if config.google_client_id:
                 app.state.google_verifier = GoogleVerifier(
                     config.google_client_id, CachingTransport(google)
                 )
-            async with httpx.AsyncClient(timeout=2.0, trust_env=False) as client:
+            async with (
+                httpx.AsyncClient(timeout=2.0, trust_env=False) as client,
+                httpx.AsyncClient(
+                    timeout=10.0,
+                    trust_env=False,
+                    transport=getattr(app.state, "engine_transport", None),
+                ) as engine_client,
+            ):
                 app.state.http = client
-                yield
+                engine = (
+                    games.EngineClient(str(config.engine_url), token, engine_client)
+                    if token
+                    else None
+                )
+                app.state.games = games.GameHub(config, app.state.database, engine)
+                await app.state.games.start()
+                try:
+                    yield
+                finally:
+                    await app.state.games.stop()
         app.state.database.dispose()
 
     app = FastAPI(
@@ -132,17 +150,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 
-    def error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
+    def error_response(
+        request: Request, status: int, code: str, message: str, names: list[str] | None = None
+    ) -> JSONResponse:
         return JSONResponse(
             status_code=status,
             content=Error(
-                code=code, message=message, request_id=request.state.request_id
-            ).model_dump(),
+                code=code, message=message, request_id=request.state.request_id, names=names
+            ).model_dump(exclude_none=True),
         )
 
     @app.exception_handler(ApiError)
     async def api_error(request: Request, exc: ApiError) -> JSONResponse:
-        response = error_response(request, exc.status, exc.code, exc.message)
+        response = error_response(request, exc.status, exc.code, exc.message, exc.names)
         response.headers.update(exc.headers or {})
         return response
 
@@ -226,4 +246,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(admin.router)
+    app.include_router(games.router)
     return app

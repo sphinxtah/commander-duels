@@ -72,3 +72,25 @@ jobs:
               && python scripts/engine_human_game.py --url http://localhost:8090 --schema contracts/engine-seat-view.schema.json --quiet --skill 1 \
                 --format commander --seats human,human,bot,bot --turn-cap 24"
           docker compose down
+      # SysOp plays a Legacy and a Commander practice game through the API and its WebSocket: the
+      # engine's service routes, seat ownership, the controller lease, a resend, the inspection
+      # view and the recorded result. A throwaway service token and SysOp password for this run.
+      - name: Practice games through the API
+        run: |
+          token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+          password="$(python3 -c 'import secrets; print(secrets.token_urlsafe(18))')"
+          echo "::add-mask::$token"
+          echo "::add-mask::$password"
+          export CD_ENGINE_SERVICE_TOKEN="$token"
+          docker compose build migrate api
+          docker compose up -d --wait --no-build db migrate api engine
+          printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin
+          # Host networking: the client reaches the API's published port from this machine, which
+          # the API sees as the Compose gateway, SysOp's network.
+          docker run --rm --network host -e CD_SYSOP_PASSWORD="$password" -v "$PWD:/w:ro" -w /w python:3.12.10-slim \
+            sh -c "pip install -q --disable-pip-version-check --root-user-action=ignore --no-deps websockets==17.2 jsonschema==4.23.0 \
+              jsonschema-specifications==2025.9.1 referencing==0.37.0 rpds-py==2026.9.1 attrs==26.1.0 typing_extensions==4.16.0 \
+              && python scripts/api_practice_game.py --url http://127.0.0.1:8000 --origin http://localhost:8080 --schemas contracts --quiet \
+              && python scripts/api_practice_game.py --url http://127.0.0.1:8000 --origin http://localhost:8080 --schemas contracts --quiet \
+                --format commander --bots 2 --turn-cap 24"
+          docker compose down

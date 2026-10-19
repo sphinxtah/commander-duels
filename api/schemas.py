@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,6 +15,9 @@ class Error(Contract):
     code: str
     message: str
     request_id: str
+    names: list[str] | None = Field(
+        default=None, description="For unknown_cards: the names the engine does not know."
+    )
 
 
 class Health(Contract):
@@ -81,6 +84,7 @@ class EngineStatus(Contract):
     xmage: XmageBuild | None = None
     cards: CardCounts | None = None
     bot_match_enabled: bool = False
+    service_games_enabled: bool = False
 
 
 Role = Literal["player", "moderator", "content_editor", "administrator", "sysop"]
@@ -213,3 +217,101 @@ class AuditEntry(Contract):
 class AuditPage(Contract):
     items: list[AuditEntry]
     next_cursor: str | None
+
+
+GameFormatId = Literal["legacy", "commander"]
+FixtureDeck = Literal[
+    "legacy-mono-red-burn",
+    "legacy-mono-green-creatures",
+    "commander-mono-white-soldiers",
+    "commander-mono-blue-flyers",
+    "commander-mono-red-raiders",
+    "commander-mono-green-stompers",
+]
+DECK_LIST = Field(
+    default=None,
+    min_length=1,
+    max_length=60_000,
+    description="SysOp only (cards.any): one card per line, any card the engine implements.",
+)
+
+
+class SeatChoice(Contract):
+    """A bot seat's deck: a fixture deck of the game's format, or a deck list (SysOp)."""
+
+    deck: FixtureDeck | None = None
+    deck_list: str | None = DECK_LIST
+
+
+class PracticeGameRequest(Contract):
+    """A practice game: your seat first, then the bots in turn order."""
+
+    format: GameFormatId = "legacy"
+    deck: FixtureDeck | None = None
+    deck_list: str | None = DECK_LIST
+    bots: list[SeatChoice] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=3,
+        description="One bot in Legacy; one to three in Commander (default three).",
+    )
+    bot_skill: int = Field(default=4, ge=1, le=6)
+    turn_cap: int = Field(default=60, ge=1, le=200)
+
+
+class PracticeFormat(Contract):
+    id: GameFormatId
+    name: str
+    bots: list[int]
+    default_bots: int
+    decks: list[FixtureDeck]
+
+
+class PracticeOptions(Contract):
+    formats: list[PracticeFormat]
+    deck_lists: bool = Field(description="Whether this account may seat deck lists (cards.any).")
+
+
+class GameSeat(Contract):
+    seat: int
+    player: Literal["human", "bot"]
+    handle: str | None
+    deck: str | None = Field(
+        description="Your own seat's deck (\"custom\" for a deck list); other seats' decks are "
+        "private, except to SysOp."
+    )
+
+
+class GameResult(Contract):
+    kind: str = Field(
+        description="completed, turn_limit, closed, idle_timeout, humans_eliminated or error"
+    )
+    winner_seat: int | None
+    draw: bool
+    turns: int
+    conceded_seats: list[int]
+
+
+class GameSummary(Contract):
+    id: UUID
+    format: GameFormatId
+    status: Literal["active", "finished", "interrupted"]
+    seats: list[GameSeat]
+    your_seat: int | None
+    bot_skill: int
+    turn_cap: int
+    created_at: datetime
+    finished_at: datetime | None
+    result: GameResult | None
+
+
+class GameState(Contract):
+    game: GameSummary
+    snapshot: dict[str, Any] | None = Field(
+        description="The seat's engine snapshot, unchanged "
+        "(contracts/engine-seat-view.schema.json); null once the engine no longer holds the game."
+    )
+
+
+class CardNames(Contract):
+    names: list[str]

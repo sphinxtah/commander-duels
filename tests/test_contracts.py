@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from jsonschema import Draft202012Validator, ValidationError
+from referencing import Registry, Resource
 
 from api.main import create_app
 
@@ -241,3 +242,72 @@ def test_scenario_vocabulary_is_constrained():
     validator.validate(scenario)
     with pytest.raises(ValidationError):
         validator.validate(scenario | {"objectives": [{"type": "execute_script"}]})
+
+
+def inspection_validator() -> Draft202012Validator:
+    """The inspection contract reuses the seat-view contract's definitions."""
+    seat_view = json.loads(Path("contracts/engine-seat-view.schema.json").read_text())
+    schema = json.loads(Path("contracts/engine-inspection.schema.json").read_text())
+    Draft202012Validator.check_schema(schema)
+    registry: Registry[Any] = Registry().with_resource(
+        seat_view["$id"], Resource.from_contents(seat_view)
+    )
+    return Draft202012Validator(
+        schema, registry=registry, format_checker=Draft202012Validator.FORMAT_CHECKER
+    )
+
+
+def inspection() -> dict[str, Any]:
+    watched = spectator()
+    settings = watched["settings"]
+    for entry, deck in zip(settings["seats"], ["a", "b", "c", "d"], strict=True):
+        entry["deck"] = f"commander-mono-{deck}"
+    return {
+        "game_id": watched["game_id"],
+        "version": 40,
+        "status": "live",
+        "settings": settings,
+        "view": watched["view"],
+        "players": [
+            {
+                "seat": seat,
+                "name": f"Player {seat + 1}",
+                "hand": [card(f"o{seat + 10:016x}", "Lightning Bolt")],
+                "library": [card(f"o{seat + 20:016x}", "Mountain")],
+            }
+            for seat in range(4)
+        ],
+        "result": None,
+    }
+
+
+def test_inspection_shows_everything_and_only_as_itself():
+    validator = inspection_validator()
+    validator.validate(inspection())
+    finished = inspection() | {"status": "finished"}
+    finished["result"] = {
+        "kind": "closed",
+        "winner_seat": None,
+        "draw": False,
+        "conceded_seats": [],
+        "turns": 3,
+        "error": None,
+    }
+    validator.validate(finished)
+
+    broken: list[tuple[str, Any]] = [
+        ("a hidden card", lambda view: view["players"][1]["hand"][0].update(hidden=True)),
+        ("an unnamed card", lambda view: view["players"][1]["library"][0].update(name=None)),
+        ("a private deck", lambda view: view["settings"]["seats"][2].update(deck=None)),
+        ("a seat's own view", lambda view: view["view"].update(you=player(0))),
+        ("the seed", lambda view: view["settings"].update(seed=1)),
+        ("XMage ids", lambda view: view["players"][0]["hand"][0].update(id=str(uuid4()))),
+        ("a result while live", lambda view: view.update(result=finished["result"])),
+        ("an extra field", lambda view: view["players"][0].update(sideboard=[])),
+    ]
+    for description, mutate in broken:
+        changed = inspection()
+        mutate(changed)
+        with pytest.raises(ValidationError):
+            validator.validate(changed)
+            pytest.fail(f"schema accepted {description}")

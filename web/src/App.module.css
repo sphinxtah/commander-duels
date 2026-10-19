@@ -20,8 +20,9 @@
   margin-bottom: 58px;
 }
 .brand img {
-  width: 44px;
+  width: 48px;
   height: 48px;
+  filter: drop-shadow(0 3px 8px #0009);
 }
 .brand span {
   font-size: 0.68rem;
@@ -240,8 +241,11 @@ h1 {
 .heroArt {
   position: relative;
   min-height: 400px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
 }
 .orbit {
   width: 330px;
@@ -249,77 +253,24 @@ h1 {
   border: 1px solid #d4b47a18;
   border-radius: 50%;
   position: absolute;
+  inset: 0;
+  margin: auto;
   box-shadow:
     0 0 0 32px #d4b47a04,
     0 0 0 64px #d4b47a03;
 }
-.cardBack,
-.cardBackLeft,
-.cardBackRight {
-  position: absolute;
-  width: 158px;
-  height: 230px;
-  border-radius: 10px;
-  background: linear-gradient(150deg, #354237, #142321);
-  border: 1px solid #a499665c;
-  box-shadow: 0 20px 40px #0006;
-}
-.cardBackLeft {
-  transform: rotate(-21deg) translate(-64px, -8px);
-  background: linear-gradient(160deg, #2d3933, #152623);
-}
-.cardBackRight {
-  transform: rotate(21deg) translate(64px, -8px);
-  background: linear-gradient(160deg, #4a4933, #242b22);
-}
-.cardBack {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 20px;
-  transform: rotate(-5deg);
-  box-shadow:
-    0 20px 45px #0009,
-    inset 0 0 0 7px #172623,
-    inset 0 0 0 8px #b09e6044;
-}
-.cardBack::after {
-  content: "";
-  position: absolute;
-  inset: 16px;
-  border: 1px solid #bba66c44;
-  border-radius: 45% 45% 3px 3px;
-}
-.cardBack > span {
-  font-size: 0.48rem;
-  letter-spacing: 2px;
-  text-align: center;
-  color: #cab784;
-  line-height: 1.7;
-}
-.cardBack b {
-  font:
-    1.1rem Georgia,
-    serif;
-  letter-spacing: 4px;
-}
-.sigil {
-  color: #d3b779;
-  font-size: 80px;
-  line-height: 80px;
+.logo {
   position: relative;
-}
-.sigil span {
-  position: absolute;
-  font-size: 48px;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  width: 296px;
+  height: 296px;
+  border-radius: 18px;
+  border: 1px solid #d4b47a3d;
+  box-shadow:
+    0 24px 50px #000a,
+    0 0 0 8px #0b0f1466;
 }
 .artCaption {
-  position: absolute;
-  bottom: 35px;
+  position: relative;
   color: #8e9c85;
   font-size: 0.48rem;
   letter-spacing: 3px;
@@ -708,7 +659,17 @@ h1 {
     grid-template-columns: 1fr;
   }
   .heroArt {
+    order: -1;
+    min-height: 0;
+    padding-top: 28px;
+  }
+  .orbit,
+  .artCaption {
     display: none;
+  }
+  .logo {
+    width: 200px;
+    height: 200px;
   }
   .formatGrid {
     grid-template-columns: 1fr;

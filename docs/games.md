@@ -1,0 +1,206 @@
+# Games through the API (v0.0.6)
+
+v0.0.6 routes games through the API. A signed-in player starts a practice game against bots, plays it over a WebSocket, and sees only what the seat may see. The API, not the browser, holds the engine's seat tokens; one browser tab at a time controls the seat; and SysOp can inspect every hand and library. It covers AUTH07's match half, NET05–NET07 for practice games, T13 and T14 for routed games, and T29's match case. There is still no game interface: scripts play the games, and the interface arrives in v0.1.0.
+
+## Decisions
+
+Agreed on 2026-10-19 at the start of v0.0.6:
+- **Transport.** WebSocket now, as the scope's protocol, not long-polling first.
+- **Formats.** Legacy against one bot, and Commander against one to three bots.
+- **SysOp's any-card decks.** In v0.0.6: a deck list on SysOp's practice game, any card the engine implements.
+- **Persistence.** Games, seats, owners and results in PostgreSQL now; engine seat tokens stay in the API's memory.
+- **Small fix.** PostgreSQL's host port is configurable (`CD_DB_PORT`).
+
+The user also added the logo mid-thread: the full logo on the Play page, and the logo without words as the sidebar mark and the favicon (see [asset provenance](asset-provenance.csv)).
+
+One change from [the v0.0.6 plan](plans/0.0.6.md): the plan offered SysOp's inspection for its own games only. SysOp's standing decision is full access with no exceptions, so SysOp may observe and inspect any running game. Every such opening is audited.
+
+## How a game runs
+
+```
+browser ──HTTPS──▶ API ──service token + seat token──▶ engine (XMage)
+   ▲                │
+   └──WebSocket─────┘  views come back from the engine unchanged
+```
+
+1. **Start.** `POST /api/v1/practice-games` (needs `games.play` and the CSRF token). The API checks the table, the decks and the limits, then asks the engine for a service game with the account's seat first and the bots after it.
+2. **Record.** The engine returns the game ID and the human seat's token, once. The API stores the game and its seats (owner account, bot, deck) in PostgreSQL. It keeps the seat token only in its own memory, and returns the game's summary. The browser never receives a seat token.
+3. **Follow.** For each game, one task long-polls the owner's seat view in the engine and publishes every new revision to the game's WebSockets. When the game finishes, it records the result.
+4. **Play.** The seat's owner opens the game's WebSocket, takes the controller lease and sends commands. The API checks the session, the lease and the command's schema, then forwards the command with the seat token.
+
+Views and prompts come back from the engine unchanged, so the engine's leak rules ([the human seat](engine/human-seat.md), [Commander tables](engine/commander-tables.md)) still decide what a seat sees. The API adds nothing to a snapshot, and no payload it sends carries a seat token or the service token. The tests check this for every message.
+
+### Practice games
+
+```json
+POST /api/v1/practice-games
+{"format": "commander", "deck": "commander-mono-red-raiders",
+ "bots": [{}, {"deck": "commander-mono-blue-flyers"}, {}], "bot_skill": 4, "turn_cap": 60}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `format` | `legacy` (one bot, the default) or `commander` (one to three bots, three by default) |
+| `deck` | Your fixture deck. Without one, the engine picks the format's first unused fixture |
+| `deck_list` | SysOp only (`cards.any`): a deck list as text, below |
+| `bots` | One entry per bot, in turn order, each with an optional `deck` or (SysOp) `deck_list` |
+| `bot_skill` | XMage's AI skill, 1–6 (default 4) |
+| `turn_cap` | 1–200 turns (default 60) |
+
+The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, and whether the account may use deck lists.
+
+Refusals:
+- 401 signed out; 403 without `games.play`, or a deck list without `cards.any`; 403 `csrf_failed` without the token.
+- 409 `game_limit` while the account already runs `CD_GAMES_PER_ACCOUNT` games (default 1). SysOp has no per-account limit.
+- 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`).
+- 429 `games_busy` with `Retry-After: 30` when the API runs `CD_GAMES_MAX` games (default 2) or the engine is full (`CD_ENGINE_MAX_GAMES`).
+- 503 `games_unavailable` without a service token; 503 `engine_unavailable` when the engine does not answer.
+
+### Reading and ending games
+
+| Request | Who | Returns |
+| --- | --- | --- |
+| `GET /api/v1/games` | Any player | Your games, newest first (50). SysOp may pass `scope=all` for everyone's |
+| `GET /api/v1/games/{id}` | The seat's owner; SysOp | The summary, and the owner's current seat snapshot while the engine holds the game |
+| `POST /api/v1/games/{id}/close` | The seat's owner; SysOp | Ends the game for every seat (result `closed`) |
+| `GET /api/v1/games/{id}/inspection` | SysOp (`games.view_concealed`) | The inspection view, below |
+| `GET /api/v1/cards?q=` | SysOp (`cards.any`) | Up to 50 card names the engine implements, for deck lists |
+
+Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle. A seat's deck is shown only to that seat's owner, and to SysOp.
+
+## The WebSocket
+
+`wss://<site>/api/v1/games/{id}/events`, authenticated by the session cookie. The web proxy passes the upgrade through.
+
+**Opening.**
+1. The handshake's `Origin` must be the site's own, as for any state-changing request. Browsers always send one.
+2. The first message must arrive within 10 seconds and carry the session's CSRF token, which only the site's own pages can read from `/api/v1/me`:
+
+   ```json
+   {"type": "hello", "csrf_token": "…", "since": -1, "control": true, "inspect": false}
+   ```
+
+   - `since` is the last revision the client holds (-1 for none); the server sends a newer snapshot.
+   - `control` asks for the controller lease.
+   - `inspect` asks for SysOp's inspection views.
+3. The server answers `welcome` with the connection's ID, the seat (null for an observer who does not own it) and whether another tab controls the seat. Then come the lease, if one was granted, the current snapshot and, for SysOp, an inspection.
+
+**Refusals.** The server sends `{"type": "error", "code": …}` and closes:
+
+| Close code | Error code | Meaning |
+| --- | --- | --- |
+| 4401 | `authentication_required` | No valid session. Also sent later, when the session is signed out, revoked or expires |
+| 4401 | `session_refresh` | The account's roles changed; make any HTTP request (it rotates the cookie), then reconnect |
+| 4403 | `origin_refused`, `csrf_failed`, `forbidden` | Another site; a wrong CSRF token; no `games.play`, or `inspect` without SysOp's permission |
+| 4404 | `not_found` | Not your game, or no such game |
+| 4410 | `game_not_live` | The API no longer follows the game (finished long ago, or interrupted); read it over HTTP |
+| 4400 | `hello_required` | The first message was not a valid hello |
+| 4408 | (none) | The client stopped reading. Reconnect and resynchronize |
+
+**Messages from the client.**
+
+| Message | Effect |
+| --- | --- |
+| `{"type": "command", "command": {…}}` | A command in the engine's envelope (`v`, `game_id`, `action_id`, `expected_revision`, `prompt_id`, `type`, `payload`), `submit_choice` or `concede`. Controller only |
+| `{"type": "take_control"}` | Moves the lease to this connection (owner only) |
+| `{"type": "release_control"}` | Gives the lease up |
+| `{"type": "resync", "since": n}` | Sends the current snapshot if it is newer than `n` |
+| `{"type": "ping"}` | Answered with `pong` |
+
+**Messages from the server.**
+
+| Message | Contents |
+| --- | --- |
+| `snapshot` | The seat's engine snapshot, unchanged ([seat-view contract](../contracts/engine-seat-view.schema.json)). Each new revision carries only the log lines since the last one, with their indexes; the first snapshot carries the latest page. Older revisions than one already sent are never sent |
+| `command_result` | `action_id`, the engine's HTTP `status` and `body`, unchanged: `accepted` with the new revision, or a refusal such as `stale_prompt`, `stale_revision`, `invalid_option` or `game_over`. The API's own refusals are `not_controller` (409), `invalid_command` (400) and `engine_unavailable` (503) |
+| `lease` | `role` (`controller` or `observer`), `controlled` (whether any tab holds the lease) and `reason`: `granted`, `taken_over`, `released` or `disconnected` |
+| `inspection` | SysOp's inspection view, after each new revision while the connection inspects |
+| `interrupted` | The engine lost the game |
+| `welcome`, `pong`, `error` | As above |
+
+### The controller lease (AUTH07)
+
+- **One controller.** Only the connection holding a seat's lease may command it. Every other connection of the same account observes. It receives every snapshot, and its commands get 409 `not_controller`.
+- **Taking control.** Taking control moves the lease at once. The old controller receives `lease` with `reason: taken_over`, and its next command is refused. A command already forwarded completes.
+- **Leaving.** A controller that disconnects frees the lease. Another tab, or the same one after reconnecting, takes it with `take_control` or `"control": true`.
+- **Other accounts.** Only the seat's owner can take its lease. SysOp observes other players' games but cannot command their seats.
+
+### Resends run once (T14)
+
+The engine remembers each seat's last 512 action IDs with their results. A command resent with the same `action_id` and content returns its first result and changes nothing; with different content it is refused as `action_id_reused`. So a client whose connection drops before the reply arrives reconnects, takes control again and resends the same command. It then learns the result without applying it twice. The API forwards resends unchanged.
+
+### Sessions
+
+Every command checks that the session still stands, and counts as activity for its idle limit. An open connection alone does not extend the session. The server also rechecks the session every minute and closes the connection with 4401 when it has ended: a sign-out everywhere, a revoked session, an expired one, or a SysOp session off its network.
+
+## SysOp's powers
+
+- **Practice games against bots.** As for any player, without a per-account limit.
+- **Inspection** (`games.view_concealed`, SysOp's exception to SEC05 and NET14). The inspection view shows the public view, every seat's deck, and every player's hand and library in order, top first.
+  - **A type of its own.** It is a separate engine view type ([inspection contract](../contracts/engine-inspection.schema.json)), built field by field like the seat views, and served only on the engine's service route.
+  - **When it is built.** The engine builds it only while XMage waits for a human seat's answer. The game thread is then parked, and an answer cannot close the prompt until the view is built, so XMage's state holds still. Otherwise the engine waits up to 3 seconds for that moment, then answers `unsettled` (409). A finished game keeps its final inspection.
+  - **Where SysOp gets it.** With `"inspect": true` on the WebSocket, or from `GET /api/v1/games/{id}/inspection`.
+  - **Audit.** Every opening is audited as `game.inspection_opened`. Observing another player's game is `game.observed`, and closing it `game.closed`.
+- **Any card** (`cards.any`). A practice game's `deck_list` may name any card the engine implements, in any number, for SysOp's seat or a bot's.
+  - **The text.** One card per line: an optional count (`4`, `4x`), then the name. `#` and `//` lines are comments. Deck sites' set annotations (`Lightning Bolt (M10) 146`) are ignored. A `Commander` heading or a `Commander: Name` line names the commander, and a `Sideboard` heading skips what follows.
+  - **Names.** They match exactly first, then ignoring case, to XMage's preferred printing. Unknown names come back together in `names`.
+  - **No format rules.** Nothing is checked beyond the shape: a Commander list names one or two commanders, at most 250 different cards, 250 copies of one card and 1,000 cards in all.
+  - **Audit.** Using deck lists is audited as `game.deck_lists_used`.
+
+## The engine's service routes
+
+The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERVICE_TOKEN` is set (at least 32 characters, the same value for the API and the engine). Every request there must carry the token in `X-Service-Token`. Without it, everything under the prefix answers 401 `service_unauthorized`.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit. Unknown card names return 400 `unknown_cards` |
+| `GET` and `POST` under `/v1/service/games/{id}/` (`view`, `commands`) | As the development routes; the seat token still selects the seat |
+| `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices |
+| `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |
+| `GET /v1/service/cards?q=&limit=` | Card names containing `q`, ignoring case: names starting with it first |
+
+Service games and development games share one registry and the engine's game cap, but each belongs to its own route. A token or game ID from one route finds nothing on the other, and development games cannot be inspected. The development endpoints stay for scripts (`CD_ENGINE_DEV_ENDPOINTS`). The engine's `/health` reports `service_games_enabled`; `gameplay_available` stays false until there is a game interface.
+
+## Data and restarts
+
+Migration `0003_games` adds two tables:
+- **`games`.** The engine's game ID, kind (`practice`), format, status (`active`, `finished` or `interrupted`), creator, bot skill, turn cap, times and the engine's result: kind, winner seat, draw, turns and conceded seats. Engine error details stay in the engine's log.
+- **`game_seats`.** Each seat's player (`human` or `bot`), owner account and deck: a fixture name, or `custom` with the deck list as sent to the engine. A check constraint ties owners to human seats.
+
+One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Recovery and replay journals (NET08–NET09) remain later work.
+
+## Configuration
+
+| Key | Default / purpose |
+| --- | --- |
+| `CD_ENGINE_SERVICE_TOKEN` | Empty: games are off. API and engine; at least 32 characters. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and put it in `.env` |
+| `CD_GAMES_PER_ACCOUNT` | 1 (1–8); SysOp is not limited |
+| `CD_GAMES_MAX` | 2 (1–8): games the API runs at once |
+| `CD_DB_PORT` | Compose only: PostgreSQL's host port, default 5432. Set another (this computer uses 15432) when Windows reserves 5432 |
+
+## Verification
+
+- **API tests (`tests/test_games.py`).** These run against a fake engine that speaks the service routes.
+  - **Ownership and T29.** Another account gets 404 for the game, its WebSocket and its close, and 403 for its inspection.
+  - **The lease.** An observer's command is refused; a takeover moves the lease and the old tab is refused.
+  - **T14.** A resend returns the first result and applies nothing, including after the tab dropped before reading its reply.
+  - **Refusals.** Another origin, no session, a wrong CSRF token, no hello, and inspection by a player. Signing out everywhere ends a connection at its next command.
+  - **Results and restarts.** A concession and a close are recorded, and a restart interrupts running games.
+  - **SysOp.** Deck lists with unknown names, observing and inspecting another player's game, the audit entries, and SysOp's missing per-account limit.
+  - **Limits and parsing.** The global limit, games off without a token, the fixture decks against `engine/decks`, and the deck-list parser.
+  - **Leaks.** No payload carries a seat token or the service token.
+- **Engine tests (`ServiceGameHttpTest`).**
+  - The service token guards every route, and a short token is refused at startup.
+  - The two routes keep their games apart.
+  - Deck lists take any card in any case and number, and name unknown cards; a custom commander reaches the command zone.
+  - The inspection matches XMage's hands and libraries, in order and object by object, at several prompts and after the end.
+  - Card names can be looked up.
+- **The scripted client (`scripts/api_practice_game.py`).** It plays a whole game through the API and its WebSocket as SysOp, checking every snapshot for leaks and against the seat-view contract and every inspection against its contract. Along the way it proves the observer refusal, the lease takeover and a resend after a dropped connection. CI runs a Legacy and a Commander game with it.
+
+Results are in [the release notes](releases/0.0.6.md) and [verification](verification.md#v006).
+
+## Not in v0.0.6
+
+- The game interface (v0.1.0).
+- Lobbies, matchmaking, human opponents through the API, spectators through the API, timers and recovery journals.
+- The AI hidden-information audit (AI02): the bots still search a copy of the full game.

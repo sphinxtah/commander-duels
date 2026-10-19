@@ -35,6 +35,10 @@ import mage.util.ThreadUtils;
  * choices. An answer is accepted only for the seat's open prompt at its current revision. Views and
  * prompts are built on the game thread, the only place XMage's state is consistent; request threads
  * read the published snapshots. Games live in memory only: there is no journal or recovery yet.
+ *
+ * <p>A service game can also be inspected ({@link #inspect}): every hand and library, in order,
+ * for SysOp. That view is built only while XMage is waiting for a human seat's answer, when the
+ * game thread is parked and XMage's state holds still.
  */
 final class HumanGame {
     static final long CLOSE_GRACE_MILLIS = 5_000;
@@ -78,6 +82,18 @@ final class HumanGame {
 
     /** One public view kept for spectators, with when it was published and the log up to then. */
     private record Watched(long revision, long publishedNanos, SeatView view, int logEntries, Result result) {}
+
+    /** One player's concealed zones, for inspection: the hand, and the library from the top. */
+    record Concealed(int seat, String name, List<SeatView.CardInfo> hand, List<SeatView.CardInfo> library) {}
+
+    /**
+     * SysOp's inspection view (an exception to SEC05 and NET14, for SysOp only): the public view
+     * plus every player's hand and library in order, and every seat's deck. It is its own type, built
+     * field by field like the seat views, and served only on the service route. {@code version}
+     * counts the game's published changes; {@code status} is live or finished.
+     */
+    record Inspection(String gameId, long version, String status, Settings settings, SeatView view,
+                      List<Concealed> players, Result result) {}
 
     /** A response to a seat command: an HTTP status and its JSON body. */
     record Reply(int status, Map<String, Object> body) {}
@@ -154,6 +170,9 @@ final class HumanGame {
 
     // Guarded by this.
     private Result result;
+    private boolean inspectable;
+    private Inspection finalInspection;
+    private long version;
     private String endRequest;
     private final List<Integer> conceded = new ArrayList<>();
     private long lastActivityNanos = System.nanoTime();
@@ -258,7 +277,7 @@ final class HumanGame {
         GameFormat format = request.format();
         List<Deck> decks = new ArrayList<>();
         for (HumanGameRequest.Seat seat : request.seats()) {
-            decks.add(format.loadDeck(deckDirectory, seat.deck()));
+            decks.add(seat.custom() != null ? DeckLists.load(seat.custom()) : format.loadDeck(deckDirectory, seat.deck()));
         }
         Game created = format.newGame(players.size(), request.turnCap());
         Match match = format.newMatch("Commander Duels development game", players.size());
@@ -483,10 +502,17 @@ final class HumanGame {
             }
         }
         Result outcome = outcome(finished, failure);
+        boolean inspect;
+        synchronized (this) {
+            inspect = inspectable;
+        }
+        Inspection lastInspection = inspect && finished != null && views != null
+            ? buildInspection(finished, "finished", outcome) : null;
         synchronized (this) {
             // Spectators learn the result after the same delay as everything else.
             watch(finalPublic != null ? finalPublic : spectatorView, outcome);
             result = outcome;
+            finalInspection = lastInspection;
             for (int i = 0; i < humans.size(); i++) {
                 Seat seat = humans.get(i);
                 seat.revision++;
@@ -827,8 +853,83 @@ final class HumanGame {
         return new Reply(httpStatus, body);
     }
 
+    /** Caller holds the lock. Something a seat or SysOp can see changed. */
     private void touch() {
         lastActivityNanos = System.nanoTime();
+        version++;
+    }
+
+    /** Lets {@link #inspect} serve this game: service games only. */
+    synchronized void allowInspection() {
+        inspectable = true;
+    }
+
+    /**
+     * Request thread: SysOp's inspection view, once XMage waits for a human seat's answer, waiting
+     * up to {@code waitMillis} for that; null if it did not happen in time. A finished game returns
+     * its final inspection. The view is built under the game's lock while a prompt is open: the game
+     * thread is parked in XMage's wait for that answer, and an answer cannot close the prompt until
+     * the lock is free, so XMage's state holds still while it is read.
+     */
+    Inspection inspect(long waitMillis) throws InterruptedException {
+        synchronized (this) {
+            if (!inspectable) {
+                throw new IllegalStateException("Inspection is for service games only");
+            }
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
+            while (result == null) {
+                Game current = game;
+                if (current != null && views != null && settled()) {
+                    Inspection built = buildInspection(current, "live", null);
+                    if (built != null) {
+                        return built;
+                    }
+                }
+                long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                if (remaining <= 0) {
+                    return null;
+                }
+                wait(remaining);
+            }
+            return finalInspection;
+        }
+    }
+
+    /** Caller holds the lock. A human seat's prompt is open and nothing is ending the game. */
+    private boolean settled() {
+        return endRequest == null && humans.stream().anyMatch(seat -> seat.prompt != null && !seat.concedeRequested);
+    }
+
+    /**
+     * Every player's hand and library, field by field, with a builder of its own (the game thread's
+     * keeps caches). Null if XMage's state changed under it.
+     */
+    private Inspection buildInspection(Game current, String status, Result outcome) {
+        try {
+            var builder = new SeatViews(current, seatIds, refs);
+            SeatView publicView = builder.buildPublic();
+            List<Concealed> players = new ArrayList<>();
+            for (int seat = 0; seat < seatIds.size(); seat++) {
+                Player player = current.getPlayer(seatIds.get(seat));
+                List<SeatView.CardInfo> hand = new ArrayList<>();
+                List<SeatView.CardInfo> library = new ArrayList<>();
+                if (player != null) {
+                    player.getHand().getCards(current).forEach(card -> hand.add(builder.card(card, true)));
+                    // XMage's library iterates from the top.
+                    player.getLibrary().getCards(current).forEach(card -> library.add(builder.card(card, true)));
+                }
+                players.add(new Concealed(seat, player == null ? null : player.getName(), List.copyOf(hand),
+                    List.copyOf(library)));
+            }
+            long at;
+            synchronized (this) {
+                at = version;
+            }
+            return new Inspection(id, at, status, settings, publicView, List.copyOf(players), outcome);
+        } catch (RuntimeException e) {
+            System.err.println("Inspection of game " + id + " failed: " + e);
+            return null;
+        }
     }
 
     // For tests: XMage's state may be read only while a prompt is open (the game thread is waiting).

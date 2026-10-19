@@ -108,9 +108,9 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 
 **SysOp-only permissions.**
 - Three permissions belong to SysOp alone, and no role can be granted them: `admin.roles.administrator`, `games.view_concealed` and `cards.any`.
-- The last two are recorded now and take effect where the features exist:
-  - **Inspection.** SysOp's view of every hand and library arrives with authenticated game routing in v0.0.6.
-  - **Any card.** Its use of any card in the engine's card database comes with the first way to start a game from a deck list.
+- The last two took effect in v0.0.6 ([games through the API](games.md#sysops-powers)):
+  - **Inspection.** SysOp's view of every hand and library, in any running game, audited at every opening.
+  - **Any card.** Deck lists naming any card in the engine's card database, on SysOp's practice games.
 - Administrators and moderators keep SEC05's and NET14's restrictions: there is no "view all live hands" for them.
 
 **Errors** follow the scope's rules:

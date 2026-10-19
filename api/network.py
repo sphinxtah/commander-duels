@@ -3,7 +3,7 @@ header cannot fake the network a request comes from."""
 
 from ipaddress import IPv4Address, IPv6Address, ip_address
 
-from starlette.requests import Request
+from starlette.requests import HTTPConnection
 
 from api.config import Network
 
@@ -24,7 +24,7 @@ def within(address: Address | None, networks: list[Network]) -> bool:
     return address is not None and any(address in network for network in networks)
 
 
-def client_address(request: Request, trusted_proxies: list[Network]) -> Address | None:
+def client_address(request: HTTPConnection, trusted_proxies: list[Network]) -> Address | None:
     """The address of whoever sent the request: the peer, or, when the peer is a trusted proxy,
     the nearest X-Forwarded-For hop that is not one. Malformed chains count as unknown."""
     peer = parse_address(request.client.host) if request.client else None

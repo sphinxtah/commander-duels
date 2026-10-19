@@ -20,9 +20,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * The development games in this engine. Each human seat has its own seat token, returned once when
- * the game is created; requests carry it as a bearer token and it alone selects the seat. Unknown
- * games and wrong tokens look the same (not found). At most {@code maxActive} games run at once: each
+ * The games in this engine: development games, which scripts reach directly, and service games,
+ * which only the API reaches (with the service token). A game belongs to one route and is not found
+ * on the other. Each human seat has its own seat token, returned once when the game is created;
+ * requests carry it as a bearer token and it alone selects the seat. Unknown games and wrong tokens
+ * look the same (not found). At most {@code maxActive} games of both kinds run at once: each
  * holds a platform thread while it waits for a seat, and XMage's AI shares one search pool and one
  * random generator across games. Finished games stay readable for a while, then are dropped.
  */
@@ -51,13 +53,15 @@ final class HumanGames {
         /** SHA-256 of each human seat's token, by seat. */
         final Map<Integer, byte[]> tokenHashes;
         final byte[] spectatorHash;
+        final boolean service;
         final AtomicBoolean closing = new AtomicBoolean();
         volatile long finishedAtNanos;
 
-        Entry(HumanGame game, Map<Integer, byte[]> tokenHashes, byte[] spectatorHash) {
+        Entry(HumanGame game, Map<Integer, byte[]> tokenHashes, byte[] spectatorHash, boolean service) {
             this.game = game;
             this.tokenHashes = tokenHashes;
             this.spectatorHash = spectatorHash;
+            this.service = service;
         }
     }
 
@@ -81,8 +85,16 @@ final class HumanGames {
         return maxActive;
     }
 
-    /** Starts a game, or returns empty when {@code maxActive} games are already running. */
-    synchronized Optional<Created> create(HumanGameRequest request) {
+    /** Starts a development game, or returns empty when {@code maxActive} games are already running. */
+    Optional<Created> create(HumanGameRequest request) {
+        return create(request, false);
+    }
+
+    /**
+     * Starts a game, or returns empty when {@code maxActive} games are already running. A service
+     * game can be inspected.
+     */
+    synchronized Optional<Created> create(HumanGameRequest request, boolean service) {
         evict();
         if (active() >= maxActive) {
             return Optional.empty();
@@ -97,7 +109,10 @@ final class HumanGames {
             hashes.put(seat, hash(token));
         }
         String spectatorToken = newToken();
-        games.put(id, new Entry(game, Map.copyOf(hashes), hash(spectatorToken)));
+        if (service) {
+            game.allowInspection();
+        }
+        games.put(id, new Entry(game, Map.copyOf(hashes), hash(spectatorToken), service));
         game.start();
         return Optional.of(new Created(game, tokens, spectatorToken));
     }
@@ -108,10 +123,15 @@ final class HumanGames {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /** The game and seat (null for the spectator), if the id exists and the token is one of its tokens. */
+    /** A development game's seat (null for the spectator), if the id exists and the token is one of its tokens. */
     Optional<SeatHandle> find(String id, String token) {
+        return find(id, token, false);
+    }
+
+    /** The game and seat (null for the spectator) on the route given by {@code service}. */
+    Optional<SeatHandle> find(String id, String token, boolean service) {
         Entry entry = id == null ? null : games.get(id);
-        if (entry == null) {
+        if (entry == null || entry.service != service) {
             return Optional.empty();
         }
         byte[] presented = hash(token == null ? "" : token);
@@ -127,6 +147,12 @@ final class HumanGames {
             return Optional.of(new SeatHandle(entry.game, matches.get(0)));
         }
         return spectator && matches.isEmpty() ? Optional.of(new SeatHandle(entry.game, null)) : Optional.empty();
+    }
+
+    /** A service game by id alone: the service token already authorized the caller. */
+    Optional<HumanGame> service(String id) {
+        Entry entry = id == null ? null : games.get(id);
+        return entry == null || !entry.service ? Optional.empty() : Optional.of(entry.game);
     }
 
     synchronized int active() {

@@ -218,7 +218,7 @@ export function App() {
           className={styles.brand}
           aria-label="Commander Duels home"
         >
-          <img src="/mark.svg" alt="" />
+          <img src="/brand/mark.webp" alt="" width={48} height={48} />
           <span>
             COMMANDER<strong>DUELS</strong>
           </span>
@@ -329,18 +329,13 @@ export function App() {
                 </div>
                 <div className={styles.heroArt} aria-hidden="true">
                   <div className={styles.orbit} />
-                  <div className={styles.cardBackLeft} />
-                  <div className={styles.cardBackRight} />
-                  <div className={styles.cardBack}>
-                    <div className={styles.sigil}>
-                      ◇<span>✧</span>
-                    </div>
-                    <span>
-                      COMMANDER
-                      <br />
-                      <b>DUELS</b>
-                    </span>
-                  </div>
+                  <img
+                    className={styles.logo}
+                    src="/brand/logo.webp"
+                    alt=""
+                    width={296}
+                    height={296}
+                  />
                   <div className={styles.artCaption}>
                     THE NEXT CHAPTER IS YOURS
                   </div>

@@ -1,7 +1,7 @@
 from ipaddress import IPv4Network, IPv6Network, ip_network
 from typing import Literal
 
-from pydantic import Field, HttpUrl, field_validator, model_validator
+from pydantic import Field, HttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     sysop_absolute_minutes: int = Field(default=12 * 60, ge=5)
     # Role and account-status changes need a sign-in at most this old (AUTH03 reauthentication).
     reauth_minutes: int = Field(default=12 * 60, ge=1)
+    # Shared with the engine, which serves service games only to requests carrying it. Empty
+    # turns games off. At least 32 characters; only the API and the engine know it.
+    engine_service_token: SecretStr = SecretStr("")
+    # Games one account may have running at once; SysOp is not limited. The engine's own cap
+    # (CD_ENGINE_MAX_GAMES) and games_max bound the total.
+    games_per_account: int = Field(default=1, ge=1, le=8)
+    games_max: int = Field(default=2, ge=1, le=8)
 
     @field_validator("database_url")
     @classmethod
@@ -46,6 +53,14 @@ class Settings(BaseSettings):
         if url.drivername not in {"postgresql+psycopg", "sqlite"}:
             raise ValueError("Use postgresql+psycopg; sqlite is supported for isolated tests only")
         return value
+
+    @field_validator("engine_service_token")
+    @classmethod
+    def validate_service_token(cls, value: SecretStr) -> SecretStr:
+        secret = value.get_secret_value().strip()
+        if secret and len(secret) < 32:
+            raise ValueError("CD_ENGINE_SERVICE_TOKEN must be at least 32 characters")
+        return SecretStr(secret)
 
     @field_validator("sysop_networks", "trusted_proxies")
     @classmethod

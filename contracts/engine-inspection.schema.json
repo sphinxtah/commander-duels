@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:commander-duels:engine-inspection:v1",
+  "title": "EngineInspection",
+  "description": "SysOp's inspection view of a service game (v0.0.6): the public view, every seat's deck, and every player's hand and library in order, top first. It is SysOp's accepted exception to SEC05 and NET14, served only on the engine's service route and only to SysOp through the API. Its parts reuse the seat-view contract's definitions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["game_id", "version", "status", "settings", "view", "players", "result"],
+  "properties": {
+    "game_id": {"type": "string", "format": "uuid"},
+    "version": {
+      "description": "Counts the game's published changes; a later inspection has a higher version.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {"enum": ["live", "finished"]},
+    "settings": {
+      "allOf": [
+        {"$ref": "urn:commander-duels:engine-seat-view:v1#/properties/settings"},
+        {
+          "description": "SysOp sees every seat's deck.",
+          "properties": {
+            "seats": {"items": {"properties": {"deck": {"type": "string"}}}}
+          }
+        }
+      ]
+    },
+    "view": {
+      "allOf": [
+        {"$ref": "urn:commander-duels:engine-seat-view:v1#/$defs/view"},
+        {
+          "description": "The public view: no seat, no you, and every player among the opponents.",
+          "properties": {
+            "seat": {"type": "null"},
+            "you": {"type": "null"},
+            "hand": {"maxItems": 0},
+            "looked_at": {"maxItems": 0}
+          }
+        }
+      ]
+    },
+    "players": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seat", "name", "hand", "library"],
+        "properties": {
+          "seat": {"$ref": "urn:commander-duels:engine-seat-view:v1#/$defs/seat"},
+          "name": {"$ref": "urn:commander-duels:engine-seat-view:v1#/$defs/nullableString"},
+          "hand": {"$ref": "#/$defs/cards"},
+          "library": {"$ref": "#/$defs/cards"}
+        }
+      }
+    },
+    "result": {
+      "oneOf": [
+        {"type": "null"},
+        {"$ref": "urn:commander-duels:engine-seat-view:v1#/$defs/result"}
+      ]
+    }
+  },
+  "if": {"properties": {"status": {"const": "finished"}}},
+  "then": {"properties": {"result": {"type": "object"}}},
+  "else": {"properties": {"result": {"type": "null"}}},
+  "$defs": {
+    "cards": {
+      "description": "Every card face up: inspection hides nothing.",
+      "type": "array",
+      "items": {
+        "allOf": [
+          {"$ref": "urn:commander-duels:engine-seat-view:v1#/$defs/card"},
+          {"properties": {"hidden": {"const": false}, "name": {"type": "string"}}}
+        ]
+      }
+    }
+  }
+}

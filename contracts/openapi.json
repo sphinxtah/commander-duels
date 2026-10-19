@@ -296,7 +296,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.0.5",
+            "default": "0.0.6",
             "title": "Version",
             "type": "string"
           }
@@ -361,6 +361,23 @@
         "title": "CardCounts",
         "type": "object"
       },
+      "CardNames": {
+        "additionalProperties": false,
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "title": "CardNames",
+        "type": "object"
+      },
       "EngineStatus": {
         "additionalProperties": false,
         "description": "Engine /health, passed through. \"unavailable\" means the engine is unreachable or invalid.",
@@ -391,6 +408,11 @@
             "default": 1,
             "title": "Protocol Version",
             "type": "integer"
+          },
+          "service_games_enabled": {
+            "default": false,
+            "title": "Service Games Enabled",
+            "type": "boolean"
           },
           "status": {
             "enum": [
@@ -429,6 +451,21 @@
           "message": {
             "title": "Message",
             "type": "string"
+          },
+          "names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For unknown_cards: the names the engine does not know.",
+            "title": "Names"
           },
           "request_id": {
             "title": "Request Id",
@@ -490,6 +527,220 @@
         "title": "Format",
         "type": "object"
       },
+      "GameResult": {
+        "additionalProperties": false,
+        "properties": {
+          "conceded_seats": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Conceded Seats",
+            "type": "array"
+          },
+          "draw": {
+            "title": "Draw",
+            "type": "boolean"
+          },
+          "kind": {
+            "description": "completed, turn_limit, closed, idle_timeout, humans_eliminated or error",
+            "title": "Kind",
+            "type": "string"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "winner_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner Seat"
+          }
+        },
+        "required": [
+          "kind",
+          "winner_seat",
+          "draw",
+          "turns",
+          "conceded_seats"
+        ],
+        "title": "GameResult",
+        "type": "object"
+      },
+      "GameSeat": {
+        "additionalProperties": false,
+        "properties": {
+          "deck": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your own seat's deck (\"custom\" for a deck list); other seats' decks are private, except to SysOp.",
+            "title": "Deck"
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "player": {
+            "enum": [
+              "human",
+              "bot"
+            ],
+            "title": "Player",
+            "type": "string"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seat",
+          "player",
+          "handle",
+          "deck"
+        ],
+        "title": "GameSeat",
+        "type": "object"
+      },
+      "GameState": {
+        "additionalProperties": false,
+        "properties": {
+          "game": {
+            "$ref": "#/components/schemas/GameSummary"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The seat's engine snapshot, unchanged (contracts/engine-seat-view.schema.json); null once the engine no longer holds the game.",
+            "title": "Snapshot"
+          }
+        },
+        "required": [
+          "game",
+          "snapshot"
+        ],
+        "title": "GameState",
+        "type": "object"
+      },
+      "GameSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "bot_skill": {
+            "title": "Bot Skill",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "seats": {
+            "items": {
+              "$ref": "#/components/schemas/GameSeat"
+            },
+            "title": "Seats",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "finished",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "turn_cap": {
+            "title": "Turn Cap",
+            "type": "integer"
+          },
+          "your_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Seat"
+          }
+        },
+        "required": [
+          "id",
+          "format",
+          "status",
+          "seats",
+          "your_seat",
+          "bot_skill",
+          "turn_cap",
+          "created_at",
+          "finished_at",
+          "result"
+        ],
+        "title": "GameSummary",
+        "type": "object"
+      },
       "GoogleChallenge": {
         "additionalProperties": false,
         "properties": {
@@ -548,7 +799,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.0.5",
+            "default": "0.0.6",
             "title": "Version",
             "type": "string"
           }
@@ -699,6 +950,162 @@
         "title": "Me",
         "type": "object"
       },
+      "PracticeFormat": {
+        "additionalProperties": false,
+        "properties": {
+          "bots": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Bots",
+            "type": "array"
+          },
+          "decks": {
+            "items": {
+              "enum": [
+                "legacy-mono-red-burn",
+                "legacy-mono-green-creatures",
+                "commander-mono-white-soldiers",
+                "commander-mono-blue-flyers",
+                "commander-mono-red-raiders",
+                "commander-mono-green-stompers"
+              ],
+              "type": "string"
+            },
+            "title": "Decks",
+            "type": "array"
+          },
+          "default_bots": {
+            "title": "Default Bots",
+            "type": "integer"
+          },
+          "id": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "bots",
+          "default_bots",
+          "decks"
+        ],
+        "title": "PracticeFormat",
+        "type": "object"
+      },
+      "PracticeGameRequest": {
+        "additionalProperties": false,
+        "description": "A practice game: your seat first, then the bots in turn order.",
+        "properties": {
+          "bot_skill": {
+            "default": 4,
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Bot Skill",
+            "type": "integer"
+          },
+          "bots": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SeatChoice"
+                },
+                "maxItems": 3,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One bot in Legacy; one to three in Commander (default three).",
+            "title": "Bots"
+          },
+          "deck": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy-mono-red-burn",
+                  "legacy-mono-green-creatures",
+                  "commander-mono-white-soldiers",
+                  "commander-mono-blue-flyers",
+                  "commander-mono-red-raiders",
+                  "commander-mono-green-stompers"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck"
+          },
+          "deck_list": {
+            "anyOf": [
+              {
+                "maxLength": 60000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SysOp only (cards.any): one card per line, any card the engine implements.",
+            "title": "Deck List"
+          },
+          "format": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "turn_cap": {
+            "default": 60,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Turn Cap",
+            "type": "integer"
+          }
+        },
+        "title": "PracticeGameRequest",
+        "type": "object"
+      },
+      "PracticeOptions": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_lists": {
+            "description": "Whether this account may seat deck lists (cards.any).",
+            "title": "Deck Lists",
+            "type": "boolean"
+          },
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeFormat"
+            },
+            "title": "Formats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "formats",
+          "deck_lists"
+        ],
+        "title": "PracticeOptions",
+        "type": "object"
+      },
       "Preferences": {
         "additionalProperties": false,
         "properties": {
@@ -818,6 +1225,47 @@
           "database"
         ],
         "title": "Readiness",
+        "type": "object"
+      },
+      "SeatChoice": {
+        "additionalProperties": false,
+        "description": "A bot seat's deck: a fixture deck of the game's format, or a deck list (SysOp).",
+        "properties": {
+          "deck": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy-mono-red-burn",
+                  "legacy-mono-green-creatures",
+                  "commander-mono-white-soldiers",
+                  "commander-mono-blue-flyers",
+                  "commander-mono-red-raiders",
+                  "commander-mono-green-stompers"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck"
+          },
+          "deck_list": {
+            "anyOf": [
+              {
+                "maxLength": 60000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SysOp only (cards.any): one card per line, any card the engine implements.",
+            "title": "Deck List"
+          }
+        },
+        "title": "SeatChoice",
         "type": "object"
       },
       "SessionInfo": {
@@ -1072,7 +1520,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.0.5"
+    "version": "0.0.6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2250,6 +2698,130 @@
         "summary": "Bootstrap"
       }
     },
+    "/api/v1/cards": {
+      "get": {
+        "description": "Names of cards the engine implements, for SysOp's deck lists (cards.any).",
+        "operationId": "card_names_api_v1_cards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardNames"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Card Names"
+      }
+    },
     "/api/v1/engine/status": {
       "get": {
         "operationId": "engine_status_api_v1_engine_status_get",
@@ -2308,6 +2880,460 @@
           }
         },
         "summary": "Formats"
+      }
+    },
+    "/api/v1/games": {
+      "get": {
+        "description": "Your recent games, newest first; SysOp may list everyone's (scope=all).",
+        "operationId": "list_games_api_v1_games_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "default": "mine",
+              "enum": [
+                "mine",
+                "all"
+              ],
+              "title": "Scope",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GameSummary"
+                  },
+                  "title": "Response List Games Api V1 Games Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Games"
+      }
+    },
+    "/api/v1/games/{game_id}": {
+      "get": {
+        "description": "The game, with its owner's current seat snapshot while the engine holds it.",
+        "operationId": "get_game_api_v1_games__game_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Game"
+      }
+    },
+    "/api/v1/games/{game_id}/close": {
+      "post": {
+        "description": "Ends the game for every seat: its owner's choice, or SysOp's.",
+        "operationId": "close_game_api_v1_games__game_id__close_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Close Game"
+      }
+    },
+    "/api/v1/games/{game_id}/inspection": {
+      "get": {
+        "description": "SysOp's inspection view: every hand and library in order (engine view type\ncontracts/engine-inspection.schema.json). Audited.",
+        "operationId": "inspect_game_api_v1_games__game_id__inspection_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Inspect Game Api V1 Games  Game Id  Inspection Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Inspect Game"
       }
     },
     "/api/v1/health": {
@@ -2725,6 +3751,213 @@
           }
         },
         "summary": "End Session"
+      }
+    },
+    "/api/v1/practice-games": {
+      "post": {
+        "description": "Starts a game against bots. The response names the game; play it over its WebSocket.",
+        "operationId": "create_practice_game_api_v1_practice_games_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PracticeGameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Practice Game"
+      }
+    },
+    "/api/v1/practice-games/options": {
+      "get": {
+        "operationId": "practice_options_api_v1_practice_games_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PracticeOptions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Practice Options"
       }
     },
     "/api/v1/ready": {

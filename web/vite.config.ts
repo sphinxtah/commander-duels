@@ -8,7 +8,8 @@ const version = readFileSync(new URL("../VERSION", import.meta.url), "utf8").tri
 export default defineConfig({
   plugins: [react()],
   define: { __APP_VERSION__: JSON.stringify(version) },
-  server: { proxy: { "/api": "http://127.0.0.1:8000" } },
+  // ws: game events arrive over a WebSocket under /api (v0.0.6).
+  server: { proxy: { "/api": { target: "http://127.0.0.1:8000", ws: true } } },
   test: {
     environment: "jsdom",
     setupFiles: "./src/test-setup.ts",

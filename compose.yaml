@@ -6,7 +6,9 @@ services:
       POSTGRES_USER: commander
       POSTGRES_PASSWORD: commander
       POSTGRES_DB: commander
-    ports: ["127.0.0.1:5432:5432"]
+    # Host-side tests and Alembic only; the stack itself never uses it. Windows can reserve 5432
+    # after a restart (WinNAT's excluded port range): set CD_DB_PORT in .env to move it.
+    ports: ["127.0.0.1:${CD_DB_PORT:-5432}:5432"]
     volumes: ["postgres_data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U commander -d commander"]
@@ -28,6 +30,9 @@ services:
       # gateway is this computer: SysOp's development network.
       CD_TRUSTED_PROXIES: 172.30.233.10/32
       CD_SYSOP_NETWORKS: 172.30.233.1/32
+      # Shared with the engine; set it in .env (at least 32 random characters). Empty turns
+      # games off.
+      CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:-}
     command: ["alembic", "upgrade", "head"]
     depends_on:
       db: {condition: service_healthy}
@@ -55,8 +60,10 @@ services:
     # Internal only: no published port, and the web proxy forwards nothing to it.
     expose: ["8090"]
     environment:
-      # Development-only POST /v1/bot_match, reachable from other Compose services.
+      # Development-only POST /v1/bot_match and games, reachable from other Compose services.
       CD_ENGINE_DEV_ENDPOINTS: "true"
+      # The API's games: only requests carrying this token reach them.
+      CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:-}
       # One match peaks near 200 MB of heap; the limit leaves room for metaspace and threads.
       # XMage opens its card database with H2 AUTO_SERVER, which starts a TCP listener; bind it to
       # loopback so other services cannot reach it.

@@ -161,6 +161,50 @@ class LoginChallenge(Base):
     consumed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
+class Game(Base):
+    """A game the API started in the engine. Its id is the engine's game id. The engine holds the
+    game itself, in memory; the seat tokens live only in the API process, so a game still active
+    when the API restarts is marked interrupted."""
+
+    __tablename__ = "games"
+    __table_args__ = (
+        CheckConstraint("kind IN ('practice')", name="ck_games_kind"),
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_games_format"),
+        CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), default="practice")
+    format: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    bot_skill: Mapped[int]
+    turn_cap: Mapped[int]
+    # The engine's result, when the game finished: kind, winner_seat, draw, turns, conceded_seats.
+    result: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+
+
+class GameSeat(Base):
+    """A seat in a game: a human seat's owner, or a bot, and its deck."""
+
+    __tablename__ = "game_seats"
+    __table_args__ = (
+        UniqueConstraint("game_id", "seat"),
+        CheckConstraint("player IN ('human', 'bot')", name="ck_game_seats_player"),
+        CheckConstraint("(player = 'human') = (user_id IS NOT NULL)", name="ck_game_seats_owner"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), index=True)
+    seat: Mapped[int]
+    player: Mapped[str] = mapped_column(String(8))
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    # A fixture deck's name, or "custom" for a deck list.
+    deck: Mapped[str] = mapped_column(String(64))
+    # The deck list's cards and commanders, as sent to the engine; null for fixture decks.
+    deck_list: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+
+
 class RulesBundle(Base):
     __tablename__ = "rules_bundles"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)

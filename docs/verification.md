@@ -1,5 +1,55 @@
 # Verification
 
+## v0.0.6
+
+Validated locally on Windows on October 19, 2026.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting | Passed (API, catalog, tests and scripts) |
+| mypy strict checks | Passed, 24 Python source files; `scripts/api_practice_game.py` also passes `mypy --strict` |
+| Python suite | 32 passed against PostgreSQL 17, including nine game tests against a fake engine, the inspection contract test and the two PostgreSQL tests. Tests now ignore the developer's `.env`, which holds a real Google client ID since v0.0.5 |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated with the game routes; the WebSocket and SysOp's routes do not appear in them |
+| Alembic | `0003_games` applied in Compose. `alembic check` on SQLite and PostgreSQL: no new upgrade operations. The migration tests upgrade, downgrade and upgrade again on both |
+| Engine image build | XMage and card-database layers cached. JUnit: 69 passed, including the five new `ServiceGameHttpTest` tests |
+| Compose | Restarted without the port override: PostgreSQL published on 127.0.0.1:15432 (`CD_DB_PORT` in `.env`; Windows still reserves 5364–5463), all services healthy. The engine logs "service games enabled" and `/api/v1/engine/status` reports `service_games_enabled: true` |
+| Legacy game through the API | `scripts/api_practice_game.py` as a throwaway SysOp, through an API container on a separate `commander_e2e` database and the Compose engine. The bot won in 13 turns, and the API recorded `finished` and `completed`. 109 prompts answered in 21 s. 321 snapshots checked and validated against the seat-view contract. 259 inspection views validated against their contract, each with hand and library sizes equal to the public counts. `game.inspection_opened` audited. The observer refusal, the lease takeover and a resend after a dropped connection were all verified. No problems |
+| Commander game through the API | The same, against three bots with `--turn-cap 20`. The game reached the turn limit at turn 20, and the API recorded it. 143 prompts answered in 43 s, with two `choose_defender` prompts. 466 snapshots and 287 inspections validated, and the same three proofs. No problems |
+| Development route | `docker compose exec -T api python - --quiet --skill 1 < scripts/engine_human_game.py`. The bot won in 11 turns: 100 prompts, 390 payloads (162 of them the spectator's), both refusals verified, no problems |
+| WebSocket through the web proxy | A handshake to `ws://localhost:8080/api/v1/games/…/events` from the site's origin reached the API and was refused for having no session (4401 `authentication_required`); one from another origin got 4403 `origin_refused` |
+| Vitest and production build | 2 Vitest tests and the production build passed in a `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository |
+| Browser journeys | 6 passed in that container. A throwaway API on `commander_e2e` was configured as Playwright's own would be, with a throwaway SysOp. The shell journey now also checks that the sidebar mark, the Play page's logo and the favicon load. Screenshots at 1920, 1366 and 390 px were checked by eye after two layout fixes to the logo's caption |
+
+The game tests (`tests/test_games.py`) run against a fake engine that speaks the service routes, with its seat tokens, revisions, prompts and action-ID memory:
+- **Ownership (T29's match case).** Another account gets 404 for the game, its close and its WebSocket (close code 4404), and 403 for its inspection. Neither the seat token nor the service token appears in any response or WebSocket message.
+- **The lease (AUTH07).**
+  - The first tab takes control, and a second observes.
+  - The observer's command is refused with `not_controller`.
+  - The controller's command is applied, and both tabs see the new revision.
+  - The second tab takes control; the first gets `taken_over`, and its command is refused.
+- **Resends (T14).**
+  - Resending an applied command returns the identical result and applies nothing.
+  - A command sent by a tab that closed without reading the reply was applied once. Its resend from a new tab returned 200 and applied nothing more.
+- **Refusals.** Another origin, no session, a wrong CSRF token, a missing hello, inspection by a player, and an unknown game. Signing out everywhere ends an open connection at its next command, without applying the command.
+- **Results and restarts.** A concession is recorded as `completed` with the winner and the conceded seat. A close is recorded as `closed`. A second API process on the same database marks the running game `interrupted` and closes it in the engine.
+- **SysOp.**
+  - A player's deck list is refused, and so is the card lookup.
+  - SysOp's deck list with unknown names returns their names. A Commander deck list with set annotations reaches the engine as cards and commanders, with a bot's deck list too.
+  - SysOp has no per-account limit.
+  - SysOp lists, observes, inspects and closes a player's game, sees every deck, and cannot take that seat's lease.
+  - `game.deck_lists_used`, `game.observed`, `game.inspection_opened` and `game.closed` are audited.
+- **Limits and parsing.**
+  - The API-wide limit returns 429 with `Retry-After`, and games are off without a service token. A short service token is refused at startup.
+  - The fixture decks match `engine/decks`.
+  - The deck-list parser merges counts, ignores comments, set annotations and sideboards, and refuses empty lists, counts over 250, too many cards, a commander in Legacy, a Commander list without one, and two copies of a commander.
+
+The engine tests (`ServiceGameHttpTest`, real XMage games):
+- **The service token.** It guards every service route: without it, or with a wrong one, 401. A token under 32 characters is refused, and development games are off when only service games are configured.
+- **Separate routes.** A development game's token and ID find nothing on the service routes and the reverse. A seat token alone does not reach a service game.
+- **Deck lists.** 25 Lightning Bolts, 40 Mountains and 5 Counterspells, named in lower case, with Krenko, Mob Boss as commander: the game has 70 cards in hand and library and Krenko in the command zone. Unknown names come back together; a deck and a deck list on one seat, an empty list, a zero count, a commander in Legacy and a Commander list without one are refused.
+- **Inspection against XMage.** At each of six prompts, every player's hand and library match XMage's own: card by card, in order, and each opaque id resolving to that very card. Every seat's deck is shown, and versions increase. After a close, the final inspection carries the result.
+- **Card lookup.** `lightning bo` finds Lightning Bolt first. Bad queries are refused.
+
 ## v0.0.5
 
 Validated locally on Windows on October 18–19, 2026 (UTC).

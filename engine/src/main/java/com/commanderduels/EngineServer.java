@@ -8,6 +8,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -23,17 +24,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Internal HTTP boundary of the XMage engine. It reports engine status and, when development
- * endpoints are enabled, runs bot-versus-bot matches and development games with human and bot seats
- * (each human seat's token selects that seat). Every other operation fails closed.
+ * Internal HTTP boundary of the XMage engine. It reports engine status. When development endpoints
+ * are enabled, it runs bot-versus-bot matches and development games with human and bot seats (each
+ * human seat's token selects that seat). When a service token is configured, the API's service
+ * games run under {@code /v1/service}: every request there must carry the token, seats still need
+ * their own seat tokens, and the API may also close a game, inspect it for SysOp and look up card
+ * names. Every other operation fails closed.
  */
 public final class EngineServer {
     public static final int PROTOCOL_VERSION = 1;
     static final int MAX_BODY_BYTES = 4096;
+    /** Service game requests may carry deck lists. */
+    static final int MAX_SERVICE_BODY_BYTES = 65_536;
     static final long MAX_WAIT_MILLIS = 30_000;
+    static final String SERVICE_TOKEN_HEADER = "X-Service-Token";
+    static final int DEFAULT_CARD_RESULTS = 20;
     private static final String GAMES = "/v1/games";
-    private static final Pattern GAME_PATH =
-        Pattern.compile("([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/(view|commands|close)");
+    private static final String SERVICE = "/v1/service/";
+    private static final String GAME_ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
+    private static final Pattern GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close)");
+    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection)");
     static final Gson JSON = new GsonBuilder()
         .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
         .serializeNulls()
@@ -42,7 +52,7 @@ public final class EngineServer {
     private static final SecureRandom SEEDS = new SecureRandom();
 
     record Health(String status, int protocolVersion, boolean gameplayAvailable, Xmage xmage, Cards cards,
-                  boolean botMatchEnabled) {}
+                  boolean botMatchEnabled, boolean serviceGamesEnabled) {}
 
     record Xmage(String version, String tag, String commit, String commitDate) {}
 
@@ -80,10 +90,12 @@ public final class EngineServer {
             }
         } else if (path.equals("/v1/bot_match") && engine.botMatchEnabled()) {
             botMatch(exchange, engine);
-        } else if (path.equals(GAMES) && engine.humanGames() != null) {
-            createGame(exchange, engine);
-        } else if (path.startsWith(GAMES + "/") && engine.humanGames() != null) {
-            gameRoute(exchange, engine.humanGames(), path.substring(GAMES.length() + 1));
+        } else if (path.startsWith(SERVICE) && engine.serviceGamesEnabled()) {
+            service(exchange, engine, path.substring(SERVICE.length()));
+        } else if (path.equals(GAMES) && engine.devGamesEnabled()) {
+            createGame(exchange, engine, false);
+        } else if (path.startsWith(GAMES + "/") && engine.devGamesEnabled()) {
+            gameRoute(exchange, engine.humanGames(), path.substring(GAMES.length() + 1), false);
         } else if (path.startsWith("/v1/")) {
             respond(exchange, 503, Map.of("code", "engine_not_integrated", "protocol_version", PROTOCOL_VERSION));
         } else {
@@ -100,7 +112,96 @@ public final class EngineServer {
             false,
             new Xmage(pin.version(), pin.tag(), pin.commit(), pin.commitDate()),
             stats == null ? null : new Cards(stats.printings(), stats.distinctNames()),
-            engine.botMatchEnabled());
+            engine.botMatchEnabled(),
+            engine.serviceGamesEnabled());
+    }
+
+    /**
+     * The API's routes. The service token comes first: without it nothing under the prefix exists
+     * for the caller. Seat routes still need the seat's own token.
+     */
+    private static void service(HttpExchange exchange, Engine engine, String rest) throws IOException {
+        if (!engine.serviceAuthorized(exchange.getRequestHeaders().getFirst(SERVICE_TOKEN_HEADER))) {
+            respond(exchange, 401, Map.of("code", "service_unauthorized"));
+            return;
+        }
+        HumanGames games = engine.humanGames();
+        if (rest.equals("games")) {
+            createGame(exchange, engine, true);
+        } else if (rest.equals("cards")) {
+            cards(exchange, engine);
+        } else if (rest.startsWith("games/")) {
+            String gamePath = rest.substring("games/".length());
+            Matcher matcher = SERVICE_GAME_PATH.matcher(gamePath);
+            if (!matcher.matches()) {
+                gameRoute(exchange, games, gamePath, true);
+                return;
+            }
+            Optional<HumanGame> game = games.service(matcher.group(1));
+            if (game.isEmpty()) {
+                respond(exchange, 404, Map.of("code", "not_found"));
+            } else if (matcher.group(2).equals("close")) {
+                close(exchange, game.get());
+            } else {
+                inspection(exchange, game.get());
+            }
+        } else {
+            respond(exchange, 404, Map.of("code", "not_found"));
+        }
+    }
+
+    /** SysOp's inspection view, once XMage waits for a human seat (see {@link HumanGame#inspect}). */
+    private static void inspection(HttpExchange exchange, HumanGame game) throws IOException {
+        if (!exchange.getRequestMethod().equals("GET")) {
+            methodNotAllowed(exchange, "GET");
+            return;
+        }
+        long waitMillis;
+        try {
+            waitMillis = longParameter(query(exchange.getRequestURI().getRawQuery()), "wait_ms", 0, 0,
+                MAX_WAIT_MILLIS);
+        } catch (JsonRequest.Invalid e) {
+            respond(exchange, 400, Map.of("code", "invalid_request", "message", e.getMessage()));
+            return;
+        }
+        try {
+            HumanGame.Inspection inspection = game.inspect(waitMillis);
+            if (inspection == null) {
+                respond(exchange, 409, Map.of("code", "unsettled",
+                    "message", "The game is not waiting for a player; ask again shortly"));
+            } else {
+                respond(exchange, 200, inspection);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            respond(exchange, 503, Map.of("code", "interrupted"));
+        }
+    }
+
+    /** Card names in the engine's database containing {@code q}, for SysOp's deck lists. */
+    private static void cards(HttpExchange exchange, Engine engine) throws IOException {
+        if (!exchange.getRequestMethod().equals("GET")) {
+            methodNotAllowed(exchange, "GET");
+            return;
+        }
+        if (engine.status() != Engine.Status.READY) {
+            respond(exchange, 503, Map.of("code", notReadyCode(engine)));
+            return;
+        }
+        String text;
+        int limit;
+        try {
+            Map<String, String> query = query(exchange.getRequestURI().getRawQuery());
+            text = URLDecoder.decode(query.getOrDefault("q", ""), StandardCharsets.UTF_8);
+            limit = (int) longParameter(query, "limit", DEFAULT_CARD_RESULTS, 1, DeckLists.MAX_SEARCH);
+            if (text.isBlank() || text.length() > DeckLists.MAX_NAME) {
+                throw new JsonRequest.Invalid("q must be 1 to " + DeckLists.MAX_NAME + " characters");
+            }
+        } catch (JsonRequest.Invalid | IllegalArgumentException e) {
+            respond(exchange, 400, Map.of("code", "invalid_request", "message", e.getMessage()));
+            return;
+        }
+        respond(exchange, 200, Map.of("names", DeckLists.search(text, limit)));
     }
 
     /** Development only: plays one bot match synchronously. Outside the player command envelope. */
@@ -134,8 +235,11 @@ public final class EngineServer {
         respond(exchange, 200, result.get());
     }
 
-    /** Development only: starts a game and returns each human seat's token, once. */
-    private static void createGame(HttpExchange exchange, Engine engine) throws IOException {
+    /**
+     * Starts a development or service game and returns each human seat's token, once. Service games
+     * may seat deck lists; every name in them must be in the card database.
+     */
+    private static void createGame(HttpExchange exchange, Engine engine, boolean service) throws IOException {
         if (!exchange.getRequestMethod().equals("POST")) {
             methodNotAllowed(exchange, "POST");
             return;
@@ -144,19 +248,28 @@ public final class EngineServer {
             respond(exchange, 503, Map.of("code", notReadyCode(engine)));
             return;
         }
-        Optional<String> body = readBody(exchange);
+        Optional<String> body = readBody(exchange, service ? MAX_SERVICE_BODY_BYTES : MAX_BODY_BYTES);
         if (body.isEmpty()) {
             return;
         }
         HumanGameRequest request;
         try {
-            request = HumanGameRequest.parse(body.get(), SEEDS::nextLong);
+            request = HumanGameRequest.parse(body.get(), SEEDS::nextLong, service);
         } catch (JsonRequest.Invalid e) {
             respond(exchange, 400, Map.of("code", "invalid_request", "message", e.getMessage()));
             return;
         }
+        List<String> unknown = request.unknownCards();
+        if (!unknown.isEmpty()) {
+            Map<String, Object> refusal = new LinkedHashMap<>();
+            refusal.put("code", "unknown_cards");
+            refusal.put("message", "The card database has no card named " + String.join(", ", unknown));
+            refusal.put("names", unknown);
+            respond(exchange, 400, refusal);
+            return;
+        }
         HumanGames games = engine.humanGames();
-        Optional<HumanGames.Created> created = games.create(request);
+        Optional<HumanGames.Created> created = games.create(request, service);
         if (created.isEmpty()) {
             exchange.getResponseHeaders().set("Retry-After", "30");
             respond(exchange, 429, Map.of("code", "games_busy",
@@ -180,10 +293,11 @@ public final class EngineServer {
         respond(exchange, 201, response);
     }
 
-    private static void gameRoute(HttpExchange exchange, HumanGames games, String rest) throws IOException {
+    private static void gameRoute(HttpExchange exchange, HumanGames games, String rest, boolean service)
+            throws IOException {
         Matcher matcher = GAME_PATH.matcher(rest);
         Optional<HumanGames.SeatHandle> found = matcher.matches()
-            ? games.find(matcher.group(1), bearerToken(exchange)) : Optional.empty();
+            ? games.find(matcher.group(1), bearerToken(exchange), service) : Optional.empty();
         if (found.isEmpty()) {
             respond(exchange, 404, Map.of("code", "not_found"));
             return;
@@ -262,12 +376,16 @@ public final class EngineServer {
 
     /** The body as text, or empty after a 413 response. */
     private static Optional<String> readBody(HttpExchange exchange) throws IOException {
+        return readBody(exchange, MAX_BODY_BYTES);
+    }
+
+    private static Optional<String> readBody(HttpExchange exchange, int maxBytes) throws IOException {
         byte[] body;
         try (InputStream stream = exchange.getRequestBody()) {
-            body = stream.readNBytes(MAX_BODY_BYTES + 1);
+            body = stream.readNBytes(maxBytes + 1);
         }
-        if (body.length > MAX_BODY_BYTES) {
-            respond(exchange, 413, Map.of("code", "body_too_large", "max_bytes", MAX_BODY_BYTES));
+        if (body.length > maxBytes) {
+            respond(exchange, 413, Map.of("code", "body_too_large", "max_bytes", maxBytes));
             return Optional.empty();
         }
         return Optional.of(new String(body, StandardCharsets.UTF_8));
@@ -339,14 +457,16 @@ public final class EngineServer {
         var runner = new BotMatchRunner(decks, pin);
         int maxGames = Integer.parseInt(System.getenv().getOrDefault("CD_ENGINE_MAX_GAMES",
             String.valueOf(HumanGames.DEFAULT_MAX_ACTIVE)));
-        var games = devEndpoints ? new HumanGames(decks, maxGames) : null;
-        var engine = new Engine(pin, devEndpoints, CardDatabase::load, runner::run, games);
+        String serviceToken = System.getenv().getOrDefault("CD_ENGINE_SERVICE_TOKEN", "").strip();
+        var games = devEndpoints || !serviceToken.isEmpty() ? new HumanGames(decks, maxGames) : null;
+        var engine = new Engine(pin, devEndpoints, CardDatabase::load, runner::run, games, devEndpoints, serviceToken);
         var server = create(port, engine);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(2)));
         server.start();
-        System.out.printf("Commander Duels engine on port %d: XMage %s (%s); gameplay unavailable;"
-            + " development bot matches and human games %s%n", port, pin.version(), pin.commit(),
-            games != null ? "enabled (at most " + games.maxActive() + " human games)" : "disabled");
+        System.out.printf("Commander Duels engine on port %d: XMage %s (%s); development bot matches and"
+            + " games %s; service games %s%s%n", port, pin.version(), pin.commit(),
+            devEndpoints ? "enabled" : "disabled", engine.serviceGamesEnabled() ? "enabled" : "disabled",
+            games != null ? " (at most " + games.maxActive() + " games at once)" : "");
         engine.startLoading();
     }
 }

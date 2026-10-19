@@ -12,9 +12,11 @@ import java.util.function.LongSupplier;
  * Inputs to a development game: a format and its seats in turn order, each a human or a bot with a
  * fixture deck. Legacy takes exactly two seats (by default a human then a bot), Commander two to
  * four (by default a human and three bots); at least one seat must be human. A seat without a deck
- * gets the format's first fixture deck that no other seat uses. Spectators see the game
- * {@code spectatorDelaySeconds} late (default 0). Numbers outside the safe range are clamped. The
- * seed exists for reproducible tests and is never shown to a seat: it determines every shuffle.
+ * gets the format's first fixture deck that no other seat uses. On the service route a seat may
+ * instead carry a {@code deck_list} naming any cards ({@link DeckLists}); the API allows that only
+ * for SysOp. Spectators see the game {@code spectatorDelaySeconds} late (default 0). Numbers outside
+ * the safe range are clamped. The seed exists for reproducible tests and is never shown to a seat:
+ * it determines every shuffle.
  */
 public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
                                int idleTimeoutSeconds, int spectatorDelaySeconds) {
@@ -31,9 +33,19 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
     private static final Set<String> FIELDS =
         Set.of("seed", "format", "seats", "skill", "turn_cap", "idle_timeout_seconds", "spectator_delay_seconds");
     private static final Set<String> SEAT_FIELDS = Set.of("player", "deck");
+    private static final Set<String> SERVICE_SEAT_FIELDS = Set.of("player", "deck", "deck_list");
+    /** What a seat's settings call a deck from a deck list. */
+    public static final String CUSTOM_DECK = "custom";
 
-    /** @param player human or bot */
-    public record Seat(String player, String deck) {
+    /**
+     * @param player human or bot
+     * @param deck   a fixture deck's name, or {@link #CUSTOM_DECK} when {@code custom} holds the list
+     */
+    public record Seat(String player, String deck, DeckLists.CustomDeck custom) {
+        public Seat(String player, String deck) {
+            this(player, deck, null);
+        }
+
         boolean human() {
             return player.equals(HUMAN);
         }
@@ -59,7 +71,25 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
         return (int) seats.stream().filter(Seat::human).count();
     }
 
+    /** Every deck list's names the card database does not know, in seat and list order. */
+    List<String> unknownCards() {
+        Set<String> unknown = new java.util.LinkedHashSet<>();
+        for (Seat seat : seats) {
+            if (seat.custom() != null) {
+                unknown.addAll(DeckLists.unknown(seat.custom()));
+            }
+        }
+        return List.copyOf(unknown);
+    }
+
+    /** The development route's request: fixture decks only. */
     public static HumanGameRequest parse(String body, LongSupplier seedSource) throws JsonRequest.Invalid {
+        return parse(body, seedSource, false);
+    }
+
+    /** @param deckLists whether seats may carry a {@code deck_list} (the service route) */
+    public static HumanGameRequest parse(String body, LongSupplier seedSource, boolean deckLists)
+            throws JsonRequest.Invalid {
         JsonObject json = JsonRequest.object(body, FIELDS);
         long seed = json.has("seed") ? JsonRequest.integer(json, "seed").longValueExact() : seedSource.getAsLong();
         GameFormat format = GameFormat.LEGACY;
@@ -71,6 +101,7 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
         }
         List<String> players = new ArrayList<>();
         List<String> decks = new ArrayList<>();
+        List<DeckLists.CustomDeck> customs = new ArrayList<>();
         if (json.has("seats")) {
             JsonElement element = json.get("seats");
             if (!element.isJsonArray() || element.getAsJsonArray().size() < format.minSeats()
@@ -84,20 +115,29 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
                     throw new JsonRequest.Invalid("each seat must be an object");
                 }
                 JsonObject seat = item.getAsJsonObject();
-                JsonRequest.onlyFields(seat, SEAT_FIELDS, "seats[].");
+                JsonRequest.onlyFields(seat, deckLists ? SERVICE_SEAT_FIELDS : SEAT_FIELDS, "seats[].");
                 String player = JsonRequest.string(seat, "player", 8);
                 if (!player.equals(HUMAN) && !player.equals(BOT)) {
                     throw new JsonRequest.Invalid("seats[].player must be human or bot");
                 }
+                if (seat.has("deck") && seat.has("deck_list")) {
+                    throw new JsonRequest.Invalid("a seat has a deck or a deck_list, not both");
+                }
                 players.add(player);
-                decks.add(seat.has("deck") ? deck(seat, format) : null);
+                DeckLists.CustomDeck custom = seat.has("deck_list") ? DeckLists.parse(seat.get("deck_list"), format)
+                    : null;
+                decks.add(seat.has("deck") ? deck(seat, format) : custom != null ? CUSTOM_DECK : null);
+                customs.add(custom);
             }
         } else {
             players.add(HUMAN);
             for (int seat = 1; seat < (format == GameFormat.LEGACY ? 2 : format.maxSeats()); seat++) {
                 players.add(BOT);
             }
-            players.forEach(player -> decks.add(null));
+            players.forEach(player -> {
+                decks.add(null);
+                customs.add(null);
+            });
         }
         if (!players.contains(HUMAN)) {
             throw new JsonRequest.Invalid("at least one seat must be human");
@@ -111,7 +151,7 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
                     .orElse(format.decks().get(i % format.decks().size()));
                 taken.add(deck);
             }
-            seats.add(new Seat(players.get(i), deck));
+            seats.add(new Seat(players.get(i), deck, customs.get(i)));
         }
         return new HumanGameRequest(
             seed,

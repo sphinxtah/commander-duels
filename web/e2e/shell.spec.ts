@@ -16,6 +16,17 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
   await expect(
     page.getByRole("heading", { name: "Commander", exact: true }),
   ).toBeVisible();
+  // The owner's logo: the monogram in the sidebar, the full logo on Play, and the favicon.
+  const brand = page.locator('img[src^="/brand/"]');
+  await expect(brand).toHaveCount(2);
+  await expect
+    .poll(() =>
+      brand.evaluateAll((images) =>
+        images.every((image) => (image as HTMLImageElement).naturalWidth > 0),
+      ),
+    )
+    .toBe(true);
+  expect((await page.request.get("/brand/favicon-32.png")).ok()).toBe(true);
   await page.getByRole("button", { name: "About this format" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");

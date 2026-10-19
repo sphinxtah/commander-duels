@@ -1,5 +1,7 @@
 # Human seat and per-seat views (v0.0.3)
 
+> **Since v0.0.6** the API's own games use the same seats on the engine's service routes; see [games through the API](../games.md). The development endpoints below stay for scripts.
+>
 > **Since v0.0.4** a game seats two to four players, any mix of human and bot, in Legacy or Commander. Each human seat has its own token, prompt and view. The prompt mechanics and view rules below still hold; the endpoint shapes, results and seat rules are updated here for v0.0.4. The Commander tables, new prompt kinds and commander fields are in [Commander tables](commander-tables.md).
 
 v0.0.3 is the second slice of milestone M0. A human seat plays a Legacy Two Player Duel against an XMage computer player through XMage's own `HumanPlayer`. Each blocking choice becomes a typed prompt with an ID, stale answers are refused, and the seat receives only an authorized view. Development endpoints on the internal engine carry it; FastAPI still refuses game actions, and there is no game UI. [The engine spike](xmage-spike.md) records how XMage's human player waits for answers; this document records what was built on that.

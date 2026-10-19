@@ -18,6 +18,7 @@ from uuid import UUID
 from fastapi import Depends, Request, Response
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from starlette.requests import HTTPConnection
 
 from api.config import Settings
 from api.models import AuditEvent, ExternalIdentity, RoleGrant, User, UserSession
@@ -57,10 +58,16 @@ def utcnow() -> datetime:
 
 class ApiError(Exception):
     def __init__(
-        self, status: int, code: str, message: str, headers: dict[str, str] | None = None
+        self,
+        status: int,
+        code: str,
+        message: str,
+        headers: dict[str, str] | None = None,
+        names: list[str] | None = None,
     ) -> None:
         super().__init__(message)
         self.status, self.code, self.message, self.headers = status, code, message, headers
+        self.names = names
 
 
 def not_found() -> ApiError:
@@ -72,7 +79,7 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def settings_of(request: Request) -> Settings:
+def settings_of(request: HTTPConnection) -> Settings:
     return cast(Settings, request.app.state.settings)
 
 
@@ -84,12 +91,12 @@ def get_db(request: Request) -> Iterator[Session]:
 Db = Annotated[Session, Depends(get_db)]
 
 
-def source_of(request: Request) -> str | None:
+def source_of(request: HTTPConnection) -> str | None:
     address = client_address(request, settings_of(request).trusted_proxy_list)
     return str(address) if address else None
 
 
-def from_sysop_network(request: Request) -> bool:
+def from_sysop_network(request: HTTPConnection) -> bool:
     settings = settings_of(request)
     address = client_address(request, settings.trusted_proxy_list)
     return within(address, settings.sysop_network_list)
@@ -97,7 +104,7 @@ def from_sysop_network(request: Request) -> bool:
 
 def audit(
     db: Session,
-    request: Request,
+    request: HTTPConnection,
     action: str,
     *,
     actor_id: UUID | None = None,
@@ -235,10 +242,10 @@ def revoke_sessions(
     return db.execute(statement).rowcount  # type: ignore[attr-defined, no-any-return]
 
 
-def optional_principal(request: Request, response: Response, db: Db) -> Principal | None:
-    """The signed-in account, or None. Expired, revoked and off-network SysOp sessions count as
-    signed out. A session older than its account's last privilege change is rotated."""
-    token = request.cookies.get(SESSION_COOKIE)
+def live_session(conn: HTTPConnection, db: Session) -> tuple[UserSession, User] | None:
+    """The connection's session and account, or None. Expired, revoked and off-network SysOp
+    sessions count as signed out, as do sessions of disabled accounts."""
+    token = conn.cookies.get(SESSION_COOKIE)
     if not token:
         return None
     now = utcnow()
@@ -251,10 +258,21 @@ def optional_principal(request: Request, response: Response, db: Db) -> Principa
         or session.idle_expires_at <= now
         or session.absolute_expires_at <= now
         or user.status == "disabled"
-        or (session.kind == "sysop" and not from_sysop_network(request))
+        or (session.kind == "sysop" and not from_sysop_network(conn))
     ):
-        request.state.stale_session = True
+        conn.state.stale_session = True
         return None
+    return session, user
+
+
+def optional_principal(request: Request, response: Response, db: Db) -> Principal | None:
+    """The signed-in account, or None (see live_session). A session older than its account's last
+    privilege change is rotated."""
+    found = live_session(request, db)
+    if found is None:
+        return None
+    session, user = found
+    now = utcnow()
     if session.privilege_version != user.privilege_version:
         session.revoked_at, session.revoked_reason = now, "rotated"
         session, token = issue_session(
@@ -268,14 +286,21 @@ def optional_principal(request: Request, response: Response, db: Db) -> Principa
         )
         set_session_cookie(response, request, token, session)
         db.commit()
-    elif now - session.last_seen_at >= TOUCH_INTERVAL:
-        idle, _ = _lifetimes(settings_of(request), session.kind)
+    else:
+        keep_alive(request, db, session, user)
+    roles = roles_of(db, user)
+    return Principal(user, session, roles, permissions_for(user, roles))
+
+
+def keep_alive(conn: HTTPConnection, db: Session, session: UserSession, user: User) -> None:
+    """Activity extends the session's idle limit, at most once a minute."""
+    now = utcnow()
+    if now - session.last_seen_at >= TOUCH_INTERVAL:
+        idle, _ = _lifetimes(settings_of(conn), session.kind)
         session.last_seen_at = now
         session.idle_expires_at = min(now + idle, session.absolute_expires_at)
         user.last_seen_at = now
         db.commit()
-    roles = roles_of(db, user)
-    return Principal(user, session, roles, permissions_for(user, roles))
 
 
 OptionalPrincipal = Annotated[Principal | None, Depends(optional_principal)]

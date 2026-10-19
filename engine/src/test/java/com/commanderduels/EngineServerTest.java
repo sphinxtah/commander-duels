@@ -114,7 +114,8 @@ class EngineServerTest {
         assertEquals(PIN.version(), xmage.get("version").getAsString());
         assertEquals(PIN.tag(), xmage.get("tag").getAsString());
         assertEquals(PIN.commitDate(), xmage.get("commit_date").getAsString());
-        assertEquals(6, loading.size(), "health fields: " + loading.keySet());
+        assertFalse(loading.get("service_games_enabled").getAsBoolean());
+        assertEquals(7, loading.size(), "health fields: " + loading.keySet());
 
         var notReady = get("/ready");
         assertEquals(503, notReady.statusCode());
