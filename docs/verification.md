@@ -46,6 +46,17 @@ Earlier local runs found five problems, all fixed before this record:
 
 They are described in [Commander tables](engine/commander-tables.md#findings).
 
+### Hosted CI
+
+GitHub Actions ("Framework checks") passed on both v0.0.4 work commits:
+- **Run #13** (`f01ebf7`, Commander tables and seats). 10 m 33 s on a cold engine cache: adding `Mage.Game.CommanderDuel` changed `engine/xmage/`, so XMage was recompiled. Verify took 2 m 45 s and the engine job 10 m 28 s, including the image build with 61 JUnit tests (9 m 7 s).
+- **Run #14** (`89f3065`, prompt families and spectator views). 6 m 0 s with the XMage layers reused. Verify took 2 m 50 s and the engine job 5 m 55 s, including the image build with 64 JUnit tests (4 m 20 s). The Compose smoke ran:
+  - a bot match (17 turns);
+  - the schema-checked Legacy game (11 turns, 354 payloads);
+  - the schema-checked four-seat Commander game (24 turns, 352 prompts, 1,613 payloads, 465 of them the spectator's), with no problems.
+
+The close-out commit's run is listed in [the release notes](releases/0.0.4.md).
+
 ## v0.0.3
 
 Validated locally on Windows on October 18, 2026.
