@@ -1,4 +1,5 @@
-# Commander Duels on the TSH nginx proxy: /etc/nginx/sites-available/duels.thesphinx.co.
+# Commander Duels on the TSH nginx proxy: /etc/nginx/sites-available/zz-duels.thesphinx.co (zz- keeps
+# it after dw.thesphinx.co, the proxy's fallback for unknown hostnames; see docs/deployment.md).
 # The proxy only terminates TLS; the game runs on the VM (commanderduels). Adding this file changes no other
 # site. Certbot (--nginx) adds the HTTPS listener, the certificate and the HTTP redirect to it.
 

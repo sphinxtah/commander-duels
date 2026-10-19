@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
-import type { Prompt, PromptOption, Snapshot } from "../src/game/types";
+import type {
+  GameView,
+  Prompt,
+  PromptOption,
+  Snapshot,
+} from "../src/game/types";
 
 // Practice games played through the game screen against the real engine: by mouse, by keyboard,
 // from a second tab and across a dropped connection. They need the engine, the API and SysOp
@@ -175,40 +180,104 @@ async function startGame(
 }
 
 /** A simple player: keep, play lands, cast what it can at the opponents, attack with everything
- * once, never block, and accept the engine's suggestions. */
-function choose(prompt: Prompt, seat: number): PromptOption | "amounts" {
-  const by = (action: PromptOption["action"]) =>
-    prompt.options.filter((option) => option.action === action);
-  const first = (...actions: PromptOption["action"][]) =>
-    actions.map((action) => by(action)[0]).find(Boolean);
-  const notCancel = prompt.options.filter((o) => o.action !== "cancel");
-  switch (prompt.kind) {
-    case "mulligan":
-      return first("keep")!;
-    case "priority":
-      return first("play_land", "cast", "pass")!;
-    case "choose_target":
-    case "choose_defender": {
-      const choices = by("choose").filter((o) => !o.selected);
-      const theirs = choices.find((o) => o.seat !== null && o.seat !== seat);
-      return theirs ?? choices[0] ?? first("done")!;
+ * once, never block, and accept the engine's suggestions. Like a person, it does not cast a spell
+ * again in the same turn after cancelling its payment, and it passes, finishes or cancels a prompt
+ * that keeps coming back unchanged. */
+class Player {
+  private avoid = new Set<string>();
+  private turn = -1;
+  private casting: string | null = null;
+  private lastKey = "";
+  private repeats = 0;
+  /** The last answers, for a failure's message. */
+  readonly recent: string[] = [];
+
+  choose(
+    prompt: Prompt,
+    view: GameView | null,
+    seat: number,
+  ): PromptOption | "amounts" {
+    const turn = view?.turn ?? 0;
+    if (turn !== this.turn) {
+      this.turn = turn;
+      this.avoid.clear();
     }
-    case "pay_mana":
-      return first("tap_source", "use_pool") ?? prompt.options[0];
-    case "declare_attackers":
-      return prompt.options.some((o) => o.selected)
-        ? first("done")!
-        : (first("all_attack", "done") ?? prompt.options[0]);
-    case "declare_blockers":
-      return first("done") ?? prompt.options[0];
-    case "assign_amounts":
-    case "choose_amount":
-      return "amounts";
-    case "yes_no":
-      return first("yes")!;
-    default:
-      return notCancel[0] ?? prompt.options[0];
+    const key = `${prompt.kind}|${prompt.message}|${prompt.options
+      .map((o) => `${o.action}:${o.object_id ?? o.seat ?? ""}`)
+      .join(",")}`;
+    this.repeats = key === this.lastKey ? this.repeats + 1 : 0;
+    this.lastKey = key;
+    let choice = this.pick(prompt, seat);
+    if (this.repeats >= 8)
+      choice = firstOf(prompt, "pass", "done", "cancel", "no") ?? choice;
+    if (choice !== "amounts") {
+      if (choice.action === "cast" || choice.action === "activate")
+        this.casting = choice.object_id;
+      if (choice.action === "cancel" && this.casting)
+        this.avoid.add(this.casting);
+    }
+    this.recent.push(
+      `T${turn} ${prompt.kind} "${prompt.message}" -> ${
+        choice === "amounts"
+          ? "amounts"
+          : `${choice.action} ${choice.label ?? choice.object_id ?? ""}`
+      }`,
+    );
+    if (this.recent.length > 12) this.recent.shift();
+    return choice;
   }
+
+  private pick(prompt: Prompt, seat: number): PromptOption | "amounts" {
+    const by = (action: PromptOption["action"]) =>
+      prompt.options.filter((option) => option.action === action);
+    const first = (...actions: PromptOption["action"][]) =>
+      firstOf(prompt, ...actions);
+    switch (prompt.kind) {
+      case "mulligan":
+        return first("keep")!;
+      case "priority":
+        return (
+          first("play_land") ??
+          by("cast").find((o) => !this.avoid.has(o.object_id ?? "")) ??
+          first("pass") ??
+          prompt.options[0]
+        );
+      case "choose_target":
+      case "choose_defender": {
+        const choices = by("choose").filter((o) => !o.selected);
+        const theirs = choices.find((o) => o.seat !== null && o.seat !== seat);
+        return theirs ?? choices[0] ?? first("done") ?? prompt.options[0];
+      }
+      case "pay_mana":
+        return first("tap_source", "use_pool") ?? prompt.options[0];
+      case "declare_attackers":
+        return prompt.options.some((o) => o.selected)
+          ? (first("done") ?? prompt.options[0])
+          : (first("all_attack", "done") ?? prompt.options[0]);
+      case "declare_blockers":
+        return first("done") ?? prompt.options[0];
+      case "assign_amounts":
+      case "choose_amount":
+        return "amounts";
+      case "yes_no":
+        return first("yes") ?? prompt.options[0];
+      default:
+        return (
+          prompt.options.find((o) => o.action !== "cancel") ?? prompt.options[0]
+        );
+    }
+  }
+}
+
+function firstOf(
+  prompt: Prompt,
+  ...actions: PromptOption["action"][]
+): PromptOption | undefined {
+  for (const action of actions) {
+    const found = prompt.options.find((option) => option.action === action);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /** Plays the seat until the game ends. Mouse: cards on the board and buttons. Keyboard: focus and
@@ -220,6 +289,7 @@ async function play(
   beforeAnswer?: (snapshot: Snapshot) => Promise<void>,
 ) {
   const kinds: Record<string, number> = {};
+  const player = new Player();
   let answered = 0;
   for (let step = 0; step < 600; step += 1) {
     await expect
@@ -239,7 +309,7 @@ async function play(
         .getByRole("button", { name: "Concede" })
         .click();
     } else {
-      const choice = choose(prompt, snapshot.seat ?? 0);
+      const choice = player.choose(prompt, snapshot.view, snapshot.seat ?? 0);
       if (choice === "amounts") {
         const confirm = page.locator("[data-amounts]");
         if (mode === "keyboard") {
@@ -296,7 +366,9 @@ async function play(
       .toBe(true);
     table.results = table.results.filter((r) => r.status === 200);
   }
-  throw new Error("The game did not end within 600 prompts");
+  throw new Error(
+    `The game did not end within 600 prompts (${JSON.stringify(kinds)}). Last answers: ${player.recent.join(" | ")}`,
+  );
 }
 
 function note(

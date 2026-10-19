@@ -64,22 +64,31 @@ In Google Auth Platform (project "Commander Duels"), add `https://duels.thesphin
 
 ### On the TSH proxy
 
-1. Install the site file from the repository (`deploy/nginx/duels.thesphinx.co`, which forwards to 10.10.50.57:8080):
+Set up on 2026-10-19, step by step with discovery first, so that no other site or certificate changed. Discovery found eight enabled sites, one certificate per site, no wildcard names, no `map` blocks and no `default_server`.
+
+1. Create the site from the repository's `deploy/nginx/duels.thesphinx.co` as `/etc/nginx/sites-available/zz-duels.thesphinx.co`. Enable it with a symlink in `sites-enabled`, then run `sudo nginx -t` and reload. Before the certificate, `http://` for the name answered 502 (nothing deployed yet).
+
+   It forwards everything, the game WebSocket included, to 10.10.50.57:8080 with a one-hour read timeout, and replaces `X-Forwarded-For`. Its WebSocket `map` uses a variable of its own (`$duels_connection_upgrade`), so it cannot clash with another site's.
+
+   The `zz-` prefix kept the file after `dw.thesphinx.co`, which was then nginx's implicit fallback for unknown hostnames. With the explicit fallback below, the prefix no longer matters.
+
+2. Rehearse the certificate, then issue it with the proxy's venv certbot, after keeping a copy of the file (`~/zz-duels.thesphinx.co.before-certbot`):
 
    ```sh
-   sudo cp duels.thesphinx.co /etc/nginx/sites-available/duels.thesphinx.co
-   sudo ln -s /etc/nginx/sites-available/duels.thesphinx.co /etc/nginx/sites-enabled/
-   sudo nginx -t && sudo systemctl reload nginx
+   sudo ~/certbot-env/bin/certbot certonly --nginx --dry-run --cert-name duels.thesphinx.co -d duels.thesphinx.co --key-type ecdsa
+   sudo ~/certbot-env/bin/certbot --nginx --cert-name duels.thesphinx.co -d duels.thesphinx.co      --key-type ecdsa --redirect --hsts --deploy-hook "systemctl reload nginx"
    ```
 
-   It forwards everything, the game WebSocket included, to the VM's port 8080 with a one-hour read timeout, and replaces `X-Forwarded-For`. Its WebSocket `map` uses a variable of its own (`$duels_connection_upgrade`), so it cannot clash with another site's.
+   Certbot edited only this file: the HTTPS listener, the certificate (ECDSA, renewed through the nginx plugin by `certbot-venv-renew.timer`), HSTS, and a port-80 redirect.
 
-2. Issue the certificate with the proxy's venv certbot. The renewal timer (`certbot-venv-renew.timer`) already covers it:
+3. **The proxy's fallback** (the owner's request while setting up). `/etc/nginx/sites-enabled/00-fallback` is an explicit `default_server` for ports 80 and 443, IPv4 and IPv6. It redirects every hostname the proxy does not serve, and the bare IP, to `https://thesphinx.co/`.
+   - On 443 it presents thesphinx.co's certificate, so a browser asking for an unknown name sees a name mismatch before the redirect. That happened with DW's certificate before.
+   - Its TLS lines (TLS 1.2 and 1.3, `http2`, the shared session cache) match those of DW, the former implicit default. So the handshake every site's visitors go through did not change.
 
-   ```sh
-   sudo ~/certbot-env/bin/certbot --nginx --cert-name duels.thesphinx.co -d duels.thesphinx.co \
-     --key-type ecdsa --redirect --hsts --deploy-hook "systemctl reload nginx"
-   ```
+4. **Checked from the proxy afterwards:**
+   - unknown names and the IP redirect to thesphinx.co;
+   - `duels` redirects HTTP to HTTPS and answered 502 until the first deploy;
+   - the eight other sites answer as before.
 
 ### SysOp
 
