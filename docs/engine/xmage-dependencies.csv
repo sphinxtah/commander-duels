@@ -6,7 +6,8 @@ org.mage:mage-player-ai,1.4.62,not declared,mage-player-ai-mad,XMage; MIT per re
 org.mage:mage-player-ai-mad,1.4.62,not declared,engine,XMage; MIT per repository licence
 org.mage:mage-player-human,1.4.62,not declared,engine,"XMage HumanPlayer, the human seat since v0.0.3; MIT per repository licence"
 org.mage:mage-game-twoplayerduel,1.4.62,not declared,engine,XMage; MIT per repository licence
-org.mage:mage-game-commanderfreeforall,1.4.62,not declared,engine,XMage; MIT per repository licence; built for later milestones and not used yet
+org.mage:mage-game-commanderduel,1.4.62,not declared,engine,"XMage CommanderDuel, the two-seat Commander table since v0.0.4; MIT per repository licence"
+org.mage:mage-game-commanderfreeforall,1.4.62,not declared,engine,"XMage CommanderFreeForAll, three- and four-seat Commander tables since v0.0.4; MIT per repository licence"
 org.mage:mage-deck-constructed,1.4.62,not declared,engine,XMage; MIT per repository licence
 com.google.code.gson:gson,2.13.2,Apache-2.0,engine and mage,
 com.google.guava:guava,33.4.8-jre,Apache-2.0,mage,

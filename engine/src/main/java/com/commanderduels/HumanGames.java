@@ -5,8 +5,11 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,11 +20,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * The development human games in this engine. Each game has a seat token, returned once when it is
- * created; requests carry it as a bearer token and it alone selects the seat. Unknown games and
- * wrong tokens look the same (not found). At most {@code maxActive} games run at once: each holds
- * a platform thread while it waits for the seat, and XMage's AI shares one search pool and one random
- * generator across games. Finished games stay readable for a while, then are dropped.
+ * The development games in this engine. Each human seat has its own seat token, returned once when
+ * the game is created; requests carry it as a bearer token and it alone selects the seat. Unknown
+ * games and wrong tokens look the same (not found). At most {@code maxActive} games run at once: each
+ * holds a platform thread while it waits for a seat, and XMage's AI shares one search pool and one
+ * random generator across games. Finished games stay readable for a while, then are dropped.
  */
 final class HumanGames {
     static final int DEFAULT_MAX_ACTIVE = 2;
@@ -30,17 +33,22 @@ final class HumanGames {
     static final int MAX_FINISHED = 16;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    record Created(HumanGame game, String seatToken) {}
+    /** @param seatTokens each human seat's token, by seat, in seat order */
+    record Created(HumanGame game, Map<Integer, String> seatTokens) {}
+
+    /** A game and the seat a token selects. */
+    record SeatHandle(HumanGame game, int seat) {}
 
     private static final class Entry {
         final HumanGame game;
-        final byte[] tokenHash;
+        /** SHA-256 of each human seat's token, by seat. */
+        final Map<Integer, byte[]> tokenHashes;
         final AtomicBoolean closing = new AtomicBoolean();
         volatile long finishedAtNanos;
 
-        Entry(HumanGame game, byte[] tokenHash) {
+        Entry(HumanGame game, Map<Integer, byte[]> tokenHashes) {
             this.game = game;
-            this.tokenHash = tokenHash;
+            this.tokenHashes = tokenHashes;
         }
     }
 
@@ -71,23 +79,36 @@ final class HumanGames {
             return Optional.empty();
         }
         String id = UUID.randomUUID().toString();
-        byte[] bytes = new byte[32];
-        RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         var game = new HumanGame(id, request, deckDirectory, this::finished);
-        games.put(id, new Entry(game, hash(token)));
+        Map<Integer, String> tokens = new LinkedHashMap<>();
+        Map<Integer, byte[]> hashes = new LinkedHashMap<>();
+        for (int seat : game.humanSeats()) {
+            byte[] bytes = new byte[32];
+            RANDOM.nextBytes(bytes);
+            String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+            tokens.put(seat, token);
+            hashes.put(seat, hash(token));
+        }
+        games.put(id, new Entry(game, Map.copyOf(hashes)));
         game.start();
-        return Optional.of(new Created(game, token));
+        return Optional.of(new Created(game, tokens));
     }
 
-    /** The game, if the id exists and the token is its seat token. */
-    Optional<HumanGame> find(String id, String token) {
+    /** The game and seat, if the id exists and the token is one of its seat tokens. */
+    Optional<SeatHandle> find(String id, String token) {
         Entry entry = id == null ? null : games.get(id);
-        byte[] presented = hash(token == null ? "" : token);
-        if (entry == null || !MessageDigest.isEqual(entry.tokenHash, presented)) {
+        if (entry == null) {
             return Optional.empty();
         }
-        return Optional.of(entry.game);
+        byte[] presented = hash(token == null ? "" : token);
+        List<Integer> matches = new ArrayList<>();
+        // Every seat's hash is compared, in constant time, so timing does not say which seat matched.
+        entry.tokenHashes.forEach((seat, hash) -> {
+            if (MessageDigest.isEqual(hash, presented)) {
+                matches.add(seat);
+            }
+        });
+        return matches.size() == 1 ? Optional.of(new SeatHandle(entry.game, matches.get(0))) : Optional.empty();
     }
 
     synchronized int active() {

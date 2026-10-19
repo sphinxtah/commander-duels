@@ -1,0 +1,67 @@
+// Commander Duels engine fixture: mono-red raiders and burn, 100 cards (the commander plus 99), Commander-legal.
+// Simple cards only, singleton except basic lands. No card name is shared with another Commander
+// fixture, so the leak checks can tell concealed cards apart by name. The SB: line is the commander;
+// keep card lines contiguous (XMage's text importer treats a blank line as the sideboard switch).
+SB: 1 Jeska, Warrior Adept
+38 Mountain
+1 Mons's Goblin Raiders
+1 Raging Goblin
+1 Goblin Assailant
+1 Goblin Piker
+1 Nest Robber
+1 Balduvian Barbarians
+1 Bird Maiden
+1 Fearless Halberdier
+1 Goblin Cavaliers
+1 Goblin Chariot
+1 Goblin Hero
+1 Goblin Sky Raider
+1 Gray Ogre
+1 Hurloon Minotaur
+1 Sabretooth Tiger
+1 Canyon Minotaur
+1 Hill Giant
+1 Lightning Elemental
+1 Lightning Hounds
+1 Lowland Giant
+1 Ogre Warrior
+1 Roc of Kher Ridges
+1 Skyraker Giant
+1 Talruum Minotaur
+1 Viashino Warrior
+1 Vulshok Berserker
+1 Earth Elemental
+1 Fire Elemental
+1 Thundering Giant
+1 Volcanic Dragon
+1 Goblin Bully
+1 Leopard-Spotted Jiao
+1 Swab Goblin
+1 Frenzied Raptor
+1 Goblin Roughrider
+1 Hulking Bugbear
+1 Onakke Ogre
+1 Raging Redcap
+1 Borderland Minotaur
+1 Cobblebrute
+1 Hostile Minotaur
+1 Komodo Rhino
+1 Lizard Warrior
+1 Summit Prowler
+1 Lathnu Sailback
+1 Lightning Bolt
+1 Shock
+1 Incinerate
+1 Searing Spear
+1 Lightning Strike
+1 Volcanic Hammer
+1 Flame Slash
+1 Chandra's Outrage
+1 Lava Axe
+1 Act of Treason
+1 Threaten
+1 Brute Force
+1 Uncaged Fury
+1 Fervor
+1 Crimson Wisps
+1 Seismic Strike

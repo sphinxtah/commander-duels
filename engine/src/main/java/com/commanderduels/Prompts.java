@@ -11,11 +11,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import mage.MageObject;
+import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.PlayLandAbility;
 import mage.abilities.SpellAbility;
 import mage.abilities.mana.ActivatedManaAbilityImpl;
 import mage.cards.Card;
+import mage.choices.Choice;
 import mage.constants.Constants;
 import mage.constants.ManaType;
 import mage.constants.MultiAmountType;
@@ -29,7 +31,7 @@ import mage.players.Player;
 import mage.util.MultiAmountMessage;
 
 /**
- * Turns XMage's {@link PlayerQueryEvent}s for the human seat into typed prompts. Each option maps to
+ * Turns XMage's {@link PlayerQueryEvent}s for a human seat into typed prompts. Each option maps to
  * the answer XMage's {@code HumanPlayer} expects (a UUID, boolean or string), so the seat never
  * sends XMage identifiers itself. XMage validates the answer again and asks again if it rejects it.
  * Runs on the game thread, while XMage is about to wait for the answer.
@@ -37,6 +39,10 @@ import mage.util.MultiAmountMessage;
 final class Prompts {
     private static final String LEFT_BUTTON = "UI.left.btn.text";
     private static final String RIGHT_BUTTON = "UI.right.btn.text";
+    /** XMage's message for its TargetDefender, which HumanPlayer uses when there is more than one defender. */
+    static final String DEFENDER_MESSAGE = "Select a player, planeswalker, or battle to attack";
+    /** Larger choices (naming a card, for instance) stay unsupported rather than becoming huge prompts. */
+    static final int MAX_CHOICE_OPTIONS = 64;
 
     /** An open prompt: what the seat sees and the XMage answer behind each option id. */
     record Prompt(PromptView view, Map<String, Answer> answers) {
@@ -98,8 +104,19 @@ final class Prompts {
         this.views = views;
     }
 
-    static Prompt build(PlayerQueryEvent event, Game game, HumanPlayer human, SeatViews views, String promptId) {
-        return new Prompts(game, human, views).from(event, promptId);
+    /**
+     * @param attacker the attacker the seat last toggled, which a defender choice is about; XMage's
+     *                 request does not name it
+     */
+    static Prompt build(PlayerQueryEvent event, Game game, HumanPlayer human, SeatViews views, String promptId,
+                        String attacker) {
+        Prompt prompt = new Prompts(game, human, views).from(event, promptId);
+        if (prompt.view().kind().equals("choose_defender") && prompt.view().detail() == null && attacker != null) {
+            PromptView view = prompt.view();
+            prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message(), "Attacker: " + attacker,
+                view.options(), view.amounts(), view.xmageQuery()), prompt.answers());
+        }
+        return prompt;
     }
 
     private Prompt from(PlayerQueryEvent event, String promptId) {
@@ -135,9 +152,24 @@ final class Prompts {
                     ? "mulligan" : "yes_no";
                 break;
             case PICK_TARGET:
-                kind = "choose_target";
+                kind = message.startsWith(DEFENDER_MESSAGE) ? "choose_defender" : "choose_target";
                 target(event, extra);
                 break;
+            case CHOOSE_ABILITY:
+                kind = "choose_ability";
+                ability(event);
+                break;
+            case CHOOSE_CHOICE: {
+                Choice choice = event.getChoice();
+                if (choice == null || !choice(choice)) {
+                    return unsupported(event, promptId, message, detail);
+                }
+                kind = "choose_choice";
+                message = SeatViews.plain(choice.getMessage());
+                String sub = SeatViews.plain(choice.getSubMessage());
+                detail = sub.isEmpty() ? null : sub;
+                break;
+            }
             case PLAY_MANA:
                 kind = "pay_mana";
                 payMana();
@@ -153,13 +185,59 @@ final class Prompts {
                 amounts = amounts(event, extra);
                 break;
             default:
-                options.clear();
-                answers.clear();
-                return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null,
-                    event.getQueryType().name()), Map.of());
+                return unsupported(event, promptId, message, detail);
         }
         return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, null),
             Map.copyOf(answers));
+    }
+
+    private Prompt unsupported(PlayerQueryEvent event, String promptId, String message, String detail) {
+        options.clear();
+        answers.clear();
+        return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null,
+            event.getQueryType().name()), Map.of());
+    }
+
+    /** Which of an object's abilities to use, or how to cast a card with more than one way to cast it. */
+    private void ability(PlayerQueryEvent event) {
+        String source = event.getChoices() == null || event.getChoices().isEmpty() ? null
+            : event.getChoices().iterator().next();
+        List<? extends Ability> abilities = event.getAbilities() == null ? List.of() : event.getAbilities();
+        for (Ability ability : abilities) {
+            String rule = SeatViews.plain(source == null ? ability.getRule() : ability.getRule(source));
+            add("use_ability", rule.isEmpty() ? ability.toString() : rule, null, null, false,
+                new UuidAnswer(ability.getId()));
+        }
+        add("cancel", "Cancel", null, null, false, new BooleanAnswer(false));
+    }
+
+    /**
+     * One of a fixed list of choices: a colour, or which replacement effect applies first. A key
+     * choice answers with its key (for replacement effects, an XMage id that stays on the server),
+     * any other with the text. Returns false when the list is too long to offer.
+     */
+    private boolean choice(Choice choice) {
+        List<String[]> entries = new ArrayList<>();
+        if (choice.isKeyChoice()) {
+            Map<String, Integer> order = choice.getSortData() == null ? Map.of() : choice.getSortData();
+            List<Map.Entry<String, String>> keyed = new ArrayList<>(choice.getKeyChoices().entrySet());
+            keyed.sort(Comparator.comparing((Map.Entry<String, String> entry) -> order.getOrDefault(entry.getKey(),
+                Integer.MAX_VALUE)));
+            keyed.forEach(entry -> entries.add(new String[]{entry.getKey(), entry.getValue()}));
+        } else {
+            choice.getChoices().stream().sorted().forEach(value -> entries.add(new String[]{value, value}));
+        }
+        if (entries.isEmpty() || entries.size() > MAX_CHOICE_OPTIONS) {
+            return false;
+        }
+        for (String[] entry : entries) {
+            add("choose", SeatViews.plain(entry[1]), null, null, false, new StringAnswer(entry[0]));
+        }
+        if (!choice.isRequired()) {
+            // HumanPlayer treats an empty answer to an optional choice as cancelling it.
+            add("cancel", "Cancel", null, null, false, new StringAnswer(""));
+        }
+        return true;
     }
 
     private void priority() {

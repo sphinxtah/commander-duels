@@ -2,22 +2,38 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:commander-duels:engine-seat-view:v1",
   "title": "EngineSeatSnapshot",
-  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry an opponent's hand, library contents, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones.",
+  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand, library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players.",
   "type": "object",
   "additionalProperties": false,
   "required": ["game_id", "revision", "status", "seat", "settings", "prompt", "view", "result", "log_count", "log_from", "log"],
   "properties": {
     "game_id": {"type": "string", "format": "uuid"},
     "revision": {"type": "integer", "minimum": 0},
-    "status": {"enum": ["starting", "your_prompt", "unsupported_prompt", "waiting", "finished"]},
+    "status": {"enum": ["starting", "your_prompt", "unsupported_prompt", "waiting", "eliminated", "finished"]},
     "seat": {"$ref": "#/$defs/seat"},
     "settings": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["human_deck", "bot_deck", "skill", "turn_cap", "idle_timeout_seconds"],
+      "required": ["format", "rules_profile", "seats", "skill", "turn_cap", "idle_timeout_seconds"],
       "properties": {
-        "human_deck": {"type": "string"},
-        "bot_deck": {"type": "string"},
+        "format": {"enum": ["legacy", "commander"]},
+        "rules_profile": {"enum": ["legacy_two_player_duel", "commander_two_seat", "commander_free_for_all"]},
+        "seats": {
+          "description": "Every seat in turn order. A seat sees only its own deck; other seats' decks are null.",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["seat", "player", "deck"],
+            "properties": {
+              "seat": {"$ref": "#/$defs/seat"},
+              "player": {"enum": ["human", "bot"]},
+              "deck": {"$ref": "#/$defs/nullableString"}
+            }
+          }
+        },
         "skill": {"type": "integer", "minimum": 1, "maximum": 6},
         "turn_cap": {"type": "integer", "minimum": 1, "maximum": 200},
         "idle_timeout_seconds": {"type": "integer", "minimum": 5, "maximum": 3600}
@@ -31,7 +47,7 @@
     "log": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/logLine"}}
   },
   "$defs": {
-    "seat": {"type": "integer", "minimum": 0, "maximum": 1},
+    "seat": {"type": "integer", "minimum": 0, "maximum": 3},
     "objectId": {"type": "string", "pattern": "^o[0-9a-f]{16}$"},
     "nullableString": {"type": ["string", "null"]},
     "nullableSeat": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/seat"}]},
@@ -42,7 +58,9 @@
       "required": ["id", "kind", "message", "detail", "options", "amounts", "xmage_query"],
       "properties": {
         "id": {"type": "string", "format": "uuid"},
-        "kind": {"enum": ["priority", "mulligan", "yes_no", "choose_target", "pay_mana", "declare_attackers", "declare_blockers", "assign_amounts", "unsupported"]},
+        "kind": {
+          "enum": ["priority", "mulligan", "yes_no", "choose_target", "choose_defender", "choose_ability", "choose_choice", "pay_mana", "declare_attackers", "declare_blockers", "assign_amounts", "unsupported"]
+        },
         "message": {"type": "string"},
         "detail": {"$ref": "#/$defs/nullableString"},
         "options": {"type": "array", "items": {"$ref": "#/$defs/option"}},
@@ -56,7 +74,9 @@
       "required": ["id", "action", "label", "object_id", "seat", "selected"],
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9]{1,16}$"},
-        "action": {"enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested"]},
+        "action": {
+          "enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability"]
+        },
         "label": {"$ref": "#/$defs/nullableString"},
         "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},
         "seat": {"$ref": "#/$defs/nullableSeat"},
@@ -90,7 +110,7 @@
     "view": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["seat", "turn", "active_seat", "priority_seat", "phase", "step", "you", "opponent", "hand", "battlefield", "stack", "combat", "revealed", "looked_at", "messages"],
+      "required": ["seat", "turn", "active_seat", "priority_seat", "phase", "step", "you", "opponents", "hand", "battlefield", "stack", "combat", "revealed", "looked_at", "messages"],
       "properties": {
         "seat": {"$ref": "#/$defs/seat"},
         "turn": {"type": "integer", "minimum": 0},
@@ -99,7 +119,13 @@
         "phase": {"$ref": "#/$defs/nullableString"},
         "step": {"$ref": "#/$defs/nullableString"},
         "you": {"$ref": "#/$defs/player"},
-        "opponent": {"$ref": "#/$defs/player"},
+        "opponents": {
+          "description": "Every other player in seat order, including eliminated ones.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {"$ref": "#/$defs/player"}
+        },
         "hand": {"type": "array", "items": {"$ref": "#/$defs/card"}},
         "battlefield": {"type": "array", "items": {"$ref": "#/$defs/permanent"}},
         "stack": {"type": "array", "items": {"$ref": "#/$defs/stackItem"}},
@@ -110,10 +136,10 @@
       }
     },
     "player": {
-      "description": "A player's public state. The hand and library appear only as counts.",
+      "description": "A player's public state. The hand and library appear only as counts. Commander fields are null or empty outside Commander.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["seat", "name", "life", "counters", "library_count", "hand_count", "graveyard", "exile", "mana_pool", "lost", "won"],
+      "required": ["seat", "name", "life", "counters", "library_count", "hand_count", "graveyard", "exile", "mana_pool", "lost", "won", "color_identity", "command_zone", "commanders"],
       "properties": {
         "seat": {"$ref": "#/$defs/seat"},
         "name": {"type": "string"},
@@ -137,8 +163,42 @@
           }
         },
         "lost": {"type": "boolean"},
-        "won": {"type": "boolean"}
+        "won": {"type": "boolean"},
+        "color_identity": {
+          "description": "The combined colour identity of the player's commanders, in WUBRG order; null outside Commander.",
+          "oneOf": [{"type": "null"}, {"type": "string", "pattern": "^W?U?B?R?G?$"}]
+        },
+        "command_zone": {"type": "array", "items": {"$ref": "#/$defs/card"}},
+        "commanders": {"type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/commander"}}
       }
+    },
+    "commander": {
+      "description": "One commander (FMT01). Its identity is public; its object id appears only while the seat can see it, and a commander in a hand or library is 'hidden' to everyone but its owner.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "zone", "object_id", "cast_count", "tax", "damage_dealt"],
+      "properties": {
+        "name": {"type": "string"},
+        "zone": {
+          "enum": ["command", "battlefield", "stack", "graveyard", "exile", "hand", "library", "hidden", "outside"]
+        },
+        "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},
+        "cast_count": {"type": "integer", "minimum": 0},
+        "tax": {"type": "integer", "minimum": 0, "multipleOf": 2},
+        "damage_dealt": {
+          "description": "Combat damage this commander has dealt to each player, by seat; 21 from one commander is lethal.",
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["seat", "damage"],
+            "properties": {"seat": {"$ref": "#/$defs/seat"}, "damage": {"type": "integer", "minimum": 1}}
+          }
+        }
+      },
+      "if": {"properties": {"zone": {"enum": ["hidden", "outside"]}}},
+      "then": {"properties": {"object_id": {"type": "null"}}}
     },
     "card": {
       "description": "A card face. A hidden card (face down, for instance) carries its id and nothing else.",
@@ -156,7 +216,16 @@
         "rules": {"type": "array", "items": {"type": "string"}}
       },
       "if": {"properties": {"hidden": {"const": true}}},
-      "then": {"properties": {"name": {"type": "null"}, "mana_cost": {"type": "null"}, "type_line": {"type": "null"}, "power": {"type": "null"}, "toughness": {"type": "null"}, "rules": {"maxItems": 0}}}
+      "then": {
+        "properties": {
+          "name": {"type": "null"},
+          "mana_cost": {"type": "null"},
+          "type_line": {"type": "null"},
+          "power": {"type": "null"},
+          "toughness": {"type": "null"},
+          "rules": {"maxItems": 0}
+        }
+      }
     },
     "permanent": {
       "type": "object",
@@ -216,20 +285,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "cards"],
-      "properties": {
-        "name": {"type": "string"},
-        "cards": {"type": "array", "items": {"$ref": "#/$defs/card"}}
-      }
+      "properties": {"name": {"type": "string"}, "cards": {"type": "array", "items": {"$ref": "#/$defs/card"}}}
     },
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "winner_seat", "draw", "conceded", "turns", "error"],
+      "required": ["kind", "winner_seat", "draw", "conceded_seats", "turns", "error"],
       "properties": {
-        "kind": {"enum": ["completed", "turn_limit", "closed", "idle_timeout", "error"]},
+        "kind": {"enum": ["completed", "turn_limit", "closed", "idle_timeout", "humans_eliminated", "error"]},
         "winner_seat": {"$ref": "#/$defs/nullableSeat"},
         "draw": {"type": "boolean"},
-        "conceded": {"type": "boolean"},
+        "conceded_seats": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/seat"}},
         "turns": {"type": "integer", "minimum": 0},
         "error": {"$ref": "#/$defs/nullableString"}
       }

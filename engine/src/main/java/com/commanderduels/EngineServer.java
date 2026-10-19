@@ -11,8 +11,10 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -22,8 +24,8 @@ import java.util.regex.Pattern;
 
 /**
  * Internal HTTP boundary of the XMage engine. It reports engine status and, when development
- * endpoints are enabled, runs bot-versus-bot matches and development human-versus-bot games (a seat
- * token selects the seat). Every other operation fails closed.
+ * endpoints are enabled, runs bot-versus-bot matches and development games with human and bot seats
+ * (each human seat's token selects that seat). Every other operation fails closed.
  */
 public final class EngineServer {
     public static final int PROTOCOL_VERSION = 1;
@@ -132,7 +134,7 @@ public final class EngineServer {
         respond(exchange, 200, result.get());
     }
 
-    /** Development only: starts a human-versus-bot game and returns the seat token, once. */
+    /** Development only: starts a game and returns each human seat's token, once. */
     private static void createGame(HttpExchange exchange, Engine engine) throws IOException {
         if (!exchange.getRequestMethod().equals("POST")) {
             methodNotAllowed(exchange, "POST");
@@ -162,31 +164,39 @@ public final class EngineServer {
             return;
         }
         HumanGame game = created.get().game();
+        List<Map<String, Object>> seats = new ArrayList<>();
+        for (HumanGame.SeatSettings seat : game.settings().seats()) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("seat", seat.seat());
+            entry.put("player", seat.player());
+            entry.put("seat_token", created.get().seatTokens().get(seat.seat()));
+            seats.add(entry);
+        }
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("game_id", game.id());
-        response.put("seat", HumanGame.HUMAN_SEAT);
-        response.put("seat_token", created.get().seatToken());
+        response.put("seats", seats);
         response.put("settings", game.settings());
         respond(exchange, 201, response);
     }
 
     private static void gameRoute(HttpExchange exchange, HumanGames games, String rest) throws IOException {
         Matcher matcher = GAME_PATH.matcher(rest);
-        Optional<HumanGame> found = matcher.matches()
+        Optional<HumanGames.SeatHandle> found = matcher.matches()
             ? games.find(matcher.group(1), bearerToken(exchange)) : Optional.empty();
         if (found.isEmpty()) {
             respond(exchange, 404, Map.of("code", "not_found"));
             return;
         }
-        HumanGame game = found.get();
+        HumanGame game = found.get().game();
+        int seat = found.get().seat();
         switch (matcher.group(2)) {
-            case "view" -> view(exchange, game);
-            case "commands" -> command(exchange, game);
+            case "view" -> view(exchange, game, seat);
+            case "commands" -> command(exchange, game, seat);
             default -> close(exchange, game);
         }
     }
 
-    private static void view(HttpExchange exchange, HumanGame game) throws IOException {
+    private static void view(HttpExchange exchange, HumanGame game, int seat) throws IOException {
         if (!exchange.getRequestMethod().equals("GET")) {
             methodNotAllowed(exchange, "GET");
             return;
@@ -204,14 +214,14 @@ public final class EngineServer {
             return;
         }
         try {
-            respond(exchange, 200, game.snapshot(since, waitMillis, logFrom));
+            respond(exchange, 200, game.snapshot(seat, since, waitMillis, logFrom));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             respond(exchange, 503, Map.of("code", "interrupted"));
         }
     }
 
-    private static void command(HttpExchange exchange, HumanGame game) throws IOException {
+    private static void command(HttpExchange exchange, HumanGame game, int seat) throws IOException {
         if (!exchange.getRequestMethod().equals("POST")) {
             methodNotAllowed(exchange, "POST");
             return;
@@ -228,7 +238,7 @@ public final class EngineServer {
             return;
         }
         HumanGame.Reply reply = command.type().equals(SeatCommand.CONCEDE)
-            ? game.concede(command) : game.submit(command);
+            ? game.concede(seat, command) : game.submit(seat, command);
         respond(exchange, reply.status(), reply.body());
     }
 

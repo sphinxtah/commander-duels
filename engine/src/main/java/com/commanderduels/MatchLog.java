@@ -23,6 +23,7 @@ public final class MatchLog {
 
     static final int MAX_ENTRIES = 5_000;
     static final int TAIL = 12;
+    private static final Pattern LINE_BREAKS = Pattern.compile("<br\\s*/?>", Pattern.CASE_INSENSITIVE);
     private static final Pattern TAGS = Pattern.compile("<[^>]*>");
     private static final Pattern OBJECT_IDS = Pattern.compile(" \\[[0-9a-f]{3}]");
 
@@ -118,7 +119,7 @@ public final class MatchLog {
         if (message == null) {
             return "";
         }
-        return TAGS.matcher(message).replaceAll("")
+        return TAGS.matcher(LINE_BREAKS.matcher(message).replaceAll(" ")).replaceAll("")
             .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
             .replace("&nbsp;", " ").replace("&amp;", "&")
             .replaceAll("\\s+", " ")

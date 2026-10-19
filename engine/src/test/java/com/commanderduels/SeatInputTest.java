@@ -21,26 +21,58 @@ class SeatInputTest {
             + "\"prompt_id\":\"" + PROMPT + "\",\"type\":\"" + type + "\",\"payload\":" + payload + "}";
     }
 
+    private static List<String> decks(HumanGameRequest request) {
+        return request.seats().stream().map(HumanGameRequest.Seat::deck).toList();
+    }
+
+    private static List<String> players(HumanGameRequest request) {
+        return request.seats().stream().map(HumanGameRequest.Seat::player).toList();
+    }
+
     @Test
     void gameRequestsHaveSafeDefaultsAndClampedLimits() throws Exception {
         HumanGameRequest defaults = HumanGameRequest.parse("", () -> 99L);
         assertEquals(99L, defaults.seed());
-        assertEquals("legacy-mono-red-burn", defaults.humanDeck());
-        assertEquals("legacy-mono-green-creatures", defaults.botDeck());
+        assertEquals(GameFormat.LEGACY, defaults.format());
+        assertEquals(List.of("human", "bot"), players(defaults));
+        assertEquals(List.of("legacy-mono-red-burn", "legacy-mono-green-creatures"), decks(defaults));
         assertEquals(HumanGameRequest.DEFAULT_SKILL, defaults.skill());
         assertEquals(HumanGameRequest.DEFAULT_TURN_CAP, defaults.turnCap());
         assertEquals(HumanGameRequest.DEFAULT_IDLE_TIMEOUT_SECONDS, defaults.idleTimeoutSeconds());
 
-        HumanGameRequest green = HumanGameRequest.parse(
-            "{\"human_deck\":\"legacy-mono-green-creatures\",\"skill\":99,\"turn_cap\":0,\"idle_timeout_seconds\":1}",
-            () -> 0L);
-        assertEquals("legacy-mono-red-burn", green.botDeck(), "the bot gets the other deck");
+        HumanGameRequest green = HumanGameRequest.parse("{\"seats\":[{\"player\":\"human\",\"deck\":"
+            + "\"legacy-mono-green-creatures\"},{\"player\":\"bot\"}],\"skill\":99,\"turn_cap\":0,"
+            + "\"idle_timeout_seconds\":1}", () -> 0L);
+        assertEquals(List.of("legacy-mono-green-creatures", "legacy-mono-red-burn"), decks(green),
+            "the bot gets the other deck");
         assertEquals(HumanGameRequest.MAX_SKILL, green.skill());
         assertEquals(1, green.turnCap());
         assertEquals(HumanGameRequest.MIN_IDLE_TIMEOUT_SECONDS, green.idleTimeoutSeconds());
 
-        for (String body : new String[]{"[]", "{\"seat\":1}", "{\"human_deck\":\"../etc/passwd\"}",
-                "{\"bot_deck\":7}", "{\"seed\":1.5}"}) {
+        HumanGameRequest commander = HumanGameRequest.parse("{\"format\":\"commander\"}", () -> 0L);
+        assertEquals(List.of("human", "bot", "bot", "bot"), players(commander), "one human and three bots");
+        assertEquals(GameFormat.COMMANDER.decks(), decks(commander));
+
+        HumanGameRequest mixed = HumanGameRequest.parse("{\"format\":\"commander\",\"seats\":[{\"player\":\"bot\"},"
+            + "{\"player\":\"human\",\"deck\":\"commander-mono-white-soldiers\"},{\"player\":\"human\"}]}", () -> 0L);
+        assertEquals(List.of("bot", "human", "human"), players(mixed));
+        assertEquals(List.of("commander-mono-blue-flyers", "commander-mono-white-soldiers",
+            "commander-mono-red-raiders"), decks(mixed), "unnamed decks skip the ones other seats chose");
+        assertEquals(2, mixed.humanSeats());
+
+        for (String body : new String[]{"[]", "{\"seat\":1}", "{\"human_deck\":\"legacy-mono-red-burn\"}",
+                "{\"seed\":1.5}", "{\"format\":\"vintage\"}", "{\"seats\":{}}", "{\"seats\":[]}",
+                "{\"seats\":[{\"player\":\"human\"}]}",
+                "{\"seats\":[{\"player\":\"human\"},{\"player\":\"bot\"},{\"player\":\"bot\"}]}",
+                "{\"format\":\"commander\",\"seats\":[{\"player\":\"human\"},{\"player\":\"bot\"},"
+                    + "{\"player\":\"bot\"},{\"player\":\"bot\"},{\"player\":\"bot\"}]}",
+                "{\"seats\":[{\"player\":\"bot\"},{\"player\":\"bot\"}]}",
+                "{\"seats\":[{\"player\":\"human\",\"deck\":\"../etc/passwd\"},{\"player\":\"bot\"}]}",
+                "{\"seats\":[{\"player\":\"spectator\"},{\"player\":\"bot\"}]}",
+                "{\"seats\":[{\"player\":\"human\",\"seat\":3},{\"player\":\"bot\"}]}",
+                "{\"seats\":[\"human\",\"bot\"]}",
+                "{\"format\":\"commander\",\"seats\":[{\"player\":\"human\",\"deck\":\"legacy-mono-red-burn\"},"
+                    + "{\"player\":\"bot\"}]}"}) {
             assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(body, () -> 0L), body);
         }
     }

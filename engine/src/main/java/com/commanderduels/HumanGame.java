@@ -3,6 +3,7 @@ package com.commanderduels;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,9 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 import mage.cards.decks.Deck;
-import mage.constants.RangeOfInfluence;
 import mage.game.Game;
 import mage.game.events.PlayerQueryEvent;
 import mage.game.events.TableEvent;
@@ -25,20 +24,19 @@ import mage.util.RandomUtil;
 import mage.util.ThreadUtils;
 
 /**
- * One development game: XMage's own {@link HumanPlayer} in seat 0 against a "Computer - mad" player
- * in seat 1, with fixture decks under Legacy rules.
+ * One development game: two to four seats in turn order, each XMage's own {@link HumanPlayer} or a
+ * "Computer - mad" player, with fixture decks under Legacy or Commander rules.
  *
- * <p>XMage's human player blocks the game thread until it gets an answer. Each request it fires (a
- * {@link PlayerQueryEvent}) becomes a typed prompt with a new id, published together with the seat's
- * view at a new revision. An answer is accepted only for the open prompt at the current revision;
- * it then closes, and XMage's next request opens the next prompt. Views and prompts are built on the
- * game thread, the only place XMage's state is consistent; request threads read the published
- * snapshot. Games live in memory only: there is no journal or recovery yet.
+ * <p>XMage's human player blocks the game thread until it gets an answer, and XMage asks one player
+ * at a time, so at most one prompt is open per game. Each request it fires (a
+ * {@link PlayerQueryEvent}) becomes a typed prompt with a new id, published to that seat together
+ * with its view at a new revision. Every human seat has its own revision, prompt and view: a seat's
+ * revision moves only when what that seat sees changes, so it says nothing about other seats'
+ * choices. An answer is accepted only for the seat's open prompt at its current revision. Views and
+ * prompts are built on the game thread, the only place XMage's state is consistent; request threads
+ * read the published snapshots. Games live in memory only: there is no journal or recovery yet.
  */
 final class HumanGame {
-    static final int HUMAN_SEAT = 0;
-    static final String HUMAN_NAME = "Human";
-    static final String BOT_NAME = "Bot";
     static final long CLOSE_GRACE_MILLIS = 5_000;
     private static final int MAX_MESSAGES = 10;
     private static final int DEFAULT_LOG_PAGE = 20;
@@ -46,18 +44,33 @@ final class HumanGame {
     private static final int MAX_RECORDED_ACTIONS = 512;
     private static final String ENGINE_ERROR_PREFIX = "ENGINE ERROR:";
 
-    record Settings(String humanDeck, String botDeck, int skill, int turnCap, int idleTimeoutSeconds) {}
+    /** A seat at the table. A seat's snapshot names only its own deck. */
+    record SeatSettings(int seat, String player, String deck) {}
+
+    record Settings(String format, String rulesProfile, List<SeatSettings> seats, int skill, int turnCap,
+                    int idleTimeoutSeconds) {
+        /** What one seat is told: other seats' decks are private. */
+        Settings forSeat(int seat) {
+            return new Settings(format, rulesProfile, seats.stream()
+                .map(entry -> entry.seat() == seat ? entry : new SeatSettings(entry.seat(), entry.player(), null))
+                .toList(), skill, turnCap, idleTimeoutSeconds);
+        }
+    }
 
     /**
-     * @param kind completed (a winner or a draw), turn_limit, closed, idle_timeout or error
+     * @param kind          completed (a winner or a draw), turn_limit, closed, idle_timeout,
+     *                      humans_eliminated (every human seat lost while bots remained) or error
+     * @param concededSeats the seats that conceded, in the order they did
      */
-    record Result(String kind, Integer winnerSeat, boolean draw, boolean conceded, int turns, String error) {}
+    record Result(String kind, Integer winnerSeat, boolean draw, List<Integer> concededSeats, int turns,
+                  String error) {}
 
     record LogLine(int index, int turn, Integer activeSeat, String step, String text) {}
 
     /**
-     * What the seat is shown. {@code status} is starting, your_prompt, unsupported_prompt, waiting
-     * (the bot is acting or XMage is processing) or finished.
+     * What one seat is shown. {@code status} is starting, your_prompt, unsupported_prompt, waiting
+     * (another player is acting or XMage is processing), eliminated (this seat has lost; the game goes
+     * on) or finished.
      */
     record Snapshot(String gameId, long revision, String status, int seat, Settings settings, PromptView prompt,
                     SeatView view, Result result, int logCount, int logFrom, List<LogLine> log) {}
@@ -73,8 +86,43 @@ final class HumanGame {
 
         default void beforeStart(Game game, List<UUID> seatIds) {}
 
-        /** Every view (and prompt, if one opens) published to the seat. */
-        default void published(Game game, ObjectRefs refs, SeatView view, PromptView prompt) {}
+        /** Every view (and prompt, if one opens) published to a human seat. */
+        default void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {}
+    }
+
+    /**
+     * A human seat: XMage's HumanPlayer and what this seat has been shown. XMage replaces player
+     * objects with copies when it restores a saved state (a cancelled cast, for instance); the copies
+     * share the answer channel but not the flag that says XMage is listening, so answers always go to
+     * the game's current object, as XMage's own server sends them.
+     */
+    private static final class Seat {
+        final int index;
+        final UUID id;
+        final HumanPlayer player;
+        // Game thread only.
+        final Deque<String> messages = new ArrayDeque<>();
+        // Guarded by the game's lock.
+        long revision;
+        String status = "starting";
+        Prompts.Prompt prompt;
+        SeatView view;
+        String lastAttacker;
+        boolean concedeRequested;
+        final Map<String, Recorded> actions = new LinkedHashMap<>() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Recorded> eldest) {
+                return size() > MAX_RECORDED_ACTIONS;
+            }
+        };
+
+        Seat(int index, HumanPlayer player) {
+            this.index = index;
+            this.id = player.getId();
+            this.player = player;
+        }
     }
 
     private final String id;
@@ -83,36 +131,25 @@ final class HumanGame {
     private final Path deckDirectory;
     private final Consumer<HumanGame> onFinished;
     private final Hooks hooks;
-    private final HumanPlayer human;
-    private final Player bot;
+    private final List<Player> players;
     private final List<UUID> seatIds;
+    /** By seat; null for a bot seat. */
+    private final List<Seat> seats;
+    private final List<Seat> humans;
     private final ObjectRefs refs = new ObjectRefs();
     private final MatchLog log = new MatchLog();
     private final Thread thread;
 
     // Game thread only.
-    private final Deque<String> messages = new ArrayDeque<>();
     private SeatViews views;
 
     private volatile Game game;
-    private volatile boolean concedeRequested;
 
     // Guarded by this.
-    private long revision;
-    private String status = "starting";
-    private Prompts.Prompt prompt;
-    private SeatView view;
     private Result result;
     private String endRequest;
+    private final List<Integer> conceded = new ArrayList<>();
     private long lastActivityNanos = System.nanoTime();
-    private final Map<String, Recorded> actions = new LinkedHashMap<>() {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Recorded> eldest) {
-            return size() > MAX_RECORDED_ACTIONS;
-        }
-    };
 
     HumanGame(String id, HumanGameRequest request, Path deckDirectory, Consumer<HumanGame> onFinished) {
         this(id, request, deckDirectory, onFinished, Hooks.NONE);
@@ -123,19 +160,42 @@ final class HumanGame {
         this.id = id;
         this.hooks = hooks;
         this.request = request;
-        this.settings = new Settings(request.humanDeck(), request.botDeck(), request.skill(), request.turnCap(),
-            request.idleTimeoutSeconds());
+        GameFormat format = request.format();
+        List<SeatSettings> seatSettings = new ArrayList<>();
+        List<Player> seated = new ArrayList<>();
+        List<Seat> bySeat = new ArrayList<>();
+        for (int index = 0; index < request.seats().size(); index++) {
+            HumanGameRequest.Seat seat = request.seats().get(index);
+            seatSettings.add(new SeatSettings(index, seat.player(), seat.deck()));
+            if (seat.human()) {
+                var human = new HumanPlayer(name(seat, index), format.range(), 0);
+                // XMage's server sets each human's preferences on connect; these are its defaults (stop in
+                // both main phases, at declare attackers and blockers, and whenever something new is on
+                // the stack).
+                human.setUserData(UserData.getDefaultUserDataView());
+                seated.add(human);
+                bySeat.add(new Seat(index, human));
+            } else {
+                seated.add(new ComputerPlayerControllableProxy(name(seat, index), format.range(), request.skill()));
+                bySeat.add(null);
+            }
+        }
+        this.settings = new Settings(format.id(), format.rulesProfile(seated.size()), List.copyOf(seatSettings),
+            request.skill(), request.turnCap(), request.idleTimeoutSeconds());
+        this.players = List.copyOf(seated);
+        // Stream.toList tolerates indexOf(null): XMage has no active player before the first turn.
+        this.seatIds = seated.stream().map(Player::getId).toList();
+        this.seats = Collections.unmodifiableList(bySeat);
+        this.humans = bySeat.stream().filter(seat -> seat != null).toList();
         this.deckDirectory = deckDirectory;
         this.onFinished = onFinished;
-        this.human = new HumanPlayer(HUMAN_NAME, RangeOfInfluence.ONE, 0);
-        // XMage's server sets each human's preferences on connect; these are its defaults (stop in both
-        // main phases, at declare attackers and blockers, and whenever something new is on the stack).
-        this.human.setUserData(UserData.getDefaultUserDataView());
-        this.bot = new ComputerPlayerControllableProxy(BOT_NAME, RangeOfInfluence.ONE, request.skill());
-        // Stream.toList tolerates indexOf(null): XMage has no active player before the first turn.
-        this.seatIds = Stream.of(human.getId(), bot.getId()).toList();
         this.thread = new Thread(this::run, ThreadUtils.THREAD_PREFIX_GAME + " human_game " + id);
         this.thread.setDaemon(true);
+    }
+
+    /** Players are named by kind and seat number (seat + 1), for example "Human 1" or "Bot 2". */
+    private static String name(HumanGameRequest.Seat seat, int index) {
+        return (seat.human() ? "Human " : "Bot ") + (index + 1);
     }
 
     void start() {
@@ -152,6 +212,11 @@ final class HumanGame {
 
     Thread thread() {
         return thread;
+    }
+
+    /** The human seats, in seat order. */
+    List<Integer> humanSeats() {
+        return humans.stream().map(seat -> seat.index).toList();
     }
 
     synchronized boolean finished() {
@@ -179,12 +244,19 @@ final class HumanGame {
     private void play() throws Exception {
         // XMage's only seed control: one process-wide generator for shuffles, coin flips and AI ties.
         RandomUtil.setSeed(request.seed());
-        Deck humanDeck = LegacyDuel.loadDeck(deckDirectory, request.humanDeck());
-        Deck botDeck = LegacyDuel.loadDeck(deckDirectory, request.botDeck());
-        Game created = LegacyDuel.newGame(request.turnCap());
-        Match match = LegacyDuel.newMatch("Commander Duels human game");
-        LegacyDuel.seat(created, match, human, humanDeck);
-        LegacyDuel.seat(created, match, bot, botDeck);
+        GameFormat format = request.format();
+        List<Deck> decks = new ArrayList<>();
+        for (HumanGameRequest.Seat seat : request.seats()) {
+            decks.add(format.loadDeck(deckDirectory, seat.deck()));
+        }
+        Game created = format.newGame(players.size(), request.turnCap());
+        Match match = format.newMatch("Commander Duels development game", players.size());
+        // XMage's player list inserts each player it is given at the front, so turns pass in the
+        // opposite order to the one players were added in. Adding seat 0 and then the others in
+        // reverse makes the turn order follow the seat numbers: 0, 1, 2, 3.
+        for (int index : additionOrder(players.size())) {
+            LegacyDuel.seat(created, match, players.get(index), decks.get(index));
+        }
         views = new SeatViews(created, seatIds, refs);
         log.attach(created, seatIds);
         created.addTableEventListener(event -> {
@@ -196,84 +268,161 @@ final class HumanGame {
         game = created;
         hooks.beforeStart(created, seatIds);
         refresh();
-        if (!concedeRequested) {
+        boolean closing;
+        synchronized (this) {
+            closing = endRequest != null;
+        }
+        if (!closing) {
             created.start(seatIds.get(RandomUtil.nextInt(seatIds.size())));
         }
     }
 
-    /** Game thread: XMage is about to wait for the human seat's answer. */
+    /** The order to add seats to XMage so that its turn order is seat order (see {@link #play}). */
+    static List<Integer> additionOrder(int seatCount) {
+        List<Integer> order = new ArrayList<>(List.of(0));
+        for (int seat = seatCount - 1; seat > 0; seat--) {
+            order.add(seat);
+        }
+        return order;
+    }
+
+    /** Game thread: XMage is about to wait for a human seat's answer. */
     private void onQuery(PlayerQueryEvent event) {
-        if (!human.getId().equals(event.getPlayerId())) {
+        Seat seat = humanSeat(event.getPlayerId());
+        if (seat == null) {
             return;
         }
         if (event.getQueryType() == PlayerQueryEvent.QueryType.PERSONAL_MESSAGE) {
             String text = SeatViews.plain(event.getMessage());
             if (!text.isEmpty()) {
-                messages.addLast(text);
-                while (messages.size() > MAX_MESSAGES) {
-                    messages.removeFirst();
+                seat.messages.addLast(text);
+                while (seat.messages.size() > MAX_MESSAGES) {
+                    seat.messages.removeFirst();
                 }
             }
             refresh();
             return;
         }
-        Prompts.Prompt next = Prompts.build(event, game, human, views, UUID.randomUUID().toString());
-        SeatView seatView = views.build(HUMAN_SEAT, List.copyOf(messages));
-        hooks.published(game, refs, seatView, next.view());
+        String attacker;
         synchronized (this) {
-            revision++;
-            prompt = next;
-            view = seatView;
-            status = next.supported() ? "your_prompt" : "unsupported_prompt";
+            attacker = seat.lastAttacker;
+        }
+        HumanPlayer human = current(seat);
+        Prompts.Prompt next = Prompts.build(event, game, human, views, UUID.randomUUID().toString(), attacker);
+        SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
+        // Every other seat sees the game as it is while XMage waits. Their views go out before the
+        // prompt opens: an answer that reaches XMage before it starts listening waits in 100 ms steps.
+        for (Seat other : humans) {
+            if (other != seat) {
+                publish(other);
+            }
+        }
+        hooks.published(game, refs, seat.index, seatView, next.view());
+        boolean concede;
+        boolean closing;
+        synchronized (this) {
+            seat.revision++;
+            seat.prompt = next;
+            seat.view = seatView;
+            seat.status = next.supported() ? "your_prompt" : "unsupported_prompt";
+            concede = seat.concedeRequested;
+            closing = endRequest != null;
             touch();
             notifyAll();
         }
-        if (concedeRequested) {
+        if (closing) {
+            // The game is being closed: every seat concedes, here on the game thread. This also covers
+            // a close that arrived before the game had started, when XMage takes no concessions from
+            // other threads.
+            for (UUID playerId : seatIds) {
+                Player player = game.getPlayer(playerId);
+                if (player != null && !player.hasLeft()) {
+                    game.setConcedingPlayer(playerId);
+                }
+            }
+            human.signalPlayerConcede(true);
+        } else if (concede) {
             // A concession that arrived before the game had started is applied here, on the game thread.
-            game.setConcedingPlayer(human.getId());
+            game.setConcedingPlayer(seat.id);
+            human.signalPlayerConcede(true);
         }
     }
 
-    /** Game thread: the state changed without a request to the human seat. */
+    /** Game thread: the state changed without a request to a human seat. */
     private void refresh() {
         if (views == null) {
             return;
         }
-        SeatView seatView = views.build(HUMAN_SEAT, List.copyOf(messages));
-        hooks.published(game, refs, seatView, null);
+        for (Seat seat : humans) {
+            publish(seat);
+        }
+        Game current = game;
+        if (current != null && current.getStartTime() != null && !current.hasEnded()
+                && humans.stream().map(this::current).allMatch(human -> human.hasLost() || human.hasLeft())) {
+            // Every human seat is out and bots remain: there is nobody left to play for.
+            boolean first;
+            synchronized (this) {
+                first = endRequest == null && result == null;
+                if (first) {
+                    endRequest = "humans_eliminated";
+                }
+            }
+            if (first) {
+                Thread.ofVirtual().name("human-game-close").start(() -> close("humans_eliminated"));
+            }
+        }
+    }
+
+    /**
+     * Game thread: publishes the seat's current view at a new revision if it changed. An open prompt
+     * stays open (XMage is still waiting for it), but its answer must name the new revision.
+     */
+    private void publish(Seat seat) {
+        SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
+        HumanPlayer human = current(seat);
+        boolean out = human.hasLost() || human.hasLeft();
+        PromptView open;
         synchronized (this) {
-            // While a prompt is open the game thread is waiting, so its view is still current.
-            if (result != null || prompt != null) {
+            String status = seat.prompt != null ? seat.status : out ? "eliminated" : "waiting";
+            if (result != null || (seatView.equals(seat.view) && status.equals(seat.status))) {
                 return;
             }
-            revision++;
-            view = seatView;
-            status = "waiting";
+            seat.revision++;
+            seat.view = seatView;
+            seat.status = status;
+            open = seat.prompt == null ? null : seat.prompt.view();
             touch();
             notifyAll();
         }
+        hooks.published(game, refs, seat.index, seatView, open);
     }
 
     private void finish(Throwable failure) {
         Game finished = game;
-        SeatView finalView = null;
+        List<SeatView> finalViews = new ArrayList<>();
         if (finished != null && views != null) {
             try {
-                finalView = views.build(HUMAN_SEAT, List.copyOf(messages));
-                hooks.published(finished, refs, finalView, null);
+                for (Seat seat : humans) {
+                    SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
+                    hooks.published(finished, refs, seat.index, seatView, null);
+                    finalViews.add(seatView);
+                }
             } catch (RuntimeException e) {
-                // keep the last published view
+                finalViews.clear(); // keep the last published views
             }
         }
         Result outcome = outcome(finished, failure);
         synchronized (this) {
-            revision++;
             result = outcome;
-            prompt = null;
-            if (finalView != null) {
-                view = finalView;
+            for (int i = 0; i < humans.size(); i++) {
+                Seat seat = humans.get(i);
+                seat.revision++;
+                seat.prompt = null;
+                if (i < finalViews.size()) {
+                    seat.view = finalViews.get(i);
+                }
+                seat.status = "finished";
             }
-            status = "finished";
             touch();
             notifyAll();
         }
@@ -284,17 +433,20 @@ final class HumanGame {
     private Result outcome(Game finished, Throwable failure) {
         int turns = finished == null ? 0 : Math.min(finished.getTurnNum(), request.turnCap());
         String requested;
+        List<Integer> concededSeats;
         synchronized (this) {
             requested = endRequest;
+            concededSeats = List.copyOf(conceded);
         }
         if (failure != null) {
-            return new Result("error", null, false, false, turns, BotMatchRunner.describe(failure));
+            return new Result("error", null, false, concededSeats, turns, BotMatchRunner.describe(failure));
         }
         if (log.criticalError() != null) {
-            return new Result("error", null, false, false, turns, "XMage ended the game after an internal error");
+            return new Result("error", null, false, concededSeats, turns,
+                "XMage ended the game after an internal error");
         }
         if (requested != null) {
-            return new Result(requested, null, false, false, turns, null);
+            return new Result(requested, null, false, concededSeats, turns, null);
         }
         if (finished != null && finished.hasEnded()) {
             Integer winner = null;
@@ -303,82 +455,100 @@ final class HumanGame {
                     winner = seat;
                 }
             }
-            return new Result("completed", winner, finished.isADraw(), concedeRequested, turns, null);
+            return new Result("completed", winner, finished.isADraw(), concededSeats, turns, null);
         }
         if (finished != null && finished.getTurnNum() > request.turnCap()) {
-            return new Result("turn_limit", null, false, false, turns, null);
+            return new Result("turn_limit", null, false, concededSeats, turns, null);
         }
-        return new Result("error", null, false, false, turns, "Game stopped without a result");
+        return new Result("error", null, false, concededSeats, turns, "Game stopped without a result");
     }
 
-    /** Request thread: answers the open prompt. */
-    Reply submit(SeatCommand command) {
+    /** Request thread: answers the seat's open prompt. */
+    Reply submit(int seatIndex, SeatCommand command) {
+        Seat seat = seats.get(seatIndex);
         Prompts.Answer answer;
         Reply reply;
         synchronized (this) {
-            Reply earlier = replay(command);
+            Reply earlier = replay(seat, command);
             if (earlier != null) {
                 return earlier;
             }
             if (result != null) {
-                return reject(409, "game_over", "The game has finished");
+                return reject(seat, 409, "game_over", "The game has finished");
             }
+            Prompts.Prompt prompt = seat.prompt;
             if (prompt == null || !prompt.view().id().equals(command.promptId())) {
-                return reject(409, "stale_prompt", "That prompt is no longer open");
+                return reject(seat, 409, "stale_prompt", "That prompt is no longer open");
             }
-            if (command.expectedRevision() != revision) {
-                return reject(409, "stale_revision", "The game has moved on; fetch the view again");
+            if (command.expectedRevision() != seat.revision) {
+                return reject(seat, 409, "stale_revision", "The game has moved on; fetch the view again");
             }
             if (!prompt.supported()) {
-                return reject(409, "unsupported_prompt",
+                return reject(seat, 409, "unsupported_prompt",
                     "This request is not supported yet; concede or close the game");
             }
             if (command.amounts() != null) {
                 answer = prompt.amounts(command.amounts());
                 if (answer == null) {
-                    return reject(422, "invalid_amounts", prompt.view().amounts() == null
+                    return reject(seat, 422, "invalid_amounts", prompt.view().amounts() == null
                         ? "This prompt does not take amounts" : "The amounts break the prompt's limits");
                 }
             } else {
                 answer = prompt.answers().get(command.optionId());
                 if (answer == null) {
-                    return reject(422, "invalid_option", "The prompt has no such option");
+                    return reject(seat, 422, "invalid_option", "The prompt has no such option");
                 }
             }
-            prompt = null;
-            revision++;
-            status = "waiting";
+            if (prompt.view().kind().equals("declare_attackers")) {
+                // XMage's defender choice that may follow does not say which attacker it is for.
+                PromptView.Option option = prompt.view().options().stream()
+                    .filter(candidate -> candidate.id().equals(command.optionId())).findFirst().orElse(null);
+                seat.lastAttacker = option == null ? null
+                    : option.action().equals("all_attack") ? "all attackers" : option.label();
+            }
+            seat.prompt = null;
+            seat.revision++;
+            seat.status = "waiting";
             touch();
-            reply = accepted(command);
+            reply = accepted(seat, command);
             notifyAll();
         }
         // Outside the lock: XMage hands the answer to the waiting game thread.
-        answer.apply(human);
+        answer.apply(current(seat));
         return reply;
     }
 
-    /** Request thread: the human seat concedes the game. */
-    Reply concede(SeatCommand command) {
+    /** Request thread: the seat concedes. In a game of three or more the others play on. */
+    Reply concede(int seatIndex, SeatCommand command) {
+        Seat seat = seats.get(seatIndex);
         Reply reply;
         boolean promptOpen;
         synchronized (this) {
-            Reply earlier = replay(command);
+            Reply earlier = replay(seat, command);
             if (earlier != null) {
                 return earlier;
             }
             if (result != null) {
-                return reject(409, "game_over", "The game has finished");
+                return reject(seat, 409, "game_over", "The game has finished");
             }
-            promptOpen = markConcession();
-            reply = accepted(command);
+            HumanPlayer human = current(seat);
+            if (seat.concedeRequested || human.hasLost() || human.hasLeft()) {
+                return reject(seat, 409, "eliminated", "This seat is already out of the game");
+            }
+            promptOpen = markConcession(seat);
+            conceded.add(seat.index);
+            reply = accepted(seat, command);
         }
-        applyConcession(promptOpen);
+        applyConcession(seat.id, promptOpen);
         return reply;
     }
 
-    /** Ends the game: the seat concedes, and the result records {@code reason} instead of a winner. */
+    /**
+     * Ends the game: every seat concedes, and the result records {@code reason} instead of a winner.
+     */
     Map<String, Object> close(String reason) {
-        boolean promptOpen;
+        List<UUID> conceding = new ArrayList<>();
+        List<Boolean> promptsOpen = new ArrayList<>();
         synchronized (this) {
             if (result != null) {
                 return closeBody();
@@ -386,16 +556,34 @@ final class HumanGame {
             if (endRequest == null) {
                 endRequest = reason;
             }
-            promptOpen = markConcession();
+            // Bots first: a human's concession wakes XMage, which then applies every queued one.
+            for (int index = 0; index < seatIds.size(); index++) {
+                if (seats.get(index) == null) {
+                    conceding.add(seatIds.get(index));
+                    promptsOpen.add(false);
+                }
+            }
+            for (Seat seat : humans) {
+                if (!seat.concedeRequested) {
+                    conceding.add(seat.id);
+                    promptsOpen.add(markConcession(seat));
+                }
+            }
         }
-        applyConcession(promptOpen);
+        Game current = game;
+        for (int i = 0; i < conceding.size(); i++) {
+            Player player = current == null ? null : current.getPlayer(conceding.get(i));
+            if (player != null && !player.hasLeft()) {
+                applyConcession(conceding.get(i), promptsOpen.get(i));
+            }
+        }
         if (!BotMatchRunner.join(thread, CLOSE_GRACE_MILLIS)) {
-            // The game thread did not reach the concession (for instance, a long AI search): end the
+            // The game thread did not reach the concessions (for instance, a long AI search): end the
             // game and keep interrupting until the thread exits.
-            Game current = game;
+            Game stopping = game;
             Thread.ofVirtual().name("human-game-stopper").start(() -> {
-                if (current != null) {
-                    current.end();
+                if (stopping != null) {
+                    stopping.end();
                 }
                 BotMatchRunner.stop(thread);
             });
@@ -408,37 +596,45 @@ final class HumanGame {
     private Map<String, Object> closeBody() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", result == null ? "closing" : "finished");
-        body.put("revision", revision);
         return body;
     }
 
     /** Caller holds the lock. Closes any open prompt; returns whether one was open. */
-    private boolean markConcession() {
-        boolean promptOpen = prompt != null;
-        concedeRequested = true;
-        prompt = null;
-        status = "waiting";
-        revision++;
+    private boolean markConcession(Seat seat) {
+        boolean promptOpen = seat.prompt != null;
+        seat.concedeRequested = true;
+        seat.prompt = null;
+        seat.status = "waiting";
+        seat.revision++;
         touch();
         notifyAll();
         return promptOpen;
     }
 
-    private void applyConcession(boolean promptOpen) {
+    private void applyConcession(UUID playerId, boolean promptOpen) {
         Game current = game;
         // XMage's server records a concession from its request threads too. Before the game has
         // started, with no prompt waiting, the next prompt applies it on the game thread instead.
         if (current != null && (promptOpen || current.getStartTime() != null)) {
-            current.setConcedingPlayer(human.getId());
-            if (promptOpen) {
+            current.setConcedingPlayer(playerId);
+            Player player = current.getPlayer(playerId);
+            if (promptOpen && player != null) {
                 // Wakes the waiting choice even when XMage has no priority player yet (mulligans).
-                human.signalPlayerConcede(true);
+                player.signalPlayerConcede(true);
             }
         }
     }
 
-    /** Request thread: the latest snapshot newer than {@code since}, waiting up to {@code waitMillis}. */
-    Snapshot snapshot(long since, long waitMillis, int logFrom) throws InterruptedException {
+    /** The game's current object for a human seat (see {@link Seat}). */
+    private HumanPlayer current(Seat seat) {
+        Game current = game;
+        Player player = current == null ? null : current.getPlayer(seat.id);
+        return player instanceof HumanPlayer human ? human : seat.player;
+    }
+
+    /** Request thread: the seat's latest snapshot newer than {@code since}, waiting up to {@code waitMillis}. */
+    Snapshot snapshot(int seatIndex, long since, long waitMillis, int logFrom) throws InterruptedException {
+        Seat seat = seats.get(seatIndex);
         long revisionNow;
         String statusNow;
         PromptView promptNow;
@@ -446,17 +642,17 @@ final class HumanGame {
         Result resultNow;
         synchronized (this) {
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
-            while (revision <= since && result == null) {
+            while (seat.revision <= since && result == null) {
                 long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
                 if (remaining <= 0) {
                     break;
                 }
                 wait(remaining);
             }
-            revisionNow = revision;
-            statusNow = status;
-            promptNow = prompt == null ? null : prompt.view();
-            viewNow = view;
+            revisionNow = seat.revision;
+            statusNow = seat.status;
+            promptNow = seat.prompt == null ? null : seat.prompt.view();
+            viewNow = seat.view;
             resultNow = result;
         }
         List<MatchLog.Entry> entries = log.entries();
@@ -474,36 +670,45 @@ final class HumanGame {
         }
         int start = from < 0 ? Math.max(0, count - DEFAULT_LOG_PAGE) : Math.min(from, count);
         List<LogLine> page = List.copyOf(lines.subList(start, Math.min(count, start + MAX_LOG_PAGE)));
-        return new Snapshot(id, revisionNow, statusNow, HUMAN_SEAT, settings, promptNow, viewNow, resultNow, count,
-            start, page);
+        return new Snapshot(id, revisionNow, statusNow, seatIndex, settings.forSeat(seatIndex), promptNow, viewNow,
+            resultNow, count, start, page);
     }
 
-    private Reply replay(SeatCommand command) {
-        Recorded earlier = actions.get(command.actionId());
+    private Seat humanSeat(UUID playerId) {
+        for (Seat seat : humans) {
+            if (seat.id.equals(playerId)) {
+                return seat;
+            }
+        }
+        return null;
+    }
+
+    private Reply replay(Seat seat, SeatCommand command) {
+        Recorded earlier = seat.actions.get(command.actionId());
         if (earlier == null) {
             return null;
         }
         if (!earlier.fingerprint().equals(command.fingerprint())) {
-            return reject(409, "action_id_reused", "That action id was used for a different command");
+            return reject(seat, 409, "action_id_reused", "That action id was used for a different command");
         }
         return earlier.reply();
     }
 
-    private Reply accepted(SeatCommand command) {
+    private Reply accepted(Seat seat, SeatCommand command) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "accepted");
         body.put("action_id", command.actionId());
-        body.put("revision", revision);
+        body.put("revision", seat.revision);
         Reply reply = new Reply(200, body);
-        actions.put(command.actionId(), new Recorded(command.fingerprint(), reply));
+        seat.actions.put(command.actionId(), new Recorded(command.fingerprint(), reply));
         return reply;
     }
 
-    private Reply reject(int httpStatus, String code, String message) {
+    private Reply reject(Seat seat, int httpStatus, String code, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("code", code);
         body.put("message", message);
-        body.put("revision", revision);
+        body.put("revision", seat.revision);
         return new Reply(httpStatus, body);
     }
 
@@ -525,7 +730,26 @@ final class HumanGame {
         return seatIds;
     }
 
-    synchronized Prompts.Prompt openPrompt() {
-        return prompt;
+    synchronized Prompts.Prompt openPrompt(int seatIndex) {
+        Seat seat = seats.get(seatIndex);
+        return seat == null ? null : seat.prompt;
+    }
+
+    /** The seat with an open prompt, waiting up to {@code waitMillis}; -1 if none, -2 once finished. */
+    synchronized int awaitPromptSeat(long waitMillis) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
+        while (result == null) {
+            for (Seat seat : humans) {
+                if (seat.prompt != null) {
+                    return seat.index;
+                }
+            }
+            long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+            if (remaining <= 0) {
+                return -1;
+            }
+            wait(remaining);
+        }
+        return -2;
     }
 }

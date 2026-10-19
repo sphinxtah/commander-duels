@@ -1,5 +1,7 @@
 # Human seat and per-seat views (v0.0.3)
 
+> **Since v0.0.4** a game seats two to four players, any mix of human and bot, in Legacy or Commander. Each human seat has its own token, prompt and view. The prompt mechanics and view rules below still hold; the endpoint shapes, results and seat rules are updated here for v0.0.4. The Commander tables, new prompt kinds and commander fields are in [Commander tables](commander-tables.md).
+
 v0.0.3 is the second slice of milestone M0. A human seat plays a Legacy Two Player Duel against an XMage computer player through XMage's own `HumanPlayer`. Each blocking choice becomes a typed prompt with an ID, stale answers are refused, and the seat receives only an authorized view. Development endpoints on the internal engine carry it; FastAPI still refuses game actions, and there is no game UI. [The engine spike](xmage-spike.md) records how XMage's human player waits for answers; this document records what was built on that.
 
 What it proves:
@@ -40,7 +42,8 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 | `declare_attackers` | `SELECT` with possible attackers | `toggle_attacker` per creature; `all_attack`; `done` | UUID; "special"; boolean |
 | `declare_blockers` | `SELECT` with possible blockers | `toggle_blocker` per creature; `done` | UUID; boolean |
 | `assign_amounts` | `MULTI_AMOUNT` (combat damage among blockers, with or without trample) | `suggested` (XMage's default split); `cancel` when allowed; or a payload of one amount per entry | space-separated amounts; boolean |
-| `unsupported` | `CHOOSE_CHOICE`, `CHOOSE_ABILITY`, `CHOOSE_MODE`, `PICK_ABILITY`, `PLAY_X_MANA`, `AMOUNT`, `CHOOSE_PILE` | none | The game waits until the seat concedes or the game is closed |
+| `choose_defender`, `choose_ability`, `choose_choice` | Added in v0.0.4; see [Commander tables](commander-tables.md#prompts) | | |
+| `unsupported` | `CHOOSE_MODE`, `PICK_ABILITY`, `PLAY_X_MANA`, `AMOUNT`, `CHOOSE_PILE`, and `CHOOSE_CHOICE` lists longer than 64 entries | none | The game waits until the seat concedes or the game is closed |
 
 None of the unsupported families occurred in the scripted games: the fixture decks have no modal spells, X costs, named choices, piles or simultaneous triggers that need ordering. XMage's `PERSONAL_MESSAGE` events ("You have to attack with...") become the view's `messages`, not prompts.
 
@@ -48,7 +51,7 @@ None of the unsupported families occurred in the scripted games: the fixture dec
 
 `SeatView` is built field by field from the game state; nothing is a filtered copy of a full snapshot. [The contract](../../contracts/engine-seat-view.schema.json) closes every object, so it cannot carry these:
 
-- the opponent's hand or either library: each player shows counts only;
+- another player's hand, or any library: each player shows counts only;
 - the shuffle seed;
 - XMage identifiers.
 
@@ -76,12 +79,12 @@ These exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. The en
 
 | Request | Purpose | Responses |
 | --- | --- | --- |
-| `POST /v1/games` | Start a game: optional `seed`, `human_deck`, `bot_deck` (fixture names), `skill` (1–6), `turn_cap` (1–200) and `idle_timeout_seconds` (5–3600); out-of-range numbers are clamped | 201 `game_id`, `seat` (0), `seat_token` (returned once) and `settings`; 429 `games_busy` with `Retry-After` |
+| `POST /v1/games` | Start a game: optional `format` (`legacy` or `commander`), `seats` (players in turn order, each `{"player": "human" or "bot", "deck"?}`), `seed`, `skill` (1–6), `turn_cap` (1–200) and `idle_timeout_seconds` (5–3600); out-of-range numbers are clamped | 201 `game_id`, `seats` (each with its `seat_token`, returned once, or `null` for a bot) and `settings`; 400 for a malformed table; 429 `games_busy` with `Retry-After` |
 | `GET /v1/games/{id}/view` | The seat's snapshot. `since` and `wait_ms` (up to 30 s) long-poll for a newer revision; `log_from` pages the log (up to 200 lines) | 200 snapshot |
-| `POST /v1/games/{id}/commands` | `submit_choice` or `concede`, in the [command envelope](../../contracts/engine-command.schema.json) | 200 accepted; 400 `invalid_command`; 409 or 422 refusals as listed above |
-| `POST /v1/games/{id}/close` | End the game: the seat concedes, and the result records `closed` | 200 `finished` or `closing` |
+| `POST /v1/games/{id}/commands` | `submit_choice` or `concede`, in the [command envelope](../../contracts/engine-command.schema.json) | 200 accepted; 400 `invalid_command`; 409 or 422 refusals as listed above, plus 409 `eliminated` for a second concession |
+| `POST /v1/games/{id}/close` | End the game for every seat: all seats concede, and the result records `closed` | 200 `finished` or `closing` |
 
-Every game request needs `Authorization: Bearer <seat_token>`, and the token alone selects the seat. No body field can choose one: the envelope rejects unknown fields such as `seat`. An unknown game and a wrong token both return 404 `not_found`.
+Every game request needs `Authorization: Bearer <seat_token>`, and the token alone selects the seat: the view, prompt and commands are that seat's. No body field can choose one: the envelope rejects unknown fields such as `seat`. An unknown game and a wrong token both return 404 `not_found`.
 
 The seed is never returned. It decides every shuffle, so knowing it would reveal library order (SEC03). The seed input exists for reproducible development tests only.
 
@@ -92,13 +95,14 @@ A command:
  "type": "submit_choice", "payload": {"option_id": "2"}}
 ```
 
-The snapshot's `status` is one of `starting`, `your_prompt`, `unsupported_prompt`, `waiting` (the bot is acting or XMage is processing) or `finished`. A finished game has a `result`:
-- `kind` is `completed`, `turn_limit`, `closed`, `idle_timeout` or `error`;
-- for a completed game, also `winner_seat`, `draw` and `conceded`.
+The snapshot's `status` is one of `starting`, `your_prompt`, `unsupported_prompt`, `waiting` (another player is acting or XMage is processing), `eliminated` (this seat has lost and the game goes on) or `finished`. A finished game has a `result`:
+- `kind` is `completed`, `turn_limit`, `closed`, `idle_timeout`, `humans_eliminated` or `error`;
+- `conceded_seats` lists the seats that conceded, in order;
+- for a completed game, also `winner_seat` and `draw`.
 
 ## Lifecycle and threads
 
-- **Seats.** The human always sits in seat 0, and a seeded coin decides who chooses the starting player. The human seat uses XMage's default user settings: it stops in both main phases, at declare attackers and blockers, and whenever something new is on the stack, and it confirms before passing with mana in the pool. Configurable stops (UI07) are later work.
+- **Seats.** Seats are in turn order, as the request lists them (in v0.0.3 the human always sat in seat 0). A seeded coin decides who chooses the starting player. The human seat uses XMage's default user settings: it stops in both main phases, at declare attackers and blockers, and whenever something new is on the stack, and it confirms before passing with mana in the pool. Configurable stops (UI07) are later work.
 - **Threads.** Each game runs on its own `GAME human_game <id>` platform thread, which blocks while it waits for the seat. Views are built on that thread; request threads only read the published snapshot.
 - **Capacity.** At most `CD_ENGINE_MAX_GAMES` games run at once (default 2, at most 8). XMage's AI shares one search pool and one random generator across games, and each game holds a thread. Bot matches keep their own single slot.
 - **Watchdog.** It checks every second. A game with no activity for its idle timeout (default 15 minutes) is closed with `idle_timeout`. Finished games stay readable for 10 minutes (at most 16), then are dropped.

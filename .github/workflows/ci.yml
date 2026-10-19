@@ -56,11 +56,13 @@ jobs:
           docker compose exec -T engine curl -fsS http://localhost:8090/health
           docker compose exec -T engine curl -fsS -X POST -d '{"seed": 1}' http://localhost:8090/v1/bot_match \
             | python3 -c "import json, sys; r = json.load(sys.stdin); print(r['result'], r['turns'], r['duration_ms']); sys.exit(r['result'] != 'completed')"
-          # A scripted human seat plays a game through the seat API; every payload is checked and
-          # validated against the seat-view contract. The engine publishes no port, so the client
-          # shares its network namespace.
+          # Scripted human seats play a Legacy game and a four-seat Commander game (two humans, two
+          # bots) through the seat API; every payload is checked and validated against the seat-view
+          # contract. The engine publishes no port, so the client shares its network namespace.
           docker run --rm --network "container:$(docker compose ps -q engine)" -v "$PWD:/w:ro" -w /w python:3.12.10-slim \
             sh -c "pip install -q --disable-pip-version-check --root-user-action=ignore --no-deps jsonschema==4.23.0 \
               jsonschema-specifications==2025.9.1 referencing==0.37.0 rpds-py==2026.9.1 attrs==26.1.0 typing_extensions==4.16.0 \
-              && python scripts/engine_human_game.py --url http://localhost:8090 --schema contracts/engine-seat-view.schema.json --quiet --skill 1"
+              && python scripts/engine_human_game.py --url http://localhost:8090 --schema contracts/engine-seat-view.schema.json --quiet --skill 1 \
+              && python scripts/engine_human_game.py --url http://localhost:8090 --schema contracts/engine-seat-view.schema.json --quiet --skill 1 \
+                --format commander --seats human,human,bot,bot --turn-cap 24"
           docker compose down

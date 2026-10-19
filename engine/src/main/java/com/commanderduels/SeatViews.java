@@ -1,6 +1,8 @@
 package com.commanderduels;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -11,21 +13,29 @@ import mage.MageObject;
 import mage.abilities.Ability;
 import mage.cards.Card;
 import mage.cards.Cards;
+import mage.constants.CommanderCardType;
+import mage.constants.Zone;
 import mage.counters.Counter;
 import mage.counters.Counters;
+import mage.filter.FilterMana;
 import mage.game.ExileZone;
 import mage.game.Game;
+import mage.game.GameCommanderImpl;
 import mage.game.GameState;
 import mage.game.combat.CombatGroup;
+import mage.game.command.CommandObject;
+import mage.game.command.Commander;
 import mage.game.permanent.Permanent;
 import mage.game.stack.Spell;
 import mage.game.stack.StackObject;
 import mage.players.ManaPool;
 import mage.players.Player;
 import mage.target.Target;
+import mage.watchers.common.CommanderInfoWatcher;
+import mage.watchers.common.CommanderPlaysCountWatcher;
 
 /**
- * Builds {@link SeatView}s. Runs on the game thread only, where XMage's state is consistent (XMage's
+ * Builds {@link SeatView}s for any seat at the table. Runs on the game thread only, where XMage's state is consistent (XMage's
  * own server builds its per-player views there for the same reason).
  */
 final class SeatViews {
@@ -34,6 +44,9 @@ final class SeatViews {
     private final Game game;
     private final List<UUID> seatIds;
     private final ObjectRefs refs;
+    /** Commander names and colour identities, kept for commanders that left the game with their owner. */
+    private final Map<UUID, String> commanderNames = new HashMap<>();
+    private final Map<UUID, String> identities = new HashMap<>();
 
     SeatViews(Game game, List<UUID> seatIds, ObjectRefs refs) {
         this.game = game;
@@ -45,7 +58,12 @@ final class SeatViews {
         UUID viewer = seatIds.get(seat);
         GameState state = game.getState();
         Player you = game.getPlayer(viewer);
-        Player opponent = game.getPlayer(seatIds.get(1 - seat));
+        List<SeatView.PlayerState> opponents = new ArrayList<>();
+        for (UUID playerId : seatIds) {
+            if (!playerId.equals(viewer)) {
+                opponents.add(player(game.getPlayer(playerId), viewer));
+            }
+        }
 
         List<SeatView.CardInfo> hand = new ArrayList<>();
         for (Card card : you.getHand().getCards(game)) {
@@ -80,7 +98,7 @@ final class SeatViews {
             game.getTurnPhaseType() == null ? null : game.getTurnPhaseType().name().toLowerCase(Locale.ROOT),
             game.getTurnStepType() == null ? null : game.getTurnStepType().name().toLowerCase(Locale.ROOT),
             player(you, viewer),
-            player(opponent, viewer),
+            List.copyOf(opponents),
             hand,
             battlefield,
             stack,
@@ -103,6 +121,13 @@ final class SeatViews {
                 }
             }
         }
+        List<SeatView.CardInfo> commandZone = new ArrayList<>();
+        for (CommandObject object : game.getState().getCommand()) {
+            if (object.isControlledBy(player.getId())) {
+                commandZone.add(commandObject(object));
+            }
+        }
+        boolean commanderGame = game instanceof GameCommanderImpl;
         ManaPool pool = player.getManaPool();
         return new SeatView.PlayerState(
             seatIds.indexOf(player.getId()),
@@ -116,7 +141,125 @@ final class SeatViews {
             new SeatView.ManaPoolInfo(pool.getWhite(), pool.getBlue(), pool.getBlack(), pool.getRed(), pool.getGreen(),
                 pool.getColorless()),
             player.hasLost(),
-            player.hasWon());
+            player.hasWon(),
+            commanderGame ? colorIdentity(player) : null,
+            List.copyOf(commandZone),
+            commanderGame ? commanders(player, viewer) : List.of());
+    }
+
+    /** A commander's card, or an emblem, plane or dungeon, which are not cards. */
+    private SeatView.CardInfo commandObject(CommandObject object) {
+        if (object instanceof Commander) {
+            Card card = game.getCard(object.getId());
+            if (card != null) {
+                return card(card, true);
+            }
+        }
+        return new SeatView.CardInfo(refs.ref(object.getId(), 0), false, object.getName(), null, typeLine(object),
+            null, null, rules(object.getAbilities().getRules()));
+    }
+
+    /**
+     * The combined colour identity of the player's commanders, in WUBRG order; null until XMage has
+     * moved them to the command zone at the start of the game.
+     */
+    private String colorIdentity(Player player) {
+        FilterMana identity = new FilterMana();
+        var commanderIds = game.getCommandersIds(player, CommanderCardType.COMMANDER_OR_OATHBREAKER, false);
+        if (commanderIds.isEmpty()) {
+            return null;
+        }
+        for (UUID id : commanderIds) {
+            Card card = game.getCard(id);
+            if (card == null) {
+                // The owner left the game, and XMage removed their cards.
+                return identities.get(player.getId());
+            }
+            identity.addAll(card.getColorIdentity());
+        }
+        String colors = (identity.isWhite() ? "W" : "") + (identity.isBlue() ? "U" : "")
+            + (identity.isBlack() ? "B" : "") + (identity.isRed() ? "R" : "") + (identity.isGreen() ? "G" : "");
+        identities.put(player.getId(), colors);
+        return colors;
+    }
+
+    /**
+     * Each commander's zone, casts from the command zone, tax and combat damage dealt, read from
+     * XMage's own watchers, so the view shows exactly what XMage applies.
+     */
+    private List<SeatView.CommanderState> commanders(Player owner, UUID viewer) {
+        CommanderPlaysCountWatcher plays = game.getState().getWatcher(CommanderPlaysCountWatcher.class);
+        List<UUID> ids = new ArrayList<>();
+        for (UUID id : game.getCommandersIds(owner, CommanderCardType.COMMANDER_OR_OATHBREAKER, false)) {
+            if (commanderName(id) != null) {
+                ids.add(id);
+            }
+        }
+        ids.sort(Comparator.comparing(this::commanderName));
+        List<SeatView.CommanderState> commanders = new ArrayList<>();
+        for (UUID id : ids) {
+            String zone = commanderZone(id);
+            if ((zone.equals("hand") || zone.equals("library")) && !viewer.equals(owner.getId())) {
+                zone = "hidden";
+            }
+            String objectId = null;
+            if (!zone.equals("hidden") && !zone.equals("outside") && Visibility.identityVisible(game, id, viewer)) {
+                objectId = commanderObject(id, zone);
+            }
+            int casts = plays == null ? 0 : plays.getPlaysCount(id);
+            List<SeatView.CommanderDamage> damage = new ArrayList<>();
+            CommanderInfoWatcher watcher = game.getState().getWatcher(CommanderInfoWatcher.class, id);
+            if (watcher != null) {
+                watcher.getDamageToPlayer().forEach((playerId, amount) -> {
+                    int seat = seatIds.indexOf(playerId);
+                    if (seat >= 0 && amount > 0) {
+                        damage.add(new SeatView.CommanderDamage(seat, amount));
+                    }
+                });
+            }
+            damage.sort(Comparator.comparingInt(SeatView.CommanderDamage::seat));
+            commanders.add(new SeatView.CommanderState(commanderName(id), zone, objectId, casts, 2 * casts,
+                List.copyOf(damage)));
+        }
+        return List.copyOf(commanders);
+    }
+
+    private String commanderName(UUID id) {
+        Card card = game.getCard(id);
+        if (card != null) {
+            commanderNames.putIfAbsent(id, card.getName());
+        }
+        return commanderNames.get(id);
+    }
+
+    private String commanderZone(UUID id) {
+        Zone zone = game.getCard(id) == null ? null : game.getState().getZone(id);
+        if (zone == null) {
+            return "outside";
+        }
+        return switch (zone) {
+            case COMMAND -> "command";
+            case BATTLEFIELD -> "battlefield";
+            case STACK -> "stack";
+            case GRAVEYARD -> "graveyard";
+            case EXILED -> "exile";
+            case HAND -> "hand";
+            case LIBRARY -> "library";
+            default -> "outside";
+        };
+    }
+
+    /** The id the seat knows the commander by in its zone: the spell while it is on the stack, else the card. */
+    private String commanderObject(UUID id, String zone) {
+        if (zone.equals("stack")) {
+            Spell spell = game.getStack().getSpell(id, false);
+            return spell == null ? null : refs.ref(spell.getId(), spell.getZoneChangeCounter(game));
+        }
+        if (zone.equals("battlefield")) {
+            Permanent permanent = game.getPermanent(id);
+            return permanent == null ? null : ref(permanent);
+        }
+        return objectRef(id);
     }
 
     private SeatView.PermanentInfo permanent(Permanent permanent, UUID viewer) {

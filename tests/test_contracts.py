@@ -68,16 +68,28 @@ def card(object_id: str, name: str) -> dict[str, Any]:
 def player(seat: int) -> dict[str, Any]:
     return {
         "seat": seat,
-        "name": ["Human", "Bot"][seat],
-        "life": 20,
+        "name": f"{['Human', 'Bot', 'Bot', 'Human'][seat]} {seat + 1}",
+        "life": 40,
         "counters": {},
-        "library_count": 53,
+        "library_count": 92,
         "hand_count": 7,
         "graveyard": [],
         "exile": [],
         "mana_pool": {"white": 0, "blue": 0, "black": 0, "red": 0, "green": 0, "colorless": 0},
         "lost": False,
         "won": False,
+        "color_identity": "WURG"[seat],
+        "command_zone": [card(f"o{seat + 2:016x}", "Isamaru, Hound of Konda")],
+        "commanders": [
+            {
+                "name": "Isamaru, Hound of Konda",
+                "zone": "command",
+                "object_id": f"o{seat + 2:016x}",
+                "cast_count": 1,
+                "tax": 2,
+                "damage_dealt": [{"seat": (seat + 1) % 4, "damage": 2}],
+            }
+        ],
     }
 
 
@@ -88,8 +100,14 @@ def snapshot() -> dict[str, Any]:
         "status": "your_prompt",
         "seat": 0,
         "settings": {
-            "human_deck": "legacy-mono-red-burn",
-            "bot_deck": "legacy-mono-green-creatures",
+            "format": "commander",
+            "rules_profile": "commander_free_for_all",
+            "seats": [
+                {"seat": 0, "player": "human", "deck": "commander-mono-white-soldiers"},
+                {"seat": 1, "player": "bot", "deck": None},
+                {"seat": 2, "player": "bot", "deck": None},
+                {"seat": 3, "player": "human", "deck": None},
+            ],
             "skill": 4,
             "turn_cap": 60,
             "idle_timeout_seconds": 900,
@@ -128,7 +146,7 @@ def snapshot() -> dict[str, Any]:
             "phase": "precombat_main",
             "step": "precombat_main",
             "you": player(0),
-            "opponent": player(1),
+            "opponents": [player(1), player(2), player(3)],
             "hand": [card("o0123456789abcdef", "Lightning Bolt")],
             "battlefield": [],
             "stack": [],
@@ -141,9 +159,14 @@ def snapshot() -> dict[str, Any]:
         "log_count": 1,
         "log_from": 0,
         "log": [
-            {"index": 0, "turn": 1, "active_seat": 0, "step": "UNTAP", "text": "Human mulligans"}
+            {"index": 0, "turn": 1, "active_seat": 0, "step": "UNTAP", "text": "Human 1 mulligans"}
         ],
     }
+
+
+def opponent_commander(snapshot: dict[str, Any]) -> dict[str, Any]:
+    commander: dict[str, Any] = snapshot["view"]["opponents"][0]["commanders"][0]
+    return commander
 
 
 def test_seat_view_contract_cannot_carry_concealed_information():
@@ -152,13 +175,18 @@ def test_seat_view_contract_cannot_carry_concealed_information():
 
     secret = card("o1111111111111111", "Giant Growth")
     leaks: list[tuple[str, Any]] = [
-        ("opponent hand", lambda view: view["view"]["opponent"].update(hand=[secret])),
+        ("opponent hand", lambda view: view["view"]["opponents"][2].update(hand=[secret])),
         ("library contents", lambda view: view["view"]["you"].update(library=[])),
         ("shuffle seed", lambda view: view["settings"].update(seed=42)),
         ("XMage object id", lambda view: view["view"]["hand"][0].update(id=str(uuid4()))),
         ("named hidden card", lambda view: view["view"]["hand"][0].update(hidden=True)),
         ("unknown prompt kind", lambda view: view["prompt"].update(kind="reveal_hand")),
         ("seat chosen by option", lambda view: view["prompt"]["options"][0].update(seat=7)),
+        ("a fifth seat", lambda view: view["view"]["opponents"].append(player(3) | {"seat": 4})),
+        ("hidden commander's object", lambda view: opponent_commander(view).update(zone="hidden")),
+        ("commander library", lambda view: opponent_commander(view).update(library=[])),
+        ("odd commander tax", lambda view: view["view"]["you"]["commanders"][0].update(tax=3)),
+        ("legacy deck field", lambda view: view["settings"].update(bot_deck="legacy-burn")),
     ]
     for description, mutate in leaks:
         leaked = copy.deepcopy(snapshot())

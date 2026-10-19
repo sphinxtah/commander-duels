@@ -59,7 +59,8 @@ XMage isn't on Maven Central. Its root POM lists every module, so building a sub
 | `Mage.Server.Plugins/Mage.Player.AI` | `mage-player-ai` | Base computer player |
 | `Mage.Server.Plugins/Mage.Player.AI.MAD` | `mage-player-ai-mad` | "Computer - mad": `ComputerPlayerControllableProxy`, which extends `ComputerPlayer7`. The directory is `MAD`, not `MA` |
 | `Mage.Server.Plugins/Mage.Game.TwoPlayerDuel` | `mage-game-twoplayerduel` | `TwoPlayerDuel` game and `TwoPlayerMatch` |
-| `Mage.Server.Plugins/Mage.Game.CommanderFreeForAll` | `mage-game-commanderfreeforall` | Commander free-for-all; built and on the classpath, not used until M3 |
+| `Mage.Server.Plugins/Mage.Game.CommanderDuel` | `mage-game-commanderduel` | `CommanderDuel`, the two-seat Commander table (added in v0.0.4) |
+| `Mage.Server.Plugins/Mage.Game.CommanderFreeForAll` | `mage-game-commanderfreeforall` | `CommanderFreeForAll`, three- and four-seat Commander tables (used since v0.0.4) |
 | `Mage.Server.Plugins/Mage.Deck.Constructed` | `mage-deck-constructed` | Constructed validators, including `mage.deck.Legacy` |
 
 These aren't built: `Mage.Server` (users, sessions, tables), `Mage.Client` (Swing), `Mage.Tests`, `Mage.Verify`, `Mage.Reports` and the other game, tournament and player plugins.

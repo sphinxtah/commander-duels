@@ -22,8 +22,8 @@ git remote add origin "$repo"
 git sparse-checkout set Mage Mage.Common Mage.Sets repository \
     Mage.Server.Plugins/Mage.Player.AI Mage.Server.Plugins/Mage.Player.AI.MAD \
     Mage.Server.Plugins/Mage.Player.Human \
-    Mage.Server.Plugins/Mage.Game.TwoPlayerDuel Mage.Server.Plugins/Mage.Game.CommanderFreeForAll \
-    Mage.Server.Plugins/Mage.Deck.Constructed
+    Mage.Server.Plugins/Mage.Game.TwoPlayerDuel Mage.Server.Plugins/Mage.Game.CommanderDuel \
+    Mage.Server.Plugins/Mage.Game.CommanderFreeForAll Mage.Server.Plugins/Mage.Deck.Constructed
 git fetch -q --depth 1 --filter=blob:none origin "$sha"
 git -c advice.detachedHead=false checkout -q FETCH_HEAD
 actual=$(git rev-parse HEAD)
@@ -55,7 +55,7 @@ for module in Mage Mage.Common Mage.Sets; do
 done
 $mvn -N -f Mage.Server.Plugins/pom.xml install
 for module in Mage.Player.AI Mage.Player.AI.MAD Mage.Player.Human Mage.Game.TwoPlayerDuel \
-    Mage.Game.CommanderFreeForAll Mage.Deck.Constructed; do
+    Mage.Game.CommanderDuel Mage.Game.CommanderFreeForAll Mage.Deck.Constructed; do
     echo "Building $module"
     $mvn -f "Mage.Server.Plugins/$module/pom.xml" install
 done

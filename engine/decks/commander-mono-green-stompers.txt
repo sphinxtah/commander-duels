@@ -1,0 +1,67 @@
+// Commander Duels engine fixture: mono-green stompers, 100 cards (the commander plus 99), Commander-legal.
+// Simple cards only, singleton except basic lands. No card name is shared with another Commander
+// fixture, so the leak checks can tell concealed cards apart by name. The SB: line is the commander;
+// keep card lines contiguous (XMage's text importer treats a blank line as the sideboard switch).
+SB: 1 Lady Zhurong, Warrior Queen
+38 Forest
+1 Llanowar Elves
+1 Elvish Mystic
+1 Fyndhorn Elves
+1 Norwood Ranger
+1 Scryb Sprites
+1 Bear Cub
+1 Brushstrider
+1 Canopy Spider
+1 Deadly Recluse
+1 Elvish Archers
+1 Elvish Warrior
+1 Greenwood Sentinel
+1 Runeclaw Bear
+1 Thornweald Archer
+1 Daggerback Basilisk
+1 Gorilla Warrior
+1 Land Leeches
+1 Sporecap Spider
+1 Trained Armodon
+1 Wildwood Patrol
+1 Giant Mantis
+1 Giant Spider
+1 Rumbling Baloth
+1 Southern Elephant
+1 War Mammoth
+1 Durkwood Boars
+1 Greater Basilisk
+1 Ironroot Treefolk
+1 Mammoth Spider
+1 Panther Warriors
+1 Redwood Treefolk
+1 Sentinel Spider
+1 Spined Wurm
+1 Stampeding Rhino
+1 Tajuru Pathwarden
+1 Thornhide Wolves
+1 Colossal Dreadmaw
+1 Vastwood Gorger
+1 Yavimaya Wurm
+1 Gigantosaurus
+1 Krosan Tusker
+1 Grizzled Outrider
+1 Axebane Stag
+1 Kraul Foragers
+1 Silhana Wayfinder
+1 Giant Growth
+1 Titanic Growth
+1 Monstrous Growth
+1 Might of Old Krosa
+1 Overrun
+1 Rampant Growth
+1 Cultivate
+1 Prey Upon
+1 Rancor
+1 Garruk Wildspeaker
+1 Harmonize
+1 Explore
+1 Hunter's Insight
+1 Aspect of Hydra
+1 Ranger's Guile
+1 Pounce

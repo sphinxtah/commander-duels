@@ -5,9 +5,11 @@ import java.util.List;
 /**
  * A typed choice for one seat. Every XMage request becomes a new prompt with a fresh id, and the
  * seat answers with one option id, or for assign_amounts optionally with a list of amounts. Kinds:
- * priority, mulligan, yes_no, choose_target, pay_mana, declare_attackers, declare_blockers,
- * assign_amounts, and unsupported (an XMage request this version does not type; the game waits until
- * the seat concedes or the game is closed).
+ * priority, mulligan, yes_no, choose_target, choose_defender (which player, planeswalker or battle an
+ * attacker attacks), choose_ability (which of an object's abilities to use, or how to cast a card),
+ * choose_choice (one of a short list, such as a colour or the order of replacement effects),
+ * pay_mana, declare_attackers, declare_blockers, assign_amounts, and unsupported (an XMage request
+ * this version does not type; the game waits until the seat concedes or the game is closed).
  *
  * @param amounts    the split to choose, for assign_amounts only
  * @param xmageQuery the XMage query type, for unsupported prompts only
@@ -16,7 +18,8 @@ public record PromptView(String id, String kind, String message, String detail, 
                          Amounts amounts, String xmageQuery) {
 
     /**
-     * @param action   what choosing the option does, for example cast, play_land, pass, choose or done
+     * @param action   what choosing the option does, for example cast, play_land, pass, choose,
+     *                 use_ability or done
      * @param objectId an opaque object id from the seat's view, when the option is an object
      * @param seat     the player's seat, when the option is a player
      * @param selected whether the object is already chosen (choosing it again removes it)
