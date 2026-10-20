@@ -61,6 +61,8 @@ def install(tmp_path: Path, stub: str, *scripts: str) -> tuple[Path, dict[str, s
     (kit / "backups").mkdir(parents=True)
     for name in scripts:
         shutil.copy(ROOT / "deploy" / name, kit / name)
+        # As push.sh leaves them on the VM, whatever mode the checkout gave them.
+        (kit / name).chmod(0o750)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     # deploy.sh waits between its readiness checks; the tests need not.
