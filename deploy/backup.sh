@@ -10,6 +10,11 @@ mkdir -p backups
 file="backups/commander-$(date -u +%Y%m%dT%H%M%SZ)-$label.dump"
 docker compose exec -T db pg_dump -U commander -d commander -Fc > "$file.partial"
 mv "$file.partial" "$file"
-ls -1t backups/*-nightly.dump 2>/dev/null | tail -n +15 | xargs -r rm --
-ls -1t backups/*-pre-*.dump 2>/dev/null | tail -n +11 | xargs -r rm --
+# Keeps the newest $2 dumps whose names match $1. find, unlike ls, succeeds when none match yet.
+prune() {
+  find backups -maxdepth 1 -name "$1" -printf '%T@ %p\n' | sort -rn | tail -n +"$(($2 + 1))" \
+    | cut -d' ' -f2- | xargs -r rm --
+}
+prune '*-nightly.dump' 14
+prune '*-pre-*.dump' 10
 echo "Backup: $file ($(du -h "$file" | cut -f1))"
