@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -28,8 +29,8 @@ import java.util.regex.Pattern;
  * are enabled, it runs bot-versus-bot matches and development games with human and bot seats (each
  * human seat's token selects that seat). When a service token is configured, the API's service
  * games run under {@code /v1/service}: every request there must carry the token, seats still need
- * their own seat tokens, and the API may also close a game, inspect it for SysOp and look up card
- * names. Every other operation fails closed.
+ * their own seat tokens, and the API may also close a game, inspect it for SysOp, look up card
+ * names and fetch the list of implemented cards. Every other operation fails closed.
  */
 public final class EngineServer {
     public static final int PROTOCOL_VERSION = 1;
@@ -52,7 +53,8 @@ public final class EngineServer {
     private static final SecureRandom SEEDS = new SecureRandom();
 
     record Health(String status, int protocolVersion, boolean gameplayAvailable, Xmage xmage, Cards cards,
-                  boolean botMatchEnabled, boolean serviceGamesEnabled) {}
+                  boolean botMatchEnabled, boolean serviceGamesEnabled,
+                  Implementations.Summary implementations) {}
 
     record Xmage(String version, String tag, String commit, String commitDate) {}
 
@@ -61,12 +63,16 @@ public final class EngineServer {
     private EngineServer() {}
 
     public static HttpServer create(int port, Engine engine) throws IOException {
+        return create(port, engine, Implementations.none());
+    }
+
+    static HttpServer create(int port, Engine engine, Implementations implementations) throws IOException {
         var server = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 16);
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", exchange -> {
             try (exchange) {
                 try {
-                    route(exchange, engine);
+                    route(exchange, engine, implementations);
                 } catch (RuntimeException e) {
                     // A bug, not a refusal: the caller gets a JSON 500 rather than a dropped
                     // connection, and the details stay in the engine's log.
@@ -82,14 +88,15 @@ public final class EngineServer {
         return server;
     }
 
-    private static void route(HttpExchange exchange, Engine engine) throws IOException {
+    private static void route(HttpExchange exchange, Engine engine, Implementations implementations)
+            throws IOException {
         String path = exchange.getRequestURI().getPath();
         String method = exchange.getRequestMethod();
         if (path.equals("/health")) {
             if (!method.equals("GET")) {
                 methodNotAllowed(exchange, "GET");
             } else {
-                respond(exchange, 200, health(engine));
+                respond(exchange, 200, health(engine, implementations));
             }
         } else if (path.equals("/ready")) {
             if (!method.equals("GET")) {
@@ -102,7 +109,7 @@ public final class EngineServer {
         } else if (path.equals("/v1/bot_match") && engine.botMatchEnabled()) {
             botMatch(exchange, engine);
         } else if (path.startsWith(SERVICE) && engine.serviceGamesEnabled()) {
-            service(exchange, engine, path.substring(SERVICE.length()));
+            service(exchange, engine, implementations, path.substring(SERVICE.length()));
         } else if (path.equals(GAMES) && engine.devGamesEnabled()) {
             createGame(exchange, engine, false);
         } else if (path.startsWith(GAMES + "/") && engine.devGamesEnabled()) {
@@ -115,6 +122,10 @@ public final class EngineServer {
     }
 
     static Health health(Engine engine) {
+        return health(engine, Implementations.none());
+    }
+
+    static Health health(Engine engine, Implementations implementations) {
         XmagePin pin = engine.pin();
         CardDatabase.Stats stats = engine.cards();
         return new Health(
@@ -126,14 +137,16 @@ public final class EngineServer {
             new Xmage(pin.version(), pin.tag(), pin.commit(), pin.commitDate()),
             stats == null ? null : new Cards(stats.printings(), stats.distinctNames()),
             engine.botMatchEnabled(),
-            engine.serviceGamesEnabled());
+            engine.serviceGamesEnabled(),
+            implementations.summary());
     }
 
     /**
      * The API's routes. The service token comes first: without it nothing under the prefix exists
      * for the caller. Seat routes still need the seat's own token.
      */
-    private static void service(HttpExchange exchange, Engine engine, String rest) throws IOException {
+    private static void service(HttpExchange exchange, Engine engine, Implementations implementations,
+                                String rest) throws IOException {
         if (!engine.serviceAuthorized(exchange.getRequestHeaders().getFirst(SERVICE_TOKEN_HEADER))) {
             respond(exchange, 401, Map.of("code", "service_unauthorized"));
             return;
@@ -143,6 +156,8 @@ public final class EngineServer {
             createGame(exchange, engine, true);
         } else if (rest.equals("cards")) {
             cards(exchange, engine);
+        } else if (rest.equals("implementations")) {
+            implementations(exchange, implementations);
         } else if (rest.startsWith("games/")) {
             String gamePath = rest.substring("games/".length());
             Matcher matcher = SERVICE_GAME_PATH.matcher(gamePath);
@@ -160,6 +175,27 @@ public final class EngineServer {
             }
         } else {
             respond(exchange, 404, Map.of("code", "not_found"));
+        }
+    }
+
+    /** The implementation list, gzipped as the image made it. */
+    private static void implementations(HttpExchange exchange, Implementations implementations)
+            throws IOException {
+        if (!exchange.getRequestMethod().equals("GET")) {
+            methodNotAllowed(exchange, "GET");
+            return;
+        }
+        Optional<Path> list = implementations.list();
+        if (list.isEmpty()) {
+            respond(exchange, 404, Map.of("code", "no_implementation_list"));
+            return;
+        }
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Content-Encoding", "gzip");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, Files.size(list.get()));
+        try (var stream = exchange.getResponseBody()) {
+            Files.copy(list.get(), stream);
         }
     }
 
@@ -473,13 +509,18 @@ public final class EngineServer {
         String serviceToken = System.getenv().getOrDefault("CD_ENGINE_SERVICE_TOKEN", "").strip();
         var games = devEndpoints || !serviceToken.isEmpty() ? new HumanGames(decks, maxGames) : null;
         var engine = new Engine(pin, devEndpoints, CardDatabase::load, runner::run, games, devEndpoints, serviceToken);
-        var server = create(port, engine);
+        var implementations = Implementations.load(
+            Path.of(System.getenv().getOrDefault("CD_ENGINE_IMPLEMENTATIONS", "catalog")));
+        var server = create(port, engine, implementations);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> server.stop(2)));
         server.start();
         System.out.printf("Commander Duels engine on port %d: XMage %s (%s); development bot matches and"
             + " games %s; service games %s%s%n", port, pin.version(), pin.commit(),
             devEndpoints ? "enabled" : "disabled", engine.serviceGamesEnabled() ? "enabled" : "disabled",
             games != null ? " (at most " + games.maxActive() + " games at once)" : "");
+        System.out.println(implementations.summary() == null ? "No implementation list"
+            : "Implementation list " + implementations.summary().build() + ": "
+                + implementations.summary().cards() + " cards");
         engine.startLoading();
     }
 }

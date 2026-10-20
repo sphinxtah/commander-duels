@@ -7,10 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.sun.net.httpserver.HttpServer;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -18,8 +22,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /** HTTP boundary behaviour with stand-in loading and match functions (no XMage game is played). */
 class EngineServerTest {
@@ -115,7 +122,8 @@ class EngineServerTest {
         assertEquals(PIN.tag(), xmage.get("tag").getAsString());
         assertEquals(PIN.commitDate(), xmage.get("commit_date").getAsString());
         assertFalse(loading.get("service_games_enabled").getAsBoolean());
-        assertEquals(7, loading.size(), "health fields: " + loading.keySet());
+        assertTrue(loading.get("implementations").isJsonNull(), "this engine has no implementation list");
+        assertEquals(8, loading.size(), "health fields: " + loading.keySet());
 
         var notReady = get("/ready");
         assertEquals(503, notReady.statusCode());
@@ -163,6 +171,36 @@ class EngineServerTest {
         failed.startLoading().join();
         assertEquals(Engine.Status.FAILED, failed.status());
         assertFalse(EngineServer.health(failed).gameplayAvailable(), "no game can start without cards");
+    }
+
+    /** The catalog fetches the implementation list once per build: /health names it. */
+    @Test
+    void implementationListIsServedToTheServiceOnly(@TempDir Path folder) throws Exception {
+        String token = "service-token-for-tests-0123456789abcdef";
+        String listed = "{\"build\":\"b1\",\"cards\":[{\"name\":\"Lightning Bolt\",\"passed\":true}]}";
+        try (var out = new GZIPOutputStream(Files.newOutputStream(folder.resolve(Implementations.LIST)))) {
+            out.write(listed.getBytes(StandardCharsets.UTF_8));
+        }
+        Files.writeString(folder.resolve(Implementations.SUMMARY), "{\"build\":\"b1\",\"cards\":1,\"passed\":1}");
+        var engine = new Engine(PIN, false, () -> CARDS, EngineServerTest::echo,
+            new HumanGames(SeatChecks.DECKS, 1), false, token);
+        server = EngineServer.create(0, engine, Implementations.load(folder));
+        server.start();
+        base = "http://localhost:" + server.getAddress().getPort();
+        var summary = json(get("/health")).getAsJsonObject("implementations");
+        assertEquals("b1", summary.get("build").getAsString());
+        assertEquals(1, summary.get("passed").getAsInt());
+        assertEquals(401, get("/v1/service/implementations").statusCode());
+        var response = client.send(HttpRequest.newBuilder(URI.create(base + "/v1/service/implementations"))
+            .header(EngineServer.SERVICE_TOKEN_HEADER, token).build(), HttpResponse.BodyHandlers.ofByteArray());
+        assertEquals(200, response.statusCode());
+        assertEquals("gzip", response.headers().firstValue("Content-Encoding").orElse(""));
+        try (var in = new GZIPInputStream(new ByteArrayInputStream(response.body()))) {
+            assertEquals(listed, new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        }
+        // An engine built without the list says so, and has none to serve.
+        assertFalse(Implementations.load(folder.resolve("missing")).list().isPresent());
+        assertEquals(null, EngineServer.health(engine).implementations());
     }
 
     @Test

@@ -28,6 +28,23 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "games",
         "game_seats",
         "card_images",
+        "catalog_sync_runs",
+        "catalog_revisions",
+        "catalog_source_snapshots",
+        "catalog_changes",
+        "card_concepts",
+        "card_faces",
+        "card_printings",
+        "card_rulings",
+        "card_relations",
+        "card_aliases",
+        "card_tags",
+        "card_tag_links",
+        "engine_cards",
+        "format_versions",
+        "decks",
+        "deck_revisions",
+        "deck_entries",
     }
     command.downgrade(config, "base")
     assert inspect(engine).get_table_names() == ["alembic_version"]

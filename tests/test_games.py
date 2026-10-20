@@ -655,8 +655,8 @@ def test_sysop_inspects_observes_and_plays_any_card(
     ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
     listed = ada.post("/api/v1/practice-games", {"deck_list": "4 Lightning Bolt"})
     assert listed.status_code == 403
-    assert ada.get("/api/v1/cards", q="bolt").status_code == 403
-    assert root.get("/api/v1/cards", q="bolt").json()["names"][0] == ("Lightning Bolt")
+    assert ada.get("/api/v1/engine/cards", q="bolt").status_code == 403
+    assert root.get("/api/v1/engine/cards", q="bolt").json()["names"][0] == ("Lightning Bolt")
     assert root.get("/api/v1/practice-games/options").json()["deck_lists"] is True
 
     unknown = root.post(

@@ -296,7 +296,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.1.1",
+            "default": "0.2.0",
             "title": "Version",
             "type": "string"
           }
@@ -361,6 +361,360 @@
         "title": "CardCounts",
         "type": "object"
       },
+      "CardDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "all_legalities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "All Legalities",
+            "type": "object"
+          },
+          "capabilities": {
+            "additionalProperties": true,
+            "title": "Capabilities",
+            "type": "object"
+          },
+          "color_identity": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Color Identity",
+            "type": "array"
+          },
+          "colors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Colors",
+            "type": "array"
+          },
+          "commander": {
+            "title": "Commander",
+            "type": "boolean"
+          },
+          "companion": {
+            "title": "Companion",
+            "type": "boolean"
+          },
+          "copy_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copy Limit"
+          },
+          "defense": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defense"
+          },
+          "edhrec_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edhrec Rank"
+          },
+          "engine_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Name"
+          },
+          "faces": {
+            "items": {
+              "$ref": "#/components/schemas/FaceSummary"
+            },
+            "title": "Faces",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardImageRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "layout": {
+            "title": "Layout",
+            "type": "string"
+          },
+          "legalities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Legalities",
+            "type": "object"
+          },
+          "loyalty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loyalty"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "mana_value": {
+            "title": "Mana Value",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "oracle_text": {
+            "title": "Oracle Text",
+            "type": "string"
+          },
+          "partner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "printing_count": {
+            "title": "Printing Count",
+            "type": "integer"
+          },
+          "printings": {
+            "items": {
+              "$ref": "#/components/schemas/PrintingSummary"
+            },
+            "title": "Printings",
+            "type": "array"
+          },
+          "produced_mana": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Produced Mana",
+            "type": "array"
+          },
+          "rarity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rarity"
+          },
+          "related": {
+            "items": {
+              "$ref": "#/components/schemas/Related"
+            },
+            "title": "Related",
+            "type": "array"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "review": {
+            "title": "Review",
+            "type": "boolean"
+          },
+          "rulings": {
+            "items": {
+              "$ref": "#/components/schemas/Ruling"
+            },
+            "title": "Rulings",
+            "type": "array"
+          },
+          "set_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Detail"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "text_differs": {
+            "title": "Text Differs",
+            "type": "boolean"
+          },
+          "toughness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toughness"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "layout",
+          "mana_cost",
+          "mana_value",
+          "type_line",
+          "oracle_text",
+          "power",
+          "toughness",
+          "loyalty",
+          "defense",
+          "colors",
+          "color_identity",
+          "keywords",
+          "produced_mana",
+          "faces",
+          "rarity",
+          "set_code",
+          "released_at",
+          "status",
+          "status_reason",
+          "status_detail",
+          "playable",
+          "text_differs",
+          "legalities",
+          "commander",
+          "partner",
+          "companion",
+          "copy_limit",
+          "edhrec_rank",
+          "image",
+          "engine_name",
+          "review",
+          "capabilities",
+          "all_legalities",
+          "printings",
+          "printing_count",
+          "rulings",
+          "tags",
+          "related",
+          "removed"
+        ],
+        "title": "CardDetail",
+        "type": "object"
+      },
       "CardImageInfo": {
         "additionalProperties": false,
         "description": "The printing whose image the cache serves for a name, for crediting its artist.",
@@ -421,6 +775,27 @@
         "title": "CardImageInfo",
         "type": "object"
       },
+      "CardImageRef": {
+        "additionalProperties": false,
+        "description": "The printing whose image stands for the card, and how many faces have their own.",
+        "properties": {
+          "faces": {
+            "default": 0,
+            "title": "Faces",
+            "type": "integer"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "printing_id"
+        ],
+        "title": "CardImageRef",
+        "type": "object"
+      },
       "CardNames": {
         "additionalProperties": false,
         "properties": {
@@ -436,6 +811,1016 @@
           "names"
         ],
         "title": "CardNames",
+        "type": "object"
+      },
+      "CardPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "milliseconds": {
+            "title": "Milliseconds",
+            "type": "integer"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "milliseconds"
+        ],
+        "title": "CardPage",
+        "type": "object"
+      },
+      "CardSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "color_identity": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Color Identity",
+            "type": "array"
+          },
+          "colors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Colors",
+            "type": "array"
+          },
+          "commander": {
+            "title": "Commander",
+            "type": "boolean"
+          },
+          "companion": {
+            "title": "Companion",
+            "type": "boolean"
+          },
+          "copy_limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copy Limit"
+          },
+          "defense": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defense"
+          },
+          "edhrec_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edhrec Rank"
+          },
+          "faces": {
+            "items": {
+              "$ref": "#/components/schemas/FaceSummary"
+            },
+            "title": "Faces",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardImageRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "layout": {
+            "title": "Layout",
+            "type": "string"
+          },
+          "legalities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Legalities",
+            "type": "object"
+          },
+          "loyalty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loyalty"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "mana_value": {
+            "title": "Mana Value",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "oracle_text": {
+            "title": "Oracle Text",
+            "type": "string"
+          },
+          "partner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "produced_mana": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Produced Mana",
+            "type": "array"
+          },
+          "rarity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rarity"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "set_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Code"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "status_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Detail"
+          },
+          "status_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Reason"
+          },
+          "text_differs": {
+            "title": "Text Differs",
+            "type": "boolean"
+          },
+          "toughness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toughness"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "layout",
+          "mana_cost",
+          "mana_value",
+          "type_line",
+          "oracle_text",
+          "power",
+          "toughness",
+          "loyalty",
+          "defense",
+          "colors",
+          "color_identity",
+          "keywords",
+          "produced_mana",
+          "faces",
+          "rarity",
+          "set_code",
+          "released_at",
+          "status",
+          "status_reason",
+          "status_detail",
+          "playable",
+          "text_differs",
+          "legalities",
+          "commander",
+          "partner",
+          "companion",
+          "copy_limit",
+          "edhrec_rank",
+          "image"
+        ],
+        "title": "CardSummary",
+        "type": "object"
+      },
+      "CatalogStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "title": "Cards",
+            "type": "integer"
+          },
+          "format_versions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Format Versions",
+            "type": "object"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncRunInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run At"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "integer"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RevisionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "last_run",
+          "next_run_at",
+          "stale",
+          "format_versions",
+          "playable",
+          "cards"
+        ],
+        "title": "CatalogStatus",
+        "type": "object"
+      },
+      "Coverage": {
+        "additionalProperties": false,
+        "description": "How many cards of each format the engine can play, and why the rest cannot (CAT07).",
+        "properties": {
+          "engine_build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Build"
+          },
+          "formats": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/CoverageRow"
+              },
+              "type": "array"
+            },
+            "title": "Formats",
+            "type": "object"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "required": [
+          "revision",
+          "engine_build",
+          "formats"
+        ],
+        "title": "Coverage",
+        "type": "object"
+      },
+      "CoverageRow": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "title": "Cards",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason",
+          "cards"
+        ],
+        "title": "CoverageRow",
+        "type": "object"
+      },
+      "DeckCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "commander": {
+            "default": 0,
+            "title": "Commander",
+            "type": "integer"
+          },
+          "companion": {
+            "default": 0,
+            "title": "Companion",
+            "type": "integer"
+          },
+          "main": {
+            "default": 0,
+            "title": "Main",
+            "type": "integer"
+          },
+          "maybeboard": {
+            "default": 0,
+            "title": "Maybeboard",
+            "type": "integer"
+          },
+          "sideboard": {
+            "default": 0,
+            "title": "Sideboard",
+            "type": "integer"
+          }
+        },
+        "title": "DeckCounts",
+        "type": "object"
+      },
+      "DeckCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "maxItems": 400,
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Notes",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/DeckSource"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "format"
+        ],
+        "title": "DeckCreate",
+        "type": "object"
+      },
+      "DeckDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "card_count": {
+            "title": "Card Count",
+            "type": "integer"
+          },
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "commanders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Commanders",
+            "type": "array"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/Draft"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "identity": {
+            "title": "Identity",
+            "type": "string"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          },
+          "legal": {
+            "title": "Legal",
+            "type": "boolean"
+          },
+          "notes": {
+            "title": "Notes",
+            "type": "string"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/RevisionSummary"
+            },
+            "title": "Revisions",
+            "type": "array"
+          },
+          "share_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Code"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/Validation"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "link"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "format",
+          "visibility",
+          "card_count",
+          "legal",
+          "playable",
+          "identity",
+          "commanders",
+          "latest_revision",
+          "source",
+          "archived",
+          "deleted_at",
+          "updated_at",
+          "notes",
+          "share_code",
+          "draft",
+          "validation",
+          "revisions",
+          "cards"
+        ],
+        "title": "DeckDetail",
+        "type": "object"
+      },
+      "DeckEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "location": {
+            "default": "main",
+            "enum": [
+              "main",
+              "sideboard",
+              "commander",
+              "companion",
+              "maybeboard"
+            ],
+            "title": "Location",
+            "type": "string"
+          },
+          "printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printing Id"
+          },
+          "quantity": {
+            "maximum": 250.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card_id",
+          "quantity"
+        ],
+        "title": "DeckEntry",
+        "type": "object"
+      },
+      "DeckSource": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Id"
+          },
+          "kind": {
+            "default": "empty",
+            "enum": [
+              "empty",
+              "starter",
+              "duplicate",
+              "imported",
+              "guided"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "starter": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starter"
+          }
+        },
+        "title": "DeckSource",
+        "type": "object"
+      },
+      "DeckSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "card_count": {
+            "title": "Card Count",
+            "type": "integer"
+          },
+          "commanders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Commanders",
+            "type": "array"
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deleted At"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "identity": {
+            "title": "Identity",
+            "type": "string"
+          },
+          "latest_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Revision"
+          },
+          "legal": {
+            "title": "Legal",
+            "type": "boolean"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "link"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "format",
+          "visibility",
+          "card_count",
+          "legal",
+          "playable",
+          "identity",
+          "commanders",
+          "latest_revision",
+          "source",
+          "archived",
+          "deleted_at",
+          "updated_at"
+        ],
+        "title": "DeckSummary",
+        "type": "object"
+      },
+      "DeckUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "private",
+                  "link"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          }
+        },
+        "title": "DeckUpdate",
+        "type": "object"
+      },
+      "Draft": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "entries"
+        ],
+        "title": "Draft",
+        "type": "object"
+      },
+      "DraftSave": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "maxItems": 400,
+            "title": "Entries",
+            "type": "array"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "entries"
+        ],
+        "title": "DraftSave",
+        "type": "object"
+      },
+      "DraftSaved": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/Validation"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "updated_at",
+          "validation",
+          "cards"
+        ],
+        "title": "DraftSaved",
         "type": "object"
       },
       "EngineStatus": {
@@ -461,6 +1846,16 @@
             "default": false,
             "title": "Gameplay Available",
             "type": "boolean"
+          },
+          "implementations": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImplementationList"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "protocol_version": {
             "const": 1,
@@ -537,6 +1932,97 @@
           "request_id"
         ],
         "title": "Error",
+        "type": "object"
+      },
+      "FaceSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "defense": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Defense"
+          },
+          "loyalty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loyalty"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "oracle_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oracle Text"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "toughness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toughness"
+          },
+          "type_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Line"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "FaceSummary",
         "type": "object"
       },
       "Format": {
@@ -858,12 +2344,220 @@
             "type": "string"
           },
           "version": {
-            "default": "0.1.1",
+            "default": "0.2.0",
             "title": "Version",
             "type": "string"
           }
         },
         "title": "Health",
+        "type": "object"
+      },
+      "ImplementationList": {
+        "additionalProperties": false,
+        "description": "The engine's list of the cards it implements: its build ID and counts.",
+        "properties": {
+          "build": {
+            "title": "Build",
+            "type": "string"
+          },
+          "cards": {
+            "title": "Cards",
+            "type": "integer"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "build",
+          "cards",
+          "passed"
+        ],
+        "title": "ImplementationList",
+        "type": "object"
+      },
+      "ImportLine": {
+        "additionalProperties": false,
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "card_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Id"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "location": {
+            "enum": [
+              "main",
+              "sideboard",
+              "commander",
+              "companion",
+              "maybeboard"
+            ],
+            "title": "Location",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printing Id"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "resolved",
+              "ambiguous",
+              "unresolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "text",
+          "quantity",
+          "location",
+          "name",
+          "status"
+        ],
+        "title": "ImportLine",
+        "type": "object"
+      },
+      "ImportPreview": {
+        "additionalProperties": false,
+        "properties": {
+          "ambiguous": {
+            "title": "Ambiguous",
+            "type": "integer"
+          },
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ImportLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "unresolved": {
+            "title": "Unresolved",
+            "type": "integer"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/Validation"
+          }
+        },
+        "required": [
+          "format",
+          "title",
+          "lines",
+          "entries",
+          "unresolved",
+          "ambiguous",
+          "validation",
+          "cards"
+        ],
+        "title": "ImportPreview",
+        "type": "object"
+      },
+      "ImportRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "json_text": {
+            "default": "",
+            "maxLength": 262144,
+            "title": "Json Text",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "maxLength": 65536,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "title": "ImportRequest",
         "type": "object"
       },
       "Me": {
@@ -953,7 +2647,9 @@
                 "admin.roles.administrator",
                 "admin.audit.read",
                 "games.view_concealed",
-                "cards.any"
+                "cards.any",
+                "decks.edit",
+                "catalog.manage"
               ],
               "type": "string"
             },
@@ -1182,6 +2878,184 @@
         "title": "Preferences",
         "type": "object"
       },
+      "PrintingSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "digital": {
+            "title": "Digital",
+            "type": "boolean"
+          },
+          "faces": {
+            "title": "Faces",
+            "type": "integer"
+          },
+          "finishes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Finishes",
+            "type": "array"
+          },
+          "frame": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lang": {
+            "title": "Lang",
+            "type": "string"
+          },
+          "promo": {
+            "title": "Promo",
+            "type": "boolean"
+          },
+          "rarity": {
+            "title": "Rarity",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "title": "Set Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "set_code",
+          "set_name",
+          "collector_number",
+          "lang",
+          "released_at",
+          "rarity",
+          "finishes",
+          "frame",
+          "promo",
+          "digital",
+          "artist",
+          "faces",
+          "removed"
+        ],
+        "title": "PrintingSummary",
+        "type": "object"
+      },
+      "Problem": {
+        "additionalProperties": false,
+        "properties": {
+          "card_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Card Ids",
+            "type": "array"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "format_illegal",
+              "not_released",
+              "not_implemented",
+              "collection_locked",
+              "structure"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "enum": [
+                  "main",
+                  "sideboard",
+                  "commander",
+                  "companion",
+                  "maybeboard"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "remedy": {
+            "title": "Remedy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "kind",
+          "message",
+          "remedy"
+        ],
+        "title": "Problem",
+        "type": "object"
+      },
       "ProfileUpdate": {
         "additionalProperties": false,
         "properties": {
@@ -1284,6 +3158,309 @@
           "database"
         ],
         "title": "Readiness",
+        "type": "object"
+      },
+      "Related": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type_line": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Line"
+          }
+        },
+        "required": [
+          "component",
+          "name",
+          "type_line"
+        ],
+        "title": "Related",
+        "type": "object"
+      },
+      "ReviewAction": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "accept",
+              "suspend",
+              "restore"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ReviewAction",
+        "type": "object"
+      },
+      "ReviewCard": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "changed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Changed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "card",
+          "changed"
+        ],
+        "title": "ReviewCard",
+        "type": "object"
+      },
+      "RevisionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "catalog_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Revision"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "format_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Version"
+          },
+          "legal": {
+            "title": "Legal",
+            "type": "boolean"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "content_hash",
+          "legal",
+          "playable",
+          "format_version",
+          "catalog_revision",
+          "created_at",
+          "format",
+          "entries",
+          "cards"
+        ],
+        "title": "RevisionDetail",
+        "type": "object"
+      },
+      "RevisionInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "additionalProperties": true,
+            "title": "Changes",
+            "type": "object"
+          },
+          "counts": {
+            "additionalProperties": true,
+            "title": "Counts",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "engine_build": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Build"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "engine_build",
+          "counts",
+          "changes"
+        ],
+        "title": "RevisionInfo",
+        "type": "object"
+      },
+      "RevisionSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "catalog_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Revision"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Version"
+          },
+          "legal": {
+            "title": "Legal",
+            "type": "boolean"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "title",
+          "content_hash",
+          "legal",
+          "playable",
+          "format_version",
+          "catalog_revision",
+          "created_at"
+        ],
+        "title": "RevisionSummary",
+        "type": "object"
+      },
+      "Ruling": {
+        "additionalProperties": false,
+        "properties": {
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "published_at": {
+            "format": "date",
+            "title": "Published At",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "published_at",
+          "comment"
+        ],
+        "title": "Ruling",
         "type": "object"
       },
       "SeatChoice": {
@@ -1446,6 +3623,151 @@
         "title": "SessionSummary",
         "type": "object"
       },
+      "SetSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "title": "Cards",
+            "type": "integer"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "type",
+          "released_at",
+          "cards"
+        ],
+        "title": "SetSummary",
+        "type": "object"
+      },
+      "SharedDeck": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/Validation"
+          }
+        },
+        "required": [
+          "title",
+          "format",
+          "owner",
+          "entries",
+          "cards",
+          "validation",
+          "updated_at"
+        ],
+        "title": "SharedDeck",
+        "type": "object"
+      },
+      "StarterDeck": {
+        "additionalProperties": false,
+        "properties": {
+          "card_count": {
+            "title": "Card Count",
+            "type": "integer"
+          },
+          "commanders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Commanders",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "format",
+          "card_count",
+          "commanders",
+          "playable"
+        ],
+        "title": "StarterDeck",
+        "type": "object"
+      },
       "StatusChange": {
         "additionalProperties": false,
         "properties": {
@@ -1477,6 +3799,126 @@
         "title": "StatusChange",
         "type": "object"
       },
+      "SyncQueued": {
+        "additionalProperties": false,
+        "properties": {
+          "due_at": {
+            "format": "date-time",
+            "title": "Due At",
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "due_at"
+        ],
+        "title": "SyncQueued",
+        "type": "object"
+      },
+      "SyncRunInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "next_attempt_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Attempt At"
+          },
+          "revision_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision Id"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "stats": {
+            "additionalProperties": true,
+            "title": "Stats",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "status",
+          "started_at",
+          "finished_at",
+          "error_code",
+          "error_message",
+          "next_attempt_at",
+          "revision_id",
+          "stats"
+        ],
+        "title": "SyncRunInfo",
+        "type": "object"
+      },
       "UserPage": {
         "additionalProperties": false,
         "properties": {
@@ -1504,6 +3946,93 @@
           "next_cursor"
         ],
         "title": "UserPage",
+        "type": "object"
+      },
+      "ValidateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "maxItems": 400,
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "entries"
+        ],
+        "title": "ValidateRequest",
+        "type": "object"
+      },
+      "Validation": {
+        "additionalProperties": false,
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/DeckCounts"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "format_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format Version"
+          },
+          "legal": {
+            "title": "Legal",
+            "type": "boolean"
+          },
+          "playable": {
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/Problem"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "format",
+          "format_version",
+          "legal",
+          "playable",
+          "errors",
+          "warnings",
+          "counts"
+        ],
+        "title": "Validation",
         "type": "object"
       },
       "ValidationError": {
@@ -1579,7 +4108,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.1.1"
+    "version": "0.2.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1726,6 +4255,445 @@
           }
         },
         "summary": "Audit Log"
+      }
+    },
+    "/api/v1/admin/catalog/cards/{card_id}/review": {
+      "post": {
+        "description": "accept: the engine's behaviour is right for today's text. suspend: no new game may start\nwith the card. restore: undo a suspension.",
+        "operationId": "review_card_api_v1_admin_catalog_cards__card_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Review Card"
+      }
+    },
+    "/api/v1/admin/catalog/reviews": {
+      "get": {
+        "description": "Cards whose Oracle text changed since they were certified, and suspended cards.",
+        "operationId": "reviews_api_v1_admin_catalog_reviews_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewCard"
+                  },
+                  "title": "Response Reviews Api V1 Admin Catalog Reviews Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reviews"
+      }
+    },
+    "/api/v1/admin/catalog/runs": {
+      "get": {
+        "operationId": "catalog_runs_api_v1_admin_catalog_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SyncRunInfo"
+                  },
+                  "title": "Response Catalog Runs Api V1 Admin Catalog Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Catalog Runs"
+      }
+    },
+    "/api/v1/admin/catalog/sync": {
+      "post": {
+        "description": "Queues a catalog run now; the worker starts it within seconds.",
+        "operationId": "request_sync_api_v1_admin_catalog_sync_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncQueued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Request Sync"
       }
     },
     "/api/v1/admin/users": {
@@ -3004,8 +5972,2507 @@
     },
     "/api/v1/cards": {
       "get": {
+        "description": "Cards by structured filters and the search syntax together; all must match.",
+        "operationId": "search_cards_api_v1_cards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 500,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
+            "in": "query",
+            "name": "text",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Text"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "colors",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Colors"
+            }
+          },
+          {
+            "in": "query",
+            "name": "colors_mode",
+            "required": false,
+            "schema": {
+              "default": "including",
+              "enum": [
+                "exact",
+                "including",
+                "within"
+              ],
+              "title": "Colors Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "identity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Identity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mv_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mv Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "mv_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mv Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rarity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rarity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "legal",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Legal"
+            }
+          },
+          {
+            "in": "query",
+            "name": "playable",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Playable"
+            }
+          },
+          {
+            "in": "query",
+            "name": "extras",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Extras",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "name",
+              "enum": [
+                "name",
+                "mana_value",
+                "released",
+                "popularity",
+                "color"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "descending",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Descending",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 60,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Search Cards"
+      }
+    },
+    "/api/v1/cards/{card_id}": {
+      "get": {
+        "operationId": "card_detail_api_v1_cards__card_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Card Detail"
+      }
+    },
+    "/api/v1/cards/{card_id}/printings": {
+      "get": {
+        "operationId": "card_printings_api_v1_cards__card_id__printings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PrintingSummary"
+                  },
+                  "title": "Response Card Printings Api V1 Cards  Card Id  Printings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Card Printings"
+      }
+    },
+    "/api/v1/catalog": {
+      "get": {
+        "operationId": "catalog_status_api_v1_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Catalog Status"
+      }
+    },
+    "/api/v1/catalog/coverage": {
+      "get": {
+        "operationId": "coverage_api_v1_catalog_coverage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Coverage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Coverage"
+      }
+    },
+    "/api/v1/decks": {
+      "get": {
+        "operationId": "list_decks_api_v1_decks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "active",
+              "enum": [
+                "active",
+                "archived",
+                "trash"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeckSummary"
+                  },
+                  "title": "Response List Decks Api V1 Decks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Decks"
+      },
+      "post": {
+        "description": "A new deck: empty, from the given entries (an import or a guided build), a copy of a starter\ndeck, or a duplicate of one of the player's own.",
+        "operationId": "create_api_v1_decks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create"
+      }
+    },
+    "/api/v1/decks/import/preview": {
+      "post": {
+        "description": "Reads a text list or a deck file and shows how each line resolves. Saves nothing.",
+        "operationId": "import_preview_api_v1_decks_import_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreview"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Import Preview"
+      }
+    },
+    "/api/v1/decks/starters": {
+      "get": {
+        "operationId": "starters_api_v1_decks_starters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StarterDeck"
+                  },
+                  "title": "Response Starters Api V1 Decks Starters Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Starters"
+      }
+    },
+    "/api/v1/decks/validate": {
+      "post": {
+        "operationId": "validate_entries_api_v1_decks_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Validation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Validate Entries"
+      }
+    },
+    "/api/v1/decks/{deck_id}": {
+      "delete": {
+        "description": "Moves the deck to the trash. Its link stops working; games that used it keep their copy.",
+        "operationId": "delete_api_v1_decks__deck_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete"
+      },
+      "get": {
+        "operationId": "read_deck_api_v1_decks__deck_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Deck"
+      },
+      "patch": {
+        "operationId": "update_deck_api_v1_decks__deck_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Update Deck"
+      }
+    },
+    "/api/v1/decks/{deck_id}/archive": {
+      "post": {
+        "operationId": "archive_api_v1_decks__deck_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Archive"
+      }
+    },
+    "/api/v1/decks/{deck_id}/draft": {
+      "put": {
+        "description": "Autosave. version is the draft version this edit started from.",
+        "operationId": "save_draft_api_v1_decks__deck_id__draft_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftSaved"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save Draft"
+      }
+    },
+    "/api/v1/decks/{deck_id}/export": {
+      "get": {
+        "operationId": "export_deck_api_v1_decks__deck_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "text",
+              "enum": [
+                "text",
+                "json"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export Deck"
+      }
+    },
+    "/api/v1/decks/{deck_id}/restore": {
+      "post": {
+        "operationId": "restore_api_v1_decks__deck_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Restore"
+      }
+    },
+    "/api/v1/decks/{deck_id}/revisions": {
+      "post": {
+        "operationId": "save_revision_api_v1_decks__deck_id__revisions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Save Revision"
+      }
+    },
+    "/api/v1/decks/{deck_id}/revisions/{number}": {
+      "get": {
+        "operationId": "read_revision_api_v1_decks__deck_id__revisions__number__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Revision"
+      }
+    },
+    "/api/v1/decks/{deck_id}/unarchive": {
+      "post": {
+        "operationId": "unarchive_api_v1_decks__deck_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Unarchive"
+      }
+    },
+    "/api/v1/engine/cards": {
+      "get": {
         "description": "Names of cards the engine implements, for SysOp's deck lists (cards.any).",
-        "operationId": "card_names_api_v1_cards_get",
+        "operationId": "card_names_api_v1_engine_cards_get",
         "parameters": [
           {
             "in": "query",
@@ -4290,6 +9757,453 @@
           }
         },
         "summary": "Ready"
+      }
+    },
+    "/api/v1/sets": {
+      "get": {
+        "operationId": "sets_api_v1_sets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SetSummary"
+                  },
+                  "title": "Response Sets Api V1 Sets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Sets"
+      }
+    },
+    "/api/v1/shared-decks/{code}": {
+      "get": {
+        "description": "A deck shared by link, for anyone signed in: its cards, not its notes (DECK11).",
+        "operationId": "read_shared_api_v1_shared_decks__code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedDeck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Shared"
+      }
+    },
+    "/api/v1/shared-decks/{code}/copy": {
+      "post": {
+        "description": "Copies a shared deck into the viewer's own decks, without its owner's notes.",
+        "operationId": "copy_shared_api_v1_shared_decks__code__copy_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Copy Shared"
+      }
+    },
+    "/api/v1/shared-decks/{code}/export": {
+      "get": {
+        "operationId": "export_shared_api_v1_shared_decks__code__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "default": "text",
+              "enum": [
+                "text",
+                "json"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export Shared"
       }
     }
   }

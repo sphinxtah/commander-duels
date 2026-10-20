@@ -1,15 +1,19 @@
 """Relational model. Later milestones add domain-specific tables."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
+    Integer,
     SmallInteger,
     String,
     Text,
@@ -185,6 +189,9 @@ class Game(Base):
     turn_cap: Mapped[int]
     # The engine's result, when the game finished: kind, winner_seat, draw, turns, conceded_seats.
     result: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # What the game started under: the catalog revision and the format's version (T17).
+    catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    format_version: Mapped[int | None]
 
 
 class GameSeat(Base):
@@ -205,6 +212,8 @@ class GameSeat(Base):
     deck: Mapped[str] = mapped_column(String(64))
     # The deck list's cards and commanders, as sent to the engine; null for fixture decks.
     deck_list: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The player's deck revision the seat played, bound for good (DECK01).
+    deck_revision_id: Mapped[UUID | None] = mapped_column(ForeignKey("deck_revisions.id"))
 
 
 class CardImage(Base):
@@ -256,3 +265,420 @@ class ScheduledJob(Base):
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     generation: Mapped[int] = mapped_column(default=0)
     result_code: Mapped[str | None] = mapped_column(String(64))
+
+
+# The card catalog (CAT01–CAT10): Scryfall's bulk data, imported by the worker. Concepts, faces and
+# printings are never deleted: a record Scryfall drops keeps its row with removed_revision set, so
+# no deck loses a card. Rulings, relations, aliases and tags are rebuilt by every import.
+
+CARD_STATUSES = ("catalog_only", "mapped", "implemented", "certified", "suspended", "unsupported")
+BigCount = Integer().with_variant(BigInteger(), "postgresql")
+
+
+class CatalogRevision(Base):
+    """One successful import: the catalog as a whole changes only by a new revision."""
+
+    __tablename__ = "catalog_revisions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    sync_run_id: Mapped[UUID | None] = mapped_column(ForeignKey("catalog_sync_runs.id"))
+    # The engine build whose implementations the statuses were decided against.
+    engine_build: Mapped[str | None] = mapped_column(Text)
+    # Per dataset: source timestamp, SHA-256 and record count.
+    datasets: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    counts: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    changes: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+
+
+class CatalogSyncRun(Base):
+    """One run of the catalog job, scheduled or asked for, with what it did or why it failed."""
+
+    __tablename__ = "catalog_sync_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'succeeded', 'unchanged', 'failed', 'fenced')",
+            name="ck_catalog_sync_runs_status",
+        ),
+        CheckConstraint("trigger IN ('schedule', 'manual')", name="ck_catalog_sync_runs_trigger"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    job_id: Mapped[UUID | None] = mapped_column(ForeignKey("scheduled_jobs.id"), index=True)
+    generation: Mapped[int] = mapped_column(default=0)
+    trigger: Mapped[str] = mapped_column(String(16))
+    requested_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    attempt: Mapped[int] = mapped_column(default=1)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime(), index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    stats: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    # The revision it made. No foreign key: the revision already points at its run.
+    revision_id: Mapped[int | None]
+    next_attempt_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class SourceSnapshot(Base):
+    """A downloaded bulk file: what Scryfall advertised, what arrived and what became of it."""
+
+    __tablename__ = "catalog_source_snapshots"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('downloaded', 'validated', 'applied', 'failed')",
+            name="ck_catalog_source_snapshots_status",
+        ),
+        Index("ix_catalog_source_snapshots_dataset", "dataset", "status"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    sync_run_id: Mapped[UUID] = mapped_column(ForeignKey("catalog_sync_runs.id"), index=True)
+    dataset: Mapped[str] = mapped_column(String(32))
+    source_updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    download_uri: Mapped[str] = mapped_column(Text)
+    compressed_bytes: Mapped[int] = mapped_column(BigCount)
+    decompressed_bytes: Mapped[int | None] = mapped_column(BigCount)
+    # Computed here: it shows the file did not change locally, not who made it.
+    sha256: Mapped[str] = mapped_column(String(64))
+    etag: Mapped[str | None] = mapped_column(Text)
+    last_modified: Mapped[str | None] = mapped_column(Text)
+    records: Mapped[int | None]
+    status: Mapped[str] = mapped_column(String(16))
+    applied_revision: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class CardConcept(Base):
+    """A card as a game piece: one Scryfall Oracle ID, whatever its printings (CAT02). Copy limits
+    count construction_key, so another printing of a card is still that card (T03)."""
+
+    __tablename__ = "card_concepts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('catalog_only', 'mapped', 'implemented', 'certified', 'suspended', "
+            "'unsupported')",
+            name="ck_card_concepts_status",
+        ),
+        CheckConstraint("review IN ('none', 'pending')", name="ck_card_concepts_review"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    oracle_id: Mapped[UUID] = mapped_column(unique=True)
+    name: Mapped[str] = mapped_column(Text)
+    normalized_name: Mapped[str] = mapped_column(Text, index=True)
+    construction_key: Mapped[str] = mapped_column(Text, index=True)
+    layout: Mapped[str] = mapped_column(String(32))
+    # Whether a deck may hold it at all: not tokens, emblems, art cards, planes or schemes.
+    deck_card: Mapped[bool]
+    mana_cost: Mapped[str | None] = mapped_column(Text)
+    mana_value: Mapped[float] = mapped_column(Float)
+    type_line: Mapped[str] = mapped_column(Text)
+    oracle_text: Mapped[str] = mapped_column(Text)
+    power: Mapped[str | None] = mapped_column(Text)
+    toughness: Mapped[str | None] = mapped_column(Text)
+    loyalty: Mapped[str | None] = mapped_column(Text)
+    defense: Mapped[str | None] = mapped_column(Text)
+    colors: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    color_identity: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    color_indicator: Mapped[list[str] | None] = mapped_column(JsonType)
+    # W=1, U=2, B=4, R=8, G=16: colors and identity as bits, for search.
+    colors_mask: Mapped[int] = mapped_column(SmallInteger)
+    identity_mask: Mapped[int] = mapped_column(SmallInteger)
+    keywords: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    produced_mana: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    # Scryfall's legality per format; validation reconciles it with our own rules (CAT05).
+    legalities: Mapped[dict[str, str]] = mapped_column(JsonType, default=dict)
+    reserved: Mapped[bool] = mapped_column(default=False)
+    game_changer: Mapped[bool] = mapped_column(default=False)
+    # Popularity on EDHREC, which changes daily; it is no change to the card.
+    edhrec_rank: Mapped[int | None]
+    # The earliest printing; later than today means not yet released.
+    first_released_at: Mapped[date | None] = mapped_column(Date)
+    # Whether any printing exists on paper (not one printing's games list; CAT05).
+    paper: Mapped[bool] = mapped_column(default=True)
+    # Deck-building roles, read from the card's types and Oracle text at import (catalog.roles).
+    # commander: it may lead a Commander deck. partner: how it pairs with a second commander
+    # ("partner", "partner_with:<name>", "partner_group:<group>", "choose_background",
+    # "background", "doctors_companion", "time_lord_doctor"). copy_limit: null for the format's
+    # limit, 0 for any number (basic lands, "any number of cards named"), else "up to" that many.
+    # activated: it has an activated ability (Zirda's companion condition).
+    commander: Mapped[bool] = mapped_column(default=False)
+    partner: Mapped[str | None] = mapped_column(String(160))
+    companion: Mapped[bool] = mapped_column(default=False)
+    copy_limit: Mapped[int | None] = mapped_column(SmallInteger)
+    activated: Mapped[bool] = mapped_column(default=False)
+    # Lower-case, accent-free text of every face, for search.
+    name_search: Mapped[str] = mapped_column(Text)
+    type_search: Mapped[str] = mapped_column(Text)
+    text_search: Mapped[str] = mapped_column(Text)
+    # Hashes of the fields that decide play, and of the legalities. A changed gameplay hash is a
+    # compatibility review (CAT08).
+    gameplay_hash: Mapped[str] = mapped_column(String(64))
+    legality_hash: Mapped[str] = mapped_column(String(64))
+    # Source fields this version does not map yet, kept as they came (CAT03).
+    extra: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    # CAT07: catalog_only until mapped; only certified cards start games.
+    status: Mapped[str] = mapped_column(String(16), default="catalog_only", index=True)
+    status_reason: Mapped[str | None] = mapped_column(String(32))
+    status_detail: Mapped[str | None] = mapped_column(Text)
+    # The engine card it maps to, and the build that decided its status.
+    engine_name: Mapped[str | None] = mapped_column(Text)
+    engine_build: Mapped[str | None] = mapped_column(Text)
+    # The gameplay hash when it was certified; another one means the Oracle text moved on.
+    certified_hash: Mapped[str | None] = mapped_column(String(64))
+    # The engine's wording differs from today's Oracle text (shown with the card; CAT08).
+    text_differs: Mapped[bool] = mapped_column(default=False)
+    review: Mapped[str] = mapped_column(String(16), default="none")
+    # Separate capabilities: multiplayer, AI, campaign and offline (CAT07).
+    capabilities: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    # The printing shown when a deck names none.
+    default_printing_id: Mapped[UUID | None]
+    first_revision: Mapped[int] = mapped_column(ForeignKey("catalog_revisions.id"))
+    changed_revision: Mapped[int] = mapped_column(ForeignKey("catalog_revisions.id"))
+    removed_revision: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class CardFace(Base):
+    """A face of a card concept: split halves, both sides of a double-faced card, an adventure."""
+
+    __tablename__ = "card_faces"
+    __table_args__ = (UniqueConstraint("concept_id", "position"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    position: Mapped[int] = mapped_column(SmallInteger)
+    name: Mapped[str] = mapped_column(Text)
+    normalized_name: Mapped[str] = mapped_column(Text, index=True)
+    mana_cost: Mapped[str | None] = mapped_column(Text)
+    type_line: Mapped[str | None] = mapped_column(Text)
+    oracle_text: Mapped[str | None] = mapped_column(Text)
+    colors: Mapped[list[str] | None] = mapped_column(JsonType)
+    color_indicator: Mapped[list[str] | None] = mapped_column(JsonType)
+    power: Mapped[str | None] = mapped_column(Text)
+    toughness: Mapped[str | None] = mapped_column(Text)
+    loyalty: Mapped[str | None] = mapped_column(Text)
+    defense: Mapped[str | None] = mapped_column(Text)
+
+
+class CardPrinting(Base):
+    """One printing: set, collector number (text), language, finishes, frame and images."""
+
+    __tablename__ = "card_printings"
+    __table_args__ = (Index("ix_card_printings_set", "set_code", "collector_number"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    scryfall_id: Mapped[UUID] = mapped_column(unique=True)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    set_code: Mapped[str] = mapped_column(String(16))
+    set_name: Mapped[str] = mapped_column(Text)
+    set_type: Mapped[str] = mapped_column(String(32))
+    collector_number: Mapped[str] = mapped_column(String(32))
+    lang: Mapped[str] = mapped_column(String(8))
+    released_at: Mapped[date | None] = mapped_column(Date)
+    rarity: Mapped[str] = mapped_column(String(16))
+    layout: Mapped[str] = mapped_column(String(32))
+    finishes: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    frame: Mapped[str | None] = mapped_column(String(16))
+    frame_effects: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    border_color: Mapped[str | None] = mapped_column(String(16))
+    full_art: Mapped[bool] = mapped_column(default=False)
+    promo: Mapped[bool] = mapped_column(default=False)
+    promo_types: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    digital: Mapped[bool] = mapped_column(default=False)
+    games: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    artist: Mapped[str | None] = mapped_column(Text)
+    illustration_id: Mapped[UUID | None]
+    image_status: Mapped[str | None] = mapped_column(String(32))
+    # Scryfall's image URLs, used as returned (CAT10): the card's own, or one set per face.
+    image_uris: Mapped[dict[str, str] | None] = mapped_column(JsonType)
+    faces: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
+    flavor_name: Mapped[str | None] = mapped_column(Text)
+    printed_name: Mapped[str | None] = mapped_column(Text)
+    extra: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    cosmetic_hash: Mapped[str] = mapped_column(String(64))
+    first_revision: Mapped[int] = mapped_column(ForeignKey("catalog_revisions.id"))
+    changed_revision: Mapped[int] = mapped_column(ForeignKey("catalog_revisions.id"))
+    removed_revision: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class CardRuling(Base):
+    __tablename__ = "card_rulings"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    source: Mapped[str] = mapped_column(String(16))
+    published_at: Mapped[date] = mapped_column(Date)
+    comment: Mapped[str] = mapped_column(Text)
+
+
+class CardRelation(Base):
+    """A related object Scryfall lists with a card: its tokens, meld parts, combo pieces."""
+
+    __tablename__ = "card_relations"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    component: Mapped[str] = mapped_column(String(32))
+    related_scryfall_id: Mapped[UUID]
+    related_name: Mapped[str] = mapped_column(Text)
+    related_type_line: Mapped[str | None] = mapped_column(Text)
+
+
+class CardAlias(Base):
+    """Other names a deck list may use for a card: faces, flavor names, plain-letter spellings."""
+
+    __tablename__ = "card_aliases"
+    __table_args__ = (UniqueConstraint("alias", "concept_id"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    alias: Mapped[str] = mapped_column(Text, index=True)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+
+
+class CardTag(Base):
+    """A Scryfall Tagger oracle tag ("ramp", "spot removal"); tags form a hierarchy."""
+
+    __tablename__ = "card_tags"
+    id: Mapped[UUID] = mapped_column(primary_key=True)
+    slug: Mapped[str] = mapped_column(Text, unique=True)
+    label: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
+    parent_ids: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    aliases: Mapped[list[str]] = mapped_column(JsonType, default=list)
+
+
+class CardTagLink(Base):
+    __tablename__ = "card_tag_links"
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), primary_key=True)
+    tag_id: Mapped[UUID] = mapped_column(ForeignKey("card_tags.id"), primary_key=True, index=True)
+    weight: Mapped[str] = mapped_column(String(16))
+
+
+class CatalogChange(Base):
+    """What one revision changed: a card added, removed, reworded, re-legalled or re-statused."""
+
+    __tablename__ = "catalog_changes"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    revision_id: Mapped[int] = mapped_column(ForeignKey("catalog_revisions.id"), index=True)
+    concept_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))
+    kind: Mapped[str] = mapped_column(String(32))
+    details: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+
+
+class EngineCard(Base):
+    """A card the engine implements, as one engine build exported it, with its automatic gates
+    (CAT09). The catalog's statuses are decided from these rows."""
+
+    __tablename__ = "engine_cards"
+    __table_args__ = (UniqueConstraint("engine_build", "name"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    engine_build: Mapped[str] = mapped_column(String(128), index=True)
+    name: Mapped[str] = mapped_column(Text)
+    normalized_name: Mapped[str] = mapped_column(Text, index=True)
+    class_name: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(String(16))
+    # Its characteristics and rules text as the engine prints them.
+    data: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    gates: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    passed: Mapped[bool]
+
+
+class FormatVersion(Base):
+    """A dated revision of a format's rules and banned list (CAT05, CAT08). Decks are validated
+    against the newest; a game records the one it started under."""
+
+    __tablename__ = "format_versions"
+    __table_args__ = (
+        UniqueConstraint("format", "version"),
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_format_versions_format"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    format: Mapped[str] = mapped_column(String(16))
+    version: Mapped[int]
+    effective_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    # The construction rules this version applies (deck sizes, copy limits, rules revision).
+    rules: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    # Construction keys of the banned cards, and of role-specific bans.
+    banned: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    banned_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+# Decks (DECK01, DECK02): a deck is its owner's. Its draft autosaves, with a version for optimistic
+# concurrency; revisions are immutable copies of a draft, and a game binds to one. Decks are never
+# deleted outright: "deleted" ones wait in the trash, where they can be restored.
+
+DECK_LOCATIONS = ("main", "sideboard", "commander", "companion", "maybeboard")
+
+
+class Deck(Base):
+    __tablename__ = "decks"
+    __table_args__ = (
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_decks_format"),
+        CheckConstraint("visibility IN ('private', 'link')", name="ck_decks_visibility"),
+        CheckConstraint("draft_version >= 1", name="ck_decks_draft_version"),
+        Index("ix_decks_owner", "owner_id", "updated_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(80))
+    format: Mapped[str] = mapped_column(String(16))
+    # private, or link: anyone signed in who has the link may view it (DECK11).
+    visibility: Mapped[str] = mapped_column(String(16), default="private")
+    share_code: Mapped[str | None] = mapped_column(String(32), unique=True)
+    # The owner's notes; never shared, exported only to the owner.
+    notes: Mapped[str] = mapped_column(Text, default="")
+    # The draft: {"entries": [{card_id, printing_id, quantity, location}]}.
+    draft: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    draft_version: Mapped[int] = mapped_column(default=1)
+    draft_hash: Mapped[str] = mapped_column(String(64))
+    # The draft's last validation, so a deck list needs no revalidation.
+    card_count: Mapped[int] = mapped_column(default=0)
+    legal: Mapped[bool] = mapped_column(default=False)
+    playable: Mapped[bool] = mapped_column(default=False)
+    identity: Mapped[str] = mapped_column(String(8), default="")
+    latest_revision: Mapped[int | None]
+    # How it began: empty, imported, duplicated, starter or guided.
+    source: Mapped[str] = mapped_column(String(16), default="empty")
+    archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class DeckRevision(Base):
+    """An immutable copy of a deck: PostgreSQL refuses updates to it and to its entries."""
+
+    __tablename__ = "deck_revisions"
+    __table_args__ = (
+        UniqueConstraint("deck_id", "number"),
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_deck_revisions_format"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"), index=True)
+    number: Mapped[int]
+    format: Mapped[str] = mapped_column(String(16))
+    title: Mapped[str] = mapped_column(String(80))
+    notes: Mapped[str] = mapped_column(Text, default="")
+    content_hash: Mapped[str] = mapped_column(String(64))
+    catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    format_version: Mapped[int | None]
+    legal: Mapped[bool]
+    playable: Mapped[bool]
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class DeckEntryRow(Base):
+    __tablename__ = "deck_entries"
+    __table_args__ = (
+        CheckConstraint("quantity > 0", name="ck_deck_entries_quantity"),
+        CheckConstraint(
+            "location IN ('main', 'sideboard', 'commander', 'companion', 'maybeboard')",
+            name="ck_deck_entries_location",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    revision_id: Mapped[UUID] = mapped_column(ForeignKey("deck_revisions.id"), index=True)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))
+    quantity: Mapped[int]
+    location: Mapped[str] = mapped_column(String(16))

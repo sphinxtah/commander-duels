@@ -133,7 +133,7 @@ function Table({ me }: { me: Me }) {
     }
     const timer = window.setTimeout(() => {
       void client
-        .GET("/api/v1/cards", {
+        .GET("/api/v1/engine/cards", {
           params: { query: { q: query.trim(), limit: 12 } },
         })
         .then(({ data }) => setFound(data?.names ?? []));

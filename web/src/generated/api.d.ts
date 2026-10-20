@@ -21,6 +21,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/catalog/cards/{card_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Card
+         * @description accept: the engine's behaviour is right for today's text. suspend: no new game may start
+         *     with the card. restore: undo a suspension.
+         */
+        post: operations["review_card_api_v1_admin_catalog_cards__card_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reviews
+         * @description Cards whose Oracle text changed since they were certified, and suspended cards.
+         */
+        get: operations["reviews_api_v1_admin_catalog_reviews_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog Runs */
+        get: operations["catalog_runs_api_v1_admin_catalog_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/catalog/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Sync
+         * @description Queues a catalog run now; the worker starts it within seconds.
+         */
+        post: operations["request_sync_api_v1_admin_catalog_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -227,10 +305,318 @@ export interface paths {
             cookie?: never;
         };
         /**
+         * Search Cards
+         * @description Cards by structured filters and the search syntax together; all must match.
+         */
+        get: operations["search_cards_api_v1_cards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Card Detail */
+        get: operations["card_detail_api_v1_cards__card_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cards/{card_id}/printings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Card Printings */
+        get: operations["card_printings_api_v1_cards__card_id__printings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog Status */
+        get: operations["catalog_status_api_v1_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/coverage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coverage */
+        get: operations["coverage_api_v1_catalog_coverage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Decks */
+        get: operations["list_decks_api_v1_decks_get"];
+        put?: never;
+        /**
+         * Create
+         * @description A new deck: empty, from the given entries (an import or a guided build), a copy of a starter
+         *     deck, or a duplicate of one of the player's own.
+         */
+        post: operations["create_api_v1_decks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Preview
+         * @description Reads a text list or a deck file and shows how each line resolves. Saves nothing.
+         */
+        post: operations["import_preview_api_v1_decks_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/starters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Starters */
+        get: operations["starters_api_v1_decks_starters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Validate Entries */
+        post: operations["validate_entries_api_v1_decks_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Deck */
+        get: operations["read_deck_api_v1_decks__deck_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete
+         * @description Moves the deck to the trash. Its link stops working; games that used it keep their copy.
+         */
+        delete: operations["delete_api_v1_decks__deck_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Deck */
+        patch: operations["update_deck_api_v1_decks__deck_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive */
+        post: operations["archive_api_v1_decks__deck_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Draft
+         * @description Autosave. version is the draft version this edit started from.
+         */
+        put: operations["save_draft_api_v1_decks__deck_id__draft_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Deck */
+        get: operations["export_deck_api_v1_decks__deck_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["restore_api_v1_decks__deck_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Revision */
+        post: operations["save_revision_api_v1_decks__deck_id__revisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/revisions/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Revision */
+        get: operations["read_revision_api_v1_decks__deck_id__revisions__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unarchive */
+        post: operations["unarchive_api_v1_decks__deck_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/engine/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
          * Card Names
          * @description Names of cards the engine implements, for SysOp's deck lists (cards.any).
          */
-        get: operations["card_names_api_v1_cards_get"];
+        get: operations["card_names_api_v1_engine_cards_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -478,6 +864,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sets */
+        get: operations["sets_api_v1_sets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shared-decks/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Shared
+         * @description A deck shared by link, for anyone signed in: its cards, not its notes (DECK11).
+         */
+        get: operations["read_shared_api_v1_shared_decks__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shared-decks/{code}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Copy Shared
+         * @description Copies a shared deck into the viewer's own decks, without its owner's notes.
+         */
+        post: operations["copy_shared_api_v1_shared_decks__code__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shared-decks/{code}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Shared */
+        get: operations["export_shared_api_v1_shared_decks__code__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -585,7 +1045,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.1.1
+             * @default 0.2.0
              */
             version: string;
         };
@@ -612,6 +1072,99 @@ export interface components {
             /** Printings */
             printings: number;
         };
+        /** CardDetail */
+        CardDetail: {
+            /** All Legalities */
+            all_legalities: {
+                [key: string]: string;
+            };
+            /** Capabilities */
+            capabilities: {
+                [key: string]: unknown;
+            };
+            /** Color Identity */
+            color_identity: string[];
+            /** Colors */
+            colors: string[];
+            /** Commander */
+            commander: boolean;
+            /** Companion */
+            companion: boolean;
+            /** Copy Limit */
+            copy_limit: number | null;
+            /** Defense */
+            defense: string | null;
+            /** Edhrec Rank */
+            edhrec_rank: number | null;
+            /** Engine Name */
+            engine_name: string | null;
+            /** Faces */
+            faces: components["schemas"]["FaceSummary"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            image: components["schemas"]["CardImageRef"] | null;
+            /** Keywords */
+            keywords: string[];
+            /** Layout */
+            layout: string;
+            /** Legalities */
+            legalities: {
+                [key: string]: string;
+            };
+            /** Loyalty */
+            loyalty: string | null;
+            /** Mana Cost */
+            mana_cost: string | null;
+            /** Mana Value */
+            mana_value: number;
+            /** Name */
+            name: string;
+            /** Oracle Text */
+            oracle_text: string;
+            /** Partner */
+            partner: string | null;
+            /** Playable */
+            playable: boolean;
+            /** Power */
+            power: string | null;
+            /** Printing Count */
+            printing_count: number;
+            /** Printings */
+            printings: components["schemas"]["PrintingSummary"][];
+            /** Produced Mana */
+            produced_mana: string[];
+            /** Rarity */
+            rarity: string | null;
+            /** Related */
+            related: components["schemas"]["Related"][];
+            /** Released At */
+            released_at: string | null;
+            /** Removed */
+            removed: boolean;
+            /** Review */
+            review: boolean;
+            /** Rulings */
+            rulings: components["schemas"]["Ruling"][];
+            /** Set Code */
+            set_code: string | null;
+            /** Status */
+            status: string;
+            /** Status Detail */
+            status_detail: string | null;
+            /** Status Reason */
+            status_reason: string | null;
+            /** Tags */
+            tags: string[];
+            /** Text Differs */
+            text_differs: boolean;
+            /** Toughness */
+            toughness: string | null;
+            /** Type Line */
+            type_line: string;
+        };
         /**
          * CardImageInfo
          * @description The printing whose image the cache serves for a name, for crediting its artist.
@@ -631,10 +1184,361 @@ export interface components {
              */
             status: "found" | "missing";
         };
+        /**
+         * CardImageRef
+         * @description The printing whose image stands for the card, and how many faces have their own.
+         */
+        CardImageRef: {
+            /**
+             * Faces
+             * @default 0
+             */
+            faces: number;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+        };
         /** CardNames */
         CardNames: {
             /** Names */
             names: string[];
+        };
+        /** CardPage */
+        CardPage: {
+            /** Items */
+            items: components["schemas"]["CardSummary"][];
+            /** Milliseconds */
+            milliseconds: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** CardSummary */
+        CardSummary: {
+            /** Color Identity */
+            color_identity: string[];
+            /** Colors */
+            colors: string[];
+            /** Commander */
+            commander: boolean;
+            /** Companion */
+            companion: boolean;
+            /** Copy Limit */
+            copy_limit: number | null;
+            /** Defense */
+            defense: string | null;
+            /** Edhrec Rank */
+            edhrec_rank: number | null;
+            /** Faces */
+            faces: components["schemas"]["FaceSummary"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            image: components["schemas"]["CardImageRef"] | null;
+            /** Keywords */
+            keywords: string[];
+            /** Layout */
+            layout: string;
+            /** Legalities */
+            legalities: {
+                [key: string]: string;
+            };
+            /** Loyalty */
+            loyalty: string | null;
+            /** Mana Cost */
+            mana_cost: string | null;
+            /** Mana Value */
+            mana_value: number;
+            /** Name */
+            name: string;
+            /** Oracle Text */
+            oracle_text: string;
+            /** Partner */
+            partner: string | null;
+            /** Playable */
+            playable: boolean;
+            /** Power */
+            power: string | null;
+            /** Produced Mana */
+            produced_mana: string[];
+            /** Rarity */
+            rarity: string | null;
+            /** Released At */
+            released_at: string | null;
+            /** Set Code */
+            set_code: string | null;
+            /** Status */
+            status: string;
+            /** Status Detail */
+            status_detail: string | null;
+            /** Status Reason */
+            status_reason: string | null;
+            /** Text Differs */
+            text_differs: boolean;
+            /** Toughness */
+            toughness: string | null;
+            /** Type Line */
+            type_line: string;
+        };
+        /** CatalogStatus */
+        CatalogStatus: {
+            /** Cards */
+            cards: number;
+            /** Format Versions */
+            format_versions: {
+                [key: string]: number;
+            };
+            last_run: components["schemas"]["SyncRunInfo"] | null;
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Playable */
+            playable: number;
+            revision: components["schemas"]["RevisionInfo"] | null;
+            /** Stale */
+            stale: boolean;
+        };
+        /**
+         * Coverage
+         * @description How many cards of each format the engine can play, and why the rest cannot (CAT07).
+         */
+        Coverage: {
+            /** Engine Build */
+            engine_build: string | null;
+            /** Formats */
+            formats: {
+                [key: string]: components["schemas"]["CoverageRow"][];
+            };
+            /** Revision */
+            revision: number | null;
+        };
+        /** CoverageRow */
+        CoverageRow: {
+            /** Cards */
+            cards: number;
+            /** Reason */
+            reason: string | null;
+            /** Status */
+            status: string;
+        };
+        /** DeckCounts */
+        DeckCounts: {
+            /**
+             * Commander
+             * @default 0
+             */
+            commander: number;
+            /**
+             * Companion
+             * @default 0
+             */
+            companion: number;
+            /**
+             * Main
+             * @default 0
+             */
+            main: number;
+            /**
+             * Maybeboard
+             * @default 0
+             */
+            maybeboard: number;
+            /**
+             * Sideboard
+             * @default 0
+             */
+            sideboard: number;
+        };
+        /** DeckCreate */
+        DeckCreate: {
+            /** Entries */
+            entries?: components["schemas"]["DeckEntry"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            source?: components["schemas"]["DeckSource"];
+            /** Title */
+            title: string;
+        };
+        /** DeckDetail */
+        DeckDetail: {
+            /** Archived */
+            archived: boolean;
+            /** Card Count */
+            card_count: number;
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /** Commanders */
+            commanders: string[];
+            /** Deleted At */
+            deleted_at: string | null;
+            draft: components["schemas"]["Draft"];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Identity */
+            identity: string;
+            /** Latest Revision */
+            latest_revision: number | null;
+            /** Legal */
+            legal: boolean;
+            /** Notes */
+            notes: string;
+            /** Playable */
+            playable: boolean;
+            /** Revisions */
+            revisions: components["schemas"]["RevisionSummary"][];
+            /** Share Code */
+            share_code: string | null;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            validation: components["schemas"]["Validation"];
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "link";
+        };
+        /** DeckEntry */
+        DeckEntry: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /**
+             * Location
+             * @default main
+             * @enum {string}
+             */
+            location: "main" | "sideboard" | "commander" | "companion" | "maybeboard";
+            /** Printing Id */
+            printing_id?: string | null;
+            /** Quantity */
+            quantity: number;
+        };
+        /** DeckSource */
+        DeckSource: {
+            /** Deck Id */
+            deck_id?: string | null;
+            /**
+             * Kind
+             * @default empty
+             * @enum {string}
+             */
+            kind: "empty" | "starter" | "duplicate" | "imported" | "guided";
+            /** Starter */
+            starter?: string | null;
+        };
+        /** DeckSummary */
+        DeckSummary: {
+            /** Archived */
+            archived: boolean;
+            /** Card Count */
+            card_count: number;
+            /** Commanders */
+            commanders: string[];
+            /** Deleted At */
+            deleted_at: string | null;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Identity */
+            identity: string;
+            /** Latest Revision */
+            latest_revision: number | null;
+            /** Legal */
+            legal: boolean;
+            /** Playable */
+            playable: boolean;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "private" | "link";
+        };
+        /** DeckUpdate */
+        DeckUpdate: {
+            /** Notes */
+            notes?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Visibility */
+            visibility?: ("private" | "link") | null;
+        };
+        /** Draft */
+        Draft: {
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /** Version */
+            version: number;
+        };
+        /** DraftSave */
+        DraftSave: {
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /** Version */
+            version: number;
+        };
+        /** DraftSaved */
+        DraftSaved: {
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            validation: components["schemas"]["Validation"];
+            /** Version */
+            version: number;
         };
         /**
          * EngineStatus
@@ -652,6 +1556,7 @@ export interface components {
              * @default false
              */
             gameplay_available: boolean;
+            implementations?: components["schemas"]["ImplementationList"] | null;
             /**
              * Protocol Version
              * @default 1
@@ -683,6 +1588,25 @@ export interface components {
             names?: string[] | null;
             /** Request Id */
             request_id: string;
+        };
+        /** FaceSummary */
+        FaceSummary: {
+            /** Defense */
+            defense?: string | null;
+            /** Loyalty */
+            loyalty?: string | null;
+            /** Mana Cost */
+            mana_cost?: string | null;
+            /** Name */
+            name: string;
+            /** Oracle Text */
+            oracle_text?: string | null;
+            /** Power */
+            power?: string | null;
+            /** Toughness */
+            toughness?: string | null;
+            /** Type Line */
+            type_line?: string | null;
         };
         /** Format */
         Format: {
@@ -810,9 +1734,89 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.1.1
+             * @default 0.2.0
              */
             version: string;
+        };
+        /**
+         * ImplementationList
+         * @description The engine's list of the cards it implements: its build ID and counts.
+         */
+        ImplementationList: {
+            /** Build */
+            build: string;
+            /** Cards */
+            cards: number;
+            /** Passed */
+            passed: number;
+        };
+        /** ImportLine */
+        ImportLine: {
+            /** Candidates */
+            candidates?: components["schemas"]["CardSummary"][];
+            /** Card Id */
+            card_id?: string | null;
+            /** Line */
+            line: number;
+            /**
+             * Location
+             * @enum {string}
+             */
+            location: "main" | "sideboard" | "commander" | "companion" | "maybeboard";
+            /** Name */
+            name: string;
+            /** Printing Id */
+            printing_id?: string | null;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "resolved" | "ambiguous" | "unresolved";
+            /** Text */
+            text: string;
+        };
+        /** ImportPreview */
+        ImportPreview: {
+            /** Ambiguous */
+            ambiguous: number;
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Lines */
+            lines: components["schemas"]["ImportLine"][];
+            /** Title */
+            title: string | null;
+            /** Unresolved */
+            unresolved: number;
+            validation: components["schemas"]["Validation"];
+        };
+        /** ImportRequest */
+        ImportRequest: {
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Json Text
+             * @default
+             */
+            json_text: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
         };
         /**
          * Me
@@ -854,7 +1858,7 @@ export interface components {
              */
             onboarding: "handle" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -938,6 +1942,60 @@ export interface components {
              */
             reduced_motion: boolean;
         };
+        /** PrintingSummary */
+        PrintingSummary: {
+            /** Artist */
+            artist: string | null;
+            /** Collector Number */
+            collector_number: string;
+            /** Digital */
+            digital: boolean;
+            /** Faces */
+            faces: number;
+            /** Finishes */
+            finishes: string[];
+            /** Frame */
+            frame: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Lang */
+            lang: string;
+            /** Promo */
+            promo: boolean;
+            /** Rarity */
+            rarity: string;
+            /** Released At */
+            released_at: string | null;
+            /** Removed */
+            removed: boolean;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
+        };
+        /** Problem */
+        Problem: {
+            /** Card Ids */
+            card_ids?: string[];
+            /** Code */
+            code: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "format_illegal" | "not_released" | "not_implemented" | "collection_locked" | "structure";
+            /** Location */
+            location?: ("main" | "sideboard" | "commander" | "companion" | "maybeboard") | null;
+            /** Message */
+            message: string;
+            /** Quantity */
+            quantity?: number | null;
+            /** Remedy */
+            remedy: string;
+        };
         /** ProfileUpdate */
         ProfileUpdate: {
             /** Avatar */
@@ -962,6 +2020,123 @@ export interface components {
              * @enum {string}
              */
             status: "ready" | "not_ready";
+        };
+        /** Related */
+        Related: {
+            /** Component */
+            component: string;
+            /** Name */
+            name: string;
+            /** Type Line */
+            type_line: string | null;
+        };
+        /** ReviewAction */
+        ReviewAction: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "accept" | "suspend" | "restore";
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** ReviewCard */
+        ReviewCard: {
+            card: components["schemas"]["CardSummary"];
+            /** Changed */
+            changed: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** RevisionDetail */
+        RevisionDetail: {
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /** Catalog Revision */
+            catalog_revision: number | null;
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Format Version */
+            format_version: number | null;
+            /** Legal */
+            legal: boolean;
+            /** Number */
+            number: number;
+            /** Playable */
+            playable: boolean;
+            /** Title */
+            title: string;
+        };
+        /** RevisionInfo */
+        RevisionInfo: {
+            /** Changes */
+            changes: {
+                [key: string]: unknown;
+            };
+            /** Counts */
+            counts: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Engine Build */
+            engine_build: string | null;
+            /** Id */
+            id: number;
+        };
+        /** RevisionSummary */
+        RevisionSummary: {
+            /** Catalog Revision */
+            catalog_revision: number | null;
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Format Version */
+            format_version: number | null;
+            /** Legal */
+            legal: boolean;
+            /** Number */
+            number: number;
+            /** Playable */
+            playable: boolean;
+            /** Title */
+            title: string;
+        };
+        /** Ruling */
+        Ruling: {
+            /** Comment */
+            comment: string;
+            /**
+             * Published At
+             * Format: date
+             */
+            published_at: string;
+            /** Source */
+            source: string;
         };
         /**
          * SeatChoice
@@ -1043,6 +2218,61 @@ export interface components {
             /** User Agent */
             user_agent: string | null;
         };
+        /** SetSummary */
+        SetSummary: {
+            /** Cards */
+            cards: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Released At */
+            released_at: string | null;
+            /** Type */
+            type: string;
+        };
+        /** SharedDeck */
+        SharedDeck: {
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Owner */
+            owner: string;
+            /** Title */
+            title: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            validation: components["schemas"]["Validation"];
+        };
+        /** StarterDeck */
+        StarterDeck: {
+            /** Card Count */
+            card_count: number;
+            /** Commanders */
+            commanders: string[];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Name */
+            name: string;
+            /** Playable */
+            playable: boolean;
+            /** Title */
+            title: string;
+        };
         /** StatusChange */
         StatusChange: {
             /** Reason */
@@ -1053,12 +2283,85 @@ export interface components {
              */
             status: "active" | "denied" | "disabled";
         };
+        /** SyncQueued */
+        SyncQueued: {
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+        };
+        /** SyncRunInfo */
+        SyncRunInfo: {
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Revision Id */
+            revision_id: number | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Trigger */
+            trigger: string;
+        };
         /** UserPage */
         UserPage: {
             /** Items */
             items: components["schemas"]["AdminUser"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /** ValidateRequest */
+        ValidateRequest: {
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+        };
+        /** Validation */
+        Validation: {
+            counts: components["schemas"]["DeckCounts"];
+            /** Errors */
+            errors: components["schemas"]["Problem"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Format Version */
+            format_version: number | null;
+            /** Legal */
+            legal: boolean;
+            /** Playable */
+            playable: boolean;
+            /** Warnings */
+            warnings: components["schemas"]["Problem"][];
         };
         /** ValidationError */
         ValidationError: {
@@ -1167,6 +2470,382 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    review_card_api_v1_admin_catalog_cards__card_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reviews_api_v1_admin_catalog_reviews_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewCard"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    catalog_runs_api_v1_admin_catalog_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncRunInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    request_sync_api_v1_admin_catalog_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncQueued"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */
@@ -2229,7 +3908,1916 @@ export interface operations {
             };
         };
     };
-    card_names_api_v1_cards_get: {
+    search_cards_api_v1_cards_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                name?: string | null;
+                text?: string | null;
+                type?: string | null;
+                colors?: string | null;
+                colors_mode?: "exact" | "including" | "within";
+                identity?: string | null;
+                mv_min?: number | null;
+                mv_max?: number | null;
+                rarity?: string | null;
+                set?: string | null;
+                legal?: string | null;
+                playable?: boolean | null;
+                extras?: boolean;
+                sort?: "name" | "mana_value" | "released" | "popularity" | "color";
+                descending?: boolean;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    card_detail_api_v1_cards__card_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    card_printings_api_v1_cards__card_id__printings_get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrintingSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    catalog_status_api_v1_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    coverage_api_v1_catalog_coverage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Coverage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    list_decks_api_v1_decks_get: {
+        parameters: {
+            query?: {
+                view?: "active" | "archived" | "trash";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    create_api_v1_decks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeckCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    import_preview_api_v1_decks_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportPreview"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    starters_api_v1_decks_starters_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarterDeck"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    validate_entries_api_v1_decks_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Validation"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_deck_api_v1_decks__deck_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_decks__deck_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    update_deck_api_v1_decks__deck_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeckUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    archive_api_v1_decks__deck_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_draft_api_v1_decks__deck_id__draft_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftSaved"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    export_deck_api_v1_decks__deck_id__export_get: {
+        parameters: {
+            query?: {
+                kind?: "text" | "json";
+            };
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    restore_api_v1_decks__deck_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_revision_api_v1_decks__deck_id__revisions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_revision_api_v1_decks__deck_id__revisions__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    unarchive_api_v1_decks__deck_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    card_names_api_v1_engine_cards_get: {
         parameters: {
             query: {
                 q: string;
@@ -3356,6 +6944,380 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Readiness"];
+                };
+            };
+        };
+    };
+    sets_api_v1_sets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_shared_api_v1_shared_decks__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedDeck"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    copy_shared_api_v1_shared_decks__code__copy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    export_shared_api_v1_shared_decks__code__export_get: {
+        parameters: {
+            query?: {
+                kind?: "text" | "json";
+            };
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

@@ -87,6 +87,14 @@ class CardCounts(Contract):
     distinct_names: int
 
 
+class ImplementationList(Contract):
+    """The engine's list of the cards it implements: its build ID and counts."""
+
+    build: str
+    cards: int
+    passed: int
+
+
 class EngineStatus(Contract):
     """Engine /health, passed through. "unavailable" means the engine is unreachable or invalid."""
 
@@ -98,6 +106,7 @@ class EngineStatus(Contract):
     cards: CardCounts | None = None
     bot_match_enabled: bool = False
     service_games_enabled: bool = False
+    implementations: ImplementationList | None = None
 
 
 Role = Literal["player", "moderator", "content_editor", "administrator", "sysop"]
@@ -114,6 +123,8 @@ Permission = Literal[
     "admin.audit.read",
     "games.view_concealed",
     "cards.any",
+    "decks.edit",
+    "catalog.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled"]
@@ -250,9 +261,11 @@ DECK_LIST = Field(
 
 
 class SeatChoice(Contract):
-    """A bot seat's deck: a fixture deck of the game's format, or a deck list (SysOp)."""
+    """A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck
+    list (SysOp)."""
 
     deck: FixtureDeck | None = None
+    deck_id: UUID | None = None
     deck_list: str | None = DECK_LIST
 
 
@@ -261,6 +274,9 @@ class PracticeGameRequest(Contract):
 
     format: GameFormatId = "legacy"
     deck: FixtureDeck | None = None
+    deck_id: UUID | None = Field(
+        default=None, description="One of your own decks: the game binds to a revision of it."
+    )
     deck_list: str | None = DECK_LIST
     bots: list[SeatChoice] | None = Field(
         default=None,
@@ -283,6 +299,9 @@ class PracticeFormat(Contract):
 class PracticeOptions(Contract):
     formats: list[PracticeFormat]
     deck_lists: bool = Field(description="Whether this account may seat deck lists (cards.any).")
+    own_decks: bool = Field(
+        default=False, description="Whether this account may play its own decks (decks.edit)."
+    )
 
 
 class GameSeat(Contract):

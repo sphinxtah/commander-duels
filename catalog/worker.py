@@ -4,12 +4,14 @@ from datetime import UTC, datetime, timedelta
 from threading import Event
 from uuid import UUID
 
+import httpx
 from sqlalchemy import Engine, and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from api.config import Settings
 from api.database import build_engine
 from api.models import ScheduledJob
+from catalog import sync
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,8 @@ def claim(engine: Engine, now: datetime) -> tuple[UUID, int, str] | None:
 
 
 def finish(engine: Engine, job_id: UUID, generation: int, kind: str, now: datetime) -> bool:
-    # Only a bounded infrastructure probe is supported. Never fake a successful catalog import.
+    # The health probe completes at once; an unknown kind fails. Catalog syncs settle through
+    # catalog.sync, which never records an import that did not happen.
     with engine.begin() as connection:
         result = connection.execute(
             update(ScheduledJob)
@@ -58,6 +61,24 @@ def finish(engine: Engine, job_id: UUID, generation: int, kind: str, now: dateti
         return result.rowcount == 1
 
 
+def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
+    """One iteration: keep the catalog schedule queued, then run one due job."""
+    sync.ensure_scheduled(engine, config, datetime.now(UTC))
+    job = claim(engine, datetime.now(UTC))
+    if job is None:
+        return
+    job_id, generation, kind = job
+    if kind != sync.KIND:
+        finish(engine, *job, datetime.now(UTC))
+        return
+    with Session(engine) as session:
+        payload = session.scalar(select(ScheduledJob.payload).where(ScheduledJob.id == job_id))
+    claimed = sync.Claimed(job_id, generation, dict(payload or {}))
+    outcome = sync.handle(engine, config, client, claimed)
+    if not sync.settle(engine, claimed, outcome, datetime.now(UTC)):
+        logger.warning("Catalog job %s was taken over before it settled", job_id)
+
+
 def main() -> None:
     config = Settings()
     logging.basicConfig(level=config.log_level)
@@ -68,14 +89,15 @@ def main() -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopped.set())
     try:
-        while not stopped.is_set():
-            try:
-                job = claim(engine, datetime.now(UTC))
-                if job:
-                    finish(engine, *job, datetime.now(UTC))
-            except Exception:
-                logger.error("Worker iteration failed; check database connectivity and migrations")
-            stopped.wait(config.worker_poll_seconds)
+        with httpx.Client(timeout=30.0, trust_env=False, follow_redirects=False) as client:
+            while not stopped.is_set():
+                try:
+                    work(engine, config, client)
+                except Exception:
+                    logger.exception(
+                        "Worker iteration failed; check database connectivity and migrations"
+                    )
+                stopped.wait(config.worker_poll_seconds)
     finally:
         engine.dispose()
 

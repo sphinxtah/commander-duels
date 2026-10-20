@@ -1,0 +1,1810 @@
+{
+ "build": "test-build-1",
+ "xmage": "xmage_1.4.62V1",
+ "cards": [
+  {
+   "name": "Adventurous Eater",
+   "class": "mage.cards.a.AdventurousEater",
+   "kind": "adventure",
+   "set": "SOS",
+   "number": "72",
+   "mana_cost": "{B}{*}{2}{B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human",
+    "Warlock"
+   ],
+   "supertypes": [],
+   "rules": [
+    "Sorcery &mdash; Have a Bite {B} &mdash; Put a +1/+1 counter on target creature. You gain 1 life.",
+    "{this} enters prepared."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "2"
+  },
+  {
+   "name": "Akki Lavarunner",
+   "class": "mage.cards.a.AkkiLavarunner",
+   "kind": "flip",
+   "set": "CHK",
+   "number": "153",
+   "mana_cost": "{3}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Goblin",
+    "Warrior"
+   ],
+   "supertypes": [],
+   "rules": [
+    "Haste",
+    "Whenever {this} deals damage to an opponent, flip it."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "1"
+  },
+  {
+   "name": "Birds of Paradise",
+   "class": "mage.cards.b.BirdsOfParadise",
+   "kind": "normal",
+   "set": "RAV",
+   "number": "153",
+   "mana_cost": "{G}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Bird"
+   ],
+   "supertypes": [],
+   "rules": [
+    "Flying",
+    "{T}: Add one mana of any color."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "1"
+  },
+  {
+   "name": "Bjorna, Nightfall Alchemist",
+   "class": "mage.cards.b.BjornaNightfallAlchemist",
+   "kind": "normal",
+   "set": "SLD",
+   "number": "344",
+   "mana_cost": "{U}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "{T}, Sacrifice an artifact: {this} deals 1 damage to target creature. Goad that creature.",
+    "Partner&mdash;Friends forever <i>(You can have two commanders if both have this ability.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "3"
+  },
+  {
+   "name": "Black Lotus",
+   "class": "mage.cards.b.BlackLotus",
+   "kind": "normal",
+   "set": "2ED",
+   "number": "233",
+   "mana_cost": "{0}",
+   "types": [
+    "Artifact"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "{T}, Sacrifice {this}: Add three mana of any one color."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Bonecrusher Giant",
+   "class": "mage.cards.b.BonecrusherGiant",
+   "kind": "adventure",
+   "set": "ELD",
+   "number": "115",
+   "mana_cost": "{1}{R}{*}{2}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Giant"
+   ],
+   "supertypes": [],
+   "rules": [
+    "Adventure Instant &mdash; Stomp {1}{R} &mdash; Damage can't be prevented this turn. {this} deals 2 damage to any target. <i>(Then exile this card. You may cast the creature later from exile.)</i>",
+    "Whenever {this} becomes the target of a spell, {this} deals 2 damage to that spell's controller."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "4",
+   "toughness": "3"
+  },
+  {
+   "name": "Brainstorm",
+   "class": "mage.cards.b.Brainstorm",
+   "kind": "normal",
+   "set": "VMA",
+   "number": "58",
+   "mana_cost": "{U}",
+   "types": [
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Draw three cards, then put two cards from your hand on top of your library in any order."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Brightglass Gearhulk",
+   "class": "mage.cards.b.BrightglassGearhulk",
+   "kind": "normal",
+   "set": "DFT",
+   "number": "191",
+   "mana_cost": "{G}{G}{W}{W}",
+   "types": [
+    "Artifact",
+    "Creature"
+   ],
+   "subtypes": [
+    "Construct"
+   ],
+   "supertypes": [],
+   "rules": [
+    "First strike",
+    "Trample",
+    "When {this} enters, you may search your library for up to two artifact, creature, and/or enchantment cards with mana value 1 or less, reveal them, put them into your hand, then shuffle."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "4",
+   "toughness": "4"
+  },
+  {
+   "name": "Bruna, the Fading Light",
+   "class": "mage.cards.b.BrunaTheFadingLight",
+   "kind": "normal",
+   "set": "EMN",
+   "number": "15a",
+   "mana_cost": "{5}{W}{W}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Angel",
+    "Horror"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "When you cast this spell, you may return target Angel or Human creature card from your graveyard to the battlefield.",
+    "Flying",
+    "Vigilance",
+    "<i>(Melds with Gisela, the Broken Blade.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "5",
+   "toughness": "7"
+  },
+  {
+   "name": "Cecily, Haunted Mage",
+   "class": "mage.cards.c.CecilyHauntedMage",
+   "kind": "normal",
+   "set": "SLD",
+   "number": "343",
+   "mana_cost": "{1}{U}{B}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human",
+    "Wizard"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Your maximum hand size is eleven.",
+    "Whenever {this} attacks, you draw a card and you lose 1 life. Then if you have eleven or more cards in your hand, you may cast an instant or sorcery spell from your hand without paying its mana cost.",
+    "Partner&mdash;Friends forever <i>(You can have two commanders if both have this ability.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "5"
+  },
+  {
+   "name": "Counterspell",
+   "class": "mage.cards.c.Counterspell",
+   "kind": "normal",
+   "set": "3ED",
+   "number": "54",
+   "mana_cost": "{U}{U}",
+   "types": [
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Counter target spell."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Dark Ritual",
+   "class": "mage.cards.d.DarkRitual",
+   "kind": "normal",
+   "set": "J21",
+   "number": "783",
+   "mana_cost": "{B}",
+   "types": [
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Add {B}{B}{B}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Delver of Secrets",
+   "class": "mage.cards.d.DelverOfSecrets",
+   "kind": "modal_dfc",
+   "set": "ISD",
+   "number": "51",
+   "mana_cost": "{U}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human",
+    "Wizard"
+   ],
+   "supertypes": [],
+   "rules": [
+    "At the beginning of your upkeep, look at the top card of your library. You may reveal that card. If an instant or sorcery card is revealed this way, transform {this}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "1"
+  },
+  {
+   "name": "Dockside Extortionist",
+   "class": "mage.cards.d.DocksideExtortionist",
+   "kind": "normal",
+   "set": "TLE",
+   "number": "28",
+   "mana_cost": "{1}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Goblin",
+    "Pirate"
+   ],
+   "supertypes": [],
+   "rules": [
+    "When {this} enters, create X Treasure tokens, where X is the number of artifacts and enchantments your opponents control."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "2"
+  },
+  {
+   "name": "Everythingamajig",
+   "class": "mage.cards.e.EverythingamajigB",
+   "kind": "normal",
+   "set": "UST",
+   "number": "147b",
+   "mana_cost": "{5}",
+   "types": [
+    "Artifact"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "{2}, {T}: Draw a card. Activate only if you have no cards in hand.",
+    "{8}, {T}: You gain 10 life.",
+    "{4}, {T}, Sacrifice {this}: You may put a silver-bordered permanent card from your hand onto the battlefield."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Fire // Ice",
+   "class": "mage.cards.f.FireIce",
+   "kind": "split",
+   "set": "UMA",
+   "number": "225",
+   "mana_cost": "{1}{R}{*}{1}{U}",
+   "types": [
+    "Instant",
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "{this} deals 2 damage divided as you choose among one or two targets.",
+    "Tap target permanent. <br>Draw a card."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Forest",
+   "class": "mage.cards.basiclands.Forest",
+   "kind": "normal",
+   "set": "KTK",
+   "number": "266",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [
+    "Forest"
+   ],
+   "supertypes": [
+    "Basic"
+   ],
+   "rules": [
+    "{T}: Add {G}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Gisela, the Broken Blade",
+   "class": "mage.cards.g.GiselaTheBrokenBlade",
+   "kind": "normal",
+   "set": "EMN",
+   "number": "28",
+   "mana_cost": "{2}{W}{W}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Angel",
+    "Horror"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Flying",
+    "First strike",
+    "Lifelink",
+    "At the beginning of your end step, if you both own and control {this} and a creature named Bruna, the Fading Light, exile them, then meld them into Brisela, Voice of Nightmares."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "4",
+   "toughness": "3"
+  },
+  {
+   "name": "Grist, the Hunger Tide",
+   "class": "mage.cards.g.GristTheHungerTide",
+   "kind": "normal",
+   "set": "SLD",
+   "number": "1417",
+   "mana_cost": "{1}{B}{G}",
+   "types": [
+    "Planeswalker"
+   ],
+   "subtypes": [
+    "Grist"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "As long as {this} isn't on the battlefield, it's a 1/1 Insect creature in addition to its other types.",
+    "+1: Create a 1/1 black and green Insect creature token, then mill a card. If an Insect card was milled this way, put a loyalty counter on {this} and repeat this process.",
+    "-2: You may sacrifice a creature. When you do, destroy target creature or planeswalker.",
+    "-5: Each opponent loses life equal to the number of creature cards in your graveyard."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Grizzly Bears",
+   "class": "mage.cards.g.GrizzlyBears",
+   "kind": "normal",
+   "set": "J21",
+   "number": "580",
+   "mana_cost": "{1}{G}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Bear"
+   ],
+   "supertypes": [],
+   "rules": [],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "2"
+  },
+  {
+   "name": "Gyruda, Doom of Depths",
+   "class": "mage.cards.g.GyrudaDoomOfDepths",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80859",
+   "mana_cost": "{4}{U/B}{U/B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Demon",
+    "Kraken"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Your starting deck contains only cards with even mana values.",
+    "When {this} enters, each player mills four cards. Put a creature card with an even mana value from among the milled cards onto the battlefield under your control."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "6",
+   "toughness": "6"
+  },
+  {
+   "name": "Hill Giant",
+   "class": "mage.cards.h.HillGiant",
+   "kind": "normal",
+   "set": "3ED",
+   "number": "158",
+   "mana_cost": "{3}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Giant"
+   ],
+   "supertypes": [],
+   "rules": [],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "3"
+  },
+  {
+   "name": "Island",
+   "class": "mage.cards.basiclands.Island",
+   "kind": "normal",
+   "set": "KTK",
+   "number": "254",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [
+    "Island"
+   ],
+   "supertypes": [
+    "Basic"
+   ],
+   "rules": [
+    "{T}: Add {U}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Jegantha, the Wellspring",
+   "class": "mage.cards.j.JeganthaTheWellspring",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80811",
+   "mana_cost": "{4}{R/G}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Elemental",
+    "Elk"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; No card in your starting deck has more than one of the same mana symbol in its mana cost.",
+    "{T}: Add {W}{U}{B}{R}{G}. This mana can't be spent to pay generic mana costs."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "5",
+   "toughness": "5"
+  },
+  {
+   "name": "Kaheera, the Orphanguard",
+   "class": "mage.cards.k.KaheeraTheOrphanguard",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80861",
+   "mana_cost": "{1}{G/W}{G/W}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Cat",
+    "Beast"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Each creature card in your starting deck is a Cat, Elemental, Nightmare, Dinosaur, or Beast card.",
+    "Vigilance",
+    "Each other creature you control that's a Cat, Elemental, Nightmare, Dinosaur, or Beast gets +1/+1 and has vigilance."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "2"
+  },
+  {
+   "name": "Karlach, Fury of Avernus",
+   "class": "mage.cards.k.KarlachFuryOfAvernus",
+   "kind": "normal",
+   "set": "CLB",
+   "number": "186",
+   "mana_cost": "{4}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Tiefling",
+    "Barbarian"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Whenever you attack, if it's the first combat phase of the turn, untap all attacking creatures. They gain first strike until end of turn. After this phase, there is an additional combat phase.",
+    "Choose a Background <i>(You can have a Background as a second commander.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "5",
+   "toughness": "4"
+  },
+  {
+   "name": "Kenrith, the Returned King",
+   "class": "mage.cards.k.KenrithTheReturnedKing",
+   "kind": "normal",
+   "set": "ELD",
+   "number": "303",
+   "mana_cost": "{4}{W}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human",
+    "Noble"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "{R}: All creatures gain trample and haste until end of turn.",
+    "{1}{G}: Put a +1/+1 counter on target creature.",
+    "{2}{W}: Target player gains 5 life.",
+    "{3}{U}: Target player draws a card.",
+    "{4}{B}: Put target creature card from a graveyard onto the battlefield under its owner's control."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "5",
+   "toughness": "5"
+  },
+  {
+   "name": "Keruga, the Macrosage",
+   "class": "mage.cards.k.KerugaTheMacrosage",
+   "kind": "normal",
+   "set": "MB2",
+   "number": "84",
+   "mana_cost": "{3}{G/U}{G/U}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Dinosaur",
+    "Hippo"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Your starting deck contains only cards with mana value 3 or greater and land cards.",
+    "When {this} enters, draw a card for each other permanent you control with mana value 3 or greater."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "5",
+   "toughness": "4"
+  },
+  {
+   "name": "Lightning Bolt",
+   "class": "mage.cards.l.LightningBolt",
+   "kind": "normal",
+   "set": "J21",
+   "number": "787",
+   "mana_cost": "{R}",
+   "types": [
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "{this} deals 3 damage to any target."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Lim-Dul's Vault",
+   "class": "mage.cards.l.LimDulsVault",
+   "kind": "normal",
+   "set": "SLC",
+   "number": "1996",
+   "mana_cost": "{U}{B}",
+   "types": [
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Llanowar Elves",
+   "class": "mage.cards.l.LlanowarElves",
+   "kind": "normal",
+   "set": "J25",
+   "number": "149",
+   "mana_cost": "{G}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Elf",
+    "Druid"
+   ],
+   "supertypes": [],
+   "rules": [
+    "{T}: Add {G}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "1"
+  },
+  {
+   "name": "Lurrus of the Dream-Den",
+   "class": "mage.cards.l.LurrusOfTheDreamDen",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80845",
+   "mana_cost": "{1}{W/B}{W/B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Cat",
+    "Nightmare"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Each permanent card in your starting deck has mana value 2 or less.",
+    "Lifelink",
+    "Once during each of your turns, you may cast a permanent spell with mana value 2 or less from your graveyard."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "2"
+  },
+  {
+   "name": "Lutri, the Spellchaser",
+   "class": "mage.cards.l.LutriTheSpellchaser",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80883",
+   "mana_cost": "{1}{U/R}{U/R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Elemental",
+    "Otter"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Each nonland card in your starting deck has a different name.",
+    "Flash",
+    "When {this} enters, if you cast it, copy target instant or sorcery spell you control. You may choose new targets for the copy."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "2"
+  },
+  {
+   "name": "Mountain",
+   "class": "mage.cards.basiclands.Mountain",
+   "kind": "normal",
+   "set": "KTK",
+   "number": "262",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [
+    "Mountain"
+   ],
+   "supertypes": [
+    "Basic"
+   ],
+   "rules": [
+    "{T}: Add {R}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Nazgul",
+   "class": "mage.cards.n.Nazgul",
+   "kind": "normal",
+   "set": "LTR",
+   "number": "100",
+   "mana_cost": "{2}{B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Wraith",
+    "Knight"
+   ],
+   "supertypes": [],
+   "rules": [
+    "Deathtouch",
+    "When {this} enters, the Ring tempts you.",
+    "Whenever the Ring tempts you, put a +1/+1 counter on each Wraith you control.",
+    "A deck can have up to nine cards named Nazgul."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "2"
+  },
+  {
+   "name": "Obosh, the Preypiercer",
+   "class": "mage.cards.o.OboshThePreypiercer",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80863",
+   "mana_cost": "{3}{B/R}{B/R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Hellion",
+    "Horror"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Your starting deck contains only cards with odd mana values and land cards.",
+    "If a source you control with an odd mana value would deal damage to a permanent or player, it deals double that damage to that permanent or player instead."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "5"
+  },
+  {
+   "name": "Pir, Imaginative Rascal",
+   "class": "mage.cards.p.PirImaginativeRascal",
+   "kind": "normal",
+   "set": "BBD",
+   "number": "11",
+   "mana_cost": "{2}{G}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Partner with Toothy, Imaginary Friend <i>(When this creature enters the battlefield, target player may put Toothy into their hand from their library, then shuffle.)</i>",
+    "If one or more counters would be put on a permanent your team controls, that many plus one of each of those kinds of counters are put on it instead."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "1"
+  },
+  {
+   "name": "Plains",
+   "class": "mage.cards.basiclands.Plains",
+   "kind": "normal",
+   "set": "KTK",
+   "number": "250",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [
+    "Plains"
+   ],
+   "supertypes": [
+    "Basic"
+   ],
+   "rules": [
+    "{T}: Add {W}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Raised by Giants",
+   "class": "mage.cards.r.RaisedByGiants",
+   "kind": "normal",
+   "set": "CLB",
+   "number": "250",
+   "mana_cost": "{5}{G}",
+   "types": [
+    "Enchantment"
+   ],
+   "subtypes": [
+    "Background"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Commander creatures you own have base power and toughness 10/10 and are Giants in addition to their other types."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Relentless Rats",
+   "class": "mage.cards.r.RelentlessRats",
+   "kind": "normal",
+   "set": "SLD",
+   "number": "752",
+   "mana_cost": "{1}{B}{B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Rat"
+   ],
+   "supertypes": [],
+   "rules": [
+    "A deck can have any number of cards named Relentless Rats.",
+    "{this} gets +1/+1 for each other creature on the battlefield named Relentless Rats."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "2"
+  },
+  {
+   "name": "Rose Tyler",
+   "class": "mage.cards.r.RoseTyler",
+   "kind": "normal",
+   "set": "WHO",
+   "number": "1126",
+   "mana_cost": "{1}{W}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "{this} gets +1/+1 for each time counter on it.",
+    "<i>Bad Wolf</i> &mdash; Whenever {this} attacks, put a time counter on it for each suspended card you own and each other permanent you control with a time counter on it.",
+    "Doctor's companion <i>(You can have two commanders if the other is the Doctor.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "2"
+  },
+  {
+   "name": "Seven Dwarves",
+   "class": "mage.cards.s.SevenDwarves",
+   "kind": "normal",
+   "set": "ELD",
+   "number": "141",
+   "mana_cost": "{1}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Dwarf"
+   ],
+   "supertypes": [],
+   "rules": [
+    "{this} gets +1/+1 for each other creature named Seven Dwarves you control.",
+    "A deck can have up to seven cards named Seven Dwarves."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "2"
+  },
+  {
+   "name": "Snow-Covered Forest",
+   "class": "mage.cards.s.SnowCoveredForest",
+   "kind": "normal",
+   "set": "SLD",
+   "number": "1477*",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [
+    "Forest"
+   ],
+   "supertypes": [
+    "Basic",
+    "Snow"
+   ],
+   "rules": [
+    "{T}: Add {G}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Sol Ring",
+   "class": "mage.cards.s.SolRing",
+   "kind": "normal",
+   "set": "3ED",
+   "number": "274",
+   "mana_cost": "{1}",
+   "types": [
+    "Artifact"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "{T}: Add {C}{C}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Swamp",
+   "class": "mage.cards.basiclands.Swamp",
+   "kind": "normal",
+   "set": "KTK",
+   "number": "258",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [
+    "Swamp"
+   ],
+   "supertypes": [
+    "Basic"
+   ],
+   "rules": [
+    "{T}: Add {B}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Swords to Plowshares",
+   "class": "mage.cards.s.SwordsToPlowshares",
+   "kind": "normal",
+   "set": "BBD",
+   "number": "110",
+   "mana_cost": "{W}",
+   "types": [
+    "Instant"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Exile target creature. Its controller gains life equal to its power."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Teferi, Temporal Archmage",
+   "class": "mage.cards.t.TeferiTemporalArchmage",
+   "kind": "normal",
+   "set": "CMM",
+   "number": "125",
+   "mana_cost": "{4}{U}{U}",
+   "types": [
+    "Planeswalker"
+   ],
+   "subtypes": [
+    "Teferi"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "+1: Look at the top two cards of your library. Put one of them into your hand and the other on the bottom of your library.",
+    "-1: Untap up to four target permanents.",
+    "-10: You get an emblem with \"You may activate loyalty abilities of planeswalkers you control on any player's turn any time you could cast an instant.\"",
+    "{this} can be your commander."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "The Tenth Doctor",
+   "class": "mage.cards.t.TheTenthDoctor",
+   "kind": "normal",
+   "set": "WHO",
+   "number": "561z",
+   "mana_cost": "{3}{U}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Time Lord",
+    "Doctor"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "<i>Allons-y!</i> &mdash; Whenever you attack, exile cards from the top of your library until you exile a nonland card. Put three time counters on it. If it doesn't have suspend, it gains suspend.",
+    "<i>Timey-Wimey</i> &mdash; {7}: Time travel three times. Activate only as a sorcery. <i>(For each suspended card you own and each permanent you control with a time counter on it, you may add or remove a time counter. Then do it two more times.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "5"
+  },
+  {
+   "name": "Thoughtseize",
+   "class": "mage.cards.t.Thoughtseize",
+   "kind": "normal",
+   "set": "THS",
+   "number": "107",
+   "mana_cost": "{B}",
+   "types": [
+    "Sorcery"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Target player reveals their hand. You choose a nonland card from it. That player discards that card. You lose 2 life."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Thrasios, Triton Hero",
+   "class": "mage.cards.t.ThrasiosTritonHero",
+   "kind": "normal",
+   "set": "CMR",
+   "number": "538",
+   "mana_cost": "{G}{U}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Merfolk",
+    "Wizard"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.",
+    "Partner <i>(You can have two commanders if both have partner.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "3"
+  },
+  {
+   "name": "Toothy, Imaginary Friend",
+   "class": "mage.cards.t.ToothyImaginaryFriend",
+   "kind": "normal",
+   "set": "BBD",
+   "number": "12",
+   "mana_cost": "{3}{U}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Illusion"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Partner with Pir, Imaginative Rascal <i>(When this creature enters the battlefield, target player may put Pir into their hand from their library, then shuffle.)</i>",
+    "Whenever you draw a card, put a +1/+1 counter on {this}.",
+    "When {this} leaves the battlefield, draw a card for each +1/+1 counter on it."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "1",
+   "toughness": "1"
+  },
+  {
+   "name": "Tymna the Weaver",
+   "class": "mage.cards.t.TymnaTheWeaver",
+   "kind": "normal",
+   "set": "CMR",
+   "number": "539",
+   "mana_cost": "{1}{W}{B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Human",
+    "Cleric"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Lifelink",
+    "At the beginning of each of your postcombat main phases, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.",
+    "Partner <i>(You can have two commanders if both have partner.)</i>"
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "2"
+  },
+  {
+   "name": "Umori, the Collector",
+   "class": "mage.cards.u.UmoriTheCollector",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80813",
+   "mana_cost": "{2}{B/G}{B/G}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Ooze"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Each nonland card in your starting deck shares a card type.",
+    "As {this} enters, choose a card type.",
+    "Spells you cast of the chosen type cost {1} less to cast."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "4",
+   "toughness": "5"
+  },
+  {
+   "name": "Valki, God of Lies",
+   "class": "mage.cards.v.ValkiGodOfLies",
+   "kind": "modal_dfc",
+   "set": "PRM",
+   "number": "88270",
+   "mana_cost": "{1}{B}{*}{5}{B}{R}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "God"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "When {this} enters, each opponent reveals their hand. For each opponent, exile a creature card they revealed this way until {this} leaves the battlefield.",
+    "{X}: Choose a creature card exiled with {this} with mana value X. {this} becomes a copy of that card."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "1"
+  },
+  {
+   "name": "Wastes",
+   "class": "mage.cards.w.Wastes",
+   "kind": "normal",
+   "set": "J22",
+   "number": "834",
+   "mana_cost": "",
+   "types": [
+    "Land"
+   ],
+   "subtypes": [],
+   "supertypes": [
+    "Basic"
+   ],
+   "rules": [
+    "{T}: Add {C}."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Wrath of God",
+   "class": "mage.cards.w.WrathOfGod",
+   "kind": "normal",
+   "set": "3ED",
+   "number": "46",
+   "mana_cost": "{2}{W}{W}",
+   "types": [
+    "Sorcery"
+   ],
+   "subtypes": [],
+   "supertypes": [],
+   "rules": [
+    "Destroy all creatures. They can't be regenerated."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "0",
+   "toughness": "0"
+  },
+  {
+   "name": "Yorion, Sky Nomad",
+   "class": "mage.cards.y.YorionSkyNomad",
+   "kind": "normal",
+   "set": "MB2",
+   "number": "94",
+   "mana_cost": "{3}{W/U}{W/U}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Bird",
+    "Serpent"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Your starting deck contains at least twenty cards more than the minimum deck size.",
+    "Flying",
+    "When {this} enters, exile any number of other nonland permanents you own and control. Return those cards to the battlefield at the beginning of the next end step."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "4",
+   "toughness": "5"
+  },
+  {
+   "name": "Zirda, the Dawnwaker",
+   "class": "mage.cards.z.ZirdaTheDawnwaker",
+   "kind": "normal",
+   "set": "PRM",
+   "number": "80867",
+   "mana_cost": "{1}{R/W}{R/W}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Elemental",
+    "Fox"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Companion &mdash; Each permanent card in your starting deck has an activated ability.",
+    "Abilities you activate that aren't mana abilities cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.",
+    "{1}, {T}: Target creature can't block this turn."
+   ],
+   "faces": [],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "3",
+   "toughness": "3"
+  }
+ ]
+}

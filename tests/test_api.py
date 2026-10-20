@@ -53,6 +53,7 @@ UNAVAILABLE = {
     "cards": None,
     "bot_match_enabled": False,
     "service_games_enabled": False,
+    "implementations": None,
 }
 
 ENGINE_READY = {
@@ -68,6 +69,7 @@ ENGINE_READY = {
     "cards": {"printings": 93992, "distinct_names": 32739},
     "bot_match_enabled": True,
     "service_games_enabled": True,
+    "implementations": {"build": "1.4.62-eb69d05b-7909ff1a7bd0", "cards": 32486, "passed": 32486},
 }
 
 

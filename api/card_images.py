@@ -1,11 +1,17 @@
 """Card images, fetched from Scryfall once, cached on disk and served from our own origin.
 
-The engine's card views carry only a card's name, so an image is looked up by the exact name:
-Scryfall's named-card search answers with the card's JSON, the API downloads the JPEG it names
-from Scryfall's image host, keeps it under CD_CARD_IMAGE_DIR and records the printing, face and
-artist in card_images. Browsers only ever talk to this site. A name Scryfall does not know
-(tokens, misspellings) is recorded as missing and asked about again after a week. Missing rows
-older than that are deleted whenever another name is recorded as missing.
+Since v0.2.0 the catalog names each printing's image: a printing's image comes straight from the
+URL Scryfall returned for it (CAT10), downloaded from Scryfall's image host and never from its
+API. The engine's card views carry only a card's name, which the catalog maps to the card and the
+printing it shows by default, or the printing the player chose in the deck their seat plays.
+Only the player's own seat counts: another seat's choice would tell what that deck holds.
+
+A name the catalog does not know (before the first import, or a token) falls back to v0.1.0's
+lookup: Scryfall's named-card search answers with the card's JSON, the API downloads the JPEG it
+names, keeps it under CD_CARD_IMAGE_DIR and records the printing, face and artist in
+card_images. Browsers only ever talk to this site. A name Scryfall does not know (tokens,
+misspellings) is recorded as missing and asked about again after a week. Missing rows older than
+that are deleted whenever another name is recorded as missing.
 
 Scryfall allows its named-card search 2 requests a second, so this process spaces them at least
 550 ms apart, and after a 429 asks nothing more for as long as Scryfall says (30 s at least);
@@ -23,6 +29,7 @@ import time
 from collections import Counter
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager, contextmanager
+from dataclasses import dataclass
 from datetime import timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -31,16 +38,24 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Query, Request, Response
-from sqlalchemy import Engine, delete
+from sqlalchemy import Engine, delete, or_, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.identity import Active, ApiError, Db, Principal, utcnow
-from api.models import CardImage
+from api.models import (
+    CardAlias,
+    CardConcept,
+    CardImage,
+    CardPrinting,
+    DeckEntryRow,
+    GameSeat,
+)
 from api.schemas import Contract
 from api.version import APP_VERSION
+from catalog.text import normalize
 
 log = logging.getLogger("api.card_images")
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -75,6 +90,82 @@ IMAGE_CACHE_CONTROL = "private, max-age=604800, immutable"
 USER_AGENT = f"CommanderDuels/{APP_VERSION}"
 API_HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 IMAGE_HEADERS = {"User-Agent": USER_AGENT, "Accept": "image/jpeg"}
+
+
+@dataclass(frozen=True)
+class Chosen:
+    """A printing's image in the catalog: which face, and the object holding its image_uris."""
+
+    scryfall_id: UUID
+    face: int | None
+    source: dict[str, Any]
+    artist: str | None
+    set_code: str
+    collector_number: str
+
+
+def chosen_printing(printing: CardPrinting, name: str | None) -> Chosen | None:
+    """The image of a printing: the face named, else its own image, else its front face's."""
+    card: dict[str, Any] = {"image_uris": printing.image_uris, "card_faces": printing.faces or []}
+    picked = chosen_face(card, name or "")
+    if picked is None:
+        return None
+    face, source = picked
+    artist = source.get("artist") if face is not None else None
+    return Chosen(
+        scryfall_id=printing.scryfall_id,
+        face=face,
+        source=source,
+        artist=str(artist) if artist else printing.artist,
+        set_code=printing.set_code,
+        collector_number=printing.collector_number,
+    )
+
+
+def own_printing(db: Session, user_id: UUID, game_id: UUID, name: str) -> CardPrinting | None:
+    """The printing the user chose for this card in the deck their seat plays in the game."""
+    revision = db.scalar(
+        select(GameSeat.deck_revision_id).where(
+            GameSeat.game_id == game_id, GameSeat.user_id == user_id
+        )
+    )
+    if revision is None:
+        return None
+    wanted = normalize(name)
+    return db.scalar(
+        select(CardPrinting)
+        .join(DeckEntryRow, DeckEntryRow.printing_id == CardPrinting.id)
+        .join(CardConcept, CardConcept.id == DeckEntryRow.concept_id)
+        .where(
+            DeckEntryRow.revision_id == revision,
+            or_(CardConcept.normalized_name == wanted, CardConcept.engine_name == name),
+        )
+        .limit(1)
+    )
+
+
+def catalog_printing(db: Session, name: str) -> CardPrinting | None:
+    """The printing the catalog shows for a name: the card's own name, the engine's name for it,
+    or one of its faces (the back of a double-faced card)."""
+    wanted = normalize(name)
+    printing_id = db.scalar(
+        select(CardConcept.default_printing_id)
+        .where(
+            or_(CardConcept.normalized_name == wanted, CardConcept.engine_name == name),
+            CardConcept.removed_revision.is_(None),
+            CardConcept.default_printing_id.is_not(None),
+        )
+        .order_by(CardConcept.deck_card.desc())
+        .limit(1)
+    )
+    if printing_id is None:
+        printing_id = db.scalar(
+            select(CardConcept.default_printing_id)
+            .join(CardAlias, CardAlias.concept_id == CardConcept.id)
+            .where(CardAlias.alias == wanted, CardAlias.kind == "face")
+            .limit(1)
+        )
+    return db.get(CardPrinting, printing_id) if printing_id else None
 
 
 class CardImageInfo(Contract):
@@ -281,10 +372,71 @@ class CardImageCache:
             raise images_unavailable()
         return self.directory
 
-    async def image(self, name: str, size: ImageSize, account: UUID | None) -> bytes:
-        """The name's JPEG, from disk or, the first time, from Scryfall while the request waits.
-        A lookup counts against the account's share of the queue (see counted)."""
+    def choose(self, name: str, game: tuple[UUID, UUID] | None) -> Chosen | None:
+        """The catalog's image for a name; with (user, game), the user's own printing first."""
+        with Session(self.database) as db:
+            printing = own_printing(db, game[0], game[1], name) if game else None
+            printing = printing or catalog_printing(db, name)
+            return chosen_printing(printing, name) if printing is not None else None
+
+    async def printing(
+        self, printing_id: UUID, face: int | None, size: ImageSize, account: UUID | None
+    ) -> bytes:
+        """A catalog printing's JPEG, or one of its faces'."""
         directory = self.require_directory()
+
+        def find() -> Chosen | None:
+            with Session(self.database) as db:
+                printing = db.get(CardPrinting, printing_id)
+                if printing is None:
+                    return None
+                faces = printing.faces or []
+                name = faces[face].get("name") if face is not None and face < len(faces) else None
+                return chosen_printing(printing, str(name) if name else None)
+
+        chosen = await run_in_threadpool(find)
+        if chosen is None:
+            raise missing()
+        return await self.catalog_image(directory, chosen, size, account)
+
+    async def catalog_image(
+        self, directory: Path, chosen: Chosen, size: ImageSize, account: UUID | None
+    ) -> bytes:
+        """A catalog image from disk, or downloaded once from Scryfall's image host. Downloads
+        need no API request, but still count against the account's share of the queue."""
+        path = directory / file_name(chosen.scryfall_id, chosen.face, size)
+        image = await run_in_threadpool(read_image, path)
+        if image is not None:
+            return image
+        async with self.locked(path.name):
+            image = await run_in_threadpool(read_image, path)
+            if image is not None:
+                return image
+            url = image_url(chosen.source, size)
+            if url is None:
+                raise missing()
+            with self.counted(account):
+                image = await self.download(url)
+            try:
+                await run_in_threadpool(write_atomically, path, image)
+            except OSError as error:
+                raise unavailable(f"could not write {path.name}: {error}") from error
+            return image
+
+    async def image(
+        self,
+        name: str,
+        size: ImageSize,
+        account: UUID | None,
+        game: tuple[UUID, UUID] | None = None,
+    ) -> bytes:
+        """The name's JPEG: the catalog's printing when it knows the name, else from disk or,
+        the first time, from Scryfall's named-card search while the request waits. A lookup
+        counts against the account's share of the queue (see counted)."""
+        directory = self.require_directory()
+        chosen = await run_in_threadpool(self.choose, name, game)
+        if chosen is not None:
+            return await self.catalog_image(directory, chosen, size, account)
         image = await run_in_threadpool(self.stored, directory, name, size)
         if image is not None:
             return image
@@ -296,8 +448,17 @@ class CardImageCache:
             with self.counted(account):
                 return await self.fetch(directory, name, size)
 
-    async def info(self, name: str) -> CardImageInfo | None:
+    async def info(self, name: str, game: tuple[UUID, UUID] | None = None) -> CardImageInfo | None:
         self.require_directory()
+        chosen = await run_in_threadpool(self.choose, name, game)
+        if chosen is not None:
+            return CardImageInfo(
+                name=name,
+                status="found",
+                artist=chosen.artist,
+                set_code=chosen.set_code,
+                collector_number=chosen.collector_number,
+            )
         entry = await run_in_threadpool(lookup, self.database, name)
         if entry is None:
             return None
@@ -485,25 +646,55 @@ async def card_image(
     db: Db,
     name: CardName,
     size: Annotated[ImageSize, Query()] = "normal",
+    game: UUID | None = None,
 ) -> Response:
-    """A card's image by its exact name, from Scryfall, cached on this server. The first request
-    for a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not
-    know, such as tokens. 429 card_images_busy when the account already waits for many new
-    cards, and 503 when everyone does or Scryfall asked us to wait; both carry Retry-After."""
+    """A card's image by its exact name, from Scryfall, cached on this server. With game, the
+    printing chosen in your own seat's deck. The first request for a card waits while it is
+    fetched. 404 card_image_missing for cards Scryfall does not know, such as tokens. 429
+    card_images_busy when the account already waits for many new cards, and 503 when everyone
+    does or Scryfall asked us to wait; both carry Retry-After."""
     account = queue_account(principal)
     await release(db)
-    image = await cache_of(request).image(name, size, account)
+    seat = (principal.user.id, game) if game else None
+    image = await cache_of(request).image(name, size, account, seat)
+    # A game's own printing may differ from the card's default, so it is kept for an hour only.
+    control = IMAGE_CACHE_CONTROL if game is None else "private, max-age=3600"
+    return Response(image, media_type="image/jpeg", headers={"Cache-Control": control})
+
+
+@router.get(
+    "/card-images/printings/{printing_id}",
+    response_class=Response,
+    responses={
+        200: {
+            "description": "The printing's image.",
+            "content": {"image/jpeg": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+async def printing_image(
+    request: Request,
+    principal: Active,
+    db: Db,
+    printing_id: UUID,
+    face: Annotated[int | None, Query(ge=0, le=7)] = None,
+    size: Annotated[ImageSize, Query()] = "normal",
+) -> Response:
+    """A catalog printing's image (one face's, for double-faced cards), cached on this server."""
+    account = queue_account(principal)
+    await release(db)
+    image = await cache_of(request).printing(printing_id, face, size, account)
     return Response(image, media_type="image/jpeg", headers={"Cache-Control": IMAGE_CACHE_CONTROL})
 
 
 @router.get("/card-images/info", response_model=CardImageInfo)
 async def card_image_info(
-    request: Request, principal: Active, db: Db, name: CardName
+    request: Request, principal: Active, db: Db, name: CardName, game: UUID | None = None
 ) -> CardImageInfo:
-    """The printing and artist behind a name's cached image, to credit the artist and Scryfall.
-    Never fetches: 404 until the image has been requested."""
+    """The printing and artist behind a name's image, to credit the artist and Scryfall. Never
+    fetches: 404 until the image has been requested, unless the catalog names the printing."""
     await release(db)
-    info = await cache_of(request).info(name)
+    info = await cache_of(request).info(name, (principal.user.id, game) if game else None)
     if info is None:
         raise ApiError(404, "card_image_unknown", "This card's image has not been looked up.")
     return info

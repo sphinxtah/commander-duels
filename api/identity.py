@@ -35,7 +35,7 @@ ROTATION_GRACE = timedelta(seconds=60)
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "player": frozenset({"profile.edit", "games.play"}),
+    "player": frozenset({"profile.edit", "games.play", "decks.edit"}),
     "moderator": frozenset({"moderation.read", "admin.users.read"}),
     "content_editor": frozenset({"content.edit"}),
     "administrator": frozenset(
@@ -46,6 +46,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "admin.users.manage",
             "admin.roles.manage",
             "admin.audit.read",
+            "catalog.manage",
         }
     ),
 }

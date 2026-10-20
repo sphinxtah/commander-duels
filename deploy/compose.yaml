@@ -23,6 +23,8 @@ x-api: &api
     CD_GAMES_PER_ACCOUNT: ${CD_GAMES_PER_ACCOUNT:-1}
     CD_GAMES_MAX: ${CD_GAMES_MAX:-6}
     CD_CARD_IMAGE_DIR: /var/lib/commander-duels/card-images
+    # Scryfall's bulk files, kept by the worker for the daily catalog import (catalog_data).
+    CD_CATALOG_DIR: /var/lib/commander-duels/catalog
 services:
   db:
     image: postgres:17.5-alpine
@@ -59,6 +61,7 @@ services:
     <<: *api
     command: ["python", "-m", "catalog.worker"]
     stop_grace_period: 10s
+    volumes: ["catalog_data:/var/lib/commander-duels/catalog"]
     depends_on:
       migrate: {condition: service_completed_successfully}
   engine:
@@ -102,3 +105,4 @@ networks:
 volumes:
   postgres_data:
   card_images:
+  catalog_data:

@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     # origin; browsers never contact Scryfall. Empty turns card images off.
     card_image_dir: str = ""
     scryfall_url: HttpUrl = HttpUrl("https://api.scryfall.com")
+    # The worker keeps Scryfall's bulk files here and imports them into the catalog. Empty turns
+    # the catalog sync off.
+    catalog_dir: str = ""
+    # When the daily sync becomes due, in UTC, plus up to the jitter. Scryfall publishes its bulk
+    # files at about 09:00 UTC.
+    catalog_sync_time: str = Field(default="10:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    catalog_sync_jitter_minutes: int = Field(default=30, ge=0, le=360)
+    # Bounds on one bulk file: compressed, and unpacked.
+    catalog_max_download_mb: int = Field(default=1024, ge=1, le=16384)
+    catalog_max_dataset_mb: int = Field(default=4096, ge=1, le=65536)
+    # The starter decks anyone may copy: the engine's fixture decks (the API image holds a copy).
+    starter_decks_dir: str = "engine/decks"
 
     @field_validator("database_url")
     @classmethod

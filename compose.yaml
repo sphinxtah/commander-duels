@@ -35,6 +35,9 @@ services:
       CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:-}
       # Card images from Scryfall, cached in the api service's card_images volume.
       CD_CARD_IMAGE_DIR: /var/lib/commander-duels/card-images
+      # Scryfall's bulk files for the card catalog, in the worker's catalog_data volume. The worker
+      # imports them on its first start and then daily.
+      CD_CATALOG_DIR: /var/lib/commander-duels/catalog
     command: ["alembic", "upgrade", "head"]
     depends_on:
       db: {condition: service_healthy}
@@ -56,6 +59,7 @@ services:
     environment: *api_environment
     command: ["python", "-m", "catalog.worker"]
     stop_grace_period: 10s
+    volumes: ["catalog_data:/var/lib/commander-duels/catalog"]
     depends_on:
       migrate: {condition: service_completed_successfully}
   engine:
@@ -94,3 +98,4 @@ networks:
 volumes:
   postgres_data:
   card_images:
+  catalog_data:

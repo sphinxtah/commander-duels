@@ -16,6 +16,14 @@ RUN java -Xmx2g -cp "$(cat /xmage/mage-sets.classpath)" /xmage/BuildCardDatabase
     && echo "card database cgroup memory.peak $(cat /sys/fs/cgroup/memory.peak) bytes" \
     && rm -f db/*.trace.db && ls -l db
 
+# The engine's list of the cards it implements, with the automatic gates every card passed
+# (CAT09): made once per pin, like the card database, from the same classes games load.
+FROM carddb AS implementations
+COPY engine/xmage/ExportImplementations.java /xmage/
+RUN java -Xmx3g -cp "$(cat /xmage/mage-sets.classpath)" /xmage/ExportImplementations.java \
+    /xmage/implementations /xmage/pin.properties \
+    && echo "implementation list cgroup memory.peak $(cat /sys/fs/cgroup/memory.peak) bytes"
+
 # Engine module, compiled and tested (JUnit, including real bot games) against the pinned XMage.
 # XMage artifacts come read-only from /xmage/m2; other downloads use a BuildKit cache mount.
 FROM carddb AS engine-build
@@ -34,6 +42,7 @@ FROM eclipse-temurin:21.0.12_8-jre AS runtime
 WORKDIR /app
 COPY --from=xmage /xmage/licenses ./licenses
 COPY --from=carddb --chown=10001:10001 /xmage/carddb/db ./db
+COPY --from=implementations /xmage/implementations ./catalog
 COPY --from=engine-build /build/engine/target/lib ./lib
 COPY --from=engine-build /build/engine/target/licenses/THIRD-PARTY.txt ./licenses/
 COPY engine/decks ./decks
