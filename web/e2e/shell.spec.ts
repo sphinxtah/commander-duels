@@ -33,12 +33,23 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
   await expect(page.getByRole("dialog")).not.toContainText("planned");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  for (const name of ["Campaign", "Learn", "Decks", "Cards", "Collection"]) {
+  for (const name of ["Campaign", "Learn", "Collection"]) {
     await page
       .getByRole("navigation")
       .getByRole("link", { name, exact: true })
       .click();
     await expect(page.getByText(`NOT AVAILABLE IN v${version}`)).toBeVisible();
+  }
+  // Decks and cards (v0.2.0) ask a visitor to sign in.
+  for (const [name, heading] of [
+    ["Decks", "A strategy to call your own."],
+    ["Cards", "Discover your next centerpiece."],
+  ]) {
+    await page
+      .getByRole("navigation")
+      .getByRole("link", { name, exact: true })
+      .click();
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
   }
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("checkbox", { name: "Larger text" }).check();

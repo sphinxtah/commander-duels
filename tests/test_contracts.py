@@ -94,6 +94,19 @@ def player(seat: int) -> dict[str, Any]:
     }
 
 
+def controls() -> dict[str, Any]:
+    return {
+        "passing": None,
+        "your_turn": ["main1", "main2"],
+        "opponent_turn": ["main1", "main2"],
+        "stop_on_new_stack_objects": True,
+        "stop_on_attackers": True,
+        "stop_on_blockers": True,
+        "pass_after_casting": False,
+        "full_control": False,
+    }
+
+
 def snapshot() -> dict[str, Any]:
     return {
         "game_id": str(uuid4()),
@@ -157,6 +170,7 @@ def snapshot() -> dict[str, Any]:
             "revealed": [],
             "looked_at": [],
             "messages": [],
+            "priority": controls(),
         },
         "result": None,
         "log_count": 1,
@@ -190,6 +204,7 @@ def test_seat_view_contract_cannot_carry_concealed_information():
         ("commander library", lambda view: opponent_commander(view).update(library=[])),
         ("odd commander tax", lambda view: view["view"]["you"]["commanders"][0].update(tax=3)),
         ("legacy deck field", lambda view: view["settings"].update(bot_deck="legacy-burn")),
+        ("an unknown stop", lambda view: view["view"]["priority"].update(your_turn=["cleanup"])),
     ]
     for description, mutate in leaks:
         leaked = copy.deepcopy(snapshot())
@@ -202,7 +217,7 @@ def test_seat_view_contract_cannot_carry_concealed_information():
 def spectator() -> dict[str, Any]:
     watched = snapshot()
     watched.update(seat=None, status="spectating", prompt=None)
-    watched["view"].update(seat=None, you=None, hand=[])
+    watched["view"].update(seat=None, you=None, hand=[], priority=None)
     watched["view"]["opponents"] = [player(0), player(1), player(2), player(3)]
     for entry in watched["settings"]["seats"]:
         entry["deck"] = None
@@ -222,6 +237,7 @@ def test_spectator_snapshots_carry_public_information_only():
         ("a spectator's prompt", lambda view: view.update(prompt=snapshot()["prompt"])),
         ("a spectator's you", lambda view: view["view"].update(you=player(0))),
         ("looked-at cards", lambda v: v["view"].update(looked_at=[{"name": "x", "cards": []}])),
+        ("a spectator's priority controls", lambda view: view["view"].update(priority=controls())),
     ]
     for description, mutate in leaks:
         leaked = spectator()

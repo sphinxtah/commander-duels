@@ -23,6 +23,18 @@ const groups: { title: string; actions: PromptOption["action"][] }[] = [
     title: "Combat",
     actions: ["toggle_attacker", "all_attack", "toggle_blocker"],
   },
+  {
+    // UI07: the engine passes for the seat until the chosen point, or until something stops it.
+    title: "Keep passing",
+    actions: [
+      "pass_until_stack_resolved",
+      "pass_until_next_main",
+      "pass_until_end_of_turn",
+      "pass_until_next_turn",
+      "pass_until_end_step_before_my_turn",
+      "pass_until_my_turn",
+    ],
+  },
 ];
 
 function AmountForm({

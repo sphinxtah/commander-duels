@@ -80,6 +80,7 @@ const view: GameView = {
   revealed: [],
   looked_at: [],
   messages: [],
+  priority: null,
 };
 
 function context(change: Partial<GameContextValue> = {}): GameContextValue {

@@ -38,6 +38,7 @@ const view: GameView = {
   revealed: [],
   looked_at: [],
   messages: [],
+  priority: null,
 };
 const won = (winner_seat: number) => ({
   kind: "completed",

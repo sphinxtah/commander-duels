@@ -645,6 +645,32 @@ final class HumanGame {
         return reply;
     }
 
+    /**
+     * Request thread: changes the seat's priority controls. It needs no prompt, so a seat can
+     * cancel a pass while XMage is passing for it. The reply carries the controls as they now are;
+     * the seat's next view shows them too.
+     */
+    Reply setPriority(int seatIndex, SeatCommand command) {
+        Seat seat = seats.get(seatIndex);
+        synchronized (this) {
+            Reply earlier = replay(seat, command);
+            if (earlier != null) {
+                return earlier;
+            }
+            if (result != null) {
+                return reject(seat, 409, "game_over", "The game has finished");
+            }
+        }
+        HumanPlayer human = current(seat);
+        Priority.apply(human, game, command.priority());
+        synchronized (this) {
+            Reply reply = accepted(seat, command);
+            reply.body().put("priority", Priority.controls(human));
+            touch();
+            return reply;
+        }
+    }
+
     /** Request thread: the seat concedes. In a game of three or more the others play on. */
     Reply concede(int seatIndex, SeatCommand command) {
         Seat seat = seats.get(seatIndex);

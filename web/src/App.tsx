@@ -11,6 +11,10 @@ import {
   type Me,
   type PracticeFormat,
 } from "./api";
+import { CardsPage } from "./catalog/CardsPage";
+import { DeckEditor } from "./decks/DeckEditor";
+import { DecksPage } from "./decks/DecksPage";
+import { SharedDeck } from "./decks/SharedDeck";
 import { GameScreen } from "./game/GameScreen";
 import { PracticeTable } from "./game/PracticeTable";
 import {
@@ -35,7 +39,10 @@ const pages = [
 type Page = (typeof pages)[number] | "SysOp";
 const glyphs = ["◇", "▱", "✧", "▤", "▦", "◈", "○", "⚙", "⚖"];
 const details: Record<
-  Exclude<Page, "Play" | "Settings" | "Profile" | "Admin" | "SysOp">,
+  Exclude<
+    Page,
+    "Play" | "Settings" | "Profile" | "Admin" | "SysOp" | "Decks" | "Cards"
+  >,
   { title: string; description: string; next: string; milestone: string }
 > = {
   Campaign: {
@@ -50,18 +57,6 @@ const details: Record<
       "Guided lessons will introduce resources, combat, priority, and Commander.",
     next: "Interactive lessons need the rules adapter and validated scenarios.",
     milestone: "M4 · Tutorials & lessons",
-  },
-  Decks: {
-    title: "A strategy to call your own.",
-    description: "Build, refine, and save Commander and Legacy decks.",
-    next: "Deck creation opens with catalog identities and server-side validation.",
-    milestone: "M1 · Catalog & decks",
-  },
-  Cards: {
-    title: "Discover your next centerpiece.",
-    description: "Browse cards, explore printings, and check playability.",
-    next: "The first Scryfall import is pending. No cards are certified for play yet.",
-    milestone: "M1 · Card catalog",
   },
   Collection: {
     title: "Room for every possibility.",
@@ -84,19 +79,31 @@ function plannedFormat(format: Format | undefined): boolean {
   );
 }
 const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
+const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
+const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
 /** #game/<id> opens a game's table, full screen. */
 function currentGame(): string | undefined {
   return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
 }
+/** #deck/<id> opens a deck in the editor; #shared/<code>, a deck shared by link. */
+function currentDeck(): { deck?: string; shared?: string } {
+  const hash = window.location.hash;
+  return {
+    deck: DECK_ROUTE.exec(hash)?.[1]?.toLowerCase(),
+    shared: SHARED_ROUTE.exec(hash)?.[1],
+  };
+}
 function currentPage(): Page {
-  const path = window.location.hash.slice(1).toLowerCase();
+  const path = window.location.hash.slice(1).toLowerCase().split("?")[0] ?? "";
   if (path === "sysop") return "SysOp";
+  if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
   return pages.find((page) => page.toLowerCase() === path) ?? "Play";
 }
 
 export function App() {
   const [page, setPage] = useState<Page>(currentPage);
   const [game, setGame] = useState(currentGame);
+  const [deckRoute, setDeckRoute] = useState(currentDeck);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [formats, setFormats] = useState<Format[]>([]);
   const [connection, setConnection] = useState<
@@ -119,6 +126,7 @@ export function App() {
       navigated.current = true;
       setPage(currentPage());
       setGame(currentGame());
+      setDeckRoute(currentDeck());
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -350,6 +358,22 @@ export function App() {
             />
           ) : page === "Admin" ? (
             <Admin me={me} heading={heading} />
+          ) : page === "Decks" && deckRoute.deck && me ? (
+            <DeckEditor
+              key={deckRoute.deck}
+              deckId={deckRoute.deck}
+              heading={heading}
+            />
+          ) : page === "Decks" && deckRoute.shared && me ? (
+            <SharedDeck
+              key={deckRoute.shared}
+              code={deckRoute.shared}
+              heading={heading}
+            />
+          ) : page === "Decks" ? (
+            <DecksPage me={me} heading={heading} />
+          ) : page === "Cards" ? (
+            <CardsPage me={me} heading={heading} />
           ) : page === "SysOp" && entrance ? (
             <SysopSignIn onSignedIn={changeMe} heading={heading} />
           ) : page === "Play" || page === "SysOp" ? (
@@ -469,9 +493,9 @@ export function App() {
                   </span>
                   <h2>The foundation is taking shape.</h2>
                   <p>
-                    Practice games against the bots are open for testing. Deck
-                    building, the card catalog and human opponents arrive as
-                    their systems are ready.
+                    Practice games against the bots are open for testing, with
+                    your own decks from the card catalog. Human opponents arrive
+                    as their systems are ready.
                   </p>
                 </div>
                 <a href="#settings">

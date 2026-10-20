@@ -31,6 +31,7 @@ import {
   words,
   type Located,
 } from "./model";
+import { PriorityPanel } from "./PriorityPanel";
 import { PromptPanel } from "./PromptPanel";
 import type { CardView, CommandEnvelope, PromptOption, Seat } from "./types";
 import styles from "./game.module.css";
@@ -398,6 +399,10 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
             onAnswer={answer}
             onTakeControl={() => connection?.takeControl()}
             onConcede={() => concedeDialog.current?.showModal()}
+          />
+          <PriorityPanel
+            state={state}
+            onSet={(settings) => connection?.setPriority(settings)}
           />
           {result && outcome && (
             <section

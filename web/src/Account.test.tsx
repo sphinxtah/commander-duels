@@ -229,6 +229,43 @@ describe("signing out", () => {
     expect(screen.queryByText(/could not be ended/)).not.toBeInTheDocument();
   });
 
+  it("names each other session's button by its browser, apart from this browser's", async () => {
+    const session = (id: string, current: boolean, agent: string) => ({
+      id,
+      kind: "google",
+      current,
+      created_at: "2026-10-19T10:00:00Z",
+      last_seen_at: "2026-10-19T10:00:00Z",
+      idle_expires_at: "2026-10-26T10:00:00Z",
+      absolute_expires_at: "2026-11-02T10:00:00Z",
+      source_address: null,
+      user_agent: agent,
+    });
+    on(
+      "GET /api/v1/me/sessions",
+      () =>
+        reply(200, [
+          session("s1", true, "Firefox"),
+          session("s2", false, "Safari"),
+        ]),
+      () => reply(200, [session("s1", true, "Firefox")]),
+    );
+    on("DELETE /api/v1/me/sessions/{session_id}", () => reply(204));
+    render(<Page initial={account()} auth={google} />);
+    const other = await screen.findByRole("button", {
+      name: /^End the session in Safari, signed in /,
+    });
+    // Only this browser's button is "Sign out".
+    expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
+    fireEvent.click(other);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: /^End the session/ }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(count("DELETE /api/v1/me/sessions/{session_id}")).toBe(1);
+  });
+
   it("sends one sign-out when the button is pressed twice", async () => {
     // Were a second request sent, the first would end every session and the second find
     // this one gone.

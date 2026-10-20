@@ -1,5 +1,32 @@
 # Verification
 
+## v0.2.0
+
+Validated locally on Windows on October 20, 2026, on the work as committed for v0.2.0. Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting | Passed (API, catalog, tests and scripts; 63 files) |
+| mypy strict checks | Passed, 43 Python source files |
+| Python suite | 137 passed against a throwaway PostgreSQL 17. New: `tests/test_catalog.py` (every status with its reason, the engine unavailable, failed gates and differing characteristics, unchanged imports, new cards, reprints, Oracle changes, bans and removed printings, dropped cards kept, malformed and shrunken files, fencing, reader bounds, text normalization), `tests/test_catalog_sync.py` (unchanged days, broken downloads and rate limits with backoff, fencing, overlap, the schedule, and the first import waiting for the engine), `tests/test_validation.py` (Legacy and Commander rules, T03–T05, pairs, companions), `tests/test_decks_api.py` (card search and details, the deck lifecycle, conflicts and revisions, T29: other accounts' 404s and sharing without notes, imports that round-trip, Commander imports and starters, guided decks of exact size, images and the practice table) and new PostgreSQL cases (the revision trigger, search on PostgreSQL) |
+| Alembic | `0005_catalog` and `0006_decks`: upgrade, `alembic check`, downgrade to base, upgrade and check again on PostgreSQL, clean |
+| Generated contracts | `contracts/openapi.json` (Python 3.12) and `web/src/generated/api.d.ts` regenerated, with the card, catalog and deck routes and version 0.2.0; no drift |
+| Vitest, TypeScript and the production build | 97 tests in 14 files (new: deck statistics and odds, the deck editor's autosave and conflict choices, the decks page, the priority panel and its Escape, the connection's `set_priority`, the Admin catalog tab, the session buttons); `tsc -b` and the Vite build passed |
+| Engine image build | JUnit: 88 passed, including `PriorityControlsTest` (held priority with a nested stack, a cancelled payment, pass modes, full control on and off, command validation) and the implementation route |
+| The real catalog | The worker's first sync on the development stack: 2 minutes 3 seconds, downloads included (111 MB of gzip files), revision 1, a 489 MB database. The engine build `1.4.62-eb69d05b-7909ff1a7bd0` lists 32,486 cards, all passing the gates; 32,089 card concepts are playable. Warm searches took 39–71 ms (median per query), at most 120 ms |
+| Decks against the real engine | Through the API on the real catalog: a Legacy deck with Fire // Ice, Delver of Secrets and Bonecrusher Giant started a game whose seat was dealt its cards; a guided Kenrith tokens deck (100 cards, playable) started a Commander game. After the guided fix: Kenrith tokens and Thrasios with Tymna 100 cards each, Legacy red aggro and white-blue control 60 each, all legal and playable |
+| Browser journeys | 15 passed. Against a throwaway API on a scratch database with the test catalog (`scripts/load_fixture_catalog.py`): shell 4, identity 3, and decks 3 (a list imported with a copy-limit error, fixed, edited, saved as a version, shared and opened by link without its notes, taken to the practice table and archived; a Commander deck taken to the table in its own format; the Cards page's syntax, a card's details and the Admin catalog tab). Against the real engine and the real catalog: games 5, with every WebSocket frame leak-checked. A Legacy game by mouse completed in 9 turns (90 prompts; 205 snapshots in 297 frames); a Legacy game by keyboard to its 8-turn limit (62 prompts); a four-player Commander table to its 4-turn limit; a second tab and a resend; and a deck of the player's own with full control on and off and a pass until the next turn, which the views reported (`until_my_turn`), completed in 7 turns |
+
+**Seen while checking, then fixed:**
+- **"Play it" across formats** cleared the chosen deck: the practice table's format reset ran after the deck was chosen. The new Commander journey covers it.
+- **The deck editor** could show an older reply to "Share by link" over a newer one, because notes save on blur in the same click. Only the newest reply shows now.
+- **The engine image** on the development stack predated the priority work, so the first run of the own-deck journey found no pass modes. The journey now fails clearly when no prompt offers them; it passed on the rebuilt image.
+- **The identity journey** failed when run alongside the deck journeys: the extra SysOp sessions gave the Profile page two "Sign out" buttons. The other sessions' buttons now say "End the session", named by their browser.
+- **Guided Commander decks with a pair** had 101 cards, and the test catalog's small pool left proposals short; the lands now fill what the spells leave.
+- **The first sync** would have imported without the engine's list when the engine was still loading; it now waits for it (`tests/test_catalog_sync.py`).
+
+**The throwaway stacks.** The Python suite ran against its own PostgreSQL container. The deck journeys used a scratch database with the test catalog and an API built from the working tree; the game journeys used a scratch database with the real catalog, the development engine, and an API from the working tree. Each had a generated test SysOp, and Playwright shared the API's network, so the browser came from loopback, as in CI. The developer's database and SysOp were not used.
+
 ## v0.1.1
 
 Validated locally on Windows on October 20, 2026. A bug and security sweep found the defects: 18 reviewers, one per area and lens, and then gap finders. Each finding had to survive one to three independent verifiers, depending on its severity. Of 58 findings, 54 were confirmed and 4 refuted. The fixes were made in eight groups that never touched the same files, then reviewed by group and as a whole. Python ran on 3.12.10 in the API image, as in CI; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository.

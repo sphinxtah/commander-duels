@@ -407,8 +407,11 @@ public final class EngineServer {
             respond(exchange, 400, Map.of("code", "invalid_command", "message", e.getMessage()));
             return;
         }
-        HumanGame.Reply reply = command.type().equals(SeatCommand.CONCEDE)
-            ? game.concede(seat, command) : game.submit(seat, command);
+        HumanGame.Reply reply = switch (command.type()) {
+            case SeatCommand.CONCEDE -> game.concede(seat, command);
+            case SeatCommand.SET_PRIORITY -> game.setPriority(seat, command);
+            default -> game.submit(seat, command);
+        };
         respond(exchange, reply.status(), reply.body());
     }
 

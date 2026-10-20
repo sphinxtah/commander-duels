@@ -330,3 +330,51 @@ describe("one socket at a time", () => {
     expect(fourth.closedWith).toBe(1000);
   });
 });
+
+describe("priority controls", () => {
+  const controls = {
+    passing: "until_end_of_turn",
+    your_turn: ["main1"],
+    opponent_turn: [],
+    stop_on_new_stack_objects: true,
+    stop_on_attackers: true,
+    stop_on_blockers: true,
+    pass_after_casting: false,
+    full_control: false,
+  };
+
+  it("sends a setting without a prompt and keeps the reply's controls until the next view", () => {
+    const socket = playing();
+    socket.deliver({ type: "snapshot", snapshot: snapshot(6, null) });
+    expect(connection.setPriority({ full_control: true })).toBe(true);
+    const [command] = socket.commands();
+    expect(command).toEqual(
+      expect.objectContaining({
+        type: "set_priority",
+        expected_revision: 6,
+        payload: { full_control: true },
+      }),
+    );
+    expect(command).not.toHaveProperty("prompt_id");
+    // One command at a time.
+    expect(connection.setPriority({ cancel_passes: true })).toBe(false);
+
+    socket.deliver({
+      type: "command_result",
+      action_id: command.action_id,
+      status: 200,
+      body: { priority: controls },
+    });
+    expect(state.pending).toBeNull();
+    expect(state.priority).toEqual(controls);
+    socket.deliver({ type: "snapshot", snapshot: snapshot(7, null) });
+    expect(state.priority).toBeNull();
+  });
+
+  it("is not sent by a tab that observes", () => {
+    const socket = playing();
+    socket.deliver(lease("observer", true, "taken_over"));
+    expect(connection.setPriority({ full_control: true })).toBe(false);
+    expect(socket.commands()).toEqual([]);
+  });
+});

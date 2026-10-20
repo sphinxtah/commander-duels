@@ -39,6 +39,8 @@ jobs:
           echo "::add-mask::$password"
           echo "CD_E2E_SYSOP_PASSWORD=$password" >> "$GITHUB_ENV"
           printf '%s\n' "$password" | python -m api.cli sysop-password --stdin
+      # The deck builder's journeys need a card catalog: Scryfall's test slice, never a download.
+      - run: python scripts/load_fixture_catalog.py
       - run: pnpm test:e2e
       # A failed journey's evidence: its screenshot, trace and error context. The attempt keeps the
       # name unique when a job is re-run.
@@ -108,7 +110,8 @@ jobs:
           docker compose down
       # The game screen (v0.1.0): Legacy games played to the end by mouse and by keyboard, a
       # four-player Commander table, and a second tab with a lost reply, in Chromium through the
-      # web proxy against the engine. Every WebSocket frame is checked for concealed cards.
+      # web proxy against the engine. Since v0.2.0 also a deck of the player's own, from the test
+      # catalog, with the priority controls. Every WebSocket frame is checked for concealed cards.
       - name: Practice games in the browser
         run: |
           token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
@@ -119,6 +122,8 @@ jobs:
           docker compose build migrate api web
           docker compose up -d --wait --no-build db migrate api engine web
           printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin
+          docker compose run --rm --no-deps -v "$PWD/tests/fixtures:/fixtures:ro" -v "$PWD/scripts:/scripts:ro" \
+            api python /scripts/load_fixture_catalog.py /fixtures
           # Host networking: the browser reaches the web proxy's published port from this machine,
           # which the API sees as the Compose gateway, SysOp's network.
           docker run --rm --network host --ipc=host -e CI=1 -e CD_BROWSER_URL=http://localhost:8080 \

@@ -15,6 +15,7 @@ import {
   type Me,
 } from "./api";
 import { signInFrom } from "./Account";
+import { CatalogAdmin } from "./catalog/CatalogAdmin";
 import styles from "./Account.module.css";
 import shell from "./App.module.css";
 
@@ -406,7 +407,8 @@ export function canAdminister(me: Me | null | undefined) {
     me &&
     me.status === "active" &&
     (me.permissions.includes("admin.users.read") ||
-      me.permissions.includes("admin.audit.read")),
+      me.permissions.includes("admin.audit.read") ||
+      me.permissions.includes("catalog.manage")),
   );
 }
 
@@ -417,7 +419,7 @@ export function Admin({
   me: Me | null | undefined;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  const [tab, setTab] = useState<"users" | "audit">("users");
+  const [tab, setTab] = useState<"users" | "audit" | "catalog">("users");
   if (!canAdminister(me))
     return (
       <>
@@ -449,7 +451,13 @@ export function Admin({
     );
   const users = me!.permissions.includes("admin.users.read");
   const audit = me!.permissions.includes("admin.audit.read");
-  const shown = tab === "audit" && audit ? "audit" : users ? "users" : "audit";
+  const catalog = me!.permissions.includes("catalog.manage");
+  const available = [
+    users && "users",
+    audit && "audit",
+    catalog && "catalog",
+  ].filter(Boolean) as ("users" | "audit" | "catalog")[];
+  const shown = available.includes(tab) ? tab : available[0];
   return (
     <>
       <span className={shell.eyebrow}>ADMINISTRATION</span>
@@ -457,7 +465,8 @@ export function Admin({
         Keep the table running.
       </h1>
       <p className={shell.lead}>
-        Approve new players, assign roles and review what changed, and by whom.
+        Approve new players, assign roles, review what changed and by whom, and
+        keep the card catalog current.
       </p>
       <div
         className={styles.tabs}
@@ -482,9 +491,24 @@ export function Admin({
             Audit log
           </button>
         )}
+        {catalog && (
+          <button
+            role="tab"
+            aria-selected={shown === "catalog"}
+            onClick={() => setTab("catalog")}
+          >
+            Card catalog
+          </button>
+        )}
       </div>
       <div role="tabpanel">
-        {shown === "users" ? <Users me={me!} /> : <Audit />}
+        {shown === "users" ? (
+          <Users me={me!} />
+        ) : shown === "audit" ? (
+          <Audit />
+        ) : (
+          <CatalogAdmin />
+        )}
       </div>
     </>
   );

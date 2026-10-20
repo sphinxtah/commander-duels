@@ -25,7 +25,23 @@ public record SeatView(
     List<CombatInfo> combat,
     List<CardGroup> revealed,
     List<CardGroup> lookedAt,
-    List<String> messages) {
+    List<String> messages,
+    PriorityControls priority) {
+
+    /**
+     * The seat's priority controls (UI07; see {@link Priority}); null for spectators.
+     *
+     * @param passing          how the seat is passing now (until_stack_resolved, until_next_main,
+     *                         until_end_of_turn, until_next_turn, until_end_step_before_my_turn,
+     *                         until_my_turn), or null
+     * @param yourTurn         the steps it stops at in its own turns, with an empty stack
+     * @param opponentTurn     the steps it stops at in other players' turns
+     * @param passAfterCasting it passes as soon as it has cast a spell or activated an ability,
+     *                         instead of holding priority
+     */
+    public record PriorityControls(String passing, List<String> yourTurn, List<String> opponentTurn,
+                                   boolean stopOnNewStackObjects, boolean stopOnAttackers, boolean stopOnBlockers,
+                                   boolean passAfterCasting, boolean fullControl) {}
 
     /**
      * @param colorIdentity the combined colour identity of the player's commanders in WUBRG order

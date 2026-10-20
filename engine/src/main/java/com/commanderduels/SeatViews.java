@@ -120,7 +120,8 @@ final class SeatViews {
             combat,
             revealed,
             lookedAt,
-            List.copyOf(messages));
+            List.copyOf(messages),
+            you == null ? null : Priority.controls(you));
     }
 
     private SeatView.PlayerState player(Player player, UUID viewer) {

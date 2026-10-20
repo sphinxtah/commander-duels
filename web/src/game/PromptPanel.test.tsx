@@ -98,6 +98,7 @@ function state(snap: Snapshot, pending = false): GameState {
     refusal: null,
     interrupted: false,
     crowded: false,
+    priority: null,
   };
 }
 

@@ -10,6 +10,7 @@ import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Admin, SysopSignIn } from "./Admin";
 import { client, type AdminUser, type AuditEntry, type Me } from "./api";
+import { card } from "./decks/fixtures";
 
 // The API, answered route by route. Each route takes its answers in order and keeps the last.
 type Answer = () => unknown;
@@ -283,6 +284,154 @@ describe("the audit log", () => {
     render(<Admin me={administrator} heading={createRef()} />);
     fireEvent.click(screen.getByRole("tab", { name: "Audit log" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(unavailable);
+  });
+});
+
+describe("the card catalog", () => {
+  const catalogAdministrator: Me = {
+    ...administrator,
+    permissions: ["catalog.manage"],
+  };
+  const run = {
+    id: "run-1",
+    trigger: "schedule",
+    status: "succeeded",
+    started_at: "2026-10-20T10:00:00Z",
+    finished_at: "2026-10-20T10:02:03Z",
+    error_code: null,
+    error_message: null,
+    next_attempt_at: null,
+    revision_id: 3,
+    stats: { downloaded: ["oracle_cards"], reused: ["rulings"] },
+  };
+  const status = {
+    revision: {
+      id: 3,
+      created_at: "2026-10-20T10:02:03Z",
+      engine_build: "1.4.62V1-eb69d05b",
+      counts: {},
+      changes: {},
+    },
+    last_run: run,
+    next_run_at: "2026-10-21T10:12:00Z",
+    stale: false,
+    format_versions: { legacy: 2, commander: 1 },
+    playable: 32089,
+    cards: 33500,
+  };
+  const changed = card("Changed Card");
+  const suspended = card("Held Card", {
+    status: "suspended",
+    status_reason: "suspended_by_staff",
+    playable: false,
+  });
+
+  function serveCatalog() {
+    on("GET /api/v1/catalog", () => reply(200, status));
+    on("GET /api/v1/admin/catalog/runs", () => reply(200, [run]));
+    on("GET /api/v1/catalog/coverage", () =>
+      reply(200, {
+        revision: 3,
+        engine_build: "1.4.62V1-eb69d05b",
+        formats: {
+          legacy: [
+            { status: "certified", reason: null, cards: 31711 },
+            { status: "catalog_only", reason: "not_implemented", cards: 351 },
+          ],
+          commander: [],
+        },
+      }),
+    );
+    on("GET /api/v1/admin/catalog/reviews", () =>
+      reply(200, [
+        {
+          card: changed,
+          changed: [
+            {
+              revision: 3,
+              before: { oracle_text: "Draw a card." },
+              after: { oracle_text: "Draw two cards." },
+            },
+          ],
+        },
+        { card: suspended, changed: [] },
+      ]),
+    );
+    on("GET /api/v1/cards", () =>
+      reply(200, { items: [], total: 0, page: 1, page_size: 6 }),
+    );
+  }
+
+  it("shows the sync, the engine's coverage and the cards to review", async () => {
+    serveCatalog();
+    render(<Admin me={catalogAdministrator} heading={createRef()} />);
+    // The only section this account may open is shown at once.
+    expect(screen.getByRole("tab", { name: "Card catalog" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      await screen.findByText(/32,089 playable here · catalog revision 3/),
+    ).toBeInTheDocument();
+    const runs = screen.getByRole("table", { name: "Recent catalog runs" });
+    expect(within(runs).getByText("New revision")).toBeInTheDocument();
+    expect(
+      within(runs).getByText("downloaded oracle_cards · reused rulings"),
+    ).toBeInTheDocument();
+    const legacy = screen.getByRole("table", { name: "Legacy coverage" });
+    expect(
+      within(legacy).getByText("Not supported by the game engine yet"),
+    ).toBeInTheDocument();
+    const review = screen.getByRole("listitem", { name: "Changed Card" });
+    expect(review).toHaveTextContent("“Draw a card.” → “Draw two cards.”");
+    expect(
+      screen.getByRole("button", { name: "Restore Held Card" }),
+    ).toBeInTheDocument();
+  });
+
+  it("queues a run and accepts a review", async () => {
+    serveCatalog();
+    on("POST /api/v1/admin/catalog/sync", () =>
+      reply(202, { job_id: "job-1", due_at: "2026-10-20T11:00:00Z" }),
+    );
+    on("POST /api/v1/admin/catalog/cards/{card_id}/review", () =>
+      reply(200, changed),
+    );
+    render(<Admin me={catalogAdministrator} heading={createRef()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Run the catalog sync now" }),
+    );
+    expect(await screen.findByText(/sync is queued/)).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Accept Changed Card" }),
+    );
+    expect(
+      await screen.findByText(/Changed Card: the engine's version is accepted/),
+    ).toBeInTheDocument();
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/admin/catalog/cards/{card_id}/review",
+      {
+        params: { path: { card_id: changed.id } },
+        body: { action: "accept", reason: "" },
+      },
+    );
+  });
+
+  it("says why a run cannot start", async () => {
+    serveCatalog();
+    on("POST /api/v1/admin/catalog/sync", () =>
+      reply(409, {
+        code: "sync_busy",
+        message: "A catalog run is already queued or running.",
+      }),
+    );
+    render(<Admin me={catalogAdministrator} heading={createRef()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Run the catalog sync now" }),
+    );
+    expect(
+      await screen.findByText("A catalog run is already queued or running."),
+    ).toBeInTheDocument();
   });
 });
 

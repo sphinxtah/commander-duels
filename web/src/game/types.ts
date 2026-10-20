@@ -23,8 +23,17 @@ export type PromptKind =
   | "assign_amounts"
   | "unsupported";
 
+export type PassMode =
+  | "pass_until_stack_resolved"
+  | "pass_until_next_main"
+  | "pass_until_end_of_turn"
+  | "pass_until_next_turn"
+  | "pass_until_end_step_before_my_turn"
+  | "pass_until_my_turn";
+
 export type OptionAction =
   | "pass"
+  | PassMode
   | "cast"
   | "play_land"
   | "activate"
@@ -194,6 +203,47 @@ export interface GameView {
   revealed: CardGroup[];
   looked_at: CardGroup[];
   messages: string[];
+  /** The seat's priority controls; null for spectators. */
+  priority: PriorityControls | null;
+}
+
+export type Step =
+  | "upkeep"
+  | "draw"
+  | "main1"
+  | "before_combat"
+  | "end_of_combat"
+  | "main2"
+  | "end_of_turn";
+
+export interface PriorityControls {
+  passing:
+    | null
+    | "until_stack_resolved"
+    | "until_next_main"
+    | "until_end_of_turn"
+    | "until_next_turn"
+    | "until_end_step_before_my_turn"
+    | "until_my_turn";
+  your_turn: Step[];
+  opponent_turn: Step[];
+  stop_on_new_stack_objects: boolean;
+  stop_on_attackers: boolean;
+  stop_on_blockers: boolean;
+  pass_after_casting: boolean;
+  full_control: boolean;
+}
+
+/** A change to the priority controls; what is left out stays as it is. */
+export interface PrioritySettings {
+  your_turn?: Step[];
+  opponent_turn?: Step[];
+  stop_on_new_stack_objects?: boolean;
+  stop_on_attackers?: boolean;
+  stop_on_blockers?: boolean;
+  pass_after_casting?: boolean;
+  full_control?: boolean;
+  cancel_passes?: boolean;
 }
 
 export interface GameResultView {
@@ -275,9 +325,12 @@ export interface CommandEnvelope {
   action_id: string;
   expected_revision: number;
   prompt_id?: string;
-  type: "submit_choice" | "concede";
+  type: "submit_choice" | "concede" | "set_priority";
   payload:
-    { option_id: string } | { amounts: number[] } | Record<string, never>;
+    | { option_id: string }
+    | { amounts: number[] }
+    | PrioritySettings
+    | Record<string, never>;
 }
 
 export interface CommandResult {

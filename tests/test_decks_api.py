@@ -191,6 +191,18 @@ def test_deck_lifecycle_drafts_and_revisions(client):
     assert (renamed["title"], renamed["notes"]) == ("Red Deck Wins", "sideboard plan")
     assert ada.send("POST", f"{path}/archive").json()["archived"] is True
     assert ada.get("/api/v1/decks").json() == []
+    # A pair of commanders leaves 98 cards beside them.
+    pair = ada.send(
+        "POST",
+        "/api/v1/decks/guided",
+        {
+            "format": "commander",
+            "commander_id": card_id(client, "Thrasios, Triton Hero"),
+            "partner_id": card_id(client, "Tymna the Weaver"),
+        },
+    ).json()
+    assert sum(item["quantity"] for item in pair["entries"]) == 100
+    assert pair["validation"]["errors"] == []
     assert [d["title"] for d in ada.get("/api/v1/decks", view="archived").json()] == [
         "Red Deck Wins"
     ]
@@ -624,3 +636,49 @@ def test_practice_games_bind_your_own_deck_revisions(url, starters):
             for table in ("deck_entries", "deck_revisions", "decks", "sessions", "users"):
                 db.execute(text(f"DELETE FROM {table}"))
             db.commit()
+
+
+def test_guided_decks_are_playable_and_explain_every_card(client):
+    """DECK06 on the test catalog: a Commander deck from its commander, a Legacy deck from its
+    colors; every card playable and within the colors, with its reason, and nothing saved."""
+    ada = Account(client, "ada")
+    kenrith = card_id(client, "Kenrith, the Returned King")
+    commander = ada.send(
+        "POST",
+        "/api/v1/decks/guided",
+        {"format": "commander", "commander_id": kenrith, "theme": "tokens", "experience": "new"},
+    ).json()
+    entries = commander["entries"]
+    assert sum(item["quantity"] for item in entries) == 100
+    assert [item["card_id"] for item in entries if item["location"] == "commander"] == [kenrith]
+    assert commander["validation"]["errors"] == [] and commander["validation"]["playable"]
+    assert all(commander["cards"][item["card_id"]]["playable"] for item in entries)
+    assert all(item["reason"] for item in commander["suggestions"])
+    assert commander["note"]
+
+    legacy = ada.send(
+        "POST", "/api/v1/decks/guided", {"format": "legacy", "colors": "R", "theme": "aggro"}
+    ).json()
+    main = [item for item in legacy["entries"] if item["location"] == "main"]
+    assert sum(item["quantity"] for item in main) == 60
+    assert legacy["validation"]["errors"] == []
+    for item in main:
+        assert set(legacy["cards"][item["card_id"]]["color_identity"]) <= {"R"}
+    # A proposal saves nothing until the player keeps it.
+    assert ada.get("/api/v1/decks").json() == []
+    # A pair of commanders leaves 98 cards beside them.
+    pair = ada.send(
+        "POST",
+        "/api/v1/decks/guided",
+        {
+            "format": "commander",
+            "commander_id": card_id(client, "Thrasios, Triton Hero"),
+            "partner_id": card_id(client, "Tymna the Weaver"),
+        },
+    ).json()
+    assert sum(item["quantity"] for item in pair["entries"]) == 100
+    assert pair["validation"]["errors"] == []
+    # Another player's request needs the builder's permission like every deck route.
+    pending = Account(client, "pat", status="pending")
+    refused = pending.send("POST", "/api/v1/decks/guided", {"format": "legacy", "colors": "R"})
+    assert refused.status_code == 403

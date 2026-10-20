@@ -7,6 +7,22 @@ type Options = components["schemas"]["PracticeOptions"];
 type GameSummary = components["schemas"]["GameSummary"];
 type Request = components["schemas"]["PracticeGameRequest"];
 type Deck = NonNullable<Request["deck"]>;
+type OwnDeck = components["schemas"]["DeckSummary"];
+/** Own decks ride in the deck selects as "own:<id>"; fixture decks by name. */
+const OWN = "own:";
+
+/** The deck a "Play it" link from the deck builder asked for (#play?deck=<id>). */
+function requestedDeck(): string | undefined {
+  const query = window.location.hash.split("?")[1];
+  return query
+    ? (new URLSearchParams(query).get("deck") ?? undefined)
+    : undefined;
+}
+
+function seatChoice(value: string): { deck?: Deck; deck_id?: string } {
+  if (value.startsWith(OWN)) return { deck_id: value.slice(OWN.length) };
+  return value ? { deck: value as Deck } : {};
+}
 
 /** "commander-mono-red-raiders" reads "Mono-red raiders". */
 export function deckName(deck: string | null | undefined): string {
@@ -48,7 +64,40 @@ function outcome(game: GameSummary): string {
   return `${kinds[result.kind] ?? "Finished"} after ${turns}`;
 }
 
+function DeckOptions({
+  fixtures,
+  own,
+}: {
+  fixtures: string[];
+  own: OwnDeck[];
+}) {
+  return (
+    <>
+      {own.length > 0 && (
+        <optgroup label="Your decks">
+          {own.map((d) => (
+            <option key={d.id} value={`${OWN}${d.id}`} disabled={!d.playable}>
+              {d.title}
+              {d.playable ? "" : " (not playable yet)"}
+            </option>
+          ))}
+        </optgroup>
+      )}
+      <optgroup label="Starter decks">
+        {fixtures.map((d) => (
+          <option key={d} value={d}>
+            {deckName(d)}
+          </option>
+        ))}
+      </optgroup>
+    </>
+  );
+}
+
 const refusals: Record<string, string> = {
+  deck_not_playable:
+    "That deck has problems to fix first: open it in the deck builder to see them.",
+  invalid_deck: "That deck cannot be played in this format.",
   game_limit:
     "You already have a game running. Resume it or close it below first.",
   games_busy: "Every table is busy right now. Try again in half a minute.",
@@ -104,6 +153,8 @@ function Table({ me }: { me: Me }) {
   const [deckList, setDeckList] = useState("");
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<string[]>([]);
+  const [ownDecks, setOwnDecks] = useState<OwnDeck[]>([]);
+  const [requested, setRequested] = useState(requestedDeck);
 
   const refresh = useCallback(async () => {
     const { data } = await client.GET("/api/v1/games", {
@@ -115,7 +166,16 @@ function Table({ me }: { me: Me }) {
   useEffect(() => {
     void client.GET("/api/v1/practice-games/options").then(({ data }) => {
       if (data) setOptions(data);
+      if (data?.own_decks)
+        void client
+          .GET("/api/v1/decks", { params: { query: { view: "active" } } })
+          .then(({ data: decks }) => setOwnDecks(decks ?? []));
     });
+  }, []);
+  useEffect(() => {
+    const change = () => setRequested(requestedDeck());
+    window.addEventListener("hashchange", change);
+    return () => window.removeEventListener("hashchange", change);
   }, []);
   useEffect(() => {
     void refresh();
@@ -126,6 +186,18 @@ function Table({ me }: { me: Me }) {
     setDeck("");
     setBotDecks(["", "", ""]);
   }, [format, options]);
+  useEffect(() => {
+    // A deck asked for by a link from the deck builder: its format, then the deck itself. It
+    // runs after the reset above, which a change of format also triggers.
+    const wanted = ownDecks.find((d) => d.id === requested);
+    if (!wanted) return;
+    if (wanted.format !== format) setFormat(wanted.format);
+    else {
+      setDeck(`${OWN}${wanted.id}`);
+      document.getElementById("practice")?.scrollIntoView();
+      setRequested(undefined);
+    }
+  }, [ownDecks, requested, format]);
   useEffect(() => {
     if (!useList || query.trim().length < 2) {
       setFound([]);
@@ -152,13 +224,11 @@ function Table({ me }: { me: Me }) {
       bot_skill: skill,
       turn_cap: turnCap,
       bots: Array.from({ length: bots }, (_, i) =>
-        botDecks[i] ? { deck: botDecks[i] as Deck } : {},
+        seatChoice(botDecks[i] ?? ""),
       ),
       ...(useList && deckList.trim()
         ? { deck_list: deckList }
-        : deck
-          ? { deck: deck as Deck }
-          : {}),
+        : seatChoice(deck)),
     };
     const { data, error: failure } = await client.POST(
       "/api/v1/practice-games",
@@ -231,11 +301,10 @@ function Table({ me }: { me: Me }) {
             onChange={(event) => setDeck(event.target.value)}
           >
             <option value="">Any free fixture deck</option>
-            {chosenFormat?.decks.map((d) => (
-              <option key={d} value={d}>
-                {deckName(d)}
-              </option>
-            ))}
+            <DeckOptions
+              fixtures={chosenFormat?.decks ?? []}
+              own={ownDecks.filter((d) => d.format === format)}
+            />
           </select>
         </label>
         {chosenFormat && chosenFormat.bots.length > 1 && (
@@ -269,11 +338,10 @@ function Table({ me }: { me: Me }) {
               }
             >
               <option value="">Any free fixture deck</option>
-              {chosenFormat?.decks.map((d) => (
-                <option key={d} value={d}>
-                  {deckName(d)}
-                </option>
-              ))}
+              <DeckOptions
+                fixtures={chosenFormat?.decks ?? []}
+                own={ownDecks.filter((d) => d.format === format)}
+              />
             </select>
           </label>
         ))}

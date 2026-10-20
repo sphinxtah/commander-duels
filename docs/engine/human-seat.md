@@ -36,7 +36,7 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 
 | Kind | XMage request | Options | Answer sent to XMage |
 | --- | --- | --- | --- |
-| `priority` | `SELECT` from `firePriorityEvent` | `pass`; one option per playable object (`play_land`, `cast`, `activate`, `activate_mana`), from `getPlayable` | boolean; object UUID |
+| `priority` | `SELECT` from `firePriorityEvent` | `pass`; one option per playable object (`play_land`, `cast`, `activate`, `activate_mana`), from `getPlayable`; since v0.2.0 the pass modes (`pass_until_stack_resolved` with a non-empty stack, `pass_until_next_main`, `pass_until_end_of_turn`, `pass_until_next_turn`, `pass_until_end_step_before_my_turn`, `pass_until_my_turn`) | boolean; object UUID; a pass mode is XMage's matching `PlayerAction`, sent as its client does |
 | `mulligan` | `ASK` with Mulligan/Keep buttons | `mulligan`, `keep` | boolean |
 | `yes_no` | `ASK` (optional effects, "mana will be lost" confirmations) | `yes`, `no`, with XMage's button labels | boolean |
 | `choose_target` | `PICK_TARGET` (targets, the starting player, the attacker to block, cards to put on the bottom or discard) | `choose` per candidate (players by seat, objects by opaque ID, already chosen ones marked `selected`); `done` when not required | UUID; boolean |
@@ -50,6 +50,21 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 None of the unsupported families occurred in the scripted games: the fixture decks have no modal spells, X costs, named choices, piles or simultaneous triggers that need ordering. XMage's `PERSONAL_MESSAGE` events ("You have to attack with...") become the view's `messages`, not prompts.
 
 **Paying beyond the battlefield** (since v0.1.1). XMage lists a spell as castable when mana from the hand (Simian Spirit Guide) or a special payment (convoke, delve, improvise) could pay for it. Before v0.1.1 the payment prompt offered neither, so such a cast could end at a payment whose only option was cancel. After `special_payment`, XMage asks with `choose_ability` which special payment to use, then with `choose_target` which creatures, cards or artifacts it uses, and for convoke sometimes with `choose_choice` for the colour. Pay with mana abilities first: once a special payment is used, XMage refuses further mana abilities for that spell, as its own client does.
+
+## Priority controls
+
+Since v0.2.0 (UI07), on XMage's own human player, so XMage's rules for when a pass ends are the engine's:
+- **Pass modes** are options of the priority prompt (above). Choosing one sends XMage the player action its client sends, which passes now and keeps passing until its end. XMage ends a pass early when an object is put on the stack (if the seat stops for new stack objects), and at the declare attackers and declare blockers steps (if it stops there). Choices the seat must make, such as blockers, are still asked.
+- **`set_priority`** changes the seat's settings, in the command envelope with no `prompt_id`, so it works while the engine is passing. Its payload holds at least one of:
+  - `your_turn` and `opponent_turn`: the steps where an empty stack gives the seat priority, from `upkeep`, `draw`, `main1`, `before_combat`, `end_of_combat`, `main2` and `end_of_turn` (XMage's default: `main1` and `main2` in every turn);
+  - `stop_on_new_stack_objects`, `stop_on_attackers`, `stop_on_blockers`: what ends a pass;
+  - `pass_after_casting`: false (the default) holds priority after the seat casts or activates;
+  - `full_control`: true stops at every step and every new object and holds priority after casting; false restores XMage's defaults;
+  - `cancel_passes`: true ends a pass in progress.
+- **The reply** (200) carries the seat's controls as `priority`, the same object as the view's `priority`: the settings above plus `passing`, the pass in progress (`until_my_turn` and the like) or null. A finished game refuses with 409 `game_over`; an unknown step or setting is a 400 `invalid_command`. A repeated action ID returns its first result, as for every command.
+- **Views.** Each seat's view has `priority`; a spectator's view has null. The settings live in the seat's XMage `UserData` and last for the game.
+
+`PriorityControlsTest` holds priority with a spell on the stack and with a nested stack, passes until the next turn and checks no prompt follows in that turn, turns full control on (the seat is then asked in its upkeep) and off again, cancels a payment, and checks the command's validation.
 
 ## Authorized views
 
@@ -85,7 +100,7 @@ These exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. The en
 | --- | --- | --- |
 | `POST /v1/games` | Start a game: optional `format` (`legacy` or `commander`), `seats` (players in turn order, each `{"player": "human" or "bot", "deck"?}`), `seed`, `skill` (1–6), `turn_cap` (1–200) and `idle_timeout_seconds` (5–3600); out-of-range numbers are clamped | 201 `game_id`, `seats` (each with its `seat_token`, returned once, or `null` for a bot) and `settings`; 400 for a malformed table; 429 `games_busy` with `Retry-After` |
 | `GET /v1/games/{id}/view` | The seat's snapshot, or with the spectator token the public one (since v0.0.4). `since` and `wait_ms` (up to 30 s) long-poll for a newer revision; `log_from` pages the log (up to 200 lines) | 200 snapshot |
-| `POST /v1/games/{id}/commands` | `submit_choice` or `concede`, in the [command envelope](../../contracts/engine-command.schema.json) | 200 accepted; 400 `invalid_command`; 409 or 422 refusals as listed above, plus 409 `eliminated` for a second concession |
+| `POST /v1/games/{id}/commands` | `submit_choice`, `concede` or (since v0.2.0) `set_priority`, in the [command envelope](../../contracts/engine-command.schema.json) | 200 accepted; 400 `invalid_command`; 409 or 422 refusals as listed above, plus 409 `eliminated` for a second concession |
 | `POST /v1/games/{id}/close` | End the game for every seat: all seats concede, and the result records `closed` | 200 `finished` or `closing` |
 
 Every game request needs `Authorization: Bearer <seat_token>`, and the token alone selects the seat: the view, prompt and commands are that seat's. No body field can choose one: the envelope rejects unknown fields such as `seat`. An unknown game and a wrong token both return 404 `not_found`.
@@ -160,6 +175,6 @@ Results:
 - **AI hidden information (AI02).** The bot's search reads the human's hand. Its own backlog row.
 - **Recovery.** Journals, snapshots, reconnect and worker fencing (NET08–10).
 - **Seats.** The human is always seat 0, with no seat ownership, sign-in or controller lease. FastAPI does not route game actions yet.
-- **Timers and stops.** No timers or clocks (NET11–12), and no configurable stops (UI07).
+- **Timers.** No timers or clocks (NET11–12). Configurable stops and pass modes arrived in v0.2.0 (UI07).
 - **Prompt families.** The unsupported families above, plus multiplayer and watcher views.
 - **Browser interface.** That is v0.1.0, the first version with a UI you can use.

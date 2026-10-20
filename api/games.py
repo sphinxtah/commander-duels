@@ -183,6 +183,25 @@ class ChoicePayload(BaseModel):
     )
 
 
+PriorityStep = Literal[
+    "upkeep", "draw", "main1", "before_combat", "end_of_combat", "main2", "end_of_turn"
+]
+
+
+class PriorityPayload(BaseModel):
+    """A change to the seat's priority controls (UI07); left out, a setting stays as it is."""
+
+    model_config = ConfigDict(extra="forbid")
+    your_turn: list[PriorityStep] | None = Field(default=None, max_length=7)
+    opponent_turn: list[PriorityStep] | None = Field(default=None, max_length=7)
+    stop_on_new_stack_objects: bool | None = None
+    stop_on_attackers: bool | None = None
+    stop_on_blockers: bool | None = None
+    pass_after_casting: bool | None = None
+    full_control: bool | None = None
+    cancel_passes: bool | None = None
+
+
 class GameCommand(BaseModel):
     model_config = ConfigDict(extra="forbid")
     v: Literal[1]
@@ -190,11 +209,22 @@ class GameCommand(BaseModel):
     action_id: UUID
     expected_revision: int = Field(ge=0)
     prompt_id: UUID | None = None
-    type: Literal["submit_choice", "concede"]
-    payload: ChoicePayload
+    type: Literal["submit_choice", "concede", "set_priority"]
+    payload: ChoicePayload | PriorityPayload
 
     @model_validator(mode="after")
     def payload_matches_type(self) -> "GameCommand":
+        if self.type == "set_priority":
+            settings = self.payload
+            if not isinstance(settings, PriorityPayload) or not settings.model_dump(
+                exclude_none=True
+            ):
+                raise ValueError("set_priority needs at least one setting")
+            if self.prompt_id is not None:
+                raise ValueError("set_priority takes no prompt_id")
+            return self
+        if not isinstance(self.payload, ChoicePayload):
+            raise ValueError("submit_choice and concede take a choice payload")
         chosen = (self.payload.option_id is not None) + (self.payload.amounts is not None)
         if self.type == "submit_choice" and (self.prompt_id is None or chosen != 1):
             raise ValueError("submit_choice needs prompt_id and one of option_id and amounts")

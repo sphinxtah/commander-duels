@@ -527,12 +527,15 @@ function Sessions({
                 {when(session.absolute_expires_at)}
               </small>
             </div>
+            {/* Named for its session: beside this browser's own "Sign out", a second button
+                of the same name would leave a screen reader guessing which one ends what. */}
             {!session.current && (
               <button
                 className={styles.secondary}
+                aria-label={`End the session in ${session.user_agent ?? "an unknown browser"}, signed in ${when(session.created_at)}`}
                 onClick={() => void end(session)}
               >
-                Sign out
+                End the session
               </button>
             )}
           </li>

@@ -13,7 +13,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.config import Settings
-from api.models import CatalogRevision, CatalogSyncRun, ScheduledJob, SourceSnapshot
+from api.models import (
+    CardConcept,
+    CatalogRevision,
+    CatalogSyncRun,
+    ScheduledJob,
+    SourceSnapshot,
+)
 from catalog import sync
 from catalog.scryfall import DATASETS
 
@@ -36,6 +42,7 @@ class Scryfall:
         self.updated = {dataset: UPDATED for dataset in DATASETS}
         self.export = engine_list()
         self.list_status = 200
+        self.engine_up = True
         self.cut_short: str | None = None
         self.requests: list[str] = []
 
@@ -71,6 +78,8 @@ class Scryfall:
                 200, stream=httpx.ByteStream(body), headers={"ETag": f'"{dataset}"'}
             )
         if request.url.path == "/health":
+            if not self.engine_up:
+                return httpx.Response(503, json={"status": "loading"})
             return httpx.Response(200, json={"implementations": {"build": self.export["build"]}})
         if request.url.path == "/v1/service/implementations":
             assert request.headers["X-Service-Token"] == "t" * 32
@@ -160,6 +169,43 @@ def test_a_broken_transfer_retries_with_backoff_and_keeps_the_catalog(tmp_path):
         failed = session.get(CatalogSyncRun, broken.run_id)
         assert failed.status == "failed" and failed.next_attempt_at is not None
         assert not (Path(config.catalog_dir) / "default_cards.jsonl.gz.part").exists()
+
+
+def test_the_first_import_waits_for_the_engine_and_later_ones_do_not(tmp_path):
+    engine = database(tmp_path)
+    config = settings(tmp_path)
+    fake = Scryfall()
+    # A deploy starts the worker while the engine still loads: nothing is downloaded or written.
+    fake.engine_up = False
+    waiting = run(engine, config, fake)
+    assert (waiting.status, waiting.code) == ("pending", "engine_unavailable")
+    assert waiting.retry_at is not None
+    assert not any(path.endswith(".jsonl.gz") for path in fake.requests)
+    with Session(engine) as session:
+        assert session.scalar(select(func.count()).select_from(CatalogRevision)) == 0
+    fake.engine_up = True
+    first = run(engine, config, fake)
+    assert first.code == "imported"
+    with Session(engine) as session:
+        playable = session.scalar(
+            select(func.count()).select_from(CardConcept).where(CardConcept.status == "certified")
+        )
+    assert playable > 0
+    # Once the catalog has met the engine, a run without it goes ahead and keeps the statuses.
+    fake.engine_up = False
+    fake.updated["rulings"] = "2026-10-21T09:00:00+00:00"
+    later = run(engine, config, fake)
+    assert later.code == "imported"
+    with Session(engine) as session:
+        assert session.get(CatalogRevision, later.revision_id).engine_build is None
+        assert (
+            session.scalar(
+                select(func.count())
+                .select_from(CardConcept)
+                .where(CardConcept.status == "certified")
+            )
+            == playable
+        )
 
 
 def test_rate_limits_retry_and_settle_reschedules_the_job(tmp_path):

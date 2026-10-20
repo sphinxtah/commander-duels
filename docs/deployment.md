@@ -140,6 +140,8 @@ The site stays down until you run those commands or deploy a fixed tag.
 
 **Migrations keep the previous version working.** From step 4 until step 5 replaces them, a few seconds, the running API and worker use the newly migrated database. So a migration only adds what the previous version can ignore: tables, columns that are nullable or have a default, indexes. Dropping or renaming a table or column the previous version uses, or a backfill of data it keeps writing, waits for a later version that no longer uses it (expand, then contract).
 
+**The card catalog (since v0.2.0).** The worker keeps Scryfall's bulk files in the `catalog_data` volume, which the first deploy of v0.2.0 creates; nothing in `.env` changes. Its first sync is due as soon as it starts: it downloads about 115 MB and takes about two minutes, during which the Cards page says the catalog is not imported yet and the deck builder finds no cards. If the engine is still loading, the sync waits for it and retries. The database grows by about 450 MB. After that the sync runs daily at 10:00 UTC (plus up to 30 minutes), and an unchanged day downloads nothing. Administration → Card catalog shows each run, and "Run the catalog sync now" queues one.
+
 **Running games end.** Restarting the API interrupts every running game (recovery journals, NET08–NET09, are later work). Deploy when no one is playing.
 
 **Rolling back.** A version runs only on a database at its own last migration. Its migrate step cannot find a newer revision, and its API reports ready only at its own. So:
@@ -178,7 +180,7 @@ Without the restore, `deploy.sh` refuses the previous tag at its migrate step, b
 
   The database ends up exactly as dumped, or empty if the restore fails. It is never a mix of the dump and the tables, columns or rows a newer version added, as v0.1.0's `pg_restore --clean` into the live database could leave. The API and the worker stay stopped until `deploy.sh` starts the version with that last migration. A `pre-<tag>` dump belongs to the version that ran before `<tag>`. A nightly or `pre-restore` dump belongs to the version running when it was taken. The web container keeps running: its nginx asks Docker's DNS for the API's new address every 10 seconds.
 
-The card image cache (`card_images` volume) needs no backup: the API fetches any missing image again.
+The card image cache (`card_images` volume) needs no backup: the API fetches any missing image again. Nor do Scryfall's bulk files (`catalog_data`, since v0.2.0): the worker downloads them again. The catalog itself is in the database, so the dumps hold it, and a restore brings back its revisions with the decks that refer to them.
 
 ## Checking the live site
 
@@ -192,6 +194,8 @@ After the first deploy and at each version's close-out:
 | `/#sysop` from a phone on mobile data | The Play page (SysOp's entrance does not exist off the LAN) |
 | `/#sysop` from the home LAN | SysOp's sign-in |
 | A practice game | Plays to the end. The game WebSocket stays open while a player thinks, and card images load |
+| Administration → Card catalog (since v0.2.0) | The last run succeeded, with a catalog revision and the playable count; the Cards page searches |
+| A deck of your own (since v0.2.0) | Imported or built in the deck builder, "Ready to play", and played at the practice table |
 | Google sign-in by a listed test user | A pending account, which SysOp approves under Administration |
 
 ## Configuration

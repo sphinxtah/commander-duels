@@ -63,7 +63,8 @@
               "you": {"type": "null"},
               "hand": {"maxItems": 0},
               "looked_at": {"maxItems": 0},
-              "messages": {"maxItems": 0}
+              "messages": {"maxItems": 0},
+              "priority": {"type": "null"}
             }
           }
         ]
@@ -111,7 +112,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9]{1,16}$"},
         "action": {
-          "enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "choose_mode", "put_first", "choose_pile"]
+          "enum": ["pass", "pass_until_stack_resolved", "pass_until_next_main", "pass_until_end_of_turn", "pass_until_next_turn", "pass_until_end_step_before_my_turn", "pass_until_my_turn", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "choose_mode", "put_first", "choose_pile"]
         },
         "label": {"$ref": "#/$defs/nullableString"},
         "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},
@@ -146,7 +147,7 @@
     "view": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["seat", "turn", "active_seat", "priority_seat", "phase", "step", "you", "opponents", "hand", "battlefield", "stack", "combat", "revealed", "looked_at", "messages"],
+      "required": ["seat", "turn", "active_seat", "priority_seat", "phase", "step", "you", "opponents", "hand", "battlefield", "stack", "combat", "revealed", "looked_at", "messages", "priority"],
       "properties": {
         "seat": {"$ref": "#/$defs/nullableSeat"},
         "turn": {"type": "integer", "minimum": 0},
@@ -168,7 +169,24 @@
         "combat": {"type": "array", "items": {"$ref": "#/$defs/combat"}},
         "revealed": {"type": "array", "items": {"$ref": "#/$defs/cardGroup"}},
         "looked_at": {"type": "array", "items": {"$ref": "#/$defs/cardGroup"}},
-        "messages": {"type": "array", "maxItems": 10, "items": {"type": "string"}}
+        "messages": {"type": "array", "maxItems": 10, "items": {"type": "string"}},
+        "priority": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/priorityControls"}]}
+      }
+    },
+    "priorityControls": {
+      "description": "The seat's priority controls (UI07): how it is passing now, and where it stops. Null for spectators.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passing", "your_turn", "opponent_turn", "stop_on_new_stack_objects", "stop_on_attackers", "stop_on_blockers", "pass_after_casting", "full_control"],
+      "properties": {
+        "passing": {"enum": [null, "until_stack_resolved", "until_next_main", "until_end_of_turn", "until_next_turn", "until_end_step_before_my_turn", "until_my_turn"]},
+        "your_turn": {"type": "array", "maxItems": 7, "items": {"enum": ["upkeep", "draw", "main1", "before_combat", "end_of_combat", "main2", "end_of_turn"]}},
+        "opponent_turn": {"type": "array", "maxItems": 7, "items": {"enum": ["upkeep", "draw", "main1", "before_combat", "end_of_combat", "main2", "end_of_turn"]}},
+        "stop_on_new_stack_objects": {"type": "boolean"},
+        "stop_on_attackers": {"type": "boolean"},
+        "stop_on_blockers": {"type": "boolean"},
+        "pass_after_casting": {"type": "boolean"},
+        "full_control": {"type": "boolean"}
       }
     },
     "player": {

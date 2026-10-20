@@ -9,7 +9,7 @@ from api.main import create_app
 from api.version import APP_VERSION
 
 
-def test_framework_is_live_and_only_practice_play_is_available(tmp_path):
+def test_framework_is_live_and_practice_play_cards_and_decks_are_available(tmp_path):
     app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/app.db"))
     with TestClient(app) as client:
         response = client.get("/api/v1/health")
@@ -19,9 +19,10 @@ def test_framework_is_live_and_only_practice_play_is_available(tmp_path):
         assert client.get("/api/v1/ready").status_code == 503
         bootstrap = client.get("/api/v1/bootstrap").json()
         assert bootstrap["collection_policy"] == "open_collection"
-        # Practice games against bots are playable since v0.1.0; the rest is still planned.
+        # Practice games against bots are playable since v0.1.0, and the card catalog and decks
+        # since v0.2.0; the rest is still planned.
         available = {item["id"] for item in bootstrap["capabilities"] if item["available"]}
-        assert available == {"gameplay"}
+        assert available == {"gameplay", "catalog", "decks"}
         gameplay = next(item for item in bootstrap["capabilities"] if item["id"] == "gameplay")
         assert gameplay["name"] == "Practice play" and "playable" in gameplay["reason"]
         formats = client.get("/api/v1/formats").json()

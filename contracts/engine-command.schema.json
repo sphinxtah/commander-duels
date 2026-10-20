@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:commander-duels:engine-command:v1",
   "title": "EngineCommand",
-  "description": "Internal adapter envelope. The engine's development game endpoints accept submit_choice and concede from a seat; the other operations remain unimplemented. Authentication, authorization and controller lease are server context, never client-selected seats: the engine selects the seat from its seat token.",
+  "description": "Internal adapter envelope. The engine's development game endpoints accept submit_choice, concede and set_priority from a seat; the other operations remain unimplemented. Authentication, authorization and controller lease are server context, never client-selected seats: the engine selects the seat from its seat token.",
   "type": "object",
   "additionalProperties": false,
   "required": ["v", "game_id", "action_id", "expected_revision", "type", "payload"],
@@ -12,7 +12,7 @@
     "action_id": {"type": "string", "format": "uuid"},
     "expected_revision": {"type": "integer", "minimum": 0},
     "prompt_id": {"type": "string", "format": "uuid"},
-    "type": {"enum": ["create_game", "submit_choice", "get_authorized_view", "checkpoint", "restore", "advance_bot", "validate_deck", "close_game", "concede"]},
+    "type": {"enum": ["create_game", "submit_choice", "get_authorized_view", "checkpoint", "restore", "advance_bot", "validate_deck", "close_game", "concede", "set_priority"]},
     "payload": {"type": "object", "maxProperties": 32}
   },
   "allOf": [
@@ -23,6 +23,10 @@
     {
       "if": {"properties": {"type": {"const": "concede"}}},
       "then": {"properties": {"payload": {"type": "object", "maxProperties": 0}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "set_priority"}}},
+      "then": {"not": {"required": ["prompt_id"]}, "properties": {"payload": {"$ref": "#/$defs/priority"}}}
     }
   ],
   "$defs": {
@@ -35,6 +39,22 @@
         "amounts": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"type": "integer", "minimum": 0, "maximum": 10000}}
       },
       "oneOf": [{"required": ["option_id"]}, {"required": ["amounts"]}]
+    },
+    "priority": {
+      "description": "A change to the seat's priority controls (UI07); settings left out stay as they are. Steps are where the seat stops with an empty stack. full_control stops everywhere; false returns to the default stops. cancel_passes ends a pass at once.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "your_turn": {"type": "array", "maxItems": 7, "items": {"enum": ["upkeep", "draw", "main1", "before_combat", "end_of_combat", "main2", "end_of_turn"]}},
+        "opponent_turn": {"type": "array", "maxItems": 7, "items": {"enum": ["upkeep", "draw", "main1", "before_combat", "end_of_combat", "main2", "end_of_turn"]}},
+        "stop_on_new_stack_objects": {"type": "boolean"},
+        "stop_on_attackers": {"type": "boolean"},
+        "stop_on_blockers": {"type": "boolean"},
+        "pass_after_casting": {"type": "boolean"},
+        "full_control": {"type": "boolean"},
+        "cancel_passes": {"type": "boolean"}
+      }
     }
   }
 }

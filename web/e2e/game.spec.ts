@@ -34,6 +34,8 @@ class Table {
   frames = 0;
   problems: string[] = [];
   results: { action_id: string; status: number; body: unknown }[] = [];
+  /** Every pass in progress a view reported (UI07). */
+  readonly passing = new Set<string>();
   readonly publicNames = new Set<string>();
   /** Concealed names the log mentioned before any view showed them, by revision. */
   readonly pending = new Map<string, number>();
@@ -75,6 +77,7 @@ class Table {
     const snapshot = message.snapshot;
     this.snapshots += 1;
     const view = snapshot.view;
+    if (view?.priority?.passing) this.passing.add(view.priority.passing);
     if (view) {
       // Everything public in this snapshot may be named from now on.
       for (const permanent of view.battlefield)
@@ -677,6 +680,112 @@ test.describe("practice games in the browser", () => {
       .poll(() => Boolean(table.latest?.result), { timeout: 60_000 })
       .toBe(true);
     await closeContext(context);
+  });
+
+  test("a deck of your own, with full control and a pass until your next turn", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    const mine = new Set(["Lightning Bolt", "Hill Giant", "Mountain"]);
+    const fixtures = new Set([
+      ...deckNames("legacy-mono-red-burn"),
+      ...deckNames("legacy-mono-green-creatures"),
+    ]);
+    const table = new Table(
+      page,
+      mine,
+      new Set([...fixtures].filter((n) => !mine.has(n))),
+    );
+    await signInSysop(page);
+    const catalog = await page.evaluate(async () => {
+      const response = await fetch("/api/v1/catalog");
+      return (await response.json()) as { revision: object | null };
+    });
+    test.skip(
+      !catalog.revision,
+      "Needs a card catalog: run scripts/load_fixture_catalog.py.",
+    );
+
+    // A deck of the player's own, from the deck builder to the table (DECK01).
+    await page.goto("/#decks");
+    await page.getByRole("button", { name: "Import a list" }).click();
+    const importer = page.getByRole("dialog", { name: "Import a deck list" });
+    await importer.getByRole("radio", { name: "Legacy" }).check();
+    await importer
+      .getByLabel("Deck list")
+      .fill(["4 Lightning Bolt", "4 Hill Giant", "52 Mountain"].join("\n"));
+    await importer.getByRole("button", { name: "Preview" }).click();
+    await importer.getByLabel("Deck name").fill(`Game journey ${Date.now()}`);
+    await importer.getByRole("button", { name: "Create the deck" }).click();
+    await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
+    await page
+      .getByRole("link", { name: "Play it at the practice table" })
+      .click();
+    const practice = page.getByRole("region", {
+      name: "Sit down against the bots",
+    });
+    await expect(practice.getByLabel("Your deck")).toHaveValue(/^own:/);
+    await practice.getByLabel(/Bot skill/).fill("1");
+    await practice.getByLabel("Turn limit").fill("8");
+    await practice.getByRole("button", { name: "Start the game" }).click();
+    await expect(page).toHaveURL(/#game\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+
+    // Play up to the first priority prompt that offers to pass until the next turn.
+    class Reached extends Error {}
+    const reached = await play(page, table, "mouse", async (now) => {
+      if (now.prompt?.options.some((o) => o.action === "pass_until_my_turn"))
+        throw new Reached();
+    }).then(
+      () => false,
+      (error: unknown) => {
+        if (error instanceof Reached) return true;
+        throw error;
+      },
+    );
+    expect(reached, "no priority prompt offered the pass modes").toBe(true);
+
+    // Full control stops everywhere; turned off, the stops are the defaults again.
+    const priority = page.getByRole("region", { name: "Priority" });
+    const full = priority.getByRole("checkbox", { name: /Full control/ });
+    await expect(full).not.toBeChecked();
+    await full.click();
+    await expect(full).toBeChecked();
+    expect(table.results.at(-1)).toMatchObject({
+      status: 200,
+      body: { priority: { full_control: true } },
+    });
+    await full.click();
+    await expect(full).not.toBeChecked();
+    await page.screenshot({ path: testInfo.outputPath("priority.png") });
+
+    // The engine passes for the seat until its next turn, unless something stops it.
+    const shown = await drawn(page, table);
+    const turn = shown.view?.turn ?? 0;
+    await page
+      .getByRole("button", { name: "Pass until your next turn" })
+      .click();
+    await expect
+      .poll(() => (table.latest?.revision ?? 0) > shown.revision, {
+        timeout: 60_000,
+      })
+      .toBe(true);
+    const next = await drawn(page, table);
+    note(
+      testInfo,
+      `passed on turn ${turn}; next prompt on turn ${next.view?.turn ?? "-"} (${next.prompt?.kind ?? next.result?.kind}); passes the views reported: ${[...table.passing].join(", ") || "none"}`,
+    );
+    expect(
+      table.passing.has("until_my_turn") ||
+        (next.view?.turn ?? 0) > turn ||
+        Boolean(next.result),
+    ).toBe(true);
+
+    const { snapshot } = await play(page, table, "mouse");
+    note(
+      testInfo,
+      `${snapshot.result!.kind} after ${snapshot.result!.turns} turns with an own deck`,
+    );
+    expect(table.problems).toEqual([]);
   });
 });
 

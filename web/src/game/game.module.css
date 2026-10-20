@@ -1249,3 +1249,62 @@ button.life[data-selected] {
     padding: 20px 16px;
   }
 }
+
+/* Priority controls (UI07). */
+.priority {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #ffffff12;
+  border-radius: 8px;
+  background: #ffffff04;
+}
+.priority h2 {
+  font:
+    1rem Georgia,
+    serif;
+  margin: 0;
+}
+.passing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #e7cf9b;
+}
+.dialog {
+  width: 100%;
+  max-width: min(640px, calc(100vw - 32px));
+  border: 1px solid #d4b47a33;
+  border-radius: 10px;
+  background: #121b1c;
+  color: inherit;
+  padding: 26px;
+}
+.dialog::backdrop {
+  background: #050909cc;
+}
+.dialog h2 {
+  font:
+    1.3rem Georgia,
+    serif;
+}
+.stops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+.stops fieldset {
+  flex: 1 1 220px;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  display: grid;
+  gap: 4px;
+}
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}

@@ -42,17 +42,18 @@ POST /api/v1/practice-games
 | --- | --- |
 | `format` | `legacy` (one bot, the default) or `commander` (one to three bots, three by default) |
 | `deck` | Your fixture deck. Without one, the engine picks the format's first unused fixture |
+| `deck_id` | Since v0.2.0: one of your own decks instead ([decks](decks.md#at-the-practice-table)). The API stores a revision of it and sends the engine its main deck and commanders |
 | `deck_list` | SysOp only (`cards.any`): a deck list as text, below |
-| `bots` | One entry per bot, in turn order, each with an optional `deck` or (SysOp) `deck_list` |
+| `bots` | One entry per bot, in turn order, each with an optional `deck`, `deck_id` (one of your decks) or (SysOp) `deck_list` |
 | `bot_skill` | XMage's AI skill, 1–6 (default 4) |
 | `turn_cap` | 1–200 turns (default 60) |
 
-The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, and whether the account may use deck lists.
+The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
 
 Refusals:
 - 401 signed out; 403 without `games.play`, or a deck list without `cards.any`; 403 `csrf_failed` without the token.
 - 409 `game_limit` while the account already runs `CD_GAMES_PER_ACCOUNT` games (default 1). SysOp has no per-account limit.
-- 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`).
+- 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`). For an own deck: `invalid_deck` when it is not one of yours or not of the format, and `deck_not_playable` until it is legal and every card is playable. SysOp's decks need only cards the engine implements.
 - 429 `games_busy` with `Retry-After: 30` when the API runs `CD_GAMES_MAX` games (default 2) or the engine is full (`CD_ENGINE_MAX_GAMES`). Games still being created count toward `CD_GAMES_MAX`, so requests at the same moment cannot all pass the check.
 - 503 `games_unavailable` without a service token; 503 `engine_unavailable` when the engine does not answer.
 
@@ -64,7 +65,7 @@ Refusals:
 | `GET /api/v1/games/{id}` | The seat's owner; SysOp | The summary, and the owner's current seat snapshot while the engine holds the game |
 | `POST /api/v1/games/{id}/close` | The seat's owner; SysOp | Ends the game for every seat (result `closed`). The reply waits up to 5 seconds for the result to be recorded, so it shows the game finished. A game no task follows any more (left active by an earlier process) is marked `interrupted` and closed in the engine |
 | `GET /api/v1/games/{id}/inspection` | SysOp (`games.view_concealed`) | The inspection view, below |
-| `GET /api/v1/cards?q=` | SysOp (`cards.any`) | Up to 50 card names the engine implements, for deck lists |
+| `GET /api/v1/engine/cards?q=` | SysOp (`cards.any`) | Up to 50 card names the engine implements, for deck lists. It was `GET /api/v1/cards` until v0.2.0, which gave that path to [the card catalog](catalog.md#search-deck03-deck04) |
 
 Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle. A seat's deck is shown only to that seat's owner, and to SysOp.
 
@@ -102,7 +103,7 @@ Any other account gets 404 for someone else's game, exactly as for a game that d
 
 | Message | Effect |
 | --- | --- |
-| `{"type": "command", "command": {…}}` | A command in the engine's envelope (`v`, `game_id`, `action_id`, `expected_revision`, `prompt_id`, `type`, `payload`), `submit_choice` or `concede`. Controller only |
+| `{"type": "command", "command": {…}}` | A command in the engine's envelope (`v`, `game_id`, `action_id`, `expected_revision`, `prompt_id`, `type`, `payload`): `submit_choice`, `concede`, or since v0.2.0 `set_priority` with no `prompt_id` ([priority controls](engine/human-seat.md#priority-controls)). Controller only |
 | `{"type": "take_control"}` | Moves the lease to this connection (owner only) |
 | `{"type": "release_control"}` | Gives the lease up |
 | `{"type": "resync", "since": n}` | Sends the current snapshot if it is newer than `n`. New connections, resyncs and `GET /api/v1/games/{id}` share one engine view per revision, so they cost the engine nothing more |
@@ -163,6 +164,7 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 | `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices |
 | `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |
 | `GET /v1/service/cards?q=&limit=` | Card names containing `q`, ignoring case: names starting with it first |
+| `GET /v1/service/implementations` | Since v0.2.0: every card the engine implements, with its gates, gzip-compressed, for [the catalog](catalog.md#the-engines-implementation-list) |
 
 Service games and development games share one registry and the engine's game cap, but each belongs to its own route. A token or game ID from one route finds nothing on the other, and development games cannot be inspected. The development endpoints stay for scripts (`CD_ENGINE_DEV_ENDPOINTS`). The engine's `/health` reports `service_games_enabled`, which says only whether the service routes are on. Since v0.1.1 it also reports `gameplay_available: true` when the engine is ready (its card database is open) and its service routes serve the API's players' games. It is false while the engine loads, after a failed load, and on an engine without service games. The API passes the value through at `/api/v1/engine/status`.
 
@@ -171,6 +173,8 @@ Service games and development games share one registry and the engine's game cap
 Migration `0003_games` adds two tables:
 - **`games`.** The engine's game ID, kind (`practice`), format, status (`active`, `finished` or `interrupted`), creator, bot skill, turn cap, times and the engine's result: kind, winner seat, draw, turns and conceded seats. Engine error details stay in the engine's log.
 - **`game_seats`.** Each seat's player (`human` or `bot`), owner account and deck: a fixture name, or `custom` with the deck list as sent to the engine. A check constraint ties owners to human seats.
+
+Migration `0006_decks` (v0.2.0) adds the deck revision to each seat played with an own deck, and the catalog revision and format version to each game.
 
 One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Recovery and replay journals (NET08–NET09) remain later work.
 

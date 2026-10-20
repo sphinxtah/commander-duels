@@ -229,6 +229,8 @@ def propose(db: Session, body: GuidedRequest) -> GuidedProposal:
             )
             count -= 1
 
+    # The cards besides the commanders: 99 with one, 98 with a pair; a Legacy main deck of 60.
+    slots = 100 - max(1, len(leaders)) if body.format == "commander" else 60
     spells_total: int
     if body.format == "commander":
         for role, wanted in COMMANDER_PLAN.items():
@@ -246,7 +248,7 @@ def propose(db: Session, body: GuidedRequest) -> GuidedProposal:
                 "sweeper": "Sweeper: it clears the board when you fall behind.",
             }[role]
             take([card for card in candidates if card.id in roles[role]], count, label)
-        spells_total = 99 - COMMANDER_PLAN["lands"]
+        spells_total = slots - COMMANDER_PLAN["lands"]
     else:
         spells_total = (60 - LEGACY_LANDS.get(body.theme, 22)) // 4
         if body.theme in ("control", "midrange"):
@@ -270,7 +272,9 @@ def propose(db: Session, body: GuidedRequest) -> GuidedProposal:
         remaining,
         "A popular card in these colors, to round out the deck (EDHREC rank).",
     )
-    lands = mana_base(db, body, candidates, chosen, identity, taken)
+    # The lands fill what the spells leave, so the deck has its size even from a small pool.
+    left = slots - sum(item.quantity for item in chosen)
+    lands = mana_base(db, body, candidates, chosen, identity, taken, left)
     chosen.extend(lands)
     entries = [
         DeckEntry(card_id=leader.id, quantity=1, location="commander") for leader in leaders
@@ -299,13 +303,10 @@ def mana_base(
     chosen: list[Suggestion],
     identity: int,
     taken: set[UUID],
+    total: int,
 ) -> list[Suggestion]:
-    """Lands: a few that make two or more of the colors, then basics in proportion to the colored
-    symbols the chosen spells ask for."""
-    if body.format == "commander":
-        total = COMMANDER_PLAN["lands"]
-    else:
-        total = LEGACY_LANDS.get(body.theme, 22)
+    """`total` lands: a few that make two or more of the colors, then basics in proportion to the
+    colored symbols the chosen spells ask for."""
     copies = 1 if body.format == "commander" else 4
     colors = colors_of(identity)
     lands: list[Suggestion] = []
@@ -319,6 +320,8 @@ def mana_base(
         ]
         wanted = 10 if body.format == "commander" else 2
         for card in sorted(fixing, key=lambda item: score(item, "experienced"))[:wanted]:
+            if sum(item.quantity for item in lands) + copies > total:
+                break
             taken.add(card.id)
             lands.append(
                 Suggestion(

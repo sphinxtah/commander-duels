@@ -32,14 +32,17 @@ CAPABILITIES = [
     Capability(
         id="catalog",
         name="Card catalog",
+        available=True,
         milestone="M1",
-        reason="No Scryfall snapshot has been imported or certified.",
+        reason="Scryfall's cards, imported daily; each says whether the game engine can play it.",
     ),
     Capability(
         id="decks",
         name="Deck builder",
+        available=True,
         milestone="M1",
-        reason="Requires catalog identities and versioned construction validation.",
+        reason="Commander and Legacy decks, validated by the server and playable at the practice "
+        "table since v0.2.0.",
     ),
     Capability(
         id="gameplay",

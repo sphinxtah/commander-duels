@@ -127,6 +127,13 @@ export function optionsBySeat(
 
 const verbs: Record<PromptOption["action"], string> = {
   pass: "Pass priority",
+  pass_until_stack_resolved: "Pass until the stack resolves",
+  pass_until_next_main: "Pass until the next main phase",
+  pass_until_end_of_turn: "Pass until the end of the turn",
+  pass_until_next_turn: "Pass until the next turn",
+  pass_until_end_step_before_my_turn:
+    "Pass until the end step before your turn",
+  pass_until_my_turn: "Pass until your next turn",
   cast: "Cast",
   play_land: "Play",
   activate: "Activate",

@@ -17,15 +17,17 @@ import java.util.Set;
  *                    body is refused instead of being treated as a retry
  */
 public record SeatCommand(String actionId, long expectedRevision, String promptId, String type, String optionId,
-                          List<Integer> amounts, String fingerprint) {
+                          List<Integer> amounts, Priority.Settings priority, String fingerprint) {
     static final int MAX_AMOUNTS = 32;
     static final int MAX_AMOUNT = 10_000;
     public static final String SUBMIT_CHOICE = "submit_choice";
     public static final String CONCEDE = "concede";
+    /** Changes the seat's priority controls; it needs no prompt (see {@link Priority}). */
+    public static final String SET_PRIORITY = "set_priority";
     private static final Set<String> FIELDS =
         Set.of("v", "game_id", "action_id", "expected_revision", "prompt_id", "type", "payload");
     private static final Set<String> ENVELOPE_TYPES = Set.of("create_game", "submit_choice", "get_authorized_view",
-        "checkpoint", "restore", "advance_bot", "validate_deck", "close_game", "concede");
+        "checkpoint", "restore", "advance_bot", "validate_deck", "close_game", "concede", "set_priority");
 
     public static SeatCommand parse(String body, String gameId) throws JsonRequest.Invalid {
         JsonObject json = JsonRequest.object(body, FIELDS);
@@ -49,7 +51,7 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
         if (!ENVELOPE_TYPES.contains(type)) {
             throw new JsonRequest.Invalid("Unknown command type");
         }
-        if (!type.equals(SUBMIT_CHOICE) && !type.equals(CONCEDE)) {
+        if (!type.equals(SUBMIT_CHOICE) && !type.equals(CONCEDE) && !type.equals(SET_PRIORITY)) {
             throw new JsonRequest.Invalid("A seat cannot send " + type);
         }
         JsonElement payloadElement = json.get("payload");
@@ -60,7 +62,13 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
         String promptId = null;
         String optionId = null;
         List<Integer> amounts = null;
-        if (type.equals(SUBMIT_CHOICE)) {
+        Priority.Settings priority = null;
+        if (type.equals(SET_PRIORITY)) {
+            if (json.has("prompt_id")) {
+                throw new JsonRequest.Invalid("set_priority takes no prompt_id");
+            }
+            priority = Priority.parse(payload);
+        } else if (type.equals(SUBMIT_CHOICE)) {
             if (!json.has("prompt_id")) {
                 throw new JsonRequest.Invalid("submit_choice needs prompt_id");
             }
@@ -80,8 +88,9 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
             }
             JsonRequest.onlyFields(payload, Set.of(), "payload.");
         }
-        String fingerprint = type + "|" + promptId + "|" + optionId + "|" + amounts + "|" + revision;
-        return new SeatCommand(actionId, revision, promptId, type, optionId, amounts, fingerprint);
+        String fingerprint = type + "|" + promptId + "|" + optionId + "|" + amounts + "|" + revision + "|"
+            + (priority == null ? "" : priority.fingerprint());
+        return new SeatCommand(actionId, revision, promptId, type, optionId, amounts, priority, fingerprint);
     }
 
     private static List<Integer> amounts(JsonElement element) throws JsonRequest.Invalid {

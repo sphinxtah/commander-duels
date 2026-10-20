@@ -6,6 +6,8 @@ import type {
   LogLine,
   ServerMessage,
   Snapshot,
+  PriorityControls,
+  PrioritySettings,
 } from "./types";
 
 // One game's WebSocket (docs/games.md): the hello with the CSRF token, the controller lease,
@@ -33,6 +35,8 @@ export interface GameState {
   interrupted: boolean;
   /** The server refused this tab: the account has the game open in too many tabs already. */
   crowded: boolean;
+  /** The priority controls a set_priority reply reported, until the next view shows them. */
+  priority: PriorityControls | null;
 }
 
 export type EndReason =
@@ -58,6 +62,7 @@ const initial: GameState = {
   refusal: null,
   interrupted: false,
   crowded: false,
+  priority: null,
 };
 const LOG_KEPT = 400;
 
@@ -154,6 +159,21 @@ export class GameConnection {
       expected_revision: snapshot.revision,
       type: "concede",
       payload: {},
+    });
+  }
+
+  /** Changes the seat's priority controls. It needs no prompt: a pass can be cancelled while the
+   * engine is passing. */
+  setPriority(settings: PrioritySettings): boolean {
+    const { snapshot, pending, role } = this.state;
+    if (!snapshot || pending || role !== "controller") return false;
+    return this.command({
+      v: 1,
+      game_id: snapshot.game_id,
+      action_id: newActionId(),
+      expected_revision: snapshot.revision,
+      type: "set_priority",
+      payload: settings,
     });
   }
 
@@ -291,6 +311,7 @@ export class GameConnection {
           snapshot: next,
           log: mergeLog(this.state.log, next.log),
           pending,
+          priority: null,
         });
         break;
       }
@@ -310,7 +331,13 @@ export class GameConnection {
             refusal =
               refusals[code] ?? message.body.message ?? "That was refused.";
         }
-        this.update({ pending: null, refusal });
+        const controls = (message.body as { priority?: PriorityControls })
+          .priority;
+        this.update({
+          pending: null,
+          refusal,
+          ...(controls ? { priority: controls } : {}),
+        });
         break;
       }
       case "inspection":

@@ -300,8 +300,6 @@ class Run:
         return sources, changed
 
     def execute(self) -> Outcome:
-        files = discover(self.client, str(self.settings.scryfall_url))
-        sources, changed = self.sources(files)
         with Session(self.engine) as session, session.begin():
             cards, missing = engine_export.load(
                 session,
@@ -314,7 +312,21 @@ class Run:
                 .order_by(CatalogRevision.id.desc())
                 .limit(1)
             ).first()
+            checked = session.scalar(
+                select(CatalogRevision.id).where(CatalogRevision.engine_build.is_not(None)).limit(1)
+            )
         self.stats["engine"] = cards.build if cards else missing
+        # A catalog never checked against the engine waits for it: a deploy starts the worker with
+        # the engine, which takes a minute to load, and an import without it would leave every card
+        # unchecked until the next day's run. Later runs go ahead and keep the cards' statuses.
+        if cards is None and checked is None and missing != "engine_service_off":
+            raise SyncError(
+                str(missing),
+                "The engine's implementation list is not available yet; the import waits for it.",
+                transient=True,
+            )
+        files = discover(self.client, str(self.settings.scryfall_url))
+        sources, changed = self.sources(files)
         engine_new = cards is not None and (last is None or last.engine_build != cards.build)
         if last is not None and not changed and not engine_new:
             self.finish("unchanged", None, None, revision_id=last.id)

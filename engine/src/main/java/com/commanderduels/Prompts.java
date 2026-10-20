@@ -26,6 +26,7 @@ import mage.choices.Choice;
 import mage.constants.AsThoughEffectType;
 import mage.constants.Constants;
 import mage.constants.ManaType;
+import mage.constants.PlayerAction;
 import mage.constants.MultiAmountType;
 import mage.constants.Zone;
 import mage.game.Game;
@@ -78,6 +79,14 @@ final class Prompts {
         @Override
         public void apply(Player player) {
             player.setResponseUUID(id);
+        }
+    }
+
+    /** A pass mode: XMage passes now and keeps passing until the mode ends (see {@link Priority}). */
+    record PassAnswer(PlayerAction action, Game game) implements Answer {
+        @Override
+        public void apply(Player player) {
+            player.sendPlayerAction(action, game, null);
         }
     }
 
@@ -340,6 +349,11 @@ final class Prompts {
 
     private void priority() {
         add("pass", "Pass priority", null, null, false, new BooleanAnswer(true));
+        for (Priority.Mode mode : Priority.MODES) {
+            if (mode.xmage() != PlayerAction.PASS_PRIORITY_UNTIL_STACK_RESOLVED || !game.getStack().isEmpty()) {
+                add(mode.action(), mode.label(), null, null, false, new PassAnswer(mode.xmage(), game));
+            }
+        }
         Map<UUID, List<ActivatedAbility>> byObject = new LinkedHashMap<>();
         for (ActivatedAbility ability : human.getPlayable(game, true, Zone.ALL, false)) {
             byObject.computeIfAbsent(clickTarget(ability.getSourceId()), id -> new ArrayList<>()).add(ability);

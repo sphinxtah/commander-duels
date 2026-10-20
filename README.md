@@ -1,10 +1,12 @@
 # Commander Duels
 
-**v0.1.1: fixes from going live.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
+**v0.2.0: your own decks and priority controls.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
 
 The engine loads XMage's card database and plays complete games: Legacy between two seats, and Commander at two, three or four seats, with any mix of human seats and XMage computer players. Human seats run through XMage's own human player: every choice becomes a typed prompt, stale answers are refused, and each seat sees only its own authorized view, including commander tax and commander damage. Players sign in with Google; the account keeps a handle, an avatar and its accessibility preferences. Administrators approve accounts, assign roles and read an append-only audit log. SysOp, the local root account, signs in with a password only from the operator's network.
 
-A signed-in, approved player starts a practice game against bots on the Play page and plays it to the end in the browser, by mouse or by keyboard: Legacy against one bot, or Commander at a table of up to four ([the game screen](docs/game-screen.md)). Cards show their printed images, which the API fetches from Scryfall once and serves itself. The API holds the engine's seat tokens, one tab at a time controls the seat, and resent commands run once. SysOp also inspects every hand and library, observes any game and plays deck lists of any card the engine implements. The site runs live at https://duels.thesphinx.co ([the live site](docs/deployment.md)). v0.1.1 fixes what going live and a bug and security sweep found ([release notes](docs/releases/0.1.1.md)). The application shows unavailable features and their milestones. The source scope remains the full product backlog.
+A signed-in, approved player starts a practice game against bots on the Play page and plays it to the end in the browser, by mouse or by keyboard: Legacy against one bot, or Commander at a table of up to four ([the game screen](docs/game-screen.md)). Cards show their printed images, which the API fetches from Scryfall once and serves itself. The API holds the engine's seat tokens, one tab at a time controls the seat, and resent commands run once. SysOp also inspects every hand and library, observes any game and plays deck lists of any card the engine implements. The site runs live at https://duels.thesphinx.co ([the live site](docs/deployment.md)).
+
+Since v0.2.0 the worker imports Scryfall's card catalog every day and maps it to the cards the engine implements; a card plays only when the engine's implementation passed automatic checks ([the card catalog](docs/catalog.md)). Players search it on the Cards page, and build Legacy and Commander decks that the server validates, versions and shares by link, with guided creation, statistics and import and export; their playable decks go to the practice table ([decks](docs/decks.md)). The game screen adds the priority controls: passes until a chosen point, stops and full control ([release notes](docs/releases/0.2.0.md)). The application shows unavailable features and their milestones. The source scope remains the full product backlog.
 
 ## Start with Docker
 
@@ -64,7 +66,7 @@ python -m api.cli sysop-password   # optional: SysOp, from 127.0.0.1 with .env.e
 uvicorn api.main:create_app --factory --reload --host 127.0.0.1 --port 8000 --no-proxy-headers
 ```
 
-In a second terminal, run `pnpm dev` and open http://localhost:5173. Vite proxies `/api` to port 8000. Run `python -m catalog.worker` in a third activated terminal when testing jobs. The worker only supports `health_probe`; it records other kinds as failed instead of pretending to import data.
+In a second terminal, run `pnpm dev` and open http://localhost:5173. Vite proxies `/api` to port 8000. Run `python -m catalog.worker` in a third activated terminal when testing jobs. With `CD_CATALOG_DIR` set it imports Scryfall's catalog (about 115 MB, two minutes); without it, `python scripts/load_fixture_catalog.py` loads the 70-card test slice instead, enough for the deck builder.
 
 ### Engine
 
@@ -166,14 +168,14 @@ Each development thread is one version, and `VERSION` is the only file that hold
 
 | Directory | Responsibility |
 | --- | --- |
-| `web` | Accessible shell, the practice table and the game screen (`web/src/game`), format details, preferences, Google sign-in, profile, administration and SysOp screens, API client, the owner's logo and banner |
-| `api` | HTTP contracts, configuration, lifecycle, identity (sign-in, sessions, roles, audit, SysOp), administration, practice games and their WebSocket, the card image cache, persistence models and Alembic migrations |
-| `engine` | Java 21 XMage engine service: pinned build, card database, fixture decks, development bot matches, multi-seat Legacy and Commander games, the API's service games, SysOp's inspection view and deck lists |
-| `catalog` | PostgreSQL lease claim, generation fencing and bounded worker loop |
+| `web` | Accessible shell, the practice table and the game screen (`web/src/game`), the card catalog (`web/src/catalog`) and deck builder (`web/src/decks`), format details, preferences, Google sign-in, profile, administration and SysOp screens, API client, the owner's logo and banner |
+| `api` | HTTP contracts, configuration, lifecycle, identity (sign-in, sessions, roles, audit, SysOp), administration, practice games and their WebSocket, the card image cache, card search, deck validation, decks and guided creation, persistence models and Alembic migrations |
+| `engine` | Java 21 XMage engine service: pinned build, card database, fixture decks, development bot matches, multi-seat Legacy and Commander games, the API's service games, SysOp's inspection view and deck lists, priority controls, and the implementation list built with the image |
+| `catalog` | The worker: PostgreSQL lease claim, generation fencing, and the daily Scryfall import with its revisions, statuses and the engine's implementation list |
 | `contracts` | Generated public OpenAPI, the internal command envelope, the seat-view contract and SysOp's inspection contract |
 | `content` | Constrained draft scenario schema and example |
-| `tests` | API, migration, contract and job lifecycle regressions |
+| `tests` | API, migration, contract, catalog, validation, deck and job lifecycle regressions, with a slice of Scryfall's data (`tests/fixtures`) |
 | `deploy` | The live site: production Compose file, VM bootstrap, deploy, backup and restore scripts, the TSH proxy's nginx site |
 | `docs` | Architecture, scope ledger, reference inventory and release evidence |
 
-See [architecture](docs/architecture.md), [identity](docs/identity.md), [games through the API](docs/games.md), [the game screen](docs/game-screen.md), [the live site](docs/deployment.md), [remaining work](docs/backlog.md), [the v0.1.0 plan](docs/plans/0.1.0.md), [the v0.1.1 plan](docs/plans/0.1.1.md), [the v0.2.0 plan](docs/plans/0.2.0.md), [Two-Headed Giant feasibility](docs/engine/two-headed-giant.md), and release notes for [0.1.1](docs/releases/0.1.1.md), [0.1.0](docs/releases/0.1.0.md), [0.0.6](docs/releases/0.0.6.md), [0.0.5](docs/releases/0.0.5.md), [0.0.4](docs/releases/0.0.4.md), [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md).
+See [architecture](docs/architecture.md), [identity](docs/identity.md), [games through the API](docs/games.md), [the game screen](docs/game-screen.md), [the card catalog](docs/catalog.md), [decks](docs/decks.md), [the live site](docs/deployment.md), [remaining work](docs/backlog.md), [the v0.1.0 plan](docs/plans/0.1.0.md), [the v0.1.1 plan](docs/plans/0.1.1.md), [the v0.2.0 plan](docs/plans/0.2.0.md), [the v0.3.0 plan](docs/plans/0.3.0.md), [Two-Headed Giant feasibility](docs/engine/two-headed-giant.md), and release notes for [0.2.0](docs/releases/0.2.0.md), [0.1.1](docs/releases/0.1.1.md), [0.1.0](docs/releases/0.1.0.md), [0.0.6](docs/releases/0.0.6.md), [0.0.5](docs/releases/0.0.5.md), [0.0.4](docs/releases/0.0.4.md), [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md).

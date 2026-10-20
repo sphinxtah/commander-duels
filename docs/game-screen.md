@@ -1,4 +1,4 @@
-# The game screen (v0.1.0)
+# The game screen (v0.1.0, with v0.2.0's additions)
 
 v0.1.0 puts the practice games of v0.0.6 on screen. A signed-in, approved player starts a game against bots from the Play page and plays it to the end in the browser, by mouse or by keyboard alone. The screen shows every prompt the engine types and nothing the seat may not see. It follows the scope's UI01, UI03 to UI05 and UI08, and the first part of UI07. It is built in React DOM, as the scope sets it for now; PixiJS is left for later effects. The protocol underneath is unchanged ([games through the API](games.md)).
 
@@ -6,7 +6,7 @@ v0.1.0 puts the practice games of v0.0.6 on screen. A signed-in, approved player
 
 The Play page opens with the owner's banner. Below it, the practice table offers:
 - **the format.** Legacy against one bot, or Commander against one to three bots;
-- **your fixture deck, and each bot's,** or any free fixture deck;
+- **your deck, and each bot's:** a starter deck, or since v0.2.0 one of your own playable decks ([decks](decks.md#at-the-practice-table)). "Play it at the practice table" in the deck builder opens the table with that deck chosen;
 - **the bots' skill** (1–6) and a turn limit;
 - **for SysOp, a deck list.** Any card the engine implements, with card-name lookup that adds a line per click.
 
@@ -30,6 +30,7 @@ The board:
 The side panel holds:
 - a large preview of the card under the pointer or focus (wide screens only);
 - the prompt;
+- the priority controls (since v0.2.0);
 - the result when the game ends;
 - SysOp's inspection;
 - the game log.
@@ -81,6 +82,17 @@ The engine's open prompt lists every option. The screen offers exactly those opt
 
 The engine still checks every answer. A refusal leaves the prompt open, and the panel says why in words.
 
+## Priority controls (UI07, v0.2.0)
+
+The rest of UI07: where the game gives the seat priority, and how long it passes for the player. None of it has a timer; the engine waits for the seat however long it takes.
+- **Keep passing.** A priority prompt also offers, in its "Keep passing" group: pass until the stack resolves (only with something on it), until the next main phase, until the end of the turn, until the next turn, until the end step before your turn, and until your next turn. The engine then passes for the seat until that point. Something new on the stack, attackers or blockers stop the pass, as the stops below say, and a choice the player must make (blockers, targets for a trigger) is still asked.
+- **A pass in progress** shows in the Priority panel ("Passing until your next turn."), with **Stop passing**, which cancels it; Escape does the same anywhere on the screen. The seat's next priority is then the next one the engine would give.
+- **Full control** stops at every step, in every turn, and holds priority after each spell. Turning it off restores the default stops.
+- **Hold priority after casting** (on by default): after casting a spell or activating an ability, the player keeps priority to respond to it, instead of passing at once.
+- **Stops…** opens the list of steps where the game gives the seat priority with an empty stack, for its own turns and for the other players' (XMage's default: the two main phases, in every turn), and whether new stack objects, declared attackers and declared blockers stop a pass (all on by default).
+
+Changing a control sends a `set_priority` command, which needs no open prompt: a pass can be cancelled while the engine is passing ([the human seat](engine/human-seat.md#priority-controls)). The panel shows the engine's answer, so a box ticks once the engine has applied it. The controls belong to the seat: the tab playing it changes them, a tab watching it shows them disabled, and a spectator has none. They last for the game.
+
 ## Keyboard (UI04)
 
 | Key | Effect |
@@ -90,7 +102,7 @@ The engine still checks every answer. A refusal leaves the prompt open, and the 
 | Enter or Space | Answers a card's option, or opens its menu |
 | Z | Zooms the focused card |
 | P | Answers the primary option: pass priority, done, keep or yes |
-| Escape | Closes a menu or a dialog |
+| Escape | Closes a menu or a dialog; otherwise stops a pass in progress (since v0.2.0) |
 
 When a new prompt opens while the player works in the prompt panel, focus moves to its first control. While an answer is sent or the table waits, focus rests on the panel's heading. After a refused answer it returns to the control the player was on. A card's menu gives focus back to the card when a choice or Escape closes it; a press outside the menu closes it.
 

@@ -195,6 +195,11 @@ class FakeEngine:
                 return httpx.Response(earlier[1][0], json=earlier[1][1])
             if game.result is not None:
                 return httpx.Response(409, json={"code": "game_over"})
+            if body["type"] == "set_priority":
+                reply = {"status": "accepted", "action_id": body["action_id"], "revision": 0}
+                reply["priority"] = {"passing": None, **body["payload"]}
+                game.actions[body["action_id"]] = (fingerprint, (200, reply))
+                return httpx.Response(200, json=reply)
             if body["type"] == "concede":
                 game.result = {
                     "kind": "completed",
@@ -1093,3 +1098,37 @@ def test_games_starting_at_once_keep_the_global_limit(database: str) -> None:
         engine.cap = 8
         assert other.post("/api/v1/practice-games", {}).status_code == 201
         assert hub.starting == 0
+
+
+def test_priority_settings_reach_the_engine_without_a_prompt(
+    engine: FakeEngine, client: TestClient
+) -> None:
+    ada = Account(client, "ada")
+    game = ada.post("/api/v1/practice-games", {}).json()
+    with ada.socket(game["id"]) as socket:
+        tab = Tab(socket, [])
+        socket.send_json(ada.hello(control=True))
+        opening = tab.snapshot(1)
+
+        def send(payload: dict[str, Any], **extra: Any) -> dict[str, Any]:
+            action = str(uuid.uuid4())
+            command = {
+                "v": 1,
+                "game_id": opening["game_id"],
+                "action_id": action,
+                "expected_revision": opening["revision"],
+                "type": "set_priority",
+                "payload": payload,
+                **extra,
+            }
+            socket.send_json({"type": "command", "command": command})
+            return tab.until("command_result", action_id=action)
+
+        done = send({"full_control": True, "your_turn": ["upkeep", "main1"]})
+        assert done["status"] == 200
+        assert done["body"]["priority"]["full_control"] is True
+        assert send({})["body"]["code"] == "invalid_command"
+        assert send({"your_turn": ["cleanup"]})["body"]["code"] == "invalid_command"
+        assert send({"cancel_passes": True}, prompt_id=str(uuid.uuid4()))["status"] == 400
+    sent = [c for c in engine.game(game["id"]).actions.values()]
+    assert len(sent) == 1

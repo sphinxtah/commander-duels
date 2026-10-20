@@ -90,6 +90,7 @@ const view: GameView = {
   revealed: [],
   looked_at: [],
   messages: [],
+  priority: null,
 };
 
 function priority(id: string): Prompt {
