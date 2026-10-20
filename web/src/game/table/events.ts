@@ -1,5 +1,5 @@
 import { isCreature, isLand } from "../model";
-import type { ObjectId, PlayerView, Seat } from "../types";
+import type { GameResultView, ObjectId, PlayerView, Seat } from "../types";
 import { isToken } from "./groups";
 import type {
   Anchor,
@@ -7,6 +7,7 @@ import type {
   Exit,
   Origin,
   TableCard,
+  TableDiff,
   TableEvent,
   TableModel,
   TablePlayer,
@@ -17,6 +18,11 @@ import type {
 // name a card the seat's view does not show, and an animation or a sound must never give that
 // away. The pairing of a card that left one zone with one that arrived in another is cosmetic;
 // where it fails, a card fades instead of flying.
+//
+// The table model carries no result, so deriveEvents tells the end of a game only from a won
+// flag turning on. A draw, the turn limit, a closed or timed-out game and an engine error turn
+// none on and give no event here; withResult adds those from the snapshot's result, and
+// useTableEvents applies it when the caller passes that result.
 
 /** A larger revision gap than this is a resync: snap to it. */
 const MAX_GAP = 8;
@@ -34,6 +40,12 @@ const routes: [TableCard["zone"], TableCard["zone"][]][] = [
   ["battlefield", ["graveyard", "exile", "hand", "command"]],
   ["stack", ["graveyard"]],
 ];
+
+/** Revealed and looked-at cards are listed beside the prompt, not drawn on the table, and show a
+ * face only while listed (§23.3): being shown or put away moves nothing, so they never pair,
+ * cast, enter or leave. */
+const onTable = (card: TableCard) =>
+  card.zone !== "revealed" && card.zone !== "looked_at";
 
 function pairableName(card: TableCard): string | null {
   if (card.card.hidden || !card.card.name) return null;
@@ -85,10 +97,10 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
   // The same revision drawn again (an answer in flight, say) changes nothing on the table.
   if (next.revision === prev.revision) return { baseline: false, events: [] };
   const vanished = [...prev.cards.values()].filter(
-    (card) => !next.cards.has(card.key),
+    (card) => onTable(card) && !next.cards.has(card.key),
   );
   const appeared = [...next.cards.values()].filter(
-    (card) => !prev.cards.has(card.key),
+    (card) => onTable(card) && !prev.cards.has(card.key),
   );
   if (vanished.length + appeared.length > MAX_CHURN) return snap;
 
@@ -157,8 +169,12 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
   const isVanished = new Set(vanished.map((card) => card.key));
   const isAppeared = new Set(appeared.map((card) => card.key));
   const anchoredSeat = next.anchored?.seat ?? null;
-  // The seat whose hand this viewer sees: theirs, or the owner's for SysOp observing.
-  const handSeat = next.handBacks === 0 ? anchoredSeat : null;
+  // The seat whose hand this viewer sees: theirs, or the owner's for SysOp observing. A
+  // spectator sees the anchored hand as backs, and as no backs at all once it is empty, so a
+  // hand counts as seen only when it had no backs before and after: the last card a spectator's
+  // anchored player casts still leaves face down.
+  const handSeat =
+    prev.handBacks === 0 && next.handBacks === 0 ? anchoredSeat : null;
 
   // The commander link: the engine names each commander's object wherever it is public. One
   // that goes where this viewer cannot see is never followed there (§23.3).
@@ -445,16 +461,46 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
     }
     if (now.lost && !then.lost) results.push({ type: "eliminated", seat });
     if (now.won && !then.won)
-      results.push({
-        type: "result",
-        outcome:
-          next.viewSeat !== null && seat === next.viewSeat
-            ? "victory"
-            : next.viewSeat !== null && !next.observing
-              ? "defeat"
-              : "over",
-      });
+      results.push({ type: "result", outcome: outcomeOf(next, seat, false) });
   }
   events.push(...players, ...results);
   return { baseline: false, events };
 };
+
+type Outcome = Extract<TableEvent, { type: "result" }>["outcome"];
+
+/** A game's end in the viewer's words, as resultText puts it: a draw, your win, your loss when
+ * you hold a seat, and otherwise just over (SysOp observing, a spectator, or no winner). */
+function outcomeOf(
+  model: TableModel,
+  winner: Seat | null,
+  draw: boolean,
+): Outcome {
+  if (draw) return "draw";
+  const seated = model.viewSeat !== null && !model.observing;
+  if (winner === null || !seated) return "over";
+  return winner === model.viewSeat ? "victory" : "defeat";
+}
+
+/** The diff with the end of the game told once, from the snapshot's result. `before` is the
+ * result when the previous model was drawn and `after` the one with this model. The first diff
+ * with a result says how the game ended, in place of anything the won flags said, so a draw or a
+ * game that stops with no winner gets its event and a win is not told twice; after that, no
+ * diff tells it again. A baseline stays a baseline: the table snaps to a finished game. */
+export function withResult(
+  diff: TableDiff,
+  before: GameResultView | null,
+  after: GameResultView | null,
+  model: TableModel,
+): TableDiff {
+  if (diff.baseline || (!before && !after)) return diff;
+  const events: TableEvent[] = diff.events.filter(
+    (event) => event.type !== "result",
+  );
+  if (!before && after)
+    events.push({
+      type: "result",
+      outcome: outcomeOf(model, after.winner_seat, after.draw),
+    });
+  return { baseline: false, events };
+}

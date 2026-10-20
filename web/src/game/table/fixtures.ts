@@ -21,8 +21,8 @@ import { mulberry32 } from "./sigil";
 import type { BuildInput, SummarySeat } from "./types";
 
 // Seat views for the table: what one connection receives, at two, three and four players, for a
-// spectator and for SysOp observing, with token piles, attachments, a long stack, a full hand
-// and a 240-permanent stress board, plus seeded random boards. The unit tests, the table lab and
+// spectator and for SysOp observing, with token piles, attachments, a long stack, a full hand,
+// revealed and looked-at cards and a 240-permanent stress board, plus seeded random boards. The unit tests, the table lab and
 // the fake-table journey (e2e/table.spec.ts) all draw from here, so this module imports types
 // and pure helpers only: it runs in the browser, in Vitest and in Playwright's Node alike.
 
@@ -1258,6 +1258,56 @@ function blockers(): TableFixture {
   });
 }
 
+function revealed(): TableFixture {
+  const o = new Objects("r");
+  const hand = [
+    o.card(CARDS.shivanDragon),
+    o.card(CARDS.forest),
+    o.card(CARDS.giantGrowth),
+  ];
+  const theirs = [
+    o.card(CARDS.counterspell),
+    o.card(CARDS.island),
+    o.card(CARDS.brainstorm),
+  ];
+  const top = [o.card(CARDS.serraAngel), o.card(CARDS.mountain)];
+  return fixture({
+    name: "revealed",
+    description:
+      "Bot 2's hand revealed to you, your Shivan Dragon revealed from your hand and the top of your library: the prompt's rows, one card in your hand as well.",
+    format: "legacy",
+    seats: [alice(), bot(1)],
+    view: view({
+      turn: 9,
+      active_seat: 0,
+      priority_seat: 0,
+      you: player(0, "Alice", { hand_count: hand.length, life: 16 }),
+      opponents: [player(1, "Bot 2", { hand_count: theirs.length })],
+      hand,
+      battlefield: [
+        ...o.many(4, 0, CARDS.swamp),
+        o.permanent(0, CARDS.grizzlyBears),
+        ...o.many(3, 1, CARDS.island, { tapped: true }),
+        o.permanent(1, CARDS.airElemental),
+      ],
+      revealed: [
+        { name: "Bot 2's hand", cards: theirs },
+        { name: "Alice's hand", cards: [hand[0]] },
+      ],
+      looked_at: [{ name: "Top of your library", cards: top }],
+    }),
+    prompt: prompt(
+      "p-revealed",
+      "choose_target",
+      "Choose a nonland card from Bot 2's hand.",
+      [
+        () => option("choose", { object_id: theirs[0].id }),
+        () => option("choose", { object_id: theirs[2].id }),
+      ],
+    ),
+  });
+}
+
 function starting(): TableFixture {
   return fixture({
     name: "starting",
@@ -1769,6 +1819,7 @@ export type FixtureName =
   | "stack"
   | "hand25"
   | "blockers"
+  | "revealed"
   | "stress"
   | "starting";
 
@@ -1783,6 +1834,7 @@ const makers: Record<FixtureName, () => TableFixture> = {
   stack,
   hand25,
   blockers,
+  revealed,
   stress,
   starting,
 };

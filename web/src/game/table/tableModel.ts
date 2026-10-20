@@ -199,7 +199,8 @@ export const buildTableModel: BuildTableModel = (input) => {
     return key;
   };
 
-  // Cards in view order: hand, battlefield, stack, then each player's zones by seat.
+  // Cards in view order: hand, battlefield, stack, each player's zones by seat, then the
+  // revealed and looked-at rows.
   const hand = view.you
     ? view.hand.map((card) =>
         addCard(
@@ -331,6 +332,24 @@ export const buildTableModel: BuildTableModel = (input) => {
       command: add("command", player.command_zone),
     });
   }
+  // Revealed and looked-at cards are listed in the prompt column rather than drawn on the table,
+  // but they are buttons there and the magnifier shows them, so they are cards here too. A card
+  // you reveal from your hand is both `hand:<id>` and `revealed:<id>`. The view says nothing of
+  // whose they are, so, as in `objectIndex`, they belong to no seat.
+  for (const [zone, groups] of [
+    ["revealed", view.revealed],
+    ["looked_at", view.looked_at],
+  ] as const)
+    for (const group of groups)
+      for (const card of group.cards)
+        addCard(
+          zone,
+          card,
+          { id: card.id, zone, seat: null, card },
+          null,
+          null,
+          offeredFor(card.id),
+        );
 
   const combatIds = new Set<ObjectId>();
   for (const group of view.combat) {

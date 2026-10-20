@@ -334,6 +334,53 @@ describe("the table model", () => {
     expect(validateHits(l, m)).toEqual([]);
   });
 
+  it("keeps revealed and looked-at cards under their own keys, one in your hand as well", () => {
+    const f = tableFixture("revealed");
+    const v = f.snapshot.view!;
+    const m = model(f);
+    const [theirs, mine] = v.revealed;
+    const dragon = mine.cards[0];
+    expect(v.hand.map((c) => c.id)).toContain(dragon.id);
+    expect([...m.cards.keys()].slice(-6)).toEqual([
+      ...theirs.cards.map((c) => `revealed:${c.id}`),
+      `revealed:${dragon.id}`,
+      ...v.looked_at[0].cards.map((c) => `looked_at:${c.id}`),
+    ]);
+    // The same card twice: in your hand and in the revealed row, each its own button.
+    const inHand = m.cards.get(`hand:${dragon.id}`)!;
+    const shown = m.cards.get(`revealed:${dragon.id}`)!;
+    expect(shown).toMatchObject({
+      id: dragon.id,
+      zone: "revealed",
+      ownerSeat: null,
+      controllerSeat: null,
+      located: { id: dragon.id, zone: "revealed", seat: null },
+      mark: "none",
+      drag: null,
+      label: inHand.label,
+    });
+    expect(m.hand).toContain(inHand.key);
+    expect(m.cards.get(`revealed:${theirs.cards[0].id}`)).toMatchObject({
+      mark: "offered",
+      label: "Counterspell, Instant. Options: Choose Counterspell",
+      drag: null,
+    });
+    expect(m.cards.get(`revealed:${theirs.cards[1].id}`)?.mark).toBe("none");
+    expect(
+      m.cards.get(`looked_at:${v.looked_at[0].cards[0].id}`),
+    ).toMatchObject({
+      zone: "looked_at",
+      label: "Serra Angel, Creature — Angel, 4/4",
+      mark: "none",
+    });
+    // They are listed beside the prompt, so the table draws none of them.
+    const l = layoutTable(m, { expandedSeat: null, textScale: 1 });
+    for (const key of m.cards.keys())
+      if (key.startsWith("revealed:") || key.startsWith("looked_at:"))
+        expect(l.nodes.has(key), key).toBe(false);
+    expect(validateHits(l, m)).toEqual([]);
+  });
+
   it("keeps each zone's cards in view order, top last", () => {
     const m = fixtureModel("duel");
     const f = tableFixture("duel");

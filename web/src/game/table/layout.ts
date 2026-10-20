@@ -583,7 +583,6 @@ function tagFor(
   return { rect: r, text, tone };
 }
 
-/** Counter pips run down just outside the image's right edge (down a tapped card's short side). */
 /** The counters shown as pips: a planeswalker's loyalty is on its tag instead; at most six. */
 function pipCounters(card: TableCard): [string, number][] {
   const permanent = card.located.permanent;
@@ -596,6 +595,7 @@ function pipCounters(card: TableCard): [string, number][] {
     .slice(0, 6);
 }
 
+/** Counter pips run down just outside the image's right edge (down a tapped card's short side). */
 function pipsFor(card: TableCard, image: Rect, w: SU): PipPlacement[] {
   return pipCounters(card).map(([counter, count], i) => ({
     centre: {

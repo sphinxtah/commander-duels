@@ -1,7 +1,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { GameState } from "../connection";
-import type { CardView, GameView, PermanentView, StackItem } from "../types";
+import type {
+  CardView,
+  GameResultView,
+  GameView,
+  PermanentView,
+  StackItem,
+} from "../types";
 import {
   CARDS,
   fixtureInput,
@@ -9,7 +15,7 @@ import {
   type FixtureName,
   type TableFixture,
 } from "./fixtures";
-import { deriveEvents } from "./events";
+import { deriveEvents, withResult } from "./events";
 import { buildTableModel } from "./tableModel";
 import type { TableEvent, TableModel } from "./types";
 import { useTableEvents, useTableModel } from "./useTable";
@@ -296,6 +302,50 @@ describe("moving cards", () => {
     });
   });
 
+  it("casts the last card of a spectator's anchored hand face down, as any before it", () => {
+    const castFrom = (handCount: number) => {
+      const a = next(fx("spectator"), (v) => {
+        v.opponents[0].hand_count = handCount;
+      });
+      const b = next(a, (v) => {
+        v.opponents[0].hand_count--;
+        v.stack.push(spell(0, CARDS.lightningBolt));
+      });
+      return of(events(a, b), "cast")[0].from;
+    };
+    const backs = { kind: "anchor", anchor: "hand", seat: 0, faceDown: true };
+    expect(castFrom(3)).toEqual(backs);
+    expect(castFrom(1)).toEqual(backs);
+    // The first card back in that empty hand is counted, never shown.
+    const empty = next(fx("spectator"), (v) => {
+      v.opponents[0].hand_count = 0;
+    });
+    const drew = next(empty, (v) => {
+      v.opponents[0].hand_count++;
+      v.opponents[0].library_count--;
+    });
+    expect(of(events(empty, drew), "draw")).toEqual([
+      { type: "draw", seat: 0, keys: [], count: 1 },
+    ]);
+  });
+
+  it("casts the last card of your own hand from its card", () => {
+    const a = next(fx("duel"), (v) => {
+      v.hand = v.hand.filter((c) => c.name === "Lightning Bolt");
+      v.you!.hand_count = 1;
+    });
+    const bolt = a.snapshot.view!.hand[0];
+    const b = next(a, (v) => {
+      v.hand = [];
+      v.you!.hand_count = 0;
+      v.stack.push(spell(0, CARDS.lightningBolt));
+    });
+    expect(of(events(a, b), "cast")[0].from).toEqual({
+      kind: "node",
+      key: `hand:${bolt.id}`,
+    });
+  });
+
   it("never follows a commander into a hand this viewer cannot see", () => {
     const a = fx("three");
     const isamaru = byName(a.snapshot.view!, "Isamaru, Hound of Konda");
@@ -445,6 +495,84 @@ describe("changes in place", () => {
   });
 });
 
+describe("the end of the game", () => {
+  const ended = (change: Partial<GameResultView> = {}): GameResultView => ({
+    kind: "completed",
+    winner_seat: null,
+    draw: false,
+    conceded_seats: [],
+    turns: 12,
+    error: null,
+    ...change,
+  });
+  /** The fixture's next snapshot, finished with `result`, and the diff to it with the result. */
+  function finish(
+    name: FixtureName,
+    result: GameResultView,
+    change: (view: GameView) => void = () => undefined,
+  ) {
+    const a = fx(name);
+    const b = next(a, (v, f) => {
+      change(v);
+      f.snapshot.status = "finished";
+      f.snapshot.result = result;
+    });
+    const [ma, mb] = [model(a), model(b)];
+    return {
+      derived: deriveEvents(ma, mb, live),
+      told: withResult(deriveEvents(ma, mb, live), null, result, mb),
+    };
+  }
+  const results = (diff: { events: TableEvent[] }) => of(diff.events, "result");
+
+  it("tells a draw and a game that stops with no winner, which no won flag says", () => {
+    const draw = finish("duel", ended({ kind: "turn_limit", draw: true }));
+    expect(results(draw.derived)).toEqual([]);
+    expect(results(draw.told)).toEqual([{ type: "result", outcome: "draw" }]);
+    for (const kind of ["closed", "idle_timeout", "error"] as const)
+      expect(results(finish("duel", ended({ kind })).told)).toEqual([
+        { type: "result", outcome: "over" },
+      ]);
+  });
+
+  it("tells a win once, in the viewer's words", () => {
+    const won = finish("duel", ended({ winner_seat: 0 }), (v) => {
+      v.you!.won = true;
+      v.opponents[0].lost = true;
+    });
+    expect(results(won.derived)).toEqual([
+      { type: "result", outcome: "victory" },
+    ]);
+    expect(won.told.events).toEqual([
+      ...won.derived.events.filter((e) => e.type !== "result"),
+      { type: "result", outcome: "victory" },
+    ]);
+    expect(results(finish("duel", ended({ winner_seat: 1 })).told)).toEqual([
+      { type: "result", outcome: "defeat" },
+    ]);
+    for (const name of ["sysop", "spectator"] as const)
+      expect(results(finish(name, ended({ winner_seat: 1 })).told)).toEqual([
+        { type: "result", outcome: "over" },
+      ]);
+  });
+
+  it("says nothing more once the result is known, and nothing on a baseline", () => {
+    const a = fx("duel");
+    const b = next(a, (v) => {
+      v.opponents[0].won = true;
+    });
+    const result = ended({ winner_seat: 1 });
+    const [ma, mb] = [model(a), model(b)];
+    expect(
+      results(withResult(deriveEvents(ma, mb, live), result, result, mb)),
+    ).toEqual([]);
+    const snapped = deriveEvents(null, mb, live);
+    expect(withResult(snapped, null, result, mb)).toBe(snapped);
+    const untouched = deriveEvents(ma, mb, live);
+    expect(withResult(untouched, null, null, mb)).toBe(untouched);
+  });
+});
+
 describe("hidden information (§23)", () => {
   it("never takes a name from the log", () => {
     const a = fx("duel");
@@ -465,6 +593,68 @@ describe("hidden information (§23)", () => {
     expect(withLog).toEqual(events(a, draws(false)));
     expect(JSON.stringify(withLog)).not.toContain("Baneslayer");
     expect(withLog).toEqual([{ type: "draw", seat: 1, keys: [], count: 1 }]);
+  });
+
+  it("moves nothing when cards are revealed, looked at or put away", () => {
+    const a = fx("duel");
+    const shown = next(a, (v) => {
+      v.revealed = [
+        { name: "Alice's hand", cards: [v.hand[4]] },
+        { name: "Bot 2's hand", cards: [card(CARDS.counterspell)] },
+      ];
+      v.looked_at = [
+        {
+          name: "Your library",
+          cards: Array.from({ length: 45 }, () => card(CARDS.island)),
+        },
+      ];
+    });
+    expect(model(shown).cards.size).toBe(model(a).cards.size + 47);
+    // Forty-seven new cards in the prompt's rows are not a new board.
+    expect(events(a, shown)).toEqual([]);
+    const hidden = next(shown, (v) => {
+      v.revealed = [];
+      v.looked_at = [];
+    });
+    expect(events(shown, hidden)).toEqual([]);
+  });
+
+  it("brings a card an opponent revealed in from their library, not from the row", () => {
+    const angel = permanent(1, CARDS.serraAngel);
+    const a = next(fx("duel"), (v) => {
+      v.revealed = [{ name: "Top of Bot 2's library", cards: [angel.card] }];
+    });
+    const b = next(a, (v) => {
+      v.revealed = [];
+      v.opponents[0].library_count--;
+      v.battlefield.push(angel);
+    });
+    expect(of(events(a, b), "enter")).toEqual([
+      {
+        type: "enter",
+        key: `battlefield:${angel.id}`,
+        from: { kind: "anchor", anchor: "library", seat: 1, faceDown: true },
+        land: false,
+        token: false,
+      },
+    ]);
+    // Your own revealed card still flies from its place in your hand.
+    const c = fx("duel");
+    const dragon = c.snapshot.view!.hand[4];
+    const revealedDragon = next(c, (v) => {
+      v.revealed = [{ name: "Alice's hand", cards: [dragon] }];
+    });
+    const cast = spell(0, CARDS.shivanDragon);
+    const d = next(revealedDragon, (v) => {
+      v.revealed = [];
+      v.hand = v.hand.filter((x) => x.id !== dragon.id);
+      v.you!.hand_count--;
+      v.stack.push(cast);
+    });
+    expect(of(events(revealedDragon, d), "cast")[0].from).toEqual({
+      kind: "node",
+      key: `hand:${dragon.id}`,
+    });
   });
 
   it("names only cards the view shows: every key is a card of one of the two models", () => {
@@ -516,6 +706,45 @@ describe("the hooks", () => {
     act(() => rerender({ m: mb, phase: "open" }));
     rerender({ m: mc, phase: "open" });
     expect(result.current).toEqual({ baseline: true, events: [] });
+  });
+
+  it("tell the game's end from the snapshot's result, once", () => {
+    const a = fx("duel");
+    // The engine may finish the game without a new revision; the snapshot still changes.
+    const b = next(
+      a,
+      (_, f) => {
+        f.snapshot.status = "finished";
+        f.snapshot.result = {
+          kind: "turn_limit",
+          winner_seat: null,
+          draw: true,
+          conceded_seats: [],
+          turns: 40,
+          error: null,
+        };
+      },
+      0,
+    );
+    const c = next(b, (v) => {
+      v.you!.life--;
+    });
+    const [ma, mb, mc] = [a, b, c].map(model);
+    const { result, rerender } = renderHook(
+      ({ m, r }: { m: TableModel; r: GameResultView | null }) =>
+        useTableEvents(m, "open", r),
+      { initialProps: { m: ma, r: null as GameResultView | null } },
+    );
+    expect(result.current?.baseline).toBe(true);
+    rerender({ m: mb, r: b.snapshot.result });
+    expect(result.current).toEqual({
+      baseline: false,
+      events: [{ type: "result", outcome: "draw" }],
+    });
+    rerender({ m: mc, r: c.snapshot.result });
+    expect(result.current?.events).toEqual([
+      { type: "life", seat: 0, delta: -1 },
+    ]);
   });
 
   it("build the model once for the same parts, however the input is wrapped", () => {

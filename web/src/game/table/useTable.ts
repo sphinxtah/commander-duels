@@ -1,7 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import type { GameState } from "../connection";
-import type { Seat } from "../types";
-import { deriveEvents } from "./events";
+import type { GameResultView, Seat } from "../types";
+import { deriveEvents, withResult } from "./events";
 import { layoutTable } from "./layout";
 import { buildTableModel } from "./tableModel";
 import type { BuildInput, TableDiff, TableLayout, TableModel } from "./types";
@@ -55,33 +55,48 @@ function tabHidden(): boolean {
 
 /** The events between the model last drawn and this one. The first model, the first after the
  * connection opens again (a welcome or a resync) and any model while the tab is hidden are
- * baselines: the table snaps to them, and a reconnect never replays a draw (NET10). */
+ * baselines: the table snaps to them, and a reconnect never replays a draw (NET10). Given the
+ * snapshot's result, the diff also tells how the game ended, draws included (`withResult`);
+ * without it, only a won flag turning on says so. */
 export function useTableEvents(
   model: TableModel | null,
   phase: GameState["phase"],
+  result?: GameResultView | null,
 ): TableDiff | null {
   const memory = useRef<{
     drawn: TableModel | null;
+    drawnResult: GameResultView | null;
     phase: GameState["phase"] | null;
     armed: boolean;
     model: TableModel | null;
     diff: TableDiff | null;
-  }>({ drawn: null, phase: null, armed: false, model: null, diff: null });
+  }>({
+    drawn: null,
+    drawnResult: null,
+    phase: null,
+    armed: false,
+    model: null,
+    diff: null,
+  });
   const m = memory.current;
   let diff: TableDiff | null;
   if (!model) diff = null;
   else if (model === m.model) diff = m.diff;
-  else
+  else {
     diff = deriveEvents(m.drawn, model, {
       baseline: m.armed || (phase === "open" && m.phase !== "open"),
       hidden: tabHidden(),
     });
+    if (result !== undefined)
+      diff = withResult(diff, m.drawnResult, result, model);
+  }
 
   // Remember what was drawn once React has committed it, never during a render it may discard.
   useLayoutEffect(() => {
     const m = memory.current;
     if (model && model !== m.drawn) {
       m.drawn = model;
+      m.drawnResult = result ?? null;
       m.armed = false;
     } else if (phase === "open" && m.phase !== null && m.phase !== "open")
       // The connection opened again without a new model: the next one is a baseline.
