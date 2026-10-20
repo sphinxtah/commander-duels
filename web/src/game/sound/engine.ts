@@ -92,14 +92,29 @@ export function createSoundEngine(
   const lastStart = new Map<Cue, number>();
   let quietUntil = 0;
   let quietTimer: ReturnType<typeof setTimeout> | null = null;
+  // The context's state turns "suspended" only a moment after suspend() is asked for, once its
+  // audio thread has stopped. A sound played in that moment still reads "running", so this flag
+  // remembers the request: that sound resumes the context, or it would be scheduled and never heard.
+  let suspending = false;
 
   const level = () => (muted ? 0 : (volume / 100) ** 2);
   const applyLevel = () => {
     if (master) master.gain.value = level();
   };
 
+  function suspend(context: AudioContext) {
+    suspending = true;
+    void context.suspend().catch(ignore);
+  }
+
+  /** Asks for the context to run; it queues after a suspend still under way, so it wins. */
+  function resume(context: AudioContext): Promise<void> {
+    suspending = false;
+    return context.resume();
+  }
+
   const onVisibility = () => {
-    if (hidden() && ctx?.state === "running") void ctx.suspend().catch(ignore);
+    if (hidden() && ctx?.state === "running") suspend(ctx);
   };
 
   function build(context: AudioContext) {
@@ -158,7 +173,7 @@ export function createSoundEngine(
         quietTimer = null;
         if (now() < quietUntil + QUIET_MS) return scheduleQuiet();
         prune();
-        if (ctx?.state === "running") void ctx.suspend().catch(ignore);
+        if (ctx?.state === "running") suspend(ctx);
       },
       Math.max(0, quietUntil + QUIET_MS - now()),
     );
@@ -304,9 +319,9 @@ export function createSoundEngine(
       }
       const context = ctx;
       if (!unlocked) prime(context);
-      if (context.state === "running") unlocked = true;
+      if (context.state === "running" && !suspending) unlocked = true;
       else
-        void context.resume().then(() => {
+        void resume(context).then(() => {
           if (ctx === context && context.state === "running") unlocked = true;
         }, ignore);
       quietUntil = Math.max(quietUntil, now());
@@ -325,7 +340,8 @@ export function createSoundEngine(
       lastStart.set(cue, at);
       prune();
       while (voices.length >= MAX_VOICES) end(voices[0], true);
-      if (context.state !== "running") void context.resume().catch(ignore);
+      if (suspending || context.state !== "running")
+        void resume(context).catch(ignore);
       voices.push(voice(context, master, cue, recipe, delayMs, o));
       quietUntil = Math.max(quietUntil, at + recipe.ms);
       scheduleQuiet();
@@ -354,6 +370,7 @@ export function createSoundEngine(
       noise = null;
       unlocked = false;
       broken = false;
+      suspending = false;
       lastStart.clear();
       quietUntil = 0;
     },

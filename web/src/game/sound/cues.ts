@@ -160,7 +160,12 @@ function cueOf(
     case "enter":
       return { cue: event.land ? "land" : "enter" };
     case "leave":
-      return event.creature && toGraveyard(event.to) ? { cue: "die" } : null;
+      // A token that dies stops existing, so no graveyard grows and it only fades: a creature
+      // that vanishes has died as far as the ear goes.
+      return event.creature &&
+        (toGraveyard(event.to) || event.to.kind === "vanish")
+        ? { cue: "die" }
+        : null;
     case "tap":
       return { cue: "tap" };
     case "counters":

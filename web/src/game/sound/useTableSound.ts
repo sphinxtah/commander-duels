@@ -11,6 +11,10 @@ import { getSoundEngine } from "./engine";
 /** The timer ticks at these many ms left. */
 const TICKS_AT = [3000, 2000, 1000];
 
+/** The presses that may start audio. A touch counts only when the finger lifts (pointerdown is a
+ * gesture for a mouse alone), and iOS Safari starts Web Audio only inside such a gesture. */
+const WAKE_EVENTS = ["pointerdown", "pointerup", "touchend", "keydown"];
+
 export const useTableSound: UseTableSound = ({
   diff,
   layout,
@@ -29,15 +33,14 @@ export const useTableSound: UseTableSound = ({
   useEffect(() => {
     if (engine.state !== "locked") return;
     function stop() {
-      window.removeEventListener("pointerdown", wake, true);
-      window.removeEventListener("keydown", wake, true);
+      for (const type of WAKE_EVENTS)
+        window.removeEventListener(type, wake, true);
     }
     function wake() {
       if (engine.state === "locked") engine.unlock();
       if (engine.state !== "locked") stop();
     }
-    window.addEventListener("pointerdown", wake, true);
-    window.addEventListener("keydown", wake, true);
+    for (const type of WAKE_EVENTS) window.addEventListener(type, wake, true);
     return stop;
   }, [engine]);
 

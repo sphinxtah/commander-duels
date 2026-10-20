@@ -369,6 +369,73 @@ describe("the sound engine", () => {
     expect(context.state).toBe("running");
   });
 
+  it("resumes for a sound played while a suspend is still under way", async () => {
+    // As in a browser, the state changes (and the promise settles) only once the audio thread
+    // has acted, and the requests are carried out in the order they were made.
+    class SlowContext extends FakeContext {
+      private settle(state: "running" | "suspended") {
+        return new Promise<void>((done) =>
+          setTimeout(() => {
+            this.state = state;
+            done();
+          }, 5),
+        );
+      }
+      resume() {
+        this.resumes += 1;
+        return this.settle("running");
+      }
+      suspend() {
+        this.suspends += 1;
+        return this.settle("suspended");
+      }
+    }
+    const engine = fakeEngine(SlowContext);
+    engines.push(engine);
+    engine.unlock();
+    await vi.advanceTimersByTimeAsync(5);
+    const context = FakeContext.made[0];
+    expect(engine.state).toBe("running");
+    expect(context.resumes).toBe(1);
+
+    // The 2 s quiet suspend is asked for, and a cue comes before the state has changed.
+    vi.advanceTimersByTime(1995);
+    expect(context.suspends).toBe(1);
+    expect(context.state).toBe("running");
+    engine.play("cast");
+    expect(context.resumes).toBe(2);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(context.state).toBe("running");
+
+    // The same when the tab is hidden and a cue comes the moment it is back.
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(context.suspends).toBe(2);
+    visibility.mockReturnValue("visible");
+    expect(context.state).toBe("running");
+    engine.play("draw");
+    expect(context.resumes).toBe(3);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(context.state).toBe("running");
+
+    // A click (Start, Resume) in that moment brings it back too.
+    visibility.mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(context.suspends).toBe(3);
+    visibility.mockReturnValue("visible");
+    engine.unlock();
+    expect(context.resumes).toBe(4);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(context.state).toBe("running");
+
+    // With no suspend asked for, a running context is left alone.
+    engine.play("tap");
+    engine.unlock();
+    expect(context.resumes).toBe(4);
+  });
+
   it("suspends while the tab is hidden and plays nothing there", async () => {
     const { engine, context } = await unlocked();
     engines.push(engine);
@@ -529,6 +596,14 @@ const events = {
     creature: true,
   },
   destroyed: { type: "leave", key: c1, to: graveyard, creature: false },
+  // A token stops existing when it dies: no graveyard grows, so its exit is a fade.
+  tokenDies: { type: "leave", key: c1, to: { kind: "vanish" }, creature: true },
+  treasureSpent: {
+    type: "leave",
+    key: c1,
+    to: { kind: "vanish" },
+    creature: false,
+  },
   tap: { type: "tap", key: c1, tapped: true },
   untap: { type: "tap", key: c1, tapped: false },
   counter: { type: "counters", key: c1, seat: null, counter: "p1p1", delta: 1 },
@@ -594,8 +669,10 @@ describe("the cues for a diff", () => {
     ["a token entering", events.token, "enter"],
     ["a creature dying", events.dies, "die"],
     ["a creature put in a graveyard", events.dropped, "die"],
+    ["a creature token dying", events.tokenDies, "die"],
     ["a creature exiled", events.exiled, null],
     ["an artifact destroyed", events.destroyed, null],
+    ["a noncreature token used up", events.treasureSpent, null],
     ["a tap", events.tap, "tap"],
     ["an untap", events.untap, "tap"],
     ["a counter added", events.counter, "counter"],
@@ -654,6 +731,8 @@ describe("the cues for a diff", () => {
     expect(pan(events.draw)).toBeCloseTo(-0.53125);
     // A card gone to a graveyard is shown on that tile.
     expect(pan(events.dropped)).toBeCloseTo(0.5625);
+    // A dead token is drawn nowhere any more: it sounds from the middle.
+    expect(pan(events.tokenDies)).toBe(0);
     // Several attackers sound from between them.
     expect(pan({ type: "attack", keys: [c1, "hand:h1"] })).toBeCloseTo(0.075);
     expect(pan(events.victory)).toBe(0);
@@ -843,6 +922,28 @@ describe("the table's sound hook", () => {
     state.mockReturnValue("running");
     window.dispatchEvent(new Event("pointerdown"));
     expect(sound.unlock).toHaveBeenCalledTimes(1);
+  });
+
+  it("unlocks when a touch lifts, since a touch's pointerdown is no gesture", () => {
+    const engine = getSoundEngine();
+    const state = vi.spyOn(engine, "state", "get").mockReturnValue("locked");
+    const sound = mountSound();
+    // The browser refuses to start audio in a touch's pointerdown, so sound is still locked when
+    // the finger lifts: pointerup and touchend try again.
+    window.dispatchEvent(new Event("pointerdown"));
+    expect(sound.unlock).toHaveBeenCalledTimes(1);
+    window.dispatchEvent(new Event("pointerup"));
+    expect(sound.unlock).toHaveBeenCalledTimes(2);
+    window.dispatchEvent(new Event("touchend"));
+    expect(sound.unlock).toHaveBeenCalledTimes(3);
+    state.mockReturnValue("running");
+    window.dispatchEvent(new Event("pointerup"));
+    expect(sound.unlock).toHaveBeenCalledTimes(3);
+    // Once it runs, every listener is gone, whatever the state says later.
+    state.mockReturnValue("locked");
+    for (const type of ["pointerdown", "pointerup", "touchend", "keydown"])
+      window.dispatchEvent(new Event(type));
+    expect(sound.unlock).toHaveBeenCalledTimes(3);
   });
 
   it("listens for nothing when there is no Web Audio", () => {
