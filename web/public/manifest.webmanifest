@@ -1,0 +1,57 @@
+{
+  "id": "/",
+  "name": "Commander Duels",
+  "short_name": "Duels",
+  "description": "Commander and Legacy against bots, on a full-screen table.",
+  "start_url": "/#play",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#101819",
+  "theme_color": "#101819",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games"],
+  "launch_handler": { "client_mode": ["navigate-existing", "auto"] },
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://duels.thesphinx.co/manifest.webmanifest"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/brand/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/brand/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/brand/screenshot-play-1920.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "Starting a practice game"
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { client, describe, type Me } from "../api";
+import {
+  canFullscreen,
+  enterTableFullscreen,
+  exitTableFullscreen,
+} from "../app/fullscreen";
+import { readTableSettings } from "../app/tableSettings";
 import type { components } from "../generated/api";
 import styles from "./game.module.css";
 
@@ -92,6 +98,16 @@ function DeckOptions({
       </optgroup>
     </>
   );
+}
+
+/**
+ * Starting or resuming a game fills the screen (v0.3.0), unless the player turned it off. The
+ * browser allows it only inside the click, so this runs before anything is awaited.
+ */
+function tableFullscreen(): Promise<boolean> | null {
+  return readTableSettings().fullscreenOnStart && canFullscreen()
+    ? enterTableFullscreen()
+    : null;
 }
 
 const refusals: Record<string, string> = {
@@ -217,6 +233,7 @@ function Table({ me }: { me: Me }) {
 
   async function start(event: FormEvent) {
     event.preventDefault();
+    const fullscreen = tableFullscreen();
     setError("");
     setStarting(true);
     const body: Request = {
@@ -241,6 +258,10 @@ function Table({ me }: { me: Me }) {
       window.location.hash = `#game/${data.id}`;
       return;
     }
+    // No game to fill the screen for. The full-screen request may still be pending: wait for it.
+    void fullscreen?.then((entered) => {
+      if (entered) void exitTableFullscreen();
+    });
     const code = (failure as { code?: string } | undefined)?.code ?? "";
     const names = (failure as { names?: string[] } | undefined)?.names;
     setError(
@@ -485,6 +506,7 @@ function Table({ me }: { me: Me }) {
                     <a
                       className={styles.primaryButton}
                       href={`#game/${game.id}`}
+                      onClick={() => void tableFullscreen()}
                     >
                       {game.your_seat === null ? "Observe" : "Resume"}
                     </a>
