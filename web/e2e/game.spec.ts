@@ -35,6 +35,10 @@ class Table {
   problems: string[] = [];
   results: { action_id: string; status: number; body: unknown }[] = [];
   readonly publicNames = new Set<string>();
+  /** Concealed names the log mentioned before any view showed them, by revision. */
+  readonly pending = new Map<string, number>();
+  /** Log lines that ran ahead of the board and were confirmed public by a later view. */
+  readonly aheadOfView: string[] = [];
 
   /** Without a page, frames are fed to receive() by the test (a proxied socket). */
   constructor(
@@ -99,23 +103,46 @@ class Table {
           if (key in opponent) this.problems.push(`an opponent carries ${key}`);
     }
     // As the engine's own check: a concealed name may not be a card's or an option's name, nor a
-    // phrase in the log or the prompt, before it has been public. The engine sends each view with
-    // the log as it stood when the view was built, so a logged card is public in the same view.
-    // Type lines and rules text are not checked, because a subtype can equal a card name.
-    for (const [key, text] of strings(snapshot)) {
+    // phrase in a prompt, before it has been public. Type lines and rules text are not checked,
+    // because a subtype can equal a card name.
+    const { log, ...rest } = snapshot;
+    for (const [key, text] of strings(rest)) {
       for (const name of this.concealed) {
         if (this.publicNames.has(name)) continue;
         const named =
           key === "name" || key === "label"
             ? text === name
             : ["text", "message", "detail", "messages"].includes(key) &&
-              new RegExp(`\\b${escapeRegExp(name)}\\b`).test(text);
+              phrase(name).test(text);
         if (named)
           this.problems.push(
             `${name} was named in ${key} before it was public (r${snapshot.revision})`,
           );
       }
     }
+    // Since v0.1.1 each snapshot's log stops where its view was built, but a line can still name a
+    // bot's card one view before the board shows it (CI run #30). As in the engine's check, a
+    // logged name must become public; here, by a later view or the end.
+    for (const [name, revision] of this.pending)
+      if (this.publicNames.has(name)) {
+        this.pending.delete(name);
+        this.aheadOfView.push(
+          `${name} (logged r${revision}, public r${snapshot.revision})`,
+        );
+      }
+    for (const line of log)
+      for (const name of this.concealed)
+        if (
+          !this.publicNames.has(name) &&
+          !this.pending.has(name) &&
+          phrase(name).test(line.text)
+        )
+          this.pending.set(name, snapshot.revision);
+    if (snapshot.result)
+      for (const [name, revision] of this.pending)
+        this.problems.push(
+          `${name} was named in the log (r${revision}) and never became public`,
+        );
     if (
       !this.latest ||
       snapshot.revision >= this.latest.revision ||
@@ -123,6 +150,10 @@ class Table {
     )
       this.latest = snapshot;
   }
+}
+
+function phrase(name: string): RegExp {
+  return new RegExp(`\\b${escapeRegExp(name)}\\b`);
 }
 
 function escapeRegExp(text: string): string {
@@ -468,7 +499,7 @@ test.describe("practice games in the browser", () => {
     );
     note(
       testInfo,
-      `${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts by mouse (${JSON.stringify(kinds)}); ${table.snapshots} snapshots in ${table.frames} frames`,
+      `${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts by mouse (${JSON.stringify(kinds)}); ${table.snapshots} snapshots in ${table.frames} frames; log ahead of the board, then public: ${table.aheadOfView.join(", ") || "none"}`,
     );
     expect(table.problems).toEqual([]);
     expect(answered).toBeGreaterThan(5);
