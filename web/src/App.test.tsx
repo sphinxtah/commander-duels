@@ -23,6 +23,9 @@ import {
   type Format,
   type Me,
 } from "./api";
+import { exitTableFullscreen } from "./app/fullscreen";
+import { holdLiveGame, markIntendedLeave } from "./app/liveGame";
+import { leaveTable } from "./app/serviceWorker";
 
 // The game screen and the practice table have their own tests; here they only take up room.
 vi.mock("./game/GameScreen", async () => {
@@ -34,6 +37,15 @@ vi.mock("./game/GameScreen", async () => {
 });
 vi.mock("./game/PracticeTable", () => ({ PracticeTable: () => null }));
 vi.mock("./google", () => ({ loadGoogle: () => new Promise(() => {}) }));
+// Whether leaving the table leaves full screen and applies a waiting update; fullscreen.test.ts
+// and serviceWorker.test.ts test the rest.
+vi.mock("./app/fullscreen", () => ({
+  exitTableFullscreen: vi.fn(async () => undefined),
+}));
+vi.mock("./app/serviceWorker", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./app/serviceWorker")>()),
+  leaveTable: vi.fn(() => false),
+}));
 
 // The API, answered route by route. Each route takes its answers in order and keeps the last.
 type Answer = () => unknown;
@@ -133,6 +145,12 @@ const alice: Me = {
 };
 const signedOut = { code: "not_signed_in", message: "Sign in to continue." };
 
+// Edge on a PC, so the page's install offer (made on its first render) can come; until the
+// browser offers, nothing shows.
+Object.defineProperty(navigator, "userAgentData", {
+  configurable: true,
+  value: { brands: [{ brand: "Microsoft Edge" }], mobile: false },
+});
 beforeAll(() => {
   // jsdom has no modal dialogs.
   HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
@@ -188,6 +206,58 @@ describe("navigation", () => {
         "Make yourself at home.",
       ),
     );
+  });
+
+  it("a live game keeps its address until an in-game link leaves it, and leaving ends full screen", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    vi.mocked(exitTableFullscreen).mockClear();
+    vi.mocked(leaveTable).mockClear();
+    const id = "00000000-0000-4000-8000-0000000000aa";
+    window.location.hash = `#game/${id}`;
+    render(<App />);
+    const back = await screen.findByRole("link", { name: "Back to the table" });
+    expect(document.documentElement.dataset.route).toBe("game");
+    const release = holdLiveGame(id);
+
+    // The browser's Back, or the installed app opening #play in this window.
+    window.location.hash = "#play";
+    await waitFor(() => expect(window.location.hash).toBe(`#game/${id}`));
+    await settle();
+    expect(back).toBeInTheDocument();
+    expect(exitTableFullscreen).not.toHaveBeenCalled();
+    expect(leaveTable).not.toHaveBeenCalled();
+
+    markIntendedLeave();
+    fireEvent.click(back);
+    await waitFor(() =>
+      expect(document.activeElement).toHaveTextContent("Gather your cards."),
+    );
+    expect(exitTableFullscreen).toHaveBeenCalledTimes(1);
+    // The update the game screen said was ready applies now.
+    expect(leaveTable).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.dataset.route).toBe("shell");
+    release();
+
+    // Moving between shell pages leaves full screen and updates alone.
+    window.location.hash = "#settings";
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    expect(exitTableFullscreen).toHaveBeenCalledTimes(1);
+    expect(leaveTable).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaving the table for a version that took over reloads instead of drawing the page", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    vi.mocked(leaveTable).mockClear();
+    vi.mocked(leaveTable).mockReturnValueOnce(true);
+    window.location.hash = "#game/00000000-0000-4000-8000-0000000000aa";
+    render(<App />);
+    const back = await screen.findByRole("link", { name: "Back to the table" });
+    fireEvent.click(back);
+    await waitFor(() => expect(leaveTable).toHaveBeenCalledTimes(1));
+    await settle();
+    // The reload is under way: the old code draws nothing new.
+    expect(back).toBeInTheDocument();
+    expect(document.documentElement.dataset.route).toBe("game");
   });
 });
 
@@ -282,5 +352,42 @@ describe("release status", () => {
     fireEvent.click(about("two_headed_giant"));
     await waitFor(() => expect(dialog).toHaveTextContent("PLANNED FORMAT"));
     expect(dialog).toHaveTextContent("4 seats supported in the planned format");
+  });
+});
+
+// Last in the file: the install offer is one per page, so it stays for any test after this one.
+describe("the install banner", () => {
+  it("drops down above the top bar for a signed-in player once the browser offers", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    render(<App />);
+    await screen.findByText("Signed in");
+    expect(
+      screen.queryByRole("region", { name: "Install the app" }),
+    ).toBeNull();
+
+    const offer = Object.assign(
+      new Event("beforeinstallprompt", { cancelable: true }),
+      { prompt: vi.fn(), userChoice: new Promise(() => {}) },
+    );
+    act(() => void window.dispatchEvent(offer));
+    const banner = await screen.findByRole("region", {
+      name: "Install the app",
+    });
+    expect(banner).toHaveTextContent(
+      "Play Commander Duels in its own window, with a desktop icon.",
+    );
+    // The workspace's first child, before the top bar.
+    expect(banner.nextElementSibling?.tagName).toBe("HEADER");
+    // The owner's art on the page stays the sidebar mark and the banner image.
+    expect(document.querySelectorAll('img[src^="/brand/"]')).toHaveLength(2);
+
+    // The button goes with the banner: keyboard focus moves on to the content, not to <body>.
+    const notNow = within(banner).getByRole("button", { name: "Not now" });
+    notNow.focus();
+    fireEvent.click(notNow);
+    expect(
+      screen.queryByRole("region", { name: "Install the app" }),
+    ).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("main"));
   });
 });

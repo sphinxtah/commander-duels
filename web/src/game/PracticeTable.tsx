@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { client, describe, type Me } from "../api";
+import {
+  canFullscreen,
+  enterTableFullscreen,
+  exitTableFullscreen,
+} from "../app/fullscreen";
+import { readTableSettings } from "../app/tableSettings";
 import type { components } from "../generated/api";
 import styles from "./game.module.css";
 
@@ -91,6 +97,30 @@ function DeckOptions({
         ))}
       </optgroup>
     </>
+  );
+}
+
+/**
+ * Starting or resuming a game fills the screen (v0.3.0), unless the player turned it off. The
+ * browser allows it only inside the click, so this runs before anything is awaited.
+ */
+function tableFullscreen(): Promise<boolean> | null {
+  return readTableSettings().fullscreenOnStart && canFullscreen()
+    ? enterTableFullscreen()
+    : null;
+}
+
+/**
+ * A Ctrl, Shift, Alt or Meta click (or another button) opens the game in another tab or window,
+ * so this page stays on Play and must not fill the screen for it.
+ */
+function plainClick(event: MouseEvent): boolean {
+  return (
+    event.button === 0 &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    !event.altKey &&
+    !event.metaKey
   );
 }
 
@@ -217,6 +247,7 @@ function Table({ me }: { me: Me }) {
 
   async function start(event: FormEvent) {
     event.preventDefault();
+    const fullscreen = tableFullscreen();
     setError("");
     setStarting(true);
     const body: Request = {
@@ -230,17 +261,22 @@ function Table({ me }: { me: Me }) {
         ? { deck_list: deckList }
         : seatChoice(deck)),
     };
-    const { data, error: failure } = await client.POST(
-      "/api/v1/practice-games",
-      {
-        body,
-      },
-    );
+    // A request that throws (the network dropped) is a failure like a refusal: no game, so the
+    // full screen asked for above ends and the button comes back.
+    const answer = await client
+      .POST("/api/v1/practice-games", { body })
+      .catch(() => undefined);
+    const data = answer?.data;
+    const failure = answer?.error;
     setStarting(false);
     if (data) {
       window.location.hash = `#game/${data.id}`;
       return;
     }
+    // No game to fill the screen for. The full-screen request may still be pending: wait for it.
+    void fullscreen?.then((entered) => {
+      if (entered) void exitTableFullscreen();
+    });
     const code = (failure as { code?: string } | undefined)?.code ?? "";
     const names = (failure as { names?: string[] } | undefined)?.names;
     setError(
@@ -485,6 +521,10 @@ function Table({ me }: { me: Me }) {
                     <a
                       className={styles.primaryButton}
                       href={`#game/${game.id}`}
+                      onClick={(event) => {
+                        if (plainClick(event.nativeEvent))
+                          void tableFullscreen();
+                      }}
                     >
                       {game.your_seat === null ? "Observe" : "Resume"}
                     </a>

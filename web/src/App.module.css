@@ -106,7 +106,7 @@
   margin-left: 238px;
 }
 .topbar {
-  height: 76px;
+  min-height: 76px;
   border-bottom: 1px solid #ffffff0b;
   display: flex;
   align-items: center;
@@ -116,9 +116,12 @@
   font-size: 0.63rem;
   letter-spacing: 1.8px;
 }
+/* Wraps rather than overflowing when an update notice joins the connection status. */
 .topbar > div {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 9px;
   letter-spacing: 0;
   font-size: 0.7rem;
@@ -137,6 +140,29 @@
   padding: 5px 9px;
   border-radius: 4px;
   margin-left: 13px;
+}
+/* A new version of the site, beside the version badge (v0.3.0, PWA04). */
+.update {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: 13px;
+  color: #e6c68c;
+}
+.update button {
+  background: transparent;
+  border: 1px solid #d5b77c;
+  color: #e6c68c;
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+}
+.update button:hover {
+  background: #d4b47a1a;
+}
+/* The game screen fills the window: nothing behind it scrolls (v0.3.0). */
+:global(html[data-route="game"]) {
+  overflow: hidden;
 }
 .main {
   max-width: 1640px;
@@ -411,87 +437,7 @@ h1 {
 .empty .primary {
   margin-top: 28px;
 }
-.settingsPanel,
-.release {
-  border: 1px solid #ffffff16;
-  background: #18221f;
-  border-radius: 6px;
-  padding: 25px;
-  margin: 25px 0;
-}
-.settingsPanel h2,
-.release h2 {
-  font:
-    1.5rem Georgia,
-    serif;
-}
-.settingsPanel label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 30px;
-  padding: 20px 0;
-  border-top: 1px solid #ffffff12;
-}
-.settingsPanel strong {
-  font-size: 0.9rem;
-}
-.settingsPanel small {
-  display: block;
-  color: #9baa9d;
-  font-size: 0.76rem;
-  line-height: 1.6;
-  margin-top: 5px;
-}
-.settingsPanel input {
-  width: 22px;
-  height: 22px;
-  accent-color: #d5b77c;
-  flex-shrink: 0;
-}
-.settingsPanel > p {
-  font-size: 0.73rem;
-  color: #a5b0a3;
-  margin: 12px 0 0;
-}
-.release h2 {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-.release p {
-  color: #a5b0a3;
-  font-size: 0.8rem;
-  line-height: 1.7;
-}
-.release ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.release li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 25px;
-  border-top: 1px solid #ffffff12;
-  padding: 16px 0;
-}
-.release li p {
-  margin: 5px 0 0;
-}
-.release li > span {
-  white-space: nowrap;
-  font-size: 0.7rem;
-  color: #d3bc8d;
-}
-.release li > span[data-available="true"] {
-  color: #84ac93;
-}
-.release li strong {
-  font-size: 0.85rem;
-}
+/* The Settings page's own styles are in app/Settings.module.css (v0.3.0). */
 .dialog {
   max-width: 520px;
   width: calc(100% - 40px);
@@ -673,7 +619,7 @@ h1 {
     margin: 0;
   }
   .topbar {
-    height: 50px;
+    min-height: 50px;
   }
   .main {
     padding: 22px 18px 0;
@@ -694,15 +640,8 @@ h1 {
     gap: 15px;
     flex-wrap: wrap;
   }
-  .release li {
-    align-items: flex-start;
-  }
   .empty {
     padding: 25px;
-  }
-  .settingsPanel,
-  .release {
-    padding: 20px;
   }
 }
 .practice {

@@ -1,0 +1,88 @@
+/* The install banner drops down above the top bar (v0.3.0); reduced motion keeps it still
+   (global.css turns animations off). */
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+  padding: 12px 44px;
+  background: linear-gradient(90deg, #2a2a1c, #1c2622 70%);
+  border-bottom: 1px solid #d4b47a3a;
+  font-size: 0.78rem;
+  animation: drop 240ms ease-out;
+}
+.banner p {
+  margin: 0;
+  color: #e3dcc4;
+  line-height: 1.6;
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.install {
+  background: #d5b77c;
+  border: 1px solid #e0c58f;
+  color: #192220;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+.install:hover {
+  background: #e6cc99;
+}
+.later {
+  background: transparent;
+  border: 1px solid #ffffff2a;
+  color: #c7cdbb;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+.later:hover {
+  border-color: #d4b47a66;
+}
+.banner kbd,
+.settings kbd {
+  font-family: inherit;
+  border: 1px solid #ffffff2a;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+.installed {
+  margin: 0;
+  padding: 12px 44px;
+  background: #1f2c25;
+  border-bottom: 1px solid #84ac9344;
+  color: #c9dccb;
+  font-size: 0.78rem;
+}
+.settings p {
+  font-size: 0.8rem;
+  color: #a5b0a3;
+  line-height: 1.7;
+}
+.settings .install {
+  margin-top: 4px;
+}
+@keyframes drop {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+@media (max-width: 1200px) {
+  .banner,
+  .installed {
+    padding: 12px 28px;
+  }
+}
+@media (max-width: 600px) {
+  .banner,
+  .installed {
+    padding: 12px 18px;
+  }
+}

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Account, avatars } from "./Account";
 import { Admin, SysopSignIn, canAdminister } from "./Admin";
+import { exitTableFullscreen } from "./app/fullscreen";
+import { InstallBanner } from "./app/InstallBanner";
+import { guardLiveGame } from "./app/liveGame";
+import { useOnline } from "./app/online";
+import { leaveTable } from "./app/serviceWorker";
+import { Settings } from "./app/Settings";
+import { UpdateNotice } from "./app/UpdateNotice";
 import {
   client,
   loadFoundation,
@@ -85,6 +92,14 @@ const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
 function currentGame(): string | undefined {
   return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
 }
+/** The hash of a whole address, such as a hashchange event's oldURL. */
+function hashOf(url: string): string {
+  try {
+    return new URL(url).hash;
+  } catch {
+    return "";
+  }
+}
 /** #deck/<id> opens a deck in the editor; #shared/<code>, a deck shared by link. */
 function currentDeck(): { deck?: string; shared?: string } {
   const hash = window.location.hash;
@@ -110,7 +125,7 @@ export function App() {
     "loading" | "connected" | "unavailable"
   >("loading");
   const [attempt, setAttempt] = useState(0);
-  const [online, setOnline] = useState(navigator.onLine);
+  const online = useOnline();
   const [preferences, setPreferences] = useState(readPreferences);
   const [saveMessage, setSaveMessage] = useState("");
   const [selected, setSelected] = useState<Format>();
@@ -122,7 +137,17 @@ export function App() {
   const navigated = useRef(false);
 
   useEffect(() => {
-    const change = () => {
+    const change = (event: HashChangeEvent) => {
+      // A live game keeps its address unless an in-game link meant to leave (v0.3.0): the
+      // browser's Back, or the installed app opening #play in this window, changes nothing.
+      if (guardLiveGame(event.oldURL)) return;
+      if (GAME_ROUTE.test(hashOf(event.oldURL)) && !currentGame()) {
+        // Leaving the table: its full screen ends, and the update the game screen said was
+        // ready applies now. One that took over during the game loads at once instead of
+        // drawing the next page with the old code.
+        void exitTableFullscreen();
+        if (leaveTable()) return;
+      }
       navigated.current = true;
       setPage(currentPage());
       setGame(currentGame());
@@ -132,15 +157,17 @@ export function App() {
     return () => window.removeEventListener("hashchange", change);
   }, []);
   useEffect(() => {
+    // The table fills the window and never scrolls; the other pages scroll as ever.
+    document.documentElement.dataset.route = game ? "game" : "shell";
+  }, [game]);
+  useEffect(() => {
     // Leaving a game also lands on a page (usually Play, whose state never changed), so focus
     // follows the game route too; the game screen focuses its own heading.
     if (navigated.current && !game) heading.current?.focus();
   }, [page, game]);
   useEffect(() => {
-    const update = () => {
-      setOnline(navigator.onLine);
-      setAttempt((value) => value + 1);
-    };
+    // Either change is a reason to ask the service again.
+    const update = () => setAttempt((value) => value + 1);
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
     return () => {
@@ -324,6 +351,7 @@ export function App() {
         </a>
       </aside>
       <div className={styles.workspace}>
+        <InstallBanner me={me} onGame={false} />
         <header className={styles.topbar}>
           <span>THE GATHERING STARTS HERE</span>
           <div>
@@ -340,6 +368,7 @@ export function App() {
                     ? "Service connected"
                     : "Service unavailable"}
             </span>
+            <UpdateNotice />
             <span className={styles.version}>v{__APP_VERSION__}</span>
           </div>
         </header>
@@ -504,84 +533,13 @@ export function App() {
               </section>
             </>
           ) : page === "Settings" ? (
-            <>
-              <h1 ref={heading} tabIndex={-1}>
-                Make yourself at home.
-              </h1>
-              <p className={styles.lead}>
-                A few preferences for your side of the table.
-              </p>
-              <section
-                className={styles.settingsPanel}
-                aria-labelledby="preferences-title"
-              >
-                <h2 id="preferences-title">Display & accessibility</h2>
-                <label>
-                  <span>
-                    <strong>Larger text</strong>
-                    <small>Increase the interface text size.</small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={preferences.largeText}
-                    onChange={(event) =>
-                      updatePreference("largeText", event.target.checked)
-                    }
-                  />
-                </label>
-                <label>
-                  <span>
-                    <strong>Reduce motion</strong>
-                    <small>
-                      Keep transitions and movement to a minimum. System
-                      preferences are also respected.
-                    </small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={preferences.reducedMotion}
-                    onChange={(event) =>
-                      updatePreference("reducedMotion", event.target.checked)
-                    }
-                  />
-                </label>
-                <p role="status">
-                  {saveMessage || "Preferences are stored on this device."}
-                </p>
-              </section>
-              <section className={styles.release}>
-                <h2>
-                  Release status{" "}
-                  <span className={styles.tag}>
-                    v{__APP_VERSION__} · TESTING PREVIEW
-                  </span>
-                </h2>
-                <p>
-                  Practice games against the bots are open for testing. Here is
-                  where each part of Commander Duels stands.
-                </p>
-                {bootstrap ? (
-                  <ul>
-                    {bootstrap.capabilities.map((item) => (
-                      <li key={item.id}>
-                        <div>
-                          <strong>{item.name}</strong>
-                          <p>{item.reason}</p>
-                        </div>
-                        <span data-available={item.available}>
-                          {item.available ? "Available" : item.milestone}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>
-                    Connect to the application service to load the feature
-                    roadmap.
-                  </p>
-                )}
-              </section>
-            </>
+            <Settings
+              preferences={preferences}
+              onPreference={updatePreference}
+              saveMessage={saveMessage}
+              bootstrap={bootstrap}
+              heading={heading}
+            />
           ) : (
             <>
               <span className={styles.eyebrow}>{details[page].milestone}</span>
