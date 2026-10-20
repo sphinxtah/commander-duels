@@ -2321,6 +2321,165 @@
         "title": "GoogleCredential",
         "type": "object"
       },
+      "GuidedRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "colors": {
+            "anyOf": [
+              {
+                "maxLength": 5,
+                "pattern": "^[wubrgWUBRG]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Colors"
+          },
+          "commander_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commander Id"
+          },
+          "experience": {
+            "default": "experienced",
+            "enum": [
+              "new",
+              "experienced"
+            ],
+            "title": "Experience",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "partner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partner Id"
+          },
+          "theme": {
+            "default": "midrange",
+            "enum": [
+              "aggro",
+              "midrange",
+              "control",
+              "tokens",
+              "counters",
+              "graveyard",
+              "spells",
+              "ramp",
+              "tribal",
+              "artifacts",
+              "enchantments",
+              "lifegain"
+            ],
+            "title": "Theme",
+            "type": "string"
+          },
+          "tribe": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tribe"
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "title": "GuidedRequest",
+        "type": "object"
+      },
+      "GuidedResult": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "propertyNames": {
+              "format": "uuid"
+            },
+            "title": "Cards",
+            "type": "object"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "identity": {
+            "title": "Identity",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "validation": {
+            "$ref": "#/components/schemas/Validation"
+          }
+        },
+        "required": [
+          "format",
+          "title",
+          "identity",
+          "entries",
+          "suggestions",
+          "note",
+          "validation",
+          "cards"
+        ],
+        "title": "GuidedResult",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2804,6 +2963,19 @@
             ],
             "title": "Deck"
           },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One of your own decks: the game binds to a revision of it.",
+            "title": "Deck Id"
+          },
           "deck_list": {
             "anyOf": [
               {
@@ -2852,6 +3024,12 @@
             },
             "title": "Formats",
             "type": "array"
+          },
+          "own_decks": {
+            "default": false,
+            "description": "Whether this account may play its own decks (decks.edit).",
+            "title": "Own Decks",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3465,7 +3643,7 @@
       },
       "SeatChoice": {
         "additionalProperties": false,
-        "description": "A bot seat's deck: a fixture deck of the game's format, or a deck list (SysOp).",
+        "description": "A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck\nlist (SysOp).",
         "properties": {
           "deck": {
             "anyOf": [
@@ -3485,6 +3663,18 @@
               }
             ],
             "title": "Deck"
+          },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Id"
           },
           "deck_list": {
             "anyOf": [
@@ -3797,6 +3987,48 @@
           "status"
         ],
         "title": "StatusChange",
+        "type": "object"
+      },
+      "Suggestion": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "location": {
+            "enum": [
+              "main",
+              "sideboard",
+              "commander",
+              "companion",
+              "maybeboard"
+            ],
+            "title": "Location",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "card_id",
+          "name",
+          "quantity",
+          "location",
+          "reason"
+        ],
+        "title": "Suggestion",
         "type": "object"
       },
       "SyncQueued": {
@@ -5727,7 +5959,7 @@
     },
     "/api/v1/card-images": {
       "get": {
-        "description": "A card's image by its exact name, from Scryfall, cached on this server. The first request\nfor a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not\nknow, such as tokens. 429 card_images_busy when the account already waits for many new\ncards, and 503 when everyone does or Scryfall asked us to wait; both carry Retry-After.",
+        "description": "A card's image by its exact name, from Scryfall, cached on this server. With game, the\nprinting chosen in your own seat's deck. The first request for a card waits while it is\nfetched. 404 card_image_missing for cards Scryfall does not know, such as tokens. 429\ncard_images_busy when the account already waits for many new cards, and 503 when everyone\ndoes or Scryfall asked us to wait; both carry Retry-After.",
         "operationId": "card_image_api_v1_card_images_get",
         "parameters": [
           {
@@ -5756,6 +5988,23 @@
               ],
               "title": "Size",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Game"
             }
           }
         ],
@@ -5857,7 +6106,7 @@
     },
     "/api/v1/card-images/info": {
       "get": {
-        "description": "The printing and artist behind a name's cached image, to credit the artist and Scryfall.\nNever fetches: 404 until the image has been requested.",
+        "description": "The printing and artist behind a name's image, to credit the artist and Scryfall. Never\nfetches: 404 until the image has been requested, unless the catalog names the printing.",
         "operationId": "card_image_info_api_v1_card_images_info_get",
         "parameters": [
           {
@@ -5872,6 +6121,23 @@
               "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$",
               "title": "Name",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "game",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Game"
             }
           }
         ],
@@ -5968,6 +6234,150 @@
           }
         },
         "summary": "Card Image Info"
+      }
+    },
+    "/api/v1/card-images/printings/{printing_id}": {
+      "get": {
+        "description": "A catalog printing's image (one face's, for double-faced cards), cached on this server.",
+        "operationId": "printing_image_api_v1_card_images_printings__printing_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "printing_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Printing Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "face",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 7,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Face"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": "normal",
+              "enum": [
+                "normal",
+                "large"
+              ],
+              "title": "Size",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The printing's image."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Printing Image"
       }
     },
     "/api/v1/cards": {
@@ -7014,6 +7424,115 @@
           }
         },
         "summary": "Create"
+      }
+    },
+    "/api/v1/decks/guided": {
+      "post": {
+        "description": "A proposed starting deck (DECK06). Nothing is saved: create a deck from its entries.",
+        "operationId": "guided_deck_api_v1_decks_guided_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuidedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuidedResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Guided Deck"
       }
     },
     "/api/v1/decks/import/preview": {

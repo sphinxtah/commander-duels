@@ -262,10 +262,11 @@ export interface paths {
         };
         /**
          * Card Image
-         * @description A card's image by its exact name, from Scryfall, cached on this server. The first request
-         *     for a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not
-         *     know, such as tokens. 429 card_images_busy when the account already waits for many new
-         *     cards, and 503 when everyone does or Scryfall asked us to wait; both carry Retry-After.
+         * @description A card's image by its exact name, from Scryfall, cached on this server. With game, the
+         *     printing chosen in your own seat's deck. The first request for a card waits while it is
+         *     fetched. 404 card_image_missing for cards Scryfall does not know, such as tokens. 429
+         *     card_images_busy when the account already waits for many new cards, and 503 when everyone
+         *     does or Scryfall asked us to wait; both carry Retry-After.
          */
         get: operations["card_image_api_v1_card_images_get"];
         put?: never;
@@ -285,10 +286,30 @@ export interface paths {
         };
         /**
          * Card Image Info
-         * @description The printing and artist behind a name's cached image, to credit the artist and Scryfall.
-         *     Never fetches: 404 until the image has been requested.
+         * @description The printing and artist behind a name's image, to credit the artist and Scryfall. Never
+         *     fetches: 404 until the image has been requested, unless the catalog names the printing.
          */
         get: operations["card_image_info_api_v1_card_images_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/card-images/printings/{printing_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Printing Image
+         * @description A catalog printing's image (one face's, for double-faced cards), cached on this server.
+         */
+        get: operations["printing_image_api_v1_card_images_printings__printing_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -401,6 +422,26 @@ export interface paths {
          *     deck, or a duplicate of one of the player's own.
          */
         post: operations["create_api_v1_decks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/guided": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Guided Deck
+         * @description A proposed starting deck (DECK06). Nothing is saved: create a deck from its entries.
+         */
+        post: operations["guided_deck_api_v1_decks_guided_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1719,6 +1760,57 @@ export interface components {
             /** Credential */
             credential: string;
         };
+        /** GuidedRequest */
+        GuidedRequest: {
+            /** Colors */
+            colors?: string | null;
+            /** Commander Id */
+            commander_id?: string | null;
+            /**
+             * Experience
+             * @default experienced
+             * @enum {string}
+             */
+            experience: "new" | "experienced";
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Partner Id */
+            partner_id?: string | null;
+            /**
+             * Theme
+             * @default midrange
+             * @enum {string}
+             */
+            theme: "aggro" | "midrange" | "control" | "tokens" | "counters" | "graveyard" | "spells" | "ramp" | "tribal" | "artifacts" | "enchantments" | "lifegain";
+            /** Tribe */
+            tribe?: string | null;
+        };
+        /** GuidedResult */
+        GuidedResult: {
+            /** Cards */
+            cards: {
+                [key: string]: components["schemas"]["CardSummary"];
+            };
+            /** Entries */
+            entries: components["schemas"]["DeckEntry"][];
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Identity */
+            identity: string;
+            /** Note */
+            note: string;
+            /** Suggestions */
+            suggestions: components["schemas"]["Suggestion"][];
+            /** Title */
+            title: string;
+            validation: components["schemas"]["Validation"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1903,6 +1995,11 @@ export interface components {
             /** Deck */
             deck?: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers") | null;
             /**
+             * Deck Id
+             * @description One of your own decks: the game binds to a revision of it.
+             */
+            deck_id?: string | null;
+            /**
              * Deck List
              * @description SysOp only (cards.any): one card per line, any card the engine implements.
              */
@@ -1928,6 +2025,12 @@ export interface components {
             deck_lists: boolean;
             /** Formats */
             formats: components["schemas"]["PracticeFormat"][];
+            /**
+             * Own Decks
+             * @description Whether this account may play its own decks (decks.edit).
+             * @default false
+             */
+            own_decks: boolean;
         };
         /** Preferences */
         Preferences: {
@@ -2140,11 +2243,14 @@ export interface components {
         };
         /**
          * SeatChoice
-         * @description A bot seat's deck: a fixture deck of the game's format, or a deck list (SysOp).
+         * @description A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck
+         *     list (SysOp).
          */
         SeatChoice: {
             /** Deck */
             deck?: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers") | null;
+            /** Deck Id */
+            deck_id?: string | null;
             /**
              * Deck List
              * @description SysOp only (cards.any): one card per line, any card the engine implements.
@@ -2282,6 +2388,25 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "denied" | "disabled";
+        };
+        /** Suggestion */
+        Suggestion: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /**
+             * Location
+             * @enum {string}
+             */
+            location: "main" | "sideboard" | "commander" | "companion" | "maybeboard";
+            /** Name */
+            name: string;
+            /** Quantity */
+            quantity: number;
+            /** Reason */
+            reason: string;
         };
         /** SyncQueued */
         SyncQueued: {
@@ -3723,6 +3848,7 @@ export interface operations {
                 /** @description The card's exact name, as the game shows it. */
                 name: string;
                 size?: "normal" | "large";
+                game?: string | null;
             };
             header?: never;
             path?: never;
@@ -3818,6 +3944,7 @@ export interface operations {
             query: {
                 /** @description The card's exact name, as the game shows it. */
                 name: string;
+                game?: string | null;
             };
             header?: never;
             path?: never;
@@ -3832,6 +3959,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CardImageInfo"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    printing_image_api_v1_card_images_printings__printing_id__get: {
+        parameters: {
+            query?: {
+                face?: number | null;
+                size?: "normal" | "large";
+            };
+            header?: never;
+            path: {
+                printing_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The printing's image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
                 };
             };
             /** @description Bad Request */
@@ -4508,6 +4732,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeckDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    guided_deck_api_v1_decks_guided_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GuidedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuidedResult"];
                 };
             };
             /** @description Bad Request */
