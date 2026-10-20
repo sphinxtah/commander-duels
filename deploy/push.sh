@@ -8,5 +8,5 @@ set -euo pipefail
 cd "$(dirname "$0")"
 tag="${1:?usage: deploy/push.sh <image tag>}"
 host="${CD_DEPLOY_HOST:-duels}"
-scp -q compose.yaml deploy.sh backup.sh restore.sh "$host:/srv/commander-duels/"
-ssh "$host" "cd /srv/commander-duels && chmod 0750 deploy.sh backup.sh restore.sh && ./deploy.sh '$tag'"
+scp -q compose.yaml deploy.sh backup.sh restore.sh update.sh "$host:/srv/commander-duels/"
+ssh "$host" "cd /srv/commander-duels && chmod 0750 deploy.sh backup.sh restore.sh update.sh && ./deploy.sh '$tag'"

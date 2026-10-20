@@ -1,12 +1,14 @@
 """The deploy kit: the web proxy follows the API to a new address, deploy.sh migrates before it
 replaces anything and brings the previous version back only onto its own database, and
-restore.sh replaces the database with exactly the dump, whatever its own backup prunes."""
+restore.sh replaces the database with exactly the dump, whatever its own backup prunes, and
+update.sh brings a version's kit from GitHub before deploying it."""
 
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -247,3 +249,141 @@ def test_restore_keeps_the_dump_it_restores_when_its_backup_prunes(tmp_path, tar
     kept = sorted(p.name for p in (kit / "backups").iterdir())
     assert len([name for name in kept if not name.endswith("-pre-restore.dump")]) == 10
     assert len([name for name in kept if name.endswith("-pre-restore.dump")]) == 5
+
+
+# Stands in for curl on the VM: GitHub's tag list (STUB_TAGS) and its archives of a ref, one
+# .tar.gz per ref in STUB_ARCHIVES, named after the ref with / as _. Unknown refs answer 404.
+CURL_STUB = r"""#!/usr/bin/env bash
+url="${*: -1}"
+echo "$url" >> "$STUB_LOG"
+case "$url" in
+  https://api.github.com/repos/sphinxtah/commander-duels/tags*) cat "$STUB_TAGS" ;;
+  https://codeload.github.com/sphinxtah/commander-duels/tar.gz/*)
+    archive="$STUB_ARCHIVES/$(printf '%s' "${url##*/tar.gz/}" | tr / _).tar.gz"
+    if [ -f "$archive" ]; then cat "$archive"; else
+      echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; fi ;;
+  *) echo "unexpected: curl $*" >&2; exit 99 ;;
+esac
+"""
+
+
+def archive(tmp_path: Path, ref: str, files: dict[str, str]) -> None:
+    """GitHub's archive of a ref: everything under one top folder, the kit under deploy/."""
+    folder = tmp_path / "archives"
+    folder.mkdir(exist_ok=True)
+    with tarfile.open(folder / f"{ref.replace('/', '_')}.tar.gz", "w:gz") as tar:
+        for name, body in files.items():
+            source = tmp_path / "member"
+            source.write_text(body)
+            tar.add(source, arcname=f"commander-duels-{ref.rsplit('/', 1)[-1]}/deploy/{name}")
+
+
+def kit_of(version: str) -> dict[str, str]:
+    """A version's kit whose deploy.sh records what it was asked to deploy."""
+    return {
+        "compose.yaml": f"# compose of {version}\n",
+        "deploy.sh": f'#!/usr/bin/env bash\necho "{version} $*" > "$STUB_DEPLOYED"\n',
+        "backup.sh": f"#!/usr/bin/env bash\n# backup of {version}\n",
+        "restore.sh": f"#!/usr/bin/env bash\n# restore of {version}\n",
+        "env.example": f"# env of {version}\n",
+        "nginx/duels.thesphinx.co": "# the proxy's site file stays out of the VM's folder\n",
+    }
+
+
+def update(tmp_path: Path, *args: str, tags: tuple[str, ...] = ()) -> dict[str, str]:
+    """Runs update.sh from a VM folder holding an older kit, a .env and a backup."""
+    kit = tmp_path / "kit"
+    (kit / "backups").mkdir(parents=True)
+    for name in ("compose.yaml", "deploy.sh", "backup.sh", "restore.sh"):
+        (kit / name).write_text("old\n")
+    (kit / ".env").write_text("CD_VERSION=0.1.0\n")
+    (kit / "backups" / "commander-20261020T000000Z-nightly.dump").write_text("dump")
+    shutil.copy(ROOT / "deploy" / "update.sh", kit / "update.sh")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "curl").write_text(CURL_STUB)
+    (bin_dir / "curl").chmod(0o755)
+    listed = ",".join(f'{{"name": "{tag}", "commit": {{}}}}' for tag in tags)
+    (tmp_path / "tags.json").write_text(f"[{listed}]")
+    env = {
+        "PATH": f"{bin_dir}:/usr/bin:/bin",
+        "STUB_LOG": str(tmp_path / "curl.log"),
+        "STUB_TAGS": str(tmp_path / "tags.json"),
+        "STUB_ARCHIVES": str(tmp_path / "archives"),
+        "STUB_DEPLOYED": str(tmp_path / "deployed"),
+    }
+    result = subprocess.run(
+        ["bash", str(kit / "update.sh"), *args], env=env, capture_output=True, text=True
+    )
+    deployed = tmp_path / "deployed"
+    urls = tmp_path / "curl.log"
+    return {
+        "status": str(result.returncode),
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "deployed": deployed.read_text().strip() if deployed.exists() else "",
+        "urls": urls.read_text() if urls.exists() else "",
+    }
+
+
+@needs_bash
+def test_update_brings_the_newest_versions_kit_and_deploys_it(tmp_path):
+    for version in ("0.1.2", "0.1.10"):
+        archive(tmp_path, f"refs/tags/v{version}", kit_of(version))
+    result = update(tmp_path, tags=("v0.1.2", "v0.1.10", "v0.0.9", "not-a-version"))
+    assert result["status"] == "0", result["stderr"]
+    # Versions compare as numbers: 0.1.10 is newer than 0.1.2.
+    assert "tar.gz/refs/tags/v0.1.10" in result["urls"]
+    assert result["deployed"] == "0.1.10 0.1.10"
+    kit = tmp_path / "kit"
+    assert (kit / "compose.yaml").read_text() == "# compose of 0.1.10\n"
+    assert "backup of 0.1.10" in (kit / "backup.sh").read_text()
+    assert "restore of 0.1.10" in (kit / "restore.sh").read_text()
+    assert (kit / "env.example").exists() and not (kit / "nginx").exists()
+    # The VM's own files stay as they were.
+    assert (kit / ".env").read_text() == "CD_VERSION=0.1.0\n"
+    backups = [p.name for p in (kit / "backups").iterdir()]
+    assert backups == ["commander-20261020T000000Z-nightly.dump"]
+    for name in ("deploy.sh", "backup.sh", "restore.sh"):
+        assert (kit / name).stat().st_mode & 0o777 == 0o750
+    # An archive without update.sh (v0.1.1 and older) leaves the running one in place.
+    assert (kit / "update.sh").read_text() == (ROOT / "deploy" / "update.sh").read_text()
+    assert not list(kit.glob(".update.*"))
+
+
+@needs_bash
+def test_update_can_fetch_main_without_deploying(tmp_path):
+    files = kit_of("main") | {"update.sh": "#!/usr/bin/env bash\n# a newer update.sh\n"}
+    archive(tmp_path, "refs/heads/main", files)
+    result = update(tmp_path, "-n", "main")
+    assert result["status"] == "0", result["stderr"]
+    assert result["deployed"] == ""
+    assert "./deploy.sh main" in result["stdout"]
+    kit = tmp_path / "kit"
+    assert (kit / "compose.yaml").read_text() == "# compose of main\n"
+    assert (kit / "update.sh").read_text().endswith("# a newer update.sh\n")
+    assert "api.github.com" not in result["urls"]
+
+
+@needs_bash
+@pytest.mark.parametrize(
+    "case", ["unknown version", "kit without backup.sh", "not a version", "no tags"]
+)
+def test_update_changes_nothing_when_it_cannot_bring_a_whole_kit(tmp_path, case):
+    args: tuple[str, ...] = ()
+    if case == "unknown version":
+        args = ("9.9.9",)
+    elif case == "kit without backup.sh":
+        files = kit_of("0.2.0")
+        del files["backup.sh"]
+        archive(tmp_path, "refs/tags/v0.2.0", files)
+        args = ("0.2.0",)
+    elif case == "not a version":
+        args = ("latest; rm -rf /",)
+    result = update(tmp_path, *args)
+    assert result["status"] != "0"
+    assert result["deployed"] == ""
+    kit = tmp_path / "kit"
+    for name in ("compose.yaml", "deploy.sh", "backup.sh", "restore.sh"):
+        assert (kit / name).read_text() == "old\n", name
+    assert not list(kit.glob(".update.*"))

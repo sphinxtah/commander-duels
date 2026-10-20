@@ -30,7 +30,7 @@ systemctl enable --now docker qemu-guest-agent
 usermod -aG docker "$user"
 
 install -d -o "$user" -g "$user" -m 0750 "$app" "$app/backups"
-for file in compose.yaml deploy.sh backup.sh restore.sh; do
+for file in compose.yaml deploy.sh backup.sh restore.sh update.sh; do
   install -o "$user" -g "$user" -m 0750 "$here/$file" "$app/$file"
 done
 if [ ! -f "$app/.env" ]; then

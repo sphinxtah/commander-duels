@@ -1,6 +1,6 @@
 # The live site (v0.1.0)
 
-From v0.1.0, Commander Duels runs live at **https://duels.thesphinx.co**, and every version after it deploys there. The owner decided this on 2026-10-19: the scope document lists VM, nginx and certificates as out of scope, and this decision brings them in. Everything here is the owner's personal homelab ("The Sphinx Hosting", TSH), on the Proxmox server Hathor. None of it is TeamLogic IT's Acadia, and nothing here may be mixed into Acadia's configuration.
+From v0.1.0, Commander Duels runs live at **https://duels.thesphinx.co**, and every version after it deploys there. The owner decided this on 2026-10-19: the scope document lists VM, nginx and certificates as out of scope, and this decision brings them in. Everything here is the owner's personal homelab ("The Sphinx Hosting", TSH), on the Proxmox server Hathor, and nothing here may be mixed into any other environment's configuration.
 
 ## How a request reaches the game
 
@@ -37,11 +37,13 @@ Sizing (since v0.1.1): the live site runs at most six games at once (`CD_GAMES_M
 
 ### On the VM
 
-1. Copy the kit over from the repository (from the deploying computer):
+1. Bring the kit to the VM. The repository is public, so on the VM:
 
    ```sh
-   scp deploy/bootstrap-vm.sh deploy/env.example deploy/compose.yaml deploy/deploy.sh deploy/backup.sh deploy/restore.sh duels:~
+   curl -fsSL https://codeload.github.com/sphinxtah/commander-duels/tar.gz/refs/heads/main | tar -xz --strip-components=2 --wildcards '*/deploy/*'
    ```
+
+   (Or copy it from the deploying computer: `scp deploy/*.sh deploy/env.example deploy/compose.yaml duels:~`.)
 
 2. On the VM, run the bootstrap once as root:
 
@@ -107,13 +109,21 @@ CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` 
 
 Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, and the web container re-resolving the API and limiting sign-in challenges. Its bash tests run in CI's Linux pytest and are skipped on Windows.
 
-From the repository on the deploying computer:
+**Pushing.** On the deploying computer, `git push` sends `main` and, because this checkout sets `push.followTags`, any new version tag with it. CI then publishes the images.
+
+**Pulling, on the VM** (since the repository went public, after v0.1.1):
 
 ```sh
-deploy/push.sh 0.1.0
+cd /srv/commander-duels && ./update.sh
 ```
 
-It copies `compose.yaml`, `deploy.sh`, `backup.sh` and `restore.sh` to `/srv/commander-duels` and runs `deploy.sh 0.1.0` there. That:
+`update.sh` brings the deploy kit of the newest version tag from GitHub and deploys that version. `./update.sh 0.1.1` takes a given version, `./update.sh main` the newest build of `main` (the images CI tags `main`), and `./update.sh -n 0.1.1` only fetches the kit, for reading before `./deploy.sh 0.1.1`. It needs no GitHub sign-in: it downloads one archive of the tag from GitHub, which keeps the files of one commit together, and replaces `compose.yaml`, `deploy.sh`, `backup.sh`, `restore.sh`, `update.sh` and `env.example`. A tag that lacks one of them (`update.sh` in v0.1.1 and older, for instance) leaves the VM's copy in place. `.env`, `web-access.conf` and `backups/` are never touched. If the archive cannot be fetched, or lacks `compose.yaml`, `deploy.sh` or `backup.sh`, nothing changes. A tag never changes after it is pushed; `main` can lag a few minutes behind a push on GitHub's side.
+
+The images still come from GHCR with the VM's `docker login`.
+
+**Or from the deploying computer:** `deploy/push.sh 0.1.0` copies the same files from the checkout and runs `deploy.sh 0.1.0` on the VM.
+
+Either way, `deploy.sh 0.1.0`:
 1. writes the web container's allow list (the proxy and loopback);
 2. pulls the tag's images;
 3. dumps the database (`backups/commander-<time>-pre-0.1.0.dump`) when it is already running;
