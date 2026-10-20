@@ -18,6 +18,12 @@ Validated locally on Windows on October 19, 2026. The host has no Node, so the w
 | Card images | Real Scryfall images for the fixture decks, fetched once by the API and served from its volume |
 | Deploy kit | ShellCheck clean (`deploy/*.sh`); the production Compose file renders; actionlint clean on the workflow |
 
+**Hosted CI and the live site.** Recorded in [the release notes](releases/0.1.0.md#verification):
+- runs #24 and #25;
+- the deployment to `commanderduels` behind the TSH proxy;
+- the live checks from the owner's workstation;
+- the owner's own SysOp sign-in, game and Google sign-in.
+
 **The throwaway stack.** It had its own database (`commander_e2e` on the Compose server) and a test SysOp whose password was generated for the run. It used the Compose engine and the built API and web images, with the web container on `127.0.0.1:8080`. The Playwright container shared the web container's network, so the browser came from loopback. The developer's database and SysOp were not used.
 
 **Found and fixed while playing:**
