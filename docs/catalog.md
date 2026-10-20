@@ -53,7 +53,7 @@ Each card concept has one status, with a reason when it cannot be played:
 | `unsupported` | Not a card a deck holds: tokens, emblems, art cards, schemes, memorabilia | `not_a_deck_card` |
 | `suspended` | Held back by an administrator; no new game may start with it | `suspended_by_staff` |
 
-Unsupported and uncertified cards are shown and labeled everywhere, and blocked from play (T18). SysOp's own practice decks may still use any card the engine implements.
+Unsupported and uncertified cards stay searchable and labeled, and are blocked from play (T18). Since v0.3.0 the Cards page hides them by default, at the owner's request: it opens on playable cards, and "Show cards not playable yet" beside the result count, the "Playable here" filter, or a search that names playability (`is:unsupported`, `status:catalog_only`) shows them, each with its “Not playable” badge (the reason is in the card's details, and screen readers hear it with the badge). "Clear filters" goes back to playable cards. The deck editor's finder shows only playable cards while “Only cards this deck can use” is ticked, as it is by default. SysOp's own practice decks may still use any card the engine implements.
 
 ### The engine's implementation list
 
@@ -92,7 +92,7 @@ An unknown key or a malformed term is refused with a message that says what was 
 | Route | Who | |
 | --- | --- | --- |
 | `GET /api/v1/cards` | signed-in players | Search |
-| `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags and status |
+| `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags, status and newest 60 printings; `?printing=<id>` also lists that printing of the card when it is older (since v0.3.0, for a deck entry's chosen printing) |
 | `GET /api/v1/cards/{id}/printings` | signed-in players | Its English printings, newest first |
 | `GET /api/v1/sets` | signed-in players | Sets, for the set filter |
 | `GET /api/v1/catalog` | signed-in players | The current revision, the last run, the next scheduled run, whether it is stale (no successful run for 48 hours), format versions and counts |
@@ -106,7 +106,8 @@ An unknown key or a malformed term is refused with a message that says what was 
 
 ## On screen
 
-- **Cards** (the navigation's Cards page): search with the syntax help, filters, sorting and pages; each card opens its details: images of every printing, Oracle text, legality, rulings, tags, and why it is or is not playable here.
+- **Cards** (the navigation's Cards page): playable cards by default, with search, the syntax help, filters, sorting and pages; each card opens its details: images of every printing, Oracle text, legality, rulings, tags, why it is or is not playable here, and the illustrator of the image on show.
+- **Images as Scryfall serves them.** A card image is never dimmed, recoloured, blurred, cropped or covered over its artist or copyright line (Scryfall's image rules); a card that is not playable says so in its caption and badge instead.
 - **Administration → Card catalog:** the sync's state and recent runs, "Run the catalog sync now", the engine's coverage per format, and the cards to review, with accept, suspend and restore, and a search to suspend any other card.
 
 ## Testing without Scryfall

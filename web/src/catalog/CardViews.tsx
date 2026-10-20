@@ -28,13 +28,19 @@ export function CardImage({
   const chosen = printingId ?? card.image?.printing_id;
   const faces = card.image?.faces ?? 0;
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [chosen, face, size]);
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+    setLoaded(false);
+  }, [chosen, face, size]);
   const src =
     chosen && !failed
       ? printingImage(chosen, size, faces > 0 ? (face ?? 0) : undefined)
       : null;
+  // Once the image has drawn, the frame beneath it is hidden, so a printing of another shape
+  // shows the card's background around it rather than fragments of the text.
   return (
-    <div className={styles.cardImage}>
+    <div className={styles.cardImage} data-loaded={loaded || undefined}>
       <TextFrame card={card} face={face} />
       {src && (
         <img
@@ -42,6 +48,7 @@ export function CardImage({
           alt=""
           loading="lazy"
           decoding="async"
+          onLoad={() => setLoaded(true)}
           onError={() => setFailed(true)}
         />
       )}
@@ -116,7 +123,9 @@ export function CardTile({
         <CardImage card={card} />
       </button>
       <div className={styles.tileFoot}>
-        <span className={styles.tileName}>{card.name}</span>
+        <span className={styles.tileName} title={card.name}>
+          {card.name}
+        </span>
         <StatusBadge card={card} />
       </div>
       {children}
@@ -144,8 +153,17 @@ export function CardDetails({
     let active = true;
     setCard(undefined);
     setAllPrintings(undefined);
+    // A deck entry's chosen printing is asked for by name, so the details list it (and its
+    // artist) even when it is older than the printings the card lists first. Choosing another
+    // printing later picks one from that list, so it needs no new request.
+    const printing = chosenPrinting ?? undefined;
     void client
-      .GET("/api/v1/cards/{card_id}", { params: { path: { card_id: cardId } } })
+      .GET("/api/v1/cards/{card_id}", {
+        params: {
+          path: { card_id: cardId },
+          query: printing ? { printing } : undefined,
+        },
+      })
       .then(({ data }) => active && data && setCard(data));
     return () => {
       active = false;
@@ -153,8 +171,20 @@ export function CardDetails({
   }, [cardId]);
   useEffect(() => setPreview(chosenPrinting ?? null), [chosenPrinting]);
   if (!card) return <p role="status">Loading the card…</p>;
-  const printings = allPrintings ?? card.printings;
+  // "Show all" loads the newest 500; the first list's printings stay too, so a chosen printing
+  // older than those (asked for by name) is never dropped from the list.
+  const loaded = new Set(allPrintings?.map((printing) => printing.id));
+  const printings = allPrintings
+    ? [
+        ...allPrintings,
+        ...card.printings.filter((printing) => !loaded.has(printing.id)),
+      ]
+    : card.printings;
   const imageFaces = card.image?.faces ?? 0;
+  // The artist of the image on show: a previewed printing's, else the default image's.
+  const shownArtist = preview
+    ? (printings.find((item) => item.id === preview)?.artist ?? null)
+    : (card.image?.artist ?? null);
   return (
     <div className={styles.detail}>
       <div className={styles.detailImage}>
@@ -295,7 +325,7 @@ export function CardDetails({
               </li>
             ))}
           </ul>
-          {printings.length < card.printing_count && (
+          {!allPrintings && printings.length < card.printing_count && (
             <button
               type="button"
               className={styles.secondary}
@@ -310,7 +340,9 @@ export function CardDetails({
                   .then(({ data }) => data && setAllPrintings(data))
               }
             >
-              Show all {card.printing_count} printings
+              {card.printing_count > 500
+                ? "Show the newest 500 printings"
+                : `Show all ${card.printing_count} printings`}
             </button>
           )}
         </section>
@@ -336,7 +368,9 @@ export function CardDetails({
           </p>
         )}
         <p className={styles.credit}>
-          Card data and images from Scryfall; tags from Scryfall Tagger.
+          {shownArtist ? `Illustrated by ${shownArtist}. ` : ""}Card data and
+          images from Scryfall; tags from Scryfall Tagger. Magic: The Gathering
+          © Wizards of the Coast.
         </p>
       </div>
     </div>

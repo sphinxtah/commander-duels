@@ -206,6 +206,24 @@ test.describe("decks and the card catalog", () => {
     );
     await page.keyboard.press("Escape");
 
+    // Cards that cannot be played here yet are hidden until asked for, then shown with their
+    // badge (T18 keeps them searchable and labeled).
+    const hidden = await page.evaluate(async () => {
+      const response = await fetch("/api/v1/cards?playable=false&page_size=1");
+      return ((await response.json()) as { items: { name: string }[] }).items[0]
+        ?.name;
+    });
+    expect(hidden).toBeTruthy();
+    await page.getByLabel("Search cards").fill(`!"${hidden}"`);
+    await expect(page.getByText("0 playable cards")).toBeVisible();
+    await page
+      .getByRole("button", { name: "Show cards not playable yet" })
+      .click();
+    await expect(page.getByText("1 card", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("list", { name: "Cards" }).getByRole("listitem"),
+    ).toContainText("Not playable");
+
     // A query the parser refuses says why.
     await page.getByLabel("Search cards").fill("mv>=");
     await expect(page.getByRole("alert")).toBeVisible();

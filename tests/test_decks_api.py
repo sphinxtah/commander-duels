@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
+from api.cards import artist_of, image_of
 from api.config import Settings
 from api.identity import hash_token, utcnow
 from api.main import create_app
@@ -132,6 +133,15 @@ def test_card_search_and_details(client):
         {"legacy": "legal", "commander": "legal"},
     )
     assert bolt["image"]["printing_id"]
+    # The card dialog credits the artist of the image it shows; a double-faced card's comes
+    # from its printing (Scryfall's own, which joins the faces' artists when they differ).
+    assert bolt["image"]["artist"]
+    delver = next(
+        item
+        for item in ada.get("/api/v1/cards", q="delver").json()["items"]
+        if item["name"].startswith("Delver of Secrets")
+    )
+    assert delver["image"]["faces"] == 2 and delver["image"]["artist"]
     unsupported = ada.get("/api/v1/cards", q="status:unsupported", extras="true").json()
     assert {"Goblin", "Temple of Khonshu"} <= {item["name"] for item in unsupported["items"]}
     # Tokens and other objects no deck holds are left out unless asked for.
@@ -159,9 +169,58 @@ def test_card_search_and_details(client):
     assert status["format_versions"] == {"legacy": 1, "commander": 1}
     coverage = ada.get("/api/v1/catalog/coverage").json()
     assert any(row["status"] == "certified" for row in coverage["formats"]["commander"])
+    # The image's artist is its own printing's credit, as the printings list gives it.
+    bolt_detail = ada.get(f"/api/v1/cards/{bolt['id']}").json()
+    shown = next(p for p in bolt_detail["printings"] if p["id"] == bolt["image"]["printing_id"])
+    assert bolt["image"]["artist"] == shown["artist"]
     # Signed out, or waiting for approval: no cards.
     assert client.get("/api/v1/cards").status_code == 401
     assert Account(client, "pending", status="pending").get("/api/v1/cards").status_code == 403
+
+
+def test_a_chosen_printing_is_listed_with_its_artist(client, monkeypatch):
+    """A deck entry may pin a printing older than the ones a card's details list first; asked for
+    by name, it is listed too, so the card dialog can show and credit it."""
+    ada = Account(client, "chooser")
+    bolt = card_id(client, "Lightning Bolt")
+    every = ada.get(f"/api/v1/cards/{bolt}/printings").json()
+    assert len(every) > 1
+    oldest = every[-1]
+    monkeypatch.setattr("api.cards.MAX_PRINTINGS", 1)
+    first = ada.get(f"/api/v1/cards/{bolt}").json()["printings"]
+    assert [p["id"] for p in first] == [every[0]["id"]]
+    pinned = ada.get(f"/api/v1/cards/{bolt}", printing=oldest["id"]).json()["printings"]
+    assert [p["id"] for p in pinned] == [every[0]["id"], oldest["id"]]
+    assert pinned[-1]["artist"] == oldest["artist"]
+    # A printing already listed is not listed twice; another card's printing, or none at all,
+    # adds nothing; an id that is not one is refused.
+    again = ada.get(f"/api/v1/cards/{bolt}", printing=every[0]["id"]).json()["printings"]
+    assert [p["id"] for p in again] == [every[0]["id"]]
+    other = ada.get(f"/api/v1/cards/{card_id(client, 'Counterspell')}/printings").json()[0]
+    for stranger in (other["id"], str(uuid4())):
+        listed = ada.get(f"/api/v1/cards/{bolt}", printing=stranger).json()["printings"]
+        assert [p["id"] for p in listed] == [every[0]["id"]]
+    assert ada.get(f"/api/v1/cards/{bolt}", printing="not-a-uuid").status_code == 422
+
+
+def test_artists_of_printings():
+    """Scryfall's own credit comes first (it joins the faces' artists when they differ); a
+    printing without one is credited to its front face's artist."""
+    joined = CardPrinting(id=uuid4(), artist="A & B", image_uris={"normal": "x"}, faces=[])
+    assert artist_of(joined) == "A & B" and image_of(joined).artist == "A & B"
+    faced = CardPrinting(
+        id=uuid4(),
+        artist=None,
+        image_uris=None,
+        faces=[
+            {"artist": "Front", "image_uris": {"normal": "x"}},
+            {"artist": "Back", "image_uris": {"normal": "y"}},
+        ],
+    )
+    reference = image_of(faced)
+    assert artist_of(faced) == "Front"
+    assert reference is not None and (reference.faces, reference.artist) == (2, "Front")
+    assert artist_of(CardPrinting(id=uuid4(), artist=None, faces=[{"artist": ""}])) is None
 
 
 def test_deck_lifecycle_drafts_and_revisions(client):

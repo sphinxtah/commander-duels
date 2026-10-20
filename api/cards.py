@@ -58,10 +58,12 @@ class FaceSummary(Contract):
 
 
 class CardImageRef(Contract):
-    """The printing whose image stands for the card, and how many faces have their own."""
+    """The printing whose image stands for the card, how many faces have their own, and the
+    artist of the image shown first (the card's, or its front face's)."""
 
     printing_id: UUID
     faces: int = 0
+    artist: str | None = None
 
 
 class CardSummary(Contract):
@@ -242,13 +244,25 @@ def faces_of(db: Session, ids: list[UUID]) -> dict[UUID, list[CardFace]]:
     return found
 
 
+def artist_of(printing: CardPrinting) -> str | None:
+    """Who illustrated a printing: Scryfall's own credit (which joins the faces' artists when
+    they differ), else its front face's."""
+    faces = printing.faces or []
+    front = faces[0].get("artist") if faces else None
+    return printing.artist or (front if isinstance(front, str) and front else None)
+
+
 def image_of(printing: CardPrinting | None) -> CardImageRef | None:
     if printing is None:
         return None
+    faces = printing.faces or []
+    artist = artist_of(printing)
     if printing.image_uris:
-        return CardImageRef(printing_id=printing.id)
-    with_images = sum(1 for face in printing.faces or [] if face.get("image_uris"))
-    return CardImageRef(printing_id=printing.id, faces=with_images) if with_images else None
+        return CardImageRef(printing_id=printing.id, artist=artist)
+    with_images = sum(1 for face in faces if face.get("image_uris"))
+    if not with_images:
+        return None
+    return CardImageRef(printing_id=printing.id, faces=with_images, artist=artist)
 
 
 def summary(
@@ -473,7 +487,7 @@ def printing_summary(printing: CardPrinting) -> PrintingSummary:
         frame=printing.frame,
         promo=printing.promo,
         digital=printing.digital,
-        artist=printing.artist,
+        artist=artist_of(printing),
         faces=len(printing.faces or []),
         removed=printing.removed_revision is not None,
     )
@@ -490,12 +504,23 @@ def printings_query(card_id: UUID) -> Select[CardPrinting]:
 
 
 @router.get("/cards/{card_id}", response_model=CardDetail)
-def card_detail(card_id: UUID, principal: Active, db: Db) -> CardDetail:
+def card_detail(
+    card_id: UUID,
+    principal: Active,
+    db: Db,
+    printing: Annotated[UUID | None, Query()] = None,
+) -> CardDetail:
+    """A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)
+    is listed among them even when it is older, so the screen can show it and credit its artist."""
     concept = db.get(CardConcept, card_id)
     if concept is None:
         raise not_found()
     base = summaries(db, [concept])[0]
     printings = list(db.scalars(printings_query(card_id).limit(MAX_PRINTINGS)))
+    if printing is not None and all(shown.id != printing for shown in printings):
+        chosen = db.get(CardPrinting, printing)
+        if chosen is not None and chosen.concept_id == card_id:
+            printings.append(chosen)
     count = db.scalar(
         select(func.count()).select_from(CardPrinting).where(CardPrinting.concept_id == card_id)
     )

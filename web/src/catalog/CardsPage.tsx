@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { client, type Me } from "../api";
 import { CardDetails, CardTile } from "./CardViews";
 import {
-  emptySearch,
+  catalogSearch,
+  namesPlayability,
   type CatalogStatus,
   type CardSummary,
   type Search,
@@ -18,6 +19,18 @@ export function catalogLine(status: CatalogStatus | undefined): string {
   if (!status.revision) return "The card catalog has not been imported yet.";
   const when = new Date(status.revision.created_at).toLocaleDateString();
   return `${status.cards.toLocaleString()} cards from Scryfall, ${status.playable.toLocaleString()} playable here · catalog revision ${status.revision.id}, ${when}${status.stale ? " · not updated for two days" : ""}`;
+}
+
+/** The result count, saying which cards it counts. */
+export function resultWords(
+  total: number,
+  playable: Search["playable"],
+): string {
+  const count = total.toLocaleString();
+  const cards = total === 1 ? "card" : "cards";
+  if (playable === "true") return `${count} playable ${cards}`;
+  if (playable === "false") return `${count} ${cards} not playable yet`;
+  return `${count} ${cards}`;
 }
 
 export function useCatalogStatus(): CatalogStatus | undefined {
@@ -64,12 +77,29 @@ function Browser({
 }: {
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  const [search, setSearch] = useState<Search>({ ...emptySearch });
+  // Cards that cannot be played here yet are hidden until the player asks for them.
+  const [search, setSearch] = useState<Search>({ ...catalogSearch });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<CardSummary>();
   const dialog = useRef<HTMLDialogElement>(null);
   const status = useCatalogStatus();
-  const { results, error, loading } = useCardSearch(search, page, PAGE_SIZE);
+  // A search that names playability itself (status:unsupported, is:playable) decides it, and the
+  // "Playable here" filter steps aside rather than contradict it.
+  const typed = namesPlayability(search.q);
+  const setAside = typed && search.playable !== "";
+  const effective = useMemo<Search>(
+    () => (setAside ? { ...search, playable: "" } : search),
+    [search, setAside],
+  );
+  const { results, answered, error, loading } = useCardSearch(
+    effective,
+    page,
+    PAGE_SIZE,
+  );
+  // The result line describes the results on screen, so it follows the search they answer.
+  const shown = answered ?? effective;
+  const shownSetAside =
+    setAside && shown.playable === "" && namesPlayability(shown.q);
   useEffect(() => setPage(1), [search]);
   useEffect(() => {
     if (open) dialog.current?.showModal();
@@ -82,14 +112,40 @@ function Browser({
         Discover your next centerpiece.
       </h1>
       <p className={styles.lead}>{catalogLine(status)}</p>
-      <SearchControls search={search} onChange={setSearch} />
-      <p role="status" className={styles.resultLine}>
-        {error
-          ? ""
-          : results
-            ? `${results.total.toLocaleString()} card${results.total === 1 ? "" : "s"}${loading ? " · searching…" : ""}`
-            : "Searching…"}
-      </p>
+      <SearchControls
+        search={search}
+        onChange={setSearch}
+        defaults={catalogSearch}
+      />
+      <div className={styles.resultRow}>
+        {/* The count names the cards the shown results hold (the search they answer, not one
+            still on its way), and says when a typed term has set the filter aside, so screen
+            readers hear both. */}
+        <p role="status" className={styles.resultLine}>
+          {error
+            ? ""
+            : results
+              ? `${resultWords(results.total, shown.playable)}${shownSetAside ? " · your search names playability, so the “Playable here” filter is set aside" : ""}${loading ? " · searching…" : ""}`
+              : "Searching…"}
+        </p>
+        {/* One button whose words change, so focus stays on it after a click. */}
+        {!typed && search.playable !== "false" && (
+          <button
+            type="button"
+            className={styles.textButton}
+            onClick={() =>
+              setSearch({
+                ...search,
+                playable: search.playable === "true" ? "" : "true",
+              })
+            }
+          >
+            {search.playable === "true"
+              ? "Show cards not playable yet"
+              : "Hide cards not playable yet"}
+          </button>
+        )}
+      </div>
       {error && (
         <p role="alert" className={styles.refusal}>
           {error}

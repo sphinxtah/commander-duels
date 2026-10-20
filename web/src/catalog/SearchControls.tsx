@@ -16,7 +16,8 @@ const COLORS = [
   ["G", "Green"],
 ] as const;
 
-/** Searches as the filters change, a moment after the last keystroke. */
+/** Searches as the filters change, a moment after the last keystroke. `answered` is the search
+ * the shown results answer, which lags behind `search` while a new one is on its way. */
 export function useCardSearch(
   search: Search,
   page: number,
@@ -24,6 +25,7 @@ export function useCardSearch(
   fixed?: Partial<Record<string, string>>,
 ) {
   const [results, setResults] = useState<CardPage>();
+  const [answered, setAnswered] = useState<Search>();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const fixedKey = JSON.stringify(fixed ?? {});
@@ -43,6 +45,7 @@ export function useCardSearch(
           setLoading(false);
           if (data) {
             setResults(data);
+            setAnswered(search);
             setError("");
           } else {
             setError(
@@ -57,17 +60,20 @@ export function useCardSearch(
       window.clearTimeout(timer);
     };
   }, [search, page, pageSize, fixedKey]);
-  return { results, error, loading };
+  return { results, answered, error, loading };
 }
 
 export function SearchControls({
   search,
   onChange,
   compact = false,
+  defaults = emptySearch,
 }: {
   search: Search;
   onChange: (search: Search) => void;
   compact?: boolean;
+  /** What "Clear filters" goes back to: the screen's own starting search. */
+  defaults?: Search;
 }) {
   const [more, setMore] = useState(false);
   const help = useRef<HTMLDialogElement>(null);
@@ -246,7 +252,7 @@ export function SearchControls({
           <button
             type="button"
             className={styles.secondary}
-            onClick={() => onChange({ ...emptySearch })}
+            onClick={() => onChange({ ...defaults })}
           >
             Clear filters
           </button>

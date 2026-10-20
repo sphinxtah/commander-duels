@@ -503,16 +503,19 @@ a.deckTitle:hover {
     max-height: none;
   }
 }
+/* minmax(0, ...) columns, so an unbreakable name cannot widen the finder's rows and scroll the
+   page sideways on a phone with Large text. */
 .found {
   list-style: none;
   padding: 0;
   margin: 10px 0 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
 .found li {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px 8px;
   align-items: center;
   padding: 8px;
@@ -520,6 +523,8 @@ a.deckTitle:hover {
   border-radius: 6px;
 }
 .foundName {
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: left;
   border: 0;
   background: transparent;
@@ -549,13 +554,17 @@ a.deckTitle:hover {
   gap: 12px;
   margin: 12px 0;
 }
+/* minmax(0, 1fr) columns: an implicit auto column grows to its widest row's one-line width (a long
+   name beside a long mana cost), which pushed the deck column and the page sideways. */
 .deckColumn {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-width: 0;
 }
 .sections {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 .section h3 {
@@ -577,12 +586,18 @@ a.deckTitle:hover {
   padding: 0;
   margin: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
+/* A row that does not fit wraps instead of widening the column: the name keeps at least 14
+   characters' width on the first line, and whatever no longer fits beside it (the cost, the
+   badge, the remove button) moves to the next line, at the right. */
 .entries li {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 10px;
+  gap: 4px 10px;
   padding: 5px 8px;
   border-radius: 5px;
 }
@@ -619,7 +634,9 @@ a.deckTitle:hover {
   font-variant-numeric: tabular-nums;
 }
 .entryName {
-  flex: 1;
+  flex: 1 1 14ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
   text-align: left;
   border: 0;
   background: transparent;

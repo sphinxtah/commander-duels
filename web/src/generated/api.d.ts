@@ -345,7 +345,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Card Detail */
+        /**
+         * Card Detail
+         * @description A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)
+         *     is listed among them even when it is older, so the screen can show it and credit its artist.
+         */
         get: operations["card_detail_api_v1_cards__card_id__get"];
         put?: never;
         post?: never;
@@ -1227,9 +1231,12 @@ export interface components {
         };
         /**
          * CardImageRef
-         * @description The printing whose image stands for the card, and how many faces have their own.
+         * @description The printing whose image stands for the card, how many faces have their own, and the
+         *     artist of the image shown first (the card's, or its front face's).
          */
         CardImageRef: {
+            /** Artist */
+            artist?: string | null;
             /**
              * Faces
              * @default 0
@@ -4245,7 +4252,9 @@ export interface operations {
     };
     card_detail_api_v1_cards__card_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                printing?: string | null;
+            };
             header?: never;
             path: {
                 card_id: string;

@@ -52,7 +52,7 @@ Images come from Scryfall by the card's name. The API fetches each once, keeps i
 Both routes give back the database connection their sign-in used before any lookup, so a slow Scryfall never holds one.
 
 Scryfall's terms are kept:
-- **No changes to the image.** Images are never cropped, covered, distorted or watermarked.
+- **No changes to the image.** Images are never cropped, blurred, recoloured, distorted or watermarked, nor covered over the artist or copyright line. Since v0.3.0 the sticky game bar is opaque, so cards scrolling under it are hidden rather than blurred, and a tapped card's ◆ sits over its name, since turning the card moves its artist line to the corner the mark used.
 - **Spacing.** Requests to Scryfall's API are at least 550 ms apart, because Scryfall allows its named-card search 2 requests a second.
 - **Rate limiting.** After a 429 the API asks Scryfall nothing for as long as its `Retry-After` says: 30 seconds at least, an hour at most. Retry-After is read as seconds or as an HTTP date. A number too large to hold means the longest pause; an unreadable value counts as no header (30 seconds). Meanwhile, new names answer 503 `card_images_unavailable` with `Retry-After`, and cached images are still served.
 - **No paywall.** Nothing is sold, so no Scryfall data sits behind a payment.

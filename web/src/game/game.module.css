@@ -31,11 +31,12 @@
   flex-wrap: wrap;
   padding: 10px 18px;
   border-bottom: 1px solid var(--line);
-  background: #111b1cdd;
+  /* Opaque, with no backdrop blur: cards that scroll under the bar are hidden, never blurred
+     (Scryfall's image rules forbid blurring card images). */
+  background: #111b1c;
   position: sticky;
   top: 0;
   z-index: 10;
-  backdrop-filter: blur(6px);
 }
 .gameBar h1 {
   margin: 0;
@@ -451,6 +452,13 @@ button.life[data-selected] {
 }
 .card[data-selected] .actionMark {
   background: var(--teal);
+}
+/* A tapped card is turned clockwise, so the button's top-left holds the card's bottom-left corner,
+   where the artist is credited. The mark moves to the top-right, over the name, and stays inside
+   the slot so it never meets the next card's mark. */
+.cardSlot[data-tapped] .actionMark {
+  left: auto;
+  right: 7px;
 }
 .face,
 .cardBack {
