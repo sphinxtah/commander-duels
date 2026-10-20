@@ -40,7 +40,7 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 | `mulligan` | `ASK` with Mulligan/Keep buttons | `mulligan`, `keep` | boolean |
 | `yes_no` | `ASK` (optional effects, "mana will be lost" confirmations) | `yes`, `no`, with XMage's button labels | boolean |
 | `choose_target` | `PICK_TARGET` (targets, the starting player, the attacker to block, cards to put on the bottom or discard) | `choose` per candidate (players by seat, objects by opaque ID, already chosen ones marked `selected`); `done` when not required | UUID; boolean |
-| `pay_mana` | `PLAY_MANA` | `tap_source` per permanent with a usable mana ability; `use_pool` per mana type in the pool; `cancel` | UUID; mana type; boolean |
+| `pay_mana` | `PLAY_MANA` | Since v0.1.1 only sources and pool mana that can pay part of the unpaid cost (read from XMage's message, "Pay {R}{R}…"; when it cannot be read, or an effect lets mana be spent as another type, nothing is left out). With nothing that can pay, the detail says "Nothing you control can pay {R}{R}." and only `cancel` is offered. Options: `tap_source` per permanent with a usable mana ability, and (since v0.1.1) per hand card whose mana ability works from the hand, labelled with that ability ("Exile Simian Spirit Guide from your hand: Add {R}."); `use_pool` per mana type in the pool; `special_payment` ("Special payment (convoke, delve, improvise)") whenever XMage's own condition for its Special button holds, that is, the seat controls mana special actions during the payment; `cancel` | UUID; mana type; "special"; boolean |
 | `declare_attackers` | `SELECT` with possible attackers | `toggle_attacker` per creature; `all_attack`; `done` | UUID; "special"; boolean |
 | `declare_blockers` | `SELECT` with possible blockers | `toggle_blocker` per creature; `done` | UUID; boolean |
 | `assign_amounts` | `MULTI_AMOUNT` (combat damage among blockers, with or without trample) | `suggested` (XMage's default split); `cancel` when allowed; or a payload of one amount per entry | space-separated amounts; boolean |
@@ -48,6 +48,8 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 | `unsupported` | `CHOOSE_CHOICE` lists longer than 64 entries, and `PLAY_X_MANA`, which XMage's human player never sends at the pin | none | The game waits until the seat concedes or the game is closed |
 
 None of the unsupported families occurred in the scripted games: the fixture decks have no modal spells, X costs, named choices, piles or simultaneous triggers that need ordering. XMage's `PERSONAL_MESSAGE` events ("You have to attack with...") become the view's `messages`, not prompts.
+
+**Paying beyond the battlefield** (since v0.1.1). XMage lists a spell as castable when mana from the hand (Simian Spirit Guide) or a special payment (convoke, delve, improvise) could pay for it. Before v0.1.1 the payment prompt offered neither, so such a cast could end at a payment whose only option was cancel. After `special_payment`, XMage asks with `choose_ability` which special payment to use, then with `choose_target` which creatures, cards or artifacts it uses, and for convoke sometimes with `choose_choice` for the colour. Pay with mana abilities first: once a special payment is used, XMage refuses further mana abilities for that spell, as its own client does.
 
 ## Authorized views
 
@@ -66,7 +68,7 @@ None of the unsupported families occurred in the scripted games: the fixture dec
 | Looked-at cards | Only the player who looked |
 | Players | Life, counters, library and hand counts, mana pool, lost/won |
 | Combat | Attackers, the defender and blockers |
-| Log | XMage's public log, with HTML and XMage's short object IDs removed. Engine error lines stay in the engine's own log, because their details are not seat-safe |
+| Log | XMage's public log, with HTML and XMage's short object IDs removed, up to the entries that existed when the seat's current view was built, so it never runs ahead of the board (since v0.1.1). The finished game's snapshot carries the whole log. Engine error lines stay in the engine's own log, because their details are not seat-safe. XMage's own recovery lines ("Auto-restored to … due game error: …" and "Game stopped due critical error …") are replaced by "The rules engine hit an internal error and rolled the game back" and "The rules engine stopped the game after an internal error"; the details stay in the engine's ERROR entries and in XMage's console log |
 
 Objects get opaque IDs (`o` and 16 hex digits) from `SecureRandom`. The key is the XMage UUID plus its zone-change counter, so a card that changes zones becomes a new object (rule 400.7) and gets a new ID. IDs are minted only when an object is first shown.
 
@@ -88,6 +90,8 @@ These exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. The en
 
 Every game request needs `Authorization: Bearer <seat_token>`, and the token alone selects the seat: the view, prompt and commands are that seat's. No body field can choose one: the envelope rejects unknown fields such as `seat`. An unknown game and a wrong token both return 404 `not_found`.
 
+Since v0.1.1, a number past JSON-number limits (`1e10000`, `1e99999999999`, more than 10,000 digits) is a 400 `invalid_request` or `invalid_command`, like any other bad number. An unexpected failure inside the engine answers 500 `{"code": "internal_error"}` instead of dropping the connection; the details go to the engine's log.
+
 The seed is never returned. It decides every shuffle, so knowing it would reveal library order (SEC03). The seed input exists for reproducible development tests only.
 
 A command:
@@ -100,7 +104,8 @@ A command:
 The snapshot's `status` is one of `starting`, `your_prompt`, `unsupported_prompt`, `waiting` (another player is acting or XMage is processing), `eliminated` (this seat has lost and the game goes on) or `finished`. A finished game has a `result`:
 - `kind` is `completed`, `turn_limit`, `closed`, `idle_timeout`, `humans_eliminated` or `error`;
 - `conceded_seats` lists the seats that conceded, in order;
-- for a completed game, also `winner_seat` and `draw`.
+- for a completed game, also `winner_seat` and `draw`;
+- for an `error`, `error` says what happened in plain words: "The engine stopped the game after an internal error" when the engine's game thread failed (since v0.1.1; the stack trace goes to the engine's log), or "XMage ended the game after an internal error".
 
 ## Lifecycle and threads
 
@@ -108,7 +113,7 @@ The snapshot's `status` is one of `starting`, `your_prompt`, `unsupported_prompt
 - **Threads.** Each game runs on its own `GAME human_game <id>` platform thread, which blocks while it waits for the seat. Views are built on that thread; request threads only read the published snapshot.
 - **Capacity.** At most `CD_ENGINE_MAX_GAMES` games run at once (default 2, at most 8). XMage's AI shares one search pool and one random generator across games, and each game holds a thread. Bot matches keep their own single slot.
 - **Watchdog.** It checks every second. A game with no activity for its idle timeout (default 15 minutes) is closed with `idle_timeout`. Finished games stay readable for 10 minutes (at most 16), then are dropped.
-- **Concede and close.** These go through XMage's `setConcedingPlayer`, as its server does, and wake a waiting choice with `signalPlayerConcede`. If the game thread has not ended 5 seconds after a close, the engine ends the game and interrupts the thread until it exits, as bot matches do.
+- **Concede and close.** These go through XMage's `setConcedingPlayer`, as its server does, and wake a waiting choice with `signalPlayerConcede`. If the game thread has not ended 5 seconds after a close, the engine ends the game and interrupts the thread until it exits, as bot matches do. Since v0.1.1, a seat that concedes before the game starts is never shown a prompt: at its first XMage request it leaves the game, and its status becomes `eliminated`. While a game is closing, no new prompt opens.
 - **Memory only.** Games live in memory. There is no journal, snapshot or recovery yet, and a restart loses them.
 
 ## Verification
@@ -118,8 +123,9 @@ Leak checks run on the game thread for every published view, against XMage's own
 1. **No XMage UUIDs.** No UUID appears in a view or prompt other than the prompt's own ID.
 2. **IDs by zone.** Every opaque ID in a payload resolves to an object visible to the human by an independent zone check. The opponent's hand and both libraries, minus revealed and looked-at cards, are concealed.
 3. **Names.** A card name that only the opponent's deck contains appears in a payload only once a card of that name has been public. The fixture decks share no card names, so this catches a concealed card by name.
-4. **Log lines.** Every log line naming an opponent-only card must name a card that is public by the next event. XMage logs a discard just before moving the card.
+4. **Log lines.** Every log line naming an opponent-only card must name a card that is public by the next event. XMage logs a discard just before moving the card. Since v0.1.1, every log line served to a seat may also name only cards that seat's views have already shown, checked at every new log line and every published view.
 5. **Counts.** Hand and library counts, and the human's hand contents, match XMage.
+6. **No hidden errors** (since v0.1.1). Any error XMage recovered from (a rollback) fails the checks, and so does a failure to build the final views. XMage plays on after most exceptions, so a game would otherwise still finish.
 
 Results:
 - **JUnit `HumanGameTest`:** 6 complete games, 3 with each deck, at AI skill 1. About 1,400 views checked per run, with no failures. Every fixture prompt family seen: `priority`, `mulligan`, `yes_no`, `choose_target`, `pay_mana`, `declare_attackers`, `declare_blockers` and `assign_amounts`, the last both suggested and custom. No unsupported request. The first answer of each game also probes a forged prompt, a stale revision, an unknown option, a repeated action ID and a reused action ID.
@@ -135,12 +141,15 @@ Results:
   - The documented one-liner played a 13-turn game: 106 prompts and 300 payloads.
   - Afterwards the engine had no game threads, and the heap after GC was 57 MB, with 7 finished games retained.
 - **CI:** the engine job now runs one scripted game with schema validation after the bot match.
+- **Since v0.1.1:** `SpecialPaymentTest` pays for spells with convoke and with mana from the hand (Simian Spirit Guide). `CommanderGameTest` concedes a seat before the start, and `HumanGameTest` makes XMage recover from an error, which the checks must catch and the seat's log must report without its details. The engine's JUnit suite has 81 tests.
 
 ## Findings
 
 - **XMage settings.** `HumanPlayer` needs `UserData`. XMage's server sets it when a user connects, and without it the first priority throws. The engine sets `UserData.getDefaultUserDataView()`.
 - **Damage assignment.** It is reachable with simple decks: a trampler, or an attacker blocked by two creatures, makes XMage ask for a `MULTI_AMOUNT` split. It is typed as `assign_amounts`.
-- **Pool mana.** XMage spends usable pool mana automatically. Answering a payment with pool mana that cannot pay the cost repeats the request indefinitely, so a client must offer a land or cancel.
+- **Pool mana.** XMage spends usable pool mana automatically. Answering a payment with pool mana that cannot pay the cost repeats the request indefinitely, and a source whose mana cannot pay is still tapped. Since v0.1.1 the payment prompt offers neither (see `pay_mana` above).
+- **Optional costs are asked before they are checked.** Chain Lightning asks the player it hit "Pay {R}{R} to copy the spell?" whether or not they can pay. CI run #24's keyboard journey said yes with only Forests: it tapped a Forest, then answered with the green pool mana 600 times. A replay of the journey's table reproduced it in 11% of games (45 of 408); with the v0.1.1 payment prompt, 1,000 games had no payment loop.
+- **XMage's token list fills lazily, without a lock.** Every game creates its helper emblems at the start, and games starting together on a freshly started engine could fail with a `ConcurrentModificationException` (2 of 6 fresh starts lost a game with two games at once). Since v0.1.1 the engine fills the list once, after loading the card database.
 - **Cancelled casting.** `done` on a required target with nothing chosen cancels the spell. XMage treats it as cancelling the cast.
 - **No active player before turn 1.** Seat lookups must tolerate nulls (`List.of` throws on `indexOf(null)`).
 - **Revealed cards are cleared at each human priority prompt.** The view built for that prompt still shows them.

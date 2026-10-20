@@ -38,9 +38,15 @@ export function players(view: GameView): PlayerView[] {
   );
 }
 
-export function playerName(view: GameView | null, seat: Seat | null): string {
+/** A player as the viewer reads them: "You" for the viewer's own seat. SysOp observing another
+ * player's game sees that player's view but owns no seat in it, so the owner goes by name. */
+export function playerName(
+  view: GameView | null,
+  seat: Seat | null,
+  observing = false,
+): string {
   if (seat === null || !view) return "—";
-  if (view.you?.seat === seat) return "You";
+  if (view.you?.seat === seat) return observing ? view.you.name : "You";
   return (
     view.opponents.find((p) => p.seat === seat)?.name ?? `Seat ${seat + 1}`
   );
@@ -133,6 +139,7 @@ const verbs: Record<PromptOption["action"], string> = {
   done: "Done",
   tap_source: "Tap",
   use_pool: "Use from pool",
+  special_payment: "Special payment",
   cancel: "Cancel",
   toggle_attacker: "Attack with",
   all_attack: "Attack with everything",
@@ -149,11 +156,12 @@ export function optionText(
   option: PromptOption,
   index: Map<ObjectId, Located>,
   view: GameView | null,
+  observing = false,
 ): string {
   const subject = option.object_id
     ? objectName(index.get(option.object_id))
     : option.seat !== null
-      ? playerName(view, option.seat)
+      ? playerName(view, option.seat, observing)
       : null;
   if (option.action === "toggle_attacker" && option.selected && subject)
     return `Stop attacking with ${subject}`;
@@ -229,6 +237,7 @@ export function manaWords(cost: string | null): string {
     .join(", ");
 }
 
+/** The result in words for the viewer's seat; with no seat (SysOp observing), in neutral words. */
 export function resultText(
   view: GameView | null,
   seat: Seat | null,
@@ -245,13 +254,15 @@ export function resultText(
       title: "A draw",
       detail: `The game ended in a draw after ${turns}.`,
     };
-  if (result.winner_seat !== null)
-    return result.winner_seat === seat
-      ? { title: "Victory", detail: `You won in ${turns}.` }
-      : {
-          title: "Defeat",
-          detail: `${playerName(view, result.winner_seat)} won in ${turns}.`,
-        };
+  if (result.winner_seat !== null) {
+    if (result.winner_seat === seat)
+      return { title: "Victory", detail: `You won in ${turns}.` };
+    const winner = playerName(view, result.winner_seat, seat === null);
+    return {
+      title: seat === null ? "Game over" : "Defeat",
+      detail: `${winner} won in ${turns}.`,
+    };
+  }
   const kinds: Record<string, string> = {
     turn_limit: "The turn limit was reached",
     closed: "The game was closed",

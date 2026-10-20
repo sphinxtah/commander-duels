@@ -10,15 +10,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import mage.Mana;
 import mage.MageObject;
+import mage.abilities.Abilities;
 import mage.abilities.Ability;
 import mage.abilities.Modes;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.PlayLandAbility;
 import mage.abilities.SpellAbility;
+import mage.abilities.costs.mana.ManaCost;
+import mage.abilities.costs.mana.ManaCostsImpl;
 import mage.abilities.mana.ActivatedManaAbilityImpl;
 import mage.cards.Card;
 import mage.choices.Choice;
+import mage.constants.AsThoughEffectType;
 import mage.constants.Constants;
 import mage.constants.ManaType;
 import mage.constants.MultiAmountType;
@@ -199,10 +204,16 @@ final class Prompts {
                 detail = sub.isEmpty() ? null : sub;
                 break;
             }
-            case PLAY_MANA:
+            case PLAY_MANA: {
                 kind = "pay_mana";
-                payMana();
+                ManaCost unpaid = spendsAsOtherTypes() ? null : unpaidCost(event.getMessage());
+                payMana(unpaid);
+                // Cancel alone: say why, so the seat does not look stuck (UI04).
+                if (detail == null && options.size() == 1) {
+                    detail = "Nothing you control can pay " + (unpaid == null ? "this cost" : unpaid.getText()) + ".";
+                }
                 break;
+            }
             case MULTI_AMOUNT:
                 kind = "assign_amounts";
                 if (message.isEmpty()) {
@@ -410,10 +421,20 @@ final class Prompts {
         }
     }
 
-    private void payMana() {
+    /**
+     * Every way to pay that XMage counted when it listed the spell as castable: mana abilities on the
+     * battlefield and in the hand (Simian Spirit Guide's, for instance), the pool, and special
+     * payments such as convoke, delve and improvise. Sources and pool mana that cannot pay any of
+     * the unpaid cost are left out: XMage would tap the source anyway, and answers it with pool mana
+     * it cannot use by asking again, forever. With nothing that can pay, cancel is the only option
+     * (Chain Lightning's "Pay {R}{R} to copy the spell?" answered yes by a player with only Forests).
+     *
+     * @param unpaid the cost still to pay, or null when it is unknown (then nothing is left out)
+     */
+    private void payMana(ManaCost unpaid) {
         List<Permanent> sources = new ArrayList<>();
         for (Permanent permanent : game.getBattlefield().getAllActivePermanents(human.getId())) {
-            if (canProduceMana(permanent)) {
+            if (canProduceMana(permanent, unpaid)) {
                 sources.add(permanent);
             }
         }
@@ -422,13 +443,33 @@ final class Prompts {
             add("tap_source", permanent.getName(), views.ref(permanent), null, false,
                 new UuidAnswer(permanent.getId()));
         }
+        // XMage takes a hand card's id as it takes a permanent's, and uses its mana ability. The
+        // label is the ability ("Exile Simian Spirit Guide from your hand: Add {R}."): it costs a card.
+        List<Card> handSources = new ArrayList<>();
+        for (Card card : human.getHand().getCards(game)) {
+            if (handManaAbilities(card).stream().anyMatch(ability -> pays(ability, unpaid))) {
+                handSources.add(card);
+            }
+        }
+        handSources.sort(Comparator.comparing(Card::getName).thenComparing(views::ref));
+        for (Card card : handSources) {
+            String rule = SeatViews.plain(handManaAbilities(card).get(0).getRule(card.getName()));
+            add("tap_source", rule.isEmpty() ? card.getName() : rule, views.ref(card), null, false,
+                new UuidAnswer(card.getId()));
+        }
         ManaPool pool = human.getManaPool();
         for (ManaType type : ManaType.values()) {
             int amount = pool.get(type);
-            if (amount > 0) {
+            if (amount > 0 && (unpaid == null || one(type) == null || unpaid.testPay(one(type)))) {
                 add("use_pool", amount + " " + type + " mana in pool", null, null, false,
                     new ManaAnswer(human.getId(), type));
             }
+        }
+        // XMage's own condition for its Special button. XMage then asks which special payment, and
+        // which creatures, cards or artifacts it uses.
+        if (!game.getState().getSpecialActions().getControlledBy(human.getId(), true).isEmpty()) {
+            add("special_payment", "Special payment (convoke, delve, improvise)", null, null, false,
+                new StringAnswer("special"));
         }
         add("cancel", "Cancel", null, null, false, new BooleanAnswer(false));
     }
@@ -458,12 +499,73 @@ final class Prompts {
         return String.join(" ", values.stream().map(String::valueOf).toList());
     }
 
-    private boolean canProduceMana(Permanent permanent) {
+    /** The mana abilities the seat can use from its hand, as XMage counts them for castable spells. */
+    private Abilities<ActivatedManaAbilityImpl> handManaAbilities(Card card) {
+        return card.getAbilities(game).getAvailableActivatedManaAbilities(Zone.HAND, human.getId(), game);
+    }
+
+    /**
+     * The cost a payment request is for. XMage's request does not carry it, but its message is
+     * "Pay " followed by the unpaid cost's symbols and, in a div, the source's name. Null if the
+     * message does not read that way.
+     */
+    static ManaCost unpaidCost(String message) {
+        if (message == null || !message.startsWith("Pay {")) {
+            return null;
+        }
+        String text = message.substring("Pay ".length());
+        int markup = text.indexOf('<');
+        text = markup < 0 ? text : text.substring(0, markup);
+        int last = text.lastIndexOf('}');
+        if (last < 0) {
+            return null;
+        }
+        try {
+            ManaCostsImpl<ManaCost> cost = new ManaCostsImpl<>(text.substring(0, last + 1));
+            return cost.isEmpty() ? null : cost;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Whether an effect lets mana be spent as though it were mana of another type (Chromatic Orrery,
+     * for instance): then a source's colour does not rule it out.
+     */
+    private boolean spendsAsOtherTypes() {
+        return !game.getContinuousEffects().getApplicableAsThoughEffects(AsThoughEffectType.SPEND_OTHER_MANA, game)
+            .isEmpty();
+    }
+
+    /** Whether some mana the ability makes could pay part of the cost; true when either is unknown. */
+    private boolean pays(ActivatedManaAbilityImpl ability, ManaCost unpaid) {
+        if (unpaid == null) {
+            return true;
+        }
+        List<Mana> made = ability.getNetMana(game);
+        return made == null || made.isEmpty()
+            || made.stream().anyMatch(mana -> mana.count() == 0 || unpaid.testPay(mana));
+    }
+
+    /** One mana of a pool type, or null for a type with no single mana. */
+    private static Mana one(ManaType type) {
+        return switch (type) {
+            case WHITE -> Mana.WhiteMana(1);
+            case BLUE -> Mana.BlueMana(1);
+            case BLACK -> Mana.BlackMana(1);
+            case RED -> Mana.RedMana(1);
+            case GREEN -> Mana.GreenMana(1);
+            case COLORLESS -> Mana.ColorlessMana(1);
+            default -> null;
+        };
+    }
+
+    private boolean canProduceMana(Permanent permanent, ManaCost unpaid) {
         if (!permanent.canUseActivatedAbilities(game)) {
             return false;
         }
         for (ActivatedManaAbilityImpl ability : permanent.getAbilities().getActivatedManaAbilities(Zone.BATTLEFIELD)) {
-            if (ability.canActivate(human.getId(), game).canActivate()) {
+            if (ability.canActivate(human.getId(), game).canActivate() && pays(ability, unpaid)) {
                 return true;
             }
         }

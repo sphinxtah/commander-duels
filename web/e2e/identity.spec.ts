@@ -8,10 +8,13 @@ const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const fakeGoogle = `
 window.google = { accounts: { id: {
   initialize(config) { window.__gis = config; window.__gisNonces = [...(window.__gisNonces || []), config.nonce]; },
-  renderButton(parent) {
+  renderButton(parent, options) {
     const button = document.createElement("button");
     button.textContent = "Sign in with Google";
-    button.onclick = () => window.__gis.callback({ credential: "header.payload.signature", select_by: "btn" });
+    button.onclick = () => {
+      options.click_listener?.();
+      window.__gis.callback({ credential: "header.payload.signature", select_by: "btn" });
+    };
     parent.replaceChildren(button);
   },
   disableAutoSelect() {},

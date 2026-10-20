@@ -29,6 +29,9 @@ SESSION_COOKIE = "cd_session"
 GOOGLE_COOKIE = "cd_google"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 TOUCH_INTERVAL = timedelta(minutes=1)
+# How long a rotated session's old token still signs requests in, for those the browser sent
+# before it read the new cookie.
+ROTATION_GRACE = timedelta(seconds=60)
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -229,6 +232,19 @@ def clearing_headers(request: Request) -> dict[str, str]:
     return {"set-cookie": response.headers["set-cookie"]}
 
 
+def add_rotated_cookie(request: Request, response: Response) -> None:
+    """Puts a session cookie rotated while signing the request in on its response, whatever made
+    that response: a model, an error or a route's own Response. A response that sets or clears
+    the session cookie itself (a sign-out, a new sign-in) keeps its own."""
+    cookie: str | None = getattr(request.state, "rotated_cookie", None)
+    if cookie is None:
+        return
+    own = f"{SESSION_COOKIE}="
+    if any(value.startswith(own) for value in response.headers.getlist("set-cookie")):
+        return
+    response.headers.append("set-cookie", cookie)
+
+
 def revoke_sessions(
     db: Session, user_id: UUID, reason: str, *, except_id: UUID | None = None
 ) -> int:
@@ -242,14 +258,40 @@ def revoke_sessions(
     return db.execute(statement).rowcount  # type: ignore[attr-defined, no-any-return]
 
 
+def successor_of(db: Session, rotated: UserSession) -> UserSession | None:
+    """The live session a rotated one was swapped for, during ROTATION_GRACE. Rotation copies the
+    CSRF token, which sessions never otherwise share, so it links the two. Once the successor
+    ends (sign-out, sign-out everywhere, a password change), the old token ends with it."""
+    if rotated.revoked_at is None or utcnow() - rotated.revoked_at > ROTATION_GRACE:
+        return None
+    return db.scalar(
+        select(UserSession)
+        .where(
+            UserSession.user_id == rotated.user_id,
+            UserSession.csrf_token == rotated.csrf_token,
+            UserSession.revoked_at.is_(None),
+        )
+        .order_by(UserSession.created_at.desc())
+        .limit(1)
+    )
+
+
 def live_session(conn: HTTPConnection, db: Session) -> tuple[UserSession, User] | None:
     """The connection's session and account, or None. Expired, revoked and off-network SysOp
-    sessions count as signed out, as do sessions of disabled accounts."""
+    sessions count as signed out, as do sessions of disabled accounts. A token rotated moments
+    ago stands for its successor (see successor_of), and marks the connection via_grace."""
     token = conn.cookies.get(SESSION_COOKIE)
     if not token:
         return None
     now = utcnow()
     session = db.scalar(select(UserSession).where(UserSession.token_hash == hash_token(token)))
+    if session is not None and session.revoked_reason == "rotated":
+        session = successor_of(db, session)
+        if session is None:
+            # No clearing cookie: the browser may already hold the successor's, and a late
+            # response with the old one would erase it.
+            return None
+        conn.state.via_grace = True
     user = db.get(User, session.user_id) if session else None
     if (
         session is None
@@ -265,15 +307,20 @@ def live_session(conn: HTTPConnection, db: Session) -> tuple[UserSession, User] 
     return session, user
 
 
-def optional_principal(request: Request, response: Response, db: Db) -> Principal | None:
+def optional_principal(request: Request, db: Db) -> Principal | None:
     """The signed-in account, or None (see live_session). A session older than its account's last
-    privilege change is rotated."""
+    privilege change is rotated. Its new cookie waits on request.state for the correlation
+    middleware, which adds it to whatever response the request ends with (add_rotated_cookie)."""
     found = live_session(request, db)
     if found is None:
+        db.commit()
         return None
     session, user = found
     now = utcnow()
-    if session.privilege_version != user.privilege_version:
+    # An old token in its grace is served as the session it stands for but never rotates it, or
+    # whoever holds a stale token could take a fresh one. Only the successor's own cookie does.
+    due = session.privilege_version != user.privilege_version
+    if due and not getattr(request.state, "via_grace", False):
         session.revoked_at, session.revoked_reason = now, "rotated"
         session, token = issue_session(
             db,
@@ -284,11 +331,17 @@ def optional_principal(request: Request, response: Response, db: Db) -> Principa
             absolute_expires_at=session.absolute_expires_at,
             csrf_token=session.csrf_token,
         )
-        set_session_cookie(response, request, token, session)
         db.commit()
+        cookie = Response()
+        set_session_cookie(cookie, request, token, session)
+        request.state.rotated_cookie = cookie.headers["set-cookie"]
     else:
         keep_alive(request, db, session, user)
     roles = roles_of(db, user)
+    # End the read transaction: the pooled connection goes back now, not when the request ends,
+    # so no route holds one while it awaits a lock, the engine or Scryfall. Nothing expires on
+    # commit (get_db), so the principal's rows stay loaded and a route's changes still flush.
+    db.commit()
     return Principal(user, session, roles, permissions_for(user, roles))
 
 

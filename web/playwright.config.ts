@@ -4,6 +4,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.CD_BROWSER_URL || "http://127.0.0.1:5173",
     viewport: { width: 1366, height: 900 },
+    // Evidence for a failed journey, which CI keeps as an artifact.
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
   },
   // Both servers must answer before any test runs. The API command uses the active Python
   // environment; an API or Vite server that is already running is reused outside CI.

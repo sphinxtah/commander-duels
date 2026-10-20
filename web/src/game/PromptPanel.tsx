@@ -18,7 +18,7 @@ import styles from "./game.module.css";
 const groups: { title: string; actions: PromptOption["action"][] }[] = [
   { title: "Play and cast", actions: ["play_land", "cast"] },
   { title: "Abilities", actions: ["activate", "activate_mana", "use_ability"] },
-  { title: "Mana", actions: ["tap_source", "use_pool"] },
+  { title: "Mana", actions: ["tap_source", "use_pool", "special_payment"] },
   {
     title: "Combat",
     actions: ["toggle_attacker", "all_attack", "toggle_blocker"],
@@ -35,19 +35,22 @@ function AmountForm({
   onSubmit: (amounts: number[]) => void;
 }) {
   const amounts = prompt.amounts!;
+  // The form is keyed by the prompt's ID, so each prompt starts from its own suggestion, and a new
+  // revision of the same prompt keeps what the player typed.
   const [values, setValues] = useState(() =>
     amounts.entries.map((entry) => entry.suggested),
   );
-  useEffect(() => {
-    setValues(amounts.entries.map((entry) => entry.suggested));
-  }, [prompt.id, amounts.entries]);
-  const total = values.reduce((sum, value) => sum + value, 0);
-  const outOfRange = values.some(
-    (value, i) =>
-      !Number.isInteger(value) ||
-      value < amounts.entries[i].min ||
-      value > amounts.entries[i].max,
+  // The checks walk the prompt's entries, never the values, so a mismatch cannot read past them.
+  const total = amounts.entries.reduce(
+    (sum, _, i) => sum + (values[i] ?? Number.NaN),
+    0,
   );
+  const outOfRange =
+    values.length !== amounts.entries.length ||
+    amounts.entries.some((entry, i) => {
+      const value = values[i];
+      return !Number.isInteger(value) || value < entry.min || value > entry.max;
+    });
   const totalWrong = total < amounts.total_min || total > amounts.total_max;
   return (
     <form
@@ -112,28 +115,66 @@ export function PromptPanel({
 }) {
   const game = useGameContext();
   const panel = useRef<HTMLElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
   const snapshot = state.snapshot;
   const prompt = snapshot?.prompt ?? null;
   const view = snapshot?.view ?? null;
   const busy = state.pending !== null;
   const disabled = !game.canAnswer;
   const primary = primaryOption(prompt);
-
-  // Keyboard players keep their place: when a new prompt opens while focus is in this panel,
-  // focus moves to its first control.
   const promptId = prompt?.id;
+
+  // Keyboard players keep their place: when a new prompt opens while they work in this panel,
+  // focus moves to its first control. Where focus is when it opens cannot tell: answering disables
+  // the focused button and the waiting state removes it, so focus has already dropped to the page.
+  // So the panel remembers that the player was here until focus or a press goes elsewhere.
+  const working = useRef(false);
+  const last = useRef<{ prompt: string; option: string | null } | null>(null);
   useEffect(() => {
-    if (!promptId || !panel.current?.contains(document.activeElement)) return;
-    panel.current
-      .querySelector<HTMLElement>("[data-first], button:not([disabled]), input")
-      ?.focus();
-  }, [promptId]);
+    const press = (event: PointerEvent) => {
+      if (!panel.current?.contains(event.target as Node))
+        working.current = false;
+    };
+    document.addEventListener("pointerdown", press);
+    return () => document.removeEventListener("pointerdown", press);
+  }, []);
+  useEffect(() => {
+    const element = panel.current;
+    if (!element || !working.current) return;
+    const active = document.activeElement;
+    if (!promptId || disabled) {
+      // Sending, or waiting: focus rests on the panel's heading instead of the page.
+      if (!element.contains(active))
+        title.current?.focus({ preventScroll: true });
+      return;
+    }
+    const same = last.current?.prompt === promptId;
+    if (same && active !== title.current && element.contains(active)) return;
+    // The same prompt again (after a refusal): back to the control the player was on.
+    const option = same ? last.current?.option : null;
+    const previous = Array.from(
+      element.querySelectorAll<HTMLElement>("[data-option]:not(:disabled)"),
+    ).find((control) => option && control.dataset.option === option);
+    (
+      previous ??
+      element.querySelector<HTMLElement>(
+        "[data-first]:not(:disabled), button:not(:disabled), input:not(:disabled)",
+      )
+    )?.focus();
+  }, [promptId, disabled]);
 
   let body: ReactNode;
   if (!snapshot) body = <p role="status">Connecting to the table…</p>;
   else if (snapshot.result) body = <p>The game is over.</p>;
   else if (snapshot.status === "eliminated")
-    body = <p>You are out of this game. The others play on.</p>;
+    body = game.observing ? (
+      <p>
+        {playerName(view, view?.seat ?? null, true)} is out of this game. The
+        others play on.
+      </p>
+    ) : (
+      <p>You are out of this game. The others play on.</p>
+    );
   else if (
     snapshot.status === "unsupported_prompt" ||
     prompt?.kind === "unsupported"
@@ -158,7 +199,7 @@ export function PromptPanel({
       <p role="status" className={styles.waiting}>
         {snapshot.status === "starting"
           ? "Shuffling up…"
-          : `Waiting for ${playerName(view, view?.priority_seat ?? view?.active_seat ?? null)}…`}
+          : `Waiting for ${playerName(view, view?.priority_seat ?? view?.active_seat ?? null, game.observing)}…`}
       </p>
     );
   else {
@@ -204,6 +245,7 @@ export function PromptPanel({
           (prompt.kind === "assign_amounts" ||
             prompt.kind === "choose_amount") && (
             <AmountForm
+              key={prompt.id}
               prompt={prompt}
               disabled={disabled}
               onSubmit={(amounts) => onAnswer({ amounts })}
@@ -219,7 +261,7 @@ export function PromptPanel({
             onClick={() => game.choose(primary)}
             aria-keyshortcuts="P"
           >
-            {optionText(primary, game.index, view)}
+            {optionText(primary, game.index, view, game.observing)}
             <kbd aria-hidden="true">P</kbd>
           </button>
         )}
@@ -240,9 +282,26 @@ export function PromptPanel({
       className={styles.prompt}
       aria-labelledby="prompt-title"
       aria-busy={busy || undefined}
-      data-yours={(prompt && !state.takenOver) || undefined}
+      data-yours={(prompt && !state.takenOver && !game.observing) || undefined}
+      // The prompt and revision on screen: an answer is only sent for these, so the browser tests
+      // wait for them before they act.
+      data-prompt={promptId}
+      data-revision={snapshot?.revision}
+      onFocus={(event) => {
+        working.current = true;
+        if (promptId && event.target !== title.current)
+          last.current = {
+            prompt: promptId,
+            option: event.target.getAttribute("data-option"),
+          };
+      }}
+      onBlur={(event) => {
+        // Focus that goes nowhere (a control disabled or removed) still counts as here.
+        const next = event.relatedTarget;
+        if (next && !panel.current?.contains(next)) working.current = false;
+      }}
     >
-      <h2 id="prompt-title">
+      <h2 id="prompt-title" ref={title} tabIndex={-1}>
         {prompt ? words(prompt.kind) : "Table"}
         {view && (
           <span>
@@ -348,7 +407,7 @@ function OptionList({
             {option.selected && !option.action.startsWith("toggle_") && (
               <span aria-hidden="true">✓ </span>
             )}
-            {optionText(option, game.index, game.view)}
+            {optionText(option, game.index, game.view, game.observing)}
             {option.selected && !option.action.startsWith("toggle_") && (
               <span className={styles.visuallyHidden}> (chosen)</span>
             )}

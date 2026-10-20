@@ -60,8 +60,9 @@ At most one prompt is open per game, because XMage asks one player at a time on 
 ### Concessions, eliminations and the end of a game
 
 - **Conceding.** A seat that concedes leaves the game, as in XMage's server. At a table of three or four, the others play on. XMage's cleanup removes the seat's cards and ends any control effects it had: a borrowed permanent goes back to its owner.
+- **Conceding before the start** (since v0.1.1). A seat that concedes while the game is still starting is never shown a prompt. At its first XMage request it leaves the game, and its status becomes `eliminated`. Likewise, no new prompt opens while a game is closing.
 - **Eliminated seats.** A seat that has lost has the status `eliminated`. It can still read its view, which then shows only public information, until the game finishes. Conceding again returns 409 `eliminated`.
-- **No humans left.** When every human seat is out and bots remain, the engine ends the game with the result `humans_eliminated` rather than letting the bots play it out unseen.
+- **No humans left.** When every human seat is out and two or more bots remain, the engine ends the game with the result `humans_eliminated` rather than letting the bots play it out unseen. When only one bot remains, XMage ends the game itself and the result is `completed`, with that bot as the winner (since v0.1.1; before, the engine's close raced XMage's own end). The close concedes each bot only while a player holds priority or a choice, waiting up to a second, so XMage applies it on its own thread.
 - **Closing.** `POST .../close` with any seat's token ends the game for everyone: every seat concedes and the result is `closed`.
 - **Results.** A result lists `conceded_seats` in order. For a completed game it also gives `winner_seat` and `draw`.
 
@@ -116,7 +117,7 @@ Every published view and prompt, for every human seat, is checked on the game th
 1. **No XMage UUIDs**, except the prompt's own id.
 2. **Object ids by zone.** Every opaque id must resolve to an object the seat may see. Every other player's hand and every library are concealed, minus revealed and looked-at cards. A seat's own library may appear in that seat's prompts, because searching it shows it to the searcher.
 3. **Names.** A card name only other seats' decks contain must not appear as a card name, an object option's label, or a phrase in free text until a card of that name has been public. Type lines are not checked, because a subtype can equal a card name ("Ogre Warrior").
-4. **Log lines.** These are checked as in v0.0.3, for names concealed from any human seat.
+4. **Log lines.** These are checked as in v0.0.3, for names concealed from any human seat. Since v0.1.1 each seat's log stops at the entries that existed when its view was built, so every line served to a seat may name only cards that seat's views have already shown ([the human seat](human-seat.md#verification)).
 5. **State.**
    - Every player's hand and library counts, life and lost flag match XMage. So do the seat's own hand contents, and each permanent's controller and owner.
    - The opponents list is complete and in seat order.

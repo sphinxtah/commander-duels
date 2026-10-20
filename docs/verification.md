@@ -1,5 +1,31 @@
 # Verification
 
+## v0.1.1
+
+Validated locally on Windows on October 20, 2026. A bug and security sweep found the defects: 18 reviewers, one per area and lens, and then gap finders. Each finding had to survive one to three independent verifiers, depending on its severity. Of 58 findings, 54 were confirmed and 4 refuted. The fixes were made in eight groups that never touched the same files, then reviewed by group and as a whole. Python ran on 3.12.10 in the API image, as in CI; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting | Passed (API, catalog, tests and scripts; 40 files) |
+| mypy strict checks | Passed, 26 Python source files |
+| Python suite | 86 passed against a throwaway PostgreSQL 17 (final run); the sweep's fixes passed 85 in three full runs, and the session, game and card-image files five more, with no flakes. New: `tests/test_sessions.py` (7: a bug's 500 keeps the rotated cookie, the pool under a burst, the rotated cookie on errors and returned responses, the 60-second grace and its end) and `tests/test_deploy_kit.py` (14: deploy, restore, backup pools, the web container's resolver and rate limit) |
+| Alembic | `alembic upgrade head` and `alembic check` on PostgreSQL; downgrade to base and upgrade again, clean. No new migration |
+| Generated contracts | `contracts/openapi.json` (Python 3.12) and `web/src/generated/api.d.ts` regenerated: version 0.1.1, `gameplay_available` a boolean, two route descriptions; no drift |
+| Vitest, TypeScript, Prettier and the production build | 71 tests in 10 files, in three runs; `tsc -b` and the Vite build passed; Prettier clean on 35 files |
+| Engine image build | JUnit: 84 passed (Maven about 2 minutes), including the new `SpecialPaymentTest`, `UnpayableCostTest` (Chain Lightning's {R}{R} copy offered to a player with only Forests: every payment offers only cancel, with the reason) and a two-humans-and-a-bot table, and the stricter leak checks that fail on any error XMage recovered from. Run twice more for the close change, with no "Non-game thread" line in the log |
+| Deploy kit | ShellCheck clean on `deploy/*.sh` (also a CI step now); `nginx -t` passed on `web/nginx.conf` and the TSH site file; a scripted burst got 429 after the challenge limit, from one address only |
+| CI run #24's payment loop | Replayed with run #24's test player at the keyboard journey's table (human green, bot red, skill 1, 8 turns) on v0.1.0's prompt: 45 of 408 games looped on Chain Lightning's {R}{R} copy, paying with green pool mana. With v0.1.1's prompt, 1,000 games had no payment loop, and in about 123,000 priority prompts the engine never listed a spell the seat could not pay for. Eight games started at once on a fresh engine, five times: 40 of 40 clean after the token-list fix (before it, two at once lost a game in 2 of 6 fresh starts) |
+| Browser journeys | 11 passed on their first run, twice: after the sweep's fixes, and again with the final engine. The final run's keyboard game met Chain Lightning's copy cost: the payment offered only cancel, said "Nothing you control can pay {R}{R}.", and the game played on to its limit. Against a throwaway stack built from the working tree: shell and identity 7; games 4 against the real engine at bot skill 1, every WebSocket frame leak-checked with the strict "public in the same view" rule again. A Legacy game by mouse won in 11 turns (94 prompts; 280 snapshots in 376 frames); a Legacy game by keyboard to its 8-turn limit (61 prompts); a four-player Commander table to its 4-turn limit; a second tab took control and got the lost reply's first result on the resend. No 5xx responses or tracebacks in the services' logs |
+| Practice games through the API | `scripts/api_practice_game.py` as in CI, through the web container: Legacy completed in 11 turns (56 prompts, 306 payloads, 136 inspections); Commander with two bots to its 24-turn limit (210 prompts, 26 payments, 606 payloads, 458 inspections). Observer refusal, lease takeover and the resend verified; no problems, and no errors in the engine's or the API's logs |
+| Restore rehearsal | On the VM, `restore.sh` restored the first nightly dump into a scratch Compose project in 13 seconds; every table matched the live database except rows added since the dump |
+| Tapped permanents | Screenshots at 1920 x 1080, 1366 x 768 and 390 x 844, with up to 9 tapped permanents and attacking creatures. A script measured every tapped card's turned face against its slot, its neighbours and the strips: no overlaps at any size. A tapped slot is 131, 88 and 70 px wide |
+
+**Hosted CI and the live site.** Recorded at close-out in [the release notes](releases/0.1.1.md#verification).
+
+**The throwaway stacks.** The Python suite ran against its own PostgreSQL container. The browser journeys used their own network, database, engine, API and web containers, built from the working tree, with a generated service token and test SysOp. Playwright shared the web container's network, so the browser came from loopback. The developer's Compose stack, database and SysOp were not used.
+
+**Seen while checking, then fixed:** when every human seat went out, the engine's close sent concessions that XMage refused, and XMage logged "Non-game thread can't concede or end games": with one bot left it raced XMage's own end, and with two it could land between steps or after the first bot's concession ended the game. The engine now closes such a game only while two or more players remain, concedes only while a player holds priority or a choice, and stops once the game is over. The engine suite then ran with no such line in its log (82 tests, including a new two-humans-and-a-bot table). v0.1.0 behaved the same.
+
 ## v0.1.0
 
 Validated locally on Windows on October 19, 2026. The host has no Node, so the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy of the repository.

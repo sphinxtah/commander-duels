@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import mage.cards.repository.CardRepository;
 import mage.cards.repository.CardScanner;
+import mage.cards.repository.TokenRepository;
 import mage.util.Copier;
 
 /**
@@ -37,6 +38,10 @@ public final class CardDatabase {
         if (counts[0] == 0) {
             throw new IllegalStateException("Card database is empty after loading");
         }
+        // XMage fills its token list lazily, without a lock, when a game first needs it (every game
+        // creates its helper emblems at the start). Games starting together on a fresh engine raced
+        // there and failed with a ConcurrentModificationException; fill it once, before any game.
+        TokenRepository.instance.init();
         return new Stats(counts[0], counts[1], (System.nanoTime() - started) / 1_000_000, built);
     }
 

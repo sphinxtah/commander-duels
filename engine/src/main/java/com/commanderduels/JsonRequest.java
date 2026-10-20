@@ -52,7 +52,14 @@ final class JsonRequest {
     static BigDecimal integer(JsonObject json, String field) throws Invalid {
         JsonElement element = json.get(field);
         if (element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
-            BigDecimal value = element.getAsBigDecimal();
+            BigDecimal value;
+            try {
+                value = element.getAsBigDecimal();
+            } catch (NumberFormatException | ArithmeticException e) {
+                // Gson refuses an exponent or a length past its limits (1e10000), as BigDecimal does
+                // an exponent beyond an int's range.
+                throw new Invalid(field + " must be a 64-bit integer");
+            }
             boolean whole = value.signum() == 0 || value.stripTrailingZeros().scale() <= 0;
             BigDecimal longMin = BigDecimal.valueOf(Long.MIN_VALUE);
             BigDecimal longMax = BigDecimal.valueOf(Long.MAX_VALUE);

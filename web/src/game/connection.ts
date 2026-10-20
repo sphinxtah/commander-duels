@@ -31,10 +31,18 @@ export interface GameState {
   /** The engine's or the API's last refusal, in words. */
   refusal: string | null;
   interrupted: boolean;
+  /** The server refused this tab: the account has the game open in too many tabs already. */
+  crowded: boolean;
 }
 
 export type EndReason =
   "finished" | "not_live" | "signed_out" | "forbidden" | "not_found";
+
+/** The prompt an answer was chosen from, as the screen drew it. */
+export interface Seen {
+  promptId: string;
+  revision: number;
+}
 
 const initial: GameState = {
   phase: "connecting",
@@ -49,6 +57,7 @@ const initial: GameState = {
   pending: null,
   refusal: null,
   interrupted: false,
+  crowded: false,
 };
 const LOG_KEPT = 400;
 
@@ -91,6 +100,8 @@ export class GameConnection {
   private lastError: string | null = null;
   // After another tab takes the lease, this tab never takes it back by itself.
   private yielded = false;
+  // A session refresh since the last welcome: another one waits out the backoff.
+  private refreshed = false;
 
   constructor(
     private readonly gameId: string,
@@ -111,16 +122,23 @@ export class GameConnection {
     this.socket = null;
   }
 
-  /** Answers the open prompt; false when this tab cannot answer now. */
-  answer(payload: CommandEnvelope["payload"]): boolean {
+  /** Answers the prompt the player saw; false when this tab cannot answer now, or when a newer
+   * prompt or revision arrived after that one was drawn. Option IDs count from 1 in every prompt,
+   * so an option taken from an older prompt would otherwise answer the new one. */
+  answer(seen: Seen, payload: CommandEnvelope["payload"]): boolean {
     const { snapshot, pending, role } = this.state;
     if (!snapshot?.prompt || pending || role !== "controller") return false;
+    if (
+      snapshot.prompt.id !== seen.promptId ||
+      snapshot.revision !== seen.revision
+    )
+      return false;
     return this.command({
       v: 1,
       game_id: snapshot.game_id,
       action_id: newActionId(),
-      expected_revision: snapshot.revision,
-      prompt_id: snapshot.prompt.id,
+      expected_revision: seen.revision,
+      prompt_id: seen.promptId,
       type: "submit_choice",
       payload,
     });
@@ -161,8 +179,10 @@ export class GameConnection {
       this.socket.send(JSON.stringify(message));
   }
 
+  // Back online: a reconnect still waiting out its backoff starts now. One whose socket is already
+  // opening is left to finish, so the tab never holds two sockets.
   private readonly online = () => {
-    if (this.state.phase === "reconnecting") {
+    if (this.state.phase === "reconnecting" && this.socket === null) {
       window.clearTimeout(this.timer);
       this.open();
     }
@@ -170,13 +190,20 @@ export class GameConnection {
 
   private open(): void {
     if (this.stopped) return;
+    const previous = this.socket;
+    if (previous) {
+      previous.onopen = previous.onmessage = previous.onclose = null;
+      previous.close(1000);
+    }
     const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
     const socket = new WebSocket(
       `${scheme}//${window.location.host}/api/v1/games/${this.gameId}/events`,
     );
     this.socket = socket;
     this.lastError = null;
+    // A replaced socket says nothing more: its welcome or lease would overwrite this one's.
     socket.onopen = () => {
+      if (this.socket !== socket) return;
       socket.send(
         JSON.stringify({
           type: "hello",
@@ -189,6 +216,7 @@ export class GameConnection {
       );
     };
     socket.onmessage = (event: MessageEvent<string>) => {
+      if (this.socket !== socket) return;
       try {
         this.receive(JSON.parse(event.data) as ServerMessage);
       } catch {
@@ -204,11 +232,13 @@ export class GameConnection {
     switch (message.type) {
       case "welcome":
         this.attempts = 0;
+        this.refreshed = false;
         this.update({
           phase: "open",
           seat: message.seat,
           role: "observer",
           controlled: message.controlled,
+          crowded: false,
         });
         if (message.seat !== null && !message.controlled && !this.yielded)
           this.send({ type: "take_control" });
@@ -225,6 +255,16 @@ export class GameConnection {
         // A command whose reply was lost goes again with the same action ID.
         if (controller && this.state.pending)
           this.send({ type: "command", command: this.state.pending });
+        // The lease came free. After a drop the server noticed late, the tab that held it saw
+        // its own dead connection as another tab; it takes the seat back unless it gave it up.
+        if (
+          !controller &&
+          !message.controlled &&
+          !this.yielded &&
+          this.state.seat !== null &&
+          this.state.phase === "open"
+        )
+          this.send({ type: "take_control" });
         break;
       }
       case "snapshot": {
@@ -293,10 +333,17 @@ export class GameConnection {
     const end = (reason: EndReason) =>
       this.update({ phase: "ended", ended: reason, role: "observer" });
     if (code === 4401 && this.lastError === "session_refresh") {
-      // The account's roles changed: any request rotates the cookie, then reconnect.
-      await loadMe().catch(() => null);
-      this.open();
-      return;
+      // The account's roles changed: any request rotates the cookie, then reconnect, at once the
+      // first time since a welcome. A cookie rotated a moment ago stands for its successor for a
+      // minute and is not rotated again meanwhile, so the server may keep asking that long; later
+      // refreshes wait out the backoff instead of looping.
+      const refresh = async () => {
+        await loadMe().catch(() => null);
+        this.open();
+      };
+      if (this.refreshed) return this.reconnect(() => void refresh());
+      this.refreshed = true;
+      return refresh();
     }
     if (code === 4401) return end("signed_out");
     if (code === 4403) {
@@ -311,13 +358,25 @@ export class GameConnection {
     if (code === 4404) return end("not_found");
     if (code === 4410) return end("not_live");
     if (code === 1000 && this.state.snapshot?.result) return end("finished");
-    // Anything else (a dropped network, a restart, 4408) reconnects with backoff.
+    // Anything else (a dropped network, a restart, 4408) reconnects with backoff. A tab refused
+    // because the account has the game open in too many (4429) says so, and connects once
+    // another tab closes or the server drops a dead connection.
+    this.reconnect(() => this.open(), {
+      crowded: code === 4429 && this.lastError === "too_many_connections",
+    });
+  }
+
+  /** Tries again after a delay that grows with each attempt since the last welcome. */
+  private reconnect(
+    attempt: () => void,
+    change: Partial<GameState> = {},
+  ): void {
     const delay =
       Math.min(15000, 500 * 2 ** Math.min(this.attempts, 5)) +
       Math.random() * 300;
     this.attempts += 1;
-    this.update({ phase: "reconnecting", role: "observer" });
-    this.timer = window.setTimeout(() => this.open(), delay);
+    this.update({ phase: "reconnecting", role: "observer", ...change });
+    this.timer = window.setTimeout(attempt, delay);
   }
 }
 

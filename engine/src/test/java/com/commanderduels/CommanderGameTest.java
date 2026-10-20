@@ -267,6 +267,56 @@ class CommanderGameTest {
             + " snapshots of " + check.spectatorViewsChecked.get() + " views");
     }
 
+    /**
+     * A seat that concedes while the decks load leaves at its first request from XMage. It must not
+     * be shown that request as an open prompt: XMage no longer waits for it, and the seat is out.
+     */
+    @Test
+    void aSeatThatConcedesBeforeTheStartIsNeverAsked() throws Exception {
+        HumanGameRequest request = table("human,human,bot", 81, 6);
+        List<Integer> concessions = new CopyOnWriteArrayList<>();
+        var check = new SeatChecks(request) {
+            @Override
+            public void beforeStart(Game started, List<UUID> ids) {
+                super.beforeStart(started, ids);
+                // On the game thread before XMage starts: the concession waits for the seat's first request.
+                try {
+                    concessions.add(this.game.concede(1, Tables.concede(this.game, 0)).status());
+                } catch (JsonRequest.Invalid e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        };
+        HumanGame game = Tables.start(request, check);
+        List<String> seen = new CopyOnWriteArrayList<>();
+        Thread client = Thread.ofPlatform().name("seat-1-client").start(() -> {
+            long since = -1;
+            try {
+                while (true) {
+                    HumanGame.Snapshot snapshot = game.snapshot(1, since, 2_000, 0);
+                    seen.add(snapshot.status() + (snapshot.prompt() == null ? "" : " with a prompt"));
+                    if (snapshot.result() != null) {
+                        return;
+                    }
+                    since = snapshot.revision();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        var player = new ScriptedPlayer(81);
+        Tables.Played played = Tables.play(game, (seat, prompt, view) -> player.choose(prompt, view), 4, COVERAGE);
+        assertTrue(BotMatchRunner.join(client, 10_000), "seat 1's client saw the result");
+
+        assertEquals(List.of(200), concessions);
+        assertEquals(Set.of(0), played.answeredBySeat().keySet(), "seat 1 was asked after conceding");
+        assertTrue(seen.stream().noneMatch(status -> status.contains("prompt")), "seat 1 was shown: " + seen);
+        assertTrue(seen.contains("eliminated"), "seat 1 was not shown as out while the game went on: " + seen);
+        assertEquals(List.of(1), played.last().result().concededSeats());
+        check.settle();
+        assertTrue(check.failures.isEmpty(), "leaks or wrong views: " + check.failures);
+    }
+
     /** With bots left but no human, the engine stops the game instead of letting the bots play on. */
     @Test
     void aTableWhoseHumansAreAllOutStops() throws Exception {
@@ -279,6 +329,49 @@ class CommanderGameTest {
         assertNull(last.result().winnerSeat());
         assertEquals(List.of(0), last.result().concededSeats());
         Tables.assertRejected(409, "game_over", game.concede(0, Tables.concede(game, last.revision())));
+        assertTrue(BotMatchRunner.join(game.thread(), 10_000));
+    }
+
+    /**
+     * With one bot left, XMage ends the game and names that bot the winner. The engine does not
+     * start a close of its own, which raced XMage's end ("Non-game thread can't concede").
+     */
+    @Test
+    void aTableLeftToOneBotEndsWithThatBotWinning() throws Exception {
+        HumanGameRequest request = table("human,human,bot", 78, 30);
+        HumanGame game = Tables.start(request, HumanGame.Hooks.NONE);
+        // Both humans keep their hands and concede at their first prompt of the game itself, so the
+        // last of them leaves a started game to one bot. XMage asks one player at a time, in its order.
+        List<Integer> playing = new ArrayList<>(List.of(0, 1));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        while (!playing.isEmpty()) {
+            assertTrue(System.nanoTime() < deadline, "seats " + playing + " were not asked within 60 s");
+            boolean asked = false;
+            for (Integer seat : List.copyOf(playing)) {
+                HumanGame.Snapshot snapshot = game.snapshot(seat, -1, 0, 0);
+                PromptView prompt = snapshot.prompt();
+                if (prompt == null) {
+                    continue;
+                }
+                asked = true;
+                if (prompt.kind().equals("mulligan")) {
+                    String keep = prompt.options().stream().filter(option -> option.action().equals("keep"))
+                        .findFirst().orElseThrow().id();
+                    assertEquals(200, game.submit(seat, Tables.answer(game, UUID.randomUUID().toString(),
+                        snapshot.revision(), prompt.id(), keep)).status());
+                } else {
+                    assertEquals(200, game.concede(seat, Tables.concede(game, snapshot.revision())).status());
+                    playing.remove(seat);
+                }
+            }
+            if (!asked) {
+                Thread.sleep(50);
+            }
+        }
+        HumanGame.Snapshot last = Tables.finalSnapshot(game, 0);
+        assertEquals("completed", last.result().kind(), last.result().toString());
+        assertEquals(2, last.result().winnerSeat());
+        assertEquals(Set.of(0, 1), Set.copyOf(last.result().concededSeats()));
         assertTrue(BotMatchRunner.join(game.thread(), 10_000));
     }
 }

@@ -1,10 +1,22 @@
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 from api.version import APP_VERSION
+
+
+def without_nul(value: str) -> str:
+    """PostgreSQL text holds no NUL character, nor jsonb a \\u0000: such input is refused here
+    (422), not by the database (500)."""
+    if "\x00" in value:
+        raise ValueError("Text may not contain NUL characters.")
+    return value
+
+
+# Text the API stores or searches for in the database.
+StoredText = Annotated[str, AfterValidator(without_nul)]
 
 
 class Contract(BaseModel):
@@ -80,7 +92,8 @@ class EngineStatus(Contract):
 
     status: Literal["unavailable", "loading", "ready", "failed"]
     protocol_version: Literal[1] = 1
-    gameplay_available: Literal[False] = False
+    # True once the engine serves games to players (its service routes).
+    gameplay_available: bool = False
     xmage: XmageBuild | None = None
     cards: CardCounts | None = None
     bot_match_enabled: bool = False
@@ -141,7 +154,7 @@ class Me(Contract):
 
 class ProfileUpdate(Contract):
     handle: str | None = Field(default=None, min_length=3, max_length=20)
-    display_name: str | None = Field(default=None, min_length=1, max_length=64)
+    display_name: Annotated[StoredText, Field(min_length=1, max_length=64)] | None = None
     avatar: Avatar | None = None
     locale: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[A-Z]{2})?$")
     preferences: Preferences | None = None
@@ -196,7 +209,7 @@ class UserPage(Contract):
 
 class StatusChange(Contract):
     status: Literal["active", "denied", "disabled"]
-    reason: str | None = Field(default=None, max_length=200)
+    reason: Annotated[StoredText, Field(max_length=200)] | None = None
 
 
 class AuditActor(Contract):

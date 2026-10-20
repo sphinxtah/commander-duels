@@ -65,7 +65,18 @@ public final class EngineServer {
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", exchange -> {
             try (exchange) {
-                route(exchange, engine);
+                try {
+                    route(exchange, engine);
+                } catch (RuntimeException e) {
+                    // A bug, not a refusal: the caller gets a JSON 500 rather than a dropped
+                    // connection, and the details stay in the engine's log.
+                    System.err.println("Engine request " + exchange.getRequestMethod() + " "
+                        + exchange.getRequestURI().getPath() + " failed");
+                    e.printStackTrace();
+                    if (exchange.getResponseCode() == -1) {
+                        respond(exchange, 500, Map.of("code", "internal_error"));
+                    }
+                }
             }
         });
         return server;
@@ -109,7 +120,9 @@ public final class EngineServer {
         return new Health(
             engine.status().name().toLowerCase(Locale.ROOT),
             PROTOCOL_VERSION,
-            false,
+            // Players' games run on the service routes, which the API serves to the game screen.
+            // They start only once the card database is open (createGame answers 503 before that).
+            engine.serviceGamesEnabled() && engine.status() == Engine.Status.READY,
             new Xmage(pin.version(), pin.tag(), pin.commit(), pin.commitDate()),
             stats == null ? null : new Cards(stats.printings(), stats.distinctNames()),
             engine.botMatchEnabled(),

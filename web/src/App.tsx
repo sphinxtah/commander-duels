@@ -9,6 +9,7 @@ import {
   type Bootstrap,
   type Format,
   type Me,
+  type PracticeFormat,
 } from "./api";
 import { GameScreen } from "./game/GameScreen";
 import { PracticeTable } from "./game/PracticeTable";
@@ -70,6 +71,18 @@ const details: Record<
     milestone: "M1 / M4 · Collection policies",
   },
 };
+// Practice games against the bots cover these; a format that is neither one of them nor marked
+// available by the server is still planned. Keyed by the API's practice formats, so a new one
+// fails the type check until it is listed here.
+const practiceFormats: Record<PracticeFormat["id"], true> = {
+  commander: true,
+  legacy: true,
+};
+function plannedFormat(format: Format | undefined): boolean {
+  return Boolean(
+    format && !format.available && !(format.id in practiceFormats),
+  );
+}
 const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
 /** #game/<id> opens a game's table, full screen. */
 function currentGame(): string | undefined {
@@ -111,8 +124,10 @@ export function App() {
     return () => window.removeEventListener("hashchange", change);
   }, []);
   useEffect(() => {
-    if (navigated.current) heading.current?.focus();
-  }, [page]);
+    // Leaving a game also lands on a page (usually Play, whose state never changed), so focus
+    // follows the game route too; the game screen focuses its own heading.
+    if (navigated.current && !game) heading.current?.focus();
+  }, [page, game]);
   useEffect(() => {
     const update = () => {
       setOnline(navigator.onLine);
@@ -147,7 +162,11 @@ export function App() {
         if (active) changeMe(value);
       })
       .catch(() => {
-        if (active) setMe(null);
+        // An unreachable service says nothing about the session: a network blip must not sign
+        // the page out and throw away open forms, so a known account stays. A first load
+        // that fails still settles on signed out.
+        if (active)
+          setMe((current) => (current === undefined ? null : current));
       });
     return () => {
       active = false;
@@ -186,6 +205,7 @@ export function App() {
       savePreferences(next);
     }
   }, []);
+  const retry = () => setAttempt((value) => value + 1);
 
   function updatePreference(key: keyof Preferences, value: boolean) {
     const next = { ...preferences, [key]: value };
@@ -228,7 +248,15 @@ export function App() {
 
   return (
     <div className={styles.app}>
-      <a className={styles.skip} href="#main">
+      <a
+        className={styles.skip}
+        href="#main"
+        onClick={(event) => {
+          // The hash is the router: following #main would leave this page for Play.
+          event.preventDefault();
+          document.getElementById("main")?.focus();
+        }}
+      >
         Skip to content
       </a>
       <aside className={styles.sidebar}>
@@ -315,6 +343,8 @@ export function App() {
             <Account
               me={me}
               auth={bootstrap?.auth}
+              unavailable={connection === "unavailable"}
+              onRetry={retry}
               onChange={changeMe}
               heading={heading}
             />
@@ -384,7 +414,7 @@ export function App() {
                       One game. Different possibilities.
                     </h2>
                   </div>
-                  <span className={styles.tag}>IN DEVELOPMENT</span>
+                  <span className={styles.tag}>TESTING PREVIEW</span>
                 </div>
                 {connection === "loading" && (
                   <p role="status">Loading format information…</p>
@@ -396,9 +426,7 @@ export function App() {
                       The shell is ready. Format information will appear when
                       the service reconnects.
                     </p>
-                    <button onClick={() => setAttempt((value) => value + 1)}>
-                      Retry connection
-                    </button>
+                    <button onClick={retry}>Retry connection</button>
                   </div>
                 )}
                 {connection === "connected" && (
@@ -441,8 +469,9 @@ export function App() {
                   </span>
                   <h2>The foundation is taking shape.</h2>
                   <p>
-                    This first release establishes the application. Decks,
-                    cards, and gameplay will arrive as their systems are ready.
+                    Practice games against the bots are open for testing. Deck
+                    building, the card catalog and human opponents arrive as
+                    their systems are ready.
                   </p>
                 </div>
                 <a href="#settings">
@@ -500,12 +529,12 @@ export function App() {
                 <h2>
                   Release status{" "}
                   <span className={styles.tag}>
-                    v{__APP_VERSION__} · FRAMEWORK
+                    v{__APP_VERSION__} · TESTING PREVIEW
                   </span>
                 </h2>
                 <p>
-                  The application shell is available. These features are planned
-                  and remain unavailable.
+                  Practice games against the bots are open for testing. Here is
+                  where each part of Commander Duels stands.
                 </p>
                 {bootstrap ? (
                   <ul>
@@ -515,7 +544,9 @@ export function App() {
                           <strong>{item.name}</strong>
                           <p>{item.reason}</p>
                         </div>
-                        <span>{item.milestone}</span>
+                        <span data-available={item.available}>
+                          {item.available ? "Available" : item.milestone}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -575,16 +606,19 @@ export function App() {
         >
           ×
         </button>
-        <span className={styles.eyebrow}>PLANNED FORMAT</span>
+        <span className={styles.eyebrow}>
+          {plannedFormat(selected) ? "PLANNED FORMAT" : "OPEN FOR PRACTICE"}
+        </span>
         <h2 id="format-dialog-title">{selected?.name}</h2>
         <p>{selected?.description}</p>
         <p>
-          {selected?.seats.join(", ")} seats supported in the planned format.
-          Default table: {selected?.default_seats} players.
+          {selected?.seats.join(", ")} seats supported
+          {plannedFormat(selected) ? " in the planned format" : ""}. Default
+          table: {selected?.default_seats} players.
         </p>
         <p>
-          {selected?.id === "two_headed_giant"
-            ? "Two-Headed Giant opens after its engine work is proven."
+          {plannedFormat(selected)
+            ? `${selected?.name} opens after its engine work is proven.`
             : "Practice games against the bots are open for testing: start one from the practice table."}
         </p>
         <button

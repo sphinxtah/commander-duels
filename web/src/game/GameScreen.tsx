@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { client, type Me } from "../api";
 import {
   Battlefield,
@@ -25,7 +32,7 @@ import {
   type Located,
 } from "./model";
 import { PromptPanel } from "./PromptPanel";
-import type { CardView, PromptOption, Seat } from "./types";
+import type { CardView, CommandEnvelope, PromptOption, Seat } from "./types";
 import styles from "./game.module.css";
 
 type Summary = NonNullable<Awaited<ReturnType<typeof loadSummary>>>;
@@ -93,6 +100,20 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     state.role === "controller" &&
     state.pending === null &&
     !snapshot?.result;
+  // SysOp observing another player's game: the view is the owner's, but not SysOp's own.
+  const observing = state.seat === null;
+
+  // Every answer names the prompt and revision this render drew. A click or a P that lands before
+  // React draws a newer prompt is then refused instead of answering a prompt nobody has seen.
+  const promptId = prompt?.id ?? null;
+  const revision = snapshot?.revision ?? null;
+  const answer = useCallback(
+    (payload: CommandEnvelope["payload"]) =>
+      promptId !== null &&
+      revision !== null &&
+      (connection?.answer({ promptId, revision }, payload) ?? false),
+    [connection, promptId, revision],
+  );
 
   useEffect(() => {
     heading.current?.focus();
@@ -121,16 +142,23 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       byObject: optionsByObject(prompt),
       bySeat: optionsBySeat(prompt),
       canAnswer,
+      observing,
       choose: (option: PromptOption) => {
-        connection?.answer({ option_id: option.id });
+        answer({ option_id: option.id });
       },
       zoom: (card, located) => setZoomed({ card, located }),
       preview: (card, located) => setPreviewed(card ? { card, located } : null),
     }),
-    [view, prompt, canAnswer, connection],
+    [view, prompt, canAnswer, observing, answer],
   );
 
-  // P answers the primary option (pass, done, keep or yes) unless the player is typing.
+  // P answers the primary option (pass, done, keep or yes) unless the player is typing. The key
+  // reads the prompt on screen when it is pressed: the layout effect runs as the prompt is drawn,
+  // while a listener added again by a later effect could answer the prompt drawn before it.
+  const onScreen = useRef({ prompt, canAnswer, answer });
+  useLayoutEffect(() => {
+    onScreen.current = { prompt, canAnswer, answer };
+  });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (
@@ -142,15 +170,16 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
         return;
       const target = event.target as HTMLElement;
       if (target.closest("input, textarea, select, dialog[open]")) return;
-      const primary = primaryOption(prompt);
-      if (primary && canAnswer) {
+      const shown = onScreen.current;
+      const primary = primaryOption(shown.prompt);
+      if (primary && shown.canAnswer) {
         event.preventDefault();
-        connection?.answer({ option_id: primary.id });
+        shown.answer({ option_id: primary.id });
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [prompt, canAnswer, connection]);
+  }, []);
 
   function toggleInspect(next: boolean) {
     remember(`cd.inspect.${gameId}`, next);
@@ -158,6 +187,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   }
 
   const you = view?.you ?? null;
+  const handTitle = observing && you ? `${you.name}'s hand` : "Your hand";
   const opponents = view?.opponents ?? [];
   const result = snapshot?.result ?? null;
   const outcome = result ? resultText(view, state.seat, result) : null;
@@ -190,9 +220,9 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 `Turn ${view.turn}`,
                 view.active_seat === null
                   ? null
-                  : view.active_seat === view.seat
+                  : view.active_seat === view.seat && !observing
                     ? "Your turn"
-                    : `${playerName(view, view.active_seat)}’s turn`,
+                    : `${playerName(view, view.active_seat, observing)}’s turn`,
                 words(view.step ?? view.phase) || null,
               ]
                 .filter(Boolean)
@@ -253,6 +283,14 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
             </a>
           </div>
         )}
+        {state.crowded && (
+          <div className={styles.notice} role="alert">
+            <p>
+              This game is open in too many tabs. Close one, and this tab
+              connects by itself.
+            </p>
+          </div>
+        )}
         {state.interrupted && (
           <div className={styles.notice} role="alert">
             <p>
@@ -295,7 +333,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           {you && (
             <section
               className={styles.you}
-              aria-label="Your side of the table"
+              aria-label={
+                observing
+                  ? `${you.name}'s side of the table`
+                  : "Your side of the table"
+              }
               data-active={view?.active_seat === you.seat || undefined}
             >
               <PlayerHeader
@@ -306,16 +348,18 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 permanents={view!.battlefield.filter(
                   (p) => p.controller_seat === you.seat,
                 )}
-                label="Your battlefield"
+                label={
+                  observing ? `${you.name}'s battlefield` : "Your battlefield"
+                }
               />
               <div className={styles.hand}>
                 <h2>
-                  Your hand <span>{view!.hand.length}</span>
+                  {handTitle} <span>{view!.hand.length}</span>
                 </h2>
                 {view!.hand.length === 0 ? (
                   <p className={styles.emptyZone}>No cards in hand</p>
                 ) : (
-                  <CardRow label="Your hand" className={styles.handRow}>
+                  <CardRow label={handTitle} className={styles.handRow}>
                     {view!.hand.map((card) => (
                       <CardButton
                         key={card.id}
@@ -351,7 +395,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           )}
           <PromptPanel
             state={state}
-            onAnswer={(payload) => connection?.answer(payload)}
+            onAnswer={answer}
             onTakeControl={() => connection?.takeControl()}
             onConcede={() => concedeDialog.current?.showModal()}
           />

@@ -14,10 +14,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import Select, and_, delete, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.auth import ERRORS
 from api.identity import (
+    ROLE_PERMISSIONS,
     ApiError,
     Db,
     Principal,
@@ -40,6 +42,7 @@ from api.schemas import (
     GrantableRole,
     Role,
     StatusChange,
+    StoredText,
     UserPage,
 )
 
@@ -63,14 +66,27 @@ def decode_cursor(cursor: str) -> tuple[datetime, UUID]:
         raise ApiError(422, "invalid_cursor", "The page cursor is not valid.") from error
 
 
-def admin_user(db: Session, user: User) -> AdminUser:
+def granted_roles(db: Session, user: User) -> list[str]:
+    """The account's role grants, whatever its status. roles_of counts them only while the account
+    is active, but they stay through a disable and apply again on restore."""
+    granted = db.scalars(select(RoleGrant.role).where(RoleGrant.user_id == user.id)).all()
+    order = list(ROLE_PERMISSIONS)
+    return sorted(granted, key=order.index)
+
+
+def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
     return AdminUser(
         id=user.id,
         handle=user.handle,
         display_name=user.display_name,
-        email=email_of(db, user),
+        # Email identifies the accounts administrators approve; moderators approve none.
+        email=email_of(db, user) if viewer.can("admin.users.manage") else None,
         status=cast(AccountStatus, user.status),
-        roles=cast(list[Role], roles_of(db, user)),
+        # An inactive account shows the grants it would get back, so an administrator's row
+        # stays locked to those who may not change administrators.
+        roles=cast(
+            list[Role], roles_of(db, user) if user.status == "active" else granted_roles(db, user)
+        ),
         created_at=user.created_at,
         last_seen_at=user.last_seen_at,
     )
@@ -81,23 +97,29 @@ def list_users(
     principal: CanReadUsers,
     db: Db,
     status: AccountStatus | None = None,
-    q: Annotated[str | None, Query(max_length=64)] = None,
+    q: Annotated[StoredText | None, Query(max_length=64)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: str | None = None,
 ) -> UserPage:
     query: Select[User] = select(User).where(User.kind == "player")
     if status:
         query = query.where(User.status == status)
-    if q:
-        pattern = f"%{q.strip().casefold()}%"
-        emails = select(ExternalIdentity.user_id).where(ExternalIdentity.email.ilike(pattern))
-        query = query.where(
-            or_(
-                User.normalized_handle.like(pattern),
-                User.display_name.ilike(pattern),
-                User.id.in_(emails),
+    if q and (term := q.strip()):
+        # The text is matched as written: autoescape makes % _ and \ literal, and names and
+        # email compare through the database's own lower(), as they are stored.
+        matches = [
+            User.normalized_handle.contains(term.casefold(), autoescape=True),
+            User.display_name.icontains(term, autoescape=True),
+        ]
+        if principal.can("admin.users.manage"):
+            matches.append(
+                User.id.in_(
+                    select(ExternalIdentity.user_id).where(
+                        ExternalIdentity.email.icontains(term, autoescape=True)
+                    )
+                )
             )
-        )
+        query = query.where(or_(*matches))
     if cursor:
         moment, row_id = decode_cursor(cursor)
         query = query.where(
@@ -108,7 +130,7 @@ def list_users(
     more = len(page) > limit
     page = page[:limit]
     return UserPage(
-        items=[admin_user(db, user) for user in page],
+        items=[admin_user(db, user, principal) for user in page],
         next_cursor=encode_cursor(page[-1].created_at, page[-1].id) if more and page else None,
     )
 
@@ -120,7 +142,11 @@ def managed_user(db: Session, principal: Principal, user_id: UUID) -> User:
         raise not_found()
     if user.id == principal.user.id:
         raise ApiError(409, "self_change", "You cannot change your own account here.")
-    if "administrator" in roles_of(db, user) and not principal.can("admin.roles.administrator"):
+    # The grant, not the account's current roles: a disabled administrator restored by anyone
+    # but SysOp would be an administrator again.
+    if "administrator" in granted_roles(db, user) and not principal.can(
+        "admin.roles.administrator"
+    ):
         raise ApiError(403, "forbidden", "Only the site administrator can change administrators.")
     return user
 
@@ -149,7 +175,7 @@ def change_status(
             details={"from": before, "to": body.status, "reason": body.reason},
         )
         db.commit()
-    return admin_user(db, user)
+    return admin_user(db, user, principal)
 
 
 def role_change(request: Request, principal: Principal, role: str) -> None:
@@ -179,8 +205,12 @@ def grant_role(
             target_user_id=user.id,
             details={"role": role},
         )
-        db.commit()
-    return admin_user(db, user)
+        try:
+            db.commit()
+        except IntegrityError:
+            # A simultaneous grant of the same role got there first: it is granted either way.
+            db.rollback()
+    return admin_user(db, user, principal)
 
 
 @router.delete("/users/{user_id}/roles/{role}", response_model=AdminUser)
@@ -203,7 +233,7 @@ def revoke_role(
             details={"role": role},
         )
         db.commit()
-    return admin_user(db, user)
+    return admin_user(db, user, principal)
 
 
 @router.post("/users/{user_id}/sign-out", response_model=AdminUser)
@@ -219,7 +249,7 @@ def sign_out_user(user_id: UUID, request: Request, principal: CanManageUsers, db
         details={"sessions": count},
     )
     db.commit()
-    return admin_user(db, user)
+    return admin_user(db, user, principal)
 
 
 def actor_label(user: User | None, viewer: Principal) -> AuditActor | None:
@@ -228,7 +258,10 @@ def actor_label(user: User | None, viewer: Principal) -> AuditActor | None:
     if user.kind == "sysop":
         label = "SysOp" if viewer.user.kind == "sysop" else SITE_ADMINISTRATOR
         return AuditActor(id=user.id if viewer.user.kind == "sysop" else None, label=label)
-    return AuditActor(id=user.id, label=user.handle or user.display_name)
+    # A display name is free text: alone it could read "Site administrator" or another player's
+    # handle. A handle has no spaces or brackets, so this label can be neither.
+    label = user.handle or f"{user.display_name} (no handle, {str(user.id)[:8]})"
+    return AuditActor(id=user.id, label=label)
 
 
 def flat(details: dict[str, object]) -> dict[str, str | int | bool | None | list[str]]:
@@ -247,7 +280,7 @@ def flat(details: dict[str, object]) -> dict[str, str | int | bool | None | list
 def audit_log(
     principal: CanReadAudit,
     db: Db,
-    action: Annotated[str | None, Query(max_length=64)] = None,
+    action: Annotated[StoredText | None, Query(max_length=64)] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 100,
     cursor: str | None = None,
 ) -> AuditPage:
@@ -259,7 +292,8 @@ def audit_log(
             AuditEvent.action.not_like("auth.sysop%"), AuditEvent.action.not_like("account.sysop%")
         )
     if action:
-        query = query.where(AuditEvent.action.startswith(action))
+        # Actions are lower-case names; PostgreSQL's LIKE, unlike SQLite's, minds case.
+        query = query.where(AuditEvent.action.startswith(action.lower(), autoescape=True))
     if cursor:
         moment, row_id = decode_cursor(cursor)
         query = query.where(

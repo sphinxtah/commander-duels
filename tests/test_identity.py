@@ -2,11 +2,15 @@
 T29), and SysOp's entrance. Google ID tokens are signed with a test key that the verifier's
 certificate fetch returns, so google-auth's real checks run on every token."""
 
+import base64
+import hashlib
 import json
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 import httpx
 import pytest
@@ -27,7 +31,7 @@ from api.cli import set_sysop_password
 from api.config import Settings
 from api.google import CachingTransport, GoogleVerifier
 from api.main import create_app
-from api.models import AuditEvent, User, UserSession
+from api.models import AuditEvent, RoleGrant, User, UserSession
 from api.network import client_address
 
 CLIENT_ID = "test-client.apps.googleusercontent.com"
@@ -232,24 +236,40 @@ def test_google_sign_in_creates_one_account_with_a_private_session(app: FastAPI)
     assert live_sessions(app) == 2
 
 
+def malformed(header: dict[str, Any], **claims: Any) -> str:
+    """A token whose header google-auth must read before it can check any signature."""
+
+    def part(value: dict[str, Any]) -> str:
+        return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
+
+    payload = {"iss": "https://accounts.google.com", "aud": CLIENT_ID, "sub": "1001"} | claims
+    return f"{part(header)}.{part(payload)}.c2ln"
+
+
 def test_forged_expired_and_replayed_sign_ins_create_no_session(app: FastAPI, certs: Certs) -> None:
     client = browser(app)
-    nonce = client.post("/api/v1/auth/google/start").json()["nonce"]
     now = int(time.time())
-    attempts = {
-        "expired": google_token(nonce=nonce, iat=now - 7200, exp=now - 3600),
-        "wrong audience": google_token(nonce=nonce, aud="someone-else.apps.googleusercontent.com"),
-        "wrong issuer": google_token(nonce=nonce, iss="https://accounts.example.com"),
-        "forged": google_token(FORGER, nonce=nonce),
-        "other nonce": google_token(nonce="0" * 64),
-        "no nonce": google_token(),
-        "garbage": "not.a.token",
+    attempts: dict[str, Callable[[str], str]] = {
+        "expired": lambda nonce: google_token(nonce=nonce, iat=now - 7200, exp=now - 3600),
+        "wrong audience": lambda nonce: google_token(
+            nonce=nonce, aud="someone-else.apps.googleusercontent.com"
+        ),
+        "wrong issuer": lambda nonce: google_token(nonce=nonce, iss="https://accounts.example.com"),
+        "forged": lambda nonce: google_token(FORGER, nonce=nonce),
+        "other nonce": lambda nonce: google_token(nonce="0" * 64),
+        "no nonce": lambda nonce: google_token(),
+        "garbage": lambda nonce: "not.a.token",
+        "list kid": lambda nonce: malformed({"alg": "RS256", "kid": ["x"]}, nonce=nonce),
+        "list alg": lambda nonce: malformed({"alg": ["RS256"], "kid": "test-key"}, nonce=nonce),
     }
     for name, credential in attempts.items():
-        response = client.post("/api/v1/auth/google", json={"credential": credential})
+        # Every attempt spends its challenge, so each one asks for a new one, as the page does.
+        nonce = client.post("/api/v1/auth/google/start").json()["nonce"]
+        response = client.post("/api/v1/auth/google", json={"credential": credential(nonce)})
         assert response.status_code == 401, name
         assert response.json()["code"] == "invalid_sign_in", name
     # Without the challenge cookie, even a valid token is refused.
+    nonce = client.post("/api/v1/auth/google/start").json()["nonce"]
     stranger = browser(app)
     token = google_token(nonce=nonce)
     assert stranger.post("/api/v1/auth/google", json={"credential": token}).status_code == 401
@@ -269,15 +289,59 @@ def test_forged_expired_and_replayed_sign_ins_create_no_session(app: FastAPI, ce
             select(AuditEvent).where(AuditEvent.action == "auth.google_login_failed")
         )
     ]
-    assert reasons.count("invalid_token") == 5
-    assert "nonce_mismatch" in reasons and "challenge_used_or_expired" in reasons
+    assert reasons.count("invalid_token") == 7
+    assert reasons.count("nonce_mismatch") == 2 and reasons.count("challenge_used_or_expired") == 1
 
-    # Certificates are cached, and a Google outage is reported as one.
+    # Certificates are cached, and a Google outage is reported as one, even to this address,
+    # which has used up its ten audited failures: an outage is not the client's failure.
     assert certs.calls == 1
     app.state.google_verifier._request._cache.clear()
     certs.down = True
     outage = sign_in(browser(app))
     assert outage.status_code == 503 and outage.json()["code"] == "provider_unavailable"
+
+
+def test_a_bot_cannot_fill_the_audit_trail_with_failed_sign_ins(app: FastAPI) -> None:
+    def failures() -> int:
+        return count(app, AuditEvent, AuditEvent.action == "auth.google_login_failed")
+
+    junk = {"credential": "not.a.token"}
+    # A made-up challenge cookie is no challenge: refused, and not audited.
+    forger = browser(app)
+    for _ in range(20):
+        refused = forger.post(
+            "/api/v1/auth/google", json=junk, headers={"cookie": "cd_google=anything"}
+        )
+        assert refused.status_code == 401
+    # Nor is it one when Google signed its nonce: the server never issued that challenge.
+    token = google_token(nonce=hashlib.sha256(b"anything").hexdigest())
+    refused = forger.post(
+        "/api/v1/auth/google", json={"credential": token}, headers={"cookie": "cd_google=anything"}
+    )
+    assert refused.status_code == 401 and count(app, UserSession) == 0
+    assert failures() == 0
+
+    # One challenge buys one audited failure: the first attempt spends it.
+    bot = browser(app)
+    bot.post("/api/v1/auth/google/start")
+    for _ in range(20):
+        assert bot.post("/api/v1/auth/google", json=junk).json()["code"] == "invalid_sign_in"
+    assert failures() == 1
+
+    # New challenges buy at most ten audited failures per address in 15 minutes.
+    for _ in range(9):
+        bot.post("/api/v1/auth/google/start")
+        assert bot.post("/api/v1/auth/google", json=junk).status_code == 401
+    bot.post("/api/v1/auth/google/start")
+    throttled = bot.post("/api/v1/auth/google", json=junk)
+    assert throttled.status_code == 429 and throttled.json()["code"] == "too_many_attempts"
+    assert failures() == 10
+    # A genuine sign-in from that address still works, and other addresses are not affected.
+    assert sign_in(browser(app)).status_code == 200
+    other = browser(app, ("198.51.100.7", 50000))
+    other.post("/api/v1/auth/google/start")
+    assert other.post("/api/v1/auth/google", json=junk).status_code == 401
+    assert failures() == 11
 
 
 def test_without_a_client_id_google_sign_in_is_unavailable(database: str, certs: Certs) -> None:
@@ -391,11 +455,12 @@ def test_sysop_entrance_exists_only_on_its_network(app: FastAPI, database: str) 
     assert set_sysop_password(database, PASSWORD) is False
 
     wrong = {"username": "sysop", "password": "wrong password!"}
-    for _ in range(4):
+    for _ in range(5):
         assert client.post("/api/v1/sysop/login", json=wrong).status_code == 401
-    # Five failures from this address in 15 minutes lock it, even for the right password.
+    # Five failures from this address in 15 minutes lock it, even for the right password. (The
+    # failure before SysOp existed does not count: the console's password set lifts the lockout.)
     assert client.post("/api/v1/sysop/login", json=body).status_code == 429
-    assert count(app, AuditEvent, AuditEvent.action == "auth.sysop_login_failed") == 5
+    assert count(app, AuditEvent, AuditEvent.action == "auth.sysop_login_failed") == 6
 
     root = sysop(app, ("10.20.0.8", 50000))
     me = root.get("/api/v1/me").json()
@@ -424,6 +489,62 @@ def test_sysop_entrance_exists_only_on_its_network(app: FastAPI, database: str) 
     assert fresh.post("/api/v1/sysop/login", json=body).status_code == 200
     with pytest.raises(ValueError):
         set_sysop_password(database, "too short")
+
+
+def test_sysop_lockout_holds_for_parallel_guesses_and_password_changes(
+    app: FastAPI, database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_sysop_password(database, PASSWORD)
+    real = auth.verify_password
+
+    def slow(stored: str | None, password: str) -> bool:
+        time.sleep(0.05)  # widens the gap between the lockout check and the recorded failure
+        return real(stored, password)
+
+    monkeypatch.setattr(auth, "verify_password", slow)
+    neighbour = ("10.20.0.8", 50000)
+    wrong = {"username": "sysop", "password": "wrong password!"}
+
+    def login(address: tuple[str, int], password: str) -> httpx.Response:
+        body = {"username": "sysop", "password": password}
+        return browser(app, address).post("/api/v1/sysop/login", json=body)
+
+    # The current password on the Profile page is a guess like any other.
+    root = sysop(app)
+    change = {"current_password": "not the password", "new_password": "a brand new passphrase"}
+    for _ in range(5):
+        assert root.post("/api/v1/sysop/password", json=change).status_code == 401
+    change["current_password"] = PASSWORD
+    locked = root.post("/api/v1/sysop/password", json=change)
+    assert locked.status_code == 429 and locked.json()["code"] == "too_many_attempts"
+    assert login(SYSOP_ADDRESS, PASSWORD).status_code == 429
+
+    # A burst of parallel guesses gets five password checks, not one per request.
+    def guess(_: int) -> int:
+        return browser(app, neighbour).post("/api/v1/sysop/login", json=wrong).status_code
+
+    with ThreadPoolExecutor(max_workers=20) as pool:
+        statuses = list(pool.map(guess, range(20)))
+    assert sorted(statuses) == [401] * 5 + [429] * 15
+    assert count(app, AuditEvent, AuditEvent.action == "auth.sysop_login_failed") == 10
+
+    # A new password set from the server console lifts every address's lockout, as the 429
+    # message says.
+    set_sysop_password(database, "a console passphrase")
+    assert login(neighbour, PASSWORD).status_code == 401
+    root = browser(app, SYSOP_ADDRESS)
+    signed_in = root.post(
+        "/api/v1/sysop/login", json={"username": "sysop", "password": "a console passphrase"}
+    )
+    assert signed_in.status_code == 200
+    root.headers["X-CSRF-Token"] = signed_in.json()["csrf_token"]
+
+    # A password change on the Profile page is a success for its own address only.
+    for _ in range(4):
+        assert login(neighbour, "wrong password!").status_code == 401
+    change = {"current_password": "a console passphrase", "new_password": PASSWORD}
+    assert root.post("/api/v1/sysop/password", json=change).status_code == 200
+    assert login(neighbour, PASSWORD).status_code == 429
 
 
 def test_roles_follow_least_privilege_and_players_cannot_administer(
@@ -476,12 +597,21 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     ).json()
     assert len(page["items"]) == 1 and len(second["items"]) == 1
     assert page["items"][0]["id"] != second["items"][0]["id"] and second["next_cursor"] is None
-    assert ada.get("/api/v1/admin/users", params={"q": "BEA@"}).json()["items"][0]["id"] == bea_id
+    found = ada.get("/api/v1/admin/users", params={"q": "BEA@"}).json()["items"]
+    assert [(user["id"], user["email"]) for user in found] == [(bea_id, "bea@example.com")]
+
+    # A moderator reads the account list, but approves nothing: no private email addresses, and
+    # no searching by them.
+    listed = bea.get("/api/v1/admin/users").json()["items"]
+    assert len(listed) == 2 and all(user["email"] is None for user in listed)
+    assert bea.get("/api/v1/admin/users", params={"q": "ada@"}).json()["items"] == []
+    named = bea.get("/api/v1/admin/users", params={"q": "ADA"}).json()["items"]
+    assert {user["id"] for user in named} == {ada_id, bea_id}  # both are named Ada by Google
 
     disabled = ada.post(
         f"/api/v1/admin/users/{bea_id}/status", json={"status": "disabled", "reason": "test"}
     )
-    assert disabled.json()["status"] == "disabled"
+    assert disabled.json()["status"] == "disabled" and disabled.json()["roles"] == ["moderator"]
     assert bea.get("/api/v1/me").status_code == 401
     assert sign_in(bea, sub="2002").json()["code"] == "account_disabled"
     restored = ada.post(f"/api/v1/admin/users/{bea_id}/status", json={"status": "active"})
@@ -502,6 +632,161 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     clock.offset = timedelta(hours=13)
     late = ada.put(f"/api/v1/admin/users/{bea_id}/roles/content_editor")
     assert late.status_code == 401 and late.json()["code"] == "reauthentication_required"
+
+
+def test_only_sysop_restores_a_disabled_administrator(app: FastAPI, database: str) -> None:
+    set_sysop_password(database, PASSWORD)
+    root = sysop(app)
+    ada, bea = browser(app), browser(app)
+    ada_id = sign_in(ada).json()["id"]
+    bea_id = sign_in(bea, sub="2002", email="bea@example.com").json()["id"]
+    grants = [(ada_id, "administrator"), (bea_id, "moderator"), (bea_id, "administrator")]
+    for user_id, role in grants:
+        assert root.put(f"/api/v1/admin/users/{user_id}/roles/{role}").status_code == 200
+    disabled = root.post(f"/api/v1/admin/users/{bea_id}/status", json={"status": "disabled"})
+    # A disabled account keeps its grants, and shows them, so the Admin page locks its row.
+    assert disabled.json()["roles"] == ["moderator", "administrator"]
+    listed = ada.get("/api/v1/admin/users", params={"status": "disabled"}).json()["items"]
+    assert [user["roles"] for user in listed] == [["moderator", "administrator"]]
+
+    base = f"/api/v1/admin/users/{bea_id}"
+    for method, path, body in [
+        ("POST", f"{base}/status", {"status": "active"}),
+        ("POST", f"{base}/sign-out", None),
+        ("DELETE", f"{base}/roles/moderator", None),
+        ("PUT", f"{base}/roles/content_editor", None),
+    ]:
+        refused = ada.request(method, path, json=body)
+        assert refused.status_code == 403 and refused.json()["code"] == "forbidden", path
+    assert sign_in(bea, sub="2002").json()["code"] == "account_disabled"
+    restored = root.post(f"{base}/status", json={"status": "active"}).json()
+    assert restored["status"] == "active"
+    assert restored["roles"] == ["player", "moderator", "administrator"]
+
+
+def test_audit_labels_never_pass_for_the_site_administrator_or_another_player(
+    app: FastAPI, database: str
+) -> None:
+    set_sysop_password(database, PASSWORD)
+    root = sysop(app)
+    ada, bea = browser(app), browser(app)
+    ada_id = sign_in(ada).json()["id"]
+    root.put(f"/api/v1/admin/users/{ada_id}/roles/administrator")
+    sign_in(bea, sub="2002", email="bea@example.com")
+    bea.patch("/api/v1/me", json={"handle": "bea"})
+    # Two accounts without a handle, named to pass for SysOp and for bea.
+    mimic, copy = browser(app), browser(app)
+    mimic_id = sign_in(mimic, sub="3003", name="Site administrator").json()["id"]
+    copy_id = sign_in(copy, sub="4004").json()["id"]
+    assert copy.patch("/api/v1/me", json={"display_name": "bea"}).status_code == 200
+    reserved = copy.patch("/api/v1/me", json={"handle": "Site_Administrator"})
+    assert reserved.status_code == 409 and reserved.json()["code"] == "handle_unavailable"
+
+    entries = ada.get("/api/v1/admin/audit").json()["items"]
+    labels = {entry["actor"]["id"]: entry["actor"]["label"] for entry in entries if entry["actor"]}
+    assert labels[mimic_id] == f"Site administrator (no handle, {mimic_id[:8]})"
+    assert labels[copy_id] == f"bea (no handle, {copy_id[:8]})"
+    assert list(labels.values()).count("bea") == 1  # the real bea
+    # Only SysOp's events carry the site administrator's label, and they carry no id.
+    assert {key for key, label in labels.items() if label == "Site administrator"} == {None}
+
+
+def test_a_lost_race_for_a_handle_a_role_or_a_first_sign_in_is_no_crash(
+    app: FastAPI, database: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_sysop_password(database, PASSWORD)
+    ada, bea = browser(app), browser(app)
+    sign_in(ada)
+    bea_id = UUID(sign_in(bea, sub="2002", email="bea@example.com").json()["id"])
+
+    def meanwhile(module: Any, action: str, change: Callable[[Session], None]) -> None:
+        """Commits a competing change from another connection as `action` is audited: after the
+        route's own check, before its commit."""
+        real = module.audit
+
+        def audit(db: Session, request: Any, name: str, **details: Any) -> None:
+            if name == action:
+                with Session(app.state.database) as other:
+                    change(other)
+                    other.commit()
+            real(db, request, name, **details)
+
+        monkeypatch.setattr(module, "audit", audit)
+
+    # Two players claim one handle at once.
+    def claim(db: Session) -> None:
+        user = db.get_one(User, bea_id)
+        user.handle, user.normalized_handle = "Zed", "zed"
+
+    meanwhile(auth, "profile.updated", claim)
+    lost = ada.patch("/api/v1/me", json={"handle": "zed"})
+    assert lost.status_code == 409 and lost.json()["code"] == "handle_taken"
+    assert ada.get("/api/v1/me").json()["handle"] is None
+
+    # Two grants of one role at once: the role is granted either way.
+    def grant(db: Session) -> None:
+        db.add(RoleGrant(user_id=bea_id, role="moderator", granted_at=identity.utcnow()))
+
+    meanwhile(admin, "admin.role_granted", grant)
+    granted = sysop(app).put(f"/api/v1/admin/users/{bea_id}/roles/moderator")
+    assert granted.status_code == 200 and granted.json()["roles"] == ["player", "moderator"]
+
+    # Two first sign-ins of one Google account at once: the other one's account is written first.
+    first_sign_in = auth.new_account
+
+    def racing(db: Session, *args: Any) -> tuple[User, Any]:
+        first_sign_in(db, *args)
+        return first_sign_in(db, *args)
+
+    monkeypatch.setattr(auth, "new_account", racing)
+    cy = browser(app)
+    conflict = sign_in(cy, sub="5005", email="cy@example.com")
+    assert conflict.status_code == 409 and conflict.json()["code"] == "sign_in_conflict"
+    assert count(app, User, User.kind == "player") == 2
+    monkeypatch.setattr(auth, "new_account", first_sign_in)
+    assert sign_in(cy, sub="5005", email="cy@example.com").status_code == 200
+
+
+def test_text_the_database_cannot_store_is_refused(app: FastAPI, database: str) -> None:
+    client = browser(app)
+    me = sign_in(client).json()
+    refused = client.patch("/api/v1/me", json={"display_name": "Ada\u0000"})
+    assert refused.status_code == 422 and refused.json()["code"] == "invalid_request"
+    named = client.patch("/api/v1/me", json={"display_name": "Ada \U0001f469‍\U0001f4bb"})
+    assert named.status_code == 200
+
+    set_sysop_password(database, PASSWORD)
+    root = sysop(app)
+    reason = root.post(
+        f"/api/v1/admin/users/{me['id']}/status", json={"status": "disabled", "reason": "x\u0000"}
+    )
+    assert reason.status_code == 422
+    assert client.get("/api/v1/me").json()["status"] == "active"
+    for path, params in [
+        ("/api/v1/admin/users", {"q": "a\u0000"}),
+        ("/api/v1/admin/audit", {"action": "a\u0000"}),
+    ]:
+        assert root.get(path, params=params).status_code == 422, path
+
+
+def test_account_search_matches_text_as_written(app: FastAPI, database: str) -> None:
+    ids = {}
+    for sub, name in (("5005", "Weiß"), ("6006", "Σίσυφος"), ("7007", "a\\b"), ("8008", "axc")):
+        signed_in = sign_in(browser(app), sub=sub, email=f"p{sub}@example.com", name=name)
+        ids[name] = signed_in.json()["id"]
+    set_sysop_password(database, PASSWORD)
+    root = sysop(app)
+
+    def found(q: str) -> list[str]:
+        users = root.get("/api/v1/admin/users", params={"q": q}).json()["items"]
+        return [user["id"] for user in users]
+
+    assert found("Weiß") == [ids["Weiß"]] and found("WEIß") == [ids["Weiß"]]
+    assert found("Σίσυφος") == [ids["Σίσυφος"]]
+    assert found("a_c") == [] and found("%") == []  # _ and % are not wildcards
+    assert found("a\\") == [ids["a\\b"]]
+    assert found("P8008@EXAMPLE") == [ids["axc"]]
+    assert root.get("/api/v1/admin/audit", params={"action": "AUTH.GOOGLE_"}).json()["items"]
 
 
 def test_other_sites_cannot_send_state_changes(app: FastAPI) -> None:

@@ -38,7 +38,8 @@ import mage.watchers.common.CommanderPlaysCountWatcher;
  * Checks every view and prompt published to every human seat, on the game thread, against XMage's
  * own state. Failures are collected rather than thrown (throwing would break the game). Besides the
  * concealed-information checks it compares counts, life totals and each commander's zone, tax and
- * commander damage with XMage, and records which Commander situations the games reached.
+ * commander damage with XMage, reads the log each seat would be served at every new line, fails on
+ * any error XMage recovered from, and records which Commander situations the games reached.
  */
 class SeatChecks implements HumanGame.Hooks {
     static final Path DECKS = Path.of("decks");
@@ -69,7 +70,14 @@ class SeatChecks implements HumanGame.Hooks {
     final AtomicInteger maxCommanderDamage = new AtomicInteger();
     /** Log lines naming a card that was not public yet; it must be public by the next event. */
     private final List<String[]> pending = new CopyOnWriteArrayList<>();
+    /** By human seat: card names the views published to that seat have shown. */
+    private final Map<Integer, Set<String>> shown = new ConcurrentHashMap<>();
+    /** By human seat: how many log lines served to that seat have been checked. */
+    private final Map<Integer, Integer> servedChecked = new ConcurrentHashMap<>();
+    private final Map<String, Pattern> phrases = new ConcurrentHashMap<>();
     volatile List<UUID> seatIds;
+    /** The game, set before it starts, so the log each seat would be served can be read. */
+    volatile HumanGame game;
 
     SeatChecks(HumanGameRequest request) throws IOException {
         this.request = request;
@@ -80,20 +88,30 @@ class SeatChecks implements HumanGame.Hooks {
             Set<String> names = new HashSet<>();
             for (int other = 0; other < request.seats().size(); other++) {
                 if (other != seat) {
-                    names.addAll(deckNames(request.seats().get(other).deck()));
+                    names.addAll(deckNames(request.seats().get(other)));
                 }
             }
-            names.removeAll(deckNames(request.seats().get(seat).deck()));
+            names.removeAll(deckNames(request.seats().get(seat)));
             concealedNames.put(seat, names);
             concealedFromSomeone.addAll(names);
         }
         // A spectator may know no card until it is public.
         Set<String> all = new HashSet<>();
         for (HumanGameRequest.Seat seat : request.seats()) {
-            all.addAll(deckNames(seat.deck()));
+            all.addAll(deckNames(seat));
         }
         concealedNames.put(-1, all);
         concealedFromSomeone.addAll(all);
+    }
+
+    /** Card names in a seat's deck: its deck list, or its fixture deck file. */
+    static Set<String> deckNames(HumanGameRequest.Seat seat) throws IOException {
+        if (seat.custom() == null) {
+            return deckNames(seat.deck());
+        }
+        Set<String> names = new HashSet<>(seat.custom().commanders());
+        seat.custom().cards().forEach(entry -> names.add(entry.name()));
+        return names;
     }
 
     /** Card names in a fixture deck file, including the commander's SB: line. */
@@ -112,6 +130,12 @@ class SeatChecks implements HumanGame.Hooks {
     public void beforeStart(Game game, List<UUID> ids) {
         seatIds = ids;
         game.addTableEventListener(event -> {
+            if (event.getEventType() == TableEvent.EventType.ERROR) {
+                // XMage rolls back and plays on after most exceptions, including ones thrown by the
+                // engine's view and prompt builders or by these checks: the game would still finish.
+                fail("XMage recovered from a game error: " + MatchLog.plain(event.getMessage())
+                    + (event.getException() == null ? "" : " " + event.getException()));
+            }
             everPublic.addAll(publicNames(game));
             settle();
             if (event.getEventType() == TableEvent.EventType.INFO) {
@@ -123,11 +147,73 @@ class SeatChecks implements HumanGame.Hooks {
                         pending.add(new String[]{name, text});
                     }
                 }
+                // The line is in the log now; no seat may be served it before its view shows the card.
+                servedLogs();
             }
         });
     }
 
-    /** Log lines from the previous event must name only cards that are now public. */
+    /**
+     * Each seat's log stops where its view was built, so every card a line served to the seat
+     * names must be one that the seat's views have shown: public in the same view, or before it.
+     */
+    void servedLogs() {
+        HumanGame running = game;
+        if (running == null) {
+            return;
+        }
+        for (int seat : running.humanSeats()) {
+            Set<String> seen = shown.getOrDefault(seat, Set.of());
+            HumanGame.Snapshot snapshot;
+            do {
+                try {
+                    snapshot = running.snapshot(seat, -1, 0, servedChecked.getOrDefault(seat, 0));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                for (HumanGame.LogLine line : snapshot.log()) {
+                    for (String name : concealedNames.getOrDefault(seat, Set.of())) {
+                        if (!seen.contains(name) && phrase(name).matcher(line.text()).find()) {
+                            fail("the log served to seat " + seat + " names " + name + " before its view showed"
+                                + " it (revision " + snapshot.revision() + "): " + line.text());
+                        }
+                    }
+                }
+                servedChecked.put(seat, snapshot.logFrom() + snapshot.log().size());
+            } while (snapshot.log().size() == HumanGame.MAX_LOG_PAGE);
+        }
+    }
+
+    /** A name as a whole phrase, as {@link #names} matches free text. */
+    private Pattern phrase(String name) {
+        return phrases.computeIfAbsent(name,
+            key -> Pattern.compile("(?<![\\w-])" + Pattern.quote(key) + "(?![\\w-])"));
+    }
+
+    /** Names a view shows as public: as a client would read them from the view alone. */
+    private static Set<String> shownNames(SeatView view) {
+        Set<String> names = new HashSet<>();
+        view.battlefield().forEach(permanent -> names.add(permanent.card().name()));
+        view.stack().forEach(item -> names.add(item.name()));
+        List<SeatView.PlayerState> players = new ArrayList<>(view.opponents());
+        if (view.you() != null) {
+            players.add(view.you());
+        }
+        for (SeatView.PlayerState player : players) {
+            player.graveyard().forEach(card -> names.add(card.name()));
+            player.exile().forEach(card -> names.add(card.name()));
+            player.commandZone().forEach(card -> names.add(card.name()));
+        }
+        view.revealed().forEach(group -> group.cards().forEach(card -> names.add(card.name())));
+        names.remove(null);
+        return names;
+    }
+
+    /**
+     * Log lines from the previous event must name only cards that are now public. Once the game has
+     * finished, the whole log served with the final views is checked too.
+     */
     void settle() {
         for (String[] line : pending) {
             if (!everPublic.contains(line[0])) {
@@ -135,12 +221,23 @@ class SeatChecks implements HumanGame.Hooks {
             }
         }
         pending.clear();
+        HumanGame running = game;
+        if (running != null && running.finished()) {
+            servedLogs();
+        }
     }
 
     @Override
     public void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {
         viewsChecked.incrementAndGet();
+        shown.computeIfAbsent(seat, key -> ConcurrentHashMap.newKeySet()).addAll(shownNames(view));
         check(game, refs, seat, view, prompt);
+        servedLogs();
+    }
+
+    @Override
+    public void failed(RuntimeException error) {
+        fail("building the final views failed: " + error);
     }
 
     /** A spectator's view must show public information only. */

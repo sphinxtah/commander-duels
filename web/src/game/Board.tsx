@@ -35,6 +35,8 @@ export interface GameContextValue {
   bySeat: Map<Seat, PromptOption[]>;
   /** This tab controls the seat and no answer is in flight. */
   canAnswer: boolean;
+  /** SysOp watching another player's game: the seat's owner is named, never "You". */
+  observing: boolean;
   choose: (option: PromptOption) => void;
   zoom: (card: CardView, located?: Located) => void;
   preview: (card: CardView | null, located?: Located) => void;
@@ -121,6 +123,7 @@ export function CardButton({
 }) {
   const game = useGameContext();
   const [menu, setMenu] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
   const permanent = located?.permanent;
   // Options name a permanent by its own id or its card's; the engine uses one reference for both.
   const offered = [
@@ -135,13 +138,19 @@ export function CardButton({
   const label =
     cardLabel(card, located) +
     (offered.length
-      ? `. Options: ${offered.map((o) => optionText(o, game.index, game.view)).join("; ")}`
+      ? `. Options: ${offered.map((o) => optionText(o, game.index, game.view, game.observing)).join("; ")}`
       : "");
 
   function activate() {
     if (options.length === 1) game.choose(options[0]);
     else if (options.length > 1) setMenu(true);
     else game.zoom(card, located);
+  }
+
+  // Leaving the menu by a choice or Escape puts focus back on the card, not on the page.
+  function closeMenu(refocus: boolean) {
+    if (refocus) button.current?.focus();
+    setMenu(false);
   }
 
   return (
@@ -151,6 +160,7 @@ export function CardButton({
       data-tapped={permanent?.tapped || undefined}
     >
       <button
+        ref={button}
         type="button"
         data-card={card.id}
         tabIndex={-1}
@@ -210,13 +220,13 @@ export function CardButton({
       {menu && (
         <OptionMenu
           options={options}
-          onClose={() => setMenu(false)}
+          onClose={closeMenu}
           onChoose={(option) => {
-            setMenu(false);
+            closeMenu(true);
             game.choose(option);
           }}
           onZoom={() => {
-            setMenu(false);
+            closeMenu(true);
             game.zoom(card, located);
           }}
         />
@@ -233,7 +243,8 @@ function OptionMenu({
 }: {
   options: PromptOption[];
   onChoose: (option: PromptOption) => void;
-  onClose: () => void;
+  /** Closes the menu; true puts focus back on the card. */
+  onClose: (refocus: boolean) => void;
   onZoom: () => void;
 }) {
   const game = useGameContext();
@@ -241,15 +252,26 @@ function OptionMenu({
   useEffect(() => {
     menu.current?.querySelector<HTMLButtonElement>("button")?.focus();
   }, []);
+  // A press anywhere outside closes the menu. Blur cannot be the signal: Safari does not focus a
+  // pressed button, so pressing an item would blur the menu, with nowhere to go, before the click.
+  useEffect(() => {
+    const outside = (event: PointerEvent) => {
+      if (!menu.current?.contains(event.target as Node)) onClose(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, [onClose]);
   return (
     <div
       ref={menu}
       role="menu"
       className={styles.menu}
+      // Pressing an item keeps focus where it is, in every browser; the click still answers.
+      onMouseDown={(event) => event.preventDefault()}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
-          onClose();
+          onClose(true);
         }
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
@@ -261,8 +283,13 @@ function OptionMenu({
           items[(next + items.length) % items.length]?.focus();
         }
       }}
+      // Tab or Shift-Tab out of the menu closes it; focus that goes nowhere does not.
       onBlur={(event) => {
-        if (!menu.current?.contains(event.relatedTarget as Node)) onClose();
+        if (
+          event.relatedTarget &&
+          !menu.current?.contains(event.relatedTarget as Node)
+        )
+          onClose(false);
       }}
     >
       {options.map((option) => (
@@ -273,7 +300,7 @@ function OptionMenu({
           data-option={option.id}
           onClick={() => onChoose(option)}
         >
-          {optionText(option, game.index, game.view)}
+          {optionText(option, game.index, game.view, game.observing)}
         </button>
       ))}
       <button role="menuitem" type="button" onClick={onZoom}>
@@ -364,7 +391,8 @@ export function PlayerHeader({
   const offered = game.bySeat.get(player.seat) ?? [];
   const active = view?.active_seat === player.seat;
   const priority = view?.priority_seat === player.seat;
-  const name = player.seat === view?.seat ? "You" : player.name;
+  const name =
+    player.seat === view?.seat && !game.observing ? "You" : player.name;
   const pool = poolColours.filter(([key]) => player.mana_pool[key] > 0);
   return (
     <div className={styles.playerHeader} data-lost={player.lost || undefined}>
@@ -395,7 +423,7 @@ export function PlayerHeader({
           data-selected={offered.some((o) => o.selected) || undefined}
           disabled={options.length === 0}
           aria-label={`${name}: ${player.life} life. ${offered
-            .map((o) => optionText(o, game.index, view))
+            .map((o) => optionText(o, game.index, view, game.observing))
             .join("; ")}`}
           onClick={() => options[0] && game.choose(options[0])}
         >
@@ -470,7 +498,8 @@ export function PlayerHeader({
               <span>Tax {commander.tax}</span>
               {commander.damage_dealt.map((entry) => (
                 <span key={entry.seat}>
-                  {entry.damage} to {playerName(view, entry.seat)}
+                  {entry.damage} to{" "}
+                  {playerName(view, entry.seat, game.observing)}
                 </span>
               ))}
             </li>
@@ -507,7 +536,8 @@ export function StackPanel() {
                 <span className={styles.stackKind}>{item.kind}</span>
               </div>
               <div className={styles.stackMeta}>
-                Controlled by {playerName(view, item.controller_seat)}
+                Controlled by{" "}
+                {playerName(view, item.controller_seat, game.observing)}
               </div>
               {item.text && <p>{item.text}</p>}
               {item.targets.length > 0 && (
@@ -516,7 +546,7 @@ export function StackPanel() {
                   {item.targets
                     .map((target) =>
                       target.kind === "player"
-                        ? playerName(view, target.seat)
+                        ? playerName(view, target.seat, game.observing)
                         : (objectName(game.index.get(target.object_id ?? "")) ??
                           target.label ??
                           "an object"),
@@ -532,7 +562,7 @@ export function StackPanel() {
                     className={styles.inlineOption}
                     onClick={() => game.choose(option)}
                   >
-                    {optionText(option, game.index, view)}
+                    {optionText(option, game.index, view, game.observing)}
                   </button>
                 ))}
             </li>
@@ -557,7 +587,7 @@ export function CombatPanel() {
             {group.attackers.map(name).join(", ")} →{" "}
             {group.defender
               ? group.defender.kind === "player"
-                ? playerName(view, group.defender.seat)
+                ? playerName(view, group.defender.seat, game.observing)
                 : name(group.defender.object_id ?? "")
               : "no defender yet"}
             {group.blockers.length > 0
@@ -600,7 +630,7 @@ export function ZoneDialog({
           ? player.exile
           : player.command_zone;
   const title = target
-    ? `${target.seat === game.view?.seat ? "Your" : `${player?.name ?? "Their"}’s`} ${
+    ? `${target.seat === game.view?.seat && !game.observing ? "Your" : `${player?.name ?? "Their"}’s`} ${
         target.zone === "command" ? "command zone" : target.zone
       }`
     : "";

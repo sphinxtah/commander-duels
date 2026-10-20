@@ -1,16 +1,18 @@
-"""Make the web's brand images from the owner's two logo files (1254 x 1254 each).
+"""Make the web's brand images from the owner's artwork.
 
-- commander.duels.logo.png, with the words, goes on the Play page.
-- commander.duels.logo.nowords.png, the CD monogram on a transparent background, is the sidebar
-  mark and the favicon wherever the words are not needed. The home-screen icon puts it on the
-  site's background, because iOS fills transparency with black.
+- commander.duels.logo.nowords.png (1254 x 1254), the CD monogram on a transparent background, is
+  the sidebar mark and the favicon. The home-screen icon puts it on the site's background, because
+  iOS fills transparency with black.
+- commander.duels.banner.png (1916 x 821) leads the Play page: "banner <file>" makes its two
+  widths and the phone crop of its logo half.
 
-Only these web-sized copies are in the repository. It needs Pillow, which the application does
-not use, so run it in a throwaway container:
+The logo with the words (commander.duels.logo.png) is not on the site since the banner replaced
+it, so no copy of it is made. Only these web-sized copies are in the repository. The script needs
+Pillow, which the application does not use, so run it in a throwaway container:
 
-    docker run --rm -v "<folder with the logos>:/in:ro" -v "$PWD:/w" -w /w python:3.12.10-slim \\
-        sh -c "pip install -q pillow && python scripts/brand_assets.py \\
-        /in/commander.duels.logo.png /in/commander.duels.logo.nowords.png"
+    docker run --rm -v "<folder with the artwork>:/in:ro" -v "$PWD:/w" -w /w python:3.12.10-slim \
+        sh -c "pip install -q pillow && python scripts/brand_assets.py \
+        /in/commander.duels.logo.nowords.png"
 """
 
 import sys
@@ -34,12 +36,10 @@ def open_logo(path: str, mode: str) -> Image.Image:
     return image
 
 
-def main(words: str, nowords: str) -> None:
-    logo = open_logo(words, "RGB")
+def main(nowords: str) -> None:
     mark = open_logo(nowords, "RGBA")
     OUT.mkdir(parents=True, exist_ok=True)
     lanczos = Image.Resampling.LANCZOS
-    logo.resize((720, 720), lanczos).save(OUT / "logo.webp", quality=86, method=6)
     mark.resize((128, 128), lanczos).save(OUT / "mark.webp", quality=90, method=6)
     for size in (32, 64):
         mark.resize((size, size), lanczos).save(OUT / f"favicon-{size}.png", optimize=True)
@@ -74,4 +74,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "banner":
         banner(sys.argv[2])
     else:
-        main(sys.argv[1], sys.argv[2])
+        main(sys.argv[1])

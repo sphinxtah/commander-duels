@@ -37,6 +37,7 @@ export type OptionAction =
   | "done"
   | "tap_source"
   | "use_pool"
+  | "special_payment"
   | "cancel"
   | "toggle_attacker"
   | "all_attack"

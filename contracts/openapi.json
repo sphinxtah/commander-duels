@@ -296,7 +296,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.1.0",
+            "default": "0.1.1",
             "title": "Version",
             "type": "string"
           }
@@ -458,7 +458,6 @@
             ]
           },
           "gameplay_available": {
-            "const": false,
             "default": false,
             "title": "Gameplay Available",
             "type": "boolean"
@@ -859,7 +858,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.1.0",
+            "default": "0.1.1",
             "title": "Version",
             "type": "string"
           }
@@ -1580,7 +1579,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -2760,7 +2759,7 @@
     },
     "/api/v1/card-images": {
       "get": {
-        "description": "A card's image by its exact name, from Scryfall, cached on this server. The first request\nfor a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not\nknow, such as tokens.",
+        "description": "A card's image by its exact name, from Scryfall, cached on this server. The first request\nfor a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not\nknow, such as tokens. 429 card_images_busy when the account already waits for many new\ncards, and 503 when everyone does or Scryfall asked us to wait; both carry Retry-After.",
         "operationId": "card_image_api_v1_card_images_get",
         "parameters": [
           {
@@ -3419,7 +3418,7 @@
     },
     "/api/v1/games/{game_id}/close": {
       "post": {
-        "description": "Ends the game for every seat: its owner's choice, or SysOp's.",
+        "description": "Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game\nas it ended.",
         "operationId": "close_game_api_v1_games__game_id__close_post",
         "parameters": [
           {

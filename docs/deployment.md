@@ -18,6 +18,7 @@ browser ──HTTPS──▶ public IP 136.63.10.16 ──UniFi forwards 80/443�
 - **The TSH proxy** is the homelab's only public web entry: a Debian VM with nginx and certbot in a venv. It adds one site file for Commander Duels and changes no other site.
 - **The VM** (`commanderduels`) runs Docker Compose with images built by CI. Only the web container publishes a port (8080), and only the proxy and loopback may use it. The API, the engine and PostgreSQL publish nothing.
 - **Visitor addresses.** The proxy replaces `X-Forwarded-For` with the visitor's address; the web container appends the proxy's. The API believes exactly those two hops (`CD_TRUSTED_PROXIES`), so SysOp's network check sees the visitor. The UniFi hairpin keeps LAN source addresses, so SysOp signs in from the home LAN (10.10.1.0/24) through the public name. This was measured for Kingdom Connect on the same proxy.
+- **The sign-in challenge limit** (since v0.1.1). The web container lets each visitor ask for 10 Google sign-in challenges a minute, after a burst of 20 ([identity](identity.md#google-sign-in-auth01auth05)). It keys on `X-Forwarded-For`, so it depends on the proxy replacing that header, never appending to it, as its site file does. The live proxy needs no change; the repository's copy of the site file only gained a comment saying so.
 
 ## The VM
 
@@ -30,7 +31,7 @@ browser ──HTTPS──▶ public IP 136.63.10.16 ──UniFi forwards 80/443�
 | Login | `sphinx`, by SSH key. The deploying computer uses its own key, `~/.ssh/commander_duels_deploy`, through the `duels` entry in its `~/.ssh/config` |
 | Ports forwarded from the internet | None. The proxy reaches port 8080 over the LAN |
 
-Sizing: the engine is capped at 1.5 GB (one game peaks near 200 MB of heap) and runs at most two games (`CD_GAMES_MAX`). PostgreSQL, the API, the worker and the web container are small. The VM has room to raise the engine's heap and the game limits later (`CD_ENGINE_MAX_GAMES` up to 8).
+Sizing (since v0.1.1): the live site runs at most six games at once (`CD_GAMES_MAX`, 1–8). The engine gets the same number of slots (`CD_ENGINE_MAX_GAMES` follows `CD_GAMES_MAX` in the production Compose file). One game peaks near 200 MB of live heap, so the engine has a 3 GB heap, which holds eight, and a 4 GB container limit. PostgreSQL, the API, the worker and the web container are small. The VM's 16 vCPU and 32 GB leave room for more. The development Compose file keeps two games and a 1.5 GB limit.
 
 ## One-time setup
 
@@ -39,7 +40,7 @@ Sizing: the engine is capped at 1.5 GB (one game peaks near 200 MB of heap) and 
 1. Copy the kit over from the repository (from the deploying computer):
 
    ```sh
-   scp deploy/bootstrap-vm.sh deploy/env.example deploy/compose.yaml deploy/deploy.sh deploy/backup.sh duels:~
+   scp deploy/bootstrap-vm.sh deploy/env.example deploy/compose.yaml deploy/deploy.sh deploy/backup.sh deploy/restore.sh duels:~
    ```
 
 2. On the VM, run the bootstrap once as root:
@@ -104,35 +105,68 @@ CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` 
 - every push to `main` as `sha-<12-character commit>` and `main`;
 - every version tag as its version (`v0.1.0` → `0.1.0`).
 
+Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, and the web container re-resolving the API and limiting sign-in challenges. Its bash tests run in CI's Linux pytest and are skipped on Windows.
+
 From the repository on the deploying computer:
 
 ```sh
 deploy/push.sh 0.1.0
 ```
 
-It copies `compose.yaml`, `deploy.sh` and `backup.sh` to `/srv/commander-duels` and runs `deploy.sh 0.1.0` there. That:
+It copies `compose.yaml`, `deploy.sh`, `backup.sh` and `restore.sh` to `/srv/commander-duels` and runs `deploy.sh 0.1.0` there. That:
 1. writes the web container's allow list (the proxy and loopback);
 2. pulls the tag's images;
 3. dumps the database (`backups/commander-<time>-pre-0.1.0.dump`) when it is already running;
-4. starts everything. Compose runs the migrations before the API starts, and waits for every health check;
-5. records the tag in `.env` as `CD_VERSION`;
-6. checks `/api/v1/ready`, `/health` and the engine's status through the web container, and removes unused images.
+4. runs the tag's migrations on their own (`docker compose run migrate`) while the running version keeps serving. Alembic runs them in one transaction, so if they fail the database is unchanged, and `deploy.sh` stops with nothing replaced;
+5. starts everything and waits for every health check;
+6. records the tag in `.env` as `CD_VERSION`;
+7. checks `/api/v1/ready` (for up to about 10 seconds), `/health` and the engine's status through the web container, and removes unused images.
+
+**A failed start.** If the tag does not start (step 5) or is not ready (step 7), `deploy.sh` brings the previous tag back and says so. It does this only when the previous tag was running and the database is still at the migration it ran on, because starting a tag runs its migrations. Otherwise it replaces nothing more:
+- If the new tag's migrations moved the database, it prints the commands that roll back (below), with the dump it took in step 3.
+- If no version was running, as after `restore.sh`, it starts nothing. Bringing back the tag in `.env` would migrate the restored database forward again.
+
+The site stays down until you run those commands or deploy a fixed tag.
+
+**Migrations keep the previous version working.** From step 4 until step 5 replaces them, a few seconds, the running API and worker use the newly migrated database. So a migration only adds what the previous version can ignore: tables, columns that are nullable or have a default, indexes. Dropping or renaming a table or column the previous version uses, or a backfill of data it keeps writing, waits for a later version that no longer uses it (expand, then contract).
 
 **Running games end.** Restarting the API interrupts every running game (recovery journals, NET08–NET09, are later work). Deploy when no one is playing.
 
-**Rolling back.** Deploy the previous tag. A migration that already ran stays applied. If the older version cannot use the newer schema, restore the pre-deploy dump (below), then deploy the older tag.
-
-## Backups
-
-- **Nightly** at about 04:30 (`commander-duels-backup.timer`), and **before every deploy**: `pg_dump -Fc` into `/srv/commander-duels/backups`. The newest 14 nightly and 10 pre-deploy dumps are kept. Copying them off the VM (to the NAS, for instance) is the owner's choice.
-- **Restoring** a dump replaces the database. Stop the API and the worker, restore, then start them:
+**Rolling back.** A version runs only on a database at its own last migration. Its migrate step cannot find a newer revision, and its API reports ready only at its own. So:
+- If the version you are leaving added no migration (compare `api/migrations/versions` between the two tags), deploy the previous tag: `deploy/push.sh <previous tag>`.
+- If it added one, first restore the dump taken just before it was deployed, then deploy the previous tag. On the VM:
 
   ```sh
   cd /srv/commander-duels
-  docker compose stop api worker
-  docker compose exec -T db pg_restore -U commander -d commander --clean --if-exists < backups/<file>.dump
-  docker compose start api worker
+  ./restore.sh backups/commander-<time>-pre-<the version you are leaving>.dump
+  ./deploy.sh <previous tag>
   ```
+
+  Everything written since that deploy is lost (`restore.sh` keeps it in a `pre-restore` dump first). Pick the dump by its tag, not by its age: every later deploy attempt writes a newer `pre-<tag>` dump, and an attempt to roll back writes one that already has the newer schema.
+
+Without the restore, `deploy.sh` refuses the previous tag at its migrate step, before anything is replaced.
+
+## Backups
+
+- **Nightly** at about 04:30 (`commander-duels-backup.timer`), **before every deploy** and **before every restore**: `pg_dump -Fc` into `/srv/commander-duels/backups`. The newest 14 nightly, 10 pre-deploy and 5 pre-restore dumps are kept. Each kind is counted on its own, so restores never push out the pre-deploy dumps a rollback needs. The first nightly dump ran on 2026-10-20 at 04:41 (the timer adds a random delay).
+- **Off the VM.** The owner backs up the whole VM to the NAS with Proxmox VE's own scheduled backups, set up on Hathor (since v0.1.1; nothing on the VM copies dumps itself). A snapshot of a running database is only crash-consistent. The dumps in `backups/` are consistent, and every VM backup carries them, so restore from a dump, not from the snapshot's database files. A fuller backup arrangement may come later.
+- **Restoring** a dump replaces the database with it. On the VM:
+
+  ```sh
+  cd /srv/commander-duels
+  ./restore.sh backups/<file>.dump
+  ./deploy.sh <the tag the dump belongs to>
+  ```
+
+  `restore.sh`:
+  1. checks that the file is a dump it can read, and holds it open;
+  2. dumps the database it replaces (`…-pre-restore.dump`). This may prune the oldest `pre-restore` dump, which still restores if it is the one being restored;
+  3. stops the API and the worker;
+  4. drops the database and creates it again, empty;
+  5. restores the dump in one transaction that stops at the first error (`pg_restore --exit-on-error --single-transaction`);
+  6. names the dump's last migration.
+
+  The database ends up exactly as dumped, or empty if the restore fails. It is never a mix of the dump and the tables, columns or rows a newer version added, as v0.1.0's `pg_restore --clean` into the live database could leave. The API and the worker stay stopped until `deploy.sh` starts the version with that last migration. A `pre-<tag>` dump belongs to the version that ran before `<tag>`. A nightly or `pre-restore` dump belongs to the version running when it was taken. The web container keeps running: its nginx asks Docker's DNS for the API's new address every 10 seconds.
 
 The card image cache (`card_images` volume) needs no backup: the API fetches any missing image again.
 
@@ -162,7 +196,7 @@ After the first deploy and at each version's close-out:
 | `CD_SIGNUP_POLICY` | `approval` |
 | `CD_PROXY_ADDRESS` | The TSH proxy, 10.10.50.2 |
 | `CD_SYSOP_NETWORKS` | The home LAN, 10.10.1.0/24 |
-| `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 and 2 |
+| `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 and 6 (v0.1.0's `.env` says 2: change it to 6 when deploying v0.1.1) |
 | `CD_DB_PASSWORD`, `CD_ENGINE_SERVICE_TOKEN` | Generated on the VM by the bootstrap |
 
 The API runs with `CD_ENVIRONMENT=production`. In production it refuses to start unless:

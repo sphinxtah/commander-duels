@@ -1,5 +1,4 @@
 asset,origin,license_or_permission,status
-web/public/brand/logo.webp,"The owner's Commander Duels logo with its wordmark (commander.duels.logo.png, 1254 x 1254, supplied 2026-10-19), resized by scripts/brand_assets.py; the original is not in the repository",Supplied by the project owner for Commander Duels,framework
 "web/public/brand/mark.webp, favicon-32.png, favicon-64.png, touch-icon.png","The owner's CD monogram without words (commander.duels.logo.nowords.png, 1254 x 1254, transparent, supplied 2026-10-19), resized by scripts/brand_assets.py; the original is not in the repository",Supplied by the project owner for Commander Duels,framework
 Reference campaign media,Not provided,Authorization and inventory required,unresolved
 XMage engine (github.com/magefree/mage),"Built from tag xmage_1.4.62V1, commit eb69d05b88142b5c4eec4869bcb23a0fec13c091 (2026-10-03), inside the engine image; no source in this repository; no patches","MIT; LICENSE.txt and notice shipped in /app/licenses",pinned

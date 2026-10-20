@@ -28,6 +28,11 @@ Agreed on 2026-10-18 at the start of v0.0.5:
    - **The nonce.** The server checks that the token's nonce is the hash of the presented cookie.
    - **The challenge.** It consumes the challenge with a conditional update, so it works once.
 
+**Renewing the challenge** (since v0.1.1). The page renews an idle challenge after 9 minutes, measured by the wall clock, because timers stop while a computer or phone sleeps but the challenge keeps ageing. It checks every 15 seconds, when the page regains focus or is shown again, and when the pointer or keyboard reaches the button, so a device that slept renews before use.
+- **Hidden tabs.** A hidden tab does not renew. Showing it again renews at once if the challenge is old.
+- **A sign-in under way.** A new challenge replaces the `cd_google` cookie that Google's answer is checked against, so the page never renews while the server checks an answer. After the button is pressed, the 9-minute renewal also waits while a sign-in may be under way: for 2 minutes after the press, or while the page lacks focus, as it does while Google's pop-up has it. Google reports nothing when its window is closed without signing in, so an older press counts as given up once the page has focus again. A pressed challenge past its 10 minutes is replaced regardless.
+- **After a failed sign-in.** A refusal or a network failure leaves the challenge spent or doubtful, so the page asks Google again with a new one.
+
 This pair, the cookie and the nonce inside the signed token, is this flow's CSRF and replay protection (AUTH02). Google's own `g_csrf_token` double-submit belongs to its redirect mode, which posts to the server directly; with a callback, the page posts. The protection holds in each case:
 - **A stolen token** fails without the matching cookie.
 - **A replayed token** finds its challenge consumed.
@@ -36,19 +41,25 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 **Accounts.**
 - The account is keyed by issuer and Google's stable `sub`, never by email. A changed email address updates the private record, with no duplicate account.
 - Google establishes identity only (AUTH04). No Google scopes beyond the ID token's own are requested, and nothing grants roles automatically.
-- A first sign-in creates the internal UUID and an account with the Google display name. The player then chooses a unique handle: 3–20 letters, digits, hyphens or underscores, case-insensitively unique, with names such as `sysop` and `admin` reserved.
+- A first sign-in creates the internal UUID and an account with the Google display name. The player then chooses a unique handle: 3–20 letters, digits, hyphens or underscores, case-insensitively unique, with names such as `sysop`, `admin` and `site-administrator` reserved.
 - Avatars are one of eight built-in symbols, so no remote image is ever fetched.
 - The profile also holds the display name, locale, onboarding state and the accessibility preferences, which follow the account across devices.
 - Email and the Google subject are private:
   - The subject is never returned.
-  - Email goes to its owner, and to administrators, who need it to identify accounts they approve.
+  - Email goes to its owner, and to administrators (`admin.users.manage`), who need it to identify accounts they approve. Moderators see the account list without email and cannot search by it.
 
 **Failures.**
-- A refused token returns 401 `invalid_sign_in`, records `auth.google_login_failed` with a reason (`invalid_token`, `nonce_mismatch`, `challenge_used_or_expired`) and creates no session (T02).
-- A sign-in post without a challenge is refused without an audit entry, so a bot cannot fill the trail.
-- Google being unreachable returns 503 `provider_unavailable`.
-- A cancelled or denied Google prompt simply never calls back.
-- Without `CD_GOOGLE_CLIENT_ID`, sign-in reports `sign_in_unavailable` and the page says the server is not set up.
+- **Without a challenge.** A post without one of our challenges (no `cd_google` cookie, or a cookie for a challenge the server never issued) is refused 401 `invalid_sign_in` without an audit entry, so a bot cannot fill the trail.
+- **Every attempt with a live challenge spends it,** whatever the outcome; only a Google outage leaves it for a retry. So each recorded failure costs the client a new `/auth/google/start`, which the page asks for anyway.
+- **A refused token** returns 401 `invalid_sign_in`, records `auth.google_login_failed` with a reason (`invalid_token`, `nonce_mismatch`, `challenge_used_or_expired`) and creates no session (T02). A malformed token header, such as a list-valued `kid` or `alg`, is an ordinary `invalid_token`.
+- **A spent or expired challenge** is recorded as `challenge_used_or_expired` only for a token Google signed for that very challenge, such as a replay. Anything else on a spent challenge is refused unrecorded.
+- **Too many failures.** After 10 recorded failures from one address in 15 minutes, further failures from it return 429 `too_many_attempts` and are not recorded. A genuine sign-in from that address still works. The count is per exact address, which suits the IPv4-only site; if it ever serves IPv6, sources must be counted by /64.
+- **Two first sign-ins at once** of one Google account: the second gets 409 `sign_in_conflict`, which asks the player to try again.
+- **Google being unreachable** returns 503 `provider_unavailable`. It is never counted as a failure, so it is reported even to an address at its limit, and the challenge stays unspent.
+- **On the page.** A cancelled or denied Google prompt simply never calls back. A network failure while posting Google's token shows the service-unavailable message, and the page asks Google again with a new challenge.
+- **Not set up.** Without `CD_GOOGLE_CLIENT_ID`, sign-in reports `sign_in_unavailable` and the page says the server is not set up. Until the bootstrap loads, the Profile page says sign-in is being prepared; if the service did not answer, it says so, with a Try again button.
+
+**Challenge limits.** The web container lets each visitor address ask for 10 challenges a minute (`POST /api/v1/auth/google/start`), after a first burst of 20, because each one is a database row. Past that it answers 429 with the API's error shape (`too_many_attempts`). It keys on `X-Forwarded-For`, which on the live site only the TSH proxy sets, to the visitor's address alone; requests without the header (local runs, the browser tests) are not limited. Challenges are deleted a day after they expire.
 
 **Setting up a client ID.**
 1. In Google Cloud Console → APIs & Services → Credentials, create an OAuth client ID of type *Web application*.
@@ -74,11 +85,21 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
   Activity extends the idle limit at most once a minute.
 - **Rotation.**
   - Every sign-in issues a new session and ends any session the browser presented.
-  - Every role or status change raises the account's privilege version. The account's next request swaps its session for a new identifier, with the same sign-in time and limits.
+  - Every role or status change raises the account's privilege version. The account's next request swaps its session for a new identifier, with the same sign-in time, limits and CSRF token.
+  - **The new cookie** (since v0.1.1) is sent on every response to the request that rotated the session, errors and empty responses included. The correlation middleware adds it, so no route copies it, except when the response sets or clears the session cookie itself: sign-out, sign-out everywhere, ending the current session, a new sign-in, or SysOp's password change.
+  - **The old token's grace.** For 60 seconds the old token still signs requests in, as the newest session in its chain. This covers requests the browser sent before it read the new cookie. Rotation keeps the CSRF token, and that token, which sessions never otherwise share, links the old session to the new one. Such a request sets no cookie and never rotates the session it stands for, even if that session is itself due for rotation. Only the new cookie's own next request rotates it, so a stale token can never mint a fresh session.
+  - **The grace ends** as soon as the chain has no live session: sign-out, sign-out everywhere, an administrator's sign-out, a new sign-in that replaces the session, or SysOp's password change, which issues a new CSRF token. A disabled account is refused by the status check, as always.
+  - **No late clearing.** A rotated token is never answered with the cookie-clearing header, so a late response cannot erase the new cookie. The exception is when the session it stands for is itself unusable: expired, its account disabled, or a SysOp session used from off its network. The 401 then clears the cookie, as it would for that session's own token.
+  - **A bug's 500.** Starlette answers an unhandled exception outside every middleware. The API's handler for it adds what the correlation middleware would: the rotated cookie, the request ID and the usual headers. It also gives the 500 the usual error shape, `internal_error`, with no details. Starlette then re-raises the exception, so the server still logs it.
 - **Ending sessions.**
   - Sign out ends this session.
   - *Sign out everywhere* ends all of the account's sessions.
   - The Profile page lists the active sessions and ends any one of them.
+  - **On the page** (since v0.1.1):
+    - The page shows the signed-out screen only when the server confirms. A 401 also counts, because the session had already ended. Any other refusal, or a network failure, shows the error and keeps the account.
+    - While a sign-out is pending, further presses of Sign out and Sign out everywhere are ignored: a second request would find the session already ended.
+    - *Sign out everywhere* from a session that had already ended says the account's other sessions could not be ended from this browser.
+    - On `csrf_failed` (another tab signed this browser in since the page loaded), the page refreshes its token from `/api/v1/me` and tries once more. If the browser now holds another account, the page shows that account and asks to sign out again. After *Sign out everywhere* it also says the first account's sessions were not ended, and that ending them means signing in as that account and choosing *Sign out everywhere*.
 - **Reauthentication.** Role and account-status changes need a sign-in at most `CD_REAUTH_MINUTES` old (12 hours). An older session gets 401 `reauthentication_required`.
 
 ## Roles and permissions (AUTH06, AUTH07, SEC05)
@@ -98,7 +119,8 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, and grant or remove the moderator and content-editor roles.
-- They cannot change administrators, SysOp or their own account.
+- They cannot change administrators, SysOp or their own account. This holds whatever the administrator's status: grants survive a disable, so only SysOp can restore, deny, sign out or change the lesser roles of an account holding an administrator grant. The account list reports a disabled, pending or denied account's dormant grants in `roles` (without `player`, which only active accounts hold), so the Administration page locks the row.
+- The account search matches the handle, the display name and, for administrators only, the email, as written: `%`, `_` and `\` are literal, and names and email compare without regard to case.
 - The first administrator is not configured separately (AUTH06): SysOp is the configured bootstrap, and only SysOp makes or removes administrators. No Google account ever becomes an administrator by signing in.
 
 **Pending and denied accounts.**
@@ -117,7 +139,8 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 - 401 when signed out;
 - 403 when the account lacks the permission or is pending or denied;
 - 404, identical to a missing path, for SysOp or another account's session;
-- 409 for conflicts such as a taken handle or a change to your own account.
+- 409 for conflicts such as a taken handle or a change to your own account;
+- 422 `invalid_request` for input the contract does not allow. That includes a NUL character in a display name, a status reason, the account search or the audit filter, which PostgreSQL cannot store.
 
 ## SysOp, the local root account
 
@@ -128,7 +151,11 @@ SysOp copies Kingdom Connect's root account:
   - It is set only from the server console, never through the interface.
   - SysOp can change it in the Profile page by giving the current one.
   - Setting or changing it ends every SysOp session.
-- **Lockout.** Five failed sign-ins from one address in 15 minutes lock that address out until the window passes. A success clears its count. A missing account costs the same time as a wrong password.
+- **Lockout.** Five failed attempts from one address in 15 minutes lock that address out until the window passes.
+  - Failed attempts are sign-ins, and wrong current passwords on the Profile page's password change.
+  - A success at that address (a sign-in or a password change) clears its count. Setting the password from the server console clears every address's count, as the 429 message says.
+  - Attempts are checked one at a time, so a burst of guesses cannot outrun the count.
+  - A missing account costs the same time as a wrong password.
 - **Sessions.**
   - SysOp's sessions are short (table above).
   - They count as signed out whenever a request comes from outside the SysOp networks, so a session carried off the network is useless there.
@@ -168,7 +195,7 @@ Actions recorded:
 - **Profile:** `profile.updated`.
 - **Administration:** `admin.user_status_changed`, `admin.role_granted`, `admin.role_revoked` and `admin.sessions_revoked`.
 
-Administrators read the trail newest first in the Administration page, filtered by action prefix.
+Administrators read the trail newest first in the Administration page, filtered by action prefix, without regard to case. A player without a handle appears as `<display name> (no handle, <first 8 characters of its id>)`, so no player can pass for the Site administrator or another player.
 
 ## Data
 

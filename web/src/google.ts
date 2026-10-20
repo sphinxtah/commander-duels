@@ -15,7 +15,8 @@ export interface GoogleId {
   }): void;
   renderButton(
     parent: HTMLElement,
-    options: Record<string, string | number | boolean>,
+    // click_listener runs when the button is pressed, before Google's window opens.
+    options: Record<string, string | number | boolean | (() => void)>,
   ): void;
   disableAutoSelect(): void;
 }

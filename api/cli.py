@@ -4,7 +4,8 @@
     python -m api.cli sysop-password --password-file /run/secrets/sysop_password
     printf '%s\\n' "$PASSWORD" | python -m api.cli sysop-password --stdin
 
-Setting the password creates SysOp on first use and signs out every SysOp session.
+Setting the password creates SysOp on first use and signs out every SysOp session. It also lifts
+the sign-in lockout on every address: the API counts failures only after the latest console set.
 """
 
 import argparse

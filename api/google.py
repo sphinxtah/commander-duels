@@ -87,7 +87,9 @@ class GoogleVerifier:
             )
         except exceptions.TransportError as error:
             raise ProviderUnavailable(str(error)) from error
-        except (ValueError, exceptions.GoogleAuthError) as error:
+        # google-auth reads the header before the signature: a list-valued "kid" or "alg" fails
+        # there with a TypeError, and is as invalid as any other forged token.
+        except (ValueError, TypeError, exceptions.GoogleAuthError) as error:
             raise InvalidToken(str(error)) from error
         if not isinstance(claims, Mapping) or not claims.get("sub"):
             raise InvalidToken("The token has no subject.")

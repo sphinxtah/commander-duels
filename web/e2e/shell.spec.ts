@@ -29,6 +29,8 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
   expect((await page.request.get("/brand/favicon-32.png")).ok()).toBe(true);
   await page.getByRole("button", { name: "About this format" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  // Commander is open for practice games: only Two-Headed Giant is planned.
+  await expect(page.getByRole("dialog")).not.toContainText("planned");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
   for (const name of ["Campaign", "Learn", "Decks", "Cards", "Collection"]) {
@@ -49,6 +51,25 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("the skip link moves to the content and stays on the page", async ({
+  page,
+}) => {
+  await page.goto("/#settings");
+  await expect(
+    page.getByRole("heading", { name: "Make yourself at home." }),
+  ).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "Skip to content" }),
+  ).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
+  await expect(page).toHaveURL(/#settings$/);
+  await expect(
+    page.getByRole("heading", { name: "Make yourself at home." }),
+  ).toBeVisible();
 });
 
 test("service outage is visible and retry recovers", async ({ page }) => {

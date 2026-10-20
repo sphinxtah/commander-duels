@@ -9,7 +9,7 @@ from api.main import create_app
 from api.version import APP_VERSION
 
 
-def test_framework_is_live_but_not_gameplay_ready(tmp_path):
+def test_framework_is_live_and_only_practice_play_is_available(tmp_path):
     app = create_app(Settings(database_url=f"sqlite:///{tmp_path}/app.db"))
     with TestClient(app) as client:
         response = client.get("/api/v1/health")
@@ -19,10 +19,15 @@ def test_framework_is_live_but_not_gameplay_ready(tmp_path):
         assert client.get("/api/v1/ready").status_code == 503
         bootstrap = client.get("/api/v1/bootstrap").json()
         assert bootstrap["collection_policy"] == "open_collection"
-        assert all(not capability["available"] for capability in bootstrap["capabilities"])
+        # Practice games against bots are playable since v0.1.0; the rest is still planned.
+        available = {item["id"] for item in bootstrap["capabilities"] if item["available"]}
+        assert available == {"gameplay"}
+        gameplay = next(item for item in bootstrap["capabilities"] if item["id"] == "gameplay")
+        assert gameplay["name"] == "Practice play" and "playable" in gameplay["reason"]
         formats = client.get("/api/v1/formats").json()
         assert formats[0]["seats"] == [2, 3, 4]
-        assert all(not item["available"] for item in formats)
+        playable = {item["id"] for item in formats if item["available"]}
+        assert playable == {"commander", "legacy"}
         assert client.get("/api/v1/me").status_code == 401
         missing = client.get("/api/v1/missing")
         assert missing.status_code == 404
@@ -87,11 +92,14 @@ def test_engine_status_passes_real_engine_health_through(tmp_path):
     assert engine_status_for(tmp_path, ENGINE_READY) == ENGINE_READY
     loading = {**ENGINE_READY, "status": "loading", "cards": None, "bot_match_enabled": False}
     assert engine_status_for(tmp_path, loading) == loading
+    # An engine that serves games to players says so, and the status passes that through.
+    playable = {**ENGINE_READY, "gameplay_available": True}
+    assert engine_status_for(tmp_path, playable) == playable
 
 
-def test_engine_status_rejects_claims_and_unknown_shapes(tmp_path):
+def test_engine_status_rejects_unknown_shapes(tmp_path):
     for payload in (
-        {**ENGINE_READY, "gameplay_available": True},
+        {**ENGINE_READY, "gameplay_available": None},
         {**ENGINE_READY, "status": "scaffold"},
         {**ENGINE_READY, "unexpected": 1},
         {**ENGINE_READY, "cards": {"printings": 1}},

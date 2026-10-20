@@ -186,7 +186,8 @@ export interface paths {
          * Card Image
          * @description A card's image by its exact name, from Scryfall, cached on this server. The first request
          *     for a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not
-         *     know, such as tokens.
+         *     know, such as tokens. 429 card_images_busy when the account already waits for many new
+         *     cards, and 503 when everyone does or Scryfall asked us to wait; both carry Retry-After.
          */
         get: operations["card_image_api_v1_card_images_get"];
         put?: never;
@@ -323,7 +324,8 @@ export interface paths {
         put?: never;
         /**
          * Close Game
-         * @description Ends the game for every seat: its owner's choice, or SysOp's.
+         * @description Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game
+         *     as it ended.
          */
         post: operations["close_game_api_v1_games__game_id__close_post"];
         delete?: never;
@@ -583,7 +585,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.1.0
+             * @default 0.1.1
              */
             version: string;
         };
@@ -648,9 +650,8 @@ export interface components {
             /**
              * Gameplay Available
              * @default false
-             * @constant
              */
-            gameplay_available: false;
+            gameplay_available: boolean;
             /**
              * Protocol Version
              * @default 1
@@ -809,7 +810,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.1.0
+             * @default 0.1.1
              */
             version: string;
         };

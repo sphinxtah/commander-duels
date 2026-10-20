@@ -23,6 +23,9 @@ public final class MatchLog {
 
     static final int MAX_ENTRIES = 5_000;
     static final int TAIL = 12;
+    /** What the log says in place of XMage's own lines about an error it rolled back or ended on. */
+    static final String ROLLED_BACK = "The rules engine hit an internal error and rolled the game back";
+    static final String STOPPED = "The rules engine stopped the game after an internal error";
     private static final Pattern LINE_BREAKS = Pattern.compile("<br\\s*/?>", Pattern.CASE_INSENSITIVE);
     private static final Pattern TAGS = Pattern.compile("<[^>]*>");
     private static final Pattern OBJECT_IDS = Pattern.compile(" \\[[0-9a-f]{3}]");
@@ -46,11 +49,30 @@ public final class MatchLog {
     void attach(Game game, List<UUID> seatIds) {
         game.addTableEventListener(event -> {
             if (event.getEventType() == TableEvent.EventType.INFO) {
-                record(game, seatIds, event.getMessage());
+                record(game, seatIds, seatSafe(event.getMessage()));
             } else if (event.getEventType() == TableEvent.EventType.ERROR) {
                 recordError(game, seatIds, event);
             }
         });
+    }
+
+    /**
+     * XMage's error handlers also write the exception into the ordinary log ("Auto-restored to T5.M1
+     * due game error: java.lang...", and the technical winner's "Reason: ..."), which every seat
+     * reads. Those lines become a plain notice. The details stay in the ERROR entry recorded just
+     * before, which seats never see, and in XMage's own log.
+     */
+    static String seatSafe(String message) {
+        if (message == null) {
+            return null;
+        }
+        if (message.startsWith("Auto-restored to ") && message.contains(" due game error: ")) {
+            return ROLLED_BACK;
+        }
+        if (message.startsWith("Game stopped due critical error")) {
+            return STOPPED;
+        }
+        return message;
     }
 
     private synchronized void recordError(Game game, List<UUID> seatIds, TableEvent event) {

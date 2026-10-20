@@ -1,18 +1,23 @@
 """Practice games through the API (v0.0.6), against a fake engine that speaks the service routes.
 
 Covers seat ownership (T29's match case), the controller lease (AUTH07), a resent command running
-once (T14), the WebSocket's refusals, results and restarts, SysOp's inspection and deck lists,
-and the limits. No payload the API sends may carry an engine seat token or the service token.
+once (T14), the WebSocket's refusals and session refreshes, results and restarts (also while the
+database is unreachable), SysOp's inspection and deck lists, and the limits on games and
+connections. No payload the API sends may carry an engine seat token or the service token.
 """
 
+import argparse
 import asyncio
+import importlib.util
 import json
 import secrets
+import sys
 import threading
 import time
 import uuid
 from collections.abc import Iterator
-from datetime import timedelta
+from contextlib import ExitStack
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +27,8 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import Engine, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocketDisconnect
 
@@ -85,6 +91,11 @@ class FakeEngine:
         self.closed: list[str] = []
         self.created: list[dict[str, Any]] = []
         self.inspections = 0
+        # Views asked for without waiting: a new connection's, a resync's or a read over HTTP.
+        self.pages = 0
+        # A slow engine: creating a game takes this long, and so does stopping one ("closing").
+        self.create_delay = 0.0
+        self.close_delay = 0.0
 
     def game(self, game_id: str) -> FakeGame:
         return self.games[game_id]
@@ -97,6 +108,7 @@ class FakeEngine:
         if parts == ["cards"]:
             return httpx.Response(200, json={"names": ["Lightning Bolt", "Lightning Helix"]})
         if parts == ["games"]:
+            await asyncio.sleep(self.create_delay)
             return self.create(body)
         game = self.games.get(parts[1])
         if game is None:
@@ -104,9 +116,10 @@ class FakeEngine:
         if parts[2] == "close":
             with self.lock:
                 self.closed.append(game.id)
-                if game.result is None:
-                    game.result = closed()
-                    game.revision += 1
+                if game.result is None and self.close_delay:
+                    asyncio.get_running_loop().call_later(self.close_delay, self.finish, game)
+                    return httpx.Response(200, json={"status": "closing"})
+            self.finish(game)
             return httpx.Response(200, json={"status": "finished"})
         if parts[2] == "inspection":
             with self.lock:
@@ -117,6 +130,12 @@ class FakeEngine:
         if parts[2] == "view":
             return await self.view(game, request.url.params)
         return self.command(game, body)
+
+    def finish(self, game: FakeGame) -> None:
+        with self.lock:
+            if game.result is None:
+                game.result = closed()
+                game.revision += 1
 
     def create(self, body: dict[str, Any]) -> httpx.Response:
         names = [
@@ -158,6 +177,8 @@ class FakeEngine:
         since = int(params.get("since", -1))
         deadline = time.monotonic() + min(int(params.get("wait_ms", 0)), 1000) / 1000
         log_from = int(params["log_from"]) if "log_from" in params else None
+        if "wait_ms" not in params:
+            self.pages += 1
         while True:
             with self.lock:
                 if game.revision > since or game.result or time.monotonic() >= deadline:
@@ -368,6 +389,54 @@ def closes_with(socket: Any, code: int) -> str:
     return str(error["code"])
 
 
+def ended_with(tab: Tab, code: int) -> str:
+    """The error code an open connection gets, after which the server closes it with ``code``."""
+    error = tab.until("error")
+    with pytest.raises(WebSocketDisconnect) as closed:
+        tab.receive()
+    assert closed.value.code == code
+    return str(error["code"])
+
+
+def drained(tab: Tab) -> list[str]:
+    """The kinds of every message queued for the tab so far: they all arrive before its pong."""
+    tab.socket.send_json({"type": "ping"})
+    kinds = [tab.receive()["type"]]
+    while kinds[-1] != "pong":
+        kinds.append(tab.receive()["type"])
+    return kinds
+
+
+def grant_role(app: FastAPI, account: Account) -> None:
+    """What a role grant does to the account's sessions: they must be renewed."""
+    with Session(app.state.database) as db:
+        user = db.get(User, account.id)
+        assert user is not None
+        user.privilege_version += 1
+        db.commit()
+
+
+def renew(account: Account) -> str:
+    """The page's next HTTP request rotates a session older than its account's privileges, and
+    the browser keeps the new cookie. Returns the old token."""
+    response = account.get("/api/v1/me")
+    assert response.status_code == 200, response.text
+    cookies = [c for c in response.headers.get_list("set-cookie") if c.startswith("cd_session=")]
+    assert cookies, "the session was not rotated"
+    old, account.token = account.token, cookies[-1].split(";", 1)[0].removeprefix("cd_session=")
+    return old
+
+
+def past_grace(app: FastAPI, token: str) -> None:
+    """Ages a rotated session past the rotation grace: its token no longer stands for its
+    successor, so it signs nothing in any more."""
+    with Session(app.state.database) as db:
+        found = db.scalar(select(UserSession).where(UserSession.token_hash == hash_token(token)))
+        assert found is not None and found.revoked_reason == "rotated"
+        found.revoked_at = utcnow() - timedelta(hours=1)
+        db.commit()
+
+
 def until_status(account: Account, game_id: str, status: str) -> dict[str, Any]:
     for _ in range(200):
         state = account.get(f"/api/v1/games/{game_id}").json()
@@ -521,17 +590,14 @@ def test_the_websocket_refuses_strangers(
     with ada.socket(str(uuid.uuid4())) as socket:
         assert closes_with(socket, games.CLOSE_NOT_FOUND) == "not_found"
 
-    # Signing out everywhere ends the connection at its next command.
+    # Signing out everywhere ends the connection at its next command, and says so first.
     with ada.socket(game_id) as socket:
         tab = Tab(socket, [])
         socket.send_json(ada.hello(control=True))
         opening = tab.snapshot(1)
         assert ada.post("/api/v1/auth/logout-all").status_code == 204
         tab.command(opening)
-        with pytest.raises(WebSocketDisconnect) as ended:
-            for _ in range(10):
-                tab.receive()
-        assert ended.value.code == games.CLOSE_UNAUTHENTICATED
+        assert ended_with(tab, games.CLOSE_UNAUTHENTICATED) == "authentication_required"
     assert engine.game(game_id).applied == 0
 
 
@@ -645,6 +711,62 @@ def test_sysop_inspects_observes_and_plays_any_card(
     assert "game.closed" in audit_actions(app)
 
 
+def test_only_inspecting_connections_receive_the_inspection(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """SysOp's inspection (every hand and library) reaches only the connections that asked for it:
+    never the seat owner's, nor SysOp's own tab that did not ask."""
+    ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    seen: list[str] = []
+    with (
+        ada.socket(game_id) as own_socket,
+        root.socket(game_id) as plain_socket,
+        root.socket(game_id) as inspecting_socket,
+    ):
+        own, plain = Tab(own_socket, seen), Tab(plain_socket, seen)
+        inspecting = Tab(inspecting_socket, [])
+        own_socket.send_json(ada.hello(control=True))
+        opening = own.snapshot(1)
+        plain_socket.send_json(root.hello())
+        plain.snapshot(1)
+        inspecting_socket.send_json(root.hello(inspect=True))
+        assert inspecting.until("inspection")["inspection"]["players"][1]["hand"]
+        # Each new revision brings another.
+        own.command(opening)
+        own.until("command_result")
+        while inspecting.until("inspection")["inspection"]["version"] < 2:
+            pass
+        # Anything sent to the other tabs by now is queued ahead of their pong.
+        assert "inspection" not in drained(own)
+        assert "inspection" not in drained(plain)
+    assert '"Forest"' not in "\n".join(seen)
+
+
+def test_the_scripted_client_counts_inspections_only_where_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CI's game through the API (scripts/api_practice_game.py) treats an inspection reaching a tab
+    that did not ask to inspect as a problem."""
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    spec = importlib.util.spec_from_file_location(
+        "api_practice_game", Path("scripts/api_practice_game.py")
+    )
+    assert spec is not None and spec.loader is not None
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    view = {
+        "view": {"opponents": [{"seat": 1, "hand_count": 1, "library_count": 0}]},
+        "players": [{"seat": 1, "hand": [{"name": "Forest"}], "library": []}],
+    }
+    run = script.Run(argparse.Namespace(schemas=None))
+    run.seen({"type": "inspection", "inspection": view}, True)
+    assert run.inspections == 1 and run.inspection_problems == []
+    run.seen({"type": "inspection", "inspection": view}, False)
+    assert run.inspections == 1
+    assert run.inspection_problems == ["an inspection view reached a tab that did not ask for one"]
+
+
 def test_limits_and_configuration(database: str) -> None:
     engine = FakeEngine(cap=8)
     with connect(build(database, engine, games_max=1)) as client:
@@ -703,3 +825,271 @@ def test_seats_record_their_owner(client: TestClient, app: FastAPI, engine: Fake
         seats = list(db.scalars(select(GameSeat).order_by(GameSeat.seat)))
     assert [(seat.player, seat.user_id) for seat in seats] == [("human", ada.id), ("bot", None)]
     assert seats[0].deck == "commander-mono-white-soldiers"
+
+
+def test_connections_are_limited_and_share_one_view(
+    client: TestClient, app: FastAPI, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each connection costs a copy of every snapshot, so a player's are limited and SysOp's are
+    not. New connections and resyncs reuse the view the engine built for the revision."""
+    ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    with ExitStack() as stack:
+        tabs = []
+        for index in range(games.CONNECTIONS_PER_ACCOUNT):
+            socket = stack.enter_context(ada.socket(game_id))
+            tab = Tab(socket, [])
+            socket.send_json(ada.hello(control=index == 0))
+            tab.snapshot(1)
+            socket.send_json({"type": "resync", "since": -1})
+            drained(tab)
+            tabs.append(tab)
+        with ada.socket(game_id) as extra:
+            extra.send_json(ada.hello())
+            assert closes_with(extra, games.CLOSE_TOO_MANY) == "too_many_connections"
+        for _ in range(games.CONNECTIONS_PER_ACCOUNT + 1):
+            socket = stack.enter_context(root.socket(game_id))
+            socket.send_json(root.hello())
+            Tab(socket, []).snapshot(1)
+        assert engine.pages == 1, "one view from the engine for every connection and resync"
+
+        # The connections already open follow the game; the next revision is one more view.
+        opening = engine.game(game_id).snapshot(None)
+        tabs[0].command(opening)
+        assert tabs[0].until("command_result")["status"] == 200
+        for tab in tabs:
+            tab.snapshot(2)
+        with root.socket(game_id) as late:
+            late.send_json(root.hello())
+            assert Tab(late, []).snapshot(2)["log"][-1]["text"] == "Answer 1"
+        assert engine.pages == 2
+
+    # Closed connections free their places.
+    with ada.socket(game_id) as again:
+        again.send_json(ada.hello())
+        Tab(again, []).until("welcome")
+
+    # The game as a whole has a limit too; SysOp is still let in.
+    monkeypatch.setattr(games, "CONNECTIONS_PER_GAME", 2)
+    with ExitStack() as stack:
+        for _ in range(2):
+            socket = stack.enter_context(ada.socket(game_id))
+            socket.send_json(ada.hello())
+            Tab(socket, []).until("welcome")
+        with ada.socket(game_id) as extra:
+            extra.send_json(ada.hello())
+            assert closes_with(extra, games.CLOSE_TOO_MANY) == "too_many_connections"
+        with root.socket(game_id) as sysop:
+            sysop.send_json(root.hello())
+            Tab(sysop, []).until("welcome")
+
+
+def test_a_role_change_mid_game_asks_for_a_session_refresh(
+    client: TestClient, app: FastAPI, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A role change during a game is no sign-out: the socket sends session_refresh before it
+    closes with 4401, so the page renews the session and reconnects (docs/game-screen.md). The
+    same holds once the page's own HTTP request has rotated the cookie the socket opened with."""
+    ada = Account(client, "ada")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    fake = engine.game(game_id)
+
+    # At the next command, which goes no further.
+    with ada.socket(game_id) as socket:
+        tab = Tab(socket, [])
+        socket.send_json(ada.hello(control=True))
+        opening = tab.snapshot(1)
+        grant_role(app, ada)
+        tab.command(opening)
+        assert ended_with(tab, games.CLOSE_UNAUTHENTICATED) == "session_refresh"
+    assert fake.applied == 0
+    renew(ada)
+
+    # At the session check, with no command.
+    monkeypatch.setattr(games, "SESSION_CHECK_SECONDS", 0.1)
+    with ada.socket(game_id) as socket:
+        tab = Tab(socket, [])
+        socket.send_json(ada.hello(control=True))
+        tab.snapshot(1)
+        grant_role(app, ada)
+        assert ended_with(tab, games.CLOSE_UNAUTHENTICATED) == "session_refresh"
+    renew(ada)
+    monkeypatch.setattr(games, "SESSION_CHECK_SECONDS", 60.0)
+
+    # The cookie was rotated by an HTTP request long enough ago that the old token signs nothing
+    # in any more: the browser holds the new one.
+    with ada.socket(game_id) as socket:
+        tab = Tab(socket, [])
+        socket.send_json(ada.hello(control=True))
+        opening = tab.snapshot(1)
+        grant_role(app, ada)
+        old = renew(ada)
+        past_grace(app, old)
+        tab.command(opening)
+        assert ended_with(tab, games.CLOSE_UNAUTHENTICATED) == "session_refresh"
+
+    # The socket went out with the old cookie just after an HTTP request rotated it (the page
+    # read the game while connecting), so it stood for the new session during the grace.
+    grant_role(app, ada)
+    old = renew(ada)
+    new, ada.token = ada.token, old
+    with ada.socket(game_id) as socket:
+        tab = Tab(socket, [])
+        socket.send_json(ada.hello(control=True))
+        opening = tab.snapshot(1)
+        past_grace(app, old)
+        tab.command(opening)
+        assert ended_with(tab, games.CLOSE_UNAUTHENTICATED) == "session_refresh"
+    ada.token = new
+    assert ada.get("/api/v1/me").status_code == 200, "the browser's cookie still stands"
+    assert fake.applied == 0
+    # Once the new session ends as well, nothing is left to refresh.
+    assert games.rotated(app.state.database, old)
+    assert ada.post("/api/v1/auth/logout-all").status_code == 204
+    assert not games.rotated(app.state.database, old)
+
+
+def test_closing_a_game_answers_with_its_end(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """The reply to a close, and the list read right after it, show the game finished; even when
+    the engine still had to stop the game thread ("closing")."""
+    ada = Account(client, "ada")
+    for delay in (0.0, 0.3):
+        engine.close_delay = delay
+        created = ada.post("/api/v1/practice-games", {})
+        assert created.status_code == 201, created.text
+        game_id = created.json()["id"]
+        closed_now = ada.post(f"/api/v1/games/{game_id}/close")
+        assert closed_now.status_code == 200
+        assert closed_now.json()["status"] == "finished"
+        assert closed_now.json()["result"]["kind"] == "closed"
+        listed = {game["id"]: game["status"] for game in ada.get("/api/v1/games").json()}
+        assert listed[game_id] == "finished"
+    assert ada.post("/api/v1/practice-games", {}).status_code == 201
+
+
+def test_an_end_the_database_missed_is_recorded_later(
+    client: TestClient, app: FastAPI, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A game's end is written again until the database takes it. Otherwise the game would stay
+    active, holding its owner's only game, and Close could not clear it."""
+    monkeypatch.setattr(games, "RETRY_SECONDS", 0.05)
+    record_end = games.record_end
+    failures = [OperationalError("UPDATE games", {}, Exception("the database is restarting"))]
+
+    def flaky(*args: Any) -> None:
+        if failures:
+            raise failures.pop()
+        record_end(*args)
+
+    monkeypatch.setattr(games, "record_end", flaky)
+    ada = Account(client, "ada")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    closed_now = ada.post(f"/api/v1/games/{game_id}/close").json()
+    assert not failures
+    assert closed_now["status"] == "finished" and closed_now["result"]["kind"] == "closed"
+    assert ada.post("/api/v1/practice-games", {}).status_code == 201
+
+
+def test_closing_a_game_nothing_follows_interrupts_it(
+    database: str, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A game left active that no task follows (an earlier process ran it, and the restart's
+    check has not reached the database yet) cannot be played. Close ends it, so it no longer holds
+    its owner's limit, and stops it in the engine, where it would hold a slot until it idled out:
+    the restart's check, once it runs, no longer sees it."""
+    with connect(build(database, engine)) as first:
+        ada = Account(first, "ada")
+        orphan = ada.post("/api/v1/practice-games", {}).json()["id"]
+    # The check fails at startup and does not come round again during the test.
+    monkeypatch.setattr(games, "RETRY_SECONDS", 60.0)
+    interrupt_active = games.interrupt_active
+    failures = [OperationalError("SELECT games", {}, Exception("the database is starting"))]
+
+    def flaky(database: Engine, before: datetime | None = None) -> list[uuid.UUID]:
+        if failures:
+            raise failures.pop()
+        return interrupt_active(database, before)
+
+    monkeypatch.setattr(games, "interrupt_active", flaky)
+    with connect(build(database, engine)) as restarted:
+        ada.http = restarted
+        assert not failures
+        assert ada.post("/api/v1/practice-games", {}).json()["code"] == "game_limit"
+        assert orphan not in engine.closed
+        closed_now = ada.post(f"/api/v1/games/{orphan}/close")
+        assert closed_now.status_code == 200 and closed_now.json()["status"] == "interrupted"
+        assert orphan in engine.closed
+        assert ada.post("/api/v1/practice-games", {}).status_code == 201
+
+
+def test_a_restart_before_the_database_is_up_interrupts_later(
+    database: str, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When the database cannot be reached at startup, the check for games an earlier process
+    left active retries in the background. It spares games started in the meantime."""
+    monkeypatch.setattr(games, "RETRY_SECONDS", 0.5)
+    with connect(build(database, engine)) as first:
+        orphan = Account(first, "ada").post("/api/v1/practice-games", {}).json()["id"]
+    interrupt_active = games.interrupt_active
+    calls: list[datetime | None] = []
+
+    def flaky(database: Engine, before: datetime | None = None) -> list[uuid.UUID]:
+        calls.append(before)
+        if len(calls) == 1:
+            raise OperationalError("SELECT games", {}, Exception("the database is starting"))
+        return interrupt_active(database, before)
+
+    monkeypatch.setattr(games, "interrupt_active", flaky)
+    with connect(build(database, engine)) as restarted:
+        mine = Account(restarted, "bea").post("/api/v1/practice-games", {}).json()["id"]
+        for _ in range(200):
+            if orphan in engine.closed:
+                break
+            time.sleep(0.02)
+        assert orphan in engine.closed and mine not in engine.closed
+        with Session(restarted.app.state.database) as db:  # type: ignore[attr-defined]
+            assert db.get(Game, uuid.UUID(orphan)).status == "interrupted"  # type: ignore[union-attr]
+            assert db.get(Game, uuid.UUID(mine)).status == "active"  # type: ignore[union-attr]
+
+
+def test_games_starting_at_once_keep_the_global_limit(database: str) -> None:
+    """Players on several accounts start games at the same moment against CD_GAMES_MAX=1, and the
+    engine takes a while to create each: only one starts."""
+    engine = FakeEngine(cap=8)
+    engine.create_delay = 0.3
+    with connect(build(database, engine, games_max=1)) as client:
+        hub: games.GameHub = client.app.state.games  # type: ignore[attr-defined]
+        players = {handle: Account(client, handle) for handle in ("ada", "bea", "cara")}
+        barrier = threading.Barrier(len(players))
+        replies: list[httpx.Response] = []
+
+        def start(player: Account) -> None:
+            barrier.wait()
+            replies.append(player.post("/api/v1/practice-games", {}))
+
+        threads = [threading.Thread(target=start, args=(player,)) for player in players.values()]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        assert sorted(reply.status_code for reply in replies) == [201, 429, 429]
+        for reply in replies:
+            if reply.status_code == 429:
+                assert reply.json()["code"] == "games_busy"
+                assert reply.headers["retry-after"] == "30"
+        assert len(engine.created) == 1
+        assert hub.running() == 1 and hub.starting == 0
+
+        # A creation that fails gives its slot back.
+        won = next(reply for reply in replies if reply.status_code == 201).json()
+        winner = players.pop(won["seats"][0]["handle"])
+        assert winner.post(f"/api/v1/games/{won['id']}/close").json()["status"] == "finished"
+        other = next(iter(players.values()))
+        engine.cap = 0
+        refused = other.post("/api/v1/practice-games", {})
+        assert refused.status_code == 429 and hub.starting == 0
+        engine.cap = 8
+        assert other.post("/api/v1/practice-games", {}).status_code == 201
+        assert hub.starting == 0

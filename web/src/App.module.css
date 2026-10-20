@@ -486,6 +486,9 @@ h1 {
   font-size: 0.7rem;
   color: #d3bc8d;
 }
+.release li > span[data-available="true"] {
+  color: #84ac93;
+}
 .release li strong {
   font-size: 0.85rem;
 }

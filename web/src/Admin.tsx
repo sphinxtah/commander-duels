@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
   type RefObject,
@@ -55,22 +56,40 @@ function Users({ me }: { me: Me }) {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const latest = useRef(0);
+  // The message a failed load left, so a load that works can take it back.
+  const loadFailure = useRef("");
   const manage = me.permissions.includes("admin.users.manage");
   const roles = me.permissions.includes("admin.roles.manage");
   const administrators = me.permissions.includes("admin.roles.administrator");
 
   const load = useCallback(
     async (after?: string) => {
-      const { data, error } = await client.GET("/api/v1/admin/users", {
-        params: {
-          query: {
-            status: status || undefined,
-            q: search || undefined,
-            cursor: after,
+      // Only the newest request may change the list: an older answer (a previous filter, or
+      // the first of two clicks on "Show more") would mix or repeat pages.
+      const ticket = ++latest.current;
+      if (!after) setCursor(null);
+      const { data, error } = await client
+        .GET("/api/v1/admin/users", {
+          params: {
+            query: {
+              status: status || undefined,
+              q: search || undefined,
+              cursor: after,
+            },
           },
-        },
-      });
-      if (!data) return setMessage(describe(error));
+        })
+        .catch(() => ({ data: undefined, error: undefined }));
+      if (ticket !== latest.current) return;
+      if (!data) {
+        loadFailure.current = describe(error);
+        return setMessage(loadFailure.current);
+      }
+      // Take back an earlier failure to load, but keep an action's own message.
+      const failed = loadFailure.current;
+      loadFailure.current = "";
+      if (failed) setMessage((current) => (current === failed ? "" : current));
       setUsers((current) => (after ? [...current, ...data.items] : data.items));
       setCursor(data.next_cursor);
     },
@@ -78,7 +97,7 @@ function Users({ me }: { me: Me }) {
   );
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refresh]);
 
   function replace(updated: AdminUser) {
     setUsers((current) =>
@@ -131,6 +150,8 @@ function Users({ me }: { me: Me }) {
   function find(event: FormEvent) {
     event.preventDefault();
     setSearch(query.trim());
+    // Searching again with the same words reloads the list (new sign-ups, changed states).
+    setRefresh((value) => value + 1);
   }
 
   return (
@@ -151,7 +172,10 @@ function Users({ me }: { me: Me }) {
           </select>
         </label>
         <label className={styles.field}>
-          <span>Search handle, name or email</span>
+          {/* Only administrators see addresses or find accounts by them. */}
+          <span>
+            {manage ? "Search handle, name or email" : "Search handle or name"}
+          </span>
           <input
             type="search"
             value={query}
@@ -181,7 +205,9 @@ function Users({ me }: { me: Me }) {
                     <strong>{user.handle ?? "No handle yet"}</strong>
                     <span>{user.display_name}</span>
                     <small>
-                      {user.email ?? "No email"} · joined{" "}
+                      {manage
+                        ? `${user.email ?? "No email"} · joined`
+                        : "Joined"}{" "}
                       {when(user.created_at)} · last seen{" "}
                       {when(user.last_seen_at)}
                     </small>
@@ -273,12 +299,22 @@ function Audit() {
   const [action, setAction] = useState("");
   const [filter, setFilter] = useState("");
   const [message, setMessage] = useState("");
+  const [refresh, setRefresh] = useState(0);
+  const latest = useRef(0);
   const load = useCallback(
     async (after?: string) => {
-      const { data, error } = await client.GET("/api/v1/admin/audit", {
-        params: { query: { action: filter || undefined, cursor: after } },
-      });
+      // As for accounts: only the newest request may change the log.
+      const ticket = ++latest.current;
+      if (!after) setCursor(null);
+      const { data, error } = await client
+        .GET("/api/v1/admin/audit", {
+          params: { query: { action: filter || undefined, cursor: after } },
+        })
+        .catch(() => ({ data: undefined, error: undefined }));
+      if (ticket !== latest.current) return;
       if (!data) return setMessage(describe(error));
+      // The message only ever reports a failed load, which this one answers.
+      setMessage("");
       setEntries((current) =>
         after ? [...current, ...data.items] : data.items,
       );
@@ -288,7 +324,7 @@ function Audit() {
   );
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refresh]);
   return (
     <section className={styles.panel} aria-labelledby="audit-title">
       <h2 id="audit-title">Audit log</h2>
@@ -298,6 +334,8 @@ function Audit() {
         onSubmit={(event) => {
           event.preventDefault();
           setFilter(action.trim());
+          // Filtering again by the same prefix reloads the newest events.
+          setRefresh((value) => value + 1);
         }}
       >
         <label className={styles.field}>
@@ -467,13 +505,18 @@ export function SysopSignIn({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
-    const { me, error } = await sysopSignIn(username, password);
-    setBusy(false);
-    setPassword("");
-    if (me) {
-      onSignedIn(me);
-      window.location.hash = "#admin";
-    } else setMessage(error ?? "");
+    setMessage("");
+    try {
+      // A network failure comes back as an error too, so the form always says why.
+      const { me, error } = await sysopSignIn(username, password);
+      setPassword("");
+      if (me) {
+        onSignedIn(me);
+        window.location.hash = "#admin";
+      } else setMessage(error ?? "");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <>

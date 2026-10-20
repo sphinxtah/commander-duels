@@ -64,6 +64,9 @@ final class Tables {
 
     static HumanGame start(HumanGameRequest request, HumanGame.Hooks hooks) {
         var game = new HumanGame(UUID.randomUUID().toString(), request, SeatChecks.DECKS, finished -> {}, hooks);
+        if (hooks instanceof SeatChecks check) {
+            check.game = game;
+        }
         game.start();
         return game;
     }

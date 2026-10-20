@@ -374,9 +374,6 @@ button.life[data-selected] {
 .screen[data-opponents="3"] .opponent .cardSlot {
   --card-w: calc(clamp(56px, 4.9vw, 100px) * 0.7);
 }
-.cardSlot[data-tapped] {
-  margin-inline: calc(var(--card-w) * 0.2);
-}
 .card {
   display: block;
   width: 100%;
@@ -386,11 +383,30 @@ button.life[data-selected] {
   border-radius: calc(var(--card-w) * 0.055);
   background: none;
   position: relative;
-  transition: transform 0.18s ease;
   box-shadow: 0 2px 6px #0008;
 }
+/* A tapped permanent turns sideways. Its slot and button take the turned card's footprint (88 wide,
+   63 high), so the card never spills over its neighbours or the strip beneath it; the upright
+   face is centred in that footprint and turned. */
+.cardSlot[data-tapped] {
+  width: calc(var(--card-w) * 88 / 63);
+}
 .cardSlot[data-tapped] .card {
-  transform: rotate(90deg) scale(0.86);
+  aspect-ratio: 88 / 63;
+}
+.cardSlot .face,
+.cardSlot .cardBack {
+  transition: rotate 0.18s ease;
+}
+.cardSlot[data-tapped] .face,
+.cardSlot[data-tapped] .cardBack {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: var(--card-w);
+  height: calc(var(--card-w) * 88 / 63);
+  translate: -50% -50%;
+  rotate: 90deg;
 }
 .card:hover {
   box-shadow:
@@ -706,6 +722,10 @@ button.life[data-selected] {
 }
 .prompt h2 {
   justify-content: space-between;
+}
+/* Focus rests on the heading while an answer is sent or the table waits, as on a page's h1. */
+.prompt h2:focus {
+  outline: none;
 }
 .promptMessage {
   font-size: 0.95rem;

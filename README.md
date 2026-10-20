@@ -1,10 +1,10 @@
 # Commander Duels
 
-**v0.1.0: the testing interface and the live site.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
+**v0.1.1: fixes from going live.** A runnable foundation for the Commander Duels development scope: React/TypeScript interface, Python/FastAPI application, PostgreSQL migrations, a durable worker, and a Java 21 engine service built on XMage from a pinned commit.
 
 The engine loads XMage's card database and plays complete games: Legacy between two seats, and Commander at two, three or four seats, with any mix of human seats and XMage computer players. Human seats run through XMage's own human player: every choice becomes a typed prompt, stale answers are refused, and each seat sees only its own authorized view, including commander tax and commander damage. Players sign in with Google; the account keeps a handle, an avatar and its accessibility preferences. Administrators approve accounts, assign roles and read an append-only audit log. SysOp, the local root account, signs in with a password only from the operator's network.
 
-A signed-in, approved player starts a practice game against bots on the Play page and plays it to the end in the browser, by mouse or by keyboard: Legacy against one bot, or Commander at a table of up to four ([the game screen](docs/game-screen.md)). Cards show their printed images, which the API fetches from Scryfall once and serves itself. The API holds the engine's seat tokens, one tab at a time controls the seat, and resent commands run once. SysOp also inspects every hand and library, observes any game and plays deck lists of any card the engine implements. The site runs live at https://duels.thesphinx.co ([the live site](docs/deployment.md)). The application shows unavailable features and their milestones. The source scope remains the full product backlog.
+A signed-in, approved player starts a practice game against bots on the Play page and plays it to the end in the browser, by mouse or by keyboard: Legacy against one bot, or Commander at a table of up to four ([the game screen](docs/game-screen.md)). Cards show their printed images, which the API fetches from Scryfall once and serves itself. The API holds the engine's seat tokens, one tab at a time controls the seat, and resent commands run once. SysOp also inspects every hand and library, observes any game and plays deck lists of any card the engine implements. The site runs live at https://duels.thesphinx.co ([the live site](docs/deployment.md)). v0.1.1 fixes what going live and a bug and security sweep found ([release notes](docs/releases/0.1.1.md)). The application shows unavailable features and their milestones. The source scope remains the full product backlog.
 
 ## Start with Docker
 
@@ -123,7 +123,7 @@ Add `--format commander --bots 3` for a four-seat Commander game, `--deck-list F
 
 ### Deploying
 
-CI publishes the images to GitHub's container registry. `deploy/push.sh <tag>` deploys one to the live VM over SSH: it backs up the database, migrates, restarts and checks the site. The one-time setup of the VM and the TSH proxy, backups and the live checks are in [the live site](docs/deployment.md).
+CI publishes the images to GitHub's container registry. `deploy/push.sh <tag>` deploys one to the live VM over SSH: it backs up the database, migrates before replacing anything, restarts and checks the site. If the new tag does not start or is not ready, the previous one comes back when the database still allows it. On the VM, `restore.sh` restores a backup into an emptied database. The one-time setup of the VM and the TSH proxy, backups, restores, rolling back and the live checks are in [the live site](docs/deployment.md).
 
 ## Verify changes
 
@@ -146,9 +146,10 @@ pnpm --dir web exec playwright install chromium
 # The SysOp journey runs when CD_E2E_SYSOP_PASSWORD holds SysOp's password in that database.
 pnpm test:e2e
 docker compose config --quiet
+docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 --severity=warning deploy/*.sh
 ```
 
-Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also builds the engine image (Maven and JUnit), smoke-tests it in Compose with a bot match, a schema-checked Legacy human-seat game and a schema-checked four-seat Commander game, plays a Legacy and a Commander practice game through the API as SysOp, plays practice games in Chromium through the game screen (`web/e2e/game.spec.ts`, with `CD_E2E_GAMES=1`), runs migration checks against PostgreSQL and browser journeys, and builds the other containers. On pushes to `main` and version tags it publishes the images.
+Commit regenerated `contracts/openapi.json` and `web/src/generated/api.d.ts` together. The browser uses `openapi-fetch` against the generated types. API tests detect schema drift. CI also builds the engine image (Maven and JUnit), smoke-tests it in Compose with a bot match, a schema-checked Legacy human-seat game and a schema-checked four-seat Commander game, plays a Legacy and a Commander practice game through the API as SysOp, plays practice games in Chromium through the game screen (`web/e2e/game.spec.ts`, with `CD_E2E_GAMES=1`), runs migration checks against PostgreSQL and browser journeys, checks the deploy scripts with ShellCheck, and builds the other containers. On pushes to `main` and version tags it publishes the images.
 
 To run browser tests against the built Compose app, set `CD_BROWSER_URL=http://127.0.0.1:8080` before `pnpm test:e2e`. Without this override, the tests start the API on port 8000 and Vite on port 5173.
 
@@ -172,7 +173,7 @@ Each development thread is one version, and `VERSION` is the only file that hold
 | `contracts` | Generated public OpenAPI, the internal command envelope, the seat-view contract and SysOp's inspection contract |
 | `content` | Constrained draft scenario schema and example |
 | `tests` | API, migration, contract and job lifecycle regressions |
-| `deploy` | The live site: production Compose file, VM bootstrap, deploy and backup scripts, the TSH proxy's nginx site |
+| `deploy` | The live site: production Compose file, VM bootstrap, deploy, backup and restore scripts, the TSH proxy's nginx site |
 | `docs` | Architecture, scope ledger, reference inventory and release evidence |
 
-See [architecture](docs/architecture.md), [identity](docs/identity.md), [games through the API](docs/games.md), [the game screen](docs/game-screen.md), [the live site](docs/deployment.md), [remaining work](docs/backlog.md), [the v0.1.0 plan](docs/plans/0.1.0.md), [the v0.1.1 plan](docs/plans/0.1.1.md), [Two-Headed Giant feasibility](docs/engine/two-headed-giant.md), and release notes for [0.1.0](docs/releases/0.1.0.md), [0.0.6](docs/releases/0.0.6.md), [0.0.5](docs/releases/0.0.5.md), [0.0.4](docs/releases/0.0.4.md), [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md).
+See [architecture](docs/architecture.md), [identity](docs/identity.md), [games through the API](docs/games.md), [the game screen](docs/game-screen.md), [the live site](docs/deployment.md), [remaining work](docs/backlog.md), [the v0.1.0 plan](docs/plans/0.1.0.md), [the v0.1.1 plan](docs/plans/0.1.1.md), [Two-Headed Giant feasibility](docs/engine/two-headed-giant.md), and release notes for [0.1.1](docs/releases/0.1.1.md), [0.1.0](docs/releases/0.1.0.md), [0.0.6](docs/releases/0.0.6.md), [0.0.5](docs/releases/0.0.5.md), [0.0.4](docs/releases/0.0.4.md), [0.0.3](docs/releases/0.0.3.md), [0.0.2](docs/releases/0.0.2.md) and [0.0.1](docs/releases/0.0.1.md).

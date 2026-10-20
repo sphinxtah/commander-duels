@@ -10,12 +10,14 @@ or replayed token cannot open a session and a cross-site page cannot sign a visi
 import hashlib
 import re
 import secrets
-from datetime import timedelta
-from typing import Annotated
+import threading
+from datetime import datetime, timedelta
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
-from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.google import ISSUER, GoogleVerifier, InvalidToken, ProviderUnavailable
@@ -57,8 +59,17 @@ from api.schemas import (
 
 router = APIRouter(prefix="/api/v1")
 CHALLENGE_LIFETIME = timedelta(minutes=10)
+# Refused Google sign-ins one address may leave in the audit trail per window. Counted per exact
+# address, which suits the IPv4-only site; if it ever serves IPv6, count by /64, or one client
+# could rotate through its own prefix.
+GOOGLE_FAILURE_LIMIT = 10
+GOOGLE_FAILURE_WINDOW = timedelta(minutes=15)
 SYSOP_FAILURE_LIMIT = 5
 SYSOP_FAILURE_WINDOW = timedelta(minutes=15)
+# SysOp's password checks run one at a time, so a burst of guesses cannot all pass the lockout
+# check before the first failure is recorded. The API is one process with one SysOp; this also
+# bounds the 64 MiB Argon2 checks running at once.
+SYSOP_ATTEMPTS = threading.Lock()
 HANDLE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{2,19}$")
 RESERVED_HANDLES = {
     "admin",
@@ -75,6 +86,9 @@ RESERVED_HANDLES = {
     "null",
     "official",
     "root",
+    "site-administrator",
+    "site_administrator",
+    "siteadministrator",
     "spectator",
     "staff",
     "support",
@@ -84,6 +98,11 @@ RESERVED_HANDLES = {
 }
 ERRORS: dict[int | str, dict[str, object]] = {
     status: {"model": Error} for status in (400, 401, 403, 404, 409, 429, 503)
+}
+# With 422 for input the contract does not allow. FastAPI would describe it with Python's phrase
+# for the status, which Python 3.13 renamed; naming it keeps the contract the same on any Python.
+INPUT_ERRORS: dict[int | str, dict[str, object]] = ERRORS | {
+    422: {"model": Error, "description": "Unprocessable Entity"}
 }
 
 
@@ -119,10 +138,39 @@ def google_start(
     return GoogleChallenge(nonce=nonce, client_id=verifier.client_id)
 
 
+def invalid_sign_in() -> ApiError:
+    return ApiError(401, "invalid_sign_in", "Google sign-in could not be verified. Try again.")
+
+
+def recent_google_failures(db: Session, address: str | None) -> int:
+    """Refused Google sign-ins from this address in the window."""
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.action == "auth.google_login_failed",
+                AuditEvent.source_address == address,
+                AuditEvent.occurred_at > utcnow() - GOOGLE_FAILURE_WINDOW,
+            )
+        )
+        or 0
+    )
+
+
 def refuse_google(db: Session, request: Request, reason: str) -> ApiError:
+    """A refused sign-in, audited unless its address has failed too often lately: past the limit
+    it is refused unrecorded, so nobody can fill the append-only trail."""
+    if recent_google_failures(db, source_of(request)) >= GOOGLE_FAILURE_LIMIT:
+        db.commit()  # the attempt still spends its challenge
+        return ApiError(
+            429,
+            "too_many_attempts",
+            "Too many failed sign-ins from this address. Wait 15 minutes, then try again.",
+        )
     audit(db, request, "auth.google_login_failed", details={"reason": reason})
     db.commit()
-    return ApiError(401, "invalid_sign_in", "Google sign-in could not be verified. Try again.")
+    return invalid_sign_in()
 
 
 @router.post("/auth/google", response_model=Me, responses=ERRORS)
@@ -132,19 +180,20 @@ def google_sign_in(
     secret = request.cookies.get(GOOGLE_COOKIE)
     if not secret:
         # Not audited: without a challenge this is not a sign-in attempt from our page.
-        raise ApiError(401, "invalid_sign_in", "Google sign-in could not be verified. Try again.")
+        raise invalid_sign_in()
+    claims: dict[str, Any] | None
     try:
         claims = verifier.verify(body.credential)
     except ProviderUnavailable as error:
+        # The challenge is left unspent, for a retry.
         raise ApiError(
             503, "provider_unavailable", "Google is not responding. Try again shortly."
         ) from error
     except InvalidToken:
-        raise refuse_google(db, request, "invalid_token") from None
+        claims = None
     nonce = hashlib.sha256(secret.encode()).hexdigest()
     now = utcnow()
-    if claims.get("nonce") != nonce:
-        raise refuse_google(db, request, "nonce_mismatch")
+    # Every attempt spends its challenge, so each audited failure costs the client a new one.
     consumed = db.execute(
         update(LoginChallenge)
         .where(
@@ -154,8 +203,20 @@ def google_sign_in(
         )
         .values(consumed_at=now)
     ).rowcount  # type: ignore[attr-defined]
+    genuine = claims is not None and claims.get("nonce") == nonce
     if consumed != 1:
+        known = db.scalar(select(LoginChallenge.id).where(LoginChallenge.nonce == nonce))
+        if known is None or not genuine:
+            # Not audited either: a made-up cookie is no challenge, and a spent one buys no
+            # further entries, so a bot cannot fill the trail.
+            raise invalid_sign_in()
+        # A token signed for this very challenge, after it was spent or expired: a replay, or a
+        # sign-in left open too long.
         raise refuse_google(db, request, "challenge_used_or_expired")
+    if claims is None:
+        raise refuse_google(db, request, "invalid_token")
+    if not genuine:
+        raise refuse_google(db, request, "nonce_mismatch")
 
     subject = str(claims["sub"])
     identity = db.scalar(
@@ -166,16 +227,7 @@ def google_sign_in(
     email = claims.get("email") if isinstance(claims.get("email"), str) else None
     created = identity is None
     if identity is None:
-        policy = settings_of(request).signup_policy
-        user = User(
-            display_name=(str(claims.get("name") or claims.get("given_name") or "Player"))[:64],
-            status="active" if policy == "open" else "pending",
-            created_at=now,
-        )
-        db.add(user)
-        db.flush()
-        identity = ExternalIdentity(user_id=user.id, issuer=ISSUER, subject=subject, created_at=now)
-        db.add(identity)
+        user, identity = new_account(db, request, subject, claims, now)
     else:
         user = db.get_one(User, identity.user_id)
     # The subject is the identity; a changed email address only updates the private record.
@@ -209,6 +261,31 @@ def google_sign_in(
     response.delete_cookie(GOOGLE_COOKIE, path="/api/v1/auth/google")
     roles = roles_of(db, user)
     return me_of(db, Principal(user, session, roles, permissions_for(user, roles)))
+
+
+def new_account(
+    db: Session, request: Request, subject: str, claims: dict[str, Any], now: datetime
+) -> tuple[User, ExternalIdentity]:
+    """A first sign-in's account. Two first sign-ins of one Google account can race; the one that
+    finds the identity taken when it writes is asked to try again."""
+    policy = settings_of(request).signup_policy
+    user = User(
+        display_name=(str(claims.get("name") or claims.get("given_name") or "Player"))[:64],
+        status="active" if policy == "open" else "pending",
+        created_at=now,
+    )
+    db.add(user)
+    db.flush()
+    identity = ExternalIdentity(user_id=user.id, issuer=ISSUER, subject=subject, created_at=now)
+    db.add(identity)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise ApiError(
+            409, "sign_in_conflict", "This account is signing in elsewhere. Try again."
+        ) from None
+    return user, identity
 
 
 def end_presented_session(db: Session, request: Request, reason: str) -> None:
@@ -269,7 +346,7 @@ def normalized_handle(value: str) -> str:
     return normalized
 
 
-@router.patch("/me", response_model=Me, responses=ERRORS | {422: {"model": Error}})
+@router.patch("/me", response_model=Me, responses=INPUT_ERRORS)
 def update_profile(body: ProfileUpdate, request: Request, principal: SignedIn, db: Db) -> Me:
     user = principal.user
     if user.status == "denied":
@@ -308,7 +385,14 @@ def update_profile(body: ProfileUpdate, request: Request, principal: SignedIn, d
             target_user_id=user.id,
             details={"fields": changed},
         )
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Another account claimed the handle between the check above and this write.
+            db.rollback()
+            if "handle" not in changed:
+                raise
+            raise ApiError(409, "handle_taken", "That handle is already taken.") from None
     return me_of(db, principal)
 
 
@@ -383,11 +467,21 @@ def sysop_entrance() -> Response:
 
 
 def recent_sysop_failures(db: Session, address: str | None) -> int:
-    """Failed sign-ins from this address in the window, since its last success."""
+    """Failed sign-ins from this address in the window, since its last success there (a sign-in
+    or a password change) or the last password set from the server console, which lifts every
+    address's lockout."""
     now = utcnow()
     last_success = (
         select(func.max(AuditEvent.occurred_at))
-        .where(AuditEvent.action == "auth.sysop_login", AuditEvent.source_address == address)
+        .where(
+            or_(
+                and_(
+                    AuditEvent.action.in_(("auth.sysop_login", "account.sysop_password_changed")),
+                    AuditEvent.source_address == address,
+                ),
+                AuditEvent.action == "account.sysop_password_set",
+            )
+        )
         .scalar_subquery()
     )
     return (
@@ -405,6 +499,17 @@ def recent_sysop_failures(db: Session, address: str | None) -> int:
     )
 
 
+def refuse_locked_out(db: Session, request: Request) -> None:
+    """Call holding SYSOP_ATTEMPTS, and record a failure before releasing it."""
+    if recent_sysop_failures(db, source_of(request)) >= SYSOP_FAILURE_LIMIT:
+        raise ApiError(
+            429,
+            "too_many_attempts",
+            "Too many failed sign-in attempts from this address. Wait 15 minutes, or set a new "
+            "password from the server console.",
+        )
+
+
 @router.post(
     "/sysop/login",
     response_model=Me,
@@ -413,26 +518,20 @@ def recent_sysop_failures(db: Session, address: str | None) -> int:
     include_in_schema=False,
 )
 def sysop_login(body: SysopLogin, request: Request, response: Response, db: Db) -> Me:
-    address = source_of(request)
-    if recent_sysop_failures(db, address) >= SYSOP_FAILURE_LIMIT:
-        raise ApiError(
-            429,
-            "too_many_attempts",
-            "Too many failed sign-in attempts from this address. Wait 15 minutes, or set a new "
-            "password from the server console.",
-        )
-    sysop = db.scalar(select(User).where(User.kind == "sysop"))
-    password_ok = verify_password(sysop.password_hash if sysop else None, body.password)
-    if not (sysop and password_ok and body.username.strip().casefold() == "sysop"):
-        audit(db, request, "auth.sysop_login_failed")
+    with SYSOP_ATTEMPTS:
+        refuse_locked_out(db, request)
+        sysop = db.scalar(select(User).where(User.kind == "sysop"))
+        password_ok = verify_password(sysop.password_hash if sysop else None, body.password)
+        if not (sysop and password_ok and body.username.strip().casefold() == "sysop"):
+            audit(db, request, "auth.sysop_login_failed")
+            db.commit()
+            raise ApiError(401, "invalid_credentials", "Unable to sign in with those credentials.")
+        if sysop.password_hash and needs_rehash(sysop.password_hash):
+            sysop.password_hash = hash_password(body.password)
+        end_presented_session(db, request, "replaced")
+        session, token = issue_session(db, request, sysop, "sysop")
+        audit(db, request, "auth.sysop_login", actor_id=sysop.id, target_user_id=sysop.id)
         db.commit()
-        raise ApiError(401, "invalid_credentials", "Unable to sign in with those credentials.")
-    if sysop.password_hash and needs_rehash(sysop.password_hash):
-        sysop.password_hash = hash_password(body.password)
-    end_presented_session(db, request, "replaced")
-    session, token = issue_session(db, request, sysop, "sysop")
-    audit(db, request, "auth.sysop_login", actor_id=sysop.id, target_user_id=sysop.id)
-    db.commit()
     set_session_cookie(response, request, token, session)
     return me_of(db, Principal(sysop, session, ["sysop"], permissions_for(sysop, ["sysop"])))
 
@@ -450,15 +549,21 @@ def sysop_password(
     user = principal.user
     if user.kind != "sysop":
         raise not_found()
-    if not verify_password(user.password_hash, body.current_password):
-        audit(db, request, "auth.sysop_login_failed", details={"step": "password_change"})
+    with SYSOP_ATTEMPTS:
+        # The current password is a guess like any other, under the same lockout: a session left
+        # open is no way to try passwords without limit.
+        refuse_locked_out(db, request)
+        if not verify_password(user.password_hash, body.current_password):
+            audit(db, request, "auth.sysop_login_failed", details={"step": "password_change"})
+            db.commit()
+            raise ApiError(401, "invalid_credentials", "The current password is not correct.")
+        user.password_hash = hash_password(body.new_password)
+        user.updated_at = utcnow()
+        revoke_sessions(db, user.id, "password_changed")
+        session, token = issue_session(db, request, user, "sysop")
+        audit(
+            db, request, "account.sysop_password_changed", actor_id=user.id, target_user_id=user.id
+        )
         db.commit()
-        raise ApiError(401, "invalid_credentials", "The current password is not correct.")
-    user.password_hash = hash_password(body.new_password)
-    user.updated_at = utcnow()
-    revoke_sessions(db, user.id, "password_changed")
-    session, token = issue_session(db, request, user, "sysop")
-    audit(db, request, "account.sysop_password_changed", actor_id=user.id, target_user_id=user.id)
-    db.commit()
     set_session_cookie(response, request, token, session)
     return me_of(db, Principal(user, session, ["sysop"], permissions_for(user, ["sysop"])))

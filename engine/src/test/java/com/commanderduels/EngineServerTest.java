@@ -127,7 +127,7 @@ class EngineServerTest {
         assertEquals("ready", ready.get("status").getAsString());
         assertEquals(120, ready.getAsJsonObject("cards").get("printings").getAsLong());
         assertEquals(100, ready.getAsJsonObject("cards").get("distinct_names").getAsLong());
-        assertFalse(ready.get("gameplay_available").getAsBoolean());
+        assertFalse(ready.get("gameplay_available").getAsBoolean(), "no service games, so none for players");
     }
 
     @Test
@@ -144,6 +144,25 @@ class EngineServerTest {
         var match = send(post("/v1/bot_match", "{}"));
         assertEquals(503, match.statusCode());
         assertEquals("engine_failed", json(match).get("code").getAsString());
+    }
+
+    /** Players' games need the card database, so a service engine offers gameplay only once ready. */
+    @Test
+    void gameplayWaitsForTheCardDatabase() throws Exception {
+        String token = "service-token-for-tests-0123456789abcdef";
+        var engine = new Engine(PIN, false, () -> CARDS, EngineServerTest::echo,
+            new HumanGames(SeatChecks.DECKS, 1), false, token);
+        assertTrue(EngineServer.health(engine).serviceGamesEnabled());
+        assertFalse(EngineServer.health(engine).gameplayAvailable(), "the card database is still loading");
+        engine.startLoading().join();
+        assertTrue(EngineServer.health(engine).gameplayAvailable());
+
+        var failed = new Engine(PIN, false, () -> {
+            throw new IllegalStateException("no database");
+        }, EngineServerTest::echo, new HumanGames(SeatChecks.DECKS, 1), false, token);
+        failed.startLoading().join();
+        assertEquals(Engine.Status.FAILED, failed.status());
+        assertFalse(EngineServer.health(failed).gameplayAvailable(), "no game can start without cards");
     }
 
     @Test
@@ -212,6 +231,27 @@ class EngineServerTest {
         var get = get("/v1/bot_match");
         assertEquals(405, get.statusCode());
         assertEquals("POST", get.headers().firstValue("Allow").orElse(""));
+        // Numbers past Gson's or BigDecimal's limits are refused like any other bad number.
+        for (String body : new String[]{"{\"seed\":1e10000}", "{\"turn_cap\":1e99999999999}"}) {
+            var response = send(post("/v1/bot_match", body));
+            assertEquals(400, response.statusCode(), body);
+            assertEquals("invalid_request", json(response).get("code").getAsString());
+        }
+    }
+
+    /** An unexpected exception still gets a JSON reply, without its details, not a dropped connection. */
+    @Test
+    void unexpectedFailuresAnswer500() throws Exception {
+        startReady(request -> {
+            throw new IllegalStateException("internal detail 3f2c9a4e");
+        });
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var response = send(post("/v1/bot_match", "{\"seed\":1}"));
+            assertEquals(500, response.statusCode(), response.body());
+            assertEquals("internal_error", json(response).get("code").getAsString());
+            assertFalse(response.body().contains("3f2c9a4e"), response.body());
+        }
+        assertEquals(200, get("/health").statusCode(), "the engine keeps serving");
     }
 
     @Test

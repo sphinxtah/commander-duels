@@ -26,6 +26,8 @@ jobs:
         with: {version: '11.25.0'}
       - run: pip install -r requirements.lock && pip install --no-deps -e .
       - run: ruff check api catalog tests scripts && ruff format --check api catalog tests scripts && mypy && pytest
+      # The live site's deploy kit: bootstrap, push, deploy, backup and restore.
+      - run: docker run --rm -v "$PWD:/mnt:ro" -w /mnt koalaman/shellcheck:v0.10.0 --severity=warning deploy/*.sh
       - run: alembic upgrade head && alembic check
       - run: pnpm install --frozen-lockfile
       - run: python scripts/export_contracts.py && pnpm contracts && git diff --exit-code -- contracts/openapi.json web/src/generated/api.d.ts
@@ -38,6 +40,16 @@ jobs:
           echo "CD_E2E_SYSOP_PASSWORD=$password" >> "$GITHUB_ENV"
           printf '%s\n' "$password" | python -m api.cli sysop-password --stdin
       - run: pnpm test:e2e
+      # A failed journey's evidence: its screenshot, trace and error context. The attempt keeps the
+      # name unique when a job is re-run.
+      - name: Keep the browser evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-journeys-${{ github.run_attempt }}
+          path: web/test-results
+          if-no-files-found: ignore
+          retention-days: 14
       # The engine image is built (with its XMage cache) by the engine job.
       - run: docker compose config --quiet && docker compose build migrate api worker web
   engine:
@@ -115,6 +127,15 @@ jobs:
               && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
               && pnpm --dir web exec playwright test e2e/game.spec.ts --reporter=line"
           docker compose down
+      # As in verify; a failed game's error also lists the test player's last answers.
+      - name: Keep the browser games' evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-games-${{ github.run_attempt }}
+          path: web/test-results
+          if-no-files-found: ignore
+          retention-days: 14
   # Images for the live site, once both jobs pass: every push to main as sha-<commit> and main,
   # every version tag as its version (v0.1.0 -> 0.1.0). deploy/push.sh deploys one by its tag.
   publish:

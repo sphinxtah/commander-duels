@@ -38,8 +38,17 @@ class BotMatchRequestTest {
     @ParameterizedTest
     @ValueSource(strings = {
         "not json", "[]", "7", "{\"unknown\":1}", "{\"turn_cap\":1.5}", "{\"seed\":\"7\"}",
-        "{\"seed\":9223372036854775808}", "{\"skill\":null}", "{\"include_log\":1}", "{\"turn_cap\":[1]}"})
+        "{\"seed\":9223372036854775808}", "{\"skill\":null}", "{\"include_log\":1}", "{\"turn_cap\":[1]}",
+        "{\"seed\":1e10000}", "{\"turn_cap\":1e10000}", "{\"skill\":1e-10000}", "{\"seed\":1e99999999999}",
+        "{\"time_budget_seconds\":-1e99999999999}"})
     void invalidBodiesAreRejected(String body) {
+        assertThrows(JsonRequest.Invalid.class, () -> BotMatchRequest.parse(body, () -> 0L));
+    }
+
+    /** Gson refuses a number of more than 10,000 characters; that is a refusal, not a crash. */
+    @Test
+    void overlongNumbersAreRejected() {
+        String body = "{\"seed\":1" + "0".repeat(10_001) + "}";
         assertThrows(JsonRequest.Invalid.class, () -> BotMatchRequest.parse(body, () -> 0L));
     }
 }

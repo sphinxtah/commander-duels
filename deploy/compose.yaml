@@ -21,7 +21,7 @@ x-api: &api
     CD_SYSOP_NETWORKS: ${CD_SYSOP_NETWORKS:?}
     CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:?}
     CD_GAMES_PER_ACCOUNT: ${CD_GAMES_PER_ACCOUNT:-1}
-    CD_GAMES_MAX: ${CD_GAMES_MAX:-2}
+    CD_GAMES_MAX: ${CD_GAMES_MAX:-6}
     CD_CARD_IMAGE_DIR: /var/lib/commander-duels/card-images
 services:
   db:
@@ -70,8 +70,12 @@ services:
       # Service games only; the development routes stay off on the live site.
       CD_ENGINE_DEV_ENDPOINTS: "false"
       CD_ENGINE_SERVICE_TOKEN: ${CD_ENGINE_SERVICE_TOKEN:?}
-      JDK_JAVA_OPTIONS: "-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
-    mem_limit: 1536m
+      # One limit for both: the engine has a slot for every game the API may run (at most 8).
+      CD_ENGINE_MAX_GAMES: ${CD_GAMES_MAX:-6}
+      # One game peaks near 200 MB of live heap (docs/engine/xmage-spike.md); 3 GB holds eight with
+      # room for G1, and the limit adds metaspace, threads and the card database's page cache.
+      JDK_JAVA_OPTIONS: "-Xms512m -Xmx3g -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
+    mem_limit: 4g
     healthcheck:
       test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8090/ready"]
       interval: 10s

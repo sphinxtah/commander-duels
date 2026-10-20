@@ -21,8 +21,10 @@ import json
 import logging
 import secrets
 from collections import defaultdict
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
+from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import datetime
 from functools import partial
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID
@@ -36,14 +38,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api.auth import ERRORS
+from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.decklists import parse_deck_list
 from api.identity import (
+    SESSION_COOKIE,
     ApiError,
     Db,
     Principal,
     audit,
+    hash_token,
     keep_alive,
     live_session,
     not_found,
@@ -53,7 +57,7 @@ from api.identity import (
     settings_of,
     utcnow,
 )
-from api.models import Game, GameSeat, User
+from api.models import Game, GameSeat, User, UserSession
 from api.schemas import (
     CardNames,
     Error,
@@ -70,7 +74,7 @@ from api.schemas import (
 from api.schemas import GameSeat as SeatSummary
 
 log = logging.getLogger("api.games")
-router = APIRouter(prefix="/api/v1", responses=ERRORS | {422: {"model": Error}})
+router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Player = Annotated[Principal, Depends(require_permission("games.play"))]
 Inspector = Annotated[Principal, Depends(require_permission("games.view_concealed"))]
 AnyCard = Annotated[Principal, Depends(require_permission("cards.any"))]
@@ -91,9 +95,17 @@ SERVICE_HEADER = "X-Service-Token"
 LONG_POLL_MS = 25_000
 INSPECTION_WAIT_MS = 3_000
 RETAIN_FINISHED_SECONDS = 600.0
+# How long closing a game waits for its result to be recorded, so the reply shows it.
+CLOSE_WAIT_SECONDS = 5.0
+# Database writes that must land (a game's end, the restart sweep) retry, doubling the wait.
+RETRY_SECONDS = 1.0
+RETRY_MAX_SECONDS = 30.0
 HELLO_SECONDS = 10.0
 SESSION_CHECK_SECONDS = 60.0
 QUEUE_LIMIT = 512
+# Every connection costs a copy of each snapshot. SysOp's are not counted.
+CONNECTIONS_PER_ACCOUNT = 4
+CONNECTIONS_PER_GAME = 8
 RESULT_FIELDS = ("kind", "winner_seat", "draw", "turns", "conceded_seats")
 
 # WebSocket close codes: the HTTP status they stand for, in the private-use range.
@@ -102,6 +114,7 @@ CLOSE_FORBIDDEN = 4403
 CLOSE_NOT_FOUND = 4404
 CLOSE_TOO_SLOW = 4408
 CLOSE_GONE = 4410
+CLOSE_TOO_MANY = 4429
 CLOSE_BAD_MESSAGE = 4400
 
 
@@ -213,6 +226,8 @@ class Connection:
     session_id: UUID
     owner: bool
     inspect: bool
+    # Whether it counts toward the connection limits: SysOp's do not.
+    counted: bool = True
     queue: asyncio.Queue[dict[str, Any] | None] = field(
         default_factory=lambda: asyncio.Queue(QUEUE_LIMIT)
     )
@@ -229,11 +244,15 @@ class Connection:
             # The client is not reading; it resynchronizes by revision when it reconnects.
             self.close(CLOSE_TOO_SLOW)
 
-    def close(self, code: int) -> None:
+    def close(self, code: int, error: str | None = None) -> None:
+        """Ends the connection. An error code goes out before the close, as at the handshake, so
+        the client can tell a session to refresh from a sign-out."""
         if self.close_code is None:
             self.close_code = code
             while not self.queue.empty():
                 self.queue.get_nowait()
+            if error is not None:
+                self.queue.put_nowait({"type": "error", "code": error})
             self.queue.put_nowait(None)
             self.ended.set()
 
@@ -249,13 +268,34 @@ class LiveGame:
     connections: dict[str, Connection] = field(default_factory=dict)
     controller: str | None = None
     finished: bool = False
+    # Set once the database holds how the game ended.
+    recorded: asyncio.Event = field(default_factory=asyncio.Event)
+    # The follow task's latest snapshot, which carries only the log lines new since the one before.
     snapshot: dict[str, Any] | None = None
+    # The latest snapshot with a whole page of the log, for new connections and resyncs.
+    page: dict[str, Any] | None = None
+    paging: asyncio.Lock = field(default_factory=asyncio.Lock)
     inspecting: bool = False
     inspect_again: bool = False
 
     @property
     def path(self) -> str:
         return f"/games/{self.id}"
+
+
+def log_end(snapshot: dict[str, Any]) -> int:
+    return int(snapshot["log_from"]) + len(snapshot["log"])
+
+
+def covers(page: dict[str, Any] | None, latest: dict[str, Any] | None) -> bool:
+    """Whether a page is as new as the follow task's latest snapshot, log and result included."""
+    if page is None:
+        return False
+    return latest is None or (
+        page["revision"] >= latest["revision"]
+        and log_end(page) >= log_end(latest)
+        and (page.get("result") is not None or latest.get("result") is None)
+    )
 
 
 class GameHub:
@@ -268,6 +308,8 @@ class GameHub:
         self.games: dict[UUID, LiveGame] = {}
         self.locks: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
         self.tasks: set[asyncio.Task[None]] = set()
+        # Games being created in the engine: they hold a slot under CD_GAMES_MAX already.
+        self.starting = 0
 
     def require_engine(self) -> EngineClient:
         if self.engine is None:
@@ -287,12 +329,27 @@ class GameHub:
         return sum(not game.finished for game in self.games.values())
 
     async def start(self) -> None:
-        """Games left active by an earlier process cannot be played: their tokens are gone."""
+        """Games left active by an earlier process cannot be played: their tokens are gone. While
+        the database cannot be reached (it may still be starting), the check retries in the
+        background."""
+        started = utcnow()
         try:
             orphans = await run_in_threadpool(interrupt_active, self.database)
         except SQLAlchemyError:
             log.warning("Could not check for interrupted games; is the database migrated?")
+            self.spawn(self.sweep(started))
             return
+        await self.close_orphans(orphans)
+
+    async def sweep(self, before: datetime) -> None:
+        """The restart's check, retried. It spares the games this process started meanwhile."""
+        await asyncio.sleep(RETRY_SECONDS)
+        orphans = await retried(
+            partial(interrupt_active, self.database, before), "check for interrupted games"
+        )
+        await self.close_orphans(orphans)
+
+    async def close_orphans(self, orphans: list[UUID]) -> None:
         if orphans and self.engine is not None:
             for game_id in orphans:
                 try:
@@ -347,15 +404,17 @@ class GameHub:
 
     async def end(self, game: LiveGame, result: dict[str, Any] | None) -> None:
         """Records how the game ended (a missing game was interrupted), then keeps it readable
-        for a while before forgetting its token."""
+        for a while before forgetting its token. Until the end is recorded the game counts
+        against its owner's limit, so the write retries until it lands."""
         game.finished = True
         status = "finished" if result is not None else "interrupted"
-        try:
-            await run_in_threadpool(record_end, self.database, game.id, status, result)
-        except SQLAlchemyError:
-            log.exception("Could not record the end of game %s", game.id)
         if result is None:
             self.broadcast(game, {"type": "interrupted", "game_id": str(game.id)})
+        await retried(
+            partial(record_end, self.database, game.id, status, result),
+            f"record the end of game {game.id}",
+        )
+        game.recorded.set()
         await asyncio.sleep(RETAIN_FINISHED_SECONDS)
         for connection in list(game.connections.values()):
             connection.close(1000)
@@ -426,6 +485,15 @@ class GameHub:
         )
         return snapshot if status == 200 and isinstance(snapshot, dict) else None
 
+    async def page(self, game: LiveGame) -> dict[str, Any] | None:
+        """The seat snapshot for a new connection, a resync or a read over HTTP. The engine builds
+        one for each revision the follow task sees, and every later ask gets that copy, so opening
+        connections or asking to resync costs the engine nothing more."""
+        async with game.paging:
+            if not covers(game.page, game.snapshot):
+                game.page = await self.snapshot(game)
+            return game.page
+
     async def command(self, game: LiveGame, connection: Connection, raw: object) -> None:
         action_id = raw.get("action_id") if isinstance(raw, dict) else None
 
@@ -476,9 +544,24 @@ def hub_of(request: Request | WebSocket) -> GameHub:
 # Database work, run in the thread pool from the event loop.
 
 
-def interrupt_active(database: Engine) -> list[UUID]:
+async def retried[T](work: Callable[[], T], what: str) -> T:
+    """Database work that must land, run until it does: the database may be restarting."""
+    delay = RETRY_SECONDS
+    while True:
+        try:
+            return await run_in_threadpool(work)
+        except SQLAlchemyError:
+            log.warning("Could not %s; trying again in %.0f s", what, delay, exc_info=True)
+        await asyncio.sleep(delay)
+        delay = min(RETRY_MAX_SECONDS, delay * 2)
+
+
+def interrupt_active(database: Engine, before: datetime | None = None) -> list[UUID]:
     with Session(database) as db:
-        ids = list(db.scalars(select(Game.id).where(Game.status == "active")))
+        active = select(Game.id).where(Game.status == "active")
+        if before is not None:
+            active = active.where(Game.created_at < before)
+        ids = list(db.scalars(active))
         if ids:
             db.execute(
                 update(Game)
@@ -682,57 +765,67 @@ async def create_practice_game(
                     "game_limit",
                     "Finish or close your running game before starting another.",
                 )
-        if hub.running() >= hub.settings.games_max:
+        # Other accounts' requests do not wait for this lock, so the slot is taken before the
+        # first await: requests at once cannot all pass the check. Once registered, the game
+        # holds the slot itself.
+        if hub.running() + hub.starting >= hub.settings.games_max:
             raise ApiError(
                 429,
                 "games_busy",
                 "Every game slot is in use. Try again shortly.",
                 {"Retry-After": "30"},
             )
+        hub.starting += 1
         try:
-            status, created = await engine.request(
-                "POST",
-                "/games",
-                body={
-                    "format": fmt,
-                    "seats": seats,
-                    "skill": body.bot_skill,
-                    "turn_cap": body.turn_cap,
-                },
+            try:
+                status, created = await engine.request(
+                    "POST",
+                    "/games",
+                    body={
+                        "format": fmt,
+                        "seats": seats,
+                        "skill": body.bot_skill,
+                        "turn_cap": body.turn_cap,
+                    },
+                )
+            except EngineUnavailable as error:
+                raise unavailable() from error
+            if status == 400 and created.get("code") == "unknown_cards":
+                names = [str(name) for name in created.get("names", [])]
+                raise ApiError(
+                    422,
+                    "unknown_cards",
+                    "The engine has no card named " + ", ".join(names) + ".",
+                    names=names,
+                )
+            if status == 400:
+                raise ApiError(422, "invalid_table", str(created.get("message", "Invalid table.")))
+            if status == 429:
+                raise ApiError(
+                    429,
+                    "games_busy",
+                    "The engine is running every game it can.",
+                    {"Retry-After": "30"},
+                )
+            if status != 201:
+                raise unavailable()
+            try:
+                game = await run_in_threadpool(
+                    record_game, db, request, principal, created, body, seats
+                )
+            except SQLAlchemyError:
+                await engine.request("POST", f"/games/{created['game_id']}/close", body={})
+                raise
+            hub.register(
+                LiveGame(
+                    id=game.id,
+                    owner_id=user_id,
+                    seat=0,
+                    seat_token=created["seats"][0]["seat_token"],
+                )
             )
-        except EngineUnavailable as error:
-            raise unavailable() from error
-        if status == 400 and created.get("code") == "unknown_cards":
-            names = [str(name) for name in created.get("names", [])]
-            raise ApiError(
-                422,
-                "unknown_cards",
-                "The engine has no card named " + ", ".join(names) + ".",
-                names=names,
-            )
-        if status == 400:
-            raise ApiError(422, "invalid_table", str(created.get("message", "Invalid table.")))
-        if status == 429:
-            raise ApiError(
-                429, "games_busy", "The engine is running every game it can.", {"Retry-After": "30"}
-            )
-        if status != 201:
-            raise unavailable()
-        try:
-            game = await run_in_threadpool(
-                record_game, db, request, principal, created, body, seats
-            )
-        except SQLAlchemyError:
-            await engine.request("POST", f"/games/{created['game_id']}/close", body={})
-            raise
-        hub.register(
-            LiveGame(
-                id=game.id,
-                owner_id=user_id,
-                seat=0,
-                seat_token=created["seats"][0]["seat_token"],
-            )
-        )
+        finally:
+            hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal)
 
 
@@ -762,8 +855,10 @@ async def get_game(game_id: UUID, request: Request, principal: Player, db: Db) -
     live = hub.games.get(game_id)
     snapshot = None
     if live is not None:
+        # No pooled connection is held while the engine answers.
+        await run_in_threadpool(db.commit)
         try:
-            snapshot = await hub.snapshot(live)
+            snapshot = await hub.page(live)
         except EngineUnavailable as error:
             raise unavailable() from error
     summary = await run_in_threadpool(summary_of, db, game, principal)
@@ -779,10 +874,13 @@ def observed(
 
 @router.post("/games/{game_id}/close", response_model=GameSummary)
 async def close_game(game_id: UUID, request: Request, principal: Player, db: Db) -> GameSummary:
-    """Ends the game for every seat: its owner's choice, or SysOp's."""
+    """Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game
+    as it ended."""
     game, owner = await run_in_threadpool(visible_game, db, game_id, principal)
     hub = hub_of(request)
     live = hub.games.get(game_id)
+    # No pooled connection is held while the engine closes the game.
+    await run_in_threadpool(db.commit)
     if live is not None and not live.finished:
         try:
             await hub.require_engine().request("POST", f"{live.path}/close", body={})
@@ -790,6 +888,26 @@ async def close_game(game_id: UUID, request: Request, principal: Player, db: Db)
             raise unavailable() from error
         if not owner:
             await run_in_threadpool(observed, db, request, principal, game_id, "game.closed")
+    if live is not None:
+        # The follow task records the result once the engine's last snapshot reaches it.
+        with suppress(TimeoutError):
+            await asyncio.wait_for(live.recorded.wait(), CLOSE_WAIT_SECONDS)
+    elif game.status == "active":
+        # Nothing follows the game: an earlier process ran it, and no seat can play it now.
+        # The creator's lock keeps out a game being created, which is recorded before it is
+        # registered.
+        async with hub.locks[game.created_by]:
+            orphan = game_id not in hub.games
+            if orphan:
+                await run_in_threadpool(record_end, hub.database, game_id, "interrupted", None)
+                if not owner:
+                    await run_in_threadpool(
+                        observed, db, request, principal, game_id, "game.closed"
+                    )
+        if orphan:
+            # The engine may still run it, holding a slot, when the restart's check has not
+            # reached the database yet; once it does, that check no longer sees the game.
+            await hub.close_orphans([game_id])
     await run_in_threadpool(db.refresh, game)
     return await run_in_threadpool(summary_of, db, game, principal)
 
@@ -868,6 +986,48 @@ def connection_principal(
         return Principal(user, session, roles, permissions_for(user, roles))
 
 
+def session_ended(
+    database: Engine, websocket: WebSocket, session_id: UUID, *, active: bool = False
+) -> str | None:
+    """Why an open connection's session no longer stands, as the error code to close with, or
+    None while it stands. A session rotated by an HTTP request since the handshake is no sign-out:
+    the browser already holds its successor, so the page refreshes and reconnects."""
+    principal = connection_principal(database, websocket, active=active)
+    if not isinstance(principal, str):
+        # The socket's cookie never changes, so another session behind it is its successor
+        # (a rotated token stands for it for a moment; see live_session).
+        return None if principal.session.id == session_id else "session_refresh"
+    # Asked of the cookie's own session, not the connection's: a handshake during the rotation
+    # grace holds the successor's id, while its cookie is the rotated one.
+    if principal == "authentication_required" and rotated(
+        database, websocket.cookies.get(SESSION_COOKIE)
+    ):
+        return "session_refresh"
+    return principal
+
+
+def rotated(database: Engine, token: str | None) -> bool:
+    """Whether the session behind a cookie was rotated and a successor still stands. Rotation
+    keeps the CSRF token, so the successor is the account's live session with the same one."""
+    if not token:
+        return False
+    now = utcnow()
+    with Session(database) as db:
+        old = db.scalar(select(UserSession).where(UserSession.token_hash == hash_token(token)))
+        if old is None or old.revoked_reason != "rotated":
+            return False
+        successors = db.scalars(
+            select(UserSession).where(
+                UserSession.user_id == old.user_id,
+                UserSession.csrf_token == old.csrf_token,
+                UserSession.revoked_at.is_(None),
+            )
+        )
+        return any(
+            row.idle_expires_at > now and row.absolute_expires_at > now for row in successors
+        )
+
+
 def websocket_game(database: Engine, game_id: UUID, principal: Principal) -> bool | None:
     """Whether the account owns a seat in the game; None if it may not see the game at all."""
     with Session(database) as db:
@@ -888,6 +1048,15 @@ def origin_refused(websocket: WebSocket) -> bool:
 async def refuse(websocket: WebSocket, code: int, reason: str) -> None:
     await websocket.send_json({"type": "error", "code": reason})
     await websocket.close(code, reason)
+
+
+def crowded(game: LiveGame, user_id: UUID) -> bool:
+    """Whether the account, or the game, has all the connections it may have."""
+    counted = [connection for connection in game.connections.values() if connection.counted]
+    return (
+        sum(connection.user_id == user_id for connection in counted) >= CONNECTIONS_PER_ACCOUNT
+        or len(counted) >= CONNECTIONS_PER_GAME
+    )
 
 
 @router.websocket("/games/{game_id}/events")
@@ -929,6 +1098,11 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
     if hello.inspect and not full_access(principal):
         await refuse(websocket, CLOSE_FORBIDDEN, "forbidden")
         return
+    # Counted and added with no await between, so handshakes at once cannot all pass.
+    counted = not full_access(principal)
+    if counted and crowded(game, principal.user.id):
+        await refuse(websocket, CLOSE_TOO_MANY, "too_many_connections")
+        return
 
     connection = Connection(
         id=secrets.token_hex(8),
@@ -936,6 +1110,7 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
         session_id=principal.session.id,
         owner=owner,
         inspect=hello.inspect,
+        counted=counted,
     )
     game.connections[connection.id] = connection
     try:
@@ -1004,7 +1179,7 @@ def claim(hub: GameHub, game: LiveGame, connection: Connection) -> None:
 async def resync(hub: GameHub, game: LiveGame, connection: Connection, since: int) -> None:
     """Sends the seat's current snapshot unless the client already has that revision."""
     try:
-        snapshot = await hub.snapshot(game)
+        snapshot = await hub.page(game)
     except EngineUnavailable:
         snapshot = game.snapshot
     if snapshot is not None and (since < 0 or snapshot["revision"] != since):
@@ -1026,12 +1201,16 @@ async def receive_loop(
             connection.send({"type": "error", "code": "invalid_message"})
             continue
         if kind == "command":
-            # Every command checks that the session still stands, and counts as activity.
-            principal = await run_in_threadpool(
-                partial(connection_principal, active=True), hub.database, websocket
+            # Every command checks that the session still stands, and counts as activity. A
+            # command stopped here goes nowhere; after a session refresh the client resends it.
+            ended = await run_in_threadpool(
+                partial(session_ended, active=True),
+                hub.database,
+                websocket,
+                connection.session_id,
             )
-            if isinstance(principal, str) or principal.session.id != connection.session_id:
-                connection.close(CLOSE_UNAUTHENTICATED)
+            if ended is not None:
+                connection.close(CLOSE_UNAUTHENTICATED, ended)
                 return
             await hub.command(game, connection, message.get("command"))
         elif kind == "take_control":
@@ -1067,13 +1246,13 @@ async def send_loop(websocket: WebSocket, connection: Connection) -> None:
 
 
 async def watch_session(database: Engine, websocket: WebSocket, connection: Connection) -> None:
-    """Signing out, a revoked session or an expired one ends the connection. Returns when the
-    connection ends."""
+    """Signing out, a revoked session or an expired one ends the connection, as does a role
+    change (the client refreshes the session and reconnects). Returns when the connection ends."""
     while connection.close_code is None:
         with anyio.move_on_after(SESSION_CHECK_SECONDS):
             await connection.ended.wait()
         if connection.close_code is not None:
             return
-        principal = await run_in_threadpool(connection_principal, database, websocket)
-        if isinstance(principal, str) or principal.session.id != connection.session_id:
-            connection.close(CLOSE_UNAUTHENTICATED)
+        ended = await run_in_threadpool(session_ended, database, websocket, connection.session_id)
+        if ended is not None:
+            connection.close(CLOSE_UNAUTHENTICATED, ended)

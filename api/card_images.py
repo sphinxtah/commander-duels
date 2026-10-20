@@ -4,11 +4,14 @@ The engine's card views carry only a card's name, so an image is looked up by th
 Scryfall's named-card search answers with the card's JSON, the API downloads the JPEG it names
 from Scryfall's image host, keeps it under CD_CARD_IMAGE_DIR and records the printing, face and
 artist in card_images. Browsers only ever talk to this site. A name Scryfall does not know
-(tokens, misspellings) is recorded as missing and asked about again after a week.
+(tokens, misspellings) is recorded as missing and asked about again after a week. Missing rows
+older than that are deleted whenever another name is recorded as missing.
 
-Scryfall asks for 50-100 ms between requests to its API, so this process spaces them at least
-120 ms apart; downloads from its image host are not limited. Concurrent requests for one name
-fetch it once.
+Scryfall allows its named-card search 2 requests a second, so this process spaces them at least
+550 ms apart, and after a 429 asks nothing more for as long as Scryfall says (30 s at least);
+downloads from its image host are not limited. Concurrent requests for one name fetch it once.
+Each name waiting its turn delays every name behind it, so the names waiting are capped, per
+account and in all; more are refused at once, and those cards keep their text frame.
 """
 
 import asyncio
@@ -18,28 +21,29 @@ import os
 import tempfile
 import time
 from collections import Counter
-from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 from datetime import timedelta
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Query, Request, Response
-from sqlalchemy import Engine
+from sqlalchemy import Engine, delete
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api.auth import ERRORS
+from api.auth import INPUT_ERRORS
 from api.config import Settings
-from api.identity import Active, ApiError, utcnow
+from api.identity import Active, ApiError, Db, Principal, utcnow
 from api.models import CardImage
-from api.schemas import Contract, Error
+from api.schemas import Contract
 from api.version import APP_VERSION
 
 log = logging.getLogger("api.card_images")
-router = APIRouter(prefix="/api/v1", responses=ERRORS | {422: {"model": Error}})
+router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
 ImageSize = Literal["normal", "large"]
 # 1-200 characters, none of them control characters (Unicode category Cc).
@@ -53,7 +57,15 @@ CardName = Annotated[
     ),
 ]
 
-API_SPACING = 0.12
+# Scryfall's rate limits page allows /cards/named 2 requests a second; the margin is for jitter.
+API_SPACING = 0.55
+# A 429 limits access for 30 s (the same page). A longer Retry-After is honoured, up to an hour.
+RATE_LIMIT_PAUSE = 30.0
+MAX_RATE_LIMIT_PAUSE = 3600.0
+# Uncached names waiting on Scryfall's API, for one account and in all. One account's waiting
+# names hold up everyone else's first look by up to LOOKUPS_PER_ACCOUNT * API_SPACING.
+LOOKUPS_PER_ACCOUNT = 8
+LOOKUPS_WAITING = 24
 MISSING_RETRY = timedelta(days=7)
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 JPEG_MAGIC = b"\xff\xd8\xff"
@@ -90,6 +102,41 @@ def unavailable(reason: str) -> ApiError:
     return ApiError(
         503, "card_images_unavailable", "Card images are not available right now. Try again."
     )
+
+
+def deferred(wait: float) -> ApiError:
+    """Refused before Scryfall is asked: it asked us to wait, or too many lookups are waiting.
+    Not logged; a burst of requests would repeat it for each."""
+    return ApiError(
+        503,
+        "card_images_unavailable",
+        "Card images are not available right now. Try again.",
+        {"Retry-After": str(max(1, math.ceil(wait)))},
+    )
+
+
+def busy(wait: float) -> ApiError:
+    return ApiError(
+        429,
+        "card_images_busy",
+        "Your account is already waiting for many card images. Try again shortly.",
+        {"Retry-After": str(max(1, math.ceil(wait)))},
+    )
+
+
+def retry_after(response: httpx.Response) -> float:
+    """How long Scryfall asked us to wait after a 429: its Retry-After, in seconds or as a date,
+    at least the 30 s its documentation names and at most an hour."""
+    value = response.headers.get("retry-after", "").strip()
+    if value.isascii() and value.isdigit():
+        # More digits than a float holds reads as infinity: the longest pause, not an error.
+        seconds = float(value)
+    else:
+        try:
+            seconds = (parsedate_to_datetime(value) - utcnow()).total_seconds()
+        except (TypeError, ValueError, OverflowError):
+            seconds = 0.0
+    return min(max(seconds, RATE_LIMIT_PAUSE), MAX_RATE_LIMIT_PAUSE)
 
 
 def file_name(scryfall_id: UUID, face: int | None, size: ImageSize) -> str:
@@ -192,6 +239,22 @@ def missing_entry(name: str) -> CardImage:
     )
 
 
+def record_missing(database: Engine, name: str) -> None:
+    """Records that Scryfall has no image for the name. Names it had none for a week ago or more
+    count as never asked (see stored), so their rows go now: names come from clients, and each
+    new one an account asks for would otherwise add a row for good."""
+    entry = missing_entry(name)
+    with Session(database) as db:
+        db.execute(
+            delete(CardImage).where(
+                CardImage.status == "missing",
+                CardImage.checked_at < entry.checked_at - MISSING_RETRY,
+            )
+        )
+        db.merge(entry)
+        db.commit()
+
+
 class CardImageCache:
     """The images on disk, and the lookups that fill it. One per API process."""
 
@@ -205,6 +268,10 @@ class CardImageCache:
         self.waiting: Counter[str] = Counter()
         self.spacing = asyncio.Lock()
         self.next_request = -math.inf
+        # Scryfall answered 429: nothing is asked of its API before this time.
+        self.paused_until = -math.inf
+        # Lookups waiting on Scryfall's API, by account; None is SysOp's, which are never refused.
+        self.lookups: Counter[UUID | None] = Counter()
         # Replaced in tests, to measure the spacing without waiting for it.
         self.clock: Callable[[], float] = time.monotonic
         self.sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
@@ -214,8 +281,9 @@ class CardImageCache:
             raise images_unavailable()
         return self.directory
 
-    async def image(self, name: str, size: ImageSize) -> bytes:
-        """The name's JPEG, from disk or, the first time, from Scryfall while the request waits."""
+    async def image(self, name: str, size: ImageSize, account: UUID | None) -> bytes:
+        """The name's JPEG, from disk or, the first time, from Scryfall while the request waits.
+        A lookup counts against the account's share of the queue (see counted)."""
         directory = self.require_directory()
         image = await run_in_threadpool(self.stored, directory, name, size)
         if image is not None:
@@ -223,7 +291,10 @@ class CardImageCache:
         async with self.locked(name):
             # Another request may have fetched it while this one waited.
             image = await run_in_threadpool(self.stored, directory, name, size)
-            return image if image is not None else await self.fetch(directory, name, size)
+            if image is not None:
+                return image
+            with self.counted(account):
+                return await self.fetch(directory, name, size)
 
     async def info(self, name: str) -> CardImageInfo | None:
         self.require_directory()
@@ -250,6 +321,24 @@ class CardImageCache:
             if not self.waiting[name]:
                 del self.waiting[name], self.locks[name]
 
+    @contextmanager
+    def counted(self, account: UUID | None) -> Iterator[None]:
+        """Counts a lookup that will wait its turn for Scryfall's API, or refuses it at once,
+        before Scryfall is asked or a row recorded, when the account already has
+        LOOKUPS_PER_ACCOUNT waiting or everyone LOOKUPS_WAITING. SysOp (None) is never refused."""
+        if account is not None:
+            if self.lookups[account] >= LOOKUPS_PER_ACCOUNT:
+                raise busy(self.lookups[account] * API_SPACING)
+            if self.lookups.total() >= LOOKUPS_WAITING:
+                raise deferred(self.lookups.total() * API_SPACING)
+        self.lookups[account] += 1
+        try:
+            yield
+        finally:
+            self.lookups[account] -= 1
+            if not self.lookups[account]:
+                del self.lookups[account]
+
     def stored(self, directory: Path, name: str, size: ImageSize) -> bytes | None:
         """The cached image when the name's printing is known and this size is on disk. A name
         Scryfall did not know stays missing for a week."""
@@ -268,7 +357,7 @@ class CardImageCache:
         url = image_url(chosen[1], size) if chosen is not None else None
         if card is None or chosen is None or url is None:
             # Scryfall knows no such card, or has no image of it.
-            await run_in_threadpool(record, self.database, missing_entry(name))
+            await run_in_threadpool(record_missing, self.database, name)
             raise missing()
         try:
             scryfall_id = UUID(str(card["id"]))
@@ -300,11 +389,19 @@ class CardImageCache:
         return image
 
     async def pace(self) -> None:
-        """Returns once the previous request to Scryfall's API started API_SPACING ago or more."""
+        """Returns once the previous request to Scryfall's API started API_SPACING ago or more.
+        While Scryfall has asked us to wait, refuses at once instead, requests already queued
+        included: asking again while limited can get this site's address banned."""
+        self.check_pause()
         async with self.spacing:
             while (delay := self.next_request - self.clock()) > 0:
                 await self.sleep(delay)
+            self.check_pause()
             self.next_request = self.clock() + API_SPACING
+
+    def check_pause(self) -> None:
+        if (wait := self.paused_until - self.clock()) > 0:
+            raise deferred(wait)
 
     async def named(self, name: str) -> dict[str, Any] | None:
         """Scryfall's card for the exact name, or None if Scryfall knows no such card."""
@@ -313,8 +410,16 @@ class CardImageCache:
             response = await self.client.get(
                 f"{self.api_url}/cards/named", params={"exact": name}, headers=API_HEADERS
             )
+        except httpx.HTTPError as error:
+            raise unavailable(f"Scryfall's API: {type(error).__name__}") from error
+        if response.status_code == 429:
+            pause = retry_after(response)
+            self.paused_until = max(self.paused_until, self.clock() + pause)
+            log.warning("Scryfall's API answered 429: no lookups for %.0f s", pause)
+            raise deferred(pause)
+        try:
             body = response.json()
-        except (httpx.HTTPError, ValueError) as error:
+        except ValueError as error:
             raise unavailable(f"Scryfall's API: {type(error).__name__}") from error
         if not isinstance(body, dict):
             raise unavailable("Scryfall's API answered with something other than an object")
@@ -347,11 +452,16 @@ def cache_of(request: Request) -> CardImageCache:
     return cast(CardImageCache, request.app.state.card_images)
 
 
-def rotated_cookie(response: Response) -> dict[str, str]:
-    """A session rotated while signing this request in sets its new cookie on the request's
-    response, which a returned Response or an error response would otherwise drop."""
-    cookie = response.headers.get("set-cookie")
-    return {"set-cookie": cookie} if cookie else {}
+async def release(db: Session) -> None:
+    """Gives back the connection that signing the request in used. The cache opens a Session of
+    its own; requests holding one connection while waiting for another (and for Scryfall) could
+    take the whole pool, and every request in the API would then wait for it."""
+    await run_in_threadpool(db.close)
+
+
+def queue_account(principal: Principal) -> UUID | None:
+    """Whose share of the Scryfall queue a lookup takes; SysOp's lookups are never refused."""
+    return None if principal.user.kind == "sysop" else principal.user.id
 
 
 # Hidden information: these routes only map a name the client already knows to an image. Nothing
@@ -371,34 +481,29 @@ def rotated_cookie(response: Response) -> dict[str, str]:
 )
 async def card_image(
     request: Request,
-    response: Response,
     principal: Active,
+    db: Db,
     name: CardName,
     size: Annotated[ImageSize, Query()] = "normal",
 ) -> Response:
     """A card's image by its exact name, from Scryfall, cached on this server. The first request
     for a card waits while it is fetched. 404 card_image_missing for cards Scryfall does not
-    know, such as tokens."""
-    try:
-        image = await cache_of(request).image(name, size)
-    except ApiError as error:
-        error.headers = (error.headers or {}) | rotated_cookie(response)
-        raise
-    headers = {"Cache-Control": IMAGE_CACHE_CONTROL} | rotated_cookie(response)
-    return Response(image, media_type="image/jpeg", headers=headers)
+    know, such as tokens. 429 card_images_busy when the account already waits for many new
+    cards, and 503 when everyone does or Scryfall asked us to wait; both carry Retry-After."""
+    account = queue_account(principal)
+    await release(db)
+    image = await cache_of(request).image(name, size, account)
+    return Response(image, media_type="image/jpeg", headers={"Cache-Control": IMAGE_CACHE_CONTROL})
 
 
 @router.get("/card-images/info", response_model=CardImageInfo)
 async def card_image_info(
-    request: Request, response: Response, principal: Active, name: CardName
+    request: Request, principal: Active, db: Db, name: CardName
 ) -> CardImageInfo:
     """The printing and artist behind a name's cached image, to credit the artist and Scryfall.
     Never fetches: 404 until the image has been requested."""
-    try:
-        info = await cache_of(request).info(name)
-        if info is None:
-            raise ApiError(404, "card_image_unknown", "This card's image has not been looked up.")
-    except ApiError as error:
-        error.headers = (error.headers or {}) | rotated_cookie(response)
-        raise
+    await release(db)
+    info = await cache_of(request).info(name)
+    if info is None:
+        raise ApiError(404, "card_image_unknown", "This card's image has not been looked up.")
     return info

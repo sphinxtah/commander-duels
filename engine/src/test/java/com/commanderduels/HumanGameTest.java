@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import mage.game.Game;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -156,6 +158,50 @@ class HumanGameTest {
         assertRejected(409, "action_id_reused", game.submit(0, answer(game, actionId, revision, promptId, other)));
         assertRejected(409, "stale_prompt",
             game.submit(0, answer(game, UUID.randomUUID().toString(), revision, promptId, other)));
+    }
+
+    /**
+     * XMage rolls the game back and plays on after an exception in the engine's own view or prompt
+     * code, so the game still finishes. The leak checks must fail on it, and the seat's log must
+     * report the rollback without the exception's text.
+     */
+    @Test
+    void recoveredEngineErrorsFailTheChecksAndStayOutOfTheLog() throws Exception {
+        HumanGameRequest request = legacy(12L, LegacyDuel.DECKS.get(0), 3, 600);
+        var thrown = new AtomicBoolean();
+        String marker = UUID.randomUUID().toString();
+        var check = new SeatChecks(request) {
+            @Override
+            public void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {
+                super.published(game, refs, seat, view, prompt);
+                // Inside XMage's priority loop, where it recovers from errors.
+                if (prompt != null && prompt.kind().equals("priority") && thrown.compareAndSet(false, true)) {
+                    throw new IllegalStateException("view builder failed " + marker);
+                }
+            }
+        };
+        HumanGame game = start(request, check);
+        var player = new ScriptedPlayer(12L);
+        Tables.Played played = Tables.play(game, (seat, prompt, view) -> player.choose(prompt, view), 4,
+            new Tables.Coverage());
+        check.settle();
+
+        assertTrue(thrown.get(), "the human was never given priority");
+        assertTrue(Set.of("completed", "turn_limit").contains(played.last().result().kind()),
+            "XMage recovered and played on: " + played.last().result());
+        assertTrue(check.failures.stream().anyMatch(failure -> failure.startsWith("XMage recovered from a game error")),
+            "the checks missed the recovered error: " + check.failures);
+        List<String> log = new ArrayList<>();
+        HumanGame.Snapshot page;
+        do {
+            page = game.snapshot(0, -1, 0, log.size());
+            page.log().forEach(line -> log.add(line.text()));
+        } while (page.log().size() == HumanGame.MAX_LOG_PAGE);
+        assertTrue(log.contains(MatchLog.ROLLED_BACK), "the seat is told about the rollback: " + log);
+        for (String line : log) {
+            assertFalse(line.contains("Exception") || line.contains("view builder") || line.contains(marker)
+                || line.contains("Auto-restored"), "XMage's error text reached the seat: " + line);
+        }
     }
 
     @Test

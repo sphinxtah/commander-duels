@@ -4,6 +4,7 @@ import type { paths, components } from "./generated/api";
 export const client = createClient<paths>();
 export type Bootstrap = components["schemas"]["Bootstrap"];
 export type Format = components["schemas"]["Format"];
+export type PracticeFormat = components["schemas"]["PracticeFormat"];
 export type Me = components["schemas"]["Me"];
 export type AdminUser = components["schemas"]["AdminUser"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
@@ -68,15 +69,22 @@ export async function sysopEntrance(): Promise<boolean> {
   }
 }
 
-export async function sysopSignIn(
-  username: string,
-  password: string,
+/** SysOp's account answer; a network failure is an error like any other, never a throw. */
+async function sysopPost(
+  path: string,
+  headers: Record<string, string>,
+  payload: unknown,
 ): Promise<{ me?: Me; error?: string }> {
-  const response = await fetch("/api/v1/sysop/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return { error: describe(undefined) };
+  }
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) return { error: describe(body) };
   const me = body as Me;
@@ -84,22 +92,21 @@ export async function sysopSignIn(
   return { me };
 }
 
+export function sysopSignIn(
+  username: string,
+  password: string,
+): Promise<{ me?: Me; error?: string }> {
+  return sysopPost("/api/v1/sysop/login", {}, { username, password });
+}
+
 /** Changing the password ends every SysOp session and starts a new one for this browser. */
-export async function sysopChangePassword(
+export function sysopChangePassword(
   current_password: string,
   new_password: string,
 ): Promise<{ me?: Me; error?: string }> {
-  const response = await fetch("/api/v1/sysop/password", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": csrfToken ?? "",
-    },
-    body: JSON.stringify({ current_password, new_password }),
-  });
-  const body: unknown = await response.json().catch(() => null);
-  if (!response.ok) return { error: describe(body) };
-  const me = body as Me;
-  setCsrfToken(me.csrf_token);
-  return { me };
+  return sysopPost(
+    "/api/v1/sysop/password",
+    { "X-CSRF-Token": csrfToken ?? "" },
+    { current_password, new_password },
+  );
 }

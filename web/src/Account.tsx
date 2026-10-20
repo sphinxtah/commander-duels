@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -8,8 +9,10 @@ import {
 import {
   client,
   describe,
+  loadMe,
   setCsrfToken,
   sysopChangePassword,
+  type ApiError,
   type Avatar,
   type Bootstrap,
   type Me,
@@ -37,6 +40,15 @@ const roleNames: Record<string, string> = {
   sysop: "SysOp",
 };
 const RETURN_KEY = "cd.returnTo";
+// The server's sign-in challenge and its cookie last 10 minutes. The page renews an idle one a
+// minute early, and checks its age often by the wall clock, because timers stop while a
+// computer or phone sleeps but the challenge keeps ageing.
+const CHALLENGE_LIFETIME_MS = 10 * 60 * 1000;
+const CHALLENGE_RENEW_MS = 9 * 60 * 1000;
+const CHALLENGE_CHECK_MS = 15 * 1000;
+// Google says nothing when its window is closed without signing in. A press this old, once the
+// page has focus again, counts as given up, so it no longer holds off the early renewal.
+const PRESS_GIVEN_UP_MS = 2 * 60 * 1000;
 
 /** Remember where to come back to after signing in (T01: return to the intended screen). */
 export function signInFrom(hash: string) {
@@ -74,6 +86,56 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   >("loading");
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  // When the shown button's challenge was issued (0 while none is), and whether a sign-in
+  // with it is under way. A new challenge replaces the cookie that Google's answer is checked
+  // against, so it must not arrive while Google's window is open or the server is checking.
+  const issued = useRef(0);
+  const flow = useRef<"idle" | "pressed" | "verifying">("idle");
+  const pressed = useRef(0);
+
+  // The old button goes at once, so nobody starts a sign-in with a challenge being replaced.
+  const renew = useCallback(() => {
+    issued.current = 0;
+    flow.current = "idle";
+    container.current?.replaceChildren();
+    setState("loading");
+    setAttempt((value) => value + 1);
+  }, []);
+  const renewIfOld = useCallback(() => {
+    // A hidden tab waits: coming back checks at once, before anyone can press the button.
+    if (
+      !issued.current ||
+      flow.current === "verifying" ||
+      document.visibilityState === "hidden"
+    )
+      return;
+    const now = Date.now();
+    const age = now - issued.current;
+    // A recent press, or Google's pop-up still holding focus, means a sign-in may be under way.
+    const signingIn =
+      flow.current === "pressed" &&
+      (now - pressed.current < PRESS_GIVEN_UP_MS || !document.hasFocus());
+    // Past its lifetime the challenge is dead anyway, even for a sign-in begun with it.
+    if (
+      age >= CHALLENGE_LIFETIME_MS ||
+      (age >= CHALLENGE_RENEW_MS && !signingIn)
+    )
+      renew();
+  }, [renew]);
+
+  useEffect(() => {
+    const check = window.setInterval(renewIfOld, CHALLENGE_CHECK_MS);
+    // Coming back to the page, or waking up, checks at once.
+    window.addEventListener("focus", renewIfOld);
+    window.addEventListener("pageshow", renewIfOld);
+    document.addEventListener("visibilitychange", renewIfOld);
+    return () => {
+      window.clearInterval(check);
+      window.removeEventListener("focus", renewIfOld);
+      window.removeEventListener("pageshow", renewIfOld);
+      document.removeEventListener("visibilitychange", renewIfOld);
+    };
+  }, [renewIfOld]);
 
   useEffect(() => {
     let active = true;
@@ -95,19 +157,26 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
           itp_support: true,
           context: "signin",
           callback: async ({ credential }) => {
+            flow.current = "verifying";
             setState("verifying");
             setError("");
-            const result = await client.POST("/api/v1/auth/google", {
-              body: { credential },
-            });
-            if (result.data) {
-              setCsrfToken(result.data.csrf_token);
-              onSignedIn(result.data);
-              returnAfterSignIn();
-            } else {
+            try {
+              const result = await client.POST("/api/v1/auth/google", {
+                body: { credential },
+              });
+              if (result.data) {
+                setCsrfToken(result.data.csrf_token);
+                onSignedIn(result.data);
+                returnAfterSignIn();
+                return;
+              }
               setError(describe(result.error));
-              setAttempt((value) => value + 1);
+            } catch {
+              // The network failed: say so, rather than "Signing you in…" for good.
+              setError(describe(undefined));
             }
+            // The challenge is spent or doubtful either way: ask Google again with a new one.
+            renew();
           },
         });
         container.current.replaceChildren();
@@ -118,7 +187,13 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
           shape: "pill",
           logo_alignment: "left",
           width: 280,
+          click_listener: () => {
+            pressed.current = Date.now();
+            flow.current = "pressed";
+          },
         });
+        issued.current = Date.now();
+        flow.current = "idle";
         setState("ready");
       } catch (caught) {
         if (active) {
@@ -130,11 +205,17 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
     return () => {
       active = false;
     };
-  }, [attempt, onSignedIn]);
+  }, [attempt, onSignedIn, renew]);
 
   return (
     <div className={styles.google}>
-      <div ref={container} className={styles.googleButton} />
+      {/* Reaching for the button checks its challenge first. */}
+      <div
+        ref={container}
+        className={styles.googleButton}
+        onPointerEnter={renewIfOld}
+        onFocus={renewIfOld}
+      />
       {state === "loading" && <p role="status">Preparing Google sign-in…</p>}
       {state === "verifying" && <p role="status">Signing you in…</p>}
       {error && (
@@ -145,7 +226,10 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
       {state === "unavailable" && (
         <button
           className={styles.secondary}
-          onClick={() => setAttempt((value) => value + 1)}
+          onClick={() => {
+            setError("");
+            renew();
+          }}
         >
           Try again
         </button>
@@ -156,10 +240,16 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
 
 function SignedOut({
   auth,
+  unavailable,
+  onRetry,
+  notice,
   onSignedIn,
   heading,
 }: {
   auth: Bootstrap["auth"] | undefined;
+  unavailable: boolean;
+  onRetry: () => void;
+  notice: string;
   onSignedIn: (me: Me) => void;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
@@ -173,9 +263,31 @@ function SignedOut({
         Sign in with Google to create your Commander Duels account. One Google
         account is one player.
       </p>
+      {notice && (
+        <div className={shell.notice} role="status">
+          <p>{notice}</p>
+        </div>
+      )}
       <section className={styles.panel} aria-labelledby="sign-in-title">
         <h2 id="sign-in-title">Sign in</h2>
-        {auth?.google_client_id ? (
+        {/* Sign-in's settings come with the bootstrap: until it loads, nothing is known. */}
+        {auth === undefined ? (
+          unavailable ? (
+            <>
+              <p className={styles.fine} role="status">
+                The application service did not answer, so sign-in cannot start
+                yet.
+              </p>
+              <button className={styles.secondary} onClick={onRetry}>
+                Try again
+              </button>
+            </>
+          ) : (
+            <p className={styles.fine} role="status">
+              Preparing sign-in…
+            </p>
+          )
+        ) : auth.google_client_id ? (
           <>
             <GoogleSignIn onSignedIn={onSignedIn} />
             <p className={styles.fine}>
@@ -316,9 +428,21 @@ function ProfileForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
   );
 }
 
-function Sessions({ me, onSignedOut }: { me: Me; onSignedOut: () => void }) {
+function Sessions({
+  me,
+  onChange,
+  onSignedOut,
+}: {
+  me: Me;
+  onChange: (me: Me) => void;
+  onSignedOut: (notice?: string) => void;
+}) {
   const [sessions, setSessions] = useState<SessionSummary[]>();
   const [message, setMessage] = useState("");
+  // One sign-out at a time. A second click's request would find this session already ended,
+  // and its 401 would wrongly say the other sessions could not be ended.
+  const [busy, setBusy] = useState(false);
+  const signingOut = useRef(false);
   async function load() {
     const { data } = await client.GET("/api/v1/me/sessions");
     setSessions(data);
@@ -334,11 +458,54 @@ function Sessions({ me, onSignedOut }: { me: Me; onSignedOut: () => void }) {
     else if (session.current) onSignedOut();
     else await load();
   }
+  // The page shows the signed-out screen only once the server confirms: a refused sign-out
+  // leaves the session alive, and saying otherwise would be false comfort.
   async function signOut(everywhere: boolean) {
-    await client.POST(
-      everywhere ? "/api/v1/auth/logout-all" : "/api/v1/auth/logout",
-    );
-    onSignedOut();
+    if (signingOut.current) return;
+    signingOut.current = true;
+    setBusy(true);
+    setMessage("");
+    const send = () =>
+      client.POST(
+        everywhere ? "/api/v1/auth/logout-all" : "/api/v1/auth/logout",
+      );
+    // An ended session ends only this browser's: the account's others are out of reach.
+    const gone = everywhere
+      ? "This browser was already signed out, so your other sessions could not be ended from here. Sign in again and choose Sign out everywhere."
+      : undefined;
+    try {
+      let { response, error } = await send();
+      if (
+        response.status === 403 &&
+        (error as ApiError | undefined)?.code === "csrf_failed"
+      ) {
+        // Another tab signed this browser in since this page loaded, so this page's token is
+        // stale. Sign out only the account shown here; if the browser now holds another one,
+        // show that one instead.
+        const current = await loadMe();
+        if (current === null) return onSignedOut(gone);
+        if (current.id !== me.id) {
+          onChange(current);
+          const other = current.handle ?? current.display_name;
+          const shown = me.handle ?? me.display_name;
+          return setMessage(
+            everywhere
+              ? `Another tab signed this browser in as ${other}, so ${shown}'s sessions were not ended. To end them, sign in as ${shown} and choose Sign out everywhere.`
+              : `Another tab signed this browser in as ${other}. Sign out again to end that session.`,
+          );
+        }
+        ({ response, error } = await send());
+      }
+      if (response.ok) onSignedOut();
+      // 401: the session had already ended, so this browser is signed out either way.
+      else if (response.status === 401) onSignedOut(gone);
+      else setMessage(describe(error));
+    } catch {
+      setMessage(describe(undefined));
+    } finally {
+      signingOut.current = false;
+      setBusy(false);
+    }
   }
   return (
     <section className={styles.panel} aria-labelledby="sessions-title">
@@ -376,11 +543,21 @@ function Sessions({ me, onSignedOut }: { me: Me; onSignedOut: () => void }) {
           {message}
         </p>
       )}
+      {/* aria-disabled, not disabled: a disabled button loses keyboard focus, so after a
+          refused sign-out a keyboard user would start again from the top of the page. */}
       <div className={styles.actions}>
-        <button className={shell.primary} onClick={() => void signOut(false)}>
+        <button
+          className={shell.primary}
+          aria-disabled={busy}
+          onClick={() => void signOut(false)}
+        >
           Sign out
         </button>
-        <button className={styles.secondary} onClick={() => void signOut(true)}>
+        <button
+          className={styles.secondary}
+          aria-disabled={busy}
+          onClick={() => void signOut(true)}
+        >
           Sign out everywhere
         </button>
       </div>
@@ -456,14 +633,24 @@ function SysopPassword({ onChange }: { onChange: (me: Me) => void }) {
 export function Account({
   me,
   auth,
+  unavailable,
+  onRetry,
   onChange,
   heading,
 }: {
   me: Me | null | undefined;
   auth: Bootstrap["auth"] | undefined;
+  /** The bootstrap failed to load, so sign-in's settings are unknown. */
+  unavailable: boolean;
+  onRetry: () => void;
   onChange: (me: Me | null) => void;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
+  // What the signed-out screen says about the sign-out that led to it; a sign-in clears it.
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (me) setNotice("");
+  }, [me]);
   if (me === undefined)
     return (
       <>
@@ -476,9 +663,19 @@ export function Account({
       </>
     );
   if (me === null)
-    return <SignedOut auth={auth} onSignedIn={onChange} heading={heading} />;
-  const signedOut = () => {
+    return (
+      <SignedOut
+        auth={auth}
+        unavailable={unavailable}
+        onRetry={onRetry}
+        notice={notice}
+        onSignedIn={onChange}
+        heading={heading}
+      />
+    );
+  const signedOut = (said = "") => {
     setCsrfToken(undefined);
+    setNotice(said);
     onChange(null);
   };
   return (
@@ -526,11 +723,12 @@ export function Account({
       {me.status !== "denied" &&
         (me.onboarding === "handle" ? (
           <section className={styles.panel}>
-            <HandleForm me={me} onChange={onChange} />
+            {/* Keyed by account: a form must never keep another account's values. */}
+            <HandleForm key={me.id} me={me} onChange={onChange} />
           </section>
         ) : (
           <section className={styles.panel}>
-            <ProfileForm me={me} onChange={onChange} />
+            <ProfileForm key={me.id} me={me} onChange={onChange} />
           </section>
         ))}
       {me.kind === "sysop" && (
@@ -538,7 +736,7 @@ export function Account({
           <SysopPassword onChange={onChange} />
         </section>
       )}
-      <Sessions me={me} onSignedOut={signedOut} />
+      <Sessions me={me} onChange={onChange} onSignedOut={signedOut} />
     </>
   );
 }

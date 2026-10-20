@@ -32,9 +32,11 @@ import mage.util.ThreadUtils;
  * {@link PlayerQueryEvent}) becomes a typed prompt with a new id, published to that seat together
  * with its view at a new revision. Every human seat has its own revision, prompt and view: a seat's
  * revision moves only when what that seat sees changes, so it says nothing about other seats'
- * choices. An answer is accepted only for the seat's open prompt at its current revision. Views and
- * prompts are built on the game thread, the only place XMage's state is consistent; request threads
- * read the published snapshots. Games live in memory only: there is no journal or recovery yet.
+ * choices. A seat's log stops at the entries that existed when its view was built, so it does not
+ * run ahead of the board. An answer is accepted only for the seat's open prompt at its current
+ * revision. Views and prompts are built on the game thread, the only place XMage's state is
+ * consistent; request threads read the published snapshots. Games live in memory only: there is no
+ * journal or recovery yet.
  *
  * <p>A service game can also be inspected ({@link #inspect}): every hand and library, in order,
  * for SysOp. That view is built only while XMage is waiting for a human seat's answer, when the
@@ -111,6 +113,9 @@ final class HumanGame {
 
         /** Every public view published for spectators, when it is published (before any delay). */
         default void spectated(Game game, ObjectRefs refs, SeatView view) {}
+
+        /** Building the final views failed; the seats keep their last published ones. */
+        default void failed(RuntimeException error) {}
     }
 
     /**
@@ -130,6 +135,8 @@ final class HumanGame {
         String status = "starting";
         Prompts.Prompt prompt;
         SeatView view;
+        /** The log entries that existed when {@code view} was built: the seat's log stops there. */
+        int logEntries;
         String lastAttacker;
         boolean concedeRequested;
         final Map<String, Recorded> actions = new LinkedHashMap<>() {
@@ -334,12 +341,15 @@ final class HumanGame {
             return;
         }
         String attacker;
+        boolean leaving;
         synchronized (this) {
             attacker = seat.lastAttacker;
+            leaving = seat.concedeRequested || endRequest != null;
         }
         HumanPlayer human = current(seat);
         Prompts.Prompt next = Prompts.build(event, game, human, views, UUID.randomUUID().toString(), attacker);
         SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
+        int logged = log.size();
         // Every other seat sees the game as it is while XMage waits. Their views go out before the
         // prompt opens: an answer that reaches XMage before it starts listening waits in 100 ms steps.
         for (Seat other : humans) {
@@ -348,16 +358,20 @@ final class HumanGame {
             }
         }
         publishSpectators();
-        hooks.published(game, refs, seat.index, seatView, next.view());
+        hooks.published(game, refs, seat.index, seatView, leaving ? null : next.view());
         boolean concede;
         boolean closing;
         synchronized (this) {
-            seat.revision++;
-            seat.prompt = next;
-            seat.view = seatView;
-            seat.status = next.supported() ? "your_prompt" : "unsupported_prompt";
             concede = seat.concedeRequested;
             closing = endRequest != null;
+            // A seat that has conceded, or any seat of a game being closed, is not asked: the
+            // concession below makes XMage drop this request, and the seat leaves the game.
+            boolean ask = !concede && !closing;
+            seat.revision++;
+            seat.prompt = ask ? next : null;
+            seat.view = seatView;
+            seat.logEntries = logged;
+            seat.status = !ask ? "waiting" : next.supported() ? "your_prompt" : "unsupported_prompt";
             touch();
             notifyAll();
         }
@@ -376,6 +390,8 @@ final class HumanGame {
             // A concession that arrived before the game had started is applied here, on the game thread.
             game.setConcedingPlayer(seat.id);
             human.signalPlayerConcede(true);
+            // XMage has removed the seat: its view now says it is out.
+            publish(seat);
         }
     }
 
@@ -390,8 +406,10 @@ final class HumanGame {
         publishSpectators();
         Game current = game;
         if (current != null && current.getStartTime() != null && !current.hasEnded()
-                && humans.stream().map(this::current).allMatch(human -> human.hasLost() || human.hasLeft())) {
-            // Every human seat is out and bots remain: there is nobody left to play for.
+                && humans.stream().map(this::current).allMatch(human -> human.hasLost() || human.hasLeft())
+                && current.getPlayers().values().stream().filter(p -> !p.hasLost() && !p.hasLeft()).count() > 1) {
+            // Every human seat is out and two or more bots play on: there is nobody left to play for.
+            // With one player left XMage ends the game itself, and a close would race it.
             boolean first;
             synchronized (this) {
                 first = endRequest == null && result == null;
@@ -406,11 +424,13 @@ final class HumanGame {
     }
 
     /**
-     * Game thread: publishes the seat's current view at a new revision if it changed. An open prompt
-     * stays open (XMage is still waiting for it), but its answer must name the new revision.
+     * Game thread: publishes the seat's current view at a new revision if it changed, with the log
+     * up to now. An open prompt stays open (XMage is still waiting for it), but its answer must name
+     * the new revision.
      */
     private void publish(Seat seat) {
         SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
+        int logged = log.size();
         HumanPlayer human = current(seat);
         boolean out = human.hasLost() || human.hasLeft();
         PromptView open;
@@ -421,6 +441,7 @@ final class HumanGame {
             }
             seat.revision++;
             seat.view = seatView;
+            seat.logEntries = logged;
             seat.status = status;
             open = seat.prompt == null ? null : seat.prompt.view();
             touch();
@@ -499,6 +520,9 @@ final class HumanGame {
             } catch (RuntimeException e) {
                 finalViews.clear(); // keep the last published views
                 finalPublic = null;
+                System.err.println("Final views of human game " + id + " failed");
+                e.printStackTrace();
+                hooks.failed(e);
             }
         }
         Result outcome = outcome(finished, failure);
@@ -520,6 +544,8 @@ final class HumanGame {
                 if (i < finalViews.size()) {
                     seat.view = finalViews.get(i);
                 }
+                // The final snapshot carries the whole log.
+                seat.logEntries = Integer.MAX_VALUE;
                 seat.status = "finished";
             }
             touch();
@@ -538,7 +564,9 @@ final class HumanGame {
             concededSeats = List.copyOf(conceded);
         }
         if (failure != null) {
-            return new Result("error", null, false, concededSeats, turns, BotMatchRunner.describe(failure));
+            // Every seat is sent the result: the details stay in the engine's log (see run).
+            return new Result("error", null, false, concededSeats, turns,
+                "The engine stopped the game after an internal error");
         }
         if (log.criticalError() != null) {
             return new Result("error", null, false, concededSeats, turns,
@@ -671,7 +699,12 @@ final class HumanGame {
         }
         Game current = game;
         for (int i = 0; i < conceding.size(); i++) {
-            Player player = current == null ? null : current.getPlayer(conceding.get(i));
+            // A game that has ended meanwhile (conceding one of two bots ends it) needs no more
+            // concessions, and XMage refuses them from this thread. Its thread records the result.
+            if (current == null || over(current)) {
+                break;
+            }
+            Player player = current.getPlayer(conceding.get(i));
             if (player != null && !player.hasLeft()) {
                 applyConcession(conceding.get(i), promptsOpen.get(i));
             }
@@ -715,6 +748,9 @@ final class HumanGame {
         // XMage's server records a concession from its request threads too. Before the game has
         // started, with no prompt waiting, the next prompt applies it on the game thread instead.
         if (current != null && (promptOpen || current.getStartTime() != null)) {
+            if (!awaitPriority(current)) {
+                return;
+            }
             current.setConcedingPlayer(playerId);
             Player player = current.getPlayer(playerId);
             if (promptOpen && player != null) {
@@ -722,6 +758,29 @@ final class HumanGame {
                 player.signalPlayerConcede(true);
             }
         }
+    }
+
+    private static boolean over(Game game) {
+        return game.hasEnded() || game.getState().isGameOver();
+    }
+
+    /**
+     * Waits up to a second, while the game runs, for a player to hold priority or a choice. XMage
+     * then queues a concession from any thread and applies it on its game thread. With nobody
+     * holding either (between steps) it would check the game's end on the caller's thread, which it
+     * refuses ("Non-game thread can't concede"). Returns whether the game still runs.
+     */
+    private static boolean awaitPriority(Game game) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
+        try {
+            while (!over(game) && game.getState().getPriorityPlayerId() == null
+                    && game.getState().getChoosingPlayerId() == null && System.nanoTime() < deadline) {
+                Thread.sleep(5);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        return !over(game);
     }
 
     /** The game's current object for a human seat (see {@link Seat}). */
@@ -738,6 +797,7 @@ final class HumanGame {
         String statusNow;
         PromptView promptNow;
         SeatView viewNow;
+        int logLimit;
         Result resultNow;
         synchronized (this) {
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
@@ -752,9 +812,11 @@ final class HumanGame {
             statusNow = seat.status;
             promptNow = seat.prompt == null ? null : seat.prompt.view();
             viewNow = seat.view;
+            logLimit = seat.logEntries;
             resultNow = result;
         }
-        LogPage page = logPage(Integer.MAX_VALUE, logFrom);
+        // The log as it was when the view was built: XMage writes "casts X" before any view shows X.
+        LogPage page = logPage(logLimit, logFrom);
         return new Snapshot(id, revisionNow, statusNow, seatIndex, settings.forSeat(seatIndex), promptNow, viewNow,
             resultNow, page.count(), page.start(), page.lines());
     }

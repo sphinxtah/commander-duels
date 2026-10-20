@@ -72,9 +72,14 @@ class SeatInputTest {
                 "{\"seats\":[{\"player\":\"human\",\"seat\":3},{\"player\":\"bot\"}]}",
                 "{\"seats\":[\"human\",\"bot\"]}",
                 "{\"format\":\"commander\",\"seats\":[{\"player\":\"human\",\"deck\":\"legacy-mono-red-burn\"},"
-                    + "{\"player\":\"bot\"}]}"}) {
+                    + "{\"player\":\"bot\"}]}",
+                "{\"seed\":1e10000}", "{\"turn_cap\":1e99999999999}", "{\"spectator_delay_seconds\":1e-10000}"}) {
             assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(body, () -> 0L), body);
         }
+        // A service game's deck list counts are numbers too.
+        String list = "{\"seats\":[{\"player\":\"human\",\"deck_list\":{\"cards\":[{\"name\":\"Mountain\","
+            + "\"count\":1e10000}]}},{\"player\":\"bot\"}]}";
+        assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(list, () -> 0L, true), list);
     }
 
     @Test
@@ -112,6 +117,12 @@ class SeatInputTest {
             command("teleport", "{}"),
             command("submit_choice", "[]"),
             command("submit_choice", "{\"option_id\":\"1\"}").replace("\"v\":1", "\"v\":1e400"),
+            // Past Gson's limits (scale 10,000) and past an int's exponent: refusals, not crashes.
+            command("submit_choice", "{\"option_id\":\"1\"}").replace("\"v\":1", "\"v\":1e10000"),
+            command("submit_choice", "{\"option_id\":\"1\"}").replace("\"expected_revision\":4",
+                "\"expected_revision\":1e99999999999"),
+            command("submit_choice", "{\"amounts\":[1e10000]}"),
+            command("submit_choice", "{\"amounts\":[1e-10000]}"),
             command("submit_choice", "{\"option_id\":\"1\"}").replace("\"expected_revision\":4", "\"expected_revision\":-1"),
             command("submit_choice", "{\"option_id\":\"1\"}").replace(ACTION, ACTION.toUpperCase()),
             command("submit_choice", "{\"option_id\":\"1\"}").replace("\"v\":1,", ""),

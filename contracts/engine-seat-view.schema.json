@@ -111,7 +111,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9]{1,16}$"},
         "action": {
-          "enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "choose_mode", "put_first", "choose_pile"]
+          "enum": ["pass", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "choose_mode", "put_first", "choose_pile"]
         },
         "label": {"$ref": "#/$defs/nullableString"},
         "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},

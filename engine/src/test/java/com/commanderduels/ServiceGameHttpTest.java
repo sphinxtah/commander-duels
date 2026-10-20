@@ -120,7 +120,7 @@ class ServiceGameHttpTest {
         assertEquals(503, development.statusCode(), "development games are off");
         JsonObject health = json(send("GET", "/health", null, null, null));
         assertTrue(health.get("service_games_enabled").getAsBoolean());
-        assertFalse(health.get("gameplay_available").getAsBoolean());
+        assertTrue(health.get("gameplay_available").getAsBoolean(), "the API's players' games run here");
     }
 
     /** The two routes keep their games apart: a token from one finds nothing on the other. */

@@ -15,7 +15,7 @@ from api import admin, auth, card_images, games
 from api.config import Settings
 from api.database import build_engine, migration_head
 from api.google import CachingTransport, GoogleVerifier
-from api.identity import SAFE_METHODS, ApiError
+from api.identity import SAFE_METHODS, ApiError, add_rotated_cookie
 from api.schemas import (
     AuthConfig,
     Bootstrap,
@@ -43,7 +43,8 @@ CAPABILITIES = [
     ),
     Capability(
         id="gameplay",
-        name="Connected play",
+        name="Practice play",
+        available=True,
         milestone="M0–M3",
         reason="Practice games against bots are playable in the browser since v0.1.0. Human "
         "opponents, lobbies and recovery come later.",
@@ -155,6 +156,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> Response:
         request.state.request_id = str(uuid4())
         response = await call_next(request)
+        # Here, not in the route: FastAPI drops a dependency's cookies from error responses and
+        # from routes that return their own Response, which would sign the player out.
+        add_rotated_cookie(request, response)
         response.headers["X-Request-ID"] = request.state.request_id
         # Only a route that sets its own caching (card images) keeps it.
         response.headers.setdefault("Cache-Control", "no-store")
@@ -186,6 +190,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return error_response(
             request, 422, "invalid_request", "Request does not match the API contract."
         )
+
+    # A bug's 500. Starlette answers it outside every middleware and then re-raises it for the
+    # server's log, so this response gets correlation's work here: the request ID, the headers and
+    # a cookie rotated before the failure, without which the player would be signed out.
+    @app.exception_handler(Exception)
+    async def unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+        if not hasattr(request.state, "request_id"):
+            request.state.request_id = str(uuid4())
+        response = error_response(
+            request, 500, "internal_error", "Something went wrong on the server."
+        )
+        add_rotated_cookie(request, response)
+        response.headers["X-Request-ID"] = request.state.request_id
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.get("/api/v1/health", response_model=Health)
     def health() -> Health:
@@ -220,6 +240,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/v1/formats", response_model=list[Format])
     def formats() -> list[Format]:
+        # Practice games against the bots play Commander and Legacy (games.FIXTURE_DECKS).
         return [
             Format(
                 id="commander",
@@ -227,6 +248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 seats=[2, 3, 4],
                 default_seats=4,
                 description="Build around your commander. A shared table, a singular strategy.",
+                available=True,
             ),
             Format(
                 id="legacy",
@@ -234,6 +256,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 seats=[2],
                 default_seats=2,
                 description="Two players. Deep card history. Your next decisive play.",
+                available=True,
             ),
             Format(
                 id="two_headed_giant",

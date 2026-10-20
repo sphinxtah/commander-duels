@@ -9,7 +9,7 @@ ID. Every snapshot is checked for concealed information (the engine client's che
 - a second tab observes and cannot command; taking control moves the lease (AUTH07);
 - a command resent after its tab dropped runs once (T14);
 - SysOp's inspection view arrives, matches the public view's counts, validates against its
-  contract and is audited.
+  contract and is audited; it reaches only the tab that asked to inspect, never the observer.
 
 It needs the websockets package (in requirements.lock) and SysOp's password in
 CD_SYSOP_PASSWORD, from a SysOp network. Run it against the API or the web proxy:
@@ -98,14 +98,25 @@ class Tab:
 
     def __init__(self, api: Api, game_id: str, run: "Run", **hello: Any) -> None:
         self.run = run
+        # Set before the welcome is read: every message, that one included, goes through seen.
+        self.inspecting = bool(hello.get("inspect"))
         self.socket = api.socket(game_id)
         self.socket.send(json.dumps({"type": "hello", "csrf_token": api.csrf} | hello))
         self.welcome = self.until("welcome")
 
     def receive(self, timeout: float = 60) -> dict[str, Any]:
         message: dict[str, Any] = json.loads(self.socket.recv(timeout=timeout))
-        self.run.seen(message)
+        self.run.seen(message, self.inspecting)
         return message
+
+    def drain(self) -> None:
+        """Reads everything the server queued for this tab so far, which comes before the pong."""
+        try:
+            self.send({"type": "ping"})
+            self.until("pong")
+        except ConnectionClosed:
+            # A tab left unread can be closed for not reading (4408); what it got was checked.
+            pass
 
     def until(self, kind: str, timeout: float = 60, **match: Any) -> dict[str, Any]:
         deadline = time.monotonic() + timeout
@@ -137,14 +148,18 @@ class Run:
         self.inspection_problems: list[str] = []
         self.verified: list[str] = []
 
-    def seen(self, message: dict[str, Any]) -> None:
+    def seen(self, message: dict[str, Any], inspecting: bool = False) -> None:
         if message["type"] == "snapshot":
             snapshot = message["snapshot"]
             self.checks.snapshot(0, snapshot)
             if self.snapshot is None or snapshot["revision"] >= self.snapshot["revision"]:
                 self.snapshot = snapshot
         elif message["type"] == "inspection":
-            self.inspect(message["inspection"])
+            # Every hand and library: only a tab that asked to inspect may receive it.
+            if not inspecting:
+                self.inspection_problem("an inspection view reached a tab that did not ask for one")
+            else:
+                self.inspect(message["inspection"])
 
     def inspect(self, inspection: dict[str, Any]) -> None:
         """SysOp's view: every hand and library, with the public view's counts."""
@@ -262,6 +277,8 @@ def play(args: argparse.Namespace, api: Api, game_id: str, run: Run) -> dict[str
         while run.snapshot is not None and run.snapshot["revision"] <= snapshot["revision"]:
             control.until("snapshot")
     control.close()
+    # The observer has not read since the takeover: what reached it since is checked too.
+    observer.drain()
     observer.close()
     assert run.snapshot is not None
     return {"last": run.snapshot, "answered": answered, "kinds": kinds}
