@@ -13,7 +13,7 @@ app=/srv/commander-duels
 [ "$ID" = debian ] || { echo "Expected Debian, found $ID" >&2; exit 2; }
 
 apt-get update -q
-apt-get install -y -q ca-certificates curl qemu-guest-agent unattended-upgrades
+apt-get install -y -q ca-certificates curl git qemu-guest-agent unattended-upgrades
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
 chmod a+r /etc/apt/keyrings/docker.asc

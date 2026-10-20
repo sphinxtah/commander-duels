@@ -1,7 +1,8 @@
 """The deploy kit: the web proxy follows the API to a new address, deploy.sh migrates before it
 replaces anything and brings the previous version back only onto its own database, and
 restore.sh replaces the database with exactly the dump, whatever its own backup prunes, and
-update.sh brings a version's kit from GitHub before deploying it."""
+update.sh brings a version's kit from GitHub before deploying it, and upgrade.sh brings it from
+a clone of the repository."""
 
 import os
 import re
@@ -387,3 +388,150 @@ def test_update_changes_nothing_when_it_cannot_bring_a_whole_kit(tmp_path, case)
     for name in ("compose.yaml", "deploy.sh", "backup.sh", "restore.sh"):
         assert (kit / name).read_text() == "old\n", name
     assert not list(kit.glob(".update.*"))
+
+
+needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="upgrade.sh reads a git clone")
+
+
+def git(repo: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args], capture_output=True, text=True, check=True
+    )
+    return result.stdout.strip()
+
+
+def commit_kit(repo: Path, version: str, tag: str | None = None) -> None:
+    """One commit of the clone: the kit of a version, upgrade.sh as it is now, and a tag."""
+    for name, body in kit_of(version).items():
+        path = repo / "deploy" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body)
+    shutil.copy(ROOT / "deploy" / "upgrade.sh", repo / "deploy" / "upgrade.sh")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", f"kit of {version}")
+    if tag:
+        git(repo, "tag", "-a", tag, "-m", tag)
+
+
+def upgrade(tmp_path: Path, *args: str) -> dict[str, str]:
+    """Runs deploy/upgrade.sh from a clone (~/commander-duels) against the VM's folder, as the
+    deploy user: as root it refuses, or runs again through sudo as the user who called it."""
+    if os.geteuid() == 0:
+        pytest.skip("runs as the deploy user, not root")
+    app = tmp_path / "srv"
+    (app / "backups").mkdir(parents=True)
+    for name in ("compose.yaml", "deploy.sh", "backup.sh", "restore.sh"):
+        (app / name).write_text("old\n")
+    (app / ".env").write_text("CD_VERSION=0.1.0\n")
+    (app / "backups" / "commander-20261020T000000Z-nightly.dump").write_text("dump")
+    env = {
+        "PATH": "/usr/bin:/bin:/usr/local/bin",
+        "HOME": str(tmp_path),
+        "CD_DIR": str(app),
+        "STUB_DEPLOYED": str(tmp_path / "deployed"),
+    }
+    result = subprocess.run(
+        ["bash", "deploy/upgrade.sh", *args],
+        cwd=tmp_path / "clone",
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    deployed = tmp_path / "deployed"
+    return {
+        "status": str(result.returncode),
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "deployed": deployed.read_text().strip() if deployed.exists() else "",
+    }
+
+
+@pytest.fixture
+def clone(tmp_path: Path) -> Path:
+    """A clone with v0.1.2 and v0.1.10 tagged, and main one commit past the newest tag."""
+    repo = tmp_path / "clone"
+    repo.mkdir()
+    git(repo, "init", "-q", "-b", "main")
+    git(repo, "config", "user.email", "test@example.com")
+    git(repo, "config", "user.name", "Test")
+    commit_kit(repo, "0.1.2", "v0.1.2")
+    commit_kit(repo, "0.1.10", "v0.1.10")
+    commit_kit(repo, "main")
+    return repo
+
+
+@needs_bash
+@needs_git
+def test_upgrade_deploys_the_newest_tag_in_the_clone(tmp_path, clone):
+    result = upgrade(tmp_path)
+    assert result["status"] == "0", result["stderr"]
+    # Versions compare as numbers, and main's newer commit is not a version.
+    assert result["deployed"] == "0.1.10 0.1.10"
+    app = tmp_path / "srv"
+    assert (app / "compose.yaml").read_text() == "# compose of 0.1.10\n"
+    assert "restore of 0.1.10" in (app / "restore.sh").read_text()
+    assert (app / "env.example").exists() and not (app / "nginx").exists()
+    assert not (app / "upgrade.sh").exists()
+    # The VM's own files stay, and the clone stays on main for the next git pull.
+    assert (app / ".env").read_text() == "CD_VERSION=0.1.0\n"
+    assert [p.name for p in (app / "backups").iterdir()] == [
+        "commander-20261020T000000Z-nightly.dump"
+    ]
+    assert git(clone, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert git(clone, "status", "--porcelain") == ""
+    for name in ("deploy.sh", "backup.sh", "restore.sh"):
+        assert (app / name).stat().st_mode & 0o777 == 0o750
+    assert not list(app.glob(".upgrade.*"))
+
+
+@needs_bash
+@needs_git
+def test_upgrade_takes_a_version_or_mains_own_build(tmp_path, clone):
+    older = upgrade(tmp_path, "0.1.2")
+    assert older["status"] == "0", older["stderr"]
+    assert older["deployed"] == "0.1.2 0.1.2"
+    shutil.rmtree(tmp_path / "srv")
+    (tmp_path / "deployed").unlink()
+    main = upgrade(tmp_path, "-n", "main")
+    assert main["status"] == "0", main["stderr"]
+    assert main["deployed"] == ""
+    commit = git(clone, "rev-parse", "--short=12", "HEAD")
+    assert f"./deploy.sh sha-{commit}" in main["stdout"]
+    assert (tmp_path / "srv" / "compose.yaml").read_text() == "# compose of main\n"
+
+
+@needs_bash
+@needs_git
+@pytest.mark.parametrize("case", ["unknown version", "not a version", "no tag in the clone"])
+def test_upgrade_changes_nothing_when_it_cannot(tmp_path, clone, case):
+    args = {
+        "unknown version": ("9.9.9",),
+        "not a version": ("0.1.10; rm -rf /",),
+        "no tag in the clone": (),
+    }[case]
+    if case == "no tag in the clone":
+        for tag in git(clone, "tag", "--list").split():
+            git(clone, "tag", "-d", tag)
+    result = upgrade(tmp_path, *args)
+    assert result["status"] != "0"
+    assert result["deployed"] == ""
+    for name in ("compose.yaml", "deploy.sh", "backup.sh", "restore.sh"):
+        assert (tmp_path / "srv" / name).read_text() == "old\n", name
+    assert not list((tmp_path / "srv").glob(".upgrade.*"))
+
+
+@needs_bash
+@needs_git
+def test_upgrade_needs_a_set_up_vm(tmp_path, clone):
+    app = tmp_path / "srv"
+    app.mkdir()
+    result = subprocess.run(
+        ["bash", "deploy/upgrade.sh"],
+        cwd=clone,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path), "CD_DIR": str(app)},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "has no .env" in result.stderr
+    assert list(app.iterdir()) == []

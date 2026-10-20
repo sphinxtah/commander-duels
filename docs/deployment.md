@@ -107,11 +107,30 @@ CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` 
 - every push to `main` as `sha-<12-character commit>` and `main`;
 - every version tag as its version (`v0.1.0` → `0.1.0`).
 
-Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, and the web container re-resolving the API and limiting sign-in challenges. Its bash tests run in CI's Linux pytest and are skipped on Windows.
+Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, `update.sh` and `upgrade.sh` (against a real Git clone), and the web container re-resolving the API and limiting sign-in challenges. Its bash tests run in CI's Linux pytest and are skipped on Windows.
 
 **Pushing.** On the deploying computer, `git push` sends `main` and, because this checkout sets `push.followTags`, any new version tag with it. CI then publishes the images.
 
-**Pulling, on the VM** (since the repository went public, after v0.1.1):
+**Pulling and updating, on the VM** (since 2026-10-20, as for Kingdom Connect): one command pulls the repository from GitHub and deploys the newest version.
+
+```sh
+cd ~/commander-duels && git pull && bash deploy/upgrade.sh
+```
+
+Once, before the first time: install Git (`bootstrap-vm.sh` does on a new VM) and clone the repository into your home folder. It is public, so this needs no deploy key or GitHub sign-in.
+
+```sh
+sudo apt-get install -y git
+git clone https://github.com/sphinxtah/commander-duels.git ~/commander-duels
+```
+
+`git pull` brings `main` and the version tags on it. `deploy/upgrade.sh` then reads the deploy kit of the newest version tag from the clone and deploys that version, the images CI tagged with it:
+- **Other versions.** `bash deploy/upgrade.sh 0.2.0` takes a given version. `bash deploy/upgrade.sh main` takes the commit the clone is on, with the images CI published for that commit (`sha-<12 characters>`); CI publishes them a few minutes after the push, once its checks pass. `bash deploy/upgrade.sh -n 0.2.0` only puts the kit in place, for reading before `./deploy.sh 0.2.0` in `/srv/commander-duels`.
+- **What it replaces.** In `/srv/commander-duels`: `compose.yaml`, `deploy.sh`, `backup.sh`, `restore.sh`, `update.sh` and `env.example`, all from that one commit. `.env`, `web-access.conf` and `backups/` are never touched. If the tag lacks `compose.yaml`, `deploy.sh` or `backup.sh`, nothing changes.
+- **The clone stays on `main`.** The kit is read from the tag with Git, so nothing is checked out and the next `git pull` works. Change nothing in the clone.
+- **No sudo needed.** The deploy user runs Docker. With `sudo` it runs itself again as the user who called it, so the backups and the kit keep their owner; as root without sudo it refuses.
+
+**Without a clone,** `update.sh` does the same from `/srv/commander-duels`, fetching an archive of the tag from GitHub instead (since the repository went public, after v0.1.1):
 
 ```sh
 cd /srv/commander-duels && ./update.sh
