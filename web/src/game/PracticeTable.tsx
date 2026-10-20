@@ -6,6 +6,7 @@ import {
   exitTableFullscreen,
 } from "../app/fullscreen";
 import { readTableSettings } from "../app/tableSettings";
+import { getSoundEngine } from "./sound/engine";
 import type { components } from "../generated/api";
 import styles from "./game.module.css";
 
@@ -248,6 +249,8 @@ function Table({ me }: { me: Me }) {
   async function start(event: FormEvent) {
     event.preventDefault();
     const fullscreen = tableFullscreen();
+    // Browsers start sound only from a click, and this is the last one before the table opens.
+    getSoundEngine().unlock();
     setError("");
     setStarting(true);
     const body: Request = {
@@ -522,8 +525,10 @@ function Table({ me }: { me: Me }) {
                       className={styles.primaryButton}
                       href={`#game/${game.id}`}
                       onClick={(event) => {
-                        if (plainClick(event.nativeEvent))
+                        if (plainClick(event.nativeEvent)) {
                           void tableFullscreen();
+                          getSoundEngine().unlock();
+                        }
                       }}
                     >
                       {game.your_seat === null ? "Observe" : "Resume"}
