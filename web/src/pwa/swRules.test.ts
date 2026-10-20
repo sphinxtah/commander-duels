@@ -63,22 +63,37 @@ describe("the service worker's routes", () => {
 });
 
 describe("the caches a new version keeps", () => {
-  it("keeps itself and the version before it, and nothing that is not ours is touched", () => {
+  it("keeps itself and the version it replaces, and nothing that is not ours is touched", () => {
     const keys = [
       "someone-else",
+      "cd-meta",
       "cd-shell-0.2.0+aaa",
       "cd-shell-0.3.0+bbb",
       "cd-shell-0.3.0+ccc",
       "cd-shell-0.3.0+ddd",
     ];
-    expect(cachesToDelete(keys, "cd-shell-0.3.0+ddd")).toEqual([
-      "cd-shell-0.2.0+aaa",
-      "cd-shell-0.3.0+bbb",
-    ]);
-    expect(cachesToDelete(["cd-shell-1"], "cd-shell-1")).toEqual([]);
-    expect(cachesToDelete(["cd-shell-1", "cd-shell-2"], "cd-shell-2")).toEqual(
-      [],
-    );
+    expect(
+      cachesToDelete(keys, "cd-shell-0.3.0+ddd", "cd-shell-0.3.0+ccc"),
+    ).toEqual(["cd-shell-0.2.0+aaa", "cd-shell-0.3.0+bbb"]);
+    expect(cachesToDelete(["cd-shell-1"], "cd-shell-1", null)).toEqual([]);
+    expect(
+      cachesToDelete(["cd-shell-1", "cd-shell-2"], "cd-shell-2", "cd-shell-1"),
+    ).toEqual([]);
+    // The first install keeps nothing older, such as a cache an interrupted install left.
+    expect(
+      cachesToDelete(["cd-shell-1", "cd-shell-2"], "cd-shell-2", null),
+    ).toEqual(["cd-shell-1"]);
+  });
+
+  it("keeps the version the pages run, not one that was superseded while it waited", () => {
+    // V1 is active; V2 installs and waits; V3 installs, so V2 never runs; V3 activates.
+    expect(
+      cachesToDelete(
+        ["cd-shell-V1", "cd-shell-V2", "cd-shell-V3"],
+        "cd-shell-V3",
+        "cd-shell-V1",
+      ),
+    ).toEqual(["cd-shell-V2"]);
   });
 
   it("knows a live game's lock by its prefix", () => {

@@ -25,6 +25,7 @@ import {
 } from "./api";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { holdLiveGame, markIntendedLeave } from "./app/liveGame";
+import { leaveTable } from "./app/serviceWorker";
 
 // The game screen and the practice table have their own tests; here they only take up room.
 vi.mock("./game/GameScreen", async () => {
@@ -36,9 +37,14 @@ vi.mock("./game/GameScreen", async () => {
 });
 vi.mock("./game/PracticeTable", () => ({ PracticeTable: () => null }));
 vi.mock("./google", () => ({ loadGoogle: () => new Promise(() => {}) }));
-// Whether leaving the table leaves full screen; fullscreen.test.ts tests the rest.
+// Whether leaving the table leaves full screen and applies a waiting update; fullscreen.test.ts
+// and serviceWorker.test.ts test the rest.
 vi.mock("./app/fullscreen", () => ({
   exitTableFullscreen: vi.fn(async () => undefined),
+}));
+vi.mock("./app/serviceWorker", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./app/serviceWorker")>()),
+  leaveTable: vi.fn(() => false),
 }));
 
 // The API, answered route by route. Each route takes its answers in order and keeps the last.
@@ -205,6 +211,7 @@ describe("navigation", () => {
   it("a live game keeps its address until an in-game link leaves it, and leaving ends full screen", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
     vi.mocked(exitTableFullscreen).mockClear();
+    vi.mocked(leaveTable).mockClear();
     const id = "00000000-0000-4000-8000-0000000000aa";
     window.location.hash = `#game/${id}`;
     render(<App />);
@@ -218,6 +225,7 @@ describe("navigation", () => {
     await settle();
     expect(back).toBeInTheDocument();
     expect(exitTableFullscreen).not.toHaveBeenCalled();
+    expect(leaveTable).not.toHaveBeenCalled();
 
     markIntendedLeave();
     fireEvent.click(back);
@@ -225,13 +233,31 @@ describe("navigation", () => {
       expect(document.activeElement).toHaveTextContent("Gather your cards."),
     );
     expect(exitTableFullscreen).toHaveBeenCalledTimes(1);
+    // The update the game screen said was ready applies now.
+    expect(leaveTable).toHaveBeenCalledTimes(1);
     expect(document.documentElement.dataset.route).toBe("shell");
     release();
 
-    // Moving between shell pages leaves full screen alone.
+    // Moving between shell pages leaves full screen and updates alone.
     window.location.hash = "#settings";
     await screen.findByRole("heading", { name: "Make yourself at home." });
     expect(exitTableFullscreen).toHaveBeenCalledTimes(1);
+    expect(leaveTable).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaving the table for a version that took over reloads instead of drawing the page", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    vi.mocked(leaveTable).mockClear();
+    vi.mocked(leaveTable).mockReturnValueOnce(true);
+    window.location.hash = "#game/00000000-0000-4000-8000-0000000000aa";
+    render(<App />);
+    const back = await screen.findByRole("link", { name: "Back to the table" });
+    fireEvent.click(back);
+    await waitFor(() => expect(leaveTable).toHaveBeenCalledTimes(1));
+    await settle();
+    // The reload is under way: the old code draws nothing new.
+    expect(back).toBeInTheDocument();
+    expect(document.documentElement.dataset.route).toBe("game");
   });
 });
 
@@ -355,9 +381,13 @@ describe("the install banner", () => {
     // The owner's art on the page stays the sidebar mark and the banner image.
     expect(document.querySelectorAll('img[src^="/brand/"]')).toHaveLength(2);
 
-    fireEvent.click(within(banner).getByRole("button", { name: "Not now" }));
+    // The button goes with the banner: keyboard focus moves on to the content, not to <body>.
+    const notNow = within(banner).getByRole("button", { name: "Not now" });
+    notNow.focus();
+    fireEvent.click(notNow);
     expect(
       screen.queryByRole("region", { name: "Install the app" }),
     ).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("main"));
   });
 });

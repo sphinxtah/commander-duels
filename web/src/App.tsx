@@ -5,7 +5,7 @@ import { exitTableFullscreen } from "./app/fullscreen";
 import { InstallBanner } from "./app/InstallBanner";
 import { guardLiveGame } from "./app/liveGame";
 import { useOnline } from "./app/online";
-import { reloadIfUpdated } from "./app/serviceWorker";
+import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { UpdateNotice } from "./app/UpdateNotice";
 import {
@@ -142,10 +142,11 @@ export function App() {
       // browser's Back, or the installed app opening #play in this window, changes nothing.
       if (guardLiveGame(event.oldURL)) return;
       if (GAME_ROUTE.test(hashOf(event.oldURL)) && !currentGame()) {
-        // Leaving the table: its full screen ends, and a version that took over during the
-        // game loads now instead of drawing the next page with the old code.
+        // Leaving the table: its full screen ends, and the update the game screen said was
+        // ready applies now. One that took over during the game loads at once instead of
+        // drawing the next page with the old code.
         void exitTableFullscreen();
-        if (reloadIfUpdated()) return;
+        if (leaveTable()) return;
       }
       navigated.current = true;
       setPage(currentPage());

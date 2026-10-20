@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import styles from "../App.module.css";
 import { page, useAppUpdate } from "./serviceWorker";
 
@@ -22,6 +23,7 @@ export function UpdateNotice({
   className?: string;
 }) {
   const { state, apply } = useAppUpdate();
+  const status = useRef<HTMLSpanElement>(null);
   if (state === "none") return null;
   if (inGame)
     return (
@@ -31,9 +33,19 @@ export function UpdateNotice({
     );
   return (
     <span className={className ?? styles.update} data-update={state}>
-      <span role="status">{shellText[state]}</span>
+      <span role="status" ref={status} tabIndex={-1}>
+        {shellText[state]}
+      </span>
       {state === "available" && (
-        <button type="button" onClick={() => void apply()}>
+        <button
+          type="button"
+          onClick={() => {
+            void apply();
+            // The button goes as soon as the update waits or starts: focus stays on the notice
+            // that says which, rather than falling to the page's body.
+            status.current?.focus();
+          }}
+        >
           Update
         </button>
       )}

@@ -3,6 +3,8 @@
 // hosts or anything but a GET (src/pwa/swRules.ts), and the game's WebSocket never reaches it.
 // A new version waits: it takes over only when a page asks and no game is live in any tab.
 import {
+  ACTIVE_CACHE,
+  ACTIVE_KEY,
   SHELL_CACHE_PREFIX,
   cachesToDelete,
   liveGameHeld,
@@ -35,16 +37,21 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
+      // The version this one replaces is the one the open pages run, which is not always the
+      // newest older cache: a version that installed and was superseded while it waited never
+      // ran anywhere. So each version records itself as the active one when it takes over.
+      const meta = await caches.open(ACTIVE_CACHE);
+      const marker = await meta.match(ACTIVE_KEY);
+      const previous = marker ? await marker.text() : null;
+      // Written first: an activation cut short still leaves the right version on record.
+      await meta.put(ACTIVE_KEY, new Response(CACHE));
       const keys = await caches.keys();
-      const first = !keys.some(
-        (key) => key.startsWith(SHELL_CACHE_PREFIX) && key !== CACHE,
-      );
       await Promise.all(
-        cachesToDelete(keys, CACHE).map((key) => caches.delete(key)),
+        cachesToDelete(keys, CACHE, previous).map((key) => caches.delete(key)),
       );
       // The first install has no older version to disturb, so it controls the open pages at once.
       // Later versions only ever take over through skipWaiting below, which a page asks for.
-      if (first) await self.clients.claim();
+      if (previous === null) await self.clients.claim();
     })(),
   );
 });
@@ -108,15 +115,18 @@ async function shell(request: Request): Promise<Response> {
   const timeout = new Promise<undefined>((resolve) =>
     setTimeout(() => resolve(undefined), SHELL_TIMEOUT_MS),
   );
+  let response: Response | undefined;
   try {
-    const response = await Promise.race([network, timeout]);
-    if (response) return response;
+    response = await Promise.race([network, timeout]);
   } catch {
     // Offline: the cached shell below.
   }
-  // Every route is a hash on "/", so the cached "/" is the whole shell. Without one, the slow
-  // network is still the only answer.
-  return (await cached("/")) ?? network;
+  // A server error (the host's 502 while an upgrade recreates the site) is no page either: the
+  // kept shell loads and says the service is unavailable.
+  if (response && response.status < 500) return response;
+  // Every route is a hash on "/", so the cached "/" is the whole shell. Without one, the server's
+  // error or the slow network is still the only answer.
+  return (await cached("/")) ?? response ?? network;
 }
 
 async function asset(event: FetchEvent, request: Request): Promise<Response> {

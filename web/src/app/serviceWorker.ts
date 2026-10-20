@@ -3,12 +3,15 @@ import type { UpdateState } from "../game/table/types";
 import { anyLiveGame } from "./liveGame";
 
 // The service worker's registration and updates (v0.3.0, PWA03). A new version waits until a
-// player asks for it in a shell tab and no game is live anywhere; the worker checks the live-game
-// locks again before it takes over. A game tab never reloads by itself: it shows that an update
-// is ready, and reloads on the player's next intended leave.
+// player asks for it in a shell tab, or leaves a game's table, and no game is live anywhere; the
+// worker checks the live-game locks again before it takes over. A game tab never reloads by
+// itself: it shows that an update is ready, and loads it on the player's next intended leave.
 
 const CHECK_MS = 60 * 60 * 1000;
 const RECHECK_MS = 30 * 1000;
+/** After a leave, how long the game's own lock may take to go, and how often to look. */
+const LEAVE_WAIT_MS = 1000;
+const LEAVE_STEP_MS = 100;
 
 let state: UpdateState = "none";
 let registration: ServiceWorkerRegistration | null = null;
@@ -17,7 +20,6 @@ let worker: ServiceWorkerContainer | null = null;
 let controlled = false;
 /** This tab asked for the update, so it may reload when the new version takes over. */
 let asked = false;
-let reloadOnLeave = false;
 let recheck: ReturnType<typeof setInterval> | undefined;
 const listeners = new Set<() => void>();
 
@@ -100,10 +102,8 @@ function onControllerChange() {
     controlled = true;
     return;
   }
-  if (onGame()) {
-    reloadOnLeave = true;
-    set("applied");
-  } else if (asked) page.reload();
+  // A game tab keeps the old code until the player leaves the table (leaveTable below).
+  if (asked && !onGame()) page.reload();
   else set("applied");
 }
 
@@ -126,13 +126,30 @@ async function apply(): Promise<void> {
 }
 
 /**
- * App calls this on an intended leave from a game. True when a new version took over during the
- * game: the page reloads into it instead of drawing the next page with the old code.
+ * App calls this on an intended leave from a game, which is when the game screen's "Update ready:
+ * it applies when you leave the table." comes true. True when a new version already took over:
+ * the page reloads into it instead of drawing the next page with the old code. A version still
+ * waiting is applied as if Update was pressed, so this tab reloads once it takes over.
  */
-export function reloadIfUpdated(): boolean {
-  if (!reloadOnLeave) return false;
-  page.reload();
-  return true;
+export function leaveTable(): boolean {
+  if (state === "applied") {
+    page.reload();
+    return true;
+  }
+  if (state === "available" || state === "deferred") void applyAfterLeave();
+  return false;
+}
+
+async function applyAfterLeave(): Promise<void> {
+  // The game's own lock goes when its screen unmounts, a moment after the route changed. One
+  // still held after that is another window's game, and apply() waits for it as ever.
+  for (
+    let waited = 0;
+    waited < LEAVE_WAIT_MS && (await anyLiveGame());
+    waited += LEAVE_STEP_MS
+  )
+    await new Promise((resolve) => setTimeout(resolve, LEAVE_STEP_MS));
+  await apply();
 }
 
 function subscribe(listener: () => void): () => void {

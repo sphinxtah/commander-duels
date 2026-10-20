@@ -31,14 +31,19 @@ const scope = {
   addEventListener: (type: string, handler: Handler) =>
     handlers.set(type, handler),
 };
+const urlOf = (request: string | { url: string }) =>
+  typeof request === "string" ? request : request.url;
 const caches = {
   open: async (name: string) => {
     if (!store.has(name)) store.set(name, new Map());
     const cache = store.get(name)!;
     return {
       addAll: async () => undefined,
-      put: async (request: { url: string }, response: Response) =>
-        void cache.set(request.url, response),
+      put: async (request: string | { url: string }, response: Response) =>
+        void cache.set(urlOf(request), response),
+      // A real cache answers with a new Response each time, so its body can be read again.
+      match: async (request: string | { url: string }) =>
+        cache.get(urlOf(request))?.clone(),
     };
   },
   keys: async () => [...store.keys()],
@@ -46,13 +51,15 @@ const caches = {
   match: async (
     request: string | { url: string },
     options?: { cacheName?: string },
-  ) => {
-    const url = typeof request === "string" ? request : request.url;
-    return options?.cacheName
-      ? store.get(options.cacheName)?.get(url)
-      : undefined;
-  },
+  ) =>
+    options?.cacheName
+      ? store.get(options.cacheName)?.get(urlOf(request))
+      : undefined,
 };
+/** The version the worker last recorded as active. */
+async function active(): Promise<string | undefined> {
+  return store.get("cd-meta")?.get("/cd-active-version")?.clone().text();
+}
 
 function fetchEvent(method: string, path: string, mode = "cors") {
   const url = path.startsWith("http") ? path : `${origin}${path}`;
@@ -119,6 +126,30 @@ describe("the service worker", () => {
     expect(await offline.respondWith.mock.calls[0]![0]).toBe(shell);
   });
 
+  it("loads the kept shell when the server answers with an error, and its error without one", async () => {
+    const fetch = handlers.get("fetch")!;
+    // The host's proxy while an upgrade recreates the site.
+    const gateway = new Response("Bad gateway", { status: 502 });
+    network.mockResolvedValueOnce(gateway);
+    const bare = fetchEvent("GET", "/", "navigate");
+    fetch(bare);
+    expect(await bare.respondWith.mock.calls[0]![0]).toBe(gateway);
+
+    const shell = new Response("kept shell");
+    (await caches.open(CACHE)).put({ url: "/" }, shell);
+    network.mockResolvedValueOnce(new Response("Bad gateway", { status: 502 }));
+    const down = fetchEvent("GET", "/", "navigate");
+    fetch(down);
+    expect(await down.respondWith.mock.calls[0]![0]).toBe(shell);
+
+    // Anything short of a server error is the server's answer.
+    const missing = new Response("Not found", { status: 404 });
+    network.mockResolvedValueOnce(missing);
+    const unknown = fetchEvent("GET", "/table-lab.html", "navigate");
+    fetch(unknown);
+    expect(await unknown.respondWith.mock.calls[0]![0]).toBe(missing);
+  });
+
   it("serves build files from any kept version before the network", async () => {
     const fetch = handlers.get("fetch")!;
     const chunk = new Response("chunk");
@@ -132,7 +163,7 @@ describe("the service worker", () => {
     expect(network).not.toHaveBeenCalled();
   });
 
-  it("keeps the newest older version and claims pages only on its first install", async () => {
+  it("keeps the version it replaces and claims pages only on its first install", async () => {
     const activate = handlers.get("activate")!;
     const run = async () => {
       const event = { waitUntil: vi.fn() };
@@ -141,12 +172,20 @@ describe("the service worker", () => {
     };
     await run();
     expect(claim).toHaveBeenCalledTimes(1);
+    expect(await active()).toBe(CACHE);
 
-    claim.mockClear();
+    // a was active; b installed and was superseded while it waited, so no page ever ran it.
+    store.clear();
+    (await caches.open("cd-meta")).put(
+      "/cd-active-version",
+      new Response("cd-shell-a"),
+    );
     for (const name of ["cd-shell-a", "cd-shell-b", CACHE])
       await caches.open(name);
+    claim.mockClear();
     await run();
-    expect([...store.keys()]).toEqual(["cd-shell-b", CACHE]);
+    expect([...store.keys()]).toEqual(["cd-meta", "cd-shell-a", CACHE]);
+    expect(await active()).toBe(CACHE);
     expect(claim).not.toHaveBeenCalled();
   });
 

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { Me } from "../api";
 import { bannerVisible, useInstall } from "./install";
 import { InstallSteps } from "./InstallSettings";
@@ -16,6 +17,18 @@ export function InstallBanner({
   onGame: boolean;
 }) {
   const install = useInstall();
+  const banner = useRef<HTMLElement>(null);
+  /**
+   * Install and Not now both hide the banner, and the button pressed goes with it: focus moves on
+   * to the page's content (main, as the skip link does) rather than falling to its body.
+   */
+  const thenContent = (action: () => unknown) => () => {
+    const focused = banner.current?.contains(document.activeElement) ?? false;
+    // The action comes first: Install's prompt() is accepted only inside the click.
+    void action();
+    if (focused)
+      document.getElementById("main")?.focus({ preventScroll: true });
+  };
   if (install.installedNotice)
     return (
       <p className={styles.installed} role="status">
@@ -33,7 +46,11 @@ export function InstallBanner({
   )
     return null;
   return (
-    <section className={styles.banner} aria-label="Install the app">
+    <section
+      ref={banner}
+      className={styles.banner}
+      aria-label="Install the app"
+    >
       <p>
         {install.state === "available" ? (
           "Play Commander Duels in its own window, with a desktop icon."
@@ -49,12 +66,16 @@ export function InstallBanner({
           <button
             type="button"
             className={styles.install}
-            onClick={() => void install.install()}
+            onClick={thenContent(install.install)}
           >
             Install
           </button>
         )}
-        <button type="button" className={styles.later} onClick={install.notNow}>
+        <button
+          type="button"
+          className={styles.later}
+          onClick={thenContent(install.notNow)}
+        >
           Not now
         </button>
       </div>

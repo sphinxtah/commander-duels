@@ -10,8 +10,11 @@
  */
 export type SwRoute = "pass" | "shell" | "asset" | "brand";
 
-/** Every cache the worker makes; the rest of the name is the build's version. */
+/** Every cache of the site's files; the rest of the name is the build's version. */
 export const SHELL_CACHE_PREFIX = "cd-shell-";
+/** One entry in its own cache: the name of the shell cache whose version is active. */
+export const ACTIVE_CACHE = "cd-meta";
+export const ACTIVE_KEY = "/cd-active-version";
 /** app/liveGame.ts holds a Web Lock under this prefix while a game is live; it cannot be imported here. */
 export const LIVE_GAME_LOCK_PREFIX = "cd-live-game:";
 
@@ -42,15 +45,20 @@ export function routeRequest(
 }
 
 /**
- * The caches to delete when a version activates: every older shell but the newest one, which pages
- * still running the previous version may need for their lazy chunks. caches.keys() lists caches in
- * the order they were made, so the last other shell is the previous version.
+ * The caches to delete when a version activates: every other shell but the one of the version it
+ * replaces (`previous`, null on the first install), which pages still running that version may
+ * need for their lazy chunks. Not the newest older cache: a version that installed and was
+ * superseded while it waited made one too, and no page ever ran it.
  */
-export function cachesToDelete(keys: string[], current: string): string[] {
-  const older = keys.filter(
-    (key) => key.startsWith(SHELL_CACHE_PREFIX) && key !== current,
+export function cachesToDelete(
+  keys: string[],
+  current: string,
+  previous: string | null,
+): string[] {
+  return keys.filter(
+    (key) =>
+      key.startsWith(SHELL_CACHE_PREFIX) && key !== current && key !== previous,
   );
-  return older.slice(0, -1);
 }
 
 /** True when any tab holds a live game's lock (navigator.locks.query()'s held list). */

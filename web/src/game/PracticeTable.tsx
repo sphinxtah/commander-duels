@@ -110,6 +110,20 @@ function tableFullscreen(): Promise<boolean> | null {
     : null;
 }
 
+/**
+ * A Ctrl, Shift, Alt or Meta click (or another button) opens the game in another tab or window,
+ * so this page stays on Play and must not fill the screen for it.
+ */
+function plainClick(event: MouseEvent): boolean {
+  return (
+    event.button === 0 &&
+    !event.ctrlKey &&
+    !event.shiftKey &&
+    !event.altKey &&
+    !event.metaKey
+  );
+}
+
 const refusals: Record<string, string> = {
   deck_not_playable:
     "That deck has problems to fix first: open it in the deck builder to see them.",
@@ -247,12 +261,13 @@ function Table({ me }: { me: Me }) {
         ? { deck_list: deckList }
         : seatChoice(deck)),
     };
-    const { data, error: failure } = await client.POST(
-      "/api/v1/practice-games",
-      {
-        body,
-      },
-    );
+    // A request that throws (the network dropped) is a failure like a refusal: no game, so the
+    // full screen asked for above ends and the button comes back.
+    const answer = await client
+      .POST("/api/v1/practice-games", { body })
+      .catch(() => undefined);
+    const data = answer?.data;
+    const failure = answer?.error;
     setStarting(false);
     if (data) {
       window.location.hash = `#game/${data.id}`;
@@ -506,7 +521,10 @@ function Table({ me }: { me: Me }) {
                     <a
                       className={styles.primaryButton}
                       href={`#game/${game.id}`}
-                      onClick={() => void tableFullscreen()}
+                      onClick={(event) => {
+                        if (plainClick(event.nativeEvent))
+                          void tableFullscreen();
+                      }}
                     >
                       {game.your_seat === null ? "Observe" : "Resume"}
                     </a>

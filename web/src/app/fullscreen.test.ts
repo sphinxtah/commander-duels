@@ -176,6 +176,42 @@ describe("full screen when a game starts", () => {
     await vi.waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
   });
 
+  it("leaves full screen when the start request throws, and the button comes back", async () => {
+    // The network dropped: openapi-fetch rethrows fetch's TypeError.
+    practice(() => Promise.reject(new TypeError("Failed to fetch")));
+    const start = await screen.findByRole("button", { name: "Start the game" });
+    await vi.waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+    await grant();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The application service is unavailable. Try again.",
+    );
+    await vi.waitFor(() => expect(exitFullscreen).toHaveBeenCalledTimes(1));
+    expect(document.fullscreenElement).toBeNull();
+    expect(keyboard.unlock).toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Start the game" }),
+    ).toBeEnabled();
+  });
+
+  it("is not asked for by a click that opens the game in another tab or window", async () => {
+    practice(() => new Promise(() => {}));
+    const resume = await screen.findByRole("link", { name: "Resume" });
+    resume.addEventListener("click", (event) => event.preventDefault());
+    for (const modifier of [
+      { ctrlKey: true },
+      { shiftKey: true },
+      { metaKey: true },
+      { altKey: true },
+      { button: 1 },
+    ])
+      fireEvent.click(resume, modifier);
+    expect(requestFullscreen).not.toHaveBeenCalled();
+    fireEvent.click(resume);
+    expect(requestFullscreen).toHaveBeenCalledTimes(1);
+  });
+
   it("is asked for by Resume, and not at all when the setting is off", async () => {
     practice(() => new Promise(() => {}));
     const resume = await screen.findByRole("link", { name: "Resume" });
