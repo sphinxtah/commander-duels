@@ -20,7 +20,7 @@ Validated locally on Windows on October 20, 2026. A bug and security sweep found
 | Restore rehearsal | On the VM, `restore.sh` restored the first nightly dump into a scratch Compose project in 13 seconds; every table matched the live database except rows added since the dump |
 | Tapped permanents | Screenshots at 1920 x 1080, 1366 x 768 and 390 x 844, with up to 9 tapped permanents and attacking creatures. A script measured every tapped card's turned face against its slot, its neighbours and the strips: no overlaps at any size. A tapped slot is 131, 88 and 70 px wide |
 
-**Hosted CI and the live site.** Recorded in [the release notes](releases/0.1.1.md#verification): run #30 failed (script modes in git; the strict leak check), runs #31 and #32 passed.
+**Hosted CI and the live site.** Recorded in [the release notes](releases/0.1.1.md#verification): run #30 failed (script modes in git; the strict leak check), runs #31 and #32 passed. The owner deployed `0.1.1` on 2026-10-20 with `./update.sh`, and the live checks passed.
 
 **The throwaway stacks.** The Python suite ran against its own PostgreSQL container. The browser journeys used their own network, database, engine, API and web containers, built from the working tree, with a generated service token and test SysOp. Playwright shared the web container's network, so the browser came from loopback. The developer's Compose stack, database and SysOp were not used.
 
