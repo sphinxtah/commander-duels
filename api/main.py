@@ -11,7 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
-from api import admin, auth, card_images, cards, decks, games
+from api import admin, auth, card_images, cards, custom_cards, decks, games, progression
 from api.config import Settings
 from api.database import build_engine, migration_head
 from api.google import CachingTransport, GoogleVerifier
@@ -51,6 +51,14 @@ CAPABILITIES = [
         milestone="M0–M3",
         reason="Practice games against bots are playable in the browser since v0.1.0. Human "
         "opponents, lobbies and recovery come later.",
+    ),
+    Capability(
+        id="alliance",
+        name="Planeswalker Alliance",
+        available=True,
+        milestone="M4",
+        reason="Wins raise your level, which opens Planeswalkers to ally with; an alliance brings "
+        "its Planeswalker's cards into your library (v0.3.1).",
     ),
     Capability(
         id="campaign",
@@ -287,4 +295,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(card_images.router)
     app.include_router(cards.router)
     app.include_router(decks.router)
+    app.include_router(progression.router)
+    app.include_router(custom_cards.router)
     return app

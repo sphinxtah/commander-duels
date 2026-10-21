@@ -362,7 +362,10 @@ def update_profile(body: ProfileUpdate, request: Request, principal: SignedIn, d
         )
         if taken:
             raise ApiError(409, "handle_taken", "That handle is already taken.")
-        user.handle, user.normalized_handle, user.onboarding = body.handle, normalized, "complete"
+        user.handle, user.normalized_handle = body.handle, normalized
+        # A player chooses two starter decks next (v0.3.1), unless they already have.
+        if user.onboarding == "handle":
+            user.onboarding = "starters" if user.starter_decks is None else "complete"
         changed.append("handle")
     if body.display_name is not None and body.display_name.strip() != user.display_name:
         user.display_name = body.display_name.strip() or user.display_name

@@ -4,6 +4,17 @@
       "AdminUser": {
         "additionalProperties": false,
         "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alliance"
+          },
           "created_at": {
             "format": "date-time",
             "title": "Created At",
@@ -75,6 +86,24 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "tier": {
+            "default": "bronze",
+            "enum": [
+              "bronze",
+              "silver",
+              "gold",
+              "platinum",
+              "mythic",
+              "godlike"
+            ],
+            "title": "Tier",
+            "type": "string"
+          },
+          "wins": {
+            "default": 0,
+            "title": "Wins",
+            "type": "integer"
           }
         },
         "required": [
@@ -88,6 +117,22 @@
           "last_seen_at"
         ],
         "title": "AdminUser",
+        "type": "object"
+      },
+      "AllianceChange": {
+        "additionalProperties": false,
+        "properties": {
+          "planeswalker": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Planeswalker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "planeswalker"
+        ],
+        "title": "AllianceChange",
         "type": "object"
       },
       "AuditActor": {
@@ -278,8 +323,11 @@
             "type": "array"
           },
           "collection_policy": {
-            "const": "open_collection",
-            "default": "open_collection",
+            "default": "earned_collection",
+            "enum": [
+              "open_collection",
+              "earned_collection"
+            ],
             "title": "Collection Policy",
             "type": "string"
           },
@@ -296,7 +344,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.3.0",
+            "default": "0.3.1",
             "title": "Version",
             "type": "string"
           }
@@ -515,6 +563,18 @@
           "oracle_text": {
             "title": "Oracle Text",
             "type": "string"
+          },
+          "owned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Copies in the player's library (v0.3.1); null when not limited: basic lands, and accounts that build from the whole catalog.",
+            "title": "Owned"
           },
           "partner": {
             "anyOf": [
@@ -993,6 +1053,18 @@
             "title": "Oracle Text",
             "type": "string"
           },
+          "owned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Copies in the player's library (v0.3.1); null when not limited: basic lands, and accounts that build from the whole catalog.",
+            "title": "Owned"
+          },
           "partner": {
             "anyOf": [
               {
@@ -1283,6 +1355,321 @@
           "cards"
         ],
         "title": "CoverageRow",
+        "type": "object"
+      },
+      "CustomCardInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "artist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "collector_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collector Number"
+          },
+          "flavor_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flavor Text"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "image_url": {
+            "title": "Image Url",
+            "type": "string"
+          },
+          "in_library": {
+            "default": false,
+            "description": "In your library: you are allied with its Planeswalker.",
+            "title": "In Library",
+            "type": "boolean"
+          },
+          "loyalty": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loyalty"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "oracle_text": {
+            "title": "Oracle Text",
+            "type": "string"
+          },
+          "planeswalker": {
+            "title": "Planeswalker",
+            "type": "string"
+          },
+          "playable": {
+            "default": false,
+            "description": "None can be played yet.",
+            "title": "Playable",
+            "type": "boolean"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "rarity": {
+            "title": "Rarity",
+            "type": "string"
+          },
+          "set_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Code"
+          },
+          "toughness": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toughness"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "planeswalker",
+          "mana_cost",
+          "type_line",
+          "oracle_text",
+          "flavor_text",
+          "power",
+          "toughness",
+          "loyalty",
+          "rarity",
+          "set_code",
+          "collector_number",
+          "artist",
+          "image_url"
+        ],
+        "title": "CustomCardInfo",
+        "type": "object"
+      },
+      "CustomCardUpload": {
+        "additionalProperties": false,
+        "properties": {
+          "artist": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artist"
+          },
+          "collector_number": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collector Number"
+          },
+          "flavor_text": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flavor Text"
+          },
+          "image": {
+            "description": "The card's image, base64, at most 900 KB decoded.",
+            "maxLength": 1200008,
+            "minLength": 1,
+            "title": "Image",
+            "type": "string"
+          },
+          "image_type": {
+            "enum": [
+              "image/webp",
+              "image/png",
+              "image/jpeg"
+            ],
+            "title": "Image Type",
+            "type": "string"
+          },
+          "loyalty": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loyalty"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "oracle_text": {
+            "default": "",
+            "maxLength": 4000,
+            "title": "Oracle Text",
+            "type": "string"
+          },
+          "planeswalker": {
+            "maxLength": 48,
+            "minLength": 1,
+            "title": "Planeswalker",
+            "type": "string"
+          },
+          "power": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Power"
+          },
+          "rarity": {
+            "default": "mythic",
+            "enum": [
+              "common",
+              "uncommon",
+              "rare",
+              "mythic",
+              "special"
+            ],
+            "title": "Rarity",
+            "type": "string"
+          },
+          "set_code": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set Code"
+          },
+          "toughness": {
+            "anyOf": [
+              {
+                "maxLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Toughness"
+          },
+          "type_line": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "planeswalker",
+          "type_line",
+          "image",
+          "image_type"
+        ],
+        "title": "CustomCardUpload",
         "type": "object"
       },
       "DeckCounts": {
@@ -2162,6 +2549,18 @@
             "title": "Player",
             "type": "string"
           },
+          "portrait": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A player's allied Planeswalker, whose portrait stands for them.",
+            "title": "Portrait"
+          },
           "seat": {
             "title": "Seat",
             "type": "integer"
@@ -2514,7 +2913,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.3.0",
+            "default": "0.3.1",
             "title": "Version",
             "type": "string"
           }
@@ -2730,10 +3129,96 @@
         "title": "ImportRequest",
         "type": "object"
       },
+      "LibraryCard": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/CardSummary"
+          },
+          "copies": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Copies owned; null for basic lands.",
+            "title": "Copies"
+          },
+          "sources": {
+            "items": {
+              "enum": [
+                "starter",
+                "grandfathered",
+                "alliance"
+              ],
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "card",
+          "copies",
+          "sources"
+        ],
+        "title": "LibraryCard",
+        "type": "object"
+      },
+      "LibraryView": {
+        "additionalProperties": false,
+        "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alliance"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/LibraryCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "unlimited": {
+            "description": "Builds from the whole catalog (administrators, SysOp).",
+            "title": "Unlimited",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "unlimited",
+          "alliance",
+          "cards"
+        ],
+        "title": "LibraryView",
+        "type": "object"
+      },
       "Me": {
         "additionalProperties": false,
         "description": "The signed-in account, for its owner only. Email is private; the Google subject is never\nreturned.",
         "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The allied Planeswalker's ID; its portrait is the account's.",
+            "title": "Alliance"
+          },
           "avatar": {
             "enum": [
               "sigil",
@@ -2797,8 +3282,10 @@
             "type": "string"
           },
           "onboarding": {
+            "description": "handle, then starters (choose two starter decks), then complete.",
             "enum": [
               "handle",
+              "starters",
               "complete"
             ],
             "title": "Onboarding",
@@ -2819,7 +3306,10 @@
                 "games.view_concealed",
                 "cards.any",
                 "decks.edit",
-                "catalog.manage"
+                "catalog.manage",
+                "library.unlimited",
+                "progress.manage",
+                "custom_cards.manage"
               ],
               "type": "string"
             },
@@ -2873,6 +3363,97 @@
           "csrf_token"
         ],
         "title": "Me",
+        "type": "object"
+      },
+      "PlaneswalkerInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "description": "Its Planeswalker cards in the catalog.",
+            "title": "Cards",
+            "type": "integer"
+          },
+          "custom": {
+            "title": "Custom",
+            "type": "boolean"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "first_card": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Card"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "description": "Whether your tier has opened it.",
+            "title": "Open",
+            "type": "boolean"
+          },
+          "playable_cards": {
+            "description": "Of those, the ones a game can be played with.",
+            "title": "Playable Cards",
+            "type": "integer"
+          },
+          "portrait": {
+            "description": "Whether it has a portrait (web/public/portraits).",
+            "title": "Portrait",
+            "type": "boolean"
+          },
+          "tier": {
+            "enum": [
+              "bronze",
+              "silver",
+              "gold",
+              "platinum",
+              "mythic",
+              "godlike"
+            ],
+            "title": "Tier",
+            "type": "string"
+          },
+          "wins": {
+            "description": "The wins that open it.",
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tier",
+          "wins",
+          "open",
+          "portrait",
+          "description",
+          "first_card",
+          "cards",
+          "playable_cards",
+          "custom"
+        ],
+        "title": "PlaneswalkerInfo",
         "type": "object"
       },
       "PracticeFormat": {
@@ -3319,6 +3900,80 @@
           }
         },
         "title": "ProfileUpdate",
+        "type": "object"
+      },
+      "Progress": {
+        "additionalProperties": false,
+        "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alliance"
+          },
+          "alliance_since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alliance Since"
+          },
+          "counted_wins": {
+            "description": "Wins from games.",
+            "title": "Counted Wins",
+            "type": "integer"
+          },
+          "next_tier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TierInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "set_wins": {
+            "description": "Wins SysOp set, apart from games.",
+            "title": "Set Wins",
+            "type": "integer"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/TierInfo"
+          },
+          "tiers": {
+            "items": {
+              "$ref": "#/components/schemas/TierInfo"
+            },
+            "title": "Tiers",
+            "type": "array"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "wins",
+          "counted_wins",
+          "set_wins",
+          "tier",
+          "next_tier",
+          "alliance",
+          "alliance_since",
+          "tiers"
+        ],
+        "title": "Progress",
         "type": "object"
       },
       "Readiness": {
@@ -3923,12 +4578,71 @@
         "title": "SharedDeck",
         "type": "object"
       },
+      "StarterChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "decks": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Decks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "decks"
+        ],
+        "title": "StarterChoice",
+        "type": "object"
+      },
       "StarterDeck": {
         "additionalProperties": false,
+        "description": "One of the ten Commander starter decks (v0.3.1). Each player chooses two at onboarding.",
         "properties": {
           "card_count": {
             "title": "Card Count",
             "type": "integer"
+          },
+          "chosen": {
+            "description": "One of the two the player chose.",
+            "title": "Chosen",
+            "type": "boolean"
+          },
+          "color_names": {
+            "title": "Color Names",
+            "type": "string"
+          },
+          "colors": {
+            "title": "Colors",
+            "type": "string"
+          },
+          "commander_card_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commander Card Id"
+          },
+          "commander_printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commander Printing Id"
           },
           "commanders": {
             "items": {
@@ -3936,6 +4650,10 @@
             },
             "title": "Commanders",
             "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
           },
           "format": {
             "enum": [
@@ -3945,13 +4663,26 @@
             "title": "Format",
             "type": "string"
           },
+          "guild": {
+            "title": "Guild",
+            "type": "string"
+          },
+          "how_to_play": {
+            "title": "How To Play",
+            "type": "string"
+          },
           "name": {
+            "description": "The starter deck's ID, such as starter_wu_v1.",
             "title": "Name",
             "type": "string"
           },
           "playable": {
             "title": "Playable",
             "type": "boolean"
+          },
+          "teaches": {
+            "title": "Teaches",
+            "type": "string"
           },
           "title": {
             "title": "Title",
@@ -3964,9 +4695,37 @@
           "format",
           "card_count",
           "commanders",
-          "playable"
+          "playable",
+          "colors",
+          "color_names",
+          "guild",
+          "description",
+          "how_to_play",
+          "teaches",
+          "commander_card_id",
+          "commander_printing_id",
+          "chosen"
         ],
         "title": "StarterDeck",
+        "type": "object"
+      },
+      "StarterResult": {
+        "additionalProperties": false,
+        "properties": {
+          "decks": {
+            "description": "The two new decks.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Decks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "decks"
+        ],
+        "title": "StarterResult",
         "type": "object"
       },
       "StatusChange": {
@@ -4162,6 +4921,39 @@
         "title": "SyncRunInfo",
         "type": "object"
       },
+      "TierInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "enum": [
+              "bronze",
+              "silver",
+              "gold",
+              "platinum",
+              "mythic",
+              "godlike"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "wins": {
+            "description": "The wins that reach this tier.",
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "wins"
+        ],
+        "title": "TierInfo",
+        "type": "object"
+      },
       "UserPage": {
         "additionalProperties": false,
         "properties": {
@@ -4318,6 +5110,29 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "WinsChange": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "wins": {
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "wins",
+          "reason"
+        ],
+        "title": "WinsChange",
+        "type": "object"
+      },
       "XmageBuild": {
         "additionalProperties": false,
         "properties": {
@@ -4351,7 +5166,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.3.0"
+    "version": "0.3.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -4937,6 +5752,318 @@
           }
         },
         "summary": "Request Sync"
+      }
+    },
+    "/api/v1/admin/custom-cards": {
+      "get": {
+        "operationId": "uploaded_api_v1_admin_custom_cards_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomCardInfo"
+                  },
+                  "title": "Response Uploaded Api V1 Admin Custom Cards Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Uploaded"
+      },
+      "post": {
+        "description": "Adds a custom card, or replaces the one of the same name. The audit trail records its ID,\nnever its name or text.",
+        "operationId": "upload_api_v1_admin_custom_cards_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomCardUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomCardInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Upload"
+      }
+    },
+    "/api/v1/admin/custom-cards/{card_id}": {
+      "delete": {
+        "operationId": "remove_api_v1_admin_custom_cards__card_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove"
       }
     },
     "/api/v1/admin/users": {
@@ -5580,6 +6707,127 @@
           }
         },
         "summary": "Change Status"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/wins": {
+      "post": {
+        "description": "SysOp sets an account's wins, and so its level: any player's, or its own. The setting is a\nledger entry of its own, apart from counted wins, with the reason, and is audited (PROG03).",
+        "operationId": "change_wins_api_v1_admin_users__user_id__wins_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WinsChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Wins"
       }
     },
     "/api/v1/auth/google": {
@@ -6407,7 +7655,7 @@
     },
     "/api/v1/cards": {
       "get": {
-        "description": "Cards by structured filters and the search syntax together; all must match.",
+        "description": "Cards by structured filters and the search syntax together; all must match. `owned` keeps\nto the cards in the player's library (basic lands included); every card says how many copies\nthe library holds.",
         "operationId": "search_cards_api_v1_cards_get",
         "parameters": [
           {
@@ -6631,6 +7879,16 @@
             "schema": {
               "default": false,
               "title": "Extras",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owned",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Owned",
               "type": "boolean"
             }
           },
@@ -7243,6 +8501,217 @@
         "summary": "Coverage"
       }
     },
+    "/api/v1/custom-cards": {
+      "get": {
+        "description": "The custom cards, for accounts at the Godlike tier only.",
+        "operationId": "custom_cards_api_v1_custom_cards_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomCardInfo"
+                  },
+                  "title": "Response Custom Cards Api V1 Custom Cards Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Custom Cards"
+      }
+    },
+    "/api/v1/custom-cards/{card_id}/image": {
+      "get": {
+        "operationId": "custom_card_image_api_v1_custom_cards__card_id__image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "card_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Card Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {},
+              "image/png": {},
+              "image/webp": {}
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Custom Card Image"
+      }
+    },
     "/api/v1/decks": {
       "get": {
         "operationId": "list_decks_api_v1_decks_get",
@@ -7471,7 +8940,7 @@
     },
     "/api/v1/decks/guided": {
       "post": {
-        "description": "A proposed starting deck (DECK06). Nothing is saved: create a deck from its entries.",
+        "description": "A proposed starting deck (DECK06), from the cards the player's library holds. Nothing is\nsaved: create a deck from its entries.",
         "operationId": "guided_deck_api_v1_decks_guided_post",
         "requestBody": {
           "content": {
@@ -7689,6 +9158,7 @@
     },
     "/api/v1/decks/starters": {
       "get": {
+        "description": "The ten starter decks. \"playable\" counts the player's own library: a deck they did not\nchoose holds cards they do not own.",
         "operationId": "starters_api_v1_decks_starters_get",
         "responses": {
           "200": {
@@ -9697,6 +11167,105 @@
         "summary": "Health"
       }
     },
+    "/api/v1/library": {
+      "get": {
+        "description": "The cards in the account's library, with their copies and where they came from. An\naccount that builds from the whole catalog has no list here.",
+        "operationId": "my_library_api_v1_library_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Library"
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "me_api_v1_me_get",
@@ -9889,6 +11458,309 @@
           }
         },
         "summary": "Update Profile"
+      }
+    },
+    "/api/v1/me/alliance": {
+      "delete": {
+        "operationId": "leave_alliance_api_v1_me_alliance_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Leave Alliance"
+      },
+      "put": {
+        "description": "Allies with a Planeswalker the account's tier has opened, leaving any other alliance.",
+        "operationId": "join_alliance_api_v1_me_alliance_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllianceChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Join Alliance"
+      }
+    },
+    "/api/v1/me/progress": {
+      "get": {
+        "operationId": "my_progress_api_v1_me_progress_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Progress"
       }
     },
     "/api/v1/me/sessions": {
@@ -10086,6 +11958,218 @@
         "summary": "End Session"
       }
     },
+    "/api/v1/me/starters": {
+      "post": {
+        "description": "The two starter decks: each becomes a deck of the player's own, and every copy of their\ncards joins the library for good. Chosen once.",
+        "operationId": "choose_starters_api_v1_me_starters_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StarterChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StarterResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Choose Starters"
+      }
+    },
+    "/api/v1/planeswalkers": {
+      "get": {
+        "description": "The roster, with what the account's tier has opened.",
+        "operationId": "planeswalkers_api_v1_planeswalkers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlaneswalkerInfo"
+                  },
+                  "title": "Response Planeswalkers Api V1 Planeswalkers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Planeswalkers"
+      }
+    },
     "/api/v1/practice-games": {
       "post": {
         "description": "Starts a game against bots. The response names the game; play it over its WebSocket.",
@@ -10197,6 +12281,7 @@
     },
     "/api/v1/practice-games/options": {
       "get": {
+        "description": "The table's formats and bots. The engine's fixture decks are offered to SysOp only, as its\ntest decks for the browser journeys; players play their own decks, the two starter decks they\nchose among them. The routes still accept a fixture deck by name, for scripts.",
         "operationId": "practice_options_api_v1_practice_games_options_get",
         "responses": {
           "200": {
@@ -10425,7 +12510,7 @@
     },
     "/api/v1/shared-decks/{code}": {
       "get": {
-        "description": "A deck shared by link, for anyone signed in: its cards, not its notes (DECK11).",
+        "description": "A deck shared by link, for anyone signed in: its cards, not its notes (DECK11). It is\nvalidated against the viewer's library, as a copy of it would be.",
         "operationId": "read_shared_api_v1_shared_decks__code__get",
         "parameters": [
           {

@@ -17,9 +17,18 @@ export interface BuiltFile {
   content: string | Uint8Array;
 }
 
-/** "/" and every file by its URL, sorted: every chunk (lazy ones too), asset and public file. */
+// The Planeswalker portraits (v0.3.1: 98 of them in three sizes, about 12 MB) load when a screen
+// shows one, and the HTTP cache keeps them; precaching them would make every install and every
+// update fetch them all.
+const ON_DEMAND = ["portraits/"];
+
+/**
+ * "/" and every file by its URL, sorted: every chunk (lazy ones too), asset and public file,
+ * except the folders loaded on demand.
+ */
 export function precacheList(names: string[]): string[] {
-  return ["/", ...[...new Set(names)].sort().map((name) => `/${name}`)];
+  const kept = names.filter((name) => !ON_DEMAND.some((folder) => name.startsWith(folder)));
+  return ["/", ...[...new Set(kept)].sort().map((name) => `/${name}`)];
 }
 
 /** `<release>+<10 hex digits>` from the files' names and contents. */

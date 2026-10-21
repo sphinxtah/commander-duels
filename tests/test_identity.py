@@ -220,7 +220,8 @@ def test_google_sign_in_creates_one_account_with_a_private_session(app: FastAPI)
             "preferences": {"large_text": True, "reduced_motion": False},
         },
     ).json()
-    assert profile["handle"] == "Ada_L" and profile["onboarding"] == "complete"
+    # Two starter decks are chosen next (v0.3.1).
+    assert profile["handle"] == "Ada_L" and profile["onboarding"] == "starters"
     assert profile["avatar"] == "flame" and profile["preferences"]["large_text"] is True
 
     other = browser(app)

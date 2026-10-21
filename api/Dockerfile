@@ -3,9 +3,9 @@ WORKDIR /app
 COPY requirements.lock pyproject.toml alembic.ini VERSION ./
 COPY api ./api
 COPY catalog ./catalog
-# The starter decks, the same lists as the engine's fixture decks.
-COPY engine/decks ./starters
-ENV CD_STARTER_DECKS_DIR=/app/starters
+# The Planeswalker roster and the starter decks.
+COPY content/planeswalkers.json content/starter-decks.json ./content/
+ENV CD_CONTENT_DIR=/app/content
 RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 # The card image cache and the catalog's bulk files; named volumes mounted here start with this owner.
 RUN install -d -o 10001 -g 10001 /var/lib/commander-duels/card-images /var/lib/commander-duels/catalog

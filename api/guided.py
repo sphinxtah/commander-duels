@@ -6,7 +6,8 @@ competitive. Only playable cards are offered (certified, legal in the format, wi
 Roles come from Scryfall Tagger's oracle tags (ramp, card draw, removal, sweepers) and the cards'
 types and Oracle text (the themes); among cards that fit, popularity on EDHREC orders them, and
 for new players simpler cards (shorter text, fewer keywords) come first. A mana base follows the
-colors the chosen spells ask for. No language model or paid service is involved.
+colors the chosen spells ask for. No language model or paid service is involved. Since v0.3.1 a
+player's suggestions come from their own library, at most the copies they own.
 """
 
 from collections import defaultdict
@@ -18,6 +19,7 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from api.library import Library
 from api.models import CardConcept, CardTag, CardTagLink
 from api.schemas import Contract
 from api.search import colors as color_bits
@@ -97,6 +99,11 @@ class Candidate:
     identity: int
     colors: int
     mana_cost: str
+    # Copies in the player's library; None when not limited.
+    owned: int | None = None
+
+    def copies(self, wanted: int) -> int:
+        return wanted if self.owned is None else min(wanted, self.owned)
 
     @property
     def types(self) -> list[str]:
@@ -134,16 +141,21 @@ def tag_members(db: Session, slugs: tuple[str, ...]) -> set[UUID]:
     return set(db.scalars(select(CardTagLink.concept_id).where(CardTagLink.tag_id.in_(found))))
 
 
-def pool(db: Session, fmt: str, identity: int) -> list[Candidate]:
-    rows = db.scalars(
-        select(CardConcept).where(
-            CardConcept.status == "certified",
-            CardConcept.deck_card.is_(True),
-            CardConcept.removed_revision.is_(None),
-            CardConcept.legalities[fmt].as_string() == "legal",
-            CardConcept.identity_mask.op("&")(ALL_COLORS & ~identity) == 0,
-        )
+def pool(db: Session, fmt: str, identity: int, library: Library | None = None) -> list[Candidate]:
+    query = select(CardConcept).where(
+        CardConcept.status == "certified",
+        CardConcept.deck_card.is_(True),
+        CardConcept.removed_revision.is_(None),
+        CardConcept.legalities[fmt].as_string() == "legal",
+        CardConcept.identity_mask.op("&")(ALL_COLORS & ~identity) == 0,
     )
+    limited = library is not None and not library.unlimited
+    if limited:
+        owned = [key for key, copies in library.copies.items() if copies > 0]  # type: ignore[union-attr]
+        query = query.where(
+            CardConcept.construction_key.in_(owned) | CardConcept.type_line.startswith("Basic ")
+        )
+    rows = db.scalars(query)
     return [
         Candidate(
             id=row.id,
@@ -157,6 +169,11 @@ def pool(db: Session, fmt: str, identity: int) -> list[Candidate]:
             identity=row.identity_mask,
             colors=row.colors_mask,
             mana_cost=row.mana_cost or "",
+            owned=(
+                library.owned(row.construction_key)  # type: ignore[union-attr]
+                if limited and not row.type_line.startswith("Basic ")
+                else None
+            ),
         )
         for row in rows
     ]
@@ -193,7 +210,7 @@ def score(card: Candidate, experience: Experience) -> tuple[float, str]:
     return (card.rank + penalty, normalize(card.name))
 
 
-def propose(db: Session, body: GuidedRequest) -> GuidedProposal:
+def propose(db: Session, body: GuidedRequest, library: Library | None = None) -> GuidedProposal:
     """The proposal; the caller saves it as a new deck if the player keeps it."""
     leaders: list[CardConcept] = []
     for card_id in (body.commander_id, body.partner_id):
@@ -208,7 +225,9 @@ def propose(db: Session, body: GuidedRequest) -> GuidedProposal:
     else:
         identity = color_bits(body.colors or "c", "colors") if body.colors else 0
     candidates = [
-        card for card in pool(db, body.format, identity) if card.id not in {c.id for c in leaders}
+        card
+        for card in pool(db, body.format, identity, library)
+        if card.id not in {c.id for c in leaders}
     ]
     roles = {role: tag_members(db, slugs) for role, slugs in ROLE_TAGS.items()}
     chosen: list[Suggestion] = []
@@ -224,7 +243,11 @@ def propose(db: Session, body: GuidedRequest) -> GuidedProposal:
             taken.add(card.id)
             chosen.append(
                 Suggestion(
-                    card_id=card.id, name=card.name, quantity=copies, location="main", reason=reason
+                    card_id=card.id,
+                    name=card.name,
+                    quantity=card.copies(copies),
+                    location="main",
+                    reason=reason,
                 )
             )
             count -= 1
@@ -320,14 +343,14 @@ def mana_base(
         ]
         wanted = 10 if body.format == "commander" else 2
         for card in sorted(fixing, key=lambda item: score(item, "experienced"))[:wanted]:
-            if sum(item.quantity for item in lands) + copies > total:
+            if sum(item.quantity for item in lands) + card.copies(copies) > total:
                 break
             taken.add(card.id)
             lands.append(
                 Suggestion(
                     card_id=card.id,
                     name=card.name,
-                    quantity=copies,
+                    quantity=card.copies(copies),
                     location="main",
                     reason="Mana: it makes two or more of your colors.",
                 )

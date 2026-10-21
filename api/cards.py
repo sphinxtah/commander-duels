@@ -8,6 +8,7 @@ says why (CAT07). Search takes structured filters, the search syntax (api/search
 """
 
 import time
+from collections.abc import Iterable
 from datetime import UTC, date, datetime, timedelta
 from typing import Annotated, Any, Literal
 from uuid import UUID
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from api.auth import INPUT_ERRORS
 from api.identity import Active, ApiError, Db, Principal, audit, not_found, require_permission
+from api.library import CurrentLibrary, Library
 from api.models import (
     CardConcept,
     CardFace,
@@ -100,6 +102,11 @@ class CardSummary(Contract):
     copy_limit: int | None
     edhrec_rank: int | None
     image: CardImageRef | None
+    owned: int | None = Field(
+        default=None,
+        description="Copies in the player's library (v0.3.1); null when not limited: basic "
+        "lands, and accounts that build from the whole catalog.",
+    )
 
 
 class CardPage(Contract):
@@ -333,6 +340,24 @@ def summaries(db: Session, concepts: list[CardConcept]) -> list[CardSummary]:
     ]
 
 
+def mark_owned(db: Session, items: Iterable[CardSummary], library: Library) -> None:
+    """Sets each card's copies in the player's library; basic lands stay unlimited."""
+    found = list(items)
+    if library.unlimited or not found:
+        return
+    rows = db.execute(
+        select(CardConcept.id, CardConcept.construction_key, CardConcept.type_line).where(
+            CardConcept.id.in_({item.id for item in found})
+        )
+    )
+    keys = {
+        card_id: None if type_line.startswith("Basic ") else key for card_id, key, type_line in rows
+    }
+    for item in found:
+        key = keys.get(item.id)
+        item.owned = library.owned(key) if key is not None else None
+
+
 def summaries_by_id(db: Session, ids: set[UUID]) -> dict[UUID, CardSummary]:
     if not ids:
         return {}
@@ -357,6 +382,7 @@ def filters(
     legal: str | None,
     playable: bool | None,
     extras: bool,
+    library: Library | None = None,
 ) -> list[ColumnElement[bool]]:
     compiler = Compiler(db)
     conditions: list[ColumnElement[bool]] = [condition(db, q)]
@@ -389,6 +415,11 @@ def filters(
     conditions.append(CardConcept.removed_revision.is_(None))
     if not extras:
         conditions.append(CardConcept.deck_card.is_(True))
+    if library is not None and not library.unlimited:
+        owned = [key for key, copies in library.copies.items() if copies > 0]
+        conditions.append(
+            CardConcept.construction_key.in_(owned) | CardConcept.type_line.startswith("Basic ")
+        )
     return conditions
 
 
@@ -411,6 +442,7 @@ def order_of(sort: Sort, descending: bool) -> list[Any]:
 @router.get("/cards", response_model=CardPage)
 def search_cards(
     principal: Active,
+    library: CurrentLibrary,
     db: Db,
     q: Annotated[str, Query(max_length=500)] = "",
     name: Annotated[str | None, Query(max_length=200)] = None,
@@ -426,12 +458,15 @@ def search_cards(
     legal: Annotated[str | None, Query(max_length=20)] = None,
     playable: bool | None = None,
     extras: bool = False,
+    owned: bool = False,
     sort: Sort = "name",
     descending: bool = False,
     page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = PAGE_SIZE,
 ) -> CardPage:
-    """Cards by structured filters and the search syntax together; all must match."""
+    """Cards by structured filters and the search syntax together; all must match. `owned` keeps
+    to the cards in the player's library (basic lands included); every card says how many copies
+    the library holds."""
     started = time.monotonic()
     try:
         conditions = filters(
@@ -450,6 +485,7 @@ def search_cards(
             legal=legal,
             playable=playable,
             extras=extras,
+            library=library if owned else None,
         )
     except SearchError as error:
         raise ApiError(422, "invalid_search", error.message) from None
@@ -465,6 +501,7 @@ def search_cards(
         )
     )
     items = summaries(db, concepts)
+    mark_owned(db, items, library)
     return CardPage(
         items=items,
         total=total,
@@ -507,6 +544,7 @@ def printings_query(card_id: UUID) -> Select[CardPrinting]:
 def card_detail(
     card_id: UUID,
     principal: Active,
+    library: CurrentLibrary,
     db: Db,
     printing: Annotated[UUID | None, Query()] = None,
 ) -> CardDetail:
@@ -516,6 +554,7 @@ def card_detail(
     if concept is None:
         raise not_found()
     base = summaries(db, [concept])[0]
+    mark_owned(db, [base], library)
     printings = list(db.scalars(printings_query(card_id).limit(MAX_PRINTINGS)))
     if printing is not None and all(shown.id != printing for shown in printings):
         chosen = db.get(CardPrinting, printing)

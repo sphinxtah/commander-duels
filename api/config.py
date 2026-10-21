@@ -60,8 +60,13 @@ class Settings(BaseSettings):
     # Bounds on one bulk file: compressed, and unpacked.
     catalog_max_download_mb: int = Field(default=1024, ge=1, le=16384)
     catalog_max_dataset_mb: int = Field(default=4096, ge=1, le=65536)
-    # The starter decks anyone may copy: the engine's fixture decks (the API image holds a copy).
-    starter_decks_dir: str = "engine/decks"
+    # The Planeswalker roster and the starter decks, content/ in the repository (the API image
+    # holds a copy).
+    content_dir: str = "content"
+    # What Commander bots play when no deck is chosen for them: the starter decks, or the engine's
+    # fixture decks, whose card names are unique to each deck as the browser journeys' leak
+    # checks need.
+    bot_decks: Literal["starters", "fixtures"] = "starters"
 
     @field_validator("database_url")
     @classmethod

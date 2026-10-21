@@ -9,13 +9,17 @@ validation comes back with every save. A revision is an immutable copy of the dr
 the player saves one or when a game starts with the deck, and a game binds to it, so editing the
 deck never changes a game. Deleting moves a deck to the trash, from which it can be restored;
 archived decks leave the list but keep working.
+
+Since v0.3.1 players build from their own library (api/library.py): every validation of a
+player's deck counts the copies they own, and a deck holding more is collection-locked, saved but
+kept from games until fixed. Each deck's stored flags are refreshed whenever its owner's library
+changes (refresh_decks). The starter decks are the ten in content/starter-decks.json.
 """
 
 import hashlib
 import json
 import secrets
 from datetime import UTC, date, datetime
-from pathlib import Path
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
@@ -28,8 +32,17 @@ from sqlalchemy.orm import Session
 
 from api import deckio, guided
 from api.auth import INPUT_ERRORS
-from api.cards import CardSummary, summaries_by_id
-from api.identity import Active, ApiError, Db, Principal, not_found, require_permission
+from api.cards import CardSummary, mark_owned, summaries_by_id
+from api.identity import (
+    Active,
+    ApiError,
+    Db,
+    Principal,
+    not_found,
+    require_permission,
+    settings_of,
+)
+from api.library import CurrentLibrary, Library, Starter, starter_entries, starters_in
 from api.models import (
     CardConcept,
     CardPrinting,
@@ -54,14 +67,6 @@ router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
 MAX_DECKS = 250
 MAX_NOTES = 10_000
-STARTERS = {
-    "legacy-mono-red-burn": ("Mono-Red Burn", "legacy"),
-    "legacy-mono-green-creatures": ("Mono-Green Creatures", "legacy"),
-    "commander-mono-white-soldiers": ("Mono-White Soldiers", "commander"),
-    "commander-mono-blue-flyers": ("Mono-Blue Flyers", "commander"),
-    "commander-mono-red-raiders": ("Mono-Red Raiders", "commander"),
-    "commander-mono-green-stompers": ("Mono-Green Stompers", "commander"),
-}
 Title = Annotated[StoredText, Field(min_length=1, max_length=80)]
 ShareCode = Annotated[str, PathParam(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")]
 
@@ -158,12 +163,23 @@ class SharedDeck(Contract):
 
 
 class StarterDeck(Contract):
-    name: str
+    """One of the ten Commander starter decks (v0.3.1). Each player chooses two at onboarding."""
+
+    name: str = Field(description="The starter deck's ID, such as starter_wu_v1.")
     title: str
     format: GameFormatName
     card_count: int
     commanders: list[str]
     playable: bool
+    colors: str
+    color_names: str
+    guild: str
+    description: str
+    how_to_play: str
+    teaches: str
+    commander_card_id: UUID | None
+    commander_printing_id: UUID | None
+    chosen: bool = Field(description="One of the two the player chose.")
 
 
 class ImportPreview(Contract):
@@ -248,9 +264,16 @@ def identity_of(db: Session, fmt: str, entries: list[DeckEntry]) -> str:
     return "".join(colors_of(bits))
 
 
-def store_draft(db: Session, deck: Deck, entries: list[DeckEntry]) -> Validation:
+def store_draft(
+    db: Session, deck: Deck, entries: list[DeckEntry], library: Library | None
+) -> Validation:
     clean = normalized(entries)
-    validation = validate_deck(db, DeckContent(format=deck.format, entries=clean), today())  # type: ignore[arg-type]
+    validation = validate_deck(
+        db,
+        DeckContent(format=deck.format, entries=clean),  # type: ignore[arg-type]
+        today(),
+        library.collection() if library else None,
+    )
     deck.draft = {"entries": [entry.model_dump(mode="json") for entry in clean]}
     deck.draft_hash = content_hash(deck.format, clean)
     counts = validation.counts
@@ -303,10 +326,19 @@ def revision_summary(revision: DeckRevision) -> RevisionSummary:
     )
 
 
-def deck_detail(db: Session, deck: Deck, validation: Validation | None = None) -> DeckDetail:
+def deck_detail(
+    db: Session, deck: Deck, library: Library, validation: Validation | None = None
+) -> DeckDetail:
     entries = entries_of(deck)
     if validation is None:
-        validation = validate_deck(db, DeckContent(format=deck.format, entries=entries), today())  # type: ignore[arg-type]
+        validation = validate_deck(
+            db,
+            DeckContent(format=deck.format, entries=entries),  # type: ignore[arg-type]
+            today(),
+            library.collection(),
+        )
+    cards = summaries_by_id(db, {entry.card_id for entry in entries})
+    mark_owned(db, cards.values(), library)
     revisions = db.scalars(
         select(DeckRevision)
         .where(DeckRevision.deck_id == deck.id)
@@ -319,7 +351,7 @@ def deck_detail(db: Session, deck: Deck, validation: Validation | None = None) -
         draft=Draft(version=deck.draft_version, entries=entries),
         validation=validation,
         revisions=[revision_summary(revision) for revision in revisions],
-        cards=summaries_by_id(db, {entry.card_id for entry in entries}),
+        cards=cards,
     )
 
 
@@ -333,6 +365,7 @@ def create_deck(
     title: str,
     fmt: str,
     entries: list[DeckEntry],
+    library: Library | None,
     *,
     notes: str = "",
     source: str = "empty",
@@ -356,13 +389,27 @@ def create_deck(
         updated_at=stamp,
     )
     db.add(deck)
-    validation = store_draft(db, deck, entries)
+    validation = store_draft(db, deck, entries, library)
     db.flush()
     return deck, validation
 
 
-def publish(db: Session, deck: Deck) -> DeckRevision:
-    """The draft as an immutable revision; the latest one when the draft has not changed."""
+def refresh_decks(db: Session, user_id: UUID, library: Library) -> None:
+    """Revalidates the account's decks after its library changed, so each deck's stored flags
+    say whether it can start a game now."""
+    for deck in db.scalars(select(Deck).where(Deck.owner_id == user_id, Deck.deleted_at.is_(None))):
+        validation = validate_deck(
+            db,
+            DeckContent(format=deck.format, entries=entries_of(deck)),  # type: ignore[arg-type]
+            today(),
+            library.collection(),
+        )
+        deck.legal, deck.playable = validation.legal, validation.playable
+
+
+def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
+    """The draft as an immutable revision; the latest one when the draft has not changed. Its
+    flags record the deck as it stood then; a game revalidates it against the library."""
     entries = normalized(entries_of(deck))
     digest = content_hash(deck.format, entries)
     if deck.latest_revision is not None:
@@ -373,7 +420,12 @@ def publish(db: Session, deck: Deck) -> DeckRevision:
         )
         if latest is not None and latest.content_hash == digest and latest.title == deck.title:
             return latest
-    validation = validate_deck(db, DeckContent(format=deck.format, entries=entries), today())  # type: ignore[arg-type]
+    validation = validate_deck(
+        db,
+        DeckContent(format=deck.format, entries=entries),  # type: ignore[arg-type]
+        today(),
+        library.collection(),
+    )
     catalog = db.scalar(select(func.max(CatalogRevision.id)))
     revision = DeckRevision(
         deck_id=deck.id,
@@ -420,52 +472,48 @@ def revision_entries(db: Session, revision: DeckRevision) -> list[DeckEntry]:
     )
 
 
-# Starter decks: the engine's fixture decks, which anyone may copy and edit.
+# Starter decks: the ten Commander decks players choose from (content/starter-decks.json).
 
 
-def starter_folder(request: Request) -> Path:
-    return Path(request.app.state.settings.starter_decks_dir)
+def starters_of(request: Request) -> dict[str, Starter]:
+    return starters_in(settings_of(request).content_dir)
 
 
-def starter_entries(
-    db: Session, folder: Path, name: str
-) -> tuple[str, str, list[DeckEntry], list[str]]:
-    if name not in STARTERS:
-        raise not_found()
-    title, fmt = STARTERS[name]
-    path = folder / f"{name}.txt"
-    if not path.is_file():
-        raise ApiError(503, "starters_unavailable", "The starter decks are not installed.")
-    parsed = deckio.parse_text(path.read_text(encoding="utf-8"), fmt)
-    for line in parsed.lines:
-        # In the engine's Commander fixtures the SB: line is the commander.
-        if fmt == "commander" and line.location == "sideboard":
-            line.location = "commander"
-    lines = deckio.resolve(db, parsed)
-    missing = [line.name for line in lines if line.card_id is None]
-    return title, fmt, deckio.merged(lines), missing
+def starter_deck(
+    db: Session, starter: Starter, library: Library, chosen: list[str] | None
+) -> StarterDeck:
+    entries, missing = starter_entries(db, starter)
+    validation = validate_deck(
+        db, DeckContent(format="commander", entries=entries), today(), library.collection()
+    )
+    leader = next((entry for entry in entries if entry.location == "commander"), None)
+    return StarterDeck(
+        name=starter.id,
+        title=starter.title,
+        format="commander",
+        card_count=validation.counts.main + validation.counts.commander,
+        commanders=commanders_of(db, entries),
+        playable=validation.playable and not missing,
+        colors=starter.colors,
+        color_names=starter.color_names,
+        guild=starter.guild,
+        description=starter.description,
+        how_to_play=starter.how_to_play,
+        teaches=starter.teaches,
+        commander_card_id=leader.card_id if leader else None,
+        commander_printing_id=leader.printing_id if leader else None,
+        chosen=starter.id in (chosen or []),
+    )
 
 
 @router.get("/decks/starters", response_model=list[StarterDeck])
-def starters(request: Request, principal: Builder, db: Db) -> list[StarterDeck]:
-    found = []
-    folder = starter_folder(request)
-    for name in STARTERS:
-        if not (folder / f"{name}.txt").is_file():
-            continue
-        title, fmt, entries, missing = starter_entries(db, folder, name)
-        validation = validate_deck(db, DeckContent(format=fmt, entries=entries), today())  # type: ignore[arg-type]
-        found.append(
-            StarterDeck(
-                name=name,
-                title=title,
-                format=fmt,  # type: ignore[arg-type]
-                card_count=validation.counts.main + validation.counts.commander,
-                commanders=commanders_of(db, entries),
-                playable=validation.playable and not missing,
-            )
-        )
-    return found
+def starters(
+    request: Request, principal: Builder, library: CurrentLibrary, db: Db
+) -> list[StarterDeck]:
+    """The ten starter decks. "playable" counts the player's own library: a deck they did not
+    choose holds cards they do not own."""
+    chosen = principal.user.starter_decks
+    return [starter_deck(db, starter, library, chosen) for starter in starters_of(request).values()]
 
 
 # Routes.
@@ -490,7 +538,9 @@ def list_decks(
 
 
 @router.post("/decks", response_model=DeckDetail, status_code=201)
-def create(body: DeckCreate, request: Request, principal: Builder, db: Db) -> DeckDetail:
+def create(
+    body: DeckCreate, request: Request, principal: Builder, library: CurrentLibrary, db: Db
+) -> DeckDetail:
     """A new deck: empty, from the given entries (an import or a guided build), a copy of a starter
     deck, or a duplicate of one of the player's own."""
     entries, notes, title, fmt = body.entries, body.notes, body.title, body.format
@@ -498,8 +548,11 @@ def create(body: DeckCreate, request: Request, principal: Builder, db: Db) -> De
     if kind == "starter":
         if body.source.starter is None:
             raise ApiError(422, "invalid_source", "Name the starter deck to copy.")
-        _, fmt_found, entries, _ = starter_entries(db, starter_folder(request), body.source.starter)
-        fmt = cast(GameFormatName, fmt_found)
+        starter = starters_of(request).get(body.source.starter)
+        if starter is None:
+            raise not_found()
+        entries, _ = starter_entries(db, starter)
+        fmt = "commander"
     elif kind == "duplicate":
         if body.source.deck_id is None:
             raise ApiError(422, "invalid_source", "Name the deck to duplicate.")
@@ -509,18 +562,22 @@ def create(body: DeckCreate, request: Request, principal: Builder, db: Db) -> De
             original.notes,
             cast(GameFormatName, original.format),
         )
-    deck, validation = create_deck(db, principal, title, fmt, entries, notes=notes, source=kind)
+    deck, validation = create_deck(
+        db, principal, title, fmt, entries, library, notes=notes, source=kind
+    )
     db.commit()
-    return deck_detail(db, deck, validation)
+    return deck_detail(db, deck, library, validation)
 
 
 @router.get("/decks/{deck_id}", response_model=DeckDetail)
-def read_deck(deck_id: UUID, principal: Builder, db: Db) -> DeckDetail:
-    return deck_detail(db, owned(db, principal, deck_id))
+def read_deck(deck_id: UUID, principal: Builder, library: CurrentLibrary, db: Db) -> DeckDetail:
+    return deck_detail(db, owned(db, principal, deck_id), library)
 
 
 @router.patch("/decks/{deck_id}", response_model=DeckDetail)
-def update_deck(deck_id: UUID, body: DeckUpdate, principal: Builder, db: Db) -> DeckDetail:
+def update_deck(
+    deck_id: UUID, body: DeckUpdate, principal: Builder, library: CurrentLibrary, db: Db
+) -> DeckDetail:
     deck = owned(db, principal, deck_id)
     if body.title is not None:
         deck.title = body.title
@@ -532,7 +589,7 @@ def update_deck(deck_id: UUID, body: DeckUpdate, principal: Builder, db: Db) -> 
         deck.share_code = secrets.token_urlsafe(12) if body.visibility == "link" else None
     deck.updated_at = now()
     db.commit()
-    return deck_detail(db, deck)
+    return deck_detail(db, deck, library)
 
 
 @router.put(
@@ -540,7 +597,9 @@ def update_deck(deck_id: UUID, body: DeckUpdate, principal: Builder, db: Db) -> 
     response_model=DraftSaved,
     responses={409: {"model": Error}},
 )
-def save_draft(deck_id: UUID, body: DraftSave, principal: Builder, db: Db) -> DraftSaved:
+def save_draft(
+    deck_id: UUID, body: DraftSave, principal: Builder, library: CurrentLibrary, db: Db
+) -> DraftSaved:
     """Autosave. version is the draft version this edit started from."""
     deck = db.scalar(select(Deck).where(Deck.id == deck_id).with_for_update())
     if deck is None or deck.owner_id != principal.user.id or deck.deleted_at is not None:
@@ -552,20 +611,24 @@ def save_draft(deck_id: UUID, body: DraftSave, principal: Builder, db: Db) -> Dr
             "This deck changed in another tab or window. Your changes are kept here: compare "
             "them with the saved deck and choose what to keep.",
         )
-    validation = store_draft(db, deck, body.entries)
+    validation = store_draft(db, deck, body.entries, library)
     deck.draft_version += 1
     db.commit()
+    cards = summaries_by_id(db, {entry.card_id for entry in body.entries})
+    mark_owned(db, cards.values(), library)
     return DraftSaved(
         version=deck.draft_version,
         updated_at=deck.updated_at,
         validation=validation,
-        cards=summaries_by_id(db, {entry.card_id for entry in body.entries}),
+        cards=cards,
     )
 
 
 @router.post("/decks/{deck_id}/revisions", response_model=RevisionSummary, status_code=201)
-def save_revision(deck_id: UUID, principal: Builder, db: Db) -> RevisionSummary:
-    revision = publish(db, owned(db, principal, deck_id))
+def save_revision(
+    deck_id: UUID, principal: Builder, library: CurrentLibrary, db: Db
+) -> RevisionSummary:
+    revision = publish(db, owned(db, principal, deck_id), library)
     db.commit()
     return revision_summary(revision)
 
@@ -622,28 +685,39 @@ def restore(deck_id: UUID, principal: Builder, db: Db) -> DeckSummary:
 
 
 @router.post("/decks/validate", response_model=Validation)
-def validate_entries(body: ValidateRequest, principal: Builder, db: Db) -> Validation:
+def validate_entries(
+    body: ValidateRequest, principal: Builder, library: CurrentLibrary, db: Db
+) -> Validation:
     return validate_deck(
-        db, DeckContent(format=body.format, entries=normalized(body.entries)), today()
+        db,
+        DeckContent(format=body.format, entries=normalized(body.entries)),
+        today(),
+        library.collection(),
     )
 
 
 @router.post("/decks/guided", response_model=GuidedResult)
-def guided_deck(body: guided.GuidedRequest, principal: Builder, db: Db) -> GuidedResult:
-    """A proposed starting deck (DECK06). Nothing is saved: create a deck from its entries."""
-    proposal = guided.propose(db, body)
+def guided_deck(
+    body: guided.GuidedRequest, principal: Builder, library: CurrentLibrary, db: Db
+) -> GuidedResult:
+    """A proposed starting deck (DECK06), from the cards the player's library holds. Nothing is
+    saved: create a deck from its entries."""
+    proposal = guided.propose(db, body, library)
     validation = validate_deck(
-        db, DeckContent(format=body.format, entries=proposal.entries), today()
+        db,
+        DeckContent(format=body.format, entries=proposal.entries),
+        today(),
+        library.collection(),
     )
-    return GuidedResult(
-        **proposal.model_dump(),
-        validation=validation,
-        cards=summaries_by_id(db, {entry.card_id for entry in proposal.entries}),
-    )
+    cards = summaries_by_id(db, {entry.card_id for entry in proposal.entries})
+    mark_owned(db, cards.values(), library)
+    return GuidedResult(**proposal.model_dump(), validation=validation, cards=cards)
 
 
 @router.post("/decks/import/preview", response_model=ImportPreview)
-def import_preview(body: deckio.ImportRequest, principal: Builder, db: Db) -> ImportPreview:
+def import_preview(
+    body: deckio.ImportRequest, principal: Builder, library: CurrentLibrary, db: Db
+) -> ImportPreview:
     """Reads a text list or a deck file and shows how each line resolves. Saves nothing."""
     if bool(body.text.strip()) == bool(body.json_text.strip()):
         raise ApiError(422, "invalid_deck_list", "Send a text list or a deck file.")
@@ -657,7 +731,11 @@ def import_preview(body: deckio.ImportRequest, principal: Builder, db: Db) -> Im
         fmt = cast(GameFormatName, parsed.game_format)
     lines = deckio.resolve(db, parsed)
     entries = deckio.merged(lines)
-    validation = validate_deck(db, DeckContent(format=fmt, entries=entries), today())
+    validation = validate_deck(
+        db, DeckContent(format=fmt, entries=entries), today(), library.collection()
+    )
+    cards = summaries_by_id(db, {entry.card_id for entry in entries})
+    mark_owned(db, cards.values(), library)
     return ImportPreview(
         format=fmt,
         title=parsed.title,
@@ -666,7 +744,7 @@ def import_preview(body: deckio.ImportRequest, principal: Builder, db: Db) -> Im
         unresolved=sum(1 for line in lines if line.status == "unresolved"),
         ambiguous=sum(1 for line in lines if line.status == "ambiguous"),
         validation=validation,
-        cards=summaries_by_id(db, {entry.card_id for entry in entries}),
+        cards=cards,
     )
 
 
@@ -720,18 +798,26 @@ def shared(db: Session, code: str) -> Deck:
 
 
 @router.get("/shared-decks/{code}", response_model=SharedDeck)
-def read_shared(code: ShareCode, principal: Active, db: Db) -> SharedDeck:
-    """A deck shared by link, for anyone signed in: its cards, not its notes (DECK11)."""
+def read_shared(code: ShareCode, principal: Active, library: CurrentLibrary, db: Db) -> SharedDeck:
+    """A deck shared by link, for anyone signed in: its cards, not its notes (DECK11). It is
+    validated against the viewer's library, as a copy of it would be."""
     deck = shared(db, code)
     owner = db.get(User, deck.owner_id)
     entries = entries_of(deck)
+    cards = summaries_by_id(db, {entry.card_id for entry in entries})
+    mark_owned(db, cards.values(), library)
     return SharedDeck(
         title=deck.title,
         format=deck.format,  # type: ignore[arg-type]
         owner=(owner.handle or owner.display_name) if owner else "",
         entries=entries,
-        cards=summaries_by_id(db, {entry.card_id for entry in entries}),
-        validation=validate_deck(db, DeckContent(format=deck.format, entries=entries), today()),  # type: ignore[arg-type]
+        cards=cards,
+        validation=validate_deck(
+            db,
+            DeckContent(format=deck.format, entries=entries),  # type: ignore[arg-type]
+            today(),
+            library.collection(),
+        ),
         updated_at=deck.updated_at,
     )
 
@@ -745,7 +831,7 @@ def export_shared(
 
 
 @router.post("/shared-decks/{code}/copy", response_model=DeckDetail, status_code=201)
-def copy_shared(code: ShareCode, principal: Builder, db: Db) -> DeckDetail:
+def copy_shared(code: ShareCode, principal: Builder, library: CurrentLibrary, db: Db) -> DeckDetail:
     """Copies a shared deck into the viewer's own decks, without its owner's notes."""
     deck = shared(db, code)
     copied, validation = create_deck(
@@ -754,7 +840,8 @@ def copy_shared(code: ShareCode, principal: Builder, db: Db) -> DeckDetail:
         deck.title[:73] + " (copy)",
         deck.format,
         entries_of(deck),
+        library,
         source="duplicate",
     )
     db.commit()
-    return deck_detail(db, copied, validation)
+    return deck_detail(db, copied, library, validation)

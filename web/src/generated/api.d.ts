@@ -99,6 +99,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/custom-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Uploaded */
+        get: operations["uploaded_api_v1_admin_custom_cards_get"];
+        put?: never;
+        /**
+         * Upload
+         * @description Adds a custom card, or replaces the one of the same name. The audit trail records its ID,
+         *     never its name or text.
+         */
+        post: operations["upload_api_v1_admin_custom_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/custom-cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove */
+        delete: operations["remove_api_v1_admin_custom_cards__card_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -162,6 +201,27 @@ export interface paths {
         put?: never;
         /** Change Status */
         post: operations["change_status_api_v1_admin_users__user_id__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/wins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Wins
+         * @description SysOp sets an account's wins, and so its level: any player's, or its own. The setting is a
+         *     ledger entry of its own, apart from counted wins, with the reason, and is audited (PROG03).
+         */
+        post: operations["change_wins_api_v1_admin_users__user_id__wins_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -327,7 +387,9 @@ export interface paths {
         };
         /**
          * Search Cards
-         * @description Cards by structured filters and the search syntax together; all must match.
+         * @description Cards by structured filters and the search syntax together; all must match. `owned` keeps
+         *     to the cards in the player's library (basic lands included); every card says how many copies
+         *     the library holds.
          */
         get: operations["search_cards_api_v1_cards_get"];
         put?: never;
@@ -410,6 +472,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/custom-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Custom Cards
+         * @description The custom cards, for accounts at the Godlike tier only.
+         */
+        get: operations["custom_cards_api_v1_custom_cards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/custom-cards/{card_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Custom Card Image */
+        get: operations["custom_card_image_api_v1_custom_cards__card_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks": {
         parameters: {
             query?: never;
@@ -443,7 +542,8 @@ export interface paths {
         put?: never;
         /**
          * Guided Deck
-         * @description A proposed starting deck (DECK06). Nothing is saved: create a deck from its entries.
+         * @description A proposed starting deck (DECK06), from the cards the player's library holds. Nothing is
+         *     saved: create a deck from its entries.
          */
         post: operations["guided_deck_api_v1_decks_guided_post"];
         delete?: never;
@@ -479,7 +579,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Starters */
+        /**
+         * Starters
+         * @description The ten starter decks. "playable" counts the player's own library: a deck they did not
+         *     choose holds cards they do not own.
+         */
         get: operations["starters_api_v1_decks_starters_get"];
         put?: never;
         post?: never;
@@ -803,6 +907,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Library
+         * @description The cards in the account's library, with their copies and where they came from. An
+         *     account that builds from the whole catalog has no list here.
+         */
+        get: operations["my_library_api_v1_library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -819,6 +944,44 @@ export interface paths {
         head?: never;
         /** Update Profile */
         patch: operations["update_profile_api_v1_me_patch"];
+        trace?: never;
+    };
+    "/api/v1/me/alliance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Join Alliance
+         * @description Allies with a Planeswalker the account's tier has opened, leaving any other alliance.
+         */
+        put: operations["join_alliance_api_v1_me_alliance_put"];
+        post?: never;
+        /** Leave Alliance */
+        delete: operations["leave_alliance_api_v1_me_alliance_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Progress */
+        get: operations["my_progress_api_v1_me_progress_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/me/sessions": {
@@ -855,6 +1018,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/starters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose Starters
+         * @description The two starter decks: each becomes a deck of the player's own, and every copy of their
+         *     cards joins the library for good. Chosen once.
+         */
+        post: operations["choose_starters_api_v1_me_starters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/planeswalkers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Planeswalkers
+         * @description The roster, with what the account's tier has opened.
+         */
+        get: operations["planeswalkers_api_v1_planeswalkers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/practice-games": {
         parameters: {
             query?: never;
@@ -882,7 +1086,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Practice Options */
+        /**
+         * Practice Options
+         * @description The table's formats and bots. The engine's fixture decks are offered to SysOp only, as its
+         *     test decks for the browser journeys; players play their own decks, the two starter decks they
+         *     chose among them. The routes still accept a fixture deck by name, for scripts.
+         */
         get: operations["practice_options_api_v1_practice_games_options_get"];
         put?: never;
         post?: never;
@@ -935,7 +1144,8 @@ export interface paths {
         };
         /**
          * Read Shared
-         * @description A deck shared by link, for anyone signed in: its cards, not its notes (DECK11).
+         * @description A deck shared by link, for anyone signed in: its cards, not its notes (DECK11). It is
+         *     validated against the viewer's library, as a copy of it would be.
          */
         get: operations["read_shared_api_v1_shared_decks__code__get"];
         put?: never;
@@ -989,6 +1199,8 @@ export interface components {
     schemas: {
         /** AdminUser */
         AdminUser: {
+            /** Alliance */
+            alliance?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1014,6 +1226,22 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "denied" | "disabled";
+            /**
+             * Tier
+             * @default bronze
+             * @enum {string}
+             */
+            tier: "bronze" | "silver" | "gold" | "platinum" | "mythic" | "godlike";
+            /**
+             * Wins
+             * @default 0
+             */
+            wins: number;
+        };
+        /** AllianceChange */
+        AllianceChange: {
+            /** Planeswalker */
+            planeswalker: string;
         };
         /** AuditActor */
         AuditActor: {
@@ -1072,10 +1300,10 @@ export interface components {
             capabilities: components["schemas"]["Capability"][];
             /**
              * Collection Policy
-             * @default open_collection
-             * @constant
+             * @default earned_collection
+             * @enum {string}
              */
-            collection_policy: "open_collection";
+            collection_policy: "open_collection" | "earned_collection";
             /**
              * Name
              * @default Commander Duels
@@ -1090,7 +1318,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.3.0
+             * @default 0.3.1
              */
             version: string;
         };
@@ -1169,6 +1397,11 @@ export interface components {
             name: string;
             /** Oracle Text */
             oracle_text: string;
+            /**
+             * Owned
+             * @description Copies in the player's library (v0.3.1); null when not limited: basic lands, and accounts that build from the whole catalog.
+             */
+            owned?: number | null;
             /** Partner */
             partner: string | null;
             /** Playable */
@@ -1308,6 +1541,11 @@ export interface components {
             name: string;
             /** Oracle Text */
             oracle_text: string;
+            /**
+             * Owned
+             * @description Copies in the player's library (v0.3.1); null when not limited: basic lands, and accounts that build from the whole catalog.
+             */
+            owned?: number | null;
             /** Partner */
             partner: string | null;
             /** Playable */
@@ -1374,6 +1612,100 @@ export interface components {
             reason: string | null;
             /** Status */
             status: string;
+        };
+        /** CustomCardInfo */
+        CustomCardInfo: {
+            /** Artist */
+            artist: string | null;
+            /** Collector Number */
+            collector_number: string | null;
+            /** Flavor Text */
+            flavor_text: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Image Url */
+            image_url: string;
+            /**
+             * In Library
+             * @description In your library: you are allied with its Planeswalker.
+             * @default false
+             */
+            in_library: boolean;
+            /** Loyalty */
+            loyalty: string | null;
+            /** Mana Cost */
+            mana_cost: string | null;
+            /** Name */
+            name: string;
+            /** Oracle Text */
+            oracle_text: string;
+            /** Planeswalker */
+            planeswalker: string;
+            /**
+             * Playable
+             * @description None can be played yet.
+             * @default false
+             */
+            playable: boolean;
+            /** Power */
+            power: string | null;
+            /** Rarity */
+            rarity: string;
+            /** Set Code */
+            set_code: string | null;
+            /** Toughness */
+            toughness: string | null;
+            /** Type Line */
+            type_line: string;
+        };
+        /** CustomCardUpload */
+        CustomCardUpload: {
+            /** Artist */
+            artist?: string | null;
+            /** Collector Number */
+            collector_number?: string | null;
+            /** Flavor Text */
+            flavor_text?: string | null;
+            /**
+             * Image
+             * @description The card's image, base64, at most 900 KB decoded.
+             */
+            image: string;
+            /**
+             * Image Type
+             * @enum {string}
+             */
+            image_type: "image/webp" | "image/png" | "image/jpeg";
+            /** Loyalty */
+            loyalty?: string | null;
+            /** Mana Cost */
+            mana_cost?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Oracle Text
+             * @default
+             */
+            oracle_text: string;
+            /** Planeswalker */
+            planeswalker: string;
+            /** Power */
+            power?: string | null;
+            /**
+             * Rarity
+             * @default mythic
+             * @enum {string}
+             */
+            rarity: "common" | "uncommon" | "rare" | "mythic" | "special";
+            /** Set Code */
+            set_code?: string | null;
+            /** Toughness */
+            toughness?: string | null;
+            /** Type Line */
+            type_line: string;
         };
         /** DeckCounts */
         DeckCounts: {
@@ -1707,6 +2039,11 @@ export interface components {
              * @enum {string}
              */
             player: "human" | "bot";
+            /**
+             * Portrait
+             * @description A player's allied Planeswalker, whose portrait stands for them.
+             */
+            portrait?: string | null;
             /** Seat */
             seat: number;
         };
@@ -1833,7 +2170,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.3.0
+             * @default 0.3.1
              */
             version: string;
         };
@@ -1917,12 +2254,40 @@ export interface components {
              */
             text: string;
         };
+        /** LibraryCard */
+        LibraryCard: {
+            card: components["schemas"]["CardSummary"];
+            /**
+             * Copies
+             * @description Copies owned; null for basic lands.
+             */
+            copies: number | null;
+            /** Sources */
+            sources: ("starter" | "grandfathered" | "alliance")[];
+        };
+        /** LibraryView */
+        LibraryView: {
+            /** Alliance */
+            alliance: string | null;
+            /** Cards */
+            cards: components["schemas"]["LibraryCard"][];
+            /**
+             * Unlimited
+             * @description Builds from the whole catalog (administrators, SysOp).
+             */
+            unlimited: boolean;
+        };
         /**
          * Me
          * @description The signed-in account, for its owner only. Email is private; the Google subject is never
          *     returned.
          */
         Me: {
+            /**
+             * Alliance
+             * @description The allied Planeswalker's ID; its portrait is the account's.
+             */
+            alliance?: string | null;
             /**
              * Avatar
              * @enum {string}
@@ -1953,11 +2318,12 @@ export interface components {
             locale: string;
             /**
              * Onboarding
+             * @description handle, then starters (choose two starter decks), then complete.
              * @enum {string}
              */
-            onboarding: "handle" | "complete";
+            onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -1967,6 +2333,49 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "denied";
+        };
+        /** PlaneswalkerInfo */
+        PlaneswalkerInfo: {
+            /**
+             * Cards
+             * @description Its Planeswalker cards in the catalog.
+             */
+            cards: number;
+            /** Custom */
+            custom: boolean;
+            /** Description */
+            description: string | null;
+            /** First Card */
+            first_card: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Open
+             * @description Whether your tier has opened it.
+             */
+            open: boolean;
+            /**
+             * Playable Cards
+             * @description Of those, the ones a game can be played with.
+             */
+            playable_cards: number;
+            /**
+             * Portrait
+             * @description Whether it has a portrait (web/public/portraits).
+             */
+            portrait: boolean;
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "bronze" | "silver" | "gold" | "platinum" | "mythic" | "godlike";
+            /**
+             * Wins
+             * @description The wins that open it.
+             */
+            wins: number;
         };
         /** PracticeFormat */
         PracticeFormat: {
@@ -2117,6 +2526,29 @@ export interface components {
             /** Locale */
             locale?: string | null;
             preferences?: components["schemas"]["Preferences"] | null;
+        };
+        /** Progress */
+        Progress: {
+            /** Alliance */
+            alliance: string | null;
+            /** Alliance Since */
+            alliance_since: string | null;
+            /**
+             * Counted Wins
+             * @description Wins from games.
+             */
+            counted_wins: number;
+            next_tier: components["schemas"]["TierInfo"] | null;
+            /**
+             * Set Wins
+             * @description Wins SysOp set, apart from games.
+             */
+            set_wins: number;
+            tier: components["schemas"]["TierInfo"];
+            /** Tiers */
+            tiers: components["schemas"]["TierInfo"][];
+            /** Wins */
+            wins: number;
         };
         /** Readiness */
         Readiness: {
@@ -2368,23 +2800,63 @@ export interface components {
             updated_at: string;
             validation: components["schemas"]["Validation"];
         };
-        /** StarterDeck */
+        /** StarterChoice */
+        StarterChoice: {
+            /** Decks */
+            decks: string[];
+        };
+        /**
+         * StarterDeck
+         * @description One of the ten Commander starter decks (v0.3.1). Each player chooses two at onboarding.
+         */
         StarterDeck: {
             /** Card Count */
             card_count: number;
+            /**
+             * Chosen
+             * @description One of the two the player chose.
+             */
+            chosen: boolean;
+            /** Color Names */
+            color_names: string;
+            /** Colors */
+            colors: string;
+            /** Commander Card Id */
+            commander_card_id: string | null;
+            /** Commander Printing Id */
+            commander_printing_id: string | null;
             /** Commanders */
             commanders: string[];
+            /** Description */
+            description: string;
             /**
              * Format
              * @enum {string}
              */
             format: "legacy" | "commander";
-            /** Name */
+            /** Guild */
+            guild: string;
+            /** How To Play */
+            how_to_play: string;
+            /**
+             * Name
+             * @description The starter deck's ID, such as starter_wu_v1.
+             */
             name: string;
             /** Playable */
             playable: boolean;
+            /** Teaches */
+            teaches: string;
             /** Title */
             title: string;
+        };
+        /** StarterResult */
+        StarterResult: {
+            /**
+             * Decks
+             * @description The two new decks.
+             */
+            decks: string[];
         };
         /** StatusChange */
         StatusChange: {
@@ -2459,6 +2931,21 @@ export interface components {
             /** Trigger */
             trigger: string;
         };
+        /** TierInfo */
+        TierInfo: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "bronze" | "silver" | "gold" | "platinum" | "mythic" | "godlike";
+            /** Name */
+            name: string;
+            /**
+             * Wins
+             * @description The wins that reach this tier.
+             */
+            wins: number;
+        };
         /** UserPage */
         UserPage: {
             /** Items */
@@ -2507,6 +2994,13 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** WinsChange */
+        WinsChange: {
+            /** Reason */
+            reason: string;
+            /** Wins */
+            wins: number;
         };
         /** XmageBuild */
         XmageBuild: {
@@ -2925,6 +3419,286 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SyncQueued"];
                 };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    uploaded_api_v1_admin_custom_cards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomCardInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    upload_api_v1_admin_custom_cards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomCardUpload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomCardInfo"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    remove_api_v1_admin_custom_cards__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Bad Request */
             400: {
@@ -3457,6 +4231,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_wins_api_v1_admin_users__user_id__wins_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WinsChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */
@@ -4158,6 +5030,7 @@ export interface operations {
                 legal?: string | null;
                 playable?: boolean | null;
                 extras?: boolean;
+                owned?: boolean;
                 sort?: "name" | "mana_value" | "released" | "popularity" | "color";
                 descending?: boolean;
                 page?: number;
@@ -4553,6 +5426,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Coverage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    custom_cards_api_v1_custom_cards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomCardInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    custom_card_image_api_v1_custom_cards__card_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": unknown;
+                    "image/png": unknown;
+                    "image/webp": unknown;
                 };
             };
             /** @description Bad Request */
@@ -6708,6 +7769,98 @@ export interface operations {
             };
         };
     };
+    my_library_api_v1_library_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -6811,6 +7964,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    join_alliance_api_v1_me_alliance_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AllianceChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    leave_alliance_api_v1_me_alliance_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_progress_api_v1_me_progress_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Progress"];
                 };
             };
             /** @description Bad Request */
@@ -7040,6 +8473,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    choose_starters_api_v1_me_starters_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StarterChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StarterResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    planeswalkers_api_v1_planeswalkers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlaneswalkerInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */

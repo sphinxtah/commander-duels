@@ -14,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     SmallInteger,
     String,
     Text,
@@ -53,7 +54,9 @@ class User(Base):
         CheckConstraint(
             "status IN ('active', 'pending', 'denied', 'disabled')", name="ck_users_status"
         ),
-        CheckConstraint("onboarding IN ('handle', 'complete')", name="ck_users_onboarding"),
+        CheckConstraint(
+            "onboarding IN ('handle', 'starters', 'complete')", name="ck_users_onboarding"
+        ),
         CheckConstraint("privilege_version >= 0", name="ck_users_privilege_version"),
         Index(
             "uq_users_one_sysop",
@@ -81,6 +84,11 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     last_seen_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # The Planeswalker the account is allied with (content/planeswalkers.json), and since when.
+    alliance: Mapped[str | None] = mapped_column(String(48))
+    alliance_since: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # The two starter decks chosen at onboarding, by ID; null until chosen.
+    starter_decks: Mapped[list[str] | None] = mapped_column(JsonType)
 
 
 class ExternalIdentity(Base):
@@ -682,3 +690,80 @@ class DeckEntryRow(Base):
     printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))
     quantity: Mapped[int]
     location: Mapped[str] = mapped_column(String(16))
+
+
+class ProgressEntry(Base):
+    """The progression ledger (PROG03-PROG05): wins, each counted once from a committed game
+    result, and SysOp's settings of an account's wins, kept apart from them. Append-only:
+    PostgreSQL refuses updates and deletes. An account's wins are the sum of its entries."""
+
+    __tablename__ = "progress_ledger"
+    __table_args__ = (
+        CheckConstraint("kind IN ('game_win', 'wins_set')", name="ck_progress_ledger_kind"),
+        CheckConstraint(
+            "(kind = 'game_win') = (game_id IS NOT NULL)", name="ck_progress_ledger_game"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    # A change in wins: 1 for a game won; for a setting, the difference it made.
+    wins: Mapped[int] = mapped_column(BigInteger)
+    # Unique per fact, so retries and replays write nothing twice: win:<game>:<seat>, set:<id>.
+    key: Mapped[str] = mapped_column(String(96), unique=True)
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    # The rule an entry was counted under, recorded with it (PROG05).
+    policy: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class LibraryGrant(Base):
+    """Copies of a card granted into an account's library for good: a starter deck's cards, or
+    the cards of decks saved before libraries existed. An alliance's cards are not granted: they
+    are in the library while the alliance lasts. Append-only, like the ledger."""
+
+    __tablename__ = "library_grants"
+    __table_args__ = (
+        UniqueConstraint("user_id", "grant_key", "concept_id"),
+        CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
+        CheckConstraint("source IN ('starter', 'grandfathered')", name="ck_library_grants_source"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    quantity: Mapped[int]
+    source: Mapped[str] = mapped_column(String(16))
+    # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1.
+    grant_key: Mapped[str] = mapped_column(String(96))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class CustomCard(Base):
+    """A card of the owner's own making, uploaded by SysOp: never in the catalog's tables, so no
+    search, card page, deck or list of others can reach it. Only accounts at the Godlike tier see
+    it, and none may play it until the engine implements it."""
+
+    __tablename__ = "custom_cards"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(160), unique=True)
+    # The roster's Planeswalker whose alliance brings it.
+    planeswalker: Mapped[str] = mapped_column(String(48))
+    mana_cost: Mapped[str | None] = mapped_column(String(64))
+    type_line: Mapped[str] = mapped_column(String(160))
+    oracle_text: Mapped[str] = mapped_column(Text, default="")
+    flavor_text: Mapped[str | None] = mapped_column(Text)
+    power: Mapped[str | None] = mapped_column(String(8))
+    toughness: Mapped[str | None] = mapped_column(String(8))
+    loyalty: Mapped[str | None] = mapped_column(String(8))
+    rarity: Mapped[str] = mapped_column(String(16))
+    set_code: Mapped[str | None] = mapped_column(String(16))
+    collector_number: Mapped[str | None] = mapped_column(String(16))
+    artist: Mapped[str | None] = mapped_column(String(128))
+    image: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    image_type: Mapped[str] = mapped_column(String(32))
+    image_sha256: Mapped[str] = mapped_column(String(64))
+    uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())

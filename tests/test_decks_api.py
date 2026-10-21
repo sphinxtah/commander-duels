@@ -1,5 +1,8 @@
 """Cards and decks through the API: search, the deck lifecycle, drafts and revisions, sharing,
-import and export, starter decks, and that no deck reaches another account (T29's deck case)."""
+import and export, starter decks, and that no deck reaches another account (T29's deck case).
+
+Accounts that test deck mechanics are administrators, who build from the whole catalog; players'
+libraries are tested in test_progression.py."""
 
 import json
 import secrets
@@ -21,11 +24,27 @@ from api.cards import artist_of, image_of
 from api.config import Settings
 from api.identity import hash_token, utcnow
 from api.main import create_app
-from api.models import CardConcept, CardPrinting, User, UserSession
+from api.models import CardConcept, CardPrinting, RoleGrant, User, UserSession
+
+# Tables a test empties after itself, children first; the catalog stays.
+ACCOUNT_TABLES = (
+    "library_grants",
+    "progress_ledger",
+    "deck_entries",
+    "deck_revisions",
+    "decks",
+    "audit_events",
+    "role_grants",
+    "sessions",
+    "users",
+)
+CONTENT = Path(__file__).resolve().parent.parent / "content"
 
 
 class Account:
-    def __init__(self, client: TestClient, handle: str, status: str = "active") -> None:
+    def __init__(
+        self, client: TestClient, handle: str, status: str = "active", admin: bool = False
+    ) -> None:
         now = utcnow()
         self.token = secrets.token_urlsafe(32)
         with Session(client.app.state.database, expire_on_commit=False) as db:  # type: ignore[attr-defined]
@@ -40,6 +59,8 @@ class Account:
             )
             db.add(user)
             db.flush()
+            if admin:
+                db.add(RoleGrant(user_id=user.id, role="administrator", granted_at=now))
             session = UserSession(
                 token_hash=hash_token(self.token),
                 user_id=user.id,
@@ -67,15 +88,67 @@ class Account:
         return self.http.request(method, path, json=body, params=params, headers=self.headers())
 
 
+def starter(ident: str, number: int, title: str, cards: list[tuple[int, str]]) -> dict:
+    return {
+        "id": ident,
+        "number": number,
+        "title": title,
+        "commander": cards[0][1],
+        "colors": "R",
+        "color_names": "Red",
+        "guild": "Test",
+        "description": f"{title}, from the test catalog.",
+        "how_to_play": "Play it.",
+        "teaches": "Testing.",
+        "cards": [
+            {
+                "quantity": quantity,
+                "name": name,
+                "role": "Test",
+                "set": "tst",
+                "collector_number": "1",
+            }
+            for quantity, name in cards
+        ],
+    }
+
+
 @pytest.fixture(scope="module")
 def starters(tmp_path_factory) -> Path:
-    """Two starter lists from the fixture catalog's cards."""
-    folder = tmp_path_factory.mktemp("starters")
-    (folder / "legacy-mono-red-burn.txt").write_text(
-        "// a fixture\n20 Mountain\n4 Lightning Bolt\n36 Mountain\n", encoding="utf-8"
+    """The roster, and two starter decks from the fixture catalog's cards, sharing Sol Ring."""
+    folder = tmp_path_factory.mktemp("content")
+    (folder / "planeswalkers.json").write_text(
+        (CONTENT / "planeswalkers.json").read_text(encoding="utf-8"), encoding="utf-8"
     )
-    (folder / "commander-mono-red-raiders.txt").write_text(
-        "SB: 1 Kenrith, the Returned King\n99 Wastes\n", encoding="utf-8"
+    decks = [
+        starter(
+            "starter_red_test",
+            1,
+            "Red Test",
+            [
+                (1, "Kenrith, the Returned King"),
+                (1, "Lightning Bolt"),
+                (1, "Sol Ring"),
+                (1, "Hill Giant"),
+                (96, "Mountain"),
+            ],
+        ),
+        starter(
+            "starter_blue_test",
+            2,
+            "Blue Test",
+            [
+                (1, "Thrasios, Triton Hero"),
+                (1, "Counterspell"),
+                (1, "Brainstorm"),
+                (1, "Sol Ring"),
+                (1, "Llanowar Elves"),
+                (95, "Island"),
+            ],
+        ),
+    ]
+    (folder / "starter-decks.json").write_text(
+        json.dumps({"version": 1, "source": "tests", "decks": decks}), encoding="utf-8"
     )
     return folder
 
@@ -95,12 +168,12 @@ def url(tmp_path_factory) -> str:
 
 @pytest.fixture
 def client(url: str, starters: Path):
-    app = create_app(Settings(database_url=url, starter_decks_dir=str(starters)))
+    app = create_app(Settings(database_url=url, content_dir=str(starters)))
     with TestClient(app, base_url="https://testserver") as client:
         yield client
         with Session(app.state.database) as db:
             # Each test starts without decks or accounts; the catalog stays.
-            for table in ("deck_entries", "deck_revisions", "decks", "sessions", "users"):
+            for table in ACCOUNT_TABLES:
                 db.execute(text(f"DELETE FROM {table}"))
             db.commit()
 
@@ -224,7 +297,7 @@ def test_artists_of_printings():
 
 
 def test_deck_lifecycle_drafts_and_revisions(client):
-    ada = Account(client, "ada")
+    ada = Account(client, "ada", admin=True)
     created = ada.send("POST", "/api/v1/decks", {"title": "Burn", "format": "legacy"})
     assert created.status_code == 201
     deck = created.json()
@@ -436,25 +509,43 @@ def test_import_preview_resolves_names_and_round_trips(client):
 
 
 def test_commander_import_and_starters(client):
-    ada = Account(client, "ada")
+    ada = Account(client, "ada", admin=True)
     text = "1 Kenrith, the Returned King [Commander]\n99 Wastes\n"
     preview = ada.send(
         "POST", "/api/v1/decks/import/preview", {"format": "commander", "text": text}
     ).json()
     assert preview["validation"]["playable"] is True
     starters = {deck["name"]: deck for deck in ada.get("/api/v1/decks/starters").json()}
-    assert starters["legacy-mono-red-burn"]["card_count"] == 60
-    assert starters["commander-mono-red-raiders"]["commanders"] == ["Kenrith, the Returned King"]
+    assert list(starters) == ["starter_red_test", "starter_blue_test"]
+    red = starters["starter_red_test"]
+    assert (red["card_count"], red["format"], red["playable"]) == (100, "commander", True)
+    assert red["commanders"] == ["Kenrith, the Returned King"] and red["chosen"] is False
+    assert red["commander_card_id"] == card_id(client, "Kenrith, the Returned King")
     copy = ada.send(
         "POST",
         "/api/v1/decks",
         {
             "title": "My raiders",
             "format": "legacy",
-            "source": {"kind": "starter", "starter": "commander-mono-red-raiders"},
+            "source": {"kind": "starter", "starter": "starter_red_test"},
         },
     ).json()
     assert (copy["format"], copy["playable"], copy["source"]) == ("commander", True, "starter")
+    # A player who did not choose it holds none of its cards: a copy is collection-locked.
+    bea = Account(client, "bea")
+    locked = bea.get("/api/v1/decks/starters").json()[0]
+    assert locked["playable"] is False
+    copied = bea.send(
+        "POST",
+        "/api/v1/decks",
+        {
+            "title": "Theirs",
+            "format": "commander",
+            "source": {"kind": "starter", "starter": red["name"]},
+        },
+    ).json()
+    assert copied["legal"] is True and copied["playable"] is False
+    assert {problem["kind"] for problem in copied["validation"]["errors"]} == {"collection_locked"}
     assert (
         ada.send(
             "POST",
@@ -488,7 +579,7 @@ def test_card_images_come_from_the_catalog_and_your_own_printings(url, starters,
     app = create_app(
         Settings(
             database_url=url,
-            starter_decks_dir=str(starters),
+            content_dir=str(starters),
             card_image_dir=str(tmp_path / "images"),
         )
     )
@@ -588,7 +679,7 @@ def test_card_images_come_from_the_catalog_and_your_own_printings(url, starters,
         with Session(app.state.database) as db:
             db.execute(text("DELETE FROM game_seats"))
             db.execute(text("DELETE FROM games"))
-            for table in ("deck_entries", "deck_revisions", "decks", "sessions", "users"):
+            for table in ACCOUNT_TABLES:
                 db.execute(text(f"DELETE FROM {table}"))
             db.commit()
 
@@ -602,14 +693,14 @@ def test_practice_games_bind_your_own_deck_revisions(url, starters):
     app = create_app(
         Settings(
             database_url=url,
-            starter_decks_dir=str(starters),
+            content_dir=str(starters),
             engine_service_token=SERVICE_TOKEN,
             games_per_account=4,
         )
     )
     app.state.engine_transport = httpx.MockTransport(fake)
     with TestClient(app, base_url="https://testserver") as client:
-        ada, bob = Account(client, "ada"), Account(client, "bob")
+        ada, bob = Account(client, "ada", admin=True), Account(client, "bob")
         assert ada.get("/api/v1/practice-games/options").json()["own_decks"] is True
         deck = ada.send(
             "POST", "/api/v1/decks", {"title": "Burn", "format": "legacy", "entries": burn(client)}
@@ -688,11 +779,19 @@ def test_practice_games_bind_your_own_deck_revisions(url, starters):
         assert fake.created[-1]["seats"][0]["deck_list"]["commanders"] == [
             "Kenrith, the Returned King"
         ]
+        # A Commander bot with no deck chosen plays a starter deck, as a deck list of engine
+        # names; it is not audited as SysOp's deck lists are.
+        bot_seat = fake.created[-1]["seats"][1]
+        assert bot_seat["deck_list"]["commanders"] in (
+            ["Kenrith, the Returned King"],
+            ["Thrasios, Triton Hero"],
+        )
+        assert sum(card["count"] for card in bot_seat["deck_list"]["cards"]) == 99
         ada.send("POST", f"/api/v1/games/{commander.json()['id']}/close", {})
         with Session(app.state.database) as db:
             db.execute(text("DELETE FROM game_seats"))
             db.execute(text("DELETE FROM games"))
-            for table in ("deck_entries", "deck_revisions", "decks", "sessions", "users"):
+            for table in ACCOUNT_TABLES:
                 db.execute(text(f"DELETE FROM {table}"))
             db.commit()
 
@@ -700,7 +799,7 @@ def test_practice_games_bind_your_own_deck_revisions(url, starters):
 def test_guided_decks_are_playable_and_explain_every_card(client):
     """DECK06 on the test catalog: a Commander deck from its commander, a Legacy deck from its
     colors; every card playable and within the colors, with its reason, and nothing saved."""
-    ada = Account(client, "ada")
+    ada = Account(client, "ada", admin=True)
     kenrith = card_id(client, "Kenrith, the Returned King")
     commander = ada.send(
         "POST",

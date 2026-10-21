@@ -19,12 +19,13 @@ the engine, because their seat tokens are gone.
 import asyncio
 import json
 import logging
+import random
 import secrets
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import partial
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID
@@ -41,7 +42,7 @@ from starlette.concurrency import run_in_threadpool
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.decklists import parse_deck_list
-from api.decks import publish, revision_entries
+from api.decks import publish, revision_entries, starters_of
 from api.identity import (
     SESSION_COOKIE,
     ApiError,
@@ -58,6 +59,7 @@ from api.identity import (
     settings_of,
     utcnow,
 )
+from api.library import Library, Starter, library_of, starter_entries
 from api.models import (
     CardConcept,
     CatalogRevision,
@@ -68,6 +70,8 @@ from api.models import (
     User,
     UserSession,
 )
+from api.progression import count_win
+from api.roster import roster_of
 from api.schemas import (
     CardNames,
     Error,
@@ -82,6 +86,7 @@ from api.schemas import (
     SeatChoice,
 )
 from api.schemas import GameSeat as SeatSummary
+from api.validation import DeckContent, validate_deck
 
 log = logging.getLogger("api.games")
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -613,6 +618,8 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
 
 
 def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, Any] | None) -> None:
+    """Records how the game ended and, in the same transaction, the win of a player's seat that
+    won it (api/progression.py), so a result is never recorded without its win, or twice."""
     with Session(database) as db:
         game = db.get(Game, game_id)
         if game is not None and game.status == "active":
@@ -620,6 +627,8 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             game.finished_at = utcnow()
             # Engine error details stay in the engine's log.
             game.result = {key: result.get(key) for key in RESULT_FIELDS} if result else None
+            db.flush()
+            count_win(db, game)
             db.commit()
 
 
@@ -642,8 +651,10 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
     seats = db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     rows = list(seats)
     owners = [row.user_id for row in rows if row.user_id is not None]
-    found = db.execute(select(User.id, User.handle).where(User.id.in_(owners)))
-    handles = {user_id: handle for user_id, handle in found}
+    found = db.execute(select(User.id, User.handle, User.alliance).where(User.id.in_(owners)))
+    handles, alliances = {}, {}
+    for user_id, handle, alliance in found:
+        handles[user_id], alliances[user_id] = handle, alliance
     everything = full_access(principal)
     your_seat = next((row.seat for row in rows if row.user_id == principal.user.id), None)
     return GameSummary(
@@ -655,6 +666,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
                 seat=row.seat,
                 player=row.player,  # type: ignore[arg-type]
                 handle=handles.get(row.user_id) if row.user_id else None,
+                portrait=alliances.get(row.user_id) if row.user_id else None,
                 deck=row.deck if everything or row.user_id == principal.user.id else None,
             )
             for row in rows
@@ -691,6 +703,10 @@ def visible_game(db: Session, game_id: UUID, principal: Principal) -> tuple[Game
 
 @router.get("/practice-games/options", response_model=PracticeOptions)
 def practice_options(principal: Player) -> PracticeOptions:
+    """The table's formats and bots. The engine's fixture decks are offered to SysOp only, as its
+    test decks for the browser journeys; players play their own decks, the two starter decks they
+    chose among them. The routes still accept a fixture deck by name, for scripts."""
+    fixtures = principal.can("cards.any")
     return PracticeOptions(
         formats=[
             PracticeFormat(
@@ -698,7 +714,7 @@ def practice_options(principal: Player) -> PracticeOptions:
                 name=FORMAT_NAMES[fmt],
                 bots=BOTS[fmt],
                 default_bots=DEFAULT_BOTS[fmt],
-                decks=decks,
+                decks=decks if fixtures else [],
             )
             for fmt, decks in FIXTURE_DECKS.items()
         ],
@@ -708,11 +724,12 @@ def practice_options(principal: Player) -> PracticeOptions:
 
 
 def own_deck(
-    db: Session, principal: Principal, deck_id: UUID, fmt: str
+    db: Session, principal: Principal, deck_id: UUID, fmt: str, library: Library
 ) -> tuple[dict[str, object], UUID, str]:
     """One of the account's decks as the engine's deck list, bound to an immutable revision of
-    it (DECK01). The revision must be playable: legal, and every card certified. SysOp's decks
-    need only cards the engine implements, as its deck lists do."""
+    it (DECK01). The revision must be playable: legal, every card certified, and every copy in the
+    player's library now (v0.3.1). SysOp's decks need only cards the engine implements, as its
+    deck lists do."""
     deck = db.get(Deck, deck_id)
     if deck is None or deck.owner_id != principal.user.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
@@ -722,10 +739,16 @@ def own_deck(
             "invalid_deck",
             f"{deck.title} is a {FORMAT_NAMES[deck.format]} deck, not a {FORMAT_NAMES[fmt]} one.",
         )
-    revision = publish(db, deck)
+    revision = publish(db, deck, library)
     entries = [
         entry for entry in revision_entries(db, revision) if entry.location in ("main", "commander")
     ]
+    validation = validate_deck(
+        db,
+        DeckContent(format=fmt, entries=revision_entries(db, revision)),  # type: ignore[arg-type]
+        datetime.now(UTC).date(),
+        library.collection(),
+    )
     names = dict(
         db.execute(
             select(CardConcept.id, CardConcept.engine_name).where(
@@ -733,8 +756,16 @@ def own_deck(
             )
         ).all()
     )
-    if not revision.playable:
+    if not validation.playable:
         sysop_ok = principal.can("cards.any") and all(names.get(e.card_id) for e in entries)
+        locked = any(problem.kind == "collection_locked" for problem in validation.errors)
+        if locked and not sysop_ok:
+            raise ApiError(
+                422,
+                "deck_not_playable",
+                f"{deck.title} holds more copies of some cards than your library does: open it "
+                "in the deck builder to see which.",
+            )
         if not sysop_ok:
             raise ApiError(
                 422,
@@ -784,12 +815,54 @@ class SeatPlan:
     engine: dict[str, object]
     revision: UUID | None = None
     title: str | None = None
+    # A bot's starter deck, sent as a deck list but chosen by the API, not by SysOp.
+    starter: bool = False
+
+
+def starter_seat(db: Session, starter: Starter) -> SeatPlan | None:
+    """A bot seat playing a starter deck, as the engine's deck list; None when a card of it has no
+    engine implementation in this catalog, and the engine's own fixture deck plays instead."""
+    entries, missing = starter_entries(db, starter)
+    if missing:
+        return None
+    names = dict(
+        db.execute(
+            select(CardConcept.id, CardConcept.engine_name).where(
+                CardConcept.id.in_({entry.card_id for entry in entries})
+            )
+        ).all()
+    )
+    counts: dict[str, int] = defaultdict(int)
+    commanders: list[str] = []
+    for entry in entries:
+        name = names.get(entry.card_id)
+        if not name:
+            return None
+        if entry.location == "commander":
+            commanders.append(name)
+        else:
+            counts[name] += entry.quantity
+    deck_list = {
+        "cards": [{"name": name, "count": count} for name, count in counts.items()],
+        "commanders": commanders,
+    }
+    return SeatPlan({"player": "bot", "deck_list": deck_list}, title=starter.title, starter=True)
 
 
 def plan_seats(
-    db: Session, principal: Principal, body: PracticeGameRequest, bots: list[SeatChoice | None]
+    db: Session,
+    request: Request,
+    principal: Principal,
+    body: PracticeGameRequest,
+    bots: list[SeatChoice | None],
 ) -> list[SeatPlan]:
     fmt = body.format
+    settings = settings_of(request)
+    library = library_of(db, principal.user, principal.permissions, roster_of(request))
+    # Commander bots with no deck chosen play the starter decks, each a different one, unless the
+    # site keeps them on the engine's fixture decks (the browser journeys' leak checks).
+    starters = list(starters_of(request).values()) if settings.bot_decks == "starters" else []
+    random.shuffle(starters)
     human: tuple[str, str | None, UUID | None, str | None] = (
         "human",
         body.deck,
@@ -812,10 +885,16 @@ def plan_seats(
                 raise ApiError(422, "invalid_seat", "A seat takes one deck.")
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
-            seat, revision, title = own_deck(db, principal, deck_id, fmt)
+            seat, revision, title = own_deck(db, principal, deck_id, fmt, library)
             plans.append(SeatPlan({"player": player, **seat}, revision, title))
-        else:
-            plans.append(SeatPlan(engine_seat(player, deck, deck_list, fmt, principal)))
+            continue
+        unchosen = deck is None and deck_list is None
+        if player == "bot" and fmt == "commander" and unchosen and starters:
+            planned = starter_seat(db, starters.pop())
+            if planned is not None:
+                plans.append(planned)
+                continue
+        plans.append(SeatPlan(engine_seat(player, deck, deck_list, fmt, principal)))
     # Revisions made for the game are kept even if the engine refuses it, and the connection
     # goes back before the engine is asked.
     db.commit()
@@ -864,7 +943,7 @@ def record_game(
     lists = [
         index
         for index, plan in enumerate(plans)
-        if "deck_list" in plan.engine and not plan.revision
+        if "deck_list" in plan.engine and not plan.revision and not plan.starter
     ]
     if lists:
         audit(
@@ -898,7 +977,7 @@ async def create_practice_game(
         raise ApiError(
             422, "invalid_table", f"{FORMAT_NAMES[fmt]} takes {BOTS[fmt]} bots, not {len(bots)}."
         )
-    plans = await run_in_threadpool(plan_seats, db, principal, body, bots)
+    plans = await run_in_threadpool(plan_seats, db, request, principal, body, bots)
     seats = [plan.engine for plan in plans]
     user_id = principal.user.id
     async with hub.locks[user_id]:

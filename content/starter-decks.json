@@ -1,0 +1,5186 @@
+{
+  "version": 1,
+  "source": "The owner's starter decks, checked against Scryfall on 2026-10-20.",
+  "decks": [
+    {
+      "id": "starter_wu_v1",
+      "number": 1,
+      "title": "Skyward Patrol",
+      "commander": "Kangee, Sky Warden",
+      "colors": "WU",
+      "color_names": "White / Blue",
+      "guild": "Azorius",
+      "description": "Build a flock of flyers, keep cards flowing, and let Kangee turn small evasive creatures into a coordinated air force.",
+      "how_to_play": "Develop mana and two or three flyers. Let Kangee survive a turn, then attack with the flock to trigger its bonus. Save an answer for the opposing swing turn.",
+      "teaches": "Flying, vigilance, attack triggers and holding up instant-speed answers.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Kangee, Sky Warden",
+          "role": "Commander",
+          "set": "cmr",
+          "collector_number": "283"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Azorius Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "219"
+        },
+        {
+          "quantity": 1,
+          "name": "Mind Stone",
+          "role": "Ramp",
+          "set": "lcc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Commander's Sphere",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Wayfarer's Bauble",
+          "role": "Ramp",
+          "set": "plst",
+          "collector_number": "M3C-315"
+        },
+        {
+          "quantity": 1,
+          "name": "Marble Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "320"
+        },
+        {
+          "quantity": 1,
+          "name": "Sky Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "337"
+        },
+        {
+          "quantity": 1,
+          "name": "Prismatic Lens",
+          "role": "Ramp",
+          "set": "cmm",
+          "collector_number": "403"
+        },
+        {
+          "quantity": 1,
+          "name": "Worn Powerstone",
+          "role": "Ramp",
+          "set": "mh3",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Hedron Archive",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "726"
+        },
+        {
+          "quantity": 1,
+          "name": "Winged Words",
+          "role": "Draw / selection",
+          "set": "jmp",
+          "collector_number": "196"
+        },
+        {
+          "quantity": 1,
+          "name": "Mulldrifter",
+          "role": "Draw / selection",
+          "set": "cm2",
+          "collector_number": "47"
+        },
+        {
+          "quantity": 1,
+          "name": "Cloudblazer",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "653"
+        },
+        {
+          "quantity": 1,
+          "name": "Tide Skimmer",
+          "role": "Draw / selection",
+          "set": "m21",
+          "collector_number": "79"
+        },
+        {
+          "quantity": 1,
+          "name": "Bident of Thassa",
+          "role": "Draw / selection",
+          "set": "lcc",
+          "collector_number": "146"
+        },
+        {
+          "quantity": 1,
+          "name": "Windreader Sphinx",
+          "role": "Draw / selection",
+          "set": "jmp",
+          "collector_number": "194"
+        },
+        {
+          "quantity": 1,
+          "name": "Chart a Course",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "586"
+        },
+        {
+          "quantity": 1,
+          "name": "Deep Analysis",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "149"
+        },
+        {
+          "quantity": 1,
+          "name": "Chemister's Insight",
+          "role": "Draw / selection",
+          "set": "clu",
+          "collector_number": "81"
+        },
+        {
+          "quantity": 1,
+          "name": "Behold the Multiverse",
+          "role": "Draw / selection",
+          "set": "khm",
+          "collector_number": "46"
+        },
+        {
+          "quantity": 1,
+          "name": "Swords to Plowshares",
+          "role": "Interaction",
+          "set": "frc",
+          "collector_number": "37"
+        },
+        {
+          "quantity": 1,
+          "name": "Generous Gift",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "26"
+        },
+        {
+          "quantity": 1,
+          "name": "Disenchant",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "572"
+        },
+        {
+          "quantity": 1,
+          "name": "Counterspell",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "81"
+        },
+        {
+          "quantity": 1,
+          "name": "Negate",
+          "role": "Interaction",
+          "set": "tmt",
+          "collector_number": "47"
+        },
+        {
+          "quantity": 1,
+          "name": "Into the Roil",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "509"
+        },
+        {
+          "quantity": 1,
+          "name": "Aetherize",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "151"
+        },
+        {
+          "quantity": 1,
+          "name": "Cleansing Nova",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "124"
+        },
+        {
+          "quantity": 1,
+          "name": "Gods Willing",
+          "role": "Interaction",
+          "set": "clu",
+          "collector_number": "63"
+        },
+        {
+          "quantity": 1,
+          "name": "Valorous Stance",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "145"
+        },
+        {
+          "quantity": 1,
+          "name": "Healer's Hawk",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "734"
+        },
+        {
+          "quantity": 1,
+          "name": "Battlefield Raptor",
+          "role": "Theme",
+          "set": "khm",
+          "collector_number": "3"
+        },
+        {
+          "quantity": 1,
+          "name": "Faerie Seer",
+          "role": "Theme",
+          "set": "mh1",
+          "collector_number": "51"
+        },
+        {
+          "quantity": 1,
+          "name": "Siren Stormtamer",
+          "role": "Theme",
+          "set": "lcc",
+          "collector_number": "171"
+        },
+        {
+          "quantity": 1,
+          "name": "Warden of Evos Isle",
+          "role": "Theme",
+          "set": "ema",
+          "collector_number": "76"
+        },
+        {
+          "quantity": 1,
+          "name": "Empyrean Eagle",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "239"
+        },
+        {
+          "quantity": 1,
+          "name": "Thunderclap Wyvern",
+          "role": "Theme",
+          "set": "khc",
+          "collector_number": "94"
+        },
+        {
+          "quantity": 1,
+          "name": "Kangee's Lieutenant",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "26"
+        },
+        {
+          "quantity": 1,
+          "name": "Favorable Winds",
+          "role": "Theme",
+          "set": "gnt",
+          "collector_number": "21"
+        },
+        {
+          "quantity": 1,
+          "name": "Jubilant Skybonder",
+          "role": "Theme",
+          "set": "iko",
+          "collector_number": "223"
+        },
+        {
+          "quantity": 1,
+          "name": "Rally of Wings",
+          "role": "Theme",
+          "set": "war",
+          "collector_number": "27"
+        },
+        {
+          "quantity": 1,
+          "name": "Skycat Sovereign",
+          "role": "Theme",
+          "set": "iko",
+          "collector_number": "207"
+        },
+        {
+          "quantity": 1,
+          "name": "Steel-Plume Marshal",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "5"
+        },
+        {
+          "quantity": 1,
+          "name": "Aven Gagglemaster",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "5"
+        },
+        {
+          "quantity": 1,
+          "name": "Watcher of the Spheres",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "227"
+        },
+        {
+          "quantity": 1,
+          "name": "Pilgrim's Eye",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "402"
+        },
+        {
+          "quantity": 1,
+          "name": "Skyscanner",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "238"
+        },
+        {
+          "quantity": 1,
+          "name": "Aven Eternal",
+          "role": "Theme",
+          "set": "war",
+          "collector_number": "42"
+        },
+        {
+          "quantity": 1,
+          "name": "Spectral Sailor",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "746"
+        },
+        {
+          "quantity": 1,
+          "name": "Combat Professor",
+          "role": "Theme",
+          "set": "stx",
+          "collector_number": "11"
+        },
+        {
+          "quantity": 1,
+          "name": "Dawnfeather Eagle",
+          "role": "Theme",
+          "set": "aer",
+          "collector_number": "14"
+        },
+        {
+          "quantity": 1,
+          "name": "Dawnbringer Cleric",
+          "role": "Theme",
+          "set": "clb",
+          "collector_number": "15"
+        },
+        {
+          "quantity": 1,
+          "name": "Concordia Pegasus",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "12"
+        },
+        {
+          "quantity": 1,
+          "name": "Griffin Sentinel",
+          "role": "Theme",
+          "set": "m20",
+          "collector_number": "21"
+        },
+        {
+          "quantity": 1,
+          "name": "Augury Owl",
+          "role": "Theme",
+          "set": "pca",
+          "collector_number": "14"
+        },
+        {
+          "quantity": 1,
+          "name": "Migratory Route",
+          "role": "Theme",
+          "set": "moc",
+          "collector_number": "336"
+        },
+        {
+          "quantity": 1,
+          "name": "Battle Screech",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "17"
+        },
+        {
+          "quantity": 1,
+          "name": "Triplicate Spirits",
+          "role": "Theme",
+          "set": "m15",
+          "collector_number": "40"
+        },
+        {
+          "quantity": 1,
+          "name": "Staggering Insight",
+          "role": "Theme",
+          "set": "thb",
+          "collector_number": "228"
+        },
+        {
+          "quantity": 1,
+          "name": "Cartouche of Knowledge",
+          "role": "Theme",
+          "set": "akh",
+          "collector_number": "45"
+        },
+        {
+          "quantity": 1,
+          "name": "Azure Fleet Admiral",
+          "role": "Theme",
+          "set": "lcc",
+          "collector_number": "144"
+        },
+        {
+          "quantity": 1,
+          "name": "Soul of Migration",
+          "role": "Theme",
+          "set": "mh2",
+          "collector_number": "33"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Tranquil Cove",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "270"
+        },
+        {
+          "quantity": 1,
+          "name": "Azorius Chancery",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "229"
+        },
+        {
+          "quantity": 1,
+          "name": "Idyllic Beachfront",
+          "role": "Land",
+          "set": "dmu",
+          "collector_number": "249"
+        },
+        {
+          "quantity": 1,
+          "name": "Tundra",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "289"
+        },
+        {
+          "quantity": 14,
+          "name": "Plains",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "281"
+        },
+        {
+          "quantity": 16,
+          "name": "Island",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "283"
+        }
+      ]
+    },
+    {
+      "id": "starter_ub_v1",
+      "number": 2,
+      "title": "Graveyard Shift",
+      "commander": "Gisa and Geralf",
+      "colors": "UB",
+      "color_names": "Blue / Black",
+      "guild": "Dimir",
+      "description": "A resilient Zombie army that uses its graveyard as a second hand. Gisa and Geralf let you recast one Zombie during each of your turns.",
+      "how_to_play": "Cast cheap Zombies, fill your graveyard naturally, then replay useful Zombies through your commander. Win by attacking with a growing army and recurring fallen creatures.",
+      "teaches": "Self-mill, graveyard casting and creature-type bonuses. Recasting a Zombie still costs its normal mana.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Gisa and Geralf",
+          "role": "Commander",
+          "set": "inr",
+          "collector_number": "237"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Dimir Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "221"
+        },
+        {
+          "quantity": 1,
+          "name": "Mind Stone",
+          "role": "Ramp",
+          "set": "lcc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Commander's Sphere",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Wayfarer's Bauble",
+          "role": "Ramp",
+          "set": "plst",
+          "collector_number": "M3C-315"
+        },
+        {
+          "quantity": 1,
+          "name": "Sky Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "337"
+        },
+        {
+          "quantity": 1,
+          "name": "Charcoal Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "305"
+        },
+        {
+          "quantity": 1,
+          "name": "Prismatic Lens",
+          "role": "Ramp",
+          "set": "cmm",
+          "collector_number": "403"
+        },
+        {
+          "quantity": 1,
+          "name": "Worn Powerstone",
+          "role": "Ramp",
+          "set": "mh3",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Hedron Archive",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "726"
+        },
+        {
+          "quantity": 1,
+          "name": "Undead Augur",
+          "role": "Draw / selection",
+          "set": "mic",
+          "collector_number": "130"
+        },
+        {
+          "quantity": 1,
+          "name": "Distant Melody",
+          "role": "Draw / selection",
+          "set": "ecc",
+          "collector_number": "45"
+        },
+        {
+          "quantity": 1,
+          "name": "Sign in Blood",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "156"
+        },
+        {
+          "quantity": 1,
+          "name": "Night's Whisper",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "189"
+        },
+        {
+          "quantity": 1,
+          "name": "Read the Bones",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "154"
+        },
+        {
+          "quantity": 1,
+          "name": "Village Rites",
+          "role": "Draw / selection",
+          "set": "inr",
+          "collector_number": "137"
+        },
+        {
+          "quantity": 1,
+          "name": "Deep Analysis",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "149"
+        },
+        {
+          "quantity": 1,
+          "name": "Compulsive Research",
+          "role": "Draw / selection",
+          "set": "tdc",
+          "collector_number": "147"
+        },
+        {
+          "quantity": 1,
+          "name": "Organ Hoarder",
+          "role": "Draw / selection",
+          "set": "mid",
+          "collector_number": "66"
+        },
+        {
+          "quantity": 1,
+          "name": "Crow of Dark Tidings",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "519"
+        },
+        {
+          "quantity": 1,
+          "name": "Feed the Swarm",
+          "role": "Interaction",
+          "set": "tle",
+          "collector_number": "257"
+        },
+        {
+          "quantity": 1,
+          "name": "Go for the Throat",
+          "role": "Interaction",
+          "set": "slz",
+          "collector_number": "42"
+        },
+        {
+          "quantity": 1,
+          "name": "Murder",
+          "role": "Interaction",
+          "set": "dsk",
+          "collector_number": "110"
+        },
+        {
+          "quantity": 1,
+          "name": "Counterspell",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "81"
+        },
+        {
+          "quantity": 1,
+          "name": "Negate",
+          "role": "Interaction",
+          "set": "tmt",
+          "collector_number": "47"
+        },
+        {
+          "quantity": 1,
+          "name": "Resculpt",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "201"
+        },
+        {
+          "quantity": 1,
+          "name": "Fleshbag Marauder",
+          "role": "Interaction",
+          "set": "clu",
+          "collector_number": "111"
+        },
+        {
+          "quantity": 1,
+          "name": "Crux of Fate",
+          "role": "Interaction",
+          "set": "c17",
+          "collector_number": "107"
+        },
+        {
+          "quantity": 1,
+          "name": "Return to Action",
+          "role": "Interaction",
+          "set": "neo",
+          "collector_number": "121"
+        },
+        {
+          "quantity": 1,
+          "name": "Soul Manipulation",
+          "role": "Interaction",
+          "set": "c13",
+          "collector_number": "215"
+        },
+        {
+          "quantity": 1,
+          "name": "Diregraf Captain",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "148"
+        },
+        {
+          "quantity": 1,
+          "name": "Lord of the Accursed",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "124"
+        },
+        {
+          "quantity": 1,
+          "name": "Gleaming Overseer",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "151"
+        },
+        {
+          "quantity": 1,
+          "name": "Eternal Skylord",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "99"
+        },
+        {
+          "quantity": 1,
+          "name": "Vizier of the Scorpion",
+          "role": "Theme",
+          "set": "war",
+          "collector_number": "111"
+        },
+        {
+          "quantity": 1,
+          "name": "Mire Triton",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "174"
+        },
+        {
+          "quantity": 1,
+          "name": "Gray Merchant of Asphodel",
+          "role": "Theme",
+          "set": "c14",
+          "collector_number": "146"
+        },
+        {
+          "quantity": 1,
+          "name": "Lazotep Reaver",
+          "role": "Theme",
+          "set": "war",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Bladestitched Skaab",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "231"
+        },
+        {
+          "quantity": 1,
+          "name": "Shambling Ghast",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "119"
+        },
+        {
+          "quantity": 1,
+          "name": "Ghoulraiser",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "238"
+        },
+        {
+          "quantity": 1,
+          "name": "Gravedigger",
+          "role": "Theme",
+          "set": "cm2",
+          "collector_number": "66"
+        },
+        {
+          "quantity": 1,
+          "name": "Undead Butler",
+          "role": "Theme",
+          "set": "vow",
+          "collector_number": "133"
+        },
+        {
+          "quantity": 1,
+          "name": "Diregraf Ghoul",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "171"
+        },
+        {
+          "quantity": 1,
+          "name": "Wailing Ghoul",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "286"
+        },
+        {
+          "quantity": 1,
+          "name": "Stitcher's Supplier",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "196"
+        },
+        {
+          "quantity": 1,
+          "name": "Screeching Skaab",
+          "role": "Theme",
+          "set": "ema",
+          "collector_number": "69"
+        },
+        {
+          "quantity": 1,
+          "name": "Armored Skaab",
+          "role": "Theme",
+          "set": "isd",
+          "collector_number": "43"
+        },
+        {
+          "quantity": 1,
+          "name": "Dreadwing Scavenger",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "118"
+        },
+        {
+          "quantity": 1,
+          "name": "Cemetery Reaper",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "108"
+        },
+        {
+          "quantity": 1,
+          "name": "Liliana's Mastery",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "123"
+        },
+        {
+          "quantity": 1,
+          "name": "Endless Ranks of the Dead",
+          "role": "Theme",
+          "set": "mic",
+          "collector_number": "116"
+        },
+        {
+          "quantity": 1,
+          "name": "Gempalm Polluter",
+          "role": "Theme",
+          "set": "lgn",
+          "collector_number": "70"
+        },
+        {
+          "quantity": 1,
+          "name": "Loyal Subordinate",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Moan of the Unhallowed",
+          "role": "Theme",
+          "set": "uma",
+          "collector_number": "107"
+        },
+        {
+          "quantity": 1,
+          "name": "Diregraf Horde",
+          "role": "Theme",
+          "set": "mid",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Maalfeld Twins",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "132"
+        },
+        {
+          "quantity": 1,
+          "name": "Dread Return",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "153"
+        },
+        {
+          "quantity": 1,
+          "name": "Victimize",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "198"
+        },
+        {
+          "quantity": 1,
+          "name": "Crawl from the Cellar",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "102"
+        },
+        {
+          "quantity": 1,
+          "name": "Boneknitter",
+          "role": "Theme",
+          "set": "ons",
+          "collector_number": "128"
+        },
+        {
+          "quantity": 1,
+          "name": "Stitched Assistant",
+          "role": "Theme",
+          "set": "vow",
+          "collector_number": "81"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Dismal Backwater",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "254"
+        },
+        {
+          "quantity": 1,
+          "name": "Dimir Aqueduct",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "233"
+        },
+        {
+          "quantity": 1,
+          "name": "Contaminated Aquifer",
+          "role": "Land",
+          "set": "tdc",
+          "collector_number": "353"
+        },
+        {
+          "quantity": 1,
+          "name": "Underground Sea",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "290"
+        },
+        {
+          "quantity": 10,
+          "name": "Island",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "283"
+        },
+        {
+          "quantity": 20,
+          "name": "Swamp",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "285"
+        }
+      ]
+    },
+    {
+      "id": "starter_br_v1",
+      "number": 3,
+      "title": "Ember Rebellion",
+      "commander": "Garna, Bloodfist of Keld",
+      "colors": "BR",
+      "color_names": "Black / Red",
+      "guild": "Rakdos",
+      "description": "Attack with an expendable army. Garna rewards fallen attackers with cards and other creature deaths with damage to each opponent.",
+      "how_to_play": "Build a steady stream of creatures and tokens. With Garna present, sacrifice attacking creatures before combat ends when useful to draw cards. Rebuild after trades.",
+      "teaches": "Combat trades, death triggers and paying a sacrifice cost. This is a combat deck with sacrifice support.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Garna, Bloodfist of Keld",
+          "role": "Commander",
+          "set": "fdn",
+          "collector_number": "658"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Rakdos Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "226"
+        },
+        {
+          "quantity": 1,
+          "name": "Mind Stone",
+          "role": "Ramp",
+          "set": "lcc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Commander's Sphere",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Wayfarer's Bauble",
+          "role": "Ramp",
+          "set": "plst",
+          "collector_number": "M3C-315"
+        },
+        {
+          "quantity": 1,
+          "name": "Charcoal Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "305"
+        },
+        {
+          "quantity": 1,
+          "name": "Fire Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "313"
+        },
+        {
+          "quantity": 1,
+          "name": "Prismatic Lens",
+          "role": "Ramp",
+          "set": "cmm",
+          "collector_number": "403"
+        },
+        {
+          "quantity": 1,
+          "name": "Worn Powerstone",
+          "role": "Ramp",
+          "set": "mh3",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Hedron Archive",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "726"
+        },
+        {
+          "quantity": 1,
+          "name": "Village Rites",
+          "role": "Draw / selection",
+          "set": "inr",
+          "collector_number": "137"
+        },
+        {
+          "quantity": 1,
+          "name": "Deadly Dispute",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "794"
+        },
+        {
+          "quantity": 1,
+          "name": "Corrupted Conviction",
+          "role": "Draw / selection",
+          "set": "otj",
+          "collector_number": "84"
+        },
+        {
+          "quantity": 1,
+          "name": "Night's Whisper",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "189"
+        },
+        {
+          "quantity": 1,
+          "name": "Read the Bones",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "154"
+        },
+        {
+          "quantity": 1,
+          "name": "Sign in Blood",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "156"
+        },
+        {
+          "quantity": 1,
+          "name": "Thrill of Possibility",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Demand Answers",
+          "role": "Draw / selection",
+          "set": "mkm",
+          "collector_number": "122"
+        },
+        {
+          "quantity": 1,
+          "name": "Morbid Opportunist",
+          "role": "Draw / selection",
+          "set": "soc",
+          "collector_number": "219"
+        },
+        {
+          "quantity": 1,
+          "name": "Midnight Reaper",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "609"
+        },
+        {
+          "quantity": 1,
+          "name": "Terminate",
+          "role": "Interaction",
+          "set": "ecc",
+          "collector_number": "134"
+        },
+        {
+          "quantity": 1,
+          "name": "Abrade",
+          "role": "Interaction",
+          "set": "inr",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Feed the Swarm",
+          "role": "Interaction",
+          "set": "tle",
+          "collector_number": "257"
+        },
+        {
+          "quantity": 1,
+          "name": "Go for the Throat",
+          "role": "Interaction",
+          "set": "slz",
+          "collector_number": "42"
+        },
+        {
+          "quantity": 1,
+          "name": "Lightning Strike",
+          "role": "Interaction",
+          "set": "msh",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Cast Down",
+          "role": "Interaction",
+          "set": "2xm",
+          "collector_number": "79"
+        },
+        {
+          "quantity": 1,
+          "name": "Bone Splinters",
+          "role": "Interaction",
+          "set": "dmu",
+          "collector_number": "83"
+        },
+        {
+          "quantity": 1,
+          "name": "Chain Reaction",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "121"
+        },
+        {
+          "quantity": 1,
+          "name": "Supernatural Stamina",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "188"
+        },
+        {
+          "quantity": 1,
+          "name": "Undying Malice",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "528"
+        },
+        {
+          "quantity": 1,
+          "name": "Doomed Dissenter",
+          "role": "Theme",
+          "set": "vow",
+          "collector_number": "106"
+        },
+        {
+          "quantity": 1,
+          "name": "Shambling Ghast",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "119"
+        },
+        {
+          "quantity": 1,
+          "name": "Mogg War Marshal",
+          "role": "Theme",
+          "set": "plst",
+          "collector_number": "DMR-131"
+        },
+        {
+          "quantity": 1,
+          "name": "Dragon Fodder",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "535"
+        },
+        {
+          "quantity": 1,
+          "name": "Krenko's Command",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Hordeling Outburst",
+          "role": "Theme",
+          "set": "a25",
+          "collector_number": "134"
+        },
+        {
+          "quantity": 1,
+          "name": "Beetleback Chief",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "205"
+        },
+        {
+          "quantity": 1,
+          "name": "Impulsive Pilferer",
+          "role": "Theme",
+          "set": "otc",
+          "collector_number": "171"
+        },
+        {
+          "quantity": 1,
+          "name": "Carrier Thrall",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Lazotep Reaver",
+          "role": "Theme",
+          "set": "war",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Reassembling Skeleton",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "195"
+        },
+        {
+          "quantity": 1,
+          "name": "Persistent Specimen",
+          "role": "Theme",
+          "set": "vow",
+          "collector_number": "125"
+        },
+        {
+          "quantity": 1,
+          "name": "Viscera Seer",
+          "role": "Theme",
+          "set": "soc",
+          "collector_number": "229"
+        },
+        {
+          "quantity": 1,
+          "name": "Carrion Feeder",
+          "role": "Theme",
+          "set": "ema",
+          "collector_number": "84"
+        },
+        {
+          "quantity": 1,
+          "name": "Nantuko Husk",
+          "role": "Theme",
+          "set": "ori",
+          "collector_number": "109"
+        },
+        {
+          "quantity": 1,
+          "name": "Lampad of Death's Vigil",
+          "role": "Theme",
+          "set": "thb",
+          "collector_number": "103"
+        },
+        {
+          "quantity": 1,
+          "name": "Falkenrath Noble",
+          "role": "Theme",
+          "set": "dsc",
+          "collector_number": "140"
+        },
+        {
+          "quantity": 1,
+          "name": "Zulaport Cutthroat",
+          "role": "Theme",
+          "set": "soc",
+          "collector_number": "233"
+        },
+        {
+          "quantity": 1,
+          "name": "Judith, the Scourge Diva",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "234"
+        },
+        {
+          "quantity": 1,
+          "name": "Siege-Gang Commander",
+          "role": "Theme",
+          "set": "plst",
+          "collector_number": "DMR-136"
+        },
+        {
+          "quantity": 1,
+          "name": "Ogre Slumlord",
+          "role": "Theme",
+          "set": "otc",
+          "collector_number": "145"
+        },
+        {
+          "quantity": 1,
+          "name": "Lagomos, Hand of Hatred",
+          "role": "Theme",
+          "set": "dmu",
+          "collector_number": "205"
+        },
+        {
+          "quantity": 1,
+          "name": "Anax, Hardened in the Forge",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "204"
+        },
+        {
+          "quantity": 1,
+          "name": "Body Dropper",
+          "role": "Theme",
+          "set": "snc",
+          "collector_number": "168"
+        },
+        {
+          "quantity": 1,
+          "name": "Bloodflow Connoisseur",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "71"
+        },
+        {
+          "quantity": 1,
+          "name": "Witty Roastmaster",
+          "role": "Theme",
+          "set": "snc",
+          "collector_number": "131"
+        },
+        {
+          "quantity": 1,
+          "name": "Vampire Nighthawk",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "757"
+        },
+        {
+          "quantity": 1,
+          "name": "Deathbloom Thallid",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "94"
+        },
+        {
+          "quantity": 1,
+          "name": "Nested Shambler",
+          "role": "Theme",
+          "set": "mh2",
+          "collector_number": "95"
+        },
+        {
+          "quantity": 1,
+          "name": "Goblin Instigator",
+          "role": "Theme",
+          "set": "moc",
+          "collector_number": "282"
+        },
+        {
+          "quantity": 1,
+          "name": "Makeshift Munitions",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "242"
+        },
+        {
+          "quantity": 1,
+          "name": "Unearth",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Bloodfell Caves",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "250"
+        },
+        {
+          "quantity": 1,
+          "name": "Rakdos Carnarium",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "243"
+        },
+        {
+          "quantity": 1,
+          "name": "Geothermal Bog",
+          "role": "Land",
+          "set": "dsc",
+          "collector_number": "278"
+        },
+        {
+          "quantity": 1,
+          "name": "Badlands",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "282"
+        },
+        {
+          "quantity": 16,
+          "name": "Swamp",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 14,
+          "name": "Mountain",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "287"
+        }
+      ]
+    },
+    {
+      "id": "starter_rg_v1",
+      "number": 4,
+      "title": "Wild Stampede",
+      "commander": "Targ Nar, Demon-Fang Gnoll",
+      "colors": "RG",
+      "color_names": "Red / Green",
+      "guild": "Gruul",
+      "description": "A straightforward creature deck: develop extra mana, cast large trampling creatures, and attack together for Targ Nar's pack tactics bonus.",
+      "how_to_play": "Keep an opener with green mana and a ramp spell. Build toward a six-power attack, then use trample and a carefully timed pump spell to finish.",
+      "teaches": "Ramp, trample, pack tactics and combat tricks. Avoid spending every card into a possible board wipe.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Targ Nar, Demon-Fang Gnoll",
+          "role": "Commander",
+          "set": "afr",
+          "collector_number": "234"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Gruul Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "223"
+        },
+        {
+          "quantity": 1,
+          "name": "Rampant Growth",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "265"
+        },
+        {
+          "quantity": 1,
+          "name": "Nature's Lore",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "177"
+        },
+        {
+          "quantity": 1,
+          "name": "Cultivate",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Kodama's Reach",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "113"
+        },
+        {
+          "quantity": 1,
+          "name": "Sakura-Tribe Elder",
+          "role": "Ramp",
+          "set": "soc",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Elves",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "227"
+        },
+        {
+          "quantity": 1,
+          "name": "Elvish Mystic",
+          "role": "Ramp",
+          "set": "hoc",
+          "collector_number": "205"
+        },
+        {
+          "quantity": 1,
+          "name": "Wood Elves",
+          "role": "Ramp",
+          "set": "hob",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Garruk's Packleader",
+          "role": "Draw / selection",
+          "set": "c19",
+          "collector_number": "168"
+        },
+        {
+          "quantity": 1,
+          "name": "Garruk's Uprising",
+          "role": "Draw / selection",
+          "set": "ecc",
+          "collector_number": "109"
+        },
+        {
+          "quantity": 1,
+          "name": "Colossal Majesty",
+          "role": "Draw / selection",
+          "set": "clu",
+          "collector_number": "160"
+        },
+        {
+          "quantity": 1,
+          "name": "Harmonize",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "175"
+        },
+        {
+          "quantity": 1,
+          "name": "Hunter's Insight",
+          "role": "Draw / selection",
+          "set": "cmm",
+          "collector_number": "296"
+        },
+        {
+          "quantity": 1,
+          "name": "Return of the Wildspeaker",
+          "role": "Draw / selection",
+          "set": "ecc",
+          "collector_number": "115"
+        },
+        {
+          "quantity": 1,
+          "name": "Hunter's Prowess",
+          "role": "Draw / selection",
+          "set": "c17",
+          "collector_number": "152"
+        },
+        {
+          "quantity": 1,
+          "name": "Thrill of Possibility",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Visionary",
+          "role": "Draw / selection",
+          "set": "m21",
+          "collector_number": "193"
+        },
+        {
+          "quantity": 1,
+          "name": "Owlbear",
+          "role": "Draw / selection",
+          "set": "afr",
+          "collector_number": "198"
+        },
+        {
+          "quantity": 1,
+          "name": "Abrade",
+          "role": "Interaction",
+          "set": "inr",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Beast Within",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "169"
+        },
+        {
+          "quantity": 1,
+          "name": "Return to Nature",
+          "role": "Interaction",
+          "set": "moc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Ram Through",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "314"
+        },
+        {
+          "quantity": 1,
+          "name": "Bite Down",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "212"
+        },
+        {
+          "quantity": 1,
+          "name": "Reclamation Sage",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "231"
+        },
+        {
+          "quantity": 1,
+          "name": "Broken Wings",
+          "role": "Interaction",
+          "set": "dft",
+          "collector_number": "156"
+        },
+        {
+          "quantity": 1,
+          "name": "Chain Reaction",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "121"
+        },
+        {
+          "quantity": 1,
+          "name": "Snakeskin Veil",
+          "role": "Interaction",
+          "set": "tdm",
+          "collector_number": "159"
+        },
+        {
+          "quantity": 1,
+          "name": "Tamiyo's Safekeeping",
+          "role": "Interaction",
+          "set": "neo",
+          "collector_number": "211"
+        },
+        {
+          "quantity": 1,
+          "name": "Goblin Anarchomancer",
+          "role": "Theme",
+          "set": "mh2",
+          "collector_number": "200"
+        },
+        {
+          "quantity": 1,
+          "name": "Gnoll Hunter",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "185"
+        },
+        {
+          "quantity": 1,
+          "name": "Zhur-Taa Druid",
+          "role": "Theme",
+          "set": "c16",
+          "collector_number": "232"
+        },
+        {
+          "quantity": 1,
+          "name": "Tuya Bearclaw",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "360"
+        },
+        {
+          "quantity": 1,
+          "name": "Ghor-Clan Rampager",
+          "role": "Theme",
+          "set": "2xm",
+          "collector_number": "198"
+        },
+        {
+          "quantity": 1,
+          "name": "Khenra Charioteer",
+          "role": "Theme",
+          "set": "akh",
+          "collector_number": "201"
+        },
+        {
+          "quantity": 1,
+          "name": "Nylea's Forerunner",
+          "role": "Theme",
+          "set": "thb",
+          "collector_number": "186"
+        },
+        {
+          "quantity": 1,
+          "name": "Proud Wildbonder",
+          "role": "Theme",
+          "set": "iko",
+          "collector_number": "229"
+        },
+        {
+          "quantity": 1,
+          "name": "Colossal Dreadmaw",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "176"
+        },
+        {
+          "quantity": 1,
+          "name": "Dreadmaw's Ire",
+          "role": "Theme",
+          "set": "lci",
+          "collector_number": "147"
+        },
+        {
+          "quantity": 1,
+          "name": "Nessian Asp",
+          "role": "Theme",
+          "set": "ddo",
+          "collector_number": "48"
+        },
+        {
+          "quantity": 1,
+          "name": "Baloth Gorger",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "156"
+        },
+        {
+          "quantity": 1,
+          "name": "Trumpeting Herd",
+          "role": "Theme",
+          "set": "mh1",
+          "collector_number": "187"
+        },
+        {
+          "quantity": 1,
+          "name": "Greater Sandwurm",
+          "role": "Theme",
+          "set": "iko",
+          "collector_number": "157"
+        },
+        {
+          "quantity": 1,
+          "name": "Ilysian Caryatid",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "297"
+        },
+        {
+          "quantity": 1,
+          "name": "Jewel Thief",
+          "role": "Theme",
+          "set": "snc",
+          "collector_number": "151"
+        },
+        {
+          "quantity": 1,
+          "name": "Charging Monstrosaur",
+          "role": "Theme",
+          "set": "xln",
+          "collector_number": "138"
+        },
+        {
+          "quantity": 1,
+          "name": "Silverback Shaman",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "255"
+        },
+        {
+          "quantity": 1,
+          "name": "Fierce Empath",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "636"
+        },
+        {
+          "quantity": 1,
+          "name": "Sarulf's Packmate",
+          "role": "Theme",
+          "set": "khm",
+          "collector_number": "192"
+        },
+        {
+          "quantity": 1,
+          "name": "Aggressive Mammoth",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "551"
+        },
+        {
+          "quantity": 1,
+          "name": "Thunderfoot Baloth",
+          "role": "Theme",
+          "set": "dsc",
+          "collector_number": "201"
+        },
+        {
+          "quantity": 1,
+          "name": "Overrun",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "230"
+        },
+        {
+          "quantity": 1,
+          "name": "Colossal Might",
+          "role": "Theme",
+          "set": "cmd",
+          "collector_number": "190"
+        },
+        {
+          "quantity": 1,
+          "name": "Titanic Growth",
+          "role": "Theme",
+          "set": "woe",
+          "collector_number": "191"
+        },
+        {
+          "quantity": 1,
+          "name": "Giant Growth",
+          "role": "Theme",
+          "set": "msh",
+          "collector_number": "167"
+        },
+        {
+          "quantity": 1,
+          "name": "Rancor",
+          "role": "Theme",
+          "set": "pca",
+          "collector_number": "76"
+        },
+        {
+          "quantity": 1,
+          "name": "Wildsize",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "179"
+        },
+        {
+          "quantity": 1,
+          "name": "Hooting Mandrills",
+          "role": "Theme",
+          "set": "uma",
+          "collector_number": "170"
+        },
+        {
+          "quantity": 1,
+          "name": "Ravenous Lindwurm",
+          "role": "Theme",
+          "set": "khm",
+          "collector_number": "187"
+        },
+        {
+          "quantity": 1,
+          "name": "Rampaging Hippo",
+          "role": "Theme",
+          "set": "hou",
+          "collector_number": "128"
+        },
+        {
+          "quantity": 1,
+          "name": "Gaea's Courser",
+          "role": "Theme",
+          "set": "bro",
+          "collector_number": "181"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Rugged Highlands",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "265"
+        },
+        {
+          "quantity": 1,
+          "name": "Gruul Turf",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "238"
+        },
+        {
+          "quantity": 1,
+          "name": "Wooded Ridgeline",
+          "role": "Land",
+          "set": "dmu",
+          "collector_number": "260"
+        },
+        {
+          "quantity": 1,
+          "name": "Taiga",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "287"
+        },
+        {
+          "quantity": 11,
+          "name": "Mountain",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "287"
+        },
+        {
+          "quantity": 19,
+          "name": "Forest",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "289"
+        }
+      ]
+    },
+    {
+      "id": "starter_gw_v1",
+      "number": 5,
+      "title": "United Front",
+      "commander": "Emmara, Soul of the Accord",
+      "colors": "GW",
+      "color_names": "Green / White",
+      "guild": "Selesnya",
+      "description": "Create a wide army of creature tokens and turn small bodies into a winning attack. Emmara supplies a lifelink Soldier whenever she becomes tapped.",
+      "how_to_play": "Use convoke or safe attacks to tap Emmara. Save an army-wide pump spell for a decisive attack, and protect your tokens when a sweeper appears.",
+      "teaches": "Tokens, convoke and team-wide bonuses. Convoke can tap a creature even on the turn it enters.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Emmara, Soul of the Accord",
+          "role": "Commander",
+          "set": "grn",
+          "collector_number": "168"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Selesnya Signet",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "324"
+        },
+        {
+          "quantity": 1,
+          "name": "Rampant Growth",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "265"
+        },
+        {
+          "quantity": 1,
+          "name": "Cultivate",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Kodama's Reach",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "113"
+        },
+        {
+          "quantity": 1,
+          "name": "Sakura-Tribe Elder",
+          "role": "Ramp",
+          "set": "soc",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Elves",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "227"
+        },
+        {
+          "quantity": 1,
+          "name": "Avacyn's Pilgrim",
+          "role": "Ramp",
+          "set": "mic",
+          "collector_number": "132"
+        },
+        {
+          "quantity": 1,
+          "name": "Jaspera Sentinel",
+          "role": "Ramp",
+          "set": "khm",
+          "collector_number": "178"
+        },
+        {
+          "quantity": 1,
+          "name": "Nissa's Expedition",
+          "role": "Ramp",
+          "set": "c21",
+          "collector_number": "200"
+        },
+        {
+          "quantity": 1,
+          "name": "Mentor of the Meek",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "170"
+        },
+        {
+          "quantity": 1,
+          "name": "Rumor Gatherer",
+          "role": "Draw / selection",
+          "set": "clb",
+          "collector_number": "705"
+        },
+        {
+          "quantity": 1,
+          "name": "Inspiring Overseer",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "736"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Visionary",
+          "role": "Draw / selection",
+          "set": "m21",
+          "collector_number": "193"
+        },
+        {
+          "quantity": 1,
+          "name": "Elvish Visionary",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "206"
+        },
+        {
+          "quantity": 1,
+          "name": "Harmonize",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "175"
+        },
+        {
+          "quantity": 1,
+          "name": "Shamanic Revelation",
+          "role": "Draw / selection",
+          "set": "ncc",
+          "collector_number": "311"
+        },
+        {
+          "quantity": 1,
+          "name": "Lead the Stampede",
+          "role": "Draw / selection",
+          "set": "ddu",
+          "collector_number": "16"
+        },
+        {
+          "quantity": 1,
+          "name": "Winding Way",
+          "role": "Draw / selection",
+          "set": "otc",
+          "collector_number": "213"
+        },
+        {
+          "quantity": 1,
+          "name": "Spare Supplies",
+          "role": "Draw / selection",
+          "set": "znr",
+          "collector_number": "254"
+        },
+        {
+          "quantity": 1,
+          "name": "Swords to Plowshares",
+          "role": "Interaction",
+          "set": "frc",
+          "collector_number": "37"
+        },
+        {
+          "quantity": 1,
+          "name": "Generous Gift",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "26"
+        },
+        {
+          "quantity": 1,
+          "name": "Return to Nature",
+          "role": "Interaction",
+          "set": "moc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Reclamation Sage",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "231"
+        },
+        {
+          "quantity": 1,
+          "name": "Sundering Growth",
+          "role": "Interaction",
+          "set": "c19",
+          "collector_number": "203"
+        },
+        {
+          "quantity": 1,
+          "name": "Conclave Tribunal",
+          "role": "Interaction",
+          "set": "clu",
+          "collector_number": "56"
+        },
+        {
+          "quantity": 1,
+          "name": "Oblivion Ring",
+          "role": "Interaction",
+          "set": "cmd",
+          "collector_number": "23"
+        },
+        {
+          "quantity": 1,
+          "name": "Cleansing Nova",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "124"
+        },
+        {
+          "quantity": 1,
+          "name": "Rootborn Defenses",
+          "role": "Interaction",
+          "set": "plst",
+          "collector_number": "RVR-26"
+        },
+        {
+          "quantity": 1,
+          "name": "Tamiyo's Safekeeping",
+          "role": "Interaction",
+          "set": "neo",
+          "collector_number": "211"
+        },
+        {
+          "quantity": 1,
+          "name": "Selesnya Evangel",
+          "role": "Theme",
+          "set": "cmd",
+          "collector_number": "223"
+        },
+        {
+          "quantity": 1,
+          "name": "Selesnya Guildmage",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "207"
+        },
+        {
+          "quantity": 1,
+          "name": "Queen Allenal of Ruadach",
+          "role": "Theme",
+          "set": "dmu",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Maja, Bretagard Protector",
+          "role": "Theme",
+          "set": "khm",
+          "collector_number": "222"
+        },
+        {
+          "quantity": 1,
+          "name": "Raise the Alarm",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "41"
+        },
+        {
+          "quantity": 1,
+          "name": "Gather the Townsfolk",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "23"
+        },
+        {
+          "quantity": 1,
+          "name": "Captain's Call",
+          "role": "Theme",
+          "set": "dmu",
+          "collector_number": "9"
+        },
+        {
+          "quantity": 1,
+          "name": "Triplicate Spirits",
+          "role": "Theme",
+          "set": "m15",
+          "collector_number": "40"
+        },
+        {
+          "quantity": 1,
+          "name": "Battle Screech",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "17"
+        },
+        {
+          "quantity": 1,
+          "name": "Saproling Migration",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "178"
+        },
+        {
+          "quantity": 1,
+          "name": "Scatter the Seeds",
+          "role": "Theme",
+          "set": "mm2",
+          "collector_number": "159"
+        },
+        {
+          "quantity": 1,
+          "name": "Yavimaya Sapherd",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "189"
+        },
+        {
+          "quantity": 1,
+          "name": "Sporemound",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "437"
+        },
+        {
+          "quantity": 1,
+          "name": "Jade Mage",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Call of the Conclave",
+          "role": "Theme",
+          "set": "rvr",
+          "collector_number": "169"
+        },
+        {
+          "quantity": 1,
+          "name": "Attended Knight",
+          "role": "Theme",
+          "set": "mm3",
+          "collector_number": "1"
+        },
+        {
+          "quantity": 1,
+          "name": "Seller of Songbirds",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "72"
+        },
+        {
+          "quantity": 1,
+          "name": "Doomed Traveler",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "59"
+        },
+        {
+          "quantity": 1,
+          "name": "Hunted Witness",
+          "role": "Theme",
+          "set": "grn",
+          "collector_number": "15"
+        },
+        {
+          "quantity": 1,
+          "name": "Martyr of Dusk",
+          "role": "Theme",
+          "set": "lcc",
+          "collector_number": "132"
+        },
+        {
+          "quantity": 1,
+          "name": "Ironroot Warlord",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "452"
+        },
+        {
+          "quantity": 1,
+          "name": "Conclave Cavalier",
+          "role": "Theme",
+          "set": "rvr",
+          "collector_number": "173"
+        },
+        {
+          "quantity": 1,
+          "name": "Rosemane Centaur",
+          "role": "Theme",
+          "set": "grn",
+          "collector_number": "197"
+        },
+        {
+          "quantity": 1,
+          "name": "Siege Wurm",
+          "role": "Theme",
+          "set": "rvr",
+          "collector_number": "155"
+        },
+        {
+          "quantity": 1,
+          "name": "Venerated Loxodon",
+          "role": "Theme",
+          "set": "moc",
+          "collector_number": "215"
+        },
+        {
+          "quantity": 1,
+          "name": "Fortify",
+          "role": "Theme",
+          "set": "tsr",
+          "collector_number": "18"
+        },
+        {
+          "quantity": 1,
+          "name": "Inspired Charge",
+          "role": "Theme",
+          "set": "mom",
+          "collector_number": "19"
+        },
+        {
+          "quantity": 1,
+          "name": "Charge",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "10"
+        },
+        {
+          "quantity": 1,
+          "name": "Might of the Masses",
+          "role": "Theme",
+          "set": "2xm",
+          "collector_number": "176"
+        },
+        {
+          "quantity": 1,
+          "name": "Presence of Gond",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "420"
+        },
+        {
+          "quantity": 1,
+          "name": "Loxodon Restorer",
+          "role": "Theme",
+          "set": "grn",
+          "collector_number": "20"
+        },
+        {
+          "quantity": 1,
+          "name": "Kozilek's Predator",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "301"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Blossoming Sands",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "251"
+        },
+        {
+          "quantity": 1,
+          "name": "Selesnya Sanctuary",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "246"
+        },
+        {
+          "quantity": 1,
+          "name": "Radiant Grove",
+          "role": "Land",
+          "set": "tdc",
+          "collector_number": "385"
+        },
+        {
+          "quantity": 1,
+          "name": "Savannah",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 14,
+          "name": "Plains",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "281"
+        },
+        {
+          "quantity": 16,
+          "name": "Forest",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "289"
+        }
+      ]
+    },
+    {
+      "id": "starter_wb_v1",
+      "number": 6,
+      "title": "Life and Legacy",
+      "commander": "Elas il-Kor, Sadistic Pilgrim",
+      "colors": "WB",
+      "color_names": "White / Black",
+      "guild": "Orzhov",
+      "description": "Gain small amounts of life as creatures arrive, then drain opponents when your creatures die. The deck wins through steady attacks and attrition.",
+      "how_to_play": "Play creatures that leave a replacement behind. Trade in combat or use a sacrifice effect for value, then recover creatures from the graveyard.",
+      "teaches": "Lifelink, enter-the-battlefield and death triggers. Life gain helps survival; it is not the only win condition.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Elas il-Kor, Sadistic Pilgrim",
+          "role": "Commander",
+          "set": "dmu",
+          "collector_number": "198"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Orzhov Signet",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "323"
+        },
+        {
+          "quantity": 1,
+          "name": "Mind Stone",
+          "role": "Ramp",
+          "set": "lcc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Commander's Sphere",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Wayfarer's Bauble",
+          "role": "Ramp",
+          "set": "plst",
+          "collector_number": "M3C-315"
+        },
+        {
+          "quantity": 1,
+          "name": "Marble Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "320"
+        },
+        {
+          "quantity": 1,
+          "name": "Charcoal Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "305"
+        },
+        {
+          "quantity": 1,
+          "name": "Prismatic Lens",
+          "role": "Ramp",
+          "set": "cmm",
+          "collector_number": "403"
+        },
+        {
+          "quantity": 1,
+          "name": "Worn Powerstone",
+          "role": "Ramp",
+          "set": "mh3",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Hedron Archive",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "726"
+        },
+        {
+          "quantity": 1,
+          "name": "Village Rites",
+          "role": "Draw / selection",
+          "set": "inr",
+          "collector_number": "137"
+        },
+        {
+          "quantity": 1,
+          "name": "Deadly Dispute",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "794"
+        },
+        {
+          "quantity": 1,
+          "name": "Night's Whisper",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "189"
+        },
+        {
+          "quantity": 1,
+          "name": "Sign in Blood",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "156"
+        },
+        {
+          "quantity": 1,
+          "name": "Read the Bones",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "154"
+        },
+        {
+          "quantity": 1,
+          "name": "Inspiring Overseer",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "736"
+        },
+        {
+          "quantity": 1,
+          "name": "Spirited Companion",
+          "role": "Draw / selection",
+          "set": "cmm",
+          "collector_number": "838"
+        },
+        {
+          "quantity": 1,
+          "name": "Mentor of the Meek",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "170"
+        },
+        {
+          "quantity": 1,
+          "name": "Morbid Opportunist",
+          "role": "Draw / selection",
+          "set": "soc",
+          "collector_number": "219"
+        },
+        {
+          "quantity": 1,
+          "name": "Midnight Reaper",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "609"
+        },
+        {
+          "quantity": 1,
+          "name": "Swords to Plowshares",
+          "role": "Interaction",
+          "set": "frc",
+          "collector_number": "37"
+        },
+        {
+          "quantity": 1,
+          "name": "Mortify",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "662"
+        },
+        {
+          "quantity": 1,
+          "name": "Despark",
+          "role": "Interaction",
+          "set": "frc",
+          "collector_number": "50"
+        },
+        {
+          "quantity": 1,
+          "name": "Feed the Swarm",
+          "role": "Interaction",
+          "set": "tle",
+          "collector_number": "257"
+        },
+        {
+          "quantity": 1,
+          "name": "Disenchant",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "572"
+        },
+        {
+          "quantity": 1,
+          "name": "Cathar Commando",
+          "role": "Interaction",
+          "set": "inr",
+          "collector_number": "15"
+        },
+        {
+          "quantity": 1,
+          "name": "Fleshbag Marauder",
+          "role": "Interaction",
+          "set": "clu",
+          "collector_number": "111"
+        },
+        {
+          "quantity": 1,
+          "name": "Cleansing Nova",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "124"
+        },
+        {
+          "quantity": 1,
+          "name": "Gods Willing",
+          "role": "Interaction",
+          "set": "clu",
+          "collector_number": "63"
+        },
+        {
+          "quantity": 1,
+          "name": "Unbreakable Formation",
+          "role": "Interaction",
+          "set": "rvr",
+          "collector_number": "32"
+        },
+        {
+          "quantity": 1,
+          "name": "Doomed Traveler",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "59"
+        },
+        {
+          "quantity": 1,
+          "name": "Hunted Witness",
+          "role": "Theme",
+          "set": "grn",
+          "collector_number": "15"
+        },
+        {
+          "quantity": 1,
+          "name": "Martyr of Dusk",
+          "role": "Theme",
+          "set": "lcc",
+          "collector_number": "132"
+        },
+        {
+          "quantity": 1,
+          "name": "Doomed Dissenter",
+          "role": "Theme",
+          "set": "vow",
+          "collector_number": "106"
+        },
+        {
+          "quantity": 1,
+          "name": "Carrier Thrall",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Imperious Oligarch",
+          "role": "Theme",
+          "set": "rna",
+          "collector_number": "184"
+        },
+        {
+          "quantity": 1,
+          "name": "Ministrant of Obligation",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "43"
+        },
+        {
+          "quantity": 1,
+          "name": "Cruel Celebrant",
+          "role": "Theme",
+          "set": "lcc",
+          "collector_number": "267"
+        },
+        {
+          "quantity": 1,
+          "name": "Zulaport Cutthroat",
+          "role": "Theme",
+          "set": "soc",
+          "collector_number": "233"
+        },
+        {
+          "quantity": 1,
+          "name": "Falkenrath Noble",
+          "role": "Theme",
+          "set": "dsc",
+          "collector_number": "140"
+        },
+        {
+          "quantity": 1,
+          "name": "Suture Priest",
+          "role": "Theme",
+          "set": "moc",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Soul Warden",
+          "role": "Theme",
+          "set": "mm3",
+          "collector_number": "24"
+        },
+        {
+          "quantity": 1,
+          "name": "Ajani's Pridemate",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "135"
+        },
+        {
+          "quantity": 1,
+          "name": "Marauding Blight-Priest",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "178"
+        },
+        {
+          "quantity": 1,
+          "name": "Vampire Nighthawk",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "757"
+        },
+        {
+          "quantity": 1,
+          "name": "Celestial Unicorn",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "5"
+        },
+        {
+          "quantity": 1,
+          "name": "Attended Knight",
+          "role": "Theme",
+          "set": "mm3",
+          "collector_number": "1"
+        },
+        {
+          "quantity": 1,
+          "name": "Lazotep Reaver",
+          "role": "Theme",
+          "set": "war",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Reassembling Skeleton",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "195"
+        },
+        {
+          "quantity": 1,
+          "name": "Persistent Specimen",
+          "role": "Theme",
+          "set": "vow",
+          "collector_number": "125"
+        },
+        {
+          "quantity": 1,
+          "name": "Viscera Seer",
+          "role": "Theme",
+          "set": "soc",
+          "collector_number": "229"
+        },
+        {
+          "quantity": 1,
+          "name": "Bartolomé del Presidio",
+          "role": "Theme",
+          "set": "lci",
+          "collector_number": "224"
+        },
+        {
+          "quantity": 1,
+          "name": "Lampad of Death's Vigil",
+          "role": "Theme",
+          "set": "thb",
+          "collector_number": "103"
+        },
+        {
+          "quantity": 1,
+          "name": "Fleshtaker",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "235"
+        },
+        {
+          "quantity": 1,
+          "name": "Return to the Ranks",
+          "role": "Theme",
+          "set": "m15",
+          "collector_number": "29"
+        },
+        {
+          "quantity": 1,
+          "name": "Unearth",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Victimize",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "198"
+        },
+        {
+          "quantity": 1,
+          "name": "Raise the Alarm",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "41"
+        },
+        {
+          "quantity": 1,
+          "name": "Gather the Townsfolk",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "23"
+        },
+        {
+          "quantity": 1,
+          "name": "Garrison Cat",
+          "role": "Theme",
+          "set": "iko",
+          "collector_number": "14"
+        },
+        {
+          "quantity": 1,
+          "name": "Soulmender",
+          "role": "Theme",
+          "set": "m20",
+          "collector_number": "37"
+        },
+        {
+          "quantity": 1,
+          "name": "Gray Merchant of Asphodel",
+          "role": "Theme",
+          "set": "c14",
+          "collector_number": "146"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Scoured Barrens",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "267"
+        },
+        {
+          "quantity": 1,
+          "name": "Orzhov Basilica",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "241"
+        },
+        {
+          "quantity": 1,
+          "name": "Sunlit Marsh",
+          "role": "Land",
+          "set": "soc",
+          "collector_number": "409"
+        },
+        {
+          "quantity": 1,
+          "name": "Scrubland",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "286"
+        },
+        {
+          "quantity": 14,
+          "name": "Plains",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "281"
+        },
+        {
+          "quantity": 16,
+          "name": "Swamp",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "285"
+        }
+      ]
+    },
+    {
+      "id": "starter_ur_v1",
+      "number": 7,
+      "title": "Spellfire Squadron",
+      "commander": "Balmor, Battlemage Captain",
+      "colors": "UR",
+      "color_names": "Blue / Red",
+      "guild": "Izzet",
+      "description": "Deploy a team of small creatures, then cast inexpensive spells before combat. Balmor gives the whole team extra power and trample with each instant or sorcery.",
+      "how_to_play": "Start with two or three creatures, keep a draw spell ready, and combine spells with an attack. Token makers give Balmor more creatures to enhance.",
+      "teaches": "Prowess-style triggers, cantrips and spell timing. Most pump effects expire at the end of the turn.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Balmor, Battlemage Captain",
+          "role": "Commander",
+          "set": "fdn",
+          "collector_number": "237"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Izzet Signet",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "320"
+        },
+        {
+          "quantity": 1,
+          "name": "Mind Stone",
+          "role": "Ramp",
+          "set": "lcc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Commander's Sphere",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Wayfarer's Bauble",
+          "role": "Ramp",
+          "set": "plst",
+          "collector_number": "M3C-315"
+        },
+        {
+          "quantity": 1,
+          "name": "Sky Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "337"
+        },
+        {
+          "quantity": 1,
+          "name": "Fire Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "313"
+        },
+        {
+          "quantity": 1,
+          "name": "Prismatic Lens",
+          "role": "Ramp",
+          "set": "cmm",
+          "collector_number": "403"
+        },
+        {
+          "quantity": 1,
+          "name": "Worn Powerstone",
+          "role": "Ramp",
+          "set": "mh3",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Hedron Archive",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "726"
+        },
+        {
+          "quantity": 1,
+          "name": "Opt",
+          "role": "Draw / selection",
+          "set": "tdc",
+          "collector_number": "158"
+        },
+        {
+          "quantity": 1,
+          "name": "Consider",
+          "role": "Draw / selection",
+          "set": "tle",
+          "collector_number": "157"
+        },
+        {
+          "quantity": 1,
+          "name": "Preordain",
+          "role": "Draw / selection",
+          "set": "tdc",
+          "collector_number": "161"
+        },
+        {
+          "quantity": 1,
+          "name": "Ponder",
+          "role": "Draw / selection",
+          "set": "tdc",
+          "collector_number": "159"
+        },
+        {
+          "quantity": 1,
+          "name": "Brainstorm",
+          "role": "Draw / selection",
+          "set": "frc",
+          "collector_number": "39"
+        },
+        {
+          "quantity": 1,
+          "name": "Faithless Looting",
+          "role": "Draw / selection",
+          "set": "soc",
+          "collector_number": "244"
+        },
+        {
+          "quantity": 1,
+          "name": "Thrill of Possibility",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Treasure Cruise",
+          "role": "Draw / selection",
+          "set": "soc",
+          "collector_number": "205"
+        },
+        {
+          "quantity": 1,
+          "name": "Chart a Course",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "586"
+        },
+        {
+          "quantity": 1,
+          "name": "Winged Words",
+          "role": "Draw / selection",
+          "set": "jmp",
+          "collector_number": "196"
+        },
+        {
+          "quantity": 1,
+          "name": "Abrade",
+          "role": "Interaction",
+          "set": "inr",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Lightning Strike",
+          "role": "Interaction",
+          "set": "msh",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Counterspell",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "81"
+        },
+        {
+          "quantity": 1,
+          "name": "Negate",
+          "role": "Interaction",
+          "set": "tmt",
+          "collector_number": "47"
+        },
+        {
+          "quantity": 1,
+          "name": "Into the Roil",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "509"
+        },
+        {
+          "quantity": 1,
+          "name": "Resculpt",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "201"
+        },
+        {
+          "quantity": 1,
+          "name": "Reality Shift",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "199"
+        },
+        {
+          "quantity": 1,
+          "name": "Chain Reaction",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "121"
+        },
+        {
+          "quantity": 1,
+          "name": "Shore Up",
+          "role": "Interaction",
+          "set": "blb",
+          "collector_number": "69"
+        },
+        {
+          "quantity": 1,
+          "name": "Dive Down",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "588"
+        },
+        {
+          "quantity": 1,
+          "name": "Goblin Electromancer",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "99"
+        },
+        {
+          "quantity": 1,
+          "name": "Young Pyromancer",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "95"
+        },
+        {
+          "quantity": 1,
+          "name": "Third Path Iconoclast",
+          "role": "Theme",
+          "set": "tdc",
+          "collector_number": "307"
+        },
+        {
+          "quantity": 1,
+          "name": "Murmuring Mystic",
+          "role": "Theme",
+          "set": "otc",
+          "collector_number": "102"
+        },
+        {
+          "quantity": 1,
+          "name": "Talrand, Sky Summoner",
+          "role": "Theme",
+          "set": "otc",
+          "collector_number": "116"
+        },
+        {
+          "quantity": 1,
+          "name": "Guttersnipe",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "229"
+        },
+        {
+          "quantity": 1,
+          "name": "Firebrand Archer",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "196"
+        },
+        {
+          "quantity": 1,
+          "name": "Electrostatic Infantry",
+          "role": "Theme",
+          "set": "dmu",
+          "collector_number": "122"
+        },
+        {
+          "quantity": 1,
+          "name": "Wee Dragonauts",
+          "role": "Theme",
+          "set": "ddj",
+          "collector_number": "6"
+        },
+        {
+          "quantity": 1,
+          "name": "Sprite Dragon",
+          "role": "Theme",
+          "set": "clb",
+          "collector_number": "852"
+        },
+        {
+          "quantity": 1,
+          "name": "Nivix Cyclops",
+          "role": "Theme",
+          "set": "dds",
+          "collector_number": "24"
+        },
+        {
+          "quantity": 1,
+          "name": "Kiln Fiend",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "338"
+        },
+        {
+          "quantity": 1,
+          "name": "Festival Crasher",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "153"
+        },
+        {
+          "quantity": 1,
+          "name": "Jeskai Elder",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Jeskai Sage",
+          "role": "Theme",
+          "set": "frf",
+          "collector_number": "38"
+        },
+        {
+          "quantity": 1,
+          "name": "Wing Commando",
+          "role": "Theme",
+          "set": "bro",
+          "collector_number": "73"
+        },
+        {
+          "quantity": 1,
+          "name": "Burning Prophet",
+          "role": "Theme",
+          "set": "rvr",
+          "collector_number": "104"
+        },
+        {
+          "quantity": 1,
+          "name": "Spellgorger Weird",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "148"
+        },
+        {
+          "quantity": 1,
+          "name": "Tolarian Terror",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "167"
+        },
+        {
+          "quantity": 1,
+          "name": "Crackling Drake",
+          "role": "Theme",
+          "set": "rvr",
+          "collector_number": "174"
+        },
+        {
+          "quantity": 1,
+          "name": "Bloodwater Entity",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "185"
+        },
+        {
+          "quantity": 1,
+          "name": "Archaeomancer",
+          "role": "Theme",
+          "set": "uma",
+          "collector_number": "45"
+        },
+        {
+          "quantity": 1,
+          "name": "Dragon Fodder",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "535"
+        },
+        {
+          "quantity": 1,
+          "name": "Krenko's Command",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Goblin Wizardry",
+          "role": "Theme",
+          "set": "clu",
+          "collector_number": "136"
+        },
+        {
+          "quantity": 1,
+          "name": "Talrand's Invocation",
+          "role": "Theme",
+          "set": "ncc",
+          "collector_number": "234"
+        },
+        {
+          "quantity": 1,
+          "name": "Expedite",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "413"
+        },
+        {
+          "quantity": 1,
+          "name": "Warlord's Fury",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "151"
+        },
+        {
+          "quantity": 1,
+          "name": "Crash Through",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "620"
+        },
+        {
+          "quantity": 1,
+          "name": "Goblin Dark-Dwellers",
+          "role": "Theme",
+          "set": "c20",
+          "collector_number": "153"
+        },
+        {
+          "quantity": 1,
+          "name": "Mizzium Mortars",
+          "role": "Theme",
+          "set": "clb",
+          "collector_number": "803"
+        },
+        {
+          "quantity": 1,
+          "name": "Jori En, Ruin Diver",
+          "role": "Theme",
+          "set": "dds",
+          "collector_number": "23"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Swiftwater Cliffs",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "268"
+        },
+        {
+          "quantity": 1,
+          "name": "Izzet Boilerworks",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "239"
+        },
+        {
+          "quantity": 1,
+          "name": "Molten Tributary",
+          "role": "Land",
+          "set": "soc",
+          "collector_number": "387"
+        },
+        {
+          "quantity": 1,
+          "name": "Volcanic Island",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "291"
+        },
+        {
+          "quantity": 17,
+          "name": "Island",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "283"
+        },
+        {
+          "quantity": 13,
+          "name": "Mountain",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "287"
+        }
+      ]
+    },
+    {
+      "id": "starter_bg_v1",
+      "number": 8,
+      "title": "Saproling Swarm",
+      "commander": "Slimefoot, the Stowaway",
+      "colors": "BG",
+      "color_names": "Black / Green",
+      "guild": "Golgari",
+      "description": "Grow a Saproling army and make opponents pay when it dies. Slimefoot creates more tokens and turns their deaths into damage and life gain.",
+      "how_to_play": "Make Saprolings, keep Slimefoot safe, and attack or sacrifice tokens when it earns value. Use team bonuses to finish rather than waiting for a combo.",
+      "teaches": "Token production, death triggers and resource management. Spore counters take time to grow into tokens.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Slimefoot, the Stowaway",
+          "role": "Commander",
+          "set": "cmm",
+          "collector_number": "356"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Golgari Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "222"
+        },
+        {
+          "quantity": 1,
+          "name": "Rampant Growth",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "265"
+        },
+        {
+          "quantity": 1,
+          "name": "Nature's Lore",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "177"
+        },
+        {
+          "quantity": 1,
+          "name": "Cultivate",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Kodama's Reach",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "113"
+        },
+        {
+          "quantity": 1,
+          "name": "Sakura-Tribe Elder",
+          "role": "Ramp",
+          "set": "soc",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Elves",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "227"
+        },
+        {
+          "quantity": 1,
+          "name": "Elvish Mystic",
+          "role": "Ramp",
+          "set": "hoc",
+          "collector_number": "205"
+        },
+        {
+          "quantity": 1,
+          "name": "Wood Elves",
+          "role": "Ramp",
+          "set": "hob",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Village Rites",
+          "role": "Draw / selection",
+          "set": "inr",
+          "collector_number": "137"
+        },
+        {
+          "quantity": 1,
+          "name": "Deadly Dispute",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "794"
+        },
+        {
+          "quantity": 1,
+          "name": "Night's Whisper",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "189"
+        },
+        {
+          "quantity": 1,
+          "name": "Read the Bones",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "154"
+        },
+        {
+          "quantity": 1,
+          "name": "Harmonize",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "175"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Visionary",
+          "role": "Draw / selection",
+          "set": "m21",
+          "collector_number": "193"
+        },
+        {
+          "quantity": 1,
+          "name": "Elvish Visionary",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "206"
+        },
+        {
+          "quantity": 1,
+          "name": "Thallid Soothsayer",
+          "role": "Draw / selection",
+          "set": "gnt",
+          "collector_number": "35"
+        },
+        {
+          "quantity": 1,
+          "name": "Fungal Plots",
+          "role": "Draw / selection",
+          "set": "cmm",
+          "collector_number": "291"
+        },
+        {
+          "quantity": 1,
+          "name": "Shamanic Revelation",
+          "role": "Draw / selection",
+          "set": "ncc",
+          "collector_number": "311"
+        },
+        {
+          "quantity": 1,
+          "name": "Putrefy",
+          "role": "Interaction",
+          "set": "ecc",
+          "collector_number": "131"
+        },
+        {
+          "quantity": 1,
+          "name": "Feed the Swarm",
+          "role": "Interaction",
+          "set": "tle",
+          "collector_number": "257"
+        },
+        {
+          "quantity": 1,
+          "name": "Go for the Throat",
+          "role": "Interaction",
+          "set": "slz",
+          "collector_number": "42"
+        },
+        {
+          "quantity": 1,
+          "name": "Return to Nature",
+          "role": "Interaction",
+          "set": "moc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Reclamation Sage",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "231"
+        },
+        {
+          "quantity": 1,
+          "name": "Deathsprout",
+          "role": "Interaction",
+          "set": "c20",
+          "collector_number": "208"
+        },
+        {
+          "quantity": 1,
+          "name": "Eyeblight Massacre",
+          "role": "Interaction",
+          "set": "cmr",
+          "collector_number": "125"
+        },
+        {
+          "quantity": 1,
+          "name": "Crux of Fate",
+          "role": "Interaction",
+          "set": "c17",
+          "collector_number": "107"
+        },
+        {
+          "quantity": 1,
+          "name": "Golgari Charm",
+          "role": "Interaction",
+          "set": "uma",
+          "collector_number": "201"
+        },
+        {
+          "quantity": 1,
+          "name": "Tamiyo's Safekeeping",
+          "role": "Interaction",
+          "set": "neo",
+          "collector_number": "211"
+        },
+        {
+          "quantity": 1,
+          "name": "Saproling Migration",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "178"
+        },
+        {
+          "quantity": 1,
+          "name": "Scatter the Seeds",
+          "role": "Theme",
+          "set": "mm2",
+          "collector_number": "159"
+        },
+        {
+          "quantity": 1,
+          "name": "Sprout Swarm",
+          "role": "Theme",
+          "set": "fut",
+          "collector_number": "138"
+        },
+        {
+          "quantity": 1,
+          "name": "Fungal Infection",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "94"
+        },
+        {
+          "quantity": 1,
+          "name": "Yavimaya Sapherd",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "189"
+        },
+        {
+          "quantity": 1,
+          "name": "Deathbloom Thallid",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "94"
+        },
+        {
+          "quantity": 1,
+          "name": "Tukatongue Thallid",
+          "role": "Theme",
+          "set": "pca",
+          "collector_number": "79"
+        },
+        {
+          "quantity": 1,
+          "name": "Sporemound",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "437"
+        },
+        {
+          "quantity": 1,
+          "name": "Thallid",
+          "role": "Theme",
+          "set": "mma",
+          "collector_number": "167"
+        },
+        {
+          "quantity": 1,
+          "name": "Thallid Shell-Dweller",
+          "role": "Theme",
+          "set": "tsr",
+          "collector_number": "237"
+        },
+        {
+          "quantity": 1,
+          "name": "Deathspore Thallid",
+          "role": "Theme",
+          "set": "tsr",
+          "collector_number": "109"
+        },
+        {
+          "quantity": 1,
+          "name": "Thallid Germinator",
+          "role": "Theme",
+          "set": "tsr",
+          "collector_number": "236"
+        },
+        {
+          "quantity": 1,
+          "name": "Vitaspore Thallid",
+          "role": "Theme",
+          "set": "plc",
+          "collector_number": "143"
+        },
+        {
+          "quantity": 1,
+          "name": "Sporoloth Ancient",
+          "role": "Theme",
+          "set": "tsr",
+          "collector_number": "232"
+        },
+        {
+          "quantity": 1,
+          "name": "Sporecrown Thallid",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "181"
+        },
+        {
+          "quantity": 1,
+          "name": "Thallid Omnivore",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "106"
+        },
+        {
+          "quantity": 1,
+          "name": "Jade Mage",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Undercellar Myconid",
+          "role": "Theme",
+          "set": "clb",
+          "collector_number": "259"
+        },
+        {
+          "quantity": 1,
+          "name": "Overgrown Armasaur",
+          "role": "Theme",
+          "set": "rix",
+          "collector_number": "141"
+        },
+        {
+          "quantity": 1,
+          "name": "Rot Shambler",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "318"
+        },
+        {
+          "quantity": 1,
+          "name": "Poison-Tip Archer",
+          "role": "Theme",
+          "set": "khc",
+          "collector_number": "90"
+        },
+        {
+          "quantity": 1,
+          "name": "Cankerbloom",
+          "role": "Theme",
+          "set": "one",
+          "collector_number": "161"
+        },
+        {
+          "quantity": 1,
+          "name": "Fists of Ironwood",
+          "role": "Theme",
+          "set": "rvr",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Sprout",
+          "role": "Theme",
+          "set": "tsp",
+          "collector_number": "221"
+        },
+        {
+          "quantity": 1,
+          "name": "Morbid Bloom",
+          "role": "Theme",
+          "set": "arb",
+          "collector_number": "94"
+        },
+        {
+          "quantity": 1,
+          "name": "Gravedigger",
+          "role": "Theme",
+          "set": "cm2",
+          "collector_number": "66"
+        },
+        {
+          "quantity": 1,
+          "name": "Unearth",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "96"
+        },
+        {
+          "quantity": 1,
+          "name": "Second Harvest",
+          "role": "Theme",
+          "set": "inr",
+          "collector_number": "213"
+        },
+        {
+          "quantity": 1,
+          "name": "Verdant Force",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "187"
+        },
+        {
+          "quantity": 1,
+          "name": "Nemata, Grove Guardian",
+          "role": "Theme",
+          "set": "pls",
+          "collector_number": "85"
+        },
+        {
+          "quantity": 1,
+          "name": "Thallid Devourer",
+          "role": "Theme",
+          "set": "fem",
+          "collector_number": "75"
+        },
+        {
+          "quantity": 1,
+          "name": "Might of the Masses",
+          "role": "Theme",
+          "set": "2xm",
+          "collector_number": "176"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Jungle Hollow",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "258"
+        },
+        {
+          "quantity": 1,
+          "name": "Golgari Rot Farm",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "236"
+        },
+        {
+          "quantity": 1,
+          "name": "Haunted Mire",
+          "role": "Land",
+          "set": "soc",
+          "collector_number": "379"
+        },
+        {
+          "quantity": 1,
+          "name": "Bayou",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "283"
+        },
+        {
+          "quantity": 11,
+          "name": "Swamp",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 19,
+          "name": "Forest",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "289"
+        }
+      ]
+    },
+    {
+      "id": "starter_rw_v1",
+      "number": 9,
+      "title": "Forged in Battle",
+      "commander": "Bruenor Battlehammer",
+      "colors": "RW",
+      "color_names": "Red / White",
+      "guild": "Boros",
+      "description": "Arm a small band of warriors with reusable Equipment. Bruenor boosts equipped creatures and makes your first equip activation each turn cost zero.",
+      "how_to_play": "Play creatures before loading up on Equipment. Spread Equipment when possible, then use the free equip to move a key weapon before attacking.",
+      "teaches": "Equipment, equip timing and commander damage. Equipment stays on the battlefield when its creature dies.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Bruenor Battlehammer",
+          "role": "Commander",
+          "set": "afr",
+          "collector_number": "219"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Boros Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "220"
+        },
+        {
+          "quantity": 1,
+          "name": "Mind Stone",
+          "role": "Ramp",
+          "set": "lcc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Commander's Sphere",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Wayfarer's Bauble",
+          "role": "Ramp",
+          "set": "plst",
+          "collector_number": "M3C-315"
+        },
+        {
+          "quantity": 1,
+          "name": "Marble Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "320"
+        },
+        {
+          "quantity": 1,
+          "name": "Fire Diamond",
+          "role": "Ramp",
+          "set": "clb",
+          "collector_number": "313"
+        },
+        {
+          "quantity": 1,
+          "name": "Prismatic Lens",
+          "role": "Ramp",
+          "set": "cmm",
+          "collector_number": "403"
+        },
+        {
+          "quantity": 1,
+          "name": "Worn Powerstone",
+          "role": "Ramp",
+          "set": "mh3",
+          "collector_number": "298"
+        },
+        {
+          "quantity": 1,
+          "name": "Hedron Archive",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "726"
+        },
+        {
+          "quantity": 1,
+          "name": "Sram, Senior Edificer",
+          "role": "Draw / selection",
+          "set": "soc",
+          "collector_number": "176"
+        },
+        {
+          "quantity": 1,
+          "name": "Akiri, Fearless Voyager",
+          "role": "Draw / selection",
+          "set": "znr",
+          "collector_number": "220"
+        },
+        {
+          "quantity": 1,
+          "name": "Mask of Memory",
+          "role": "Draw / selection",
+          "set": "cmr",
+          "collector_number": "324"
+        },
+        {
+          "quantity": 1,
+          "name": "Rogue's Gloves",
+          "role": "Draw / selection",
+          "set": "jmp",
+          "collector_number": "479"
+        },
+        {
+          "quantity": 1,
+          "name": "Infiltration Lens",
+          "role": "Draw / selection",
+          "set": "som",
+          "collector_number": "167"
+        },
+        {
+          "quantity": 1,
+          "name": "Thrill of Possibility",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Demand Answers",
+          "role": "Draw / selection",
+          "set": "mkm",
+          "collector_number": "122"
+        },
+        {
+          "quantity": 1,
+          "name": "Seize the Spoils",
+          "role": "Draw / selection",
+          "set": "sos",
+          "collector_number": "129"
+        },
+        {
+          "quantity": 1,
+          "name": "Inspiring Overseer",
+          "role": "Draw / selection",
+          "set": "fdn",
+          "collector_number": "736"
+        },
+        {
+          "quantity": 1,
+          "name": "Spare Supplies",
+          "role": "Draw / selection",
+          "set": "znr",
+          "collector_number": "254"
+        },
+        {
+          "quantity": 1,
+          "name": "Swords to Plowshares",
+          "role": "Interaction",
+          "set": "frc",
+          "collector_number": "37"
+        },
+        {
+          "quantity": 1,
+          "name": "Generous Gift",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "26"
+        },
+        {
+          "quantity": 1,
+          "name": "Abrade",
+          "role": "Interaction",
+          "set": "inr",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Disenchant",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "572"
+        },
+        {
+          "quantity": 1,
+          "name": "Oblivion Ring",
+          "role": "Interaction",
+          "set": "cmd",
+          "collector_number": "23"
+        },
+        {
+          "quantity": 1,
+          "name": "Valorous Stance",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "145"
+        },
+        {
+          "quantity": 1,
+          "name": "Lightning Strike",
+          "role": "Interaction",
+          "set": "msh",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Cleansing Nova",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "124"
+        },
+        {
+          "quantity": 1,
+          "name": "Blacksmith's Skill",
+          "role": "Interaction",
+          "set": "mh2",
+          "collector_number": "6"
+        },
+        {
+          "quantity": 1,
+          "name": "Shelter",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "56"
+        },
+        {
+          "quantity": 1,
+          "name": "Danitha Capashen, Paragon",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "20"
+        },
+        {
+          "quantity": 1,
+          "name": "Reyav, Master Smith",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "290"
+        },
+        {
+          "quantity": 1,
+          "name": "Koll, the Forgemaster",
+          "role": "Theme",
+          "set": "khm",
+          "collector_number": "220"
+        },
+        {
+          "quantity": 1,
+          "name": "Champion of the Flame",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "210"
+        },
+        {
+          "quantity": 1,
+          "name": "Goblin Gaveleer",
+          "role": "Theme",
+          "set": "2xm",
+          "collector_number": "126"
+        },
+        {
+          "quantity": 1,
+          "name": "Sunspear Shikari",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "62"
+        },
+        {
+          "quantity": 1,
+          "name": "Armory Veteran",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "130"
+        },
+        {
+          "quantity": 1,
+          "name": "Dwarfhold Champion",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "14"
+        },
+        {
+          "quantity": 1,
+          "name": "Kazuul's Toll Collector",
+          "role": "Theme",
+          "set": "2xm",
+          "collector_number": "133"
+        },
+        {
+          "quantity": 1,
+          "name": "Bladegraft Aspirant",
+          "role": "Theme",
+          "set": "one",
+          "collector_number": "122"
+        },
+        {
+          "quantity": 1,
+          "name": "Kor Duelist",
+          "role": "Theme",
+          "set": "mm2",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Kor Outfitter",
+          "role": "Theme",
+          "set": "zen",
+          "collector_number": "21"
+        },
+        {
+          "quantity": 1,
+          "name": "Kor Skyfisher",
+          "role": "Theme",
+          "set": "mm3",
+          "collector_number": "11"
+        },
+        {
+          "quantity": 1,
+          "name": "Auriok Steelshaper",
+          "role": "Theme",
+          "set": "mrd",
+          "collector_number": "4"
+        },
+        {
+          "quantity": 1,
+          "name": "Fireblade Charger",
+          "role": "Theme",
+          "set": "znr",
+          "collector_number": "139"
+        },
+        {
+          "quantity": 1,
+          "name": "Leonin Den-Guard",
+          "role": "Theme",
+          "set": "mrd",
+          "collector_number": "9"
+        },
+        {
+          "quantity": 1,
+          "name": "Ancestral Blade",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "12"
+        },
+        {
+          "quantity": 1,
+          "name": "Bonesplitter",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "458"
+        },
+        {
+          "quantity": 1,
+          "name": "Vulshok Morningstar",
+          "role": "Theme",
+          "set": "dst",
+          "collector_number": "157"
+        },
+        {
+          "quantity": 1,
+          "name": "Short Sword",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "236"
+        },
+        {
+          "quantity": 1,
+          "name": "Bone Saw",
+          "role": "Theme",
+          "set": "ogw",
+          "collector_number": "161"
+        },
+        {
+          "quantity": 1,
+          "name": "Leather Armor",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "248"
+        },
+        {
+          "quantity": 1,
+          "name": "Haunted Cloak",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "389"
+        },
+        {
+          "quantity": 1,
+          "name": "Cliffhaven Kitesail",
+          "role": "Theme",
+          "set": "znr",
+          "collector_number": "243"
+        },
+        {
+          "quantity": 1,
+          "name": "Goldvein Pick",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "253"
+        },
+        {
+          "quantity": 1,
+          "name": "Goldwarden's Helm",
+          "role": "Theme",
+          "set": "one",
+          "collector_number": "13"
+        },
+        {
+          "quantity": 1,
+          "name": "Plate Armor",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "32"
+        },
+        {
+          "quantity": 1,
+          "name": "Explorer's Scope",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "380"
+        },
+        {
+          "quantity": 1,
+          "name": "Prying Blade",
+          "role": "Theme",
+          "set": "xln",
+          "collector_number": "244"
+        },
+        {
+          "quantity": 1,
+          "name": "Team Pennant",
+          "role": "Theme",
+          "set": "stx",
+          "collector_number": "260"
+        },
+        {
+          "quantity": 1,
+          "name": "Loxodon Warhammer",
+          "role": "Theme",
+          "set": "c17",
+          "collector_number": "216"
+        },
+        {
+          "quantity": 1,
+          "name": "Danitha, Benalia's Hope",
+          "role": "Theme",
+          "set": "dmu",
+          "collector_number": "15"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Wind-Scarred Crag",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "271"
+        },
+        {
+          "quantity": 1,
+          "name": "Boros Garrison",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "231"
+        },
+        {
+          "quantity": 1,
+          "name": "Sacred Peaks",
+          "role": "Land",
+          "set": "soc",
+          "collector_number": "402"
+        },
+        {
+          "quantity": 1,
+          "name": "Plateau",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "284"
+        },
+        {
+          "quantity": 17,
+          "name": "Plains",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "281"
+        },
+        {
+          "quantity": 13,
+          "name": "Mountain",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "287"
+        }
+      ]
+    },
+    {
+      "id": "starter_gu_v1",
+      "number": 10,
+      "title": "Tides of Growth",
+      "commander": "Tatyova, Benthic Druid",
+      "colors": "GU",
+      "color_names": "Green / Blue",
+      "guild": "Simic",
+      "description": "Turn ordinary land drops into cards and life, then use the extra resources to cast large creatures. Landfall creatures reward the same simple plan.",
+      "how_to_play": "Develop green mana and ramp first. Cast Tatyova when you can follow with a land, then use your cards to build a board of sizeable creatures.",
+      "teaches": "Landfall, sequencing land drops and balancing development with answers. Tatyova is valuable but the creatures can win without her.",
+      "cards": [
+        {
+          "quantity": 1,
+          "name": "Tatyova, Benthic Druid",
+          "role": "Commander",
+          "set": "fdn",
+          "collector_number": "247"
+        },
+        {
+          "quantity": 1,
+          "name": "Arcane Signet",
+          "role": "Ramp",
+          "set": "eoc",
+          "collector_number": "53"
+        },
+        {
+          "quantity": 1,
+          "name": "Simic Signet",
+          "role": "Ramp",
+          "set": "clu",
+          "collector_number": "228"
+        },
+        {
+          "quantity": 1,
+          "name": "Rampant Growth",
+          "role": "Ramp",
+          "set": "tdc",
+          "collector_number": "265"
+        },
+        {
+          "quantity": 1,
+          "name": "Nature's Lore",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "177"
+        },
+        {
+          "quantity": 1,
+          "name": "Cultivate",
+          "role": "Ramp",
+          "set": "msc",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Kodama's Reach",
+          "role": "Ramp",
+          "set": "ecc",
+          "collector_number": "113"
+        },
+        {
+          "quantity": 1,
+          "name": "Sakura-Tribe Elder",
+          "role": "Ramp",
+          "set": "soc",
+          "collector_number": "285"
+        },
+        {
+          "quantity": 1,
+          "name": "Wood Elves",
+          "role": "Ramp",
+          "set": "hob",
+          "collector_number": "142"
+        },
+        {
+          "quantity": 1,
+          "name": "Farhaven Elf",
+          "role": "Ramp",
+          "set": "khc",
+          "collector_number": "62"
+        },
+        {
+          "quantity": 1,
+          "name": "Springbloom Druid",
+          "role": "Ramp",
+          "set": "fdn",
+          "collector_number": "767"
+        },
+        {
+          "quantity": 1,
+          "name": "Growth Spiral",
+          "role": "Draw / selection",
+          "set": "dsc",
+          "collector_number": "88"
+        },
+        {
+          "quantity": 1,
+          "name": "Explore",
+          "role": "Draw / selection",
+          "set": "tle",
+          "collector_number": "259"
+        },
+        {
+          "quantity": 1,
+          "name": "Coiling Oracle",
+          "role": "Draw / selection",
+          "set": "rvr",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Visionary",
+          "role": "Draw / selection",
+          "set": "m21",
+          "collector_number": "193"
+        },
+        {
+          "quantity": 1,
+          "name": "Elvish Visionary",
+          "role": "Draw / selection",
+          "set": "hoc",
+          "collector_number": "206"
+        },
+        {
+          "quantity": 1,
+          "name": "Mulldrifter",
+          "role": "Draw / selection",
+          "set": "cm2",
+          "collector_number": "47"
+        },
+        {
+          "quantity": 1,
+          "name": "Harmonize",
+          "role": "Draw / selection",
+          "set": "msc",
+          "collector_number": "175"
+        },
+        {
+          "quantity": 1,
+          "name": "Urban Evolution",
+          "role": "Draw / selection",
+          "set": "ncc",
+          "collector_number": "355"
+        },
+        {
+          "quantity": 1,
+          "name": "Eureka Moment",
+          "role": "Draw / selection",
+          "set": "soc",
+          "collector_number": "308"
+        },
+        {
+          "quantity": 1,
+          "name": "Return of the Wildspeaker",
+          "role": "Draw / selection",
+          "set": "ecc",
+          "collector_number": "115"
+        },
+        {
+          "quantity": 1,
+          "name": "Counterspell",
+          "role": "Interaction",
+          "set": "cmm",
+          "collector_number": "81"
+        },
+        {
+          "quantity": 1,
+          "name": "Negate",
+          "role": "Interaction",
+          "set": "tmt",
+          "collector_number": "47"
+        },
+        {
+          "quantity": 1,
+          "name": "Into the Roil",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "509"
+        },
+        {
+          "quantity": 1,
+          "name": "Beast Within",
+          "role": "Interaction",
+          "set": "msc",
+          "collector_number": "169"
+        },
+        {
+          "quantity": 1,
+          "name": "Return to Nature",
+          "role": "Interaction",
+          "set": "moc",
+          "collector_number": "309"
+        },
+        {
+          "quantity": 1,
+          "name": "Reclamation Sage",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "231"
+        },
+        {
+          "quantity": 1,
+          "name": "Reality Shift",
+          "role": "Interaction",
+          "set": "soc",
+          "collector_number": "199"
+        },
+        {
+          "quantity": 1,
+          "name": "Aetherize",
+          "role": "Interaction",
+          "set": "fdn",
+          "collector_number": "151"
+        },
+        {
+          "quantity": 1,
+          "name": "Snakeskin Veil",
+          "role": "Interaction",
+          "set": "tdm",
+          "collector_number": "159"
+        },
+        {
+          "quantity": 1,
+          "name": "Tamiyo's Safekeeping",
+          "role": "Interaction",
+          "set": "neo",
+          "collector_number": "211"
+        },
+        {
+          "quantity": 1,
+          "name": "Rampaging Baloths",
+          "role": "Theme",
+          "set": "eoc",
+          "collector_number": "104"
+        },
+        {
+          "quantity": 1,
+          "name": "Scute Mob",
+          "role": "Theme",
+          "set": "c18",
+          "collector_number": "161"
+        },
+        {
+          "quantity": 1,
+          "name": "Ghalta, Primal Hunger",
+          "role": "Theme",
+          "set": "fdn",
+          "collector_number": "222"
+        },
+        {
+          "quantity": 1,
+          "name": "Soul of the Harvest",
+          "role": "Theme",
+          "set": "jmp",
+          "collector_number": "432"
+        },
+        {
+          "quantity": 1,
+          "name": "Baloth Woodcrasher",
+          "role": "Theme",
+          "set": "c18",
+          "collector_number": "130"
+        },
+        {
+          "quantity": 1,
+          "name": "Canopy Baloth",
+          "role": "Theme",
+          "set": "znr",
+          "collector_number": "182"
+        },
+        {
+          "quantity": 1,
+          "name": "Territorial Baloth",
+          "role": "Theme",
+          "set": "bfz",
+          "collector_number": "196"
+        },
+        {
+          "quantity": 1,
+          "name": "Territorial Scythecat",
+          "role": "Theme",
+          "set": "znr",
+          "collector_number": "213"
+        },
+        {
+          "quantity": 1,
+          "name": "Windrider Eel",
+          "role": "Theme",
+          "set": "e01",
+          "collector_number": "30"
+        },
+        {
+          "quantity": 1,
+          "name": "Grazing Gladehart",
+          "role": "Theme",
+          "set": "ddp",
+          "collector_number": "14"
+        },
+        {
+          "quantity": 1,
+          "name": "Sporemound",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "437"
+        },
+        {
+          "quantity": 1,
+          "name": "Snapping Gnarlid",
+          "role": "Theme",
+          "set": "bfz",
+          "collector_number": "190"
+        },
+        {
+          "quantity": 1,
+          "name": "Zendikar's Roil",
+          "role": "Theme",
+          "set": "znc",
+          "collector_number": "88"
+        },
+        {
+          "quantity": 1,
+          "name": "Scythe Leopard",
+          "role": "Theme",
+          "set": "ddr",
+          "collector_number": "19"
+        },
+        {
+          "quantity": 1,
+          "name": "Murasa Behemoth",
+          "role": "Theme",
+          "set": "mh1",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Retreat to Kazandu",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "435"
+        },
+        {
+          "quantity": 1,
+          "name": "Beanstalk Giant // Fertile Footsteps",
+          "role": "Theme",
+          "set": "dsc",
+          "collector_number": "172"
+        },
+        {
+          "quantity": 1,
+          "name": "Llanowar Scout",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "170"
+        },
+        {
+          "quantity": 1,
+          "name": "Scaled Herbalist",
+          "role": "Theme",
+          "set": "afr",
+          "collector_number": "204"
+        },
+        {
+          "quantity": 1,
+          "name": "Walking Atlas",
+          "role": "Theme",
+          "set": "wwk",
+          "collector_number": "131"
+        },
+        {
+          "quantity": 1,
+          "name": "Khalni Heart Expedition",
+          "role": "Theme",
+          "set": "cmm",
+          "collector_number": "899"
+        },
+        {
+          "quantity": 1,
+          "name": "Harrow",
+          "role": "Theme",
+          "set": "eoc",
+          "collector_number": "98"
+        },
+        {
+          "quantity": 1,
+          "name": "Roiling Regrowth",
+          "role": "Theme",
+          "set": "eoc",
+          "collector_number": "105"
+        },
+        {
+          "quantity": 1,
+          "name": "Broken Bond",
+          "role": "Theme",
+          "set": "dom",
+          "collector_number": "157"
+        },
+        {
+          "quantity": 1,
+          "name": "Natural Connection",
+          "role": "Theme",
+          "set": "c20",
+          "collector_number": "184"
+        },
+        {
+          "quantity": 1,
+          "name": "Territorial Maro",
+          "role": "Theme",
+          "set": "dmu",
+          "collector_number": "184"
+        },
+        {
+          "quantity": 1,
+          "name": "Fin-Clade Fugitives",
+          "role": "Theme",
+          "set": "cmr",
+          "collector_number": "227"
+        },
+        {
+          "quantity": 1,
+          "name": "Colossal Dreadmaw",
+          "role": "Theme",
+          "set": "m21",
+          "collector_number": "176"
+        },
+        {
+          "quantity": 1,
+          "name": "Greater Sandwurm",
+          "role": "Theme",
+          "set": "iko",
+          "collector_number": "157"
+        },
+        {
+          "quantity": 1,
+          "name": "Ravenous Lindwurm",
+          "role": "Theme",
+          "set": "khm",
+          "collector_number": "187"
+        },
+        {
+          "quantity": 1,
+          "name": "River Hoopoe",
+          "role": "Theme",
+          "set": "2x2",
+          "collector_number": "269"
+        },
+        {
+          "quantity": 1,
+          "name": "Colossal Skyturtle",
+          "role": "Theme",
+          "set": "neo",
+          "collector_number": "216"
+        },
+        {
+          "quantity": 1,
+          "name": "Command Tower",
+          "role": "Land",
+          "set": "frc",
+          "collector_number": "22"
+        },
+        {
+          "quantity": 1,
+          "name": "Evolving Wilds",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "240"
+        },
+        {
+          "quantity": 1,
+          "name": "Terramorphic Expanse",
+          "role": "Land",
+          "set": "msc",
+          "collector_number": "273"
+        },
+        {
+          "quantity": 1,
+          "name": "Thornwood Falls",
+          "role": "Land",
+          "set": "tdm",
+          "collector_number": "269"
+        },
+        {
+          "quantity": 1,
+          "name": "Simic Growth Chamber",
+          "role": "Land",
+          "set": "clu",
+          "collector_number": "247"
+        },
+        {
+          "quantity": 1,
+          "name": "Tangled Islet",
+          "role": "Land",
+          "set": "soc",
+          "collector_number": "411"
+        },
+        {
+          "quantity": 1,
+          "name": "Tropical Island",
+          "role": "Land",
+          "set": "3ed",
+          "collector_number": "288"
+        },
+        {
+          "quantity": 18,
+          "name": "Forest",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "289"
+        },
+        {
+          "quantity": 12,
+          "name": "Island",
+          "role": "Land",
+          "set": "fra",
+          "collector_number": "283"
+        }
+      ]
+    }
+  ]
+}

@@ -21,6 +21,7 @@ from api.database import build_engine
 from api.identity import revoke_sessions, utcnow
 from api.models import AuditEvent, User
 from api.passwords import MIN_LENGTH, hash_password
+from api.progression import sysop_start
 
 
 def read_password(args: argparse.Namespace) -> str:
@@ -57,6 +58,8 @@ def set_sysop_password(database_url: str, password: str) -> bool:
             sysop.password_hash = password_hash
             sysop.updated_at = now
             db.flush()
+            # SysOp starts at 100,000 wins (v0.3.1), so every tier is open to it.
+            sysop_start(db, sysop)
             revoke_sessions(db, sysop.id, "password_set")
             db.add(
                 AuditEvent(

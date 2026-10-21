@@ -61,7 +61,8 @@ class Bootstrap(Contract):
     name: Literal["Commander Duels"] = "Commander Duels"
     version: str = APP_VERSION
     protocol_version: Literal[1] = 1
-    collection_policy: Literal["open_collection"] = "open_collection"
+    # Since v0.3.1 players build from their own library; administrators and SysOp from every card.
+    collection_policy: Literal["open_collection", "earned_collection"] = "earned_collection"
     capabilities: list[Capability]
     auth: AuthConfig
 
@@ -125,6 +126,9 @@ Permission = Literal[
     "cards.any",
     "decks.edit",
     "catalog.manage",
+    "library.unlimited",
+    "progress.manage",
+    "custom_cards.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled"]
@@ -154,7 +158,12 @@ class Me(Contract):
     display_name: str
     avatar: Avatar
     locale: str
-    onboarding: Literal["handle", "complete"]
+    onboarding: Literal["handle", "starters", "complete"] = Field(
+        description="handle, then starters (choose two starter decks), then complete."
+    )
+    alliance: str | None = Field(
+        default=None, description="The allied Planeswalker's ID; its portrait is the account's."
+    )
     email: str | None
     roles: list[Role]
     permissions: list[Permission]
@@ -211,6 +220,9 @@ class AdminUser(Contract):
     roles: list[Role]
     created_at: datetime
     last_seen_at: datetime | None
+    wins: int = 0
+    tier: Literal["bronze", "silver", "gold", "platinum", "mythic", "godlike"] = "bronze"
+    alliance: str | None = None
 
 
 class UserPage(Contract):
@@ -308,6 +320,9 @@ class GameSeat(Contract):
     seat: int
     player: Literal["human", "bot"]
     handle: str | None
+    portrait: str | None = Field(
+        default=None, description="A player's allied Planeswalker, whose portrait stands for them."
+    )
     deck: str | None = Field(
         description="Your own seat's deck (\"custom\" for a deck list); other seats' decks are "
         "private, except to SysOp."

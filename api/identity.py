@@ -47,12 +47,15 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "admin.roles.manage",
             "admin.audit.read",
             "catalog.manage",
+            # Builds from the whole catalog, not a library of its own (v0.3.1).
+            "library.unlimited",
         }
     ),
 }
 # Held by SysOp alone and grantable to no role: making or removing administrators, seeing
 # concealed information in a running game (SysOp's exception to SEC05 and NET14, accepted on
-# 2026-10-18) and putting any card in the engine's database into its own library.
+# 2026-10-18), putting any card in the engine's database into its own library, setting any
+# account's wins (v0.3.1) and uploading the Godlike tier's custom cards.
 SYSOP_ONLY = ALL_PERMISSIONS - frozenset().union(*ROLE_PERMISSIONS.values())
 
 
@@ -422,6 +425,7 @@ def me_of(db: Session, principal: Principal) -> Me:
         avatar=user.avatar,  # type: ignore[arg-type]
         locale=user.locale,
         onboarding=user.onboarding,  # type: ignore[arg-type]
+        alliance=user.alliance,
         email=None if user.kind == "sysop" else email_of(db, user),
         roles=cast(list[Role], principal.roles),
         permissions=cast(list[Permission], sorted(principal.permissions)),

@@ -33,6 +33,7 @@ from api.identity import (
     utcnow,
 )
 from api.models import AuditEvent, ExternalIdentity, RoleGrant, User
+from api.progression import admin_progress
 from api.schemas import (
     AccountStatus,
     AdminUser,
@@ -75,6 +76,7 @@ def granted_roles(db: Session, user: User) -> list[str]:
 
 
 def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
+    wins, tier = admin_progress(db, user)
     return AdminUser(
         id=user.id,
         handle=user.handle,
@@ -89,6 +91,9 @@ def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
         ),
         created_at=user.created_at,
         last_seen_at=user.last_seen_at,
+        wins=wins,
+        tier=tier,
+        alliance=user.alliance,
     )
 
 

@@ -6,7 +6,8 @@ location), an explanation and a remedy, and its kind:
 - format_illegal: the format's rules forbid it (deck size, copies, bans, identity, pairs);
 - not_released: the card is not out yet;
 - not_implemented: the game engine cannot play the card (its catalog status says why);
-- collection_locked: the collection policy withholds it (none yet: every card is open);
+- collection_locked: the deck holds more copies of a card than the player owns (v0.3.1: players
+  build from their own library; administrators and SysOp from the whole catalog);
 - structure: the deck itself is malformed (a printing of another card, a sideboard in Commander).
 
 Copies are counted by construction key, the card's English name, so another printing or another
@@ -17,7 +18,7 @@ rules (at most 250 cards in a main deck) say so.
 
 import re
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
@@ -37,6 +38,8 @@ Location = Literal["main", "sideboard", "commander", "companion", "maybeboard"]
 Kind = Literal[
     "format_illegal", "not_released", "not_implemented", "collection_locked", "structure"
 ]
+# Problems that keep a legal deck from starting a game.
+BLOCKING = frozenset({"not_implemented", "collection_locked"})
 MAX_ENTRIES = 400
 MAX_QUANTITY = 250
 PERMANENTS = frozenset({"Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"})
@@ -121,6 +124,14 @@ class Card:
     @property
     def permanent(self) -> bool:
         return bool(PERMANENTS & set(self.front_types[1]))
+
+
+@dataclass(frozen=True)
+class Collection:
+    """The copies of each card a player owns, by construction key, so another printing or Oracle
+    version of a card counts as that card. Basic lands are never limited."""
+
+    copies: Mapping[str, int]
 
 
 @dataclass(frozen=True)
@@ -231,13 +242,21 @@ def rules_of(session: Session, fmt: str) -> Rules:
     return Rules(fmt, version.version, dict(version.rules), frozenset(version.banned))
 
 
-def validate_deck(session: Session, content: DeckContent, today: date) -> Validation:
+def validate_deck(
+    session: Session, content: DeckContent, today: date, collection: Collection | None = None
+) -> Validation:
+    """The deck by its format's rules and, given the player's collection, the copies they own;
+    without one (administrators, SysOp, or a deck shown without its player), every card is open."""
     cards = cards_of(session, {entry.card_id for entry in content.entries})
-    return validate(content, cards, rules_of(session, content.format), today)
+    return validate(content, cards, rules_of(session, content.format), today, collection)
 
 
 def validate(
-    content: DeckContent, cards: dict[UUID, Card], rules: Rules, today: date
+    content: DeckContent,
+    cards: dict[UUID, Card],
+    rules: Rules,
+    today: date,
+    collection: Collection | None = None,
 ) -> Validation:
     report = Report()
     counts = DeckCounts()
@@ -269,13 +288,16 @@ def validate(
     for card_id in dict.fromkeys(entry.card_id for entry in playing):
         card_problems(report, cards[card_id], rules, today)
     copies(report, playing, cards, rules)
+    if collection is not None:
+        owned_copies(report, playing, cards, collection)
     if rules.format == "legacy":
         legacy(report, playing, cards, rules, counts)
     else:
         commander(report, playing, cards, rules, counts)
-    # Legal by the format's rules; playable also needs every card supported by the engine.
-    legal = all(problem.kind == "not_implemented" for problem in report.errors)
-    blocked = any(problem.kind == "not_implemented" for problem in report.errors)
+    # Legal by the format's rules; playable also needs every card supported by the engine and
+    # owned in the copies the deck holds.
+    legal = all(problem.kind in BLOCKING for problem in report.errors)
+    blocked = any(problem.kind in BLOCKING for problem in report.errors)
     return Validation(
         format=content.format,
         format_version=rules.version,
@@ -373,6 +395,43 @@ def copies(report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], ru
                 card_ids=holders[key],
                 quantity=count,
             )
+
+
+def basic_land(card: Card) -> bool:
+    supertypes, types, _ = type_parts(front(card.type_line))
+    return "Basic" in supertypes and "Land" in types
+
+
+def owned_copies(
+    report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], collection: Collection
+) -> None:
+    """Copies the player owns, per construction key, outside the maybeboard (DECK08). Copies are a
+    limit per deck: two decks may each hold the same owned card."""
+    counted: dict[str, int] = defaultdict(int)
+    holders: dict[str, list[UUID]] = defaultdict(list)
+    for entry in entries:
+        card = cards[entry.card_id]
+        if basic_land(card):
+            continue
+        counted[card.construction_key] += entry.quantity
+        if card.id not in holders[card.construction_key]:
+            holders[card.construction_key].append(card.id)
+    for key, count in counted.items():
+        have = collection.copies.get(key, 0)
+        if count <= have:
+            continue
+        card = cards[holders[key][0]]
+        owned = "none" if have == 0 else f"{have} {'copy' if have == 1 else 'copies'}"
+        report.error(
+            "collection.locked",
+            f"This deck holds {count} {'copy' if count == 1 else 'copies'} of {card.name}; your "
+            f"library has {owned}.",
+            f"Remove {count - have}, or wait until your library holds more: starter decks, "
+            "your alliance and packs add cards to it.",
+            kind="collection_locked",
+            card_ids=holders[key],
+            quantity=count,
+        )
 
 
 def legacy(
