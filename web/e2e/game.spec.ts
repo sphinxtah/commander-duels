@@ -456,6 +456,25 @@ test.describe("practice games in the browser", () => {
   test.setTimeout(15 * 60_000);
   // A missing control fails the step instead of waiting out the whole game's time.
   test.use({ actionTimeout: 30_000 });
+  // Whole games play in a window: Start would otherwise fill the screen (v0.3.0), and a window
+  // in full screen cannot be resized for the size checks. No response timer passes for the
+  // journeys' player, animation runs at its fastest, and the table is silent. Every tab of the
+  // context (the second tab's too) starts with these settings.
+  test.beforeEach(async ({ context }) => {
+    await context.addInitScript(() => {
+      localStorage.setItem(
+        "cd.table.v1",
+        JSON.stringify({
+          fullscreenOnStart: false,
+          responseTimerSeconds: 0,
+          animationSpeed: "faster",
+          effectsVolume: 0,
+          muted: true,
+          painter: "auto",
+        }),
+      );
+    });
+  });
 
   test("a Legacy game played to the end by mouse, with no concealed card in any payload", async ({
     page,
