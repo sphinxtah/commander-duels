@@ -42,6 +42,8 @@ class Table {
   readonly pending = new Map<string, number>();
   /** Log lines that ran ahead of the board and were confirmed public by a later view. */
   readonly aheadOfView: string[] = [];
+  /** CSP violations the page has reported and this check has seen. */
+  private cspSeen = 0;
   /** Every command the page sent, in order. */
   readonly sent: {
     type: string;
@@ -97,31 +99,48 @@ class Table {
    * aria-label and title under the table, the log aside) says a concealed card before it has
    * been public. Pictures and log lines have their own checks. */
   async checkScreen(page: Page) {
-    const texts = await page.evaluate(() => {
+    const { texts, csp } = await page.evaluate(() => {
       const root = document.querySelector("[data-screen]");
-      if (!root) return [] as string[];
-      const found: string[] = [];
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode())
-        if (
-          !node.parentElement?.closest("[role=log]") &&
-          node.textContent?.trim()
-        )
-          found.push(node.textContent);
-      for (const element of root.querySelectorAll("[aria-label], [title]"))
-        if (!element.closest("[role=log]"))
-          for (const name of ["aria-label", "title"]) {
-            const value = element.getAttribute(name);
-            if (value) found.push(value);
-          }
-      const csp = (window as unknown as { __csp?: string[] }).__csp ?? [];
-      return [...found, ...csp.map((v) => `\u0000CSP ${v}`)];
-    });
-    for (const text of texts) {
-      if (text.startsWith("\u0000CSP ")) {
-        this.problems.push(`content security policy: ${text.slice(5)}`);
-        continue;
+      const found: { text: string; option: string | null }[] = [];
+      const add = (element: Element | null, text: string) =>
+        found.push({
+          text,
+          option:
+            element?.closest("[data-option]")?.getAttribute("data-option") ??
+            null,
+        });
+      if (root) {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode())
+          if (
+            !node.parentElement?.closest("[role=log]") &&
+            node.textContent?.trim()
+          )
+            add(node.parentElement, node.textContent);
+        for (const element of root.querySelectorAll("[aria-label], [title]"))
+          if (!element.closest("[role=log]"))
+            for (const name of ["aria-label", "title"]) {
+              const value = element.getAttribute(name);
+              if (value) add(element, value);
+            }
       }
+      return {
+        texts: found,
+        csp: (window as unknown as { __csp?: string[] }).__csp ?? [],
+      };
+    });
+    for (const violation of csp.slice(this.cspSeen))
+      this.problems.push(`content security policy: ${violation}`);
+    this.cspSeen = csp.length;
+    // As in the frames' check, only an object option's words name a card: the others are
+    // XMage's button words ("Cancel" is also a card) or players.
+    const buttonWords = new Set(
+      (this.latest?.prompt?.options ?? [])
+        .filter((option) => !option.object_id)
+        .map((option) => option.id),
+    );
+    for (const { text, option } of texts) {
+      if (option !== null && buttonWords.has(option)) continue;
       for (const name of this.concealed)
         if (!this.publicNames.has(name) && phrase(name).test(text))
           this.problems.push(
