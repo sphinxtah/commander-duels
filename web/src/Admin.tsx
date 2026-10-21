@@ -13,10 +13,17 @@ import {
   type AdminUser,
   type AuditEntry,
   type Me,
+  type Planeswalker,
 } from "./api";
+import { CustomCards } from "./admin/CustomCards";
+import { SetWins } from "./admin/SetWins";
+import { tierNames } from "./alliance/alliance";
+import { Portrait } from "./alliance/Portrait";
+import { TierBadge } from "./alliance/TierBadge";
 import { CatalogAdmin } from "./catalog/CatalogAdmin";
 import styles from "./Account.module.css";
 import shell from "./App.module.css";
+import admin from "./admin/admin.module.css";
 
 type Status = AdminUser["status"];
 type GrantableRole = "moderator" | "content_editor" | "administrator";
@@ -57,12 +64,31 @@ function Users({ me }: { me: Me }) {
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [refresh, setRefresh] = useState(0);
+  // The roster names each account's alliance (v0.3.1); without it, its ID stands in.
+  const [roster, setRoster] = useState<Planeswalker[]>([]);
+  // The account whose wins SysOp is setting, if any.
+  const [settingWins, setSettingWins] = useState<string>();
   const latest = useRef(0);
   // The message a failed load left, so a load that works can take it back.
   const loadFailure = useRef("");
   const manage = me.permissions.includes("admin.users.manage");
   const roles = me.permissions.includes("admin.roles.manage");
   const administrators = me.permissions.includes("admin.roles.administrator");
+  const progress = me.permissions.includes("progress.manage");
+  useEffect(() => {
+    let active = true;
+    void client
+      .GET("/api/v1/planeswalkers")
+      .then(({ data }) => {
+        if (active && data) setRoster(data);
+      })
+      .catch(() => {
+        // The list still shows each alliance by its ID.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const load = useCallback(
     async (after?: string) => {
@@ -198,6 +224,9 @@ function Users({ me }: { me: Me }) {
             const name = user.handle ?? user.display_name;
             const isAdministrator = user.roles.includes("administrator");
             const locked = isAdministrator && !administrators;
+            const allied = user.alliance
+              ? roster.find((found) => found.id === user.alliance)
+              : undefined;
             return (
               <li key={user.id} aria-label={name}>
                 <div className={styles.userHead}>
@@ -216,6 +245,40 @@ function Users({ me }: { me: Me }) {
                     {statusNames[user.status].toUpperCase()}
                   </span>
                 </div>
+                {/* Wins, tier and alliance (v0.3.1): the crest and the portrait sit beside the
+                    words that name them. */}
+                <dl className={admin.standing}>
+                  <div>
+                    <dt>Wins</dt>
+                    <dd>{user.wins.toLocaleString("en-US")}</dd>
+                  </div>
+                  <div>
+                    <dt>Tier</dt>
+                    <dd>
+                      <TierBadge tier={user.tier} size={24} decorative />
+                      {tierNames[user.tier]}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Alliance</dt>
+                    <dd>
+                      {user.alliance ? (
+                        <>
+                          <Portrait
+                            id={user.alliance}
+                            portrait={allied?.portrait}
+                            size={32}
+                            thumbnail
+                            decorative
+                          />
+                          {allied?.name ?? user.alliance}
+                        </>
+                      ) : (
+                        "None"
+                      )}
+                    </dd>
+                  </div>
+                </dl>
                 {roles && user.status === "active" && (
                   <fieldset className={styles.roleSet} disabled={locked}>
                     <legend>Roles</legend>
@@ -234,9 +297,18 @@ function Users({ me }: { me: Me }) {
                     ))}
                   </fieldset>
                 )}
-                {manage && !locked && (
+                {((manage && !locked) || progress) && (
                   <div className={styles.actions}>
-                    {user.status === "pending" && (
+                    {/* SysOp sets any account's wins, and so its tier (v0.3.1). */}
+                    {progress && settingWins !== user.id && (
+                      <button
+                        className={styles.secondary}
+                        onClick={() => setSettingWins(user.id)}
+                      >
+                        Set wins for {name}
+                      </button>
+                    )}
+                    {manage && !locked && user.status === "pending" && (
                       <>
                         <button
                           className={shell.primary}
@@ -252,7 +324,7 @@ function Users({ me }: { me: Me }) {
                         </button>
                       </>
                     )}
-                    {user.status === "active" && (
+                    {manage && !locked && user.status === "active" && (
                       <>
                         <button
                           className={styles.secondary}
@@ -268,16 +340,37 @@ function Users({ me }: { me: Me }) {
                         </button>
                       </>
                     )}
-                    {(user.status === "disabled" ||
-                      user.status === "denied") && (
-                      <button
-                        className={styles.secondary}
-                        onClick={() => void changeStatus(user, "active")}
-                      >
-                        Restore {name}
-                      </button>
-                    )}
+                    {manage &&
+                      !locked &&
+                      (user.status === "disabled" ||
+                        user.status === "denied") && (
+                        <button
+                          className={styles.secondary}
+                          onClick={() => void changeStatus(user, "active")}
+                        >
+                          Restore {name}
+                        </button>
+                      )}
                   </div>
+                )}
+                {progress && settingWins === user.id && (
+                  <SetWins
+                    userId={user.id}
+                    subject={name}
+                    wins={user.wins}
+                    onSet={(changed) => {
+                      replace({
+                        ...user,
+                        wins: changed.wins,
+                        tier: changed.tier.id,
+                      });
+                      setSettingWins(undefined);
+                      setMessage(
+                        `${name}: ${changed.wins.toLocaleString("en-US")} wins, ${changed.tier.name} tier.`,
+                      );
+                    }}
+                    onCancel={() => setSettingWins(undefined)}
+                  />
                 )}
               </li>
             );
@@ -407,9 +500,12 @@ export function canAdminister(me: Me | null | undefined) {
     me.status === "active" &&
     (me.permissions.includes("admin.users.read") ||
       me.permissions.includes("admin.audit.read") ||
-      me.permissions.includes("catalog.manage")),
+      me.permissions.includes("catalog.manage") ||
+      me.permissions.includes("custom_cards.manage")),
   );
 }
+
+type Tab = "users" | "audit" | "catalog" | "custom";
 
 export function Admin({
   me,
@@ -418,7 +514,7 @@ export function Admin({
   me: Me | null | undefined;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  const [tab, setTab] = useState<"users" | "audit" | "catalog">("users");
+  const [tab, setTab] = useState<Tab>("users");
   if (!canAdminister(me))
     return (
       <>
@@ -447,11 +543,14 @@ export function Admin({
   const users = me!.permissions.includes("admin.users.read");
   const audit = me!.permissions.includes("admin.audit.read");
   const catalog = me!.permissions.includes("catalog.manage");
+  // The Godlike tier's custom cards, SysOp's alone (v0.3.1).
+  const custom = me!.permissions.includes("custom_cards.manage");
   const available = [
     users && "users",
     audit && "audit",
     catalog && "catalog",
-  ].filter(Boolean) as ("users" | "audit" | "catalog")[];
+    custom && "custom",
+  ].filter(Boolean) as Tab[];
   const shown = available.includes(tab) ? tab : available[0];
   return (
     <>
@@ -495,14 +594,25 @@ export function Admin({
             Card catalog
           </button>
         )}
+        {custom && (
+          <button
+            role="tab"
+            aria-selected={shown === "custom"}
+            onClick={() => setTab("custom")}
+          >
+            Custom cards
+          </button>
+        )}
       </div>
       <div role="tabpanel">
         {shown === "users" ? (
           <Users me={me!} />
         ) : shown === "audit" ? (
           <Audit />
-        ) : (
+        ) : shown === "catalog" ? (
           <CatalogAdmin />
+        ) : (
+          <CustomCards />
         )}
       </div>
     </>

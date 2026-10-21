@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answered, describe as words } from "./api";
+import { answered, onboarding, describe as words, type Me } from "./api";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -28,5 +28,15 @@ describe("the API client's fetch", () => {
     expect(words(body)).toBe(
       "The application service is unavailable. Try again.",
     );
+  });
+});
+
+describe("onboarding", () => {
+  it("lasts through the handle and the starter decks (v0.3.1)", () => {
+    const at = (step: Me["onboarding"]) =>
+      onboarding({ onboarding: step } as Me);
+    expect(at("handle")).toBe(true);
+    expect(at("starters")).toBe(true);
+    expect(at("complete")).toBe(false);
   });
 });

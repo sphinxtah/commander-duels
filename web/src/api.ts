@@ -33,6 +33,23 @@ export type ProfileUpdate = components["schemas"]["ProfileUpdate"];
 export type Avatar = Me["avatar"];
 export type Permission = Me["permissions"][number];
 export type ApiError = { code: string; message: string; request_id?: string };
+// The Planeswalker Alliance (v0.3.1): wins and tiers, the roster, the starter decks chosen at
+// onboarding, and the Godlike tier's custom cards that SysOp uploads.
+export type Progress = components["schemas"]["Progress"];
+export type TierInfo = components["schemas"]["TierInfo"];
+export type TierId = TierInfo["id"];
+export type Planeswalker = components["schemas"]["PlaneswalkerInfo"];
+export type StarterDeck = components["schemas"]["StarterDeck"];
+export type CustomCard = components["schemas"]["CustomCardInfo"];
+export type CustomCardUpload = components["schemas"]["CustomCardUpload"];
+
+/**
+ * Whether the account still has a step of onboarding ahead: its handle, then its two starter
+ * decks (v0.3.1). Every page but Profile points the way until both are done.
+ */
+export function onboarding(me: Me): boolean {
+  return me.onboarding !== "complete";
+}
 
 // The session's CSRF token rides on every state-changing request. It lives in memory only and
 // comes back with /me after a reload; the session cookie itself is HttpOnly.

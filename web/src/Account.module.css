@@ -129,12 +129,24 @@
   padding: 22px 25px;
   margin: 25px 0;
 }
-.card > div {
+.card > div:not(.emblem) {
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex: 1;
   min-width: 180px;
+}
+/* The account's picture, its alliance's portrait or its avatar, with its tier's crest beside it
+   (v0.3.1). */
+.emblem {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.emblem > img,
+.emblem > svg[data-placeholder] {
+  filter: drop-shadow(0 6px 12px #00000090);
 }
 .card strong {
   font:

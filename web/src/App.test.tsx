@@ -24,6 +24,7 @@ import {
   type Format,
   type Me,
 } from "./api";
+import { progress, roster, starterDecks } from "./alliance/fixtures";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { initInstall } from "./app/install";
 import { holdLiveGame, markIntendedLeave } from "./app/liveGame";
@@ -227,6 +228,9 @@ beforeEach(() => {
   on("GET /api/v1/formats", () => reply(200, formats));
   on("GET /api/v1/me", () => reply(401, signedOut));
   on("GET /api/v1/me/sessions", () => reply(200, []));
+  // Profile's progress and the roster (v0.3.1).
+  on("GET /api/v1/me/progress", () => reply(200, progress()));
+  on("GET /api/v1/planeswalkers", () => reply(200, roster));
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -853,6 +857,64 @@ describe("a new account's handle", () => {
     expect(
       screen.queryByText("Other players know you by your handle."),
     ).toBeNull();
+  });
+
+  it("then every page but Profile points to the starter decks until they are chosen (v0.3.1)", async () => {
+    on("GET /api/v1/me", () =>
+      reply(200, { ...alice, onboarding: "starters" }),
+    );
+    on("GET /api/v1/decks/starters", () => reply(200, starterDecks));
+    window.location.hash = "#settings";
+    render(<App />);
+    const link = await screen.findByRole("link", {
+      name: "Choose them on Profile",
+    });
+    expect(link).toHaveAttribute("href", "#profile");
+    expect(screen.getByRole("main")).toHaveTextContent(
+      "Two starter decks of your choice begin your card library.",
+    );
+    expect(
+      screen.queryByText("Other players know you by your handle."),
+    ).toBeNull();
+    expect(
+      screen.getByRole("link", { name: /alice\s*Choose your starter decks/ }),
+    ).toHaveAttribute("href", "#profile");
+
+    window.location.hash = "#profile";
+    expect(
+      await screen.findByRole("heading", { name: "Choose two starter decks" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Choose them on Profile" }),
+    ).toBeNull();
+  });
+});
+
+describe("the sidebar's picture (v0.3.1)", () => {
+  it("is the alliance's portrait, never cropped, and the avatar without one", async () => {
+    on(
+      "GET /api/v1/me",
+      () => reply(200, { ...alice, alliance: "rowan" }),
+      () => reply(200, alice),
+    );
+    window.location.hash = "#settings";
+    const { unmount } = render(<App />);
+    const allied = await screen.findByRole("link", {
+      name: /^alice\s*Signed in$/,
+    });
+    // A thumbnail: the 128 px file alone, decorative beside the handle.
+    const portrait = allied.querySelector("img")!;
+    expect(portrait).toHaveAttribute("src", "/portraits/rowan-128.webp");
+    expect(portrait).toHaveAttribute("alt", "");
+    expect(portrait).not.toHaveAttribute("srcset");
+    unmount();
+
+    render(<App />);
+    const plain = await screen.findByRole("link", {
+      name: /^alice\s*Signed in$/,
+    });
+    expect(plain.querySelector("img")).toBeNull();
+    expect(plain).toHaveTextContent("◇");
   });
 });
 

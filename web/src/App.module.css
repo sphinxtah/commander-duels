@@ -96,6 +96,13 @@
     12px Georgia,
     serif;
 }
+/* The alliance's portrait in the monogram's place (v0.3.1): contain-fit, never a circle. */
+.sidebarPortrait {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 5px #00000099);
+}
 .sidebarBottom small {
   display: block;
   color: #7c8b86;

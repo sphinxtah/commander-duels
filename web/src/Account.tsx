@@ -11,6 +11,7 @@ import {
   client,
   describe,
   loadMe,
+  onboarding,
   setCsrfToken,
   sysopChangePassword,
   type ApiError,
@@ -19,6 +20,17 @@ import {
   type Me,
   type SessionSummary,
 } from "./api";
+import { SetWins } from "./admin/SetWins";
+import { Portrait } from "./alliance/Portrait";
+import {
+  AllianceOffer,
+  AlliancePanel,
+  ProgressPanel,
+  useAllianceChange,
+} from "./alliance/StandingPanels";
+import { useStanding } from "./alliance/useStanding";
+import { StarterPicker } from "./alliance/StarterPicker";
+import { TierBadge } from "./alliance/TierBadge";
 import { loadGoogle } from "./google";
 import styles from "./Account.module.css";
 import shell from "./App.module.css";
@@ -400,6 +412,12 @@ function ProfileForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
           </label>
         ))}
       </fieldset>
+      {me.alliance && (
+        <p className={styles.fine}>
+          While you are in an alliance, its Planeswalker's portrait is your
+          picture. The avatar shows again if you leave it.
+        </p>
+      )}
       <p role="status" className={styles.fine}>
         {message}
       </p>
@@ -775,7 +793,12 @@ export function Waiting({
   );
 }
 
-/** The Profile page. App shows it, like every page, only to an active account (v0.3.0). */
+/**
+ * The Profile page. App shows it, like every page, only to an active account (v0.3.0). A new
+ * account finishes onboarding here: its handle, then its two starter decks, then an alliance to
+ * choose or leave for later (v0.3.1). Once done, it shows the account's progress, its alliance
+ * and the alliance picker, the profile form and where the account is signed in.
+ */
 export function Account({
   me,
   onChange,
@@ -788,21 +811,62 @@ export function Account({
   onSignedOut: (notice: string) => void;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
+  const standing = useStanding(me.id);
+  const alliance = useAllianceChange(me, onChange, standing);
+  // The alliance offered right after the starter decks; skipping it keeps nothing on the server.
+  const [offer, setOffer] = useState(false);
+  const step =
+    me.onboarding === "handle"
+      ? "handle"
+      : me.onboarding === "starters"
+        ? "starters"
+        : offer
+          ? "alliance"
+          : "profile";
+  // Each step that follows another takes focus to its heading, as following a link does: the
+  // button that finished the step went with it.
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const shownStep = useRef(step);
+  useEffect(() => {
+    if (shownStep.current === step) return;
+    shownStep.current = step;
+    stepHeading.current?.focus();
+  }, [step]);
+  const allied = me.alliance
+    ? standing.roster?.find((found) => found.id === me.alliance)
+    : undefined;
+  const progress = standing.progress;
   return (
     <>
       <span className={shell.eyebrow}>YOUR ACCOUNT</span>
       <h1 ref={heading} tabIndex={-1}>
-        {me.onboarding === "handle"
+        {onboarding(me) || offer
           ? "Welcome to the table."
           : `Welcome back, ${me.display_name}.`}
       </h1>
       <section className={styles.card} aria-label="Account">
-        <span className={styles.avatar} aria-hidden="true">
-          {avatars[me.avatar]}
-        </span>
+        {/* The alliance's portrait is the account's picture, and its tier's crest sits beside
+            it; with no alliance, the avatar stays (v0.3.1). */}
+        <div className={styles.emblem}>
+          {me.alliance ? (
+            <Portrait
+              id={me.alliance}
+              name={allied?.name}
+              description={allied?.description}
+              portrait={allied?.portrait}
+              size={88}
+            />
+          ) : (
+            <span className={styles.avatar} aria-hidden="true">
+              {avatars[me.avatar]}
+            </span>
+          )}
+          {progress && <TierBadge tier={progress.tier.id} size={40} />}
+        </div>
         <div>
           <strong>{me.handle ?? "No handle yet"}</strong>
           <span>{me.display_name}</span>
+          {allied && <span>Allied with {allied.name}</span>}
           {me.email && <small>{me.email} · only you can see this</small>}
         </div>
         <ul className={styles.roles} aria-label="Roles">
@@ -813,14 +877,78 @@ export function Account({
           ))}
         </ul>
       </section>
-      {me.onboarding === "handle" ? (
+      {step === "handle" ? (
         <section className={styles.panel}>
           {/* Keyed by account: a form must never keep another account's values. */}
           <HandleForm key={me.id} me={me} onChange={onChange} />
         </section>
-      ) : (
+      ) : step === "starters" ? (
         <section className={styles.panel}>
-          <ProfileForm key={me.id} me={me} onChange={onChange} />
+          <StarterPicker
+            key={me.id}
+            me={me}
+            onChange={onChange}
+            onChosen={() => setOffer(true)}
+            heading={stepHeading}
+          />
+        </section>
+      ) : step === "alliance" ? (
+        <AllianceOffer
+          standing={standing}
+          alliance={alliance}
+          onDone={() => setOffer(false)}
+          heading={stepHeading}
+        />
+      ) : (
+        <>
+          {progress ? (
+            <ProgressPanel progress={progress} />
+          ) : (
+            standing.error && (
+              <section className={styles.panel} aria-label="Your progress">
+                <p role="alert" className={styles.error}>
+                  {standing.error}
+                </p>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={standing.reload}
+                >
+                  Try again
+                </button>
+              </section>
+            )
+          )}
+          <AlliancePanel
+            me={me}
+            standing={standing}
+            alliance={alliance}
+            heading={stepHeading}
+          />
+          <section className={styles.panel}>
+            <ProfileForm key={me.id} me={me} onChange={onChange} />
+          </section>
+        </>
+      )}
+      {/* SysOp sets its own wins here: it is not among the accounts in Administration. */}
+      {me.permissions.includes("progress.manage") && (
+        <section className={styles.panel} aria-labelledby="own-wins-title">
+          <h2 id="own-wins-title">Set your wins</h2>
+          <p className={styles.fine}>
+            SysOp may set any account's wins, its own included, to test the
+            tiers and what they open. A setting is kept apart from the wins
+            counted from games, and the audit log records it with its reason.
+          </p>
+          <SetWins
+            userId={me.id}
+            subject="your"
+            wins={progress?.wins}
+            onSet={(changed) => {
+              standing.setProgress(changed);
+              // A new tier opens or closes Planeswalkers: the roster is asked for again.
+              standing.reload();
+            }}
+          />
         </section>
       )}
       {me.kind === "sysop" && (

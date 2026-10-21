@@ -9,8 +9,16 @@ import {
 import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Admin, SysopSignIn } from "./Admin";
+import { CardImageError, fitCardImage } from "./admin/cardImage";
+import { customCard, progress, roster } from "./alliance/fixtures";
 import { client, type AdminUser, type AuditEntry, type Me } from "./api";
 import { card } from "./decks/fixtures";
+
+// The canvas work is cardImage.test.ts's; here the fitted image is handed over as it would be.
+vi.mock("./admin/cardImage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./admin/cardImage")>()),
+  fitCardImage: vi.fn(),
+}));
 
 // The API, answered route by route. Each route takes its answers in order and keeps the last.
 type Answer = () => unknown;
@@ -65,7 +73,11 @@ const administrator: Me = {
     absolute_expires_at: "2026-10-19T22:00:00Z",
   },
 };
-function user(handle: string, status: AdminUser["status"]): AdminUser {
+function user(
+  handle: string,
+  status: AdminUser["status"],
+  fields: Partial<AdminUser> = {},
+): AdminUser {
   return {
     id: `id-${handle}`,
     handle,
@@ -75,6 +87,10 @@ function user(handle: string, status: AdminUser["status"]): AdminUser {
     last_seen_at: null,
     roles: ["player"],
     status,
+    wins: 0,
+    tier: "bronze",
+    alliance: null,
+    ...fields,
   };
 }
 function page(items: AdminUser[], next_cursor: string | null = null) {
@@ -100,6 +116,8 @@ beforeEach(() => {
   queues.clear();
   for (const method of ["GET", "POST", "PUT", "DELETE"] as const)
     vi.spyOn(client, method).mockImplementation(serve(method));
+  // The roster names each account's alliance (v0.3.1).
+  on("GET /api/v1/planeswalkers", () => reply(200, roster));
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -432,6 +450,311 @@ describe("the card catalog", () => {
     expect(
       await screen.findByText("A catalog run is already queued or running."),
     ).toBeInTheDocument();
+  });
+});
+
+describe("wins, tiers and alliances (v0.3.1)", () => {
+  const sysop: Me = {
+    ...administrator,
+    permissions: [...administrator.permissions, "progress.manage"],
+  };
+
+  it("are shown for each account, the tier's crest and the alliance's portrait beside their names", async () => {
+    on(USERS, () =>
+      page([
+        user("ann", "active", {
+          wins: 1234,
+          tier: "platinum",
+          alliance: "rowan",
+        }),
+        user("bob", "pending"),
+      ]),
+    );
+    render(<Admin me={administrator} heading={createRef()} />);
+    const ann = await screen.findByRole("listitem", { name: "ann" });
+    expect(ann).toHaveTextContent("Wins1,234");
+    expect(ann).toHaveTextContent("TierPlatinum");
+    await waitFor(() => expect(ann).toHaveTextContent("AllianceRowan"));
+    expect(ann.querySelector('svg[data-tier="platinum"]')).not.toBeNull();
+    expect(
+      ann.querySelector('img[src="/portraits/rowan-128.webp"]'),
+    ).not.toBeNull();
+    const bob = screen.getByRole("listitem", { name: "bob" });
+    expect(bob).toHaveTextContent("Wins0");
+    expect(bob).toHaveTextContent("TierBronze");
+    expect(bob).toHaveTextContent("AllianceNone");
+    // Administrators see them; only SysOp sets wins.
+    expect(screen.queryByRole("button", { name: /^Set wins for/ })).toBeNull();
+    expect(names()).toEqual(["ann", "bob"]);
+  });
+
+  it("show an alliance by its ID when the roster does not arrive", async () => {
+    on("GET /api/v1/planeswalkers", () =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    );
+    on(USERS, () => page([user("ann", "active", { alliance: "rowan" })]));
+    render(<Admin me={administrator} heading={createRef()} />);
+    expect(
+      await screen.findByRole("listitem", { name: "ann" }),
+    ).toHaveTextContent("Alliancerowan");
+  });
+
+  it("are set by SysOp with a reason, and the list follows", async () => {
+    on(USERS, () => page([user("ann", "active", { wins: 3 })]));
+    on("POST /api/v1/admin/users/{user_id}/wins", () =>
+      reply(200, progress({ wins: 1000, counted_wins: 3, set_wins: 997 })),
+    );
+    render(<Admin me={sysop} heading={createRef()} />);
+    const open = await screen.findByRole("button", {
+      name: "Set wins for ann",
+    });
+    fireEvent.click(open);
+    const form = screen.getByRole("form", { name: "Set wins for ann" });
+    const wins = within(form).getByLabelText("Wins");
+    expect(wins).toHaveValue(3);
+    fireEvent.change(wins, { target: { value: "1000" } });
+    fireEvent.change(within(form).getByLabelText(/^Reason/), {
+      target: { value: "Testing Platinum" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Save wins" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "ann: 1,000 wins, Platinum tier.",
+      ),
+    );
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/admin/users/{user_id}/wins",
+      {
+        params: { path: { user_id: "id-ann" } },
+        body: { wins: 1000, reason: "Testing Platinum" },
+      },
+    );
+    const ann = screen.getByRole("listitem", { name: "ann" });
+    expect(ann).toHaveTextContent("Wins1,000");
+    expect(ann).toHaveTextContent("TierPlatinum");
+    expect(screen.queryByRole("form", { name: "Set wins for ann" })).toBeNull();
+  });
+
+  it("are checked before they are sent, and a refusal says why", async () => {
+    on(USERS, () => page([user("ann", "active")]));
+    on("POST /api/v1/admin/users/{user_id}/wins", () =>
+      reply(422, { code: "invalid_request", message: "Not today." }),
+    );
+    render(<Admin me={sysop} heading={createRef()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Set wins for ann" }),
+    );
+    const form = screen.getByRole("form", { name: "Set wins for ann" });
+    const wins = within(form).getByLabelText("Wins");
+    fireEvent.change(wins, { target: { value: "-5" } });
+    fireEvent.submit(form);
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "Wins are a whole number from 0 to 10,000,000.",
+    );
+    fireEvent.change(wins, { target: { value: "10" } });
+    fireEvent.change(within(form).getByLabelText(/^Reason/), {
+      target: { value: "ok" },
+    });
+    fireEvent.submit(form);
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "Give a reason of 3 to 200 characters.",
+    );
+    expect(calls).not.toContain("POST /api/v1/admin/users/{user_id}/wins");
+    fireEvent.change(within(form).getByLabelText(/^Reason/), {
+      target: { value: "Testing Silver" },
+    });
+    fireEvent.submit(form);
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "Not today.",
+    );
+    fireEvent.click(within(form).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("form", { name: "Set wins for ann" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Set wins for ann" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("the custom cards (v0.3.1)", () => {
+  const sysop: Me = {
+    ...administrator,
+    permissions: [...administrator.permissions, "custom_cards.manage"],
+  };
+  const CARDS = "GET /api/v1/admin/custom-cards";
+  beforeEach(() => {
+    on(USERS, () => page([]));
+    vi.mocked(fitCardImage).mockReset();
+    // jsdom has no object URLs.
+    Object.assign(URL, {
+      createObjectURL: vi.fn(() => "blob:preview"),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(URL, "createObjectURL");
+    Reflect.deleteProperty(URL, "revokeObjectURL");
+  });
+  async function open(me: Me = sysop) {
+    render(<Admin me={me} heading={createRef()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Custom cards" }));
+    return screen.findByRole("form", { name: "Upload a custom card" });
+  }
+
+  it("are SysOp's alone", () => {
+    render(<Admin me={administrator} heading={createRef()} />);
+    expect(screen.queryByRole("tab", { name: "Custom cards" })).toBeNull();
+  });
+
+  it("are listed with their images, and one is removed only once confirmed", async () => {
+    on(
+      CARDS,
+      () => reply(200, [customCard("Stand-in Sigil")]),
+      () => reply(200, []),
+    );
+    on("DELETE /api/v1/admin/custom-cards/{card_id}", () => reply(204));
+    await open();
+    const sigil = await screen.findByRole("listitem", {
+      name: "Stand-in Sigil",
+    });
+    expect(
+      within(sigil).getByRole("img", { name: "Stand-in Sigil" }),
+    ).toHaveAttribute(
+      "src",
+      "/api/v1/custom-cards/custom-stand-in-sigil/image?v=1",
+    );
+    expect(sigil).toHaveTextContent(
+      "{1}{U} · Artifact — Stand-in · mythic · tst",
+    );
+    fireEvent.click(
+      within(sigil).getByRole("button", { name: "Remove Stand-in Sigil" }),
+    );
+    expect(calls).not.toContain("DELETE /api/v1/admin/custom-cards/{card_id}");
+    fireEvent.click(within(sigil).getByRole("button", { name: "Keep it" }));
+    fireEvent.click(
+      within(sigil).getByRole("button", { name: "Remove Stand-in Sigil" }),
+    );
+    fireEvent.click(
+      within(sigil).getByRole("button", {
+        name: "Remove Stand-in Sigil for good",
+      }),
+    );
+    expect(
+      await screen.findByText("Stand-in Sigil is removed."),
+    ).toBeInTheDocument();
+    expect(client.DELETE).toHaveBeenCalledWith(
+      "/api/v1/admin/custom-cards/{card_id}",
+      { params: { path: { card_id: "custom-stand-in-sigil" } } },
+    );
+    expect(await screen.findByText("No custom cards yet.")).toBeInTheDocument();
+  });
+
+  it("are uploaded as WebP fitted in the browser, with their text", async () => {
+    on(
+      CARDS,
+      () => reply(200, []),
+      () => reply(200, [customCard("Stand-in Herald")]),
+    );
+    on("POST /api/v1/admin/custom-cards", () =>
+      reply(200, customCard("Stand-in Herald")),
+    );
+    vi.mocked(fitCardImage).mockResolvedValue({
+      blob: new Blob([new Uint8Array(2400)], { type: "image/webp" }),
+      width: 745,
+      height: 1040,
+      quality: 0.92,
+    });
+    const form = await open();
+    // Only the Godlike tier's Planeswalker takes custom cards.
+    const owner = within(form).getByLabelText("Planeswalker");
+    await waitFor(() => expect(owner).toHaveValue("the-sphinx"));
+    expect(
+      within(owner)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["The Sphinx"]);
+    // No image yet: nothing is sent.
+    fireEvent.change(within(form).getByLabelText("Name"), {
+      target: { value: "Stand-in Herald" },
+    });
+    fireEvent.change(within(form).getByLabelText("Type line"), {
+      target: { value: "Creature — Stand-in" },
+    });
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Upload the card" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose the card's image first.",
+    );
+    fireEvent.change(within(form).getByLabelText("Rules text"), {
+      target: { value: "Flying" },
+    });
+    fireEvent.change(within(form).getByLabelText("Power"), {
+      target: { value: "2" },
+    });
+    fireEvent.change(within(form).getByLabelText("Toughness"), {
+      target: { value: "3" },
+    });
+    const original = new File(["raw"], "herald.png", { type: "image/png" });
+    fireEvent.change(within(form).getByLabelText(/^Image/), {
+      target: { files: [original] },
+    });
+    expect(
+      await within(form).findByText("Ready: 745 × 1040 WebP, 2 KB."),
+    ).toBeInTheDocument();
+    expect(fitCardImage).toHaveBeenCalledWith(original);
+    expect(
+      within(form).getByRole("img", {
+        name: "The image as it will be uploaded",
+      }),
+    ).toHaveAttribute("src", "blob:preview");
+    fireEvent.click(
+      within(form).getByRole("button", { name: "Upload the card" }),
+    );
+    expect(
+      await screen.findByText("Stand-in Herald is saved."),
+    ).toBeInTheDocument();
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/admin/custom-cards", {
+      body: {
+        name: "Stand-in Herald",
+        planeswalker: "the-sphinx",
+        mana_cost: null,
+        type_line: "Creature — Stand-in",
+        oracle_text: "Flying",
+        flavor_text: null,
+        power: "2",
+        toughness: "3",
+        loyalty: null,
+        rarity: "mythic",
+        set_code: null,
+        collector_number: null,
+        artist: null,
+        image: "A".repeat(3200),
+        image_type: "image/webp",
+      },
+    });
+    expect(
+      await screen.findByRole("listitem", { name: "Stand-in Herald" }),
+    ).toBeInTheDocument();
+    // The form is ready for the next card.
+    expect(within(form).getByLabelText("Name")).toHaveValue("");
+    expect(within(form).queryByRole("img")).toBeNull();
+  });
+
+  it("say why an image cannot be made ready", async () => {
+    on(CARDS, () => reply(200, []));
+    vi.mocked(fitCardImage).mockRejectedValue(
+      new CardImageError(
+        "This browser cannot make WebP images. Use a current Chrome, Edge or Firefox.",
+      ),
+    );
+    const form = await open();
+    fireEvent.change(within(form).getByLabelText(/^Image/), {
+      target: { files: [new File(["raw"], "x.png", { type: "image/png" })] },
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This browser cannot make WebP images.",
+    );
+    expect(calls).not.toContain("POST /api/v1/admin/custom-cards");
   });
 });
 

@@ -1,0 +1,144 @@
+/* Administration's additions in v0.3.1: each account's wins, tier and alliance, SysOp's form for
+   setting wins, and the Godlike tier's custom cards. */
+
+.standing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 0;
+}
+.standing > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.standing dt {
+  color: #8d9b95;
+  font-size: 0.66rem;
+  letter-spacing: 0.4px;
+}
+.standing dd {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  margin: 0;
+  color: #c9d0c6;
+  font-size: 0.8rem;
+}
+
+.setWins {
+  margin-top: 12px;
+  padding: 4px 16px 14px;
+  border: 1px solid #d5b77c33;
+  border-radius: 6px;
+}
+.winsFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+}
+.winsFields > label:first-child {
+  flex: 0 1 170px;
+}
+.winsFields > label:last-child {
+  flex: 1 1 260px;
+}
+
+.customForm {
+  margin-top: 6px;
+}
+.customForm textarea {
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #ffffff26;
+  border-radius: 4px;
+  background: #101819;
+  color: #ebece6;
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.customForm textarea:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.customForm input[type="file"] {
+  padding: 9px;
+}
+.customShort {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+  gap: 0 14px;
+  max-width: 760px;
+}
+.customShort > label {
+  margin: 8px 0;
+}
+.customPreview {
+  display: block;
+  width: 186px;
+  max-width: 100%;
+  height: auto;
+  margin: 6px 0 4px;
+  border-radius: 9px;
+  box-shadow: 0 6px 16px #00000099;
+}
+.customHeading {
+  margin: 28px 0 8px;
+  font:
+    1.15rem Georgia,
+    serif;
+}
+.customList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.customList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid #ffffff12;
+}
+.customList img {
+  flex-shrink: 0;
+  width: 112px;
+  height: auto;
+  border-radius: 6px;
+}
+.customList li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.customList strong {
+  font-size: 0.9rem;
+}
+.customList small {
+  color: #8d9b95;
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+.customHidden {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 112px;
+  aspect-ratio: 63 / 88;
+  padding: 8px;
+  border: 1px dashed #ffffff26;
+  border-radius: 6px;
+  color: #8d9b95;
+  font-size: 0.66rem;
+  text-align: center;
+}
+@media (max-width: 600px) {
+  .customList li {
+    flex-direction: column;
+  }
+}
