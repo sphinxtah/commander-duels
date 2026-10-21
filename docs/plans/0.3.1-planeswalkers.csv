@@ -1,0 +1,99 @@
+draft_tier,character,first_planeswalker_card,first_printed,planeswalker_subtype,planeswalker_cards,commander_legal,best_edhrec_rank,image_file
+mythic,Liliana,Liliana Vess,2007-10-12,Liliana,13,13,773,Liliana.png
+mythic,Jace,Jace Beleren,2007-10-12,Jace,19,18,1081,Jace.png
+gold,Elspeth,"Elspeth, Knight-Errant",2008-10-03,Elspeth,8,8,655,Elspeth.png
+gold,Narset,Narset Transcendent,2015-03-27,Narset,3,3,982,Narset.png
+gold,Ugin,"Ugin, the Spirit Dragon",2015-01-17,Ugin,3,3,1095,Ugin.png
+gold,Teferi,"Teferi, Temporal Archmage",2014-11-07,Teferi,9,9,1132,Teferi.png
+gold,Tezzeret,Tezzeret the Seeker,2008-10-03,Tezzeret,9,9,1167,Tezzeret.png
+gold,Vraska,Vraska the Unseen,2012-10-05,Vraska,7,7,1264,Vraska.png
+gold,Chandra,Chandra Nalaar,2007-10-12,Chandra,23,22,1458,Chandra.png
+gold,Nissa,Nissa Revane,2009-10-02,Nissa,11,11,1672,Nissa.png
+gold,The Aetherspark,The Aetherspark,2025-02-14,Equipment,1,1,1820,The Aetherspark.png
+gold,Daretti,"Daretti, Scrap Savant",2014-11-07,Daretti,2,2,2038,Daretti.png
+gold,Grist,"Grist, the Hunger Tide",2021-05-06,Grist,2,2,2039,Grist.png
+gold,Garruk,Garruk Wildspeaker,2007-10-12,Garruk,12,10,2077,Garruk.png
+gold,Oko,"Oko, Thief of Crowns",2019-10-04,Oko,5,4,2090,Oko.png
+gold,Karn,Karn Liberated,2011-05-13,Karn,4,4,2149,Karn.png
+gold,Tyvar,Tyvar Kell,2021-02-05,Tyvar,2,2,2233,Tyvar.png
+gold,Ral,Ral Zarek,2013-05-03,Ral,7,7,2249,Ral.png
+silver,Kiora,"Kiora, the Crashing Wave",2014-02-07,Kiora,4,3,2369,Kiora.png
+silver,Saheeli,Saheeli Rai,2016-09-30,Saheeli,4,4,2495,Saheeli.png
+silver,Wrenn,Wrenn and Six,2019-06-14,Wrenn,4,3,2499,Wrenn.png
+silver,Ashiok,"Ashiok, Nightmare Weaver",2013-09-27,Ashiok,5,5,2663,Ashiok.png
+silver,Freyalise,"Freyalise, Llanowar's Fury",2014-11-07,Freyalise,2,1,2681,Freyalise.png
+silver,Domri,Domri Rade,2013-02-01,Domri,4,4,2742,Domri.png
+silver,Tamiyo,"Tamiyo, the Moon Sage",2012-05-04,Tamiyo,5,5,2810,Tamiyo.png
+silver,Ajani Goldmane,Ajani Goldmane,2007-10-12,Ajani,17,17,3069,Ajani Goldmane.png
+silver,Geyadrone Dihada,Geyadrone Dihada,2021-05-06,Dihada,2,2,3487,Geyadrone Dihada.png
+silver,Nicol Bolas,"Nicol Bolas, Planeswalker",2009-02-06,Bolas,5,5,3828,Nicol Bolas.png
+silver,Sorin,Sorin Markov,2009-10-02,Sorin,9,9,3883,Sorin.png
+silver,Tevesh Szat,"Tevesh Szat, Doom of Fools",2020-11-20,Szat,1,1,3904,Tevesh Szat.png
+silver,Vivien,Vivien Reid,2018-07-13,Vivien,7,7,3969,Vivien.png
+silver,Minsc,"Minsc & Boo, Timeless Heroes",2022-06-10,Minsc,1,1,3995,Minsc.png
+silver,Kaito,Kaito Shizuki,2022-02-18,Kaito,4,4,4103,Kaito.png
+silver,Ob Nixilis,Ob Nixilis of the Black Oath,2014-11-07,Nixilis,4,4,4225,Ob Nixilis.png
+silver,Koth,Koth of the Hammer,2010-10-01,Koth,2,2,4239,Koth.png
+silver,Lolth,"Lolth, Spider Queen",2021-07-23,Lolth,1,1,4291,Lolth.png
+silver,Aminatou,"Aminatou, the Fateshifter",2018-08-10,Aminatou,1,1,4356,Aminatou.png
+silver,Kaya,"Kaya, Ghost Assassin",2016-08-26,Kaya,8,7,4512,Kaya.png
+silver,Tasha,"Tasha, the Witch Queen",2022-06-10,Tasha,2,1,4528,Tasha.png
+silver,Jeska,"Jeska, Thrice Reborn",2020-11-20,Jeska,1,1,4678,Jeska.png
+silver,The Wanderer,The Wanderer,2019-05-03,,1,1,4916,The Wanderer.png
+silver,Xenagos,"Xenagos, the Reveler",2013-09-27,Xenagos,1,1,5085,Xenagos.png
+silver,Teyo,"Teyo, the Shieldmage",2019-05-03,Teyo,3,2,5112,Teyo.png
+silver,Calix,"Calix, Destiny's Hand",2020-01-24,Calix,1,1,5116,Calix.png
+silver,Quintorius,Quintorius Kand,2023-11-17,Quintorius,3,2,5420,Quintorius.png
+silver,Sarkhan,Sarkhan Vol,2008-10-03,Sarkhan,8,7,5687,Sarkhan.png
+silver,Serra,Serra the Benevolent,2019-06-14,Serra,1,1,5719,Serra.png
+silver,Windgrace,Lord Windgrace,2018-08-10,Windgrace,1,1,6203,Windgrace.png
+silver,Tibalt,"Tibalt, the Fiend-Blooded",2012-05-04,Tibalt,5,3,6252,Tibalt.png
+silver,Kasmina,"Kasmina, Enigmatic Mentor",2019-05-03,Kasmina,2,2,6351,Kasmina.png
+silver,Commodore Guff,Commodore Guff,2023-08-04,Guff,1,1,6392,Commodore Guff.png
+silver,Venser,"Venser, the Sojourner",2010-10-01,Venser,2,1,6398,Venser.png
+silver,Jiang Yanggu,Jiang Yanggu,2018-06-22,Yanggu,2,2,6440,Jiang Yanggu.png
+silver,Huatli,"Huatli, Warrior Poet",2017-09-29,Huatli,4,4,6451,Huatli.png
+silver,Zariel,"Zariel, Archduke of Avernus",2021-07-23,Zariel,1,1,6465,Zariel.png
+silver,Comet,"Comet, Stellar Pup",2022-10-07,Comet,1,1,6470,Comet.png
+silver,Professor Dellian Fel,Professor Dellian Fel,2026-04-24,Dellian,1,1,6701,Professor Dellian Fel.png
+silver,Vronos,"Vronos, Masked Inquisitor",2023-08-04,Vronos,1,1,6872,Vronos.png
+bronze,Dack,Dack Fayden,2014-06-06,Dack,1,1,6897,Dack.png
+bronze,Basri,Basri Ket,2020-07-03,Basri,2,2,7057,Basri.png
+bronze,Mordenkainen,Mordenkainen,2021-07-23,Mordenkainen,1,1,8097,Mordenkainen.png
+bronze,Arlinn,Arlinn Kord,2016-04-08,Arlinn,3,3,8434,Arlinn.png
+bronze,Dovin,Dovin Baan,2016-09-30,Dovin,4,4,8480,Dovin.png
+bronze,Lukka,"Lukka, Coppercoat Outcast",2020-04-24,Lukka,3,3,8691,Lukka.png
+bronze,Gideon,Gideon Jura,2010-04-23,Gideon,8,8,8728,Gideon.png
+bronze,Nahiri,"Nahiri, the Lithomancer",2014-11-07,Nahiri,5,5,9078,Nahiri.png
+bronze,Jared,Jared Carthalion,2022-09-09,Jared,1,1,9137,Jared.png
+bronze,Jaya,Jaya Ballard,2018-04-27,Jaya,3,3,9334,Jaya.png
+bronze,Elminster,Elminster,2022-06-10,Elminster,1,1,9363,Elminster.png
+bronze,Sivitri,"Sivitri, Dragon Master",2022-09-09,Sivitri,1,1,9380,Sivitri.png
+bronze,Angrath,"Angrath, the Flame-Chained",2018-01-19,Angrath,3,3,10218,Angrath.png
+bronze,Dakkon,"Dakkon, Shadow Slayer",2021-05-06,Dakkon,1,1,11130,Dakkon.png
+bronze,Estrid,"Estrid, the Masked",2018-08-10,Estrid,1,1,11547,Estrid.png
+bronze,Rowan,Rowan Kenrith,2018-06-08,Rowan,3,3,11796,Rowan.png
+bronze,Will,Will Kenrith,2018-06-08,Will,2,2,11796,Will.png
+bronze,Davriel,"Davriel, Rogue Shadowmage",2019-05-03,Davriel,2,1,11990,Davriel.png
+bronze,Mu Yanling,Mu Yanling,2018-06-22,Yanling,3,3,13359,Mu Yanling.png
+bronze,Niko,Niko Aris,2021-02-05,Niko,1,1,13777,Niko.png
+bronze,Ellywick,Ellywick Tumblestrum,2021-07-23,Ellywick,1,1,14769,Ellywick.png
+bronze,Samut,"Samut, the Tested",2017-07-14,Samut,2,2,16801,Samut.png
+bronze,Worzel,"Worzel, the Protector",2026-10-19,Worzel,1,0,17087,Worzel.png
+bronze,Bahamut,Grand Master of Flowers,2021-07-23,Bahamut,1,1,18377,Bahamut.png
+bronze,Arzakon,Arzakon,2026-10-19,Arzakon,1,0,20815,Arzakon.png
+bronze,Feroz,"Feroz, Ulgrotha's Warden",2026-10-19,Feroz,1,0,21262,Feroz.png
+bronze,Thomil,"Thomil, the Destroyer",2026-10-19,Thomil,1,0,22484,Thomil.png
+bronze,Sifa,Sifa Grent,2026-10-19,Sifa,1,0,25114,Sifa.png
+bronze,Dyfed,"Dyfed, the Guiding Hand",2026-10-19,Dyfed,1,0,25993,Dyfed.png
+bronze,Greensleeves,Greensleeves,2026-10-19,Greensleeves,1,0,27790,Greensleeves.png
+bronze,Urza,"Urza, Academy Headmaster",2017-12-08,Urza,2,1,,Urza.png
+bronze,Abian,"Abian, Luvion Usurper",2019-11-07,Abian,1,0,,Abian.png
+bronze,B.O.B.,B.O.B. (Bevy of Beebles),2020-02-29,B.O.B.,1,0,,B.O.B..png
+bronze,Deb Thomas,Deb Thomas,2024-05-10,Deb,1,0,,Deb Thomas.png
+bronze,Dungeon Master,Dungeon Master,2017-09-20,Dungeon Master,1,0,,Dungeon Master.png
+bronze,Luxior,"Luxior, Ignited",2024-08-02,Equipment Luxior,1,0,,Luxior.png
+bronze,Ersta,"Ersta, Friend to All",2022-08-01,Ersta,1,0,,Ersta.png
+bronze,Inzerva,"Inzerva, Master of Insights",2018-08-01,Inzerva,1,0,,Inzerva.png
+bronze,Mr. Monopoly,"Mr. Monopoly, On the Go",2025-08-24,Monopoly,1,0,,Mr. Monopoly.png
+bronze,Svega,"Svega, the Unconventional",2023-08-01,Svega,1,0,,Svega.png
