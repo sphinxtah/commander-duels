@@ -50,6 +50,15 @@ const locks = {
 const ID = "00000000-0000-4000-8000-0000000000aa";
 const OTHER = "00000000-0000-4000-8000-0000000000bb";
 
+// The module keeps its holders for the whole file: every hold a test takes is let go after it,
+// even when the test fails midway, so no game stays live for the tests after it.
+let holds: (() => void)[] = [];
+function hold(gameId: string) {
+  const release = holdLiveGame(gameId);
+  holds.push(release);
+  return release;
+}
+
 beforeEach(() => {
   requests = [];
   held = [];
@@ -59,13 +68,14 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  for (const release of holds.splice(0)) release();
   vi.clearAllMocks();
   Reflect.deleteProperty(navigator, "locks");
 });
 
 describe("a live game's lock", () => {
   it("is held, shared, while the game is live and released after", async () => {
-    const release = holdLiveGame(ID.toUpperCase());
+    const release = hold(ID.toUpperCase());
     expect(locks.request).toHaveBeenCalledTimes(1);
     expect(requests[0]).toMatchObject({
       name: `cd-live-game:${ID}`,
@@ -87,15 +97,15 @@ describe("a live game's lock", () => {
   });
 
   it("is never taken when the game ends before the browser grants it", async () => {
-    const release = holdLiveGame(ID);
+    const release = hold(ID);
     release();
     await requests[0]!.grant();
     expect(held).toEqual([]);
   });
 
   it("counts overlapping holders, as StrictMode's double mount makes", () => {
-    const first = holdLiveGame(ID);
-    const second = holdLiveGame(ID);
+    const first = hold(ID);
+    const second = hold(ID);
     first();
     expect(isLiveHere(ID)).toBe(true);
     second();
@@ -105,7 +115,7 @@ describe("a live game's lock", () => {
   it("without Web Locks, every check assumes a game is live", async () => {
     Reflect.deleteProperty(navigator, "locks");
     expect(await anyLiveGame()).toBe(true);
-    const release = holdLiveGame(ID);
+    const release = hold(ID);
     expect(isLiveHere(ID)).toBe(true);
     release();
     locks.query.mockRejectedValueOnce(new Error("SecurityError"));
@@ -127,7 +137,7 @@ describe("the route guard", () => {
   }
 
   it("keeps a live game's address when nothing meant to leave it", () => {
-    const release = holdLiveGame(ID);
+    const release = hold(ID);
     const { result } = renderHook(() => useLiveGameNotice());
     let kept = false;
     act(() => {
@@ -142,7 +152,7 @@ describe("the route guard", () => {
   });
 
   it("lets an in-game link leave, once", () => {
-    const release = holdLiveGame(ID);
+    const release = hold(ID);
     markIntendedLeave();
     expect(leave(`#game/${ID}`, "#play")).toBe(false);
     expect(window.location.hash).toBe("#play");
@@ -152,7 +162,7 @@ describe("the route guard", () => {
 
   it("lets go of a game that is not live here, and of other pages", () => {
     expect(leave(`#game/${ID}`, "#play")).toBe(false);
-    const release = holdLiveGame(ID);
+    const release = hold(ID);
     expect(leave(`#game/${OTHER}`, "#play")).toBe(false);
     expect(leave("#settings", "#play")).toBe(false);
     release();
@@ -163,7 +173,7 @@ describe("the route guard", () => {
   it("clears its notice after a while, or on an intended leave", () => {
     vi.useFakeTimers();
     try {
-      const release = holdLiveGame(ID);
+      const release = hold(ID);
       const { result } = renderHook(() => useLiveGameNotice());
       act(() => void leave(`#game/${ID}`, "#play"));
       expect(result.current).toBe(STILL_ON);
@@ -172,6 +182,9 @@ describe("the route guard", () => {
       act(() => void leave(`#game/${ID}`, "#play"));
       act(() => markIntendedLeave());
       expect(result.current).toBeNull();
+      // The leave it marked goes through. Left unused, it would let the next tests' leaves
+      // through too: marked on this fake clock, 8 seconds ahead, it stays "just now" for them.
+      expect(leave(`#game/${ID}`, "#play")).toBe(false);
       release();
     } finally {
       vi.useRealTimers();

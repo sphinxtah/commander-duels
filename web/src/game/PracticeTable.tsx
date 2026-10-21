@@ -195,13 +195,22 @@ function Table({ me }: { me: Me }) {
   }, [everyone]);
 
   useEffect(() => {
+    // StrictMode (pnpm dev, and so the browser journeys) mounts the table twice: the first
+    // mount's answers must not land after the second's and reset a deck already chosen.
+    let active = true;
     void client.GET("/api/v1/practice-games/options").then(({ data }) => {
+      if (!active) return;
       if (data) setOptions(data);
       if (data?.own_decks)
         void client
           .GET("/api/v1/decks", { params: { query: { view: "active" } } })
-          .then(({ data: decks }) => setOwnDecks(decks ?? []));
+          .then(({ data: decks }) => {
+            if (active) setOwnDecks(decks ?? []);
+          });
     });
+    return () => {
+      active = false;
+    };
   }, []);
   useEffect(() => {
     const change = () => setRequested(requestedDeck());
@@ -211,12 +220,16 @@ function Table({ me }: { me: Me }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  // The reset follows the format (and its default bots once the options arrive), never the
+  // options object itself: a fresh copy of the same options must not clear the chosen decks.
+  const defaultBots = options?.formats.find(
+    (f) => f.id === format,
+  )?.default_bots;
   useEffect(() => {
-    const chosen = options?.formats.find((f) => f.id === format);
-    if (chosen) setBots(chosen.default_bots);
+    if (defaultBots !== undefined) setBots(defaultBots);
     setDeck("");
     setBotDecks(["", "", ""]);
-  }, [format, options]);
+  }, [format, defaultBots]);
   useEffect(() => {
     // A deck asked for by a link from the deck builder: its format, then the deck itself. It
     // runs after the reset above, which a change of format also triggers.

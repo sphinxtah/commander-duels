@@ -20,5 +20,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test-setup.ts",
     include: ["src/**/*.test.ts*"],
+    // afterEach hooks run in the order they are defined, not reversed: the setup file's, which
+    // unmounts the page, runs before a test file's own, which restores the file's mocks. In the
+    // other order a page still mounted at a test's end could reach the real network.
+    sequence: { hooks: "list" },
   },
 });

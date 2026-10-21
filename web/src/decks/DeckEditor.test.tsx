@@ -1,11 +1,12 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { createRef } from "react";
+import { createRef, StrictMode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DeckEditor } from "./DeckEditor";
 import {
@@ -34,6 +35,10 @@ const DECK = "GET /api/v1/decks/{deck_id}";
 const DRAFT = "PUT /api/v1/decks/{deck_id}/draft";
 // The editor saves a moment after the last change.
 const SAVED = { timeout: 4000 };
+// Its search asks a moment after the deck arrives, and the first results wait on that and on the
+// first draw of the whole editor: on a busy machine (every test file at once) more than the
+// default second.
+const FOUND = { timeout: 4000 };
 
 beforeAll(openDialogs);
 afterEach(() => vi.restoreAllMocks());
@@ -70,14 +75,16 @@ function drafts(api: ReturnType<typeof mockApi>) {
     .map((call) => (call.options as { body: unknown }).body);
 }
 
-describe("the deck editor", () => {
+// These run on the editor's real clock, a search and a save or two each: more than the default
+// five seconds on a busy machine, and more than the waits above add up to.
+describe("the deck editor", { timeout: 15_000 }, () => {
   it("saves a change on its own, with the version it was based on", async () => {
     const api = mockApi();
     api.on(DECK, () => reply(200, deck(3)));
     api.on(DRAFT, () => saved(4));
     finding(api);
     render(<DeckEditor deckId="deck-1" heading={createRef()} />);
-    await screen.findByRole("button", { name: /^Mountain/ });
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
     addMountain();
     expect(screen.getByText("Unsaved changes…")).toBeInTheDocument();
     expect(
@@ -109,7 +116,7 @@ describe("the deck editor", () => {
     );
     finding(api);
     render(<DeckEditor deckId="deck-1" heading={createRef()} />);
-    await screen.findByRole("button", { name: /^Mountain/ });
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
     addMountain();
     const dialog = await screen.findByRole(
       "dialog",
@@ -139,7 +146,7 @@ describe("the deck editor", () => {
     );
     finding(api);
     render(<DeckEditor deckId="deck-1" heading={createRef()} />);
-    await screen.findByRole("button", { name: /^Mountain/ });
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
     addMountain();
     const dialog = await screen.findByRole(
       "dialog",
@@ -152,6 +159,36 @@ describe("the deck editor", () => {
     expect(screen.getByText("All changes saved")).toBeInTheDocument();
     expect(screen.getByLabelText("2 copies")).toBeInTheDocument();
     expect(drafts(api)).toHaveLength(1);
+  });
+
+  it("keeps the first edit when StrictMode's other request for the deck answers after it", async () => {
+    // StrictMode (pnpm dev, and so the browser journeys) asks for the deck twice. The answer
+    // to the mount it throws away is held back until a bolt has been taken out.
+    const api = mockApi();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const opened = () => reply(200, deck(1, [entry(bolt, 5)]));
+    api.on(DECK, () => held.then(opened), opened);
+    api.on(DRAFT, () => saved(2));
+    finding(api);
+    render(
+      <StrictMode>
+        <DeckEditor deckId="deck-1" heading={createRef()} />
+      </StrictMode>,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "One fewer Lightning Bolt" }),
+    );
+    await act(async () => release());
+    expect(api.calls.filter((call) => call.route === DECK)).toHaveLength(2);
+    expect(screen.getByLabelText("4 copies")).toBeInTheDocument();
+    expect(
+      await screen.findByText("All changes saved", undefined, SAVED),
+    ).toBeInTheDocument();
+    expect(drafts(api)).toEqual([{ version: 1, entries: [entry(bolt, 4)] }]);
+    expect(screen.getByLabelText("4 copies")).toBeInTheDocument();
   });
 
   it("says when the deck is not there", async () => {

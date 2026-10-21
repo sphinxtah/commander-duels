@@ -80,14 +80,21 @@ export function DeckEditor({
   }, [deckId]);
 
   useEffect(() => {
+    // StrictMode (pnpm dev, and so the browser journeys) opens the editor twice. Only the
+    // mount that stays may fill it: the other's answer, landing after the first edit, would
+    // put the deck back as it opened, and the autosave would then save that.
+    let active = true;
     void load().then((data) => {
-      if (!data) return;
+      if (!active || !data) return;
       setDeck(data);
       setEntries(data.draft.entries);
       setCards(data.cards);
       setValidation(data.validation);
       version.current = data.draft.version;
     });
+    return () => {
+      active = false;
+    };
   }, [load]);
 
   const save = useCallback(async () => {

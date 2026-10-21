@@ -1,7 +1,27 @@
 import createClient from "openapi-fetch";
 import type { paths, components } from "./generated/api";
 
-export const client = createClient<paths>();
+/**
+ * A request the network never answered (offline, a dropped connection, a request aborted)
+ * comes back as the service's own "unavailable" answer instead of throwing. So every caller
+ * handles it on the path it already has for an error, and none leaves an unhandled rejection
+ * or a "searching…" that never ends.
+ */
+export async function answered(request: Request): Promise<Response> {
+  try {
+    return await fetch(request);
+  } catch {
+    return new Response(
+      JSON.stringify({
+        code: "service_unavailable",
+        message: "The application service is unavailable. Try again.",
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+}
+
+export const client = createClient<paths>({ fetch: answered });
 export type Bootstrap = components["schemas"]["Bootstrap"];
 export type Format = components["schemas"]["Format"];
 export type PracticeFormat = components["schemas"]["PracticeFormat"];
@@ -67,16 +87,21 @@ export async function loadFoundation(signal: AbortSignal) {
 
 /**
  * The signed-in account, or null when signed out. Throws when the service is unreachable, or
- * when the signal aborts first.
+ * when the signal aborts first. It also keeps the CSRF token in step, unless `token` is false:
+ * a caller that may drop a late answer (one that arrives after a sign-out) applies the token
+ * itself, and only with an answer it uses.
  */
-export async function loadMe(signal?: AbortSignal): Promise<Me | null> {
+export async function loadMe(
+  signal?: AbortSignal,
+  { token = true }: { token?: boolean } = {},
+): Promise<Me | null> {
   const { data, response } = await client.GET("/api/v1/me", { signal });
   if (response.status === 401) {
-    setCsrfToken(undefined);
+    if (token) setCsrfToken(undefined);
     return null;
   }
   if (!data) throw new Error("Application service unavailable");
-  setCsrfToken(data.csrf_token);
+  if (token) setCsrfToken(data.csrf_token);
   return data;
 }
 

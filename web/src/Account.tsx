@@ -425,9 +425,14 @@ function useSignOut(
   // and its 401 would wrongly say the other sessions could not be ended.
   const [busy, setBusy] = useState(false);
   const signingOut = useRef(false);
+  // Set for good once this page has signed out. The page goes a moment later, when the sign-in
+  // is drawn; an answer arriving before then (an approval check under way) must not bring the
+  // account back.
+  const ended = useRef(false);
   // The notice is what the sign-in page then says below its button.
   const signedOut = useCallback(
     (notice = "You signed out.") => {
+      ended.current = true;
       setCsrfToken(undefined);
       onSignedOut(notice);
     },
@@ -480,7 +485,7 @@ function useSignOut(
       setBusy(false);
     }
   }
-  return { message, setMessage, busy, signingOut, signedOut, signOut };
+  return { message, setMessage, busy, signingOut, ended, signedOut, signOut };
 }
 
 function Sessions({
@@ -499,19 +504,28 @@ function Sessions({
     onSignedOut,
   );
   async function load() {
-    const { data } = await client.GET("/api/v1/me/sessions");
-    setSessions(data);
+    try {
+      const { data } = await client.GET("/api/v1/me/sessions");
+      setSessions(data);
+    } catch {
+      // A dropped network: the list stays as it was, and the next look asks again.
+    }
   }
   useEffect(() => {
     void load();
   }, [me.session.id]);
   async function end(session: SessionSummary) {
-    const { error } = await client.DELETE("/api/v1/me/sessions/{session_id}", {
-      params: { path: { session_id: session.id } },
-    });
-    if (error) setMessage(describe(error));
-    else if (session.current) signedOut();
-    else await load();
+    try {
+      const { error } = await client.DELETE(
+        "/api/v1/me/sessions/{session_id}",
+        { params: { path: { session_id: session.id } } },
+      );
+      if (error) setMessage(describe(error));
+      else if (session.current) signedOut();
+      else await load();
+    } catch {
+      setMessage(describe(undefined));
+    }
   }
   return (
     <section className={styles.panel} aria-labelledby="sessions-title">
@@ -657,7 +671,7 @@ export function Waiting({
   /** Focused when the page arrives here, as after a sign-in that must wait. */
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  const { message, busy, signingOut, signedOut, signOut } = useSignOut(
+  const { message, busy, signingOut, ended, signedOut, signOut } = useSignOut(
     me,
     onChange,
     onSignedOut,
@@ -676,7 +690,7 @@ export function Waiting({
   }, []);
   const check = useCallback(
     async (asked: boolean) => {
-      if (asking.current || signingOut.current) return;
+      if (asking.current || signingOut.current || ended.current) return;
       asking.current = true;
       setChecking(true);
       if (asked) setNote("");
@@ -684,8 +698,8 @@ export function Waiting({
       const timeout = answerTimeout();
       try {
         const current = await loadMe(timeout.signal);
-        // A sign-out begun meanwhile, or a page that has moved on, has the last word.
-        if (!shown.current || signingOut.current) return;
+        // A sign-out begun or done meanwhile, or a page that has moved on, has the last word.
+        if (!shown.current || signingOut.current || ended.current) return;
         // The session ended elsewhere: the sign-in page, with nothing to add.
         if (!current) return signedOut("");
         onChange(current);
@@ -700,7 +714,7 @@ export function Waiting({
         setChecking(false);
       }
     },
-    [onChange, signedOut, signingOut],
+    [onChange, signedOut, signingOut, ended],
   );
   useEffect(() => {
     if (!pending) return;

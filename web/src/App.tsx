@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Account, SignIn, Waiting, avatars } from "./Account";
 import { Admin, SysopSignIn, canAdminister } from "./Admin";
 import { exitTableFullscreen } from "./app/fullscreen";
@@ -14,6 +20,7 @@ import {
   client,
   loadFoundation,
   loadMe,
+  setCsrfToken,
   sysopEntrance,
   type Bootstrap,
   type Format,
@@ -142,6 +149,10 @@ export function App() {
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
+  // Counts the account's changes made here (a sign-in, an approval, a sign-out). An answer
+  // asked for before the latest one (an account check started by going online or Try again, a
+  // preferences save) is dropped, so it can never bring back an account just signed out.
+  const generation = useRef(0);
   // At #sysop nothing shows until the server says whether this is SysOp's network: off it, the
   // address is the landing page like any other. A service that did not answer shows the sign-in
   // with its Try again, never the mark alone with nothing to press.
@@ -183,12 +194,17 @@ export function App() {
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // The table fills the window and never scrolls; the other pages scroll as ever, and so does
-    // the landing page that a #game/<id> shows before sign-in.
+    // the landing page that a #game/<id> shows before sign-in. A layout effect, so the route
+    // changes in the commit that draws its screen: a session that ends at the table never shows
+    // the landing page with the table's layout, even for a moment.
     document.documentElement.dataset.route = atTable ? "game" : "shell";
   }, [atTable]);
-  useEffect(() => {
+  // Focus moves in the commit that draws the new screen (a layout effect, not a passive one), so
+  // it never rests on the page's body in between, even when an answer from the API caused the
+  // change and React would otherwise run the effect a moment later.
+  useLayoutEffect(() => {
     if (view === undefined) return;
     const before = shownBefore.current;
     shownBefore.current = view;
@@ -205,7 +221,7 @@ export function App() {
       leaveTable();
     }
   }, [view, game, atTable]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Leaving a game also lands on a page (usually Play, whose state never changed), so focus
     // follows the game route too; the game screen focuses its own heading.
     if (navigated.current && !atTable) heading.current?.focus();
@@ -239,15 +255,18 @@ export function App() {
         if (active) setConnection("unavailable");
       })
       .finally(foundation.done);
-    loadMe(account.signal)
+    const sent = generation.current;
+    loadMe(account.signal, { token: false })
       .then((value) => {
-        if (active) changeMe(value);
+        if (!active || sent !== generation.current) return;
+        setCsrfToken(value?.csrf_token);
+        changeMe(value);
       })
       .catch(() => {
         // An unreachable service, or one that did not answer in time, says nothing about the
         // session: a network blip must not sign the page out and throw away open forms, so a
         // known account stays. A first load that fails still settles on signed out.
-        if (active)
+        if (active && sent === generation.current)
           setMe((current) => (current === undefined ? null : current));
       })
       .finally(account.done);
@@ -296,12 +315,21 @@ export function App() {
       savePreferences(next);
     }
   }, []);
+  // What the page's own screens report: each is a change of account, newer than any answer
+  // still on its way.
+  const accountChanged = useCallback(
+    (value: Me | null) => {
+      generation.current += 1;
+      changeMe(value);
+    },
+    [changeMe],
+  );
   const signedOut = useCallback(
     (said: string) => {
       setNotice(said);
-      changeMe(null);
+      accountChanged(null);
     },
-    [changeMe],
+    [accountChanged],
   );
   const retry = () => setAttempt((value) => value + 1);
 
@@ -314,7 +342,8 @@ export function App() {
         ? "Preferences saved on this device."
         : "Applied for this visit. Browser storage is unavailable.",
     );
-    if (me?.status === "active")
+    if (me?.status === "active") {
+      const sent = generation.current;
       void client
         .PATCH("/api/v1/me", {
           body: {
@@ -325,13 +354,14 @@ export function App() {
           },
         })
         .then(({ data }) => {
-          if (data) {
+          if (data && sent === generation.current) {
             setMe(data);
             setSaveMessage(
               "Preferences saved to your account and this device.",
             );
           }
         });
+    }
   }
 
   // Nothing of the app is drawn, or asks the API for anything, before the account is active
@@ -343,19 +373,19 @@ export function App() {
         {checking ? undefined : me ? (
           <Waiting
             me={me}
-            onChange={changeMe}
+            onChange={accountChanged}
             onSignedOut={signedOut}
             heading={heading}
           />
         ) : page === "SysOp" && entrance ? (
-          <SysopSignIn onSignedIn={changeMe} heading={heading} />
+          <SysopSignIn onSignedIn={accountChanged} heading={heading} />
         ) : (
           <SignIn
             auth={bootstrap?.auth}
             unavailable={connection === "unavailable"}
             onRetry={retry}
             notice={notice}
-            onSignedIn={changeMe}
+            onSignedIn={accountChanged}
             heading={heading}
           />
         )}
@@ -466,7 +496,7 @@ export function App() {
           {page === "Profile" ? (
             <Account
               me={me}
-              onChange={changeMe}
+              onChange={accountChanged}
               onSignedOut={signedOut}
               heading={heading}
             />
@@ -489,7 +519,7 @@ export function App() {
           ) : page === "Cards" ? (
             <CardsPage me={me} heading={heading} />
           ) : page === "SysOp" && entrance ? (
-            <SysopSignIn onSignedIn={changeMe} heading={heading} />
+            <SysopSignIn onSignedIn={accountChanged} heading={heading} />
           ) : page === "Play" || page === "SysOp" ? (
             <>
               <section className={styles.hero} aria-labelledby="page-title">

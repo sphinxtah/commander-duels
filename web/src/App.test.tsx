@@ -525,7 +525,9 @@ describe("an account that is not active", () => {
     // The handle comes after approval.
     expect(screen.queryByLabelText("Handle")).toBeNull();
 
-    // Coming back to the window asks again.
+    // Coming back to the window asks again. The wait listens for that from an effect, which can
+    // run a moment after the wait is drawn: the window comes back once it has.
+    await settle();
     act(() => void window.dispatchEvent(new Event("focus")));
     await waitFor(() => expect(count("GET /api/v1/me")).toBe(2));
     await settle();
@@ -783,6 +785,34 @@ describe("the account", () => {
     );
     expectLanding();
   });
+
+  it("keeps the sign-in when an account check sent before the sign-out answers after it", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    on(
+      "GET /api/v1/me",
+      () => reply(200, alice),
+      // The look that coming back online starts: answered before the sign-out ended the session,
+      // but slow on its way back.
+      () => held.then(() => reply(200, alice)),
+    );
+    on("POST /api/v1/auth/logout", () => reply(204));
+    window.location.hash = "#profile";
+    render(<App />);
+    await screen.findByRole("button", { name: "Sign out" });
+    act(() => void window.dispatchEvent(new Event("online")));
+    await waitFor(() => expect(count("GET /api/v1/me")).toBe(2));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText("You signed out.")).toBeInTheDocument();
+    await act(async () => release());
+    await settle();
+    expect(
+      screen.getByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expectLanding();
+  });
 });
 
 describe("a new account's handle", () => {
@@ -908,6 +938,9 @@ describe("the install banner", () => {
     expect(banner.nextElementSibling?.tagName).toBe("HEADER");
     // The owner's art on the page stays the sidebar mark and the banner image.
     expect(document.querySelectorAll('img[src^="/brand/"]')).toHaveLength(2);
+    // The banner listens to the install offer from an effect, which can run a moment after the
+    // banner is drawn: pressed before then, Not now would change an offer nobody listens to yet.
+    await settle();
 
     // The button goes with the banner: keyboard focus moves on to the content, not to <body>.
     const notNow = within(banner).getByRole("button", { name: "Not now" });

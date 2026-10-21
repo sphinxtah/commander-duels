@@ -1,4 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
@@ -70,6 +77,100 @@ describe("the decks page", () => {
       await screen.findByText("Mono-Red Burn is archived."),
     ).toBeInTheDocument();
     expect(await screen.findByText(/No decks yet/)).toBeInTheDocument();
+  });
+
+  it("keeps the Archived tab's list when the list asked for after an archive answers last", async () => {
+    const api = mockApi();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    api.on(
+      "GET /api/v1/decks",
+      () => reply(200, [summary]),
+      // The active list after the archive is slow; the Archived tab's answers first.
+      () => held.then(() => reply(200, [])),
+      () => reply(200, [{ ...summary, archived: true }]),
+    );
+    api.on("GET /api/v1/decks/starters", () => reply(200, [starter]));
+    api.on("POST /api/v1/decks/{deck_id}/archive", () => reply(200, summary));
+    render(<DecksPage me={player} heading={createRef()} />);
+    const row = (
+      await screen.findByRole("link", { name: "Mono-Red Burn" })
+    ).closest("li")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Archive" }));
+    expect(
+      await screen.findByText("Mono-Red Burn is archived."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+    await waitFor(() =>
+      expect(
+        api.calls.filter((call) => call.route === "GET /api/v1/decks"),
+      ).toHaveLength(3),
+    );
+    await act(async () => release());
+    const archived = (
+      await screen.findByRole("link", { name: "Mono-Red Burn" })
+    ).closest("li")!;
+    expect(
+      within(archived).getByRole("button", { name: "Unarchive" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No archived decks.")).toBeNull();
+  });
+
+  it("asks for the Archived tab's list when an archive answers after the switch to it", async () => {
+    const api = mockApi();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const old = { ...summary, id: "deck-old", title: "Old Elves" };
+    // Each list after the first follows the tab it was asked for.
+    api.on(
+      "GET /api/v1/decks",
+      () => reply(200, [summary]),
+      () => {
+        const last = api.calls.at(-1)!.options as {
+          params: { query: { view: string } };
+        };
+        return reply(
+          200,
+          last.params.query.view === "archived"
+            ? [old, { ...summary, archived: true }]
+            : [],
+        );
+      },
+    );
+    api.on("GET /api/v1/decks/starters", () => reply(200, [starter]));
+    api.on("POST /api/v1/decks/{deck_id}/archive", () =>
+      held.then(() => reply(200, summary)),
+    );
+    render(<DecksPage me={player} heading={createRef()} />);
+    const row = (
+      await screen.findByRole("link", { name: "Mono-Red Burn" })
+    ).closest("li")!;
+    fireEvent.click(within(row).getByRole("button", { name: "Archive" }));
+    // The player moves to Archived while the archive is on its way.
+    fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+    expect(
+      await screen.findByRole("link", { name: "Old Elves" }),
+    ).toBeInTheDocument();
+    await act(async () => release());
+    await screen.findByText("Mono-Red Burn is archived.");
+    // The list the archive asks for afterwards is the Archived tab's, so it stays on screen.
+    const views = api.calls
+      .filter((call) => call.route === "GET /api/v1/decks")
+      .map(
+        (call) =>
+          (call.options as { params: { query: { view: string } } }).params.query
+            .view,
+      );
+    expect(views.at(-1)).toBe("archived");
+    await waitFor(() =>
+      expect(
+        screen.getByRole("link", { name: "Old Elves" }),
+      ).toBeInTheDocument(),
+    );
   });
 
   it("copies a starter deck and opens the copy", async () => {

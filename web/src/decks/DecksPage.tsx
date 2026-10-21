@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -101,16 +102,26 @@ function Decks({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
   const create = useRef<HTMLDialogElement>(null);
   const [importing, setImporting] = useState(false);
   const [guiding, setGuiding] = useState(false);
+  const lists = useRef(0);
 
   const refresh = useCallback(async () => {
+    // Only the newest list may show: an older answer landing last (the list asked for after
+    // an archive, once the player has moved to another tab) would put the wrong decks under it.
+    const ticket = ++lists.current;
     const { data } = await client.GET("/api/v1/decks", {
       params: { query: { view } },
     });
-    setDecks(data ?? []);
+    if (ticket === lists.current) setDecks(data ?? []);
   }, [view]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  // An action's answer may land after the player moved to another tab; the list it asks for
+  // then must be that tab's, so it reaches the refresh of the render on screen, not its own.
+  const latestRefresh = useRef(refresh);
+  useLayoutEffect(() => {
+    latestRefresh.current = refresh;
+  });
   useEffect(() => {
     void client
       .GET("/api/v1/decks/starters")
@@ -150,7 +161,7 @@ function Decks({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
           restore: `${deck.title} is restored.`,
         }[action],
       );
-    void refresh();
+    void latestRefresh.current();
   }
 
   async function submit(event: FormEvent) {

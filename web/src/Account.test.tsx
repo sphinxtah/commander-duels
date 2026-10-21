@@ -313,6 +313,49 @@ describe("signing out", () => {
     expect(count("DELETE /api/v1/me/sessions/{session_id}")).toBe(1);
   });
 
+  it("keeps the sessions it shows when the network drops", async () => {
+    const session = (id: string, current: boolean, agent: string) => ({
+      id,
+      kind: "google",
+      current,
+      created_at: "2026-10-19T10:00:00Z",
+      last_seen_at: "2026-10-19T10:00:00Z",
+      idle_expires_at: "2026-10-26T10:00:00Z",
+      absolute_expires_at: "2026-11-02T10:00:00Z",
+      source_address: null,
+      user_agent: agent,
+    });
+    const offline = () => Promise.reject(new TypeError("Failed to fetch"));
+    on(
+      "GET /api/v1/me/sessions",
+      () =>
+        reply(200, [
+          session("s1", true, "Firefox"),
+          session("s2", false, "Safari"),
+        ]),
+      offline,
+    );
+    on("DELETE /api/v1/me/sessions/{session_id}", offline, () => reply(204));
+    render(<Page initial={account()} auth={google} />);
+    const other = await screen.findByRole("button", {
+      name: /^End the session in Safari, signed in /,
+    });
+    // Ending it fails on the way out: the page says so instead of failing silently.
+    fireEvent.click(other);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The application service is unavailable. Try again.",
+    );
+    // Ending it works, but the fresh list does not arrive: the list stays as it was.
+    fireEvent.click(other);
+    await waitFor(() => expect(count("GET /api/v1/me/sessions")).toBe(2));
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+    expect(count("DELETE /api/v1/me/sessions/{session_id}")).toBe(2);
+    expect(other).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Welcome back, Alice." }),
+    ).toBeInTheDocument();
+  });
+
   it("sends one sign-out when the button is pressed twice", async () => {
     // Were a second request sent, the first would end every session and the second find
     // this one gone.
@@ -527,6 +570,30 @@ describe("the wait for approval", () => {
         name: "Your account is waiting for approval.",
       }),
     ).toBeNull();
+  });
+
+  it("lets a sign-out win over a look that answers before the sign-in is drawn", async () => {
+    const look = deferred<unknown>();
+    const out = deferred<unknown>();
+    on("GET /api/v1/me", () => look.promise);
+    on("POST /api/v1/auth/logout", () => out.promise);
+    render(<Page initial={pending()} auth={google} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    // Inside one act, nothing is drawn until its end: the sign-out has finished, but the waiting
+    // page is still there, when the look's answer arrives.
+    await act(async () => {
+      out.resolve(reply(204));
+      await new Promise((done) => setTimeout(done, 0));
+      look.resolve(reply(200, pending()));
+      await new Promise((done) => setTimeout(done, 0));
+    });
+    await settle();
+    expect(screen.getByText("You signed out.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(count("GET /api/v1/me")).toBe(1);
   });
 
   it("tells a denied account so, and lets it only sign out", async () => {
