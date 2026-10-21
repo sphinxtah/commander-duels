@@ -1,0 +1,190 @@
+/* "Report a problem" (v0.4.1): the same dialog in the app and at the table. */
+
+.dialog {
+  width: 100%;
+  max-width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  border: 1px solid #d4b47a33;
+  border-radius: 10px;
+  background: #121b1c;
+  color: #ebece6;
+  padding: 28px;
+  box-shadow: 0 30px 90px #0008;
+}
+.dialog::backdrop {
+  background: #050909cc;
+}
+/* An image dragged over the dialog: the whole of it takes the drop. */
+.dialog[data-dragging] {
+  outline: 2px dashed #e6c68c;
+  outline-offset: -8px;
+}
+.dialog h2 {
+  margin: 0 32px 14px 0;
+  font:
+    1.4rem Georgia,
+    serif;
+}
+.close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  color: #b8c1b6;
+  font-size: 1.6rem;
+  line-height: 1;
+  padding: 6px 8px;
+}
+.field {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.field > span,
+.screenshot legend {
+  font-size: 0.78rem;
+  color: #c9d0c6;
+}
+.field input,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+  background: #0c1314;
+  border: 1px solid #ffffff26;
+  border-radius: 5px;
+  padding: 10px 12px;
+  color: inherit;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.field textarea {
+  resize: vertical;
+}
+.field input:focus-visible,
+.field textarea:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.screenshot {
+  margin: 14px 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.screenshot legend {
+  padding: 0;
+  margin-bottom: 6px;
+}
+.drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 14px;
+  border: 1px dashed #ffffff2e;
+  border-radius: 6px;
+}
+.drop .fine {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 16px;
+}
+.preview img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(260px, 100%);
+  max-height: 180px;
+  border: 1px solid #ffffff1f;
+  border-radius: 6px;
+  background: #0c1314;
+}
+.preview .fine {
+  margin: 0 0 10px;
+}
+.fine {
+  color: #a5b0a3;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  margin: 10px 0;
+}
+/* Always there, so a screen reader hears what it comes to say. */
+.note {
+  color: #c9d0c6;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  margin: 0;
+}
+.error {
+  color: #f0b4a0;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.primary,
+.secondary,
+.choose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  padding: 10px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary {
+  background: #d5b77c;
+  border: 1px solid #e0c58f;
+  color: #192220;
+}
+.primary:hover:not(:disabled) {
+  background: #e6cc99;
+}
+.secondary,
+.choose {
+  background: transparent;
+  border: 1px solid #d5b77c;
+  color: #ebece6;
+}
+.secondary:hover,
+.choose:hover {
+  background: #d5b77c1a;
+}
+.primary:disabled {
+  opacity: 0.55;
+}
+/* The file input is hidden; its label is the button, and shows where focus is. */
+.choose:focus-within {
+  outline: 2px solid #efcc8d;
+  outline-offset: 3px;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.sent .fine {
+  font-size: 0.86rem;
+}
+@media (max-width: 600px) {
+  .dialog {
+    padding: 22px 18px;
+  }
+}

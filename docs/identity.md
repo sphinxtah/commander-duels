@@ -126,7 +126,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
   | Player (Google) | 14 days | 30 days |
   | SysOp | 60 minutes | 12 hours |
 
-  Activity extends the idle limit at most once a minute.
+  Activity extends the idle limit at most once a minute. Administration's counts, which the page asks for every minute on its own (v0.4.1), are not activity: a tab left open still reaches the idle limit.
 - **Rotation.**
   - Every sign-in issues a new session and ends any session the browser presented.
   - Every role or status change raises the account's privilege version. The account's next request swaps its session for a new identifier, with the same sign-in time, limits and CSRF token.
@@ -163,9 +163,11 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `library.unlimited` (v0.3.1: build from the whole catalog) |  |  |  | ✓ | ✓ |
 | `progress.manage` (v0.3.1: set any account's wins) |  |  |  |  | ✓ |
 | `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  |  | ✓ |
+| `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  |  | ✓ | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, and grant or remove the moderator and content-editor roles.
+- Since v0.4.1 they read the players' [problem reports](reports.md) and set their status, and Admin in the navigation and the browser tab's title count the accounts waiting for approval and the unread reports ([counts](reports.md#counts)).
 - They cannot change administrators, SysOp or their own account. This holds whatever the administrator's status: grants survive a disable, so only SysOp can restore, deny, sign out or change the lesser roles of an account holding an administrator grant. The account list reports a disabled, pending or denied account's dormant grants in `roles` (without `player`, which only active accounts hold), so the Administration page locks the row.
 - The account search matches the handle, the display name and, for administrators only, the email, as written: `%`, `_` and `\` are literal, and names and email compare without regard to case.
 - The first administrator is not configured separately (AUTH06): SysOp is the configured bootstrap, and only SysOp makes or removes administrators. No Google account ever becomes an administrator by signing in.
@@ -241,6 +243,7 @@ Actions recorded:
 - **SysOp:** `auth.sysop_login`, `auth.sysop_login_failed`, `auth.sysop_logout`, `account.sysop_password_changed` and `account.sysop_password_set` (from the console).
 - **Profile:** `profile.updated`.
 - **Administration:** `admin.user_status_changed`, `admin.role_granted`, `admin.role_revoked` and `admin.sessions_revoked`.
+- **Problem reports** (v0.4.1): `admin.report_status_changed`, with the report's ID and the statuses `from` and `to`; its account is the reporter ([problem reports](reports.md#statuses)).
 
 Administrators read the trail newest first in the Administration page, filtered by action prefix, without regard to case. A player without a handle appears as `<display name> (no handle, <first 8 characters of its id>)`, so no player can pass for the Site administrator or another player.
 

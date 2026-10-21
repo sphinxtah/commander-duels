@@ -32,6 +32,9 @@ TOUCH_INTERVAL = timedelta(minutes=1)
 # How long a rotated session's old token still signs requests in, for those the browser sent
 # before it read the new cookie.
 ROTATION_GRACE = timedelta(seconds=60)
+# Asked by the page on its own every minute (Administration's counts, v0.4.1): they are not
+# activity, so a tab left open does not keep its session from reaching its idle limit.
+BACKGROUND_PATHS = frozenset({"/api/v1/admin/counts"})
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -51,6 +54,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "library.unlimited",
             # Leng's card shop: prices, sale and the booster data job (v0.4.0).
             "shop.manage",
+            # Reading the players' problem reports and setting their status (v0.4.1).
+            "reports.manage",
         }
     ),
 }
@@ -342,7 +347,7 @@ def optional_principal(request: Request, db: Db) -> Principal | None:
         cookie = Response()
         set_session_cookie(cookie, request, token, session)
         request.state.rotated_cookie = cookie.headers["set-cookie"]
-    else:
+    elif request.url.path not in BACKGROUND_PATHS:
         keep_alive(request, db, session, user)
     roles = roles_of(db, user)
     # End the read transaction: the pooled connection goes back now, not when the request ends,

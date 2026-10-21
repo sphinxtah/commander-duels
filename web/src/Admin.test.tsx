@@ -11,7 +11,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Admin, SysopSignIn } from "./Admin";
 import { CardImageError, fitCardImage } from "./admin/cardImage";
 import { customCard, progress, roster } from "./alliance/fixtures";
-import { client, type AdminUser, type AuditEntry, type Me } from "./api";
+import {
+  client,
+  type AdminUser,
+  type AuditEntry,
+  type Me,
+  type ReportDetail,
+  type ReportSummary,
+} from "./api";
 import { card } from "./decks/fixtures";
 
 // The canvas work is cardImage.test.ts's; here the fitted image is handed over as it would be.
@@ -849,6 +856,211 @@ describe("the custom cards (v0.3.1)", () => {
       "This browser cannot make WebP images.",
     );
     expect(calls).not.toContain("POST /api/v1/admin/custom-cards");
+  });
+});
+
+describe("what waits, and the problem reports (v0.4.1)", () => {
+  const REPORTS = "GET /api/v1/admin/reports";
+  const DETAIL = "GET /api/v1/admin/reports/{report_id}";
+  const STATUS = "POST /api/v1/admin/reports/{report_id}/status";
+  const reader: Me = {
+    ...administrator,
+    permissions: [...administrator.permissions, "reports.manage"],
+  };
+  const counts = { pending_accounts: 2, unread_reports: 1 };
+  const summary: ReportSummary = {
+    id: "r1",
+    created_at: "2026-10-21T12:00:00Z",
+    status: "new",
+    summary: "The board froze",
+    reporter: { id: "id-ada", handle: "ada", display_name: "Ada" },
+    page: "#game/g1",
+    app_version: "0.4.1",
+    game_id: "8f14e45f-ceea-467f-a0e6-9d8b2c0e5f6a",
+    game_turn: 7,
+    screenshot: true,
+  };
+  const detail = (status: ReportDetail["status"]): ReportDetail => ({
+    ...summary,
+    status,
+    description: "I passed priority.\nNothing happened.",
+    api_version: "0.4.1",
+    user_agent: "Mozilla/5.0 (test browser)",
+    viewport_width: 1366,
+    viewport_height: 768,
+    pixel_ratio: 2,
+    requests: [
+      {
+        method: "POST",
+        path: "/api/v1/games",
+        status: 0,
+        request_id: null,
+        at: "2026-10-21T11:59:58Z",
+      },
+      {
+        method: "GET",
+        path: "/api/v1/me",
+        status: 200,
+        request_id: "0f9c1e0a-1b2c-4d3e-8f90-123456789abc",
+        at: "2026-10-21T11:59:59Z",
+      },
+    ],
+    screenshot_width: 1280,
+    screenshot_height: 720,
+    status_changed_at: status === "new" ? null : "2026-10-21T12:05:00Z",
+    status_changed_by: status === "new" ? null : { id: null, label: "sysop" },
+  });
+  /** What each request of the route asked for: its parameters, in order. */
+  function queried(route: string) {
+    const asked = vi.mocked(client.GET).mock.calls as unknown as [
+      string,
+      { params?: { query?: object } } | undefined,
+    ][];
+    return asked
+      .filter(([path]) => `GET ${path}` === route)
+      .map(([, init]) => init?.params);
+  }
+
+  it("counts on the tabs, with a way to the accounts that wait", async () => {
+    on(USERS, () => page([user("ann", "active")]));
+    const refresh = vi.fn();
+    render(
+      <Admin
+        me={reader}
+        heading={createRef()}
+        counts={counts}
+        onCounts={refresh}
+      />,
+    );
+    expect(
+      screen.getByRole("tab", {
+        name: "Accounts, 2 accounts waiting for approval",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("tab", { name: "Reports, 1 unread report" }),
+    ).toBeInTheDocument();
+    await screen.findByRole("listitem", { name: "ann" });
+    expect(
+      screen.getByText("2 accounts waiting for approval."),
+    ).toBeInTheDocument();
+    on(USERS, () => page([user("pat", "pending")]));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show the waiting accounts" }),
+    );
+    await screen.findByRole("listitem", { name: "pat" });
+    expect(queried(USERS).at(-1)).toMatchObject({
+      query: { status: "pending" },
+    });
+    expect(screen.getByRole("combobox", { name: "Show" })).toHaveValue(
+      "pending",
+    );
+    // An approval changes the counts: they are asked for again.
+    on("POST /api/v1/admin/users/{user_id}/status", () =>
+      reply(200, user("pat", "active")),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Approve pat" }));
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+  });
+
+  it("shows no tab of reports to an account without reports.manage", () => {
+    on(USERS, () => page([]));
+    render(<Admin me={administrator} heading={createRef()} />);
+    expect(screen.queryByRole("tab", { name: /Reports/ })).toBeNull();
+  });
+
+  it("lists new and seen reports; opening one reads it, and its status can be set", async () => {
+    on(USERS, () => page([]));
+    on(REPORTS, () => reply(200, { items: [summary], next_cursor: null }));
+    on(DETAIL, () => reply(200, detail("new")));
+    on(
+      STATUS,
+      () => reply(200, detail("seen")),
+      () => reply(200, detail("fixed")),
+    );
+    const refresh = vi.fn();
+    render(
+      <Admin
+        me={reader}
+        heading={createRef()}
+        counts={counts}
+        onCounts={refresh}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Reports/ }));
+    const item = await screen.findByRole("listitem", {
+      name: "The board froze",
+    });
+    expect(queried(REPORTS).at(-1)).toMatchObject({
+      query: { status: ["new", "seen"] },
+    });
+    expect(item).toHaveTextContent("ada (Ada)");
+    expect(item).toHaveTextContent("#game/g1");
+    expect(item).toHaveTextContent("v0.4.1");
+    expect(item).toHaveTextContent("game 8f14e45f, turn 7");
+    expect(item).toHaveTextContent("NEW");
+
+    fireEvent.click(
+      within(item).getByRole("button", { name: "Open “The board froze”" }),
+    );
+    expect(
+      await within(item).findByText(/I passed priority\./),
+    ).toBeInTheDocument();
+    // Opened, a new report is seen.
+    await waitFor(() => expect(item).toHaveTextContent("SEEN"));
+    expect(calls).toContain(STATUS);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(item).toHaveTextContent("Mozilla/5.0 (test browser)");
+    expect(item).toHaveTextContent("1366 × 768 at 2×");
+    expect(item).toHaveTextContent("Web app 0.4.1 · API 0.4.1");
+    expect(item).toHaveTextContent("0f9c1e0a-1b2c-4d3e-8f90-123456789abc");
+    expect(item).toHaveTextContent("No answer");
+    expect(item).toHaveTextContent("by sysop");
+    // The API's own image, with the session's cookie.
+    expect(
+      within(item).getByRole("img", {
+        name: "Screenshot sent with “The board froze”",
+      }),
+    ).toHaveAttribute("src", "/api/v1/admin/reports/r1/screenshot");
+
+    fireEvent.change(within(item).getByRole("combobox", { name: "Status" }), {
+      target: { value: "fixed" },
+    });
+    await waitFor(() => expect(item).toHaveTextContent("FIXED"));
+    expect(vi.mocked(client.POST).mock.calls.at(-1)?.[1]).toMatchObject({
+      params: { path: { report_id: "r1" } },
+      body: { status: "fixed" },
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "“The board froze”: Fixed.",
+    );
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    // Every report, whatever its status.
+    fireEvent.change(screen.getByRole("combobox", { name: "Show" }), {
+      target: { value: "all" },
+    });
+    await waitFor(() =>
+      expect(queried(REPORTS).at(-1)).toMatchObject({
+        query: { status: undefined },
+      }),
+    );
+  });
+
+  it("says when no report matches, or the list cannot load", async () => {
+    on(USERS, () => page([]));
+    on(
+      REPORTS,
+      () => reply(200, { items: [], next_cursor: null }),
+      () => reply(503, { code: "service_unavailable", message: unavailable }),
+    );
+    render(<Admin me={reader} heading={createRef()} />);
+    fireEvent.click(screen.getByRole("tab", { name: /Reports/ }));
+    expect(await screen.findByText("No reports match.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(unavailable),
+    );
   });
 });
 

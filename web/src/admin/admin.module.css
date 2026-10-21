@@ -142,3 +142,94 @@
     flex-direction: column;
   }
 }
+
+/* v0.4.1: counts on Administration's tabs, and the players' problem reports. */
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #d5b77c;
+  color: #192220;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.shortcut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 14px 0 0;
+  color: #dec38b;
+  font-size: 0.8rem;
+}
+[data-report="new"] {
+  border-color: #d5b77c88;
+  color: #dec38b;
+}
+.report {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid #ffffff14;
+  border-radius: 6px;
+  min-width: 0;
+}
+.reportText {
+  margin: 0 0 14px;
+  color: #dfe3db;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.reportFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 10px 24px;
+  margin: 0;
+}
+.reportFacts > div {
+  min-width: 0;
+}
+.reportFacts dt {
+  color: #8d9b95;
+  font-size: 0.66rem;
+  letter-spacing: 0.4px;
+}
+.reportFacts dd {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 4px 0 0;
+  color: #c9d0c6;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.reportFacts small {
+  color: #8d9b95;
+  font-size: 0.7rem;
+}
+.reportFacts code {
+  overflow-wrap: anywhere;
+}
+/* The requests stay one line each; on a phone their table scrolls sideways in its frame. */
+.report table td {
+  white-space: nowrap;
+}
+.reportHeading {
+  margin: 18px 0 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c9d0c6;
+}
+.reportImage {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #ffffff1f;
+  border-radius: 6px;
+}

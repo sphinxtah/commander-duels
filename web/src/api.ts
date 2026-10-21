@@ -9,8 +9,11 @@ import type { paths, components } from "./generated/api";
  */
 export async function answered(request: Request): Promise<Response> {
   try {
-    return await fetch(request);
+    const response = await fetch(request);
+    recordRequest(request, response);
+    return response;
   } catch {
+    recordRequest(request, null);
     return new Response(
       JSON.stringify({
         code: "service_unavailable",
@@ -19,6 +22,58 @@ export async function answered(request: Request): Promise<Response> {
       { status: 503, headers: { "Content-Type": "application/json" } },
     );
   }
+}
+
+export type RecentRequest = components["schemas"]["RecentRequest"];
+/** How many of the page's latest API requests a problem report carries (v0.4.1). */
+export const RECENT_REQUESTS = 20;
+const recent: RecentRequest[] = [];
+const METHODS = new Set<string>([
+  "GET",
+  "HEAD",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+]);
+// Asked by the page on its own every minute: they would push out what the person did.
+const UNRECORDED = new Set(["/api/v1/admin/counts"]);
+const REQUEST_ID = /^[A-Za-z0-9-]{1,64}$/;
+
+/**
+ * Notes an API request for a problem report: its method, its path without the query, the
+ * answer's status (0 when none came), its X-Request-ID and the time. Never a body, a query or
+ * another header. Only the latest RECENT_REQUESTS are kept, in this page's memory.
+ */
+export function recordRequest(request: Request, response: Response | null) {
+  let path: string;
+  try {
+    path = new URL(request.url).pathname;
+  } catch {
+    return;
+  }
+  if (!path.startsWith("/api/") || UNRECORDED.has(path)) return;
+  if (!METHODS.has(request.method)) return;
+  const id = response?.headers.get("X-Request-ID") ?? null;
+  recent.push({
+    method: request.method as RecentRequest["method"],
+    path: path.slice(0, 200),
+    status: response?.status ?? 0,
+    request_id: id && REQUEST_ID.test(id) ? id : null,
+    at: new Date().toISOString(),
+  });
+  if (recent.length > RECENT_REQUESTS)
+    recent.splice(0, recent.length - RECENT_REQUESTS);
+}
+
+/** The latest API requests, oldest first: copies, so a report keeps them as they were. */
+export function recentRequests(): RecentRequest[] {
+  return recent.map((entry) => ({ ...entry }));
+}
+
+/** Forgets every recorded request; for tests. */
+export function forgetRequests() {
+  recent.length = 0;
 }
 
 export const client = createClient<paths>({ fetch: answered });
@@ -46,6 +101,12 @@ export type CustomCardUpload = components["schemas"]["CustomCardUpload"];
 export type Tokens = components["schemas"]["Tokens"];
 export type TokenLine = components["schemas"]["TokenLine"];
 export type EconomySettings = components["schemas"]["EconomySettings"];
+// Problem reports (v0.4.1): what a player sends, and what Administration reads and counts.
+export type ReportContext = components["schemas"]["ReportContext"];
+export type ReportSummary = components["schemas"]["ReportSummary"];
+export type ReportDetail = components["schemas"]["ReportDetail"];
+export type ReportStatus = ReportSummary["status"];
+export type AdminCounts = components["schemas"]["AdminCounts"];
 
 /**
  * Whether the account still has a step of onboarding ahead: its handle, then its two starter

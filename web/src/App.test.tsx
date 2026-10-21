@@ -982,7 +982,10 @@ describe("release status", () => {
     expect(screen.queryByText("IN DEVELOPMENT")).toBeNull();
     expect(screen.queryByText(/gameplay will arrive/)).toBeNull();
 
-    const dialog = document.querySelector("dialog")!;
+    // The format's dialog; the page's other one is Report a problem's (v0.4.1).
+    const dialog = document.querySelector(
+      'dialog[aria-labelledby="format-dialog-title"]',
+    )!;
     const about = (id: Format["id"]) =>
       within(
         document.querySelector<HTMLElement>(`[data-format="${id}"]`)!,
@@ -1052,5 +1055,60 @@ describe("the install banner", () => {
       screen.queryByRole("region", { name: "Install the app" }),
     ).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("main"));
+  });
+});
+
+describe("what waits for Administration (v0.4.1)", () => {
+  const administrator: Me = {
+    ...alice,
+    roles: ["player", "administrator"],
+    permissions: [
+      ...alice.permissions,
+      "admin.users.read",
+      "admin.users.manage",
+      "reports.manage",
+    ],
+  };
+  afterEach(() => {
+    document.title = "";
+  });
+
+  it("is counted on Admin in the navigation and in the tab's title", async () => {
+    document.title = "Commander Duels";
+    on("GET /api/v1/me", () => reply(200, administrator));
+    on(
+      "GET /api/v1/admin/counts",
+      () => reply(200, { pending_accounts: 2, unread_reports: 1 }),
+      () => reply(200, { pending_accounts: 0, unread_reports: 0 }),
+    );
+    window.location.hash = "#settings";
+    render(<App />);
+    const link = await screen.findByRole("link", {
+      name: "Admin, 2 accounts waiting for approval, 1 unread report",
+    });
+    expect(within(link).getByText("3")).toHaveAttribute("aria-hidden", "true");
+    expect(document.title).toBe("(3) Commander Duels");
+    // Asked again when the window regains focus: nothing waits now.
+    act(() => void window.dispatchEvent(new Event("focus")));
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("navigation")).getByRole("link", {
+          name: "Admin",
+        }),
+      ).toBeInTheDocument(),
+    );
+    expect(document.title).toBe("Commander Duels");
+  });
+
+  it("is never asked for by a player, who still finds Report a problem on every page", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    window.location.hash = "#settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    expect(
+      screen.getByRole("button", { name: "Report a problem" }),
+    ).toBeInTheDocument();
+    await settle();
+    expect(count("GET /api/v1/admin/counts")).toBe(0);
   });
 });

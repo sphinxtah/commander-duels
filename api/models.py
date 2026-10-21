@@ -1072,3 +1072,49 @@ class CustomCard(Base):
     uploaded_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class ProblemReport(Base):
+    """A problem a player reported from the app (v0.4.1), with what the page attached on its own
+    and an optional screenshot. SysOp and administrators read them (reports.manage); "new" is
+    unread. The screenshot is re-encoded WebP, so it holds no metadata of the file sent."""
+
+    __tablename__ = "problem_reports"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('new', 'seen', 'fixed', 'closed')", name="ck_problem_reports_status"
+        ),
+        CheckConstraint(
+            "(screenshot IS NULL) = (screenshot_width IS NULL) "
+            "AND (screenshot IS NULL) = (screenshot_height IS NULL)",
+            name="ck_problem_reports_screenshot",
+        ),
+        # Administration's list, newest first by status; and each account's reports of the day.
+        Index("ix_problem_reports_status_created_at", "status", "created_at"),
+        Index("ix_problem_reports_user_id_created_at", "user_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    summary: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="new")
+    status_changed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    status_changed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # What the page attached: its address (the hash route, without a query), the web app's
+    # version and the API's, the browser and its window, and at a table the game and its turn.
+    page: Mapped[str] = mapped_column(String(200))
+    app_version: Mapped[str] = mapped_column(String(32))
+    api_version: Mapped[str] = mapped_column(String(32))
+    user_agent: Mapped[str | None] = mapped_column(String(512))
+    viewport_width: Mapped[int]
+    viewport_height: Mapped[int]
+    pixel_ratio: Mapped[float]
+    # No foreign key: the page says which game it was, and the report keeps that as it was said.
+    game_id: Mapped[UUID | None]
+    game_turn: Mapped[int | None]
+    # The page's latest API requests: method, path without its query, status, request ID, time.
+    requests: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
+    screenshot: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
+    screenshot_width: Mapped[int | None]
+    screenshot_height: Mapped[int | None]

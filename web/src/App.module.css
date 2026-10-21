@@ -75,6 +75,35 @@
 .navArrow {
   margin-left: auto;
 }
+/* Accounts waiting for approval and unread reports, on Admin (v0.4.1). */
+.sidebar nav a > .navBadge {
+  display: inline-grid;
+  place-items: center;
+  width: auto;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #d5b77c;
+  color: #192220;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+/* "Report a problem" (v0.4.1): on every page, quiet beside the version. */
+.report {
+  margin-left: 13px;
+  padding: 5px 9px;
+  border: 1px solid #ffffff15;
+  border-radius: 4px;
+  background: transparent;
+  color: #c9d0c6;
+  font-size: 0.7rem;
+}
+.report:hover {
+  border-color: #d5b77c88;
+  color: #e6c68c;
+}
 .sidebarBottom {
   margin-top: auto;
   border-top: 1px solid #ffffff0c;
@@ -636,6 +665,13 @@ h1 {
   }
   .sidebar nav a > span {
     display: none;
+  }
+  .sidebar nav a > .navBadge {
+    display: inline-grid;
+    margin-left: 6px;
+  }
+  .report {
+    margin-left: 4px;
   }
   .workspace {
     margin: 0;

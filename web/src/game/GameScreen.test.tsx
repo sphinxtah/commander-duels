@@ -649,3 +649,38 @@ describe("a human table's game (v0.4.0)", () => {
     }
   });
 });
+
+describe("Report a problem at the table (v0.4.1)", () => {
+  it("opens from the Game menu and names the game and its turn", async () => {
+    const { client } = await import("../api");
+    const post = vi.fn(async () => ({
+      data: { id: "r1", created_at: "2026-10-21T12:00:00Z", screenshot: false },
+      response: new Response(null, { status: 201 }),
+    }));
+    Object.assign(client, { POST: post });
+    playing(view);
+    fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
+    // The menu closes; the dialog opens over the table.
+    expect(document.getElementById("game-menu")).toHaveAttribute("hidden");
+    const dialog = screen.getByRole("dialog", { name: "Report a problem" });
+    expect(dialog).toHaveTextContent("the game and turn");
+    fireEvent.change(screen.getByLabelText("Summary"), {
+      target: { value: "A creature vanished" },
+    });
+    fireEvent.change(
+      screen.getByLabelText("What happened? What did you expect?"),
+      { target: { value: "It left the battlefield on its own." } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send report" }));
+    await screen.findByRole("heading", {
+      name: "Thank you. Your report was sent.",
+    });
+    expect(post).toHaveBeenCalledWith("/api/v1/reports", {
+      body: expect.objectContaining({
+        summary: "A creature vanished",
+        context: expect.objectContaining({ game_id: "g1", game_turn: 12 }),
+      }),
+    });
+  });
+});
