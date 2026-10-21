@@ -1,5 +1,26 @@
 # Verification
 
+## v0.4.0
+
+Validated locally on Windows on October 21, 2026, on the work as merged for v0.4.0 (tokens, human tables, Leng's card shop, the custom cards in play, and the long-choices fix). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine's tests ran in its image's Maven build.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 88 files formatted, 60 Python source files type-checked |
+| Python suite | 184 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New: `tests/test_economy.py` (what wins pay, the three-a-day limit, the bots' cap, SysOp's grants, spending, the welcome grant, migration 0008's back pay), `tests/test_tables.py`, `tests/test_shop.py` (with concurrent buys and opens on PostgreSQL), `tests/test_custom_play.py`; the append-only economy ledger refuses updates and deletes on PostgreSQL |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated on the merged tree; no drift |
+| Engine (JUnit) | 98 passed, among them `ChoicePromptsTest`, a Legacy game that plays Three Tree City (a creature type, one of about 300, listed) and Pithing Needle (a card's name typed, a wrong one refused with names that start like it), the hidden-names check of a refused name, and the tables' concession that wakes the player left alone |
+| Vitest, TypeScript and the production build | 829 tests in 67 files: the long-choice filter and the name field, the token panel and SysOp's forms, the tables, the shop and its opening, the custom cards in the deck builder |
+| Browser journeys against the API | 40 passed (11 skipped that need the engine), on Vite's dev server against an API from the working tree on PostgreSQL with the test catalog and the shop's test collation: the shell, identity (SysOp's Administration at 390 pixels, with the new sections wrapping), decks, the table screen, and the shop (a pack bought, opened at the counter and summed up; the Card shop tab) |
+| Game, table and app journeys | 11 passed, as CI's engine job runs them, on a separate Compose project built from the tree with the bots on fixture decks: a Legacy game by mouse completed in 11 turns (88 prompts), by keyboard to its 8-turn limit, a four-player Commander table, a second tab and a resend, a deck of the player's own, the response timer, full screen, the installable app, and the new human table: SysOp and a generated second player open, join and play a Legacy table until one concedes (15 s) |
+| Real data | The shop's first booster data run on a copy of the development database: 242 MTGJSON files (94 MB) in 2 min 31 s, all 392 products resolved; a second run fetched nothing new. 200 packs drawn from every product with no size or duplicate problem |
+| The private engine image | Built from the private repository on the local engine image: 18 tests (a scripted game per custom card), the card database rebuilt with the plugin, and the engine's card search lists all eight. Nothing that names them is in this repository |
+
+**Seen while checking, then fixed:**
+- **Administration overflowed a phone** once the Tokens section joined the others (CI #64, #65); the sections now wrap.
+- **A refused typed card name could suggest a custom card's name** to any player once the private plugin's cards are in the engine's database. `CD_ENGINE_HIDDEN_SETS` keeps those sets' names out of the suggestions; the private image sets it.
+- **A concession left the winner waiting** in a two-player table until they acted; the engine now wakes them.
+
 ## v0.3.1
 
 Validated locally on Windows on October 21, 2026, on the work as merged for v0.3.1. Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container; the engine built and tested in its own Docker build.

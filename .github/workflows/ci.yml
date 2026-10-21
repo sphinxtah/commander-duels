@@ -115,7 +115,8 @@ jobs:
       # catalog, with the priority controls. Every WebSocket frame is checked for concealed cards,
       # and since v0.3.0 the screen's text and every card image asked for too; the table is checked
       # at 1280 x 720 to 4K, with the response timer and full screen, and the installable app
-      # (manifest, icons, service worker, install banner) on the built image.
+      # (manifest, icons, service worker, install banner) on the built image. Since v0.4.0 also a
+      # human table: SysOp and a second, generated player play a Legacy game against each other.
       - name: Practice games in the browser
         run: |
           token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
@@ -131,13 +132,18 @@ jobs:
           printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin
           docker compose run --rm --no-deps -v "$PWD/tests/fixtures:/fixtures:ro" -v "$PWD/scripts:/scripts:ro" \
             api python /scripts/load_fixture_catalog.py /fixtures
+          # The second player of the human table's journey, and its session (v0.4.0).
+          player="$(docker compose run --rm --no-deps -v "$PWD/scripts:/scripts:ro" api \
+            python /scripts/e2e_player.py rival | tail -n 1)"
+          echo "::add-mask::$player"
           # Host networking: the browser reaches the web proxy's published port from this machine,
           # which the API sees as the Compose gateway, SysOp's network.
           docker run --rm --network host --ipc=host -e CI=1 -e CD_BROWSER_URL=http://localhost:8080 \
-            -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -v "$PWD:/w" -w /w \
-            mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
+            -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -e CD_E2E_PLAYER_SESSION="$player" \
+            -v "$PWD:/w" -w /w mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
               && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
-              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/pwa.spec.ts --reporter=line"
+              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/pwa.spec.ts \
+                --reporter=line"
           docker compose down
       # As in verify; a failed game's error also lists the test player's last answers.
       - name: Keep the browser games' evidence
