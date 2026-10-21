@@ -21,6 +21,10 @@ Validated locally on Windows on October 21, 2026, on the work as merged for v0.4
 - **A refused typed card name could suggest a custom card's name** to any player once the private plugin's cards are in the engine's database. `CD_ENGINE_HIDDEN_SETS` keeps those sets' names out of the suggestions; the private image sets it.
 - **A concession left the winner waiting** in a two-player table until they acted; the engine now wakes them.
 
+**Not checked by hand yet** (for the live site after the deploy): the private engine image on the VM and the custom cards in a real game; a human table between two real players; the shop's first booster data run against the live catalog; tokens paid for a real win and the back pay of past wins.
+
+**Hosted CI.** Recorded in [the release notes](releases/0.4.0.md#verification): run #71 passed in 15 m 41 s, with 190 pytest, 829 Vitest tests and 40 browser journeys in verify, and 98 JUnit tests and 11 game, table and app journeys in the engine job.
+
 ## v0.3.1
 
 Validated locally on Windows on October 21, 2026, on the work as merged for v0.3.1. Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container; the engine built and tested in its own Docker build.
