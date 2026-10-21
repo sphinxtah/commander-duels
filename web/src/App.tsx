@@ -35,6 +35,7 @@ import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
 import { GameScreen } from "./game/GameScreen";
 import { PracticeTable } from "./game/PracticeTable";
+import { TablesPage } from "./tables/TablesPage";
 import {
   readPreferences,
   savePreferences,
@@ -44,6 +45,7 @@ import styles from "./App.module.css";
 
 const pages = [
   "Play",
+  "Tables",
   "Campaign",
   "Learn",
   "Decks",
@@ -55,11 +57,18 @@ const pages = [
 ] as const;
 // SysOp's entrance has no navigation entry; it opens only from the SysOp networks.
 type Page = (typeof pages)[number] | "SysOp";
-const glyphs = ["◇", "▱", "✧", "▤", "▦", "◈", "○", "⚙", "⚖"];
+const glyphs = ["◇", "⚔", "▱", "✧", "▤", "▦", "◈", "○", "⚙", "⚖"];
 const details: Record<
   Exclude<
     Page,
-    "Play" | "Settings" | "Profile" | "Admin" | "SysOp" | "Decks" | "Cards"
+    | "Play"
+    | "Tables"
+    | "Settings"
+    | "Profile"
+    | "Admin"
+    | "SysOp"
+    | "Decks"
+    | "Cards"
   >,
   { title: string; description: string; next: string; milestone: string }
 > = {
@@ -99,6 +108,7 @@ function plannedFormat(format: Format | undefined): boolean {
 const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
 const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
 const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
+const TABLE_ROUTE = /^#tables\/([A-Za-z0-9_-]{8,32})$/;
 /** #game/<id> opens a game's table, full screen. */
 function currentGame(): string | undefined {
   return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -119,9 +129,14 @@ function currentDeck(): { deck?: string; shared?: string } {
     shared: SHARED_ROUTE.exec(hash)?.[1],
   };
 }
+/** #tables/<code> opens a human table: its invite link (v0.4.0). */
+function currentTable(): string | undefined {
+  return TABLE_ROUTE.exec(window.location.hash)?.[1];
+}
 function currentPage(): Page {
   const path = window.location.hash.slice(1).toLowerCase().split("?")[0] ?? "";
   if (path === "sysop") return "SysOp";
+  if (path.startsWith("tables/")) return "Tables";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
   return pages.find((page) => page.toLowerCase() === path) ?? "Play";
 }
@@ -130,6 +145,7 @@ export function App() {
   const [page, setPage] = useState<Page>(currentPage);
   const [game, setGame] = useState(currentGame);
   const [deckRoute, setDeckRoute] = useState(currentDeck);
+  const [tableRoute, setTableRoute] = useState(currentTable);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [formats, setFormats] = useState<Format[]>([]);
   const [connection, setConnection] = useState<
@@ -192,6 +208,7 @@ export function App() {
       setPage(currentPage());
       setGame(currentGame());
       setDeckRoute(currentDeck());
+      setTableRoute(currentTable());
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -545,6 +562,13 @@ export function App() {
             <DecksPage me={me} heading={heading} />
           ) : page === "Cards" ? (
             <CardsPage me={me} heading={heading} />
+          ) : page === "Tables" ? (
+            <TablesPage
+              key={tableRoute ?? "lobby"}
+              me={me}
+              heading={heading}
+              code={tableRoute}
+            />
           ) : page === "SysOp" && entrance ? (
             <SysopSignIn onSignedIn={accountChanged} heading={heading} />
           ) : page === "Play" || page === "SysOp" ? (
@@ -665,8 +689,8 @@ export function App() {
                   <h2>The foundation is taking shape.</h2>
                   <p>
                     Practice games against the bots are open for testing, with
-                    your own decks from the card catalog. Human opponents arrive
-                    as their systems are ready.
+                    your own decks from the card catalog. Sit down with other
+                    players at a human table from Tables.
                   </p>
                 </div>
                 <a href="#settings">

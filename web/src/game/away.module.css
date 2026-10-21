@@ -1,0 +1,65 @@
+/* Away players at a human table (v0.4.0), in the prompt column. */
+.away {
+  border: 1px solid #d4b47a55;
+  border-radius: 8px;
+  background: #11191acc;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: #dfe3da;
+}
+.away h2 {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #d4b47a;
+}
+.away ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.away li {
+  display: grid;
+  gap: 4px;
+}
+.away small {
+  color: #93a198;
+}
+.buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.remove,
+.wait {
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.remove {
+  background: #7a2b26;
+  border: 1px solid #b4524a;
+  color: #fbe9e6;
+}
+.wait {
+  background: #ffffff08;
+  border: 1px solid #ffffff22;
+  color: #d9ddd3;
+}
+.remove[aria-pressed="true"],
+.wait[aria-pressed="true"] {
+  outline: 2px solid #d4b47a;
+  outline-offset: 1px;
+}
+.removed {
+  margin: 0 0 8px;
+  color: #f0c9a4;
+}
+.refusal {
+  margin: 8px 0 0;
+  color: #f0b4a8;
+}

@@ -112,6 +112,8 @@ function state(snap: Snapshot, pending = false): GameState {
     interrupted: false,
     crowded: false,
     priority: null,
+    presence: null,
+    voteRefusal: null,
   };
 }
 

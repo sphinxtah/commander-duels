@@ -57,7 +57,14 @@ function ago(iso: string): string {
 }
 
 function outcome(game: GameSummary): string {
-  if (game.status === "active") return "In progress";
+  const left = game.seats.find((seat) => seat.seat === game.your_seat)?.left;
+  // At a human table (v0.4.0) a seat may be out while the others play on.
+  if (game.status === "active")
+    return left === "removed"
+      ? "Removed while away · the game goes on"
+      : left
+        ? "You are out · the game goes on"
+        : "In progress";
   if (game.status === "interrupted") return "Interrupted";
   const result = game.result;
   if (!result) return "Finished";
@@ -117,9 +124,10 @@ function DeckOptions({
 
 /**
  * Starting or resuming a game fills the screen (v0.3.0), unless the player turned it off. The
- * browser allows it only inside the click, so this runs before anything is awaited.
+ * browser allows it only inside the click, so this runs before anything is awaited. A human
+ * table's host starts with it too (v0.4.0).
  */
-function tableFullscreen(): Promise<boolean> | null {
+export function tableFullscreen(): Promise<boolean> | null {
   return readTableSettings().fullscreenOnStart && canFullscreen()
     ? enterTableFullscreen()
     : null;
@@ -578,6 +586,7 @@ function Table({ me }: { me: Me }) {
                 <div>
                   <strong>
                     {game.format === "commander" ? "Commander" : "Legacy"}
+                    {game.kind === "table" ? " table" : ""}
                   </strong>{" "}
                   <span>{players}</span>
                   <small>
@@ -600,13 +609,17 @@ function Table({ me }: { me: Me }) {
                     >
                       {game.your_seat === null ? "Observe" : "Resume"}
                     </a>
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => void close(game)}
-                    >
-                      Close
-                    </button>
+                    {/* A table's game goes on for the other players: they concede in the game
+                        instead (v0.4.0). SysOp may still close it. */}
+                    {(game.kind !== "table" || sysop) && (
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => void close(game)}
+                      >
+                        Close
+                      </button>
+                    )}
                   </div>
                 )}
               </li>

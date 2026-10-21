@@ -18,6 +18,7 @@ import { useOnline } from "../app/online";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
+import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
 import { useGame } from "./connection";
@@ -174,13 +175,22 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       document.title = "Commander Duels";
     };
   }, []);
+  // The summary again once the game ends, and until the API has recorded the end: it then holds
+  // the tokens the game paid (v0.4.0).
+  const [summaryTries, setSummaryTries] = useState(0);
   useEffect(() => {
     let active = true;
     void loadSummary(gameId).then((game) => active && game && setSummary(game));
     return () => {
       active = false;
     };
-  }, [gameId, state.ended, snapshot?.result]);
+  }, [gameId, state.ended, snapshot?.result, summaryTries]);
+  const unrecorded = Boolean(snapshot?.result) && summary?.status === "active";
+  useEffect(() => {
+    if (!unrecorded || summaryTries >= 20) return;
+    const timer = window.setTimeout(() => setSummaryTries((n) => n + 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [unrecorded, summaryTries]);
   useEffect(() => {
     if (snapshot?.result && !resultDialog.current?.open)
       resultDialog.current?.showModal();
@@ -454,6 +464,26 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   const result = snapshot?.result ?? null;
   const outcome = result ? resultText(view, state.seat, result) : null;
   const format = snapshot?.settings.format ?? summary?.format;
+  // A human table's game (v0.4.0): the others play on after a concession, and leaving goes back
+  // to the lobby.
+  const atTable = summary?.kind === "table";
+  const back = atTable
+    ? { href: "#tables", text: "Back to the lobby" }
+    : { href: "#play", text: "Back to the table" };
+  const paid =
+    summary?.status === "finished" && summary.tokens ? summary.tokens : null;
+  const tokensLine =
+    paid !== null
+      ? `This game paid you ${paid.toLocaleString()} tokens.`
+      : null;
+  // A player who comes back after the API stopped following the game sees how it ended.
+  const recordedOutcome =
+    state.ended === "not_live" && summary?.result
+      ? resultText(view, summary.your_seat, summary.result)
+      : null;
+  const seatName = (seat: number) =>
+    summary?.seats.find((entry) => entry.seat === seat)?.handle ??
+    playerName(view, seat, observing);
   const concedeDisabled = state.role !== "controller" || result !== null;
   const connectionText =
     state.phase === "open"
@@ -509,7 +539,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           >
             <h1 ref={heading} tabIndex={-1} className={styles.visuallyHidden}>
               {format === "commander" ? "Commander" : "Legacy"}
-              <span> · Practice game</span>
+              <span>{atTable ? " · Table game" : " · Practice game"}</span>
             </h1>
 
             <BandHud
@@ -562,12 +592,18 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 {state.ended && (
                   <div className={screen.alert} role="alert">
                     <p>{ended[state.ended] ?? "This game has ended."}</p>
+                    {recordedOutcome && (
+                      <p>
+                        {recordedOutcome.title}: {recordedOutcome.detail}
+                        {tokensLine ? ` ${tokensLine}` : ""}
+                      </p>
+                    )}
                     <a
-                      href="#play"
+                      href={back.href}
                       className={styles.secondaryButton}
                       onClick={leave}
                     >
-                      Back to the table
+                      {back.text}
                     </a>
                   </div>
                 )}
@@ -629,6 +665,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                     }
                   />
                 )}
+                <AwayPlayers
+                  state={state}
+                  name={seatName}
+                  onVote={(seat, remove) => connection?.vote(seat, remove)}
+                />
                 <PromptPanel
                   state={state}
                   onAnswer={answer}
@@ -644,12 +685,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   >
                     <h2 id="result-side-title">{outcome.title}</h2>
                     <p>{outcome.detail}</p>
+                    {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
                     <a
-                      href="#play"
+                      href={back.href}
                       className={styles.secondaryButton}
                       onClick={leave}
                     >
-                      Back to the table
+                      {back.text}
                     </a>
                   </section>
                 )}
@@ -762,7 +804,12 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
             aria-labelledby="concede-title"
           >
             <h2 id="concede-title">Concede this game?</h2>
-            <p>You lose this game at once. The bots play on without you.</p>
+            <p>
+              You lose this game at once.{" "}
+              {atTable
+                ? "The other players play on without you."
+                : "The bots play on without you."}
+            </p>
             <form method="dialog" className={styles.confirmButtons}>
               <button
                 type="submit"
@@ -787,12 +834,17 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           >
             <h2 id="result-title">{outcome?.title}</h2>
             <p>{outcome?.detail}</p>
+            {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
             <form method="dialog" className={styles.confirmButtons}>
               <button type="submit" className={styles.secondaryButton}>
                 Review the board
               </button>
-              <a href="#play" className={styles.primaryButton} onClick={leave}>
-                Back to the table
+              <a
+                href={back.href}
+                className={styles.primaryButton}
+                onClick={leave}
+              >
+                {back.text}
               </a>
             </form>
           </dialog>

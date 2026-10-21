@@ -342,7 +342,30 @@ export interface CommandResult {
   body: { status?: string; code?: string; message?: string; revision?: number };
 }
 
+/** A player's seat at a human table (v0.4.0): whether a tab of theirs is connected, how long
+ * none has been, whether it is out of the game, and the votes on removing it while away. */
+export interface PresenceSeat {
+  seat: Seat;
+  connected: boolean;
+  away_seconds: number | null;
+  left: "conceded" | "removed" | "eliminated" | null;
+  /** Away long enough to be voted on. */
+  removable: boolean;
+  /** The seats that voted to remove it, and those that voted to wait. */
+  yes: Seat[];
+  no: Seat[];
+  /** Yes votes that remove it: a majority of the other players still in the game. */
+  needed: number;
+}
+
+export interface Presence {
+  /** Seconds without a tab before a player may be voted out. */
+  away_after: number;
+  seats: PresenceSeat[];
+}
+
 export type ServerMessage =
+  | ({ type: "presence" } & Presence)
   | {
       type: "welcome";
       game_id: string;
@@ -362,4 +385,4 @@ export type ServerMessage =
   | { type: "inspection"; inspection: Inspection }
   | { type: "interrupted"; game_id: string }
   | { type: "pong" }
-  | { type: "error"; code: string; message?: string };
+  | { type: "error"; code: string; message?: string; seat?: Seat };

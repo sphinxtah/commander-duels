@@ -44,6 +44,8 @@ function state(
     interrupted: false,
     crowded: false,
     priority: controls,
+    presence: null,
+    voteRefusal: null,
     ...fields,
   };
 }
