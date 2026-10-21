@@ -1,0 +1,386 @@
+/* The table's DOM layer (design §9): a real, named button over everything that can be pressed,
+   placed at its layout hit in stage units (1 su = 1 px of the 1920 × 1080 stage before it is
+   scaled). With the webgl painter the PixiJS scene draws the faces and the buttons are clear;
+   with the dom painter they paint the faces themselves. The regions around them (sections,
+   articles, rows, the plate) take no pointer events, so a press always lands on one leaf.
+   Text is sized in rem, which follows the site's Larger text, so 1.125rem is 18 su. */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.region {
+  pointer-events: none;
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* Controls stack in stage order between z-index 1 and 999; an open menu rises above everything
+   on the stage, the magnifier included. */
+.slot {
+  position: absolute;
+  pointer-events: none;
+  z-index: var(--z, auto);
+}
+.slot[data-menu] {
+  z-index: 5000;
+}
+.hit {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  pointer-events: auto;
+  text-align: left;
+  /* The dom painter's picture may reach past the hit, under its neighbours' hits. */
+  overflow: visible;
+}
+.hit:disabled {
+  cursor: default;
+}
+/* Rings stay at least 3 CSS pixels however small the stage is drawn. */
+.hit:focus-visible {
+  outline: calc(3px / var(--stage-k, 1)) solid #efcc8d;
+  outline-offset: calc(2px / var(--stage-k, 1));
+}
+
+/* A card's picture, painted by the dom painter: its face, turned as it lies, and over it what
+   the scene would draw (the tag, counter pips, badges). Never under the pointer. */
+.paint {
+  position: absolute;
+  pointer-events: none;
+  border-radius: calc(var(--card-w) * 0.055);
+}
+.paint[data-mark="offered"] {
+  box-shadow:
+    0 0 0 3px #a86bff,
+    0 0 16px #a86bffaa;
+}
+.paint[data-mark="playable"] {
+  box-shadow:
+    0 0 0 3px #ff8fd0,
+    0 0 16px #ff8fd0aa;
+}
+.paint[data-mark="selected"] {
+  box-shadow: 0 0 0 4px #3fd0c0;
+}
+.tag,
+.pip,
+.badge {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  line-height: 1;
+  font-weight: 700;
+}
+.tag {
+  background: #d9d9d4;
+  color: #111;
+  border-radius: 2px;
+}
+.tag[data-tone="buffed"] {
+  color: #1b7a2a;
+}
+.tag[data-tone="hurt"] {
+  color: #b3121b;
+}
+.tag[data-tone="loyalty"] {
+  background: #111;
+  color: #f4f1e8;
+}
+.pip {
+  background: #8d6bd6;
+  border: 1px solid #000;
+  rotate: 45deg;
+  color: #fff;
+}
+.pip span {
+  rotate: -45deg;
+}
+.pip[data-colour="cyan"] {
+  background: #3fd0e0;
+  color: #06292e;
+}
+.pip[data-colour="red"] {
+  background: #b3121b;
+}
+.badge {
+  background: #000;
+  color: #fff;
+  border-radius: 2px;
+}
+.badge[data-glyph="offered"],
+.badge[data-glyph="selected"] {
+  rotate: 45deg;
+}
+.badge[data-glyph="offered"] span,
+.badge[data-glyph="selected"] span {
+  rotate: -45deg;
+}
+.badge[data-glyph="attack"] {
+  background: #e8822c;
+}
+.badge[data-glyph="block"] {
+  background: #7fa7ff;
+}
+
+/* "+N": the rest of a pile, a row, the hand or the stack. */
+.more {
+  font-size: 1.125rem;
+  font-weight: 700;
+  text-align: center;
+}
+.layer[data-painter="dom"] .more {
+  color: #f1e3c4;
+  background: #000a;
+  border: 1px solid #e6c68c66;
+  border-radius: 4px;
+}
+
+/* A player's plate: name, title, pills, portrait and life, counts, tiles, status. */
+.plate {
+  pointer-events: none;
+}
+.name,
+.title {
+  position: absolute;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+  pointer-events: none;
+  text-shadow: 0 1px 3px #000;
+}
+.name {
+  color: #f4f1e8;
+  font-weight: 600;
+}
+.title {
+  color: #cfc6b4;
+  font-style: italic;
+}
+.name[data-align="right"],
+.title[data-align="right"] {
+  text-align: right;
+}
+.pills,
+.status {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  overflow: hidden;
+  pointer-events: none;
+  font-size: 1.125rem;
+  line-height: 1.1;
+}
+.pills[data-align="right"],
+.status[data-align="right"] {
+  justify-content: flex-end;
+}
+/* One line: a long chip ("4 from Bot 2’s Omnath, Locus of Mana") ends in an ellipsis. */
+.status {
+  flex-wrap: nowrap;
+}
+.status > * {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pill {
+  padding: 0 6px;
+  border-radius: 3px;
+  background: #000b;
+  color: #e6c68c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.pill[data-tone="priority"] {
+  color: #74c7b5;
+}
+.pill[data-tone="lost"] {
+  color: #e0485a;
+}
+.chip {
+  padding: 0 6px;
+  border-radius: 3px;
+  background: #000a;
+  color: #e7e3d8;
+}
+.symbol {
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+/* Diamonds: a square turned 45° inside its bounding box, which is the element's box. */
+.diamond {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.layer[data-painter="dom"] .diamond::before {
+  content: "";
+  position: absolute;
+  inset: 14.645%;
+  rotate: 45deg;
+  background: #050707;
+  border: 2px solid #3a3326;
+}
+.layer[data-painter="dom"] .life::before {
+  background: #a3161b;
+  border-color: #2a0507;
+}
+.portrait {
+  overflow: hidden;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.layer[data-painter="dom"] .portrait::before {
+  inset: 0;
+  rotate: 0deg;
+  background: none;
+  border: 0;
+}
+.portrait svg {
+  width: 100%;
+  height: 100%;
+}
+.numeral {
+  position: relative;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+  font-size: 1.75rem;
+}
+.count {
+  position: relative;
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: transparent;
+}
+.layer[data-painter="dom"] .count {
+  color: #fff;
+}
+
+/* Zone tiles: the top card of a graveyard, an exile or a command zone; the library's pile. */
+.tileCount {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: #000c;
+  color: #f1e3c4;
+  font-size: 1.125rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.tileEmpty {
+  position: absolute;
+  inset: 0;
+  border: 2px dashed #ffffff33;
+  border-radius: 6px;
+  pointer-events: none;
+}
+.plateText {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #000c;
+  color: #f1e3c4;
+  font-size: 0.875rem;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* The phase beside your portrait, and the timer's bar under it (dom painter; the scene draws
+   the bar otherwise). */
+.caption {
+  position: absolute;
+  pointer-events: none;
+  color: #d9c8ff;
+  font-size: 1.125rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.bar {
+  position: absolute;
+  pointer-events: none;
+  background: #241a36;
+}
+.bar span {
+  display: block;
+  height: 100%;
+  background: #a86bff;
+}
+
+/* Option menus on the table: wider items, opening above the card when there is no room below,
+   and right-aligned near the stage's right edge. */
+.tableMenu[role="menu"] {
+  min-width: 320px;
+  pointer-events: auto;
+  font-size: 1.125rem;
+}
+.tableMenu[role="menu"] button {
+  min-height: 44px;
+  font-size: 1.125rem;
+}
+.tableMenu[data-placement="above"] {
+  top: auto;
+  bottom: 100%;
+}
+.tableMenu[data-align="end"] {
+  left: auto;
+  right: 0;
+}
+
+/* Zone browsers: every card of a zone in a grid (defect 1: the class the dialog named). */
+.zoneGrid {
+  --card-w: 92px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-w), 1fr));
+  gap: 12px 10px;
+  align-items: start;
+}
+.zoneCount {
+  margin: 0 0 10px;
+  color: var(--muted, #9aa7a1);
+  font-size: 0.85rem;
+}
+.zoneEmpty {
+  color: #66766f;
+  font-size: 0.85rem;
+}
+
+@media (forced-colors: active) {
+  .hit {
+    border: 1px solid ButtonText;
+  }
+  .hit:focus-visible {
+    outline-color: Highlight;
+  }
+  .hit[data-actionable] {
+    border: 2px solid Highlight;
+  }
+}

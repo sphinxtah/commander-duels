@@ -1,18 +1,17 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import {
-  CardButton,
-  GameContext,
-  PlayerHeader,
-  type GameContextValue,
-} from "./Board";
+import { CardButton, GameContext, type GameContextValue } from "./Board";
 import { objectIndex, optionsByObject, optionsBySeat } from "./model";
+import { layoutTable } from "./table/layout";
+import { PlayerPlate } from "./table/PlayerPlate";
+import { buildTableModel } from "./table/tableModel";
 import type {
   CardView,
   GameView,
   PlayerView,
   Prompt,
   PromptOption,
+  Snapshot,
 } from "./types";
 
 const card: CardView = {
@@ -148,20 +147,58 @@ describe("a card's option menu", () => {
   });
 });
 
+// The table's plate for the seat, as the table model names it for this connection.
+function plate(value: GameContextValue) {
+  const snapshot: Snapshot = {
+    game_id: "g1",
+    revision: 5,
+    status: "your_prompt",
+    seat: value.observing ? null : 0,
+    settings: {
+      format: "legacy",
+      rules_profile: "legacy",
+      seats: [],
+      skill: 3,
+      turn_cap: 40,
+      idle_timeout_seconds: 900,
+      spectator_delay_seconds: 0,
+    },
+    prompt,
+    view,
+    result: null,
+    log_count: 0,
+    log_from: 0,
+    log: [],
+  };
+  const model = buildTableModel({
+    gameId: "g1",
+    snapshot,
+    context: value,
+    viewSeat: value.observing ? null : 0,
+    summarySeats: null,
+    selfHandle: null,
+    sysop: value.observing,
+  });
+  const layout = layoutTable(model, { expandedSeat: null, textScale: 1 });
+  return (
+    <GameContext.Provider value={value}>
+      <PlayerPlate
+        player={model.anchored!}
+        node={layout.players.get(0)!}
+        tiles={layout.zones.filter((tile) => tile.seat === 0)}
+        onBrowse={vi.fn()}
+        onExpand={vi.fn()}
+      />
+    </GameContext.Provider>
+  );
+}
+
 describe("player headers", () => {
   it("name the seat's owner when SysOp observes their game", () => {
-    const { rerender } = render(
-      <GameContext.Provider value={context({ observing: true })}>
-        <PlayerHeader player={view.you!} onZone={vi.fn()} />
-      </GameContext.Provider>,
-    );
+    const { rerender } = render(plate(context({ observing: true })));
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.queryByText("You")).not.toBeInTheDocument();
-    rerender(
-      <GameContext.Provider value={context()}>
-        <PlayerHeader player={view.you!} onZone={vi.fn()} />
-      </GameContext.Provider>,
-    );
+    rerender(plate(context()));
     expect(screen.getByText("You")).toBeInTheDocument();
   });
 });
