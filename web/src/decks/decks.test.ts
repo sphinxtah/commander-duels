@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   atLeast,
+  beyondLibrary,
+  collectionLocked,
   combine,
   differences,
   exactly,
@@ -10,7 +12,8 @@ import {
   stats,
   typeGroup,
 } from "./decks";
-import { card, entry } from "./fixtures";
+import { card, entry, problem, validation } from "./fixtures";
+import { verdict } from "./ProblemList";
 
 const bolt = card("Lightning Bolt", {
   mana_cost: "{R}",
@@ -132,5 +135,92 @@ describe("merging and conflicts", () => {
       entry(mountain, 18),
       entry(giant, 1),
     ]);
+  });
+});
+
+describe("the player's library", () => {
+  it("knows a collection-locked validation", () => {
+    expect(collectionLocked(validation({ errors: [problem()] }))).toBe(true);
+    expect(
+      collectionLocked(
+        validation({
+          errors: [problem({ kind: "not_implemented", code: "card.x" })],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("marks the cards the deck holds more copies of than the library", () => {
+    const owned = {
+      [bolt.id]: { ...bolt, owned: 2 },
+      [giant.id]: { ...giant, owned: 0 },
+      [hybrid.id]: { ...hybrid, owned: 1 },
+      // A basic land, and any card for an account without a library, say null.
+      [mountain.id]: mountain,
+    };
+    expect(
+      [
+        ...beyondLibrary(
+          [
+            // Two in the main deck and one in the sideboard: three of two.
+            entry(bolt, 2),
+            entry(bolt, 1, "sideboard"),
+            entry(giant, 1),
+            // The maybeboard does not count.
+            entry(hybrid, 1),
+            entry(hybrid, 3, "maybeboard"),
+            entry(mountain, 30),
+          ],
+          owned,
+        ),
+      ].sort(),
+    ).toEqual([bolt.id, giant.id].sort());
+  });
+
+  it("says what keeps a deck from playing, the library apart from the engine", () => {
+    expect(verdict(validation())).toEqual({
+      state: "playable",
+      words: "Ready to play: legal, and every card is playable here.",
+    });
+    expect(
+      verdict(validation({ playable: false, errors: [problem()] })),
+    ).toEqual({
+      state: "locked",
+      words:
+        "Legal, but it needs cards you don't own: it cannot start a game until that is fixed.",
+    });
+    expect(
+      verdict(
+        validation({
+          playable: false,
+          errors: [
+            problem(),
+            problem({ kind: "not_implemented", code: "card.x" }),
+          ],
+        }),
+      ).words,
+    ).toBe(
+      "Legal, but it needs cards you don't own, and some cards cannot be played here yet: it cannot start a game until that is fixed.",
+    );
+    expect(
+      verdict(
+        validation({
+          playable: false,
+          errors: [problem({ kind: "not_implemented", code: "card.x" })],
+        }),
+      ).state,
+    ).toBe("legal");
+    expect(
+      verdict(
+        validation({
+          legal: false,
+          playable: false,
+          errors: [problem(), problem({ kind: "format_illegal", code: "x" })],
+        }),
+      ),
+    ).toEqual({
+      state: "draft",
+      words: "2 problems to fix before this deck can play.",
+    });
   });
 });

@@ -8,19 +8,23 @@ import {
 } from "react";
 import { client, describe } from "../api";
 import { ManaCost } from "../game/Card";
-import { CardDetails, StatusBadge } from "../catalog/CardViews";
+import { CardDetails, OwnedNote, StatusBadge } from "../catalog/CardViews";
 import { SearchControls, useCardSearch } from "../catalog/SearchControls";
 import {
+  buildsFromLibrary,
   colorWords,
   emptySearch,
   formatLabels,
+  ownedWords,
   type CardSummary,
   type Search,
 } from "../catalog/catalog";
 import { IdentityPips } from "./DecksPage";
-import { ProblemList } from "./ProblemList";
+import { LockIcon, ProblemList } from "./ProblemList";
 import {
   atLeast,
+  beyondLibrary,
+  collectionLocked,
   combine,
   differences,
   exactly,
@@ -291,6 +295,7 @@ export function DeckEditor({
         <CardFinder
           format={deck.format}
           identity={commanderIdentity(entries, cards, deck.format)}
+          known={deck.cards}
           onAdd={add}
           onOpen={(card) => setOpened({ card })}
         />
@@ -321,6 +326,7 @@ export function DeckEditor({
           <Statistics entries={entries} cards={cards} format={deck.format} />
           <DeckMeta
             deck={deck}
+            locked={collectionLocked(validation)}
             onPatch={patch}
             onSaveVersion={() => void saveVersion()}
             onMessage={setMessage}
@@ -495,21 +501,29 @@ function SaveStatus({
   );
 }
 
+/** The finder's starting search: the player's own library first (v0.3.1), the most played cards
+ * first. "Clear filters" comes back to it. */
+const finderSearch: Search = {
+  ...emptySearch,
+  sort: "popularity",
+  owned: true,
+};
+
 function CardFinder({
   format,
   identity,
+  known,
   onAdd,
   onOpen,
 }: {
   format: DeckDetail["format"];
   identity: string | null;
+  /** The cards the deck opened with, which may already say whether the account has a library. */
+  known: Record<string, CardSummary>;
   onAdd: (card: CardSummary, location: Location) => void;
   onOpen: (card: CardSummary) => void;
 }) {
-  const [search, setSearch] = useState<Search>({
-    ...emptySearch,
-    sort: "popularity",
-  });
+  const [search, setSearch] = useState<Search>(finderSearch);
   const [fits, setFits] = useState(true);
   const [page, setPage] = useState(1);
   const fixed = useMemo(() => {
@@ -521,10 +535,50 @@ function CardFinder({
   }, [fits, format, identity]);
   const { results, error } = useCardSearch(search, page, 24, fixed);
   useEffect(() => setPage(1), [search, fixed]);
+  // Whether the account builds from a library, as the cards it was sent say; once known, it
+  // stays. An account that builds from the whole catalog has nothing to switch between, so the
+  // switch waits for the first results; if those cannot tell (a library of basic lands only),
+  // it shows, so the whole catalog is never out of reach.
+  const [settled, setSettled] = useState(() =>
+    buildsFromLibrary(Object.values(known)),
+  );
+  const limited =
+    settled ?? (results ? buildsFromLibrary(results.items) : undefined);
+  useEffect(() => {
+    if (settled === undefined && limited !== undefined) setSettled(limited);
+  }, [settled, limited]);
+  const scoped = limited ?? results !== undefined;
   return (
     <section className={styles.finder} aria-labelledby="finder-title">
       <h2 id="finder-title">Add cards</h2>
-      <SearchControls search={search} onChange={setSearch} compact />
+      {scoped && (
+        <fieldset className={styles.scope}>
+          <legend>Search in</legend>
+          {([true, false] as const).map((owned) => (
+            <label key={String(owned)}>
+              <input
+                type="radio"
+                name="finder-scope"
+                checked={search.owned === owned}
+                onChange={() => setSearch({ ...search, owned })}
+              />
+              <span>{owned ? "My library" : "All cards"}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {scoped && !search.owned && (
+        <p className={styles.hint}>
+          Cards you don't own can be added, but the deck then cannot start a
+          game until your library holds them.
+        </p>
+      )}
+      <SearchControls
+        search={search}
+        onChange={setSearch}
+        defaults={finderSearch}
+        compact
+      />
       <label className={styles.inline}>
         <input
           type="checkbox"
@@ -543,6 +597,13 @@ function CardFinder({
           {error}
         </p>
       )}
+      {results?.items.length === 0 && (
+        <p className={styles.hint}>
+          {scoped && search.owned
+            ? "No card in your library matches. Search All cards for more."
+            : "No card matches."}
+        </p>
+      )}
       <ul className={styles.found}>
         {(results?.items ?? []).map((card) => (
           <li key={card.id}>
@@ -555,6 +616,11 @@ function CardFinder({
               <small>{card.type_line}</small>
             </button>
             <StatusBadge card={card} />
+            {ownedWords(card) && (
+              <div className={styles.foundOwned}>
+                <OwnedNote card={card} />
+              </div>
+            )}
             <div className={styles.foundActions}>
               {format === "commander" &&
                 (card.commander || card.partner === "background") && (
@@ -628,6 +694,8 @@ function DeckSections({
   onUpdate: (entry: DeckEntry, patch: Partial<DeckEntry>) => void;
   onOpen: (card: CardSummary, entry: DeckEntry) => void;
 }) {
+  // Rows of cards the deck holds more copies of than the player's library, marked with a lock.
+  const beyond = useMemo(() => beyondLibrary(entries, cards), [entries, cards]);
   return (
     <div className={styles.sections}>
       {locationsFor(format).map((location) => {
@@ -696,6 +764,7 @@ function DeckSections({
                           id={`entry-${entry.card_id}`}
                           data-highlight={highlight.has(entry.card_id)}
                           data-playable={card?.playable ?? false}
+                          data-locked={beyond.has(entry.card_id) || undefined}
                         >
                           <div className={styles.quantity}>
                             <button
@@ -741,6 +810,14 @@ function DeckSections({
                           {card && <ManaCost cost={card.mana_cost} />}
                           {card && !card.playable && (
                             <StatusBadge card={card} />
+                          )}
+                          {card && beyond.has(entry.card_id) && (
+                            <span className={styles.lockNote}>
+                              <LockIcon />
+                              {card.owned
+                                ? `You own ${card.owned}`
+                                : "Not in your library"}
+                            </span>
                           )}
                           <button
                             type="button"
@@ -904,11 +981,14 @@ function Statistics({
 
 function DeckMeta({
   deck,
+  locked,
   onPatch,
   onSaveVersion,
   onMessage,
 }: {
   deck: DeckDetail;
+  /** The deck needs cards the player's library lacks, so it cannot start a game. */
+  locked: boolean;
   onPatch: (body: {
     title?: string;
     notes?: string;
@@ -923,10 +1003,22 @@ function DeckMeta({
   return (
     <section className={styles.meta} aria-labelledby="meta-title">
       <h2 id="meta-title">This deck</h2>
+      {locked && (
+        <p className={styles.lockedPlay}>
+          <LockIcon />
+          <span>
+            <strong>Not playable: it needs cards you don't own.</strong> Take
+            out the copies your library lacks (the problems above name them),
+            and it can go to the practice table.
+          </span>
+        </p>
+      )}
       <div className={styles.actions}>
-        <a className={styles.primary} href={`#play?deck=${deck.id}`}>
-          Play it at the practice table
-        </a>
+        {!locked && (
+          <a className={styles.primary} href={`#play?deck=${deck.id}`}>
+            Play it at the practice table
+          </a>
+        )}
         <button
           type="button"
           className={styles.secondary}

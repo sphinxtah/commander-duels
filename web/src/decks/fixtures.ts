@@ -1,9 +1,16 @@
 import { vi } from "vitest";
 import { client } from "../api";
 import type { CardSummary } from "../catalog/catalog";
-import type { DeckDetail, DeckEntry, Validation } from "./decks";
+import type {
+  DeckDetail,
+  DeckEntry,
+  Problem,
+  StarterDeck,
+  Validation,
+} from "./decks";
 
-/** A catalog card for tests; anything not given is a playable, colorless artifact. */
+/** A catalog card for tests; anything not given is a playable, colorless artifact, as an account
+ * that builds from the whole catalog sees it (`owned` null). */
 export function card(
   name: string,
   fields: Partial<CardSummary> = {},
@@ -40,6 +47,43 @@ export function card(
     copy_limit: 4,
     edhrec_rank: null,
     image: null,
+    owned: null,
+    ...fields,
+  };
+}
+
+/** One of the ten Commander starter decks (v0.3.1), not one the player chose. */
+export function starterDeck(fields: Partial<StarterDeck> = {}): StarterDeck {
+  return {
+    name: "starter_wu_v1",
+    title: "Skyward Patrol",
+    format: "commander",
+    card_count: 100,
+    commanders: ["Kangee, Sky Warden"],
+    playable: true,
+    colors: "WU",
+    color_names: "White / Blue",
+    guild: "Azorius",
+    description: "A flock of flyers.",
+    how_to_play: "Develop mana and two or three flyers.",
+    teaches: "Flying and attack triggers.",
+    commander_card_id: null,
+    commander_printing_id: null,
+    chosen: false,
+    ...fields,
+  };
+}
+
+/** A validation problem: a collection-locked one unless told otherwise. */
+export function problem(fields: Partial<Problem> = {}): Problem {
+  return {
+    code: "collection.locked",
+    kind: "collection_locked",
+    message:
+      "This deck holds 2 copies of Stand-in Golem; your library has 1 copy.",
+    remedy: "Remove 1, or wait until your library holds more.",
+    card_ids: [],
+    quantity: 2,
     ...fields,
   };
 }

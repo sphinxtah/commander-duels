@@ -63,8 +63,15 @@ export function GuidedDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => dialog.current?.showModal(), []);
+  // Commanders from the player's library, as the proposal's cards are (v0.3.1); an account that
+  // builds from the whole catalog searches all of it, the server setting `owned` aside.
   const leaders = useCardSearch(
-    { ...emptySearch, q: name.trim() ? name.trim() : "", sort: "popularity" },
+    {
+      ...emptySearch,
+      q: name.trim() ? name.trim() : "",
+      sort: "popularity",
+      owned: true,
+    },
     1,
     8,
     {
@@ -124,9 +131,9 @@ export function GuidedDialog({ onClose }: { onClose: () => void }) {
     >
       <h2 id="guided-title">Build a deck with help</h2>
       <p className={styles.hint}>
-        Choose a direction and get a starting deck of playable cards, each with
-        the reason it was picked. The rules are simple and written down; they
-        make a start, not a promise of a strong deck.
+        Choose a direction and get a starting deck of playable cards from your
+        library, each with the reason it was picked. The rules are simple and
+        written down; they make a start, not a promise of a strong deck.
       </p>
       <fieldset className={styles.formats}>
         <legend>Format</legend>

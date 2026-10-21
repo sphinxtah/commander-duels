@@ -10,6 +10,11 @@
   max-width: 64ch;
   line-height: 1.6;
 }
+.lead a {
+  color: #e3c68f;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .hint {
   color: #93a198;
   font-size: 0.84rem;
@@ -186,6 +191,29 @@ a.deckTitle:hover {
 }
 .starters {
   margin-top: 36px;
+}
+.badge[data-state="chosen"] {
+  border-color: #d4b47a88;
+  color: #e6c68c;
+}
+.starterAbout {
+  margin: 4px 0 0;
+  max-width: 72ch;
+  color: #b9c2b6;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.starterMore summary {
+  cursor: pointer;
+  color: #e3c68f;
+  font-size: 0.82rem;
+}
+.starterMore p {
+  margin: 6px 0 0;
+  max-width: 72ch;
+  color: #b9c2b6;
+  font-size: 0.84rem;
+  line-height: 1.5;
 }
 .starters h2,
 .section h2,
@@ -444,6 +472,54 @@ a.deckTitle:hover {
   color: #f0c3b3;
 }
 
+/* Collection-locked (DECK08, v0.3.1): a padlock and its own blue-grey, apart from the amber of
+   cards the engine cannot play and the red of the format's rules. */
+.lock {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  vertical-align: -0.12em;
+  margin-right: 6px;
+}
+.verdict[data-state="locked"] {
+  border-color: #8fa9c466;
+  color: #c3d4e6;
+}
+.problems li[data-kind="collection_locked"] strong {
+  color: #c3d4e6;
+}
+.badge[data-state="locked"] {
+  display: inline-flex;
+  align-items: center;
+  border-color: #8fa9c488;
+  color: #c3d4e6;
+}
+.badge .lock {
+  margin-right: 4px;
+}
+.lockNote {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.74rem;
+  color: #c3d4e6;
+}
+.lockNote .lock {
+  margin-right: 4px;
+}
+.lockedPlay {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid #8fa9c466;
+  border-radius: 6px;
+  color: #c3d4e6;
+  line-height: 1.5;
+}
+.lockedPlay .lock {
+  margin-top: 0.25em;
+}
+
 /* The editor. */
 .editorHead {
   display: flex;
@@ -537,10 +613,36 @@ a.deckTitle:hover {
   color: #93a198;
   font-size: 0.74rem;
 }
+.foundOwned {
+  grid-column: 1 / -1;
+}
 .foundActions {
   grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+}
+/* The finder's two scopes: the player's library, or the whole catalog. */
+.scope {
+  border: 0;
+  padding: 0;
+  margin: 10px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 0.86rem;
+}
+.scope legend {
+  float: left;
+  margin-right: 4px;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  color: #93a198;
+}
+.scope label {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
 .foundActions .secondary {
@@ -610,6 +712,9 @@ a.deckTitle:hover {
 }
 .entries li[data-playable="false"] .entryName {
   color: #e3bf93;
+}
+.entries li[data-locked="true"] .entryName {
+  color: #c3d4e6;
 }
 .quantity {
   display: inline-flex;

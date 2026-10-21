@@ -74,6 +74,28 @@ describe("a card's details", () => {
     });
     fireEvent.mouseEnter(screen.getByRole("button", { name: /^Set p2 TST/ }));
     expect(screen.getByText(/^Illustrated by Older Artist\./)).toBeVisible();
+    // An account that builds from the whole catalog has no library to speak of.
+    expect(screen.queryByText("Your library")).toBeNull();
+  });
+
+  it("says how many copies the player's library holds", async () => {
+    const api = mockApi();
+    api.on(
+      "GET /api/v1/cards/{card_id}",
+      () => reply(200, { ...detail([printing("p1", "Artist")], 1), owned: 3 }),
+      () => reply(200, { ...detail([printing("p1", "Artist")], 1), owned: 0 }),
+    );
+    const { unmount } = render(<CardDetails cardId="card-lightning-bolt" />);
+    const owned = (await screen.findByText("Your library")).closest("div")!;
+    expect(owned).toHaveTextContent("In your library: 3");
+    expect(owned).toHaveTextContent(
+      "A deck may hold as many copies as your library does.",
+    );
+    unmount();
+    render(<CardDetails cardId="card-lightning-bolt" />);
+    const none = (await screen.findByText("Your library")).closest("div")!;
+    expect(none).toHaveTextContent("Not in your library");
+    expect(none).toHaveTextContent(/cannot start a game until your library/);
   });
 
   it("asks for a deck entry's chosen printing and keeps it after Show all", async () => {

@@ -11,10 +11,68 @@ import { client, describe, type Me } from "../api";
 import { formatLabels } from "../catalog/catalog";
 import { GuidedDialog } from "./GuidedDialog";
 import { ImportDialog } from "./ImportDialog";
-import type { DeckEntry, DeckFormat, DeckSummary, StarterDeck } from "./decks";
+import { LockIcon } from "./ProblemList";
+import {
+  collectionLocked,
+  type DeckEntry,
+  type DeckFormat,
+  type DeckSummary,
+  type StarterDeck,
+} from "./decks";
 import styles from "./decks.module.css";
 
 type View = "active" | "archived" | "trash";
+type DeckState = "playable" | "locked" | "legal" | "draft";
+
+const stateWords: Record<DeckState, string> = {
+  playable: "Ready to play",
+  locked: "Needs cards you don't own",
+  legal: "Legal, not playable yet",
+  draft: "Draft",
+};
+
+/** A deck's state in the list, with a padlock when the player's library holds it back. */
+function StateBadge({ state }: { state: DeckState }) {
+  return (
+    <span className={styles.badge} data-state={state}>
+      {state === "locked" && <LockIcon />}
+      {stateWords[state]}
+    </span>
+  );
+}
+
+/**
+ * The listed decks that the player's library holds back (DECK08). A deck's summary says only
+ * whether it is legal and playable, and a legal deck may fail to play for two reasons: cards the
+ * engine cannot play yet, or more copies than the library holds. So each legal deck that cannot
+ * play is asked for its validation, to tell the two apart; until it answers, the deck shows as
+ * legal and not playable yet.
+ */
+function useLockedDecks(decks: DeckSummary[] | undefined): Set<string> {
+  const [locked, setLocked] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    let active = true;
+    const held = (decks ?? []).filter((deck) => deck.legal && !deck.playable);
+    void Promise.all(
+      held.map((deck) =>
+        client
+          .GET("/api/v1/decks/{deck_id}", {
+            params: { path: { deck_id: deck.id } },
+          })
+          .then(({ data }) =>
+            data && collectionLocked(data.validation) ? deck.id : null,
+          ),
+      ),
+    ).then((found) => {
+      if (active)
+        setLocked(new Set(found.filter((id): id is string => id !== null)));
+    });
+    return () => {
+      active = false;
+    };
+  }, [decks]);
+  return locked;
+}
 
 export function IdentityPips({ identity }: { identity: string }) {
   if (!identity)
@@ -63,7 +121,12 @@ export function DecksPage({
         )}
       </>
     );
-  return <Decks heading={heading} />;
+  return (
+    <Decks
+      heading={heading}
+      library={!me.permissions.includes("library.unlimited")}
+    />
+  );
 }
 
 /** Creates a deck and opens it. */
@@ -92,9 +155,18 @@ export async function createDeck(body: {
   return describe(error);
 }
 
-function Decks({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
+function Decks({
+  heading,
+  library,
+}: {
+  heading: RefObject<HTMLHeadingElement | null>;
+  /** The account builds from a library of its own (v0.3.1), not the whole catalog. */
+  library: boolean;
+}) {
   const [view, setView] = useState<View>("active");
   const [decks, setDecks] = useState<DeckSummary[]>();
+  // Trashed decks cannot be opened, so they are not asked for.
+  const locked = useLockedDecks(view === "trash" ? undefined : decks);
   const [starters, setStarters] = useState<StarterDeck[]>([]);
   const [message, setMessage] = useState("");
   const [title, setTitle] = useState("");
@@ -180,8 +252,15 @@ function Decks({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
         A strategy to call your own.
       </h1>
       <p className={styles.lead}>
-        Build Commander and Legacy decks from the card catalog, check them
-        against the format's rules, and take them to the practice table.
+        {library ? (
+          <>
+            Build Commander and Legacy decks from your card library (see it
+            under <a href="#cards">Cards</a>, My library), check them against
+            the format's rules, and take them to the practice table.
+          </>
+        ) : (
+          "Build Commander and Legacy decks from the whole card catalog, check them against the format's rules, and take them to the practice table."
+        )}
       </p>
       <div className={styles.actions}>
         <button
@@ -257,18 +336,17 @@ function Decks({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
                     ` · ${deck.commanders.join(" & ")}`}
                 </span>
               </div>
-              <span
-                className={styles.badge}
-                data-state={
-                  deck.playable ? "playable" : deck.legal ? "legal" : "draft"
+              <StateBadge
+                state={
+                  deck.playable
+                    ? "playable"
+                    : locked.has(deck.id)
+                      ? "locked"
+                      : deck.legal
+                        ? "legal"
+                        : "draft"
                 }
-              >
-                {deck.playable
-                  ? "Ready to play"
-                  : deck.legal
-                    ? "Legal, not playable yet"
-                    : "Draft"}
-              </span>
+              />
               <div className={styles.rowActions}>
                 {view === "trash" ? (
                   <button
@@ -320,35 +398,60 @@ function Decks({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
         <section className={styles.starters} aria-labelledby="starters-title">
           <h2 id="starters-title">Starter decks</h2>
           <p className={styles.hint}>
-            The practice table's decks. Copy one to make it yours, then change
-            anything.
+            {library
+              ? "The ten Commander starter decks. The two you chose are among your decks already, and every copy of their cards is in your library for good. Any of them can be copied; a copy of one you did not choose holds cards you don't own, so it cannot start a game."
+              : "The ten Commander starter decks. Copy one to make it yours, then change anything."}
           </p>
           <ul>
-            {starters.map((starter) => (
-              <li key={starter.name}>
-                <div>
-                  <strong>{starter.title}</strong>
-                  <span className={styles.deckMeta}>
-                    {formatLabels[starter.format]} · {starter.card_count} cards
-                    {starter.commanders.length > 0 &&
-                      ` · ${starter.commanders.join(" & ")}`}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  onClick={() =>
-                    void createDeck({
-                      title: starter.title,
-                      format: starter.format,
-                      source: { kind: "starter", starter: starter.name },
-                    }).then((failure) => failure && setMessage(failure))
-                  }
-                >
-                  Copy
-                </button>
-              </li>
-            ))}
+            {/* The player's own two first, then the rest in their order. */}
+            {[...starters]
+              .sort((a, b) => Number(b.chosen) - Number(a.chosen))
+              .map((starter) => (
+                <li key={starter.name}>
+                  <div>
+                    <strong className={styles.deckTitle}>
+                      {starter.title}
+                    </strong>
+                    <span className={styles.deckMeta}>
+                      {formatLabels[starter.format]} ·{" "}
+                      <IdentityPips identity={starter.colors} /> {starter.guild}{" "}
+                      ({starter.color_names}) · {starter.commanders.join(" & ")}{" "}
+                      · {starter.card_count} cards
+                    </span>
+                    <p className={styles.starterAbout}>{starter.description}</p>
+                    <details className={styles.starterMore}>
+                      <summary>How to play it</summary>
+                      <p>{starter.how_to_play}</p>
+                      <p>
+                        <strong>It teaches:</strong> {starter.teaches}
+                      </p>
+                    </details>
+                  </div>
+                  {starter.chosen && (
+                    <span className={styles.badge} data-state="chosen">
+                      One of your two
+                    </span>
+                  )}
+                  {!starter.playable && (
+                    <StateBadge state={starter.chosen ? "legal" : "locked"} />
+                  )}
+                  {/* Ten buttons that say Copy: each names its deck to a screen reader. */}
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    aria-label={`Copy ${starter.title}`}
+                    onClick={() =>
+                      void createDeck({
+                        title: starter.title,
+                        format: starter.format,
+                        source: { kind: "starter", starter: starter.name },
+                      }).then((failure) => failure && setMessage(failure))
+                    }
+                  >
+                    Copy
+                  </button>
+                </li>
+              ))}
           </ul>
         </section>
       )}

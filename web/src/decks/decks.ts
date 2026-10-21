@@ -57,6 +57,38 @@ export function isLand(card: CardSummary): boolean {
   return frontTypes(card).includes("Land");
 }
 
+/** Whether the deck holds more copies of a card than the player's library does (DECK08, since
+ * v0.3.1): saved, and perhaps legal, but kept from games until fixed. */
+export function collectionLocked(
+  validation: Pick<Validation, "errors">,
+): boolean {
+  return validation.errors.some(
+    (problem) => problem.kind === "collection_locked",
+  );
+}
+
+/**
+ * The cards the deck holds more copies of than the player's library does, counted as the server
+ * counts them: every location but the maybeboard. A card the library does not limit (a basic
+ * land, or any card for an account that builds from the whole catalog) is never among them. The
+ * server's validation stays the authority; this only marks the deck's rows.
+ */
+export function beyondLibrary(
+  entries: DeckEntry[],
+  cards: Record<string, CardSummary>,
+): Set<string> {
+  const held = new Map<string, number>();
+  for (const entry of entries)
+    if (entry.location !== "maybeboard")
+      held.set(entry.card_id, (held.get(entry.card_id) ?? 0) + entry.quantity);
+  const found = new Set<string>();
+  for (const [id, count] of held) {
+    const owned = cards[id]?.owned;
+    if (owned !== null && owned !== undefined && count > owned) found.add(id);
+  }
+  return found;
+}
+
 /** One entry per card, printing and location; quantities added. */
 export function merge(entries: DeckEntry[]): DeckEntry[] {
   const totals = new Map<string, DeckEntry>();

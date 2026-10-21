@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { client, type Me } from "../api";
 import { CardDetails, CardTile } from "./CardViews";
+import { GodlikeCards, useCustomCards } from "./CustomCards";
+import { MyLibrary } from "./MyLibrary";
 import {
   catalogSearch,
   namesPlayability,
@@ -14,6 +16,10 @@ import styles from "./catalog.module.css";
 
 const PAGE_SIZE = 60;
 
+/** The whole catalog (CAT: every card stays searchable), the player's own library, and at the
+ * Godlike tier its custom cards; that tab is not there at all below it. */
+type View = "catalog" | "library" | "custom";
+
 export function catalogLine(status: CatalogStatus | undefined): string {
   if (!status) return "";
   if (!status.revision) return "The card catalog has not been imported yet.";
@@ -25,9 +31,10 @@ export function catalogLine(status: CatalogStatus | undefined): string {
 export function resultWords(
   total: number,
   playable: Search["playable"],
+  owned = false,
 ): string {
   const count = total.toLocaleString();
-  const cards = total === 1 ? "card" : "cards";
+  const cards = `${total === 1 ? "card" : "cards"}${owned ? " in your library" : ""}`;
   if (playable === "true") return `${count} playable ${cards}`;
   if (playable === "false") return `${count} ${cards} not playable yet`;
   return `${count} ${cards}`;
@@ -69,20 +76,33 @@ export function CardsPage({
         )}
       </>
     );
-  return <Browser heading={heading} />;
+  return (
+    <Browser
+      heading={heading}
+      library={!me.permissions.includes("library.unlimited")}
+    />
+  );
 }
 
 function Browser({
   heading,
+  library,
 }: {
   heading: RefObject<HTMLHeadingElement | null>;
+  /** The account builds from a library of its own (v0.3.1), not the whole catalog. */
+  library: boolean;
 }) {
+  const [view, setView] = useState<View>("catalog");
   // Cards that cannot be played here yet are hidden until the player asks for them.
   const [search, setSearch] = useState<Search>({ ...catalogSearch });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<CardSummary>();
   const dialog = useRef<HTMLDialogElement>(null);
   const status = useCatalogStatus();
+  const custom = useCustomCards();
+  const views: View[] = custom.length
+    ? ["catalog", "library", "custom"]
+    : ["catalog", "library"];
   // A search that names playability itself (status:unsupported, is:playable) decides it, and the
   // "Playable here" filter steps aside rather than contradict it.
   const typed = namesPlayability(search.q);
@@ -112,74 +132,100 @@ function Browser({
         Discover your next centerpiece.
       </h1>
       <p className={styles.lead}>{catalogLine(status)}</p>
-      <SearchControls
-        search={search}
-        onChange={setSearch}
-        defaults={catalogSearch}
-      />
-      <div className={styles.resultRow}>
-        {/* The count names the cards the shown results hold (the search they answer, not one
-            still on its way), and says when a typed term has set the filter aside, so screen
-            readers hear both. */}
-        <p role="status" className={styles.resultLine}>
-          {error
-            ? ""
-            : results
-              ? `${resultWords(results.total, shown.playable)}${shownSetAside ? " · your search names playability, so the “Playable here” filter is set aside" : ""}${loading ? " · searching…" : ""}`
-              : "Searching…"}
-        </p>
-        {/* One button whose words change, so focus stays on it after a click. */}
-        {!typed && search.playable !== "false" && (
+      <div className={styles.tabs} role="tablist" aria-label="Which cards">
+        {views.map((item) => (
           <button
+            key={item}
+            role="tab"
             type="button"
-            className={styles.textButton}
-            onClick={() =>
-              setSearch({
-                ...search,
-                playable: search.playable === "true" ? "" : "true",
-              })
+            aria-selected={view === item}
+            onClick={() => setView(item)}
+          >
+            {
+              {
+                catalog: "All cards",
+                library: "My library",
+                custom: "Godlike cards",
+              }[item]
             }
-          >
-            {search.playable === "true"
-              ? "Show cards not playable yet"
-              : "Hide cards not playable yet"}
           </button>
-        )}
+        ))}
       </div>
-      {error && (
-        <p role="alert" className={styles.refusal}>
-          {error}
-        </p>
-      )}
-      {results && (
-        <ul className={styles.grid} aria-label="Cards">
-          {results.items.map((card) => (
-            <CardTile key={card.id} card={card} onOpen={setOpen} />
-          ))}
-        </ul>
-      )}
-      {results && results.total > PAGE_SIZE && (
-        <nav className={styles.pager} aria-label="Result pages">
-          <button
-            type="button"
-            className={styles.secondary}
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </button>
-          <span>
-            Page {page} of {pages}
-          </span>
-          <button
-            type="button"
-            className={styles.secondary}
-            disabled={page >= pages}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </button>
-        </nav>
+      {view === "library" && <MyLibrary onOpen={setOpen} />}
+      {view === "custom" && <GodlikeCards cards={custom} />}
+      {view === "catalog" && (
+        <>
+          <SearchControls
+            search={search}
+            onChange={setSearch}
+            defaults={catalogSearch}
+            library={library}
+          />
+          <div className={styles.resultRow}>
+            {/* The count names the cards the shown results hold (the search they answer, not
+                one still on its way), and says when a typed term has set the filter aside, so
+                screen readers hear both. */}
+            <p role="status" className={styles.resultLine}>
+              {error
+                ? ""
+                : results
+                  ? `${resultWords(results.total, shown.playable, shown.owned)}${shownSetAside ? " · your search names playability, so the “Playable here” filter is set aside" : ""}${loading ? " · searching…" : ""}`
+                  : "Searching…"}
+            </p>
+            {/* One button whose words change, so focus stays on it after a click. */}
+            {!typed && search.playable !== "false" && (
+              <button
+                type="button"
+                className={styles.textButton}
+                onClick={() =>
+                  setSearch({
+                    ...search,
+                    playable: search.playable === "true" ? "" : "true",
+                  })
+                }
+              >
+                {search.playable === "true"
+                  ? "Show cards not playable yet"
+                  : "Hide cards not playable yet"}
+              </button>
+            )}
+          </div>
+          {error && (
+            <p role="alert" className={styles.refusal}>
+              {error}
+            </p>
+          )}
+          {results && (
+            <ul className={styles.grid} aria-label="Cards">
+              {results.items.map((card) => (
+                <CardTile key={card.id} card={card} onOpen={setOpen} />
+              ))}
+            </ul>
+          )}
+          {results && results.total > PAGE_SIZE && (
+            <nav className={styles.pager} aria-label="Result pages">
+              <button
+                type="button"
+                className={styles.secondary}
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </button>
+              <span>
+                Page {page} of {pages}
+              </span>
+              <button
+                type="button"
+                className={styles.secondary}
+                disabled={page >= pages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </nav>
+          )}
+        </>
       )}
       <dialog
         ref={dialog}

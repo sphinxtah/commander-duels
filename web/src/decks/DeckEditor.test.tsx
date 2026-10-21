@@ -15,6 +15,7 @@ import {
   entry,
   mockApi,
   openDialogs,
+  problem,
   reply,
   validation,
 } from "./fixtures";
@@ -74,6 +75,21 @@ function drafts(api: ReturnType<typeof mockApi>) {
     .filter((call) => call.route === DRAFT)
     .map((call) => (call.options as { body: unknown }).body);
 }
+/** The query of each card search the finder sent, in order. */
+function searches(api: ReturnType<typeof mockApi>) {
+  return api.calls
+    .filter((call) => call.route === "GET /api/v1/cards")
+    .map(
+      (call) =>
+        (call.options as { params: { query: Record<string, unknown> } }).params
+          .query,
+    );
+}
+
+// As a player who builds from a library sees them (v0.3.1): every card but a basic land (the
+// Mountain, owned null) says its copies.
+const ownedBolt = { ...bolt, owned: 1 };
+const golem = card("Stand-in Golem", { owned: 0 });
 
 // These run on the editor's real clock, a search and a save or two each: more than the default
 // five seconds on a busy machine, and more than the waits above add up to.
@@ -189,6 +205,126 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
     expect(drafts(api)).toEqual([{ version: 1, entries: [entry(bolt, 4)] }]);
     expect(screen.getByLabelText("4 copies")).toBeInTheDocument();
+  });
+
+  it("starts the finder on the player's library, with copies, and switches to all cards", async () => {
+    const api = mockApi();
+    api.on(DECK, () =>
+      reply(
+        200,
+        deckDetail({
+          draft: { version: 1, entries: [entry(ownedBolt, 1)] },
+          cards: { [ownedBolt.id]: ownedBolt },
+        }),
+      ),
+    );
+    api.on(
+      "GET /api/v1/cards",
+      () =>
+        reply(200, {
+          items: [ownedBolt, mountain],
+          total: 2,
+          page: 1,
+          page_size: 24,
+        }),
+      () =>
+        reply(200, {
+          items: [ownedBolt, golem],
+          total: 2,
+          page: 1,
+          page_size: 24,
+        }),
+    );
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    const finder = await screen.findByRole("region", { name: "Add cards" });
+    const found = await within(finder).findByRole(
+      "button",
+      { name: /^Mountain/ },
+      FOUND,
+    );
+    expect(searches(api)[0]).toMatchObject({ owned: true });
+    const library = within(finder).getByRole("radio", { name: "My library" });
+    expect(library).toBeChecked();
+    expect(
+      within(finder).getByRole("button", { name: /^Lightning Bolt/ })
+        .parentElement,
+    ).toHaveTextContent("In your library: 1");
+    // A basic land is never limited, so nothing is said of it.
+    expect(found.closest("li")).not.toHaveTextContent(/your library/);
+
+    fireEvent.click(within(finder).getByRole("radio", { name: "All cards" }));
+    expect(
+      within(finder).getByText(/Cards you don't own can be added/),
+    ).toBeInTheDocument();
+    const other = await within(finder).findByRole(
+      "button",
+      { name: /^Stand-in Golem/ },
+      FOUND,
+    );
+    expect(other.closest("li")).toHaveTextContent("Not in your library");
+    expect(searches(api).at(-1)).not.toHaveProperty("owned");
+  });
+
+  it("offers no library switch to an account that builds from the whole catalog", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deckDetail()));
+    api.on("GET /api/v1/cards", () =>
+      reply(200, { items: [bolt], total: 1, page: 1, page_size: 24 }),
+    );
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Lightning Bolt/ }, FOUND);
+    expect(screen.queryByRole("radio", { name: "My library" })).toBeNull();
+    expect(screen.queryByText(/your library/)).toBeNull();
+  });
+
+  it("says a deck needs cards the player doesn't own, and keeps it from the practice table", async () => {
+    const api = mockApi();
+    api.on(DECK, () =>
+      reply(
+        200,
+        deckDetail({
+          draft: { version: 1, entries: [entry(ownedBolt, 4)] },
+          cards: { [ownedBolt.id]: ownedBolt },
+          validation: validation({
+            playable: false,
+            errors: [
+              problem({
+                message:
+                  "This deck holds 4 copies of Lightning Bolt; your library has 1 copy.",
+                remedy: "Remove 3, or wait until your library holds more.",
+                card_ids: [ownedBolt.id],
+                quantity: 4,
+              }),
+            ],
+          }),
+        }),
+      ),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    expect(
+      await screen.findByText(/^Legal, but it needs cards you don't own/),
+    ).toHaveAttribute("data-state", "locked");
+    const found = screen
+      .getByText(/^This deck holds 4 copies of Lightning Bolt/)
+      .closest("li")!;
+    expect(found).toHaveTextContent(
+      "Needs cards you don't own: This deck holds 4 copies of Lightning Bolt; your library has 1 copy. Remove 3, or wait until your library holds more.",
+    );
+    expect(found.querySelector("svg")).not.toBeNull();
+    // The row itself says how many the library holds.
+    const row = screen
+      .getByRole("button", { name: "Remove Lightning Bolt" })
+      .closest("li")!;
+    expect(row).toHaveTextContent("You own 1");
+    expect(row).toHaveAttribute("data-locked", "true");
+    // No way to the table: the deck cannot start a game.
+    expect(
+      screen.queryByRole("link", { name: "Play it at the practice table" }),
+    ).toBeNull();
+    expect(
+      screen.getByText("Not playable: it needs cards you don't own."),
+    ).toBeInTheDocument();
   });
 
   it("says when the deck is not there", async () => {

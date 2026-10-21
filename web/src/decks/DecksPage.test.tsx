@@ -10,7 +10,14 @@ import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
 import { DecksPage } from "./DecksPage";
-import { deckDetail, mockApi, reply } from "./fixtures";
+import {
+  deckDetail,
+  mockApi,
+  problem,
+  reply,
+  starterDeck,
+  validation,
+} from "./fixtures";
 
 const player: Me = {
   id: "00000000-0000-4000-8000-000000000002",
@@ -39,14 +46,26 @@ const { draft: _draft, ...summary } = deckDetail({
   card_count: 60,
   identity: "R",
 });
-const starter = {
-  name: "legacy-red",
-  title: "Red Aggro",
-  format: "legacy",
-  card_count: 60,
-  commanders: [],
-  playable: true,
+// An administrator builds from the whole catalog (v0.3.1), so every starter deck can play.
+const administrator: Me = {
+  ...player,
+  roles: ["player", "administrator"],
+  permissions: [...player.permissions, "library.unlimited"],
 };
+const starter = starterDeck({
+  name: "starter_rg_v1",
+  title: "Wild Stampede",
+  colors: "RG",
+  color_names: "Red / Green",
+  guild: "Gruul",
+  commanders: ["Targ Nar, Demon-Fang Gnoll"],
+});
+/** The deck's address in a GET for one deck, to answer each deck with its own. */
+function asked(api: ReturnType<typeof mockApi>): string {
+  return (
+    api.calls.at(-1)!.options as { params: { path: { deck_id: string } } }
+  ).params.path.deck_id;
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -180,21 +199,123 @@ describe("the decks page", () => {
     api.on("POST /api/v1/decks", () =>
       reply(201, deckDetail({ id: "deck-9" })),
     );
-    render(<DecksPage me={player} heading={createRef()} />);
+    render(<DecksPage me={administrator} heading={createRef()} />);
     const section = await screen.findByRole("region", {
       name: "Starter decks",
     });
-    fireEvent.click(within(section).getByRole("button", { name: "Copy" }));
+    // An administrator's copy plays: nothing says otherwise.
+    expect(section).not.toHaveTextContent("Needs cards you don't own");
+    fireEvent.click(
+      within(section).getByRole("button", { name: "Copy Wild Stampede" }),
+    );
     await vi.waitFor(() => expect(window.location.hash).toBe("#deck/deck-9"));
     const create = api.calls.find(
       (call) => call.route === "POST /api/v1/decks",
     );
     expect(create?.options).toEqual({
       body: expect.objectContaining({
-        title: "Red Aggro",
-        format: "legacy",
-        source: { kind: "starter", starter: "legacy-red" },
+        title: "Wild Stampede",
+        format: "commander",
+        source: { kind: "starter", starter: "starter_rg_v1" },
       }),
     });
+  });
+
+  it("lists the player's two starter decks first, and says the others need cards they don't own", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/decks", () => reply(200, []));
+    api.on("GET /api/v1/decks/starters", () =>
+      reply(200, [
+        starterDeck({ playable: false }),
+        { ...starter, chosen: true },
+        starterDeck({
+          name: "starter_gu_v1",
+          title: "Tides of Growth",
+          chosen: true,
+        }),
+      ]),
+    );
+    render(<DecksPage me={player} heading={createRef()} />);
+    const section = await screen.findByRole("region", {
+      name: "Starter decks",
+    });
+    expect(section).toHaveTextContent(/The two you chose are among your decks/);
+    const rows = within(section).getAllByRole("listitem");
+    expect(rows.map((row) => row.querySelector("strong")?.textContent)).toEqual(
+      ["Wild Stampede", "Tides of Growth", "Skyward Patrol"],
+    );
+    expect(rows[0]).toHaveTextContent("One of your two");
+    expect(rows[0]).toHaveTextContent("Gruul (Red / Green)");
+    expect(rows[0]).toHaveTextContent("Targ Nar, Demon-Fang Gnoll");
+    expect(rows[0]).not.toHaveTextContent("Needs cards you don't own");
+    expect(rows[2]).not.toHaveTextContent("One of your two");
+    expect(rows[2]).toHaveTextContent("Needs cards you don't own");
+    // It may still be copied.
+    expect(
+      within(rows[2]!).getByRole("button", { name: "Copy Skyward Patrol" }),
+    ).toBeEnabled();
+    // How to play it, folded away until asked for.
+    expect(within(rows[2]!).getByText("How to play it")).toBeInTheDocument();
+    expect(screen.getByText(/from your card library/)).toBeInTheDocument();
+  });
+
+  it("tells a deck the library holds back from one the engine cannot play yet", async () => {
+    const api = mockApi();
+    const locked = {
+      ...summary,
+      id: "deck-locked",
+      title: "Borrowed Elves",
+      playable: false,
+    };
+    const unsupported = {
+      ...summary,
+      id: "deck-engine",
+      title: "Odd Wizards",
+      playable: false,
+    };
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [summary, locked, unsupported]),
+    );
+    api.on("GET /api/v1/decks/starters", () => reply(200, []));
+    api.on("GET /api/v1/decks/{deck_id}", () =>
+      reply(
+        200,
+        deckDetail({
+          id: asked(api),
+          validation: validation({
+            playable: false,
+            errors: [
+              asked(api) === "deck-locked"
+                ? problem()
+                : problem({
+                    code: "card.not_implemented",
+                    kind: "not_implemented",
+                  }),
+            ],
+          }),
+        }),
+      ),
+    );
+    render(<DecksPage me={player} heading={createRef()} />);
+    const row = (name: string) =>
+      screen.getByRole("link", { name }).closest("li")!;
+    await screen.findByRole("link", { name: "Borrowed Elves" });
+    await waitFor(() =>
+      expect(row("Borrowed Elves")).toHaveTextContent(
+        "Needs cards you don't own",
+      ),
+    );
+    expect(row("Odd Wizards")).toHaveTextContent("Legal, not playable yet");
+    expect(row("Mono-Red Burn")).toHaveTextContent("Ready to play");
+    // Only the two that cannot play were asked about.
+    expect(
+      api.calls
+        .filter((call) => call.route === "GET /api/v1/decks/{deck_id}")
+        .map(
+          (call) =>
+            (call.options as { params: { path: { deck_id: string } } }).params
+              .path.deck_id,
+        ),
+    ).toEqual(["deck-locked", "deck-engine"]);
   });
 });

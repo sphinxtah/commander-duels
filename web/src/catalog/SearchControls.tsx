@@ -68,12 +68,16 @@ export function SearchControls({
   onChange,
   compact = false,
   defaults = emptySearch,
+  library = false,
 }: {
   search: Search;
   onChange: (search: Search) => void;
   compact?: boolean;
   /** What "Clear filters" goes back to: the screen's own starting search. */
   defaults?: Search;
+  /** The account builds from a library of its own, so "In my library" is offered beside the
+   * search, never folded away under Filters. */
+  library?: boolean;
 }) {
   const [more, setMore] = useState(false);
   const help = useRef<HTMLDialogElement>(null);
@@ -108,6 +112,16 @@ export function SearchControls({
         >
           Filters
         </button>
+        {library && (
+          <label className={styles.inline}>
+            <input
+              type="checkbox"
+              checked={search.owned}
+              onChange={(event) => set("owned", event.target.checked)}
+            />
+            <span>In my library</span>
+          </label>
+        )}
       </div>
       {more && (
         <div className={styles.filters}>

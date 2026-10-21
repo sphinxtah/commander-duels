@@ -5,6 +5,7 @@ import {
   colorWords,
   formatLabels,
   legalityLabels,
+  ownedWords,
   printingImage,
   statusLabel,
   type CardDetail,
@@ -102,7 +103,19 @@ export function StatusBadge({ card }: { card: CardSummary }) {
   );
 }
 
-/** A card in a grid of results: its image, name, cost and status. */
+/** A card's copies in the player's library, when the library limits it: nothing otherwise. */
+export function OwnedNote({ card }: { card: CardSummary }) {
+  const words = ownedWords(card);
+  if (!words) return null;
+  return (
+    <span className={styles.owned} data-owned={(card.owned ?? 0) > 0}>
+      {words}
+    </span>
+  );
+}
+
+/** A card in a grid of results: its image, name, cost and status, and for a player who builds
+ * from a library, the copies it holds. */
 export function CardTile({
   card,
   onOpen,
@@ -112,13 +125,14 @@ export function CardTile({
   onOpen: (card: CardSummary) => void;
   children?: ReactNode;
 }) {
+  const owned = ownedWords(card);
   return (
     <li className={styles.tile} data-playable={card.playable}>
       <button
         type="button"
         className={styles.tileButton}
         onClick={() => onOpen(card)}
-        aria-label={`${card.name}, ${card.type_line}, ${statusLabel(card)}`}
+        aria-label={`${card.name}, ${card.type_line}, ${statusLabel(card)}${owned ? `, ${owned.toLowerCase()}` : ""}`}
       >
         <CardImage card={card} />
       </button>
@@ -128,6 +142,7 @@ export function CardTile({
         </span>
         <StatusBadge card={card} />
       </div>
+      <OwnedNote card={card} />
       {children}
     </li>
   );
@@ -248,6 +263,19 @@ export function CardDetails({
               )}
             </dd>
           </div>
+          {ownedWords(card) && (
+            <div>
+              <dt>Your library</dt>
+              <dd>
+                {ownedWords(card)}
+                <span className={styles.note}>
+                  {(card.owned ?? 0) > 0
+                    ? "A deck may hold as many copies as your library does."
+                    : "A deck may still hold it, but cannot start a game until your library does."}
+                </span>
+              </dd>
+            </div>
+          )}
           <div>
             <dt>Color identity</dt>
             <dd>{colorWords(card.color_identity)}</dd>

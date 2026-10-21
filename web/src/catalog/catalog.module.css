@@ -60,6 +60,26 @@
   font-size: 0.82rem;
 }
 
+/* The page's views: the catalog, the player's library, the Godlike tier's cards. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid #ffffff12;
+  margin: 22px 0 4px;
+}
+.tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 14px;
+  color: #9caaa5;
+}
+.tabs button[aria-selected="true"] {
+  color: #e6c68c;
+  border-bottom-color: #d4b47a;
+}
+
 /* Search. */
 .controls {
   display: grid;
@@ -284,6 +304,21 @@
   border-color: #c59b6566;
   color: #e3bf93;
 }
+/* A player's copies of a card (v0.3.1): quiet when owned, muted further when not, so a page of
+   cards outside the library reads as the catalog, not as a page of warnings. */
+.owned {
+  font-size: 0.74rem;
+  color: #b5d6c0;
+}
+.owned[data-owned="false"] {
+  color: #8f9e94;
+}
+.note {
+  display: block;
+  margin-top: 4px;
+  color: #93a198;
+  font-size: 0.8rem;
+}
 .pager {
   display: flex;
   align-items: center;
@@ -505,4 +540,123 @@
 }
 .tags span {
   color: #b6c0b4;
+}
+
+/* The player's library (v0.3.1). */
+.library h2,
+.custom h2 {
+  font:
+    1.3rem Georgia,
+    serif;
+  margin: 18px 0 6px;
+}
+.sources {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+  max-width: 72ch;
+}
+.sources dt {
+  color: #e3e7de;
+}
+.sources dt small {
+  color: #93a198;
+  font-size: 0.78rem;
+}
+.sources dd {
+  margin: 2px 0 0;
+  color: #aeb8ac;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.sources a {
+  color: #e3c68f;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.libraryFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: end;
+}
+.libraryFilters .field:first-child {
+  flex: 1 1 260px;
+}
+/* A table that is wider than a phone scrolls inside its own box, never the page. */
+.libraryScroll {
+  overflow-x: auto;
+  margin-top: 10px;
+}
+.libraryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.libraryTable th,
+.libraryTable td {
+  text-align: left;
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid #ffffff0a;
+  vertical-align: top;
+}
+.libraryTable thead th {
+  color: #93a198;
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+.libraryTable tbody th {
+  font-weight: 400;
+}
+.libraryTable td {
+  color: #b9c2b6;
+}
+.libraryTable tr[data-playable="false"] .cardLink {
+  color: #e3bf93;
+}
+.cardLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #e3e7de;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: #ffffff33;
+  text-underline-offset: 3px;
+  font-size: inherit;
+}
+.cardLink:hover {
+  color: #efd9a6;
+}
+
+/* The Godlike tier's custom cards: image beside text, one under the other on a phone. */
+.customList {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: grid;
+  gap: 26px;
+}
+.customList > li {
+  display: grid;
+  grid-template-columns: minmax(160px, 260px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .customList > li {
+    grid-template-columns: minmax(0, 260px);
+  }
+}
+.customText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.flavor {
+  font-style: italic;
+  color: #b9c2b6;
+}
+.customState {
+  font-size: 0.86rem;
+  color: #aeb8ac;
 }

@@ -5,6 +5,9 @@ export type CardDetail = components["schemas"]["CardDetail"];
 export type CardPage = components["schemas"]["CardPage"];
 export type PrintingSummary = components["schemas"]["PrintingSummary"];
 export type CatalogStatus = components["schemas"]["CatalogStatus"];
+export type LibraryView = components["schemas"]["LibraryView"];
+export type LibraryCard = components["schemas"]["LibraryCard"];
+export type CustomCard = components["schemas"]["CustomCardInfo"];
 
 export type Search = {
   q: string;
@@ -18,6 +21,9 @@ export type Search = {
   set: string;
   legal: string;
   playable: "" | "true" | "false";
+  /** Only the cards in the player's library (basic lands included). The server sets it aside
+   * for an account that builds from the whole catalog. */
+  owned: boolean;
   sort: "name" | "mana_value" | "released" | "popularity" | "color";
   descending: boolean;
 };
@@ -34,6 +40,7 @@ export const emptySearch: Search = {
   set: "",
   legal: "",
   playable: "",
+  owned: false,
   sort: "name",
   descending: false,
 };
@@ -101,8 +108,47 @@ export function searchQuery(
   if (search.set.trim()) query.set = search.set.trim().toLowerCase();
   if (search.legal) query.legal = search.legal;
   if (search.playable) query.playable = search.playable === "true";
+  if (search.owned) query.owned = true;
   return query;
 }
+
+/** Basic lands, which every library holds without limit; the server reads the type line the
+ * same way. */
+export function isBasicLand(card: Pick<CardSummary, "type_line">): boolean {
+  return card.type_line.startsWith("Basic ");
+}
+
+/**
+ * Whether the account builds from a library of its own (v0.3.1), as the cards it was sent say:
+ * every card's `owned` is a number of copies for such an account, and null for one that builds
+ * from the whole catalog (administrators, SysOp). Basic lands are null for both, so they tell
+ * nothing; undefined until a card tells.
+ */
+export function buildsFromLibrary(
+  cards: Iterable<Pick<CardSummary, "type_line" | "owned">>,
+): boolean | undefined {
+  for (const card of cards) {
+    if (isBasicLand(card)) continue;
+    return card.owned !== null && card.owned !== undefined;
+  }
+  return undefined;
+}
+
+/** A card's copies in the player's library, in words; null when the library does not limit it
+ * (basic lands, and accounts that build from the whole catalog), so nothing is shown. */
+export function ownedWords(card: Pick<CardSummary, "owned">): string | null {
+  if (card.owned === null || card.owned === undefined) return null;
+  return card.owned > 0
+    ? `In your library: ${card.owned}`
+    : "Not in your library";
+}
+
+/** Where a library's copies came from. */
+export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
+  starter: "Starter decks",
+  alliance: "Your alliance",
+  grandfathered: "Your earlier decks",
+};
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */
 export function printingImage(
