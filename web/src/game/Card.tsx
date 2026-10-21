@@ -1,69 +1,25 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  RETRIES,
+  backoff,
+  cardImageUrl,
+  knownMissing,
+  rememberMissing,
+  whyFailed,
+} from "./images";
 import type { Located } from "./model";
 import { manaSymbols, manaWords } from "./model";
+import type { CardImageSize } from "./table/types";
 import type { CardView, PermanentView } from "./types";
 import styles from "./game.module.css";
 
 // Card faces: the printed image from our own server's cache (Scryfall's, fetched once), drawn
 // over a text frame built from the engine's view. The frame is always underneath, so a missing
 // or slow image never hides the rules text or blocks a choice (UI03). Images are never cropped,
-// covered or altered; the current state sits in a strip below the card.
+// covered or altered; the current state sits in a strip below the card. Which images exist, and
+// how a failure is retried, live in images.ts, which the table's textures share.
 
-// Names the server says it has no image for, and when it said so. Only that answer is
-// remembered, and only for a while, since the server asks Scryfall again after a week. Any other
-// failure (a 503 or 429 while Scryfall is slow, a deploy, an expired session) is retried with
-// backoff, waiting at least as long as the server's Retry-After, or at once when the server has
-// the image by the time the page asks why.
-const missing = new Map<string, number>();
-const MISSING_FOR_MS = 60 * 60 * 1000;
-const RETRIES = 5;
-
-function knownMissing(name: string): boolean {
-  const since = missing.get(name);
-  if (since === undefined) return false;
-  if (Date.now() - since < MISSING_FOR_MS) return true;
-  missing.delete(name);
-  return false;
-}
-
-/** Asks the server why an image failed: "missing" when it has no image for the name, "ready" when
- * it has one by now, otherwise how many seconds it asked the page to wait (0 when it did not say). */
-async function whyFailed(url: string): Promise<"missing" | "ready" | number> {
-  try {
-    const response = await fetch(url, { credentials: "same-origin" });
-    if (response.ok) {
-      // Read it all, so the image lands in the browser's cache and the retry draws it from there.
-      await response.blob();
-      return "ready";
-    }
-    if (response.status === 404) {
-      const body = (await response.json()) as { code?: string };
-      if (
-        body.code === "card_image_missing" ||
-        body.code === "images_unavailable"
-      )
-        return "missing";
-    }
-    return Number(response.headers.get("Retry-After")) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-/** How long to wait before asking again: doubling from 2 s up to a minute and never less than the
- * server's Retry-After, then spread by up to a quarter, so a board of failed cards does not ask
- * all at the same moment. */
-function backoff(attempt: number, retryAfter: number): number {
-  const wait = Math.max(
-    Math.min(60_000, 2_000 * 2 ** attempt),
-    retryAfter * 1000,
-  );
-  return wait * (1 + Math.random() / 4);
-}
-
-export function cardImageUrl(name: string, size: "normal" | "large"): string {
-  return `/api/v1/card-images?name=${encodeURIComponent(name)}&size=${size}`;
-}
+export { cardImageUrl };
 
 export function ManaCost({ cost }: { cost: string | null }) {
   const symbols = manaSymbols(cost);
@@ -110,7 +66,7 @@ export function CardFace({
   size = "normal",
 }: {
   card: CardView;
-  size?: "normal" | "large";
+  size?: CardImageSize;
 }) {
   if (card.hidden || !card.name)
     return (
@@ -137,7 +93,7 @@ function Face({
 }: {
   card: CardView;
   name: string;
-  size: "normal" | "large";
+  size: CardImageSize;
 }) {
   const [state, setState] = useState<"loading" | "loaded" | "failed">(() =>
     knownMissing(name) ? "failed" : "loading",
@@ -157,7 +113,7 @@ function Face({
   function failed() {
     setState("failed");
     void whyFailed(cardImageUrl(name, size)).then((why) => {
-      if (why === "missing") missing.set(name, Date.now());
+      if (why === "missing") rememberMissing(name);
       else if (mounted.current && attempt < RETRIES)
         retry.current = window.setTimeout(
           () => {
@@ -210,12 +166,24 @@ export function permanentState(permanent: PermanentView | undefined): string[] {
   return parts;
 }
 
-export function cardLabel(card: CardView, located?: Located): string {
+/**
+ * A card's accessible name: its name, type, power and toughness and state. `owner` is the
+ * owner's name as the screen says it (model.ts's playerName); given, a permanent controlled by
+ * someone else says whose it is, ", owned by Bot 2" (design §3.2).
+ */
+export function cardLabel(
+  card: CardView,
+  located?: Located,
+  owner?: string | null,
+): string {
   if (card.hidden || !card.name) return "A face-down card";
   const parts = [card.name];
   if (card.type_line) parts.push(card.type_line);
   if (card.power !== null) parts.push(`${card.power}/${card.toughness}`);
-  parts.push(...permanentState(located?.permanent));
+  const permanent = located?.permanent;
+  parts.push(...permanentState(permanent));
+  if (owner && permanent && permanent.owner_seat !== permanent.controller_seat)
+    parts.push(`owned by ${owner}`);
   return parts.join(", ");
 }
 
