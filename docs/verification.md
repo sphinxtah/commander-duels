@@ -23,6 +23,8 @@ Validated locally on Windows on October 21, 2026, on the work as merged for v0.3
 
 **Not checked by hand yet** (for the live site after the deploy): choosing the starter decks and an alliance as a real player; the portraits at the table with a real GPU; uploading the custom cards as SysOp, with a real canvas WebP encode.
 
+**Hosted CI.** Recorded in [the release notes](releases/0.3.1.md#verification): run #58 passed in 19 m 41 s, with 154 pytest, 782 Vitest tests and 38 browser journeys in verify, and 95 JUnit tests and 10 game and app journeys in the engine job.
+
 ## v0.3.0
 
 Validated locally on Windows on October 20, 2026, on the work as committed for v0.3.0 (86cdedf, and the screen check's fix after it). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy, with WebGL2 on SwiftShader as in CI.
