@@ -1,0 +1,19 @@
+/* The public pages' line (v0.4.1): small and quiet. Each link is at least 24 px tall, so a finger
+   or a shaky pointer finds it. */
+.links {
+  margin: 0;
+  color: #a5b0a3;
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+.links a {
+  display: inline-block;
+  padding: 3px 2px;
+  text-decoration: underline;
+  text-decoration-color: #a5b0a366;
+  text-underline-offset: 3px;
+}
+.links a:hover {
+  color: #ebece6;
+  text-decoration-color: currentColor;
+}

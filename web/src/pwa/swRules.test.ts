@@ -50,6 +50,23 @@ describe("the service worker's routes", () => {
     ).toBe("pass");
   });
 
+  it("passes the public pages and their stylesheet, page loads included", () => {
+    for (const path of [
+      "/about",
+      "/privacy",
+      "/terms",
+      "/privacy?from=google",
+      "/pages/pages.css",
+      "/pages/about.html",
+    ]) {
+      expect(routeRequest(get(path), origin)).toBe("pass");
+      expect(routeRequest(get(path, "navigate"), origin)).toBe("pass");
+    }
+    // Only those addresses: anything else that loads a page is still the app.
+    expect(routeRequest(get("/about/", "navigate"), origin)).toBe("shell");
+    expect(routeRequest(get("/aboutx", "navigate"), origin)).toBe("shell");
+  });
+
   it("takes page loads, build files and brand images", () => {
     expect(routeRequest(get("/", "navigate"), origin)).toBe("shell");
     expect(routeRequest(get("/?utm=1#play", "navigate"), origin)).toBe("shell");

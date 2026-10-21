@@ -441,10 +441,29 @@ describe("the wait for approval", () => {
     render(<Page initial={pending()} auth={google} />);
     expect(
       screen.getByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       }),
     ).toBeInTheDocument();
-    expect(screen.getByText("new@example.com")).toBeInTheDocument();
+    // Written for someone who has never heard of the site (v0.4.1): who decides, that there is
+    // nothing to do, and whom to ask, with no promise of when.
+    expect(
+      screen.getByText("The site's owner reviews each request by hand."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "There is nothing else to do. This page checks every minute and opens the site once you are approved, so you can leave it open, or come back later and sign in with the same Google account.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("new@example.com").parentElement).toHaveTextContent(
+      /^Signed in as new@example\.com$/,
+    );
+    expect(screen.getByText(/^Questions\?/)).toHaveTextContent(
+      "Questions? info@thesphinx.co",
+    );
+    expect(
+      screen.getAllByRole("link").map((link) => link.getAttribute("href")),
+    ).toEqual(["mailto:info@thesphinx.co"]);
+    expect(document.body).not.toHaveTextContent(/\b(hours?|days?|soon)\b/i);
     expect(
       screen.getAllByRole("button").map((button) => button.textContent),
     ).toEqual(["Check again", "Sign out"]);
@@ -522,7 +541,7 @@ describe("the wait for approval", () => {
     expect(seen).not.toHaveBeenCalled();
     expect(
       screen.getByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       }),
     ).toBeInTheDocument();
   });
@@ -582,7 +601,7 @@ describe("the wait for approval", () => {
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       }),
     ).toBeNull();
   });
@@ -615,14 +634,20 @@ describe("the wait for approval", () => {
     on("POST /api/v1/auth/logout", () => reply(204));
     render(<Page initial={account({ status: "denied" })} auth={google} />);
     expect(
-      screen.getByRole("heading", { name: "Your account was not approved." }),
+      screen.getByRole("heading", {
+        name: "Your request was not approved this time.",
+      }),
     ).toBeInTheDocument();
+    const note = screen.getByText(/^If you think this is a mistake/);
+    expect(note).toHaveTextContent(
+      "If you think this is a mistake, write to info@thesphinx.co. A request that is not approved is deleted 30 days after it was made.",
+    );
     expect(
-      screen.getByText(
-        "Contact the operator of this server if you think this is a mistake.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+      within(note).getByRole("link", { name: "info@thesphinx.co" }),
+    ).toHaveAttribute("href", "mailto:info@thesphinx.co");
+    expect(
+      screen.getByText("alice@example.com").parentElement,
+    ).toHaveTextContent(/^Signed in as alice@example\.com$/);
     expect(
       screen.getAllByRole("button").map((button) => button.textContent),
     ).toEqual(["Sign out"]);

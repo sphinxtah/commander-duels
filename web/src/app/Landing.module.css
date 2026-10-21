@@ -30,6 +30,12 @@
   letter-spacing: 0;
   margin: 0 0 14px;
 }
+/* About · Privacy · Terms (v0.4.1): close under the room kept for the sign-in, centred. Two
+   classes, so it wins over the line's own margin whichever stylesheet loads last. */
+.landing .siteLinks {
+  margin-top: -20px;
+  text-align: center;
+}
 .visuallyHidden {
   position: absolute;
   width: 1px;
@@ -46,5 +52,8 @@
   .mark {
     width: 104px;
     height: 104px;
+  }
+  .landing .siteLinks {
+    margin-top: -16px;
   }
 }

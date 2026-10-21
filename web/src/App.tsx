@@ -15,6 +15,7 @@ import { guardLiveGame } from "./app/liveGame";
 import { useOnline } from "./app/online";
 import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
+import { SiteLinks } from "./app/SiteLinks";
 import { UpdateNotice } from "./app/UpdateNotice";
 import {
   answerTimeout,
@@ -743,6 +744,8 @@ export function App() {
               materials used are property of Wizards of the Coast. ©Wizards of
               the Coast LLC. Card images from Scryfall.
             </p>
+            {/* The public pages (v0.4.1), as on the landing page. */}
+            <SiteLinks className={styles.footerLinks} />
           </footer>
         </main>
       </div>

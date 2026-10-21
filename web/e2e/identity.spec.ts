@@ -406,7 +406,7 @@ test("an account waiting for approval sees only its wait, and approval opens the
   await page.goto("/#settings");
   await expect(
     page.getByRole("heading", {
-      name: "Your account is waiting for approval.",
+      name: "Your request to join the Commander Duels beta is in.",
     }),
   ).toBeVisible();
   await expect(page.locator('img[src="/brand/mark.webp"]')).toBeVisible();
@@ -458,13 +458,13 @@ test("a denied account sees that it was not approved, and signs out to the landi
   );
   await page.goto("/#decks");
   await expect(
-    page.getByRole("heading", { name: "Your account was not approved." }),
+    page.getByRole("heading", {
+      name: "Your request was not approved this time.",
+    }),
   ).toBeVisible();
-  await expect(
-    page.getByText(
-      "Contact the operator of this server if you think this is a mistake.",
-    ),
-  ).toBeVisible();
+  await expect(page.getByText(/^If you think this is a mistake/)).toHaveText(
+    "If you think this is a mistake, write to info@thesphinx.co. A request that is not approved is deleted 30 days after it was made.",
+  );
   await expect(page.getByRole("button", { name: "Check again" })).toHaveCount(
     0,
   );

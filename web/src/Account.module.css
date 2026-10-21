@@ -56,6 +56,17 @@
 .waiting .actions {
   justify-content: center;
 }
+/* The contact address (v0.4.1): a link in a line of small text, so underlined. */
+.mail {
+  color: #e8d3a6;
+  text-decoration: underline;
+  text-decoration-color: #e8d3a666;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.mail:hover {
+  text-decoration-color: currentColor;
+}
 .visuallyHidden {
   position: absolute;
   width: 1px;

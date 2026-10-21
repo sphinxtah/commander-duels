@@ -117,6 +117,7 @@ jobs:
       # at 1280 x 720 to 4K, with the response timer and full screen, and the installable app
       # (manifest, icons, service worker, install banner) on the built image. Since v0.4.0 also a
       # human table: SysOp and a second, generated player play a Legacy game against each other.
+      # Since v0.4.1 also the public pages as nginx serves them, and the worker leaving them alone.
       - name: Practice games in the browser
         run: |
           token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
@@ -142,7 +143,7 @@ jobs:
             -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -e CD_E2E_PLAYER_SESSION="$player" \
             -v "$PWD:/w" -w /w mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
               && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
-              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/pwa.spec.ts \
+              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
                 --reporter=line"
           docker compose down
       # As in verify; a failed game's error also lists the test player's last answers.

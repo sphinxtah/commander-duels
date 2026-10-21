@@ -1,5 +1,6 @@
-"""The deploy kit: the web proxy follows the API to a new address, deploy.sh migrates before it
-replaces anything and brings the previous version back only onto its own database, and
+"""The deploy kit: the web proxy follows the API to a new address and serves the public pages
+as files of their own, deploy.sh migrates before it replaces anything and brings the previous
+version back only onto its own database, and
 restore.sh replaces the database with exactly the dump, whatever its own backup prunes, and
 update.sh brings a version's kit from GitHub before deploying it, and upgrade.sh brings it from
 a clone of the repository."""
@@ -46,6 +47,43 @@ def test_web_proxy_limits_google_sign_in_challenges():
     assert "proxy_pass http://api;" in location[1]
     # The API takes the visitor's address from this header (SysOp's network check depends on it).
     assert "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;" in location[1]
+
+
+def test_web_proxy_serves_the_public_pages():
+    # About, Privacy and Terms (v0.4.1): files at addresses of their own, for anyone, with
+    # JavaScript or without. Google's consent screen names them.
+    conf = (ROOT / "web" / "nginx.conf").read_text()
+    public = ROOT / "web" / "public"
+    for name in ("about", "privacy", "terms"):
+        location = re.search(rf"location = /{name} \{{(.*?)\}}", conf, re.S)
+        assert location, name
+        # One exact file, never `$uri/`, whose directory redirect would name the container's port.
+        assert f"try_files /pages/{name}.html =404;" in location[1]
+        assert "$uri/" not in location[1]
+        # Checked on every visit, so a new text shows at once; and no add_header of its own,
+        # which would drop the site's headers for this location.
+        assert "expires -1;" in location[1]
+        assert "add_header" not in location[1]
+        assert (public / "pages" / f"{name}.html").is_file()
+    folder = re.search(r"location /pages/ \{(.*?)\}", conf, re.S)
+    assert folder and "try_files $uri =404;" in folder[1] and "add_header" not in folder[1]
+
+
+def test_public_pages_need_nothing_the_content_security_policy_refuses():
+    conf = (ROOT / "web" / "nginx.conf").read_text()
+    policy = re.search(r'Content-Security-Policy "([^"]*)"', conf)
+    assert policy and "style-src 'self'" in policy[1] and "'unsafe-inline'" not in policy[1]
+    public = ROOT / "web" / "public"
+    pages = sorted((public / "pages").glob("*.html"))
+    assert [page.name for page in pages] == ["about.html", "privacy.html", "terms.html"]
+    for page in pages:
+        html = page.read_text(encoding="utf-8")
+        # No inline script, style or event handler: the policy would refuse them.
+        assert not re.search(r"<script|<style|\sstyle=|\son\w+=", html, re.I), page.name
+        # The stylesheet and every image come from the site itself, and exist.
+        assert re.findall(r'<link rel="stylesheet" href="([^"]+)"', html) == ["/pages/pages.css"]
+        for path in re.findall(r'(?:src|href)="(/[^"]*\.(?:css|png|webp))"', html):
+            assert (public / path.lstrip("/")).is_file(), (page.name, path)
 
 
 def test_restore_empties_the_database_and_stops_at_the_first_error():

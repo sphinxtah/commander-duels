@@ -6,6 +6,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   afterEach,
   beforeAll,
@@ -200,10 +202,19 @@ function expectLanding() {
   expect(screen.queryByRole("navigation")).toBeNull();
   expect(screen.queryByRole("banner")).toBeNull();
   expect(screen.queryByRole("link", { name: "Skip to content" })).toBeNull();
-  expect(document.body).not.toHaveTextContent(
-    /COMMANDER DUELS|Testing preview|Fan Content/i,
-  );
+  // The shell's wordmark, breadcrumb and footer. The wait names the site in its own words, "the
+  // Commander Duels beta" (v0.4.1), so the wordmark is matched as the shell writes it.
+  expect(document.body).not.toHaveTextContent(/COMMANDER DUELS/);
+  expect(document.body).not.toHaveTextContent(/Testing preview|Fan Content/i);
   expect(document.body).not.toHaveTextContent(`v${__APP_VERSION__}`);
+  // Last, in every state, one quiet line of links to the public pages (v0.4.1).
+  const main = screen.getByRole("main");
+  expect(main.lastElementChild).toHaveTextContent(/^About · Privacy · Terms$/);
+  expect(
+    within(main.lastElementChild as HTMLElement)
+      .getAllByRole("link")
+      .map((link) => `${link.textContent} ${link.getAttribute("href")}`),
+  ).toEqual(["About /about", "Privacy /privacy", "Terms /terms"]);
 }
 
 // Edge on a PC, so the page's install offer (made on its first render) can come; until the
@@ -257,9 +268,10 @@ describe("the landing page", () => {
       const { unmount } = render(<App />);
       await screen.findByText("Preparing Google sign-in…");
       expectLanding();
-      // Nothing to read: the heading and the status are for screen readers only.
+      // Nothing to read but the links line: the heading and the status are for screen readers
+      // only.
       expect(screen.getByRole("main")).toHaveTextContent(
-        /^Sign in\s*Preparing Google sign-in…$/,
+        /^Sign in\s*Preparing Google sign-in…\s*About · Privacy · Terms$/,
       );
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
         "Sign in",
@@ -413,7 +425,7 @@ describe("the landing page", () => {
     // The button went with the sign-in: a screen reader hears where it led instead of nothing.
     expect(document.activeElement).toBe(
       screen.getByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       }),
     );
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -518,7 +530,7 @@ describe("an account that is not active", () => {
     render(<App />);
     expect(
       await screen.findByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       }),
     ).toBeInTheDocument();
     expectLanding();
@@ -537,7 +549,7 @@ describe("an account that is not active", () => {
     await settle();
     expect(
       screen.getByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       }),
     ).toBeInTheDocument();
     expect(insideCalls()).toEqual([]);
@@ -568,7 +580,7 @@ describe("an account that is not active", () => {
       window.location.hash = route;
       const { unmount } = render(<App />);
       await screen.findByRole("heading", {
-        name: "Your account is waiting for approval.",
+        name: "Your request to join the Commander Duels beta is in.",
       });
       await settle();
       expectLanding();
@@ -586,14 +598,14 @@ describe("an account that is not active", () => {
     render(<App />);
     expect(
       await screen.findByRole("heading", {
-        name: "Your account was not approved.",
+        name: "Your request was not approved this time.",
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Contact the operator of this server if you think this is a mistake.",
-      ),
-    ).toBeInTheDocument();
+      screen.getByText(/^If you think this is a mistake/),
+    ).toHaveTextContent(
+      "write to info@thesphinx.co. A request that is not approved is deleted 30 days after it was made.",
+    );
     expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
     expectLanding();
     // Only a pending account asks again.
@@ -622,7 +634,7 @@ describe("an account that is not active", () => {
     check.focus();
     fireEvent.click(check);
     const heading = await screen.findByRole("heading", {
-      name: "Your account was not approved.",
+      name: "Your request was not approved this time.",
     });
     // Check again went with the wait.
     expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
@@ -644,6 +656,34 @@ describe("navigation", () => {
       screen.getByRole("heading", { name: "Make yourself at home." }),
     ).toBeInTheDocument();
     expect(document.activeElement).toBe(screen.getByRole("main"));
+  });
+
+  it("the footer links the public pages under the Fan Content notice", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    window.location.hash = "#settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    const notice = screen.getByText(/unofficial Fan Content/);
+    const footer = notice.closest("footer")!;
+    expect(footer).not.toBeNull();
+    // Plain links out of the app: the pages are served by nginx, not by the hash router.
+    expect(
+      within(footer)
+        .getAllByRole("link")
+        .map((link) => `${link.textContent} ${link.getAttribute("href")}`),
+    ).toEqual(["About /about", "Privacy /privacy", "Terms /terms"]);
+    expect(footer.lastElementChild).toHaveTextContent(
+      /^About · Privacy · Terms$/,
+    );
+    expect(notice.nextElementSibling).toBe(footer.lastElementChild);
+    // The public pages carry the same notice, word for word (Vitest runs in web/).
+    const about = readFileSync(
+      join(process.cwd(), "public", "pages", "about.html"),
+      "utf8",
+    );
+    expect(about.replace(/\s+/g, " ")).toContain(
+      notice.textContent!.replace(/\s+/g, " ").trim(),
+    );
   });
 
   it("leaving a game focuses the page's heading", async () => {

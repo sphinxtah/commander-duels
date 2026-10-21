@@ -65,6 +65,8 @@ const CHALLENGE_CHECK_MS = 15 * 1000;
 const PRESS_GIVEN_UP_MS = 2 * 60 * 1000;
 // A pending account asks the server again this often while its page is shown.
 const APPROVAL_CHECK_MS = 60 * 1000;
+// Where anyone, signed in or not, can write about the site (the public pages say the same).
+const CONTACT = "info@thesphinx.co";
 
 function when(value: string | null | undefined) {
   return value
@@ -675,9 +677,10 @@ function SysopPassword({ onChange }: { onChange: (me: Me) => void }) {
 
 /**
  * All an account sees until it is approved (v0.3.0), under the landing page's mark: its state, its
- * email address and Sign out. A pending account asks the server again every minute while shown,
- * when the window regains focus or is shown again, and on Check again, so an approval opens the
- * app without a reload; it chooses its handle once approved. Any other account can only sign out.
+ * email address, where to write and Sign out. A pending account asks the server again every minute
+ * while shown, when the window regains focus or is shown again, and on Check again, so an approval
+ * opens the app without a reload; it chooses its handle once approved. Any other account can only
+ * sign out.
  */
 export function Waiting({
   me,
@@ -751,19 +754,48 @@ export function Waiting({
       document.removeEventListener("visibilitychange", again);
     };
   }, [pending, check]);
+  // Written for someone who has never heard of the site (v0.4.1): what happened, that there is
+  // nothing to do, and whom to ask. No promise of when.
   return (
     <div className={styles.waiting}>
       <h1 ref={heading} tabIndex={-1}>
         {pending
-          ? "Your account is waiting for approval."
-          : "Your account was not approved."}
+          ? "Your request to join the Commander Duels beta is in."
+          : "Your request was not approved this time."}
       </h1>
-      {!pending && (
+      {pending ? (
+        <>
+          <p className={styles.fine}>
+            The site's owner reviews each request by hand.
+          </p>
+          <p className={styles.fine}>
+            There is nothing else to do. This page checks every minute and opens
+            the site once you are approved, so you can leave it open, or come
+            back later and sign in with the same Google account.
+          </p>
+        </>
+      ) : (
         <p className={styles.fine}>
-          Contact the operator of this server if you think this is a mistake.
+          If you think this is a mistake, write to{" "}
+          <a className={styles.mail} href={`mailto:${CONTACT}`}>
+            {CONTACT}
+          </a>
+          . A request that is not approved is deleted 30 days after it was made.
         </p>
       )}
-      {me.email && <p className={styles.email}>{me.email}</p>}
+      {me.email && (
+        <p className={styles.email}>
+          Signed in as <span>{me.email}</span>
+        </p>
+      )}
+      {pending && (
+        <p className={styles.fine}>
+          Questions?{" "}
+          <a className={styles.mail} href={`mailto:${CONTACT}`}>
+            {CONTACT}
+          </a>
+        </p>
+      )}
       <p role="status" className={styles.fine}>
         {note}
       </p>

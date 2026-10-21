@@ -11,6 +11,9 @@
   widths and the phone crop of its logo half.
 - "screenshots <files>" turns 16:9 captures of the site (play.png, table.png from the browser
   journeys) into the manifest's 1920 x 1080 WebP screenshots, named after each file.
+- "google <file>" makes the app logo for Google's consent screen (v0.4.1) from the wordless
+  logo: google-logo-120.png, a square 120 x 120 PNG, the mark on the site's background. The site
+  does not use it; the owner uploads it in Google Auth Platform's Branding page.
 
 The logo with the words (commander.duels.logo.png) is not on the site since the banner replaced
 it, so no copy of it is made. Only these web-sized copies are in the repository. The script needs
@@ -38,6 +41,10 @@ BACKGROUND = (16, 24, 25, 255)
 # inside the safe circle (80% of the side across; 0.56 x sqrt(2) is about 0.79).
 MASKABLE_MARK = 0.56
 SCREENSHOT = (1920, 1080)
+# Google's consent screen logo: 120 px square is its best size. Google may show it in a circle, so
+# the mark's box takes this share of the side, which keeps its corners inside one.
+GOOGLE_LOGO = 120
+GOOGLE_MARK = 0.78
 
 
 def open_logo(path: str, mode: str) -> Image.Image:
@@ -85,6 +92,25 @@ def marks(mark: Image.Image) -> list[str]:
         mark.resize((size, size), Image.Resampling.LANCZOS).save(OUT / name, quality=90, method=6)
         names.append(name)
     return names
+
+
+def google_logo(mark: Image.Image) -> list[str]:
+    """The app logo for Google's consent screen: the mark centred on the site's background, with
+    no transparency, since Google shows it on light and dark pages alike."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    box = mark.getbbox()
+    if box is None:
+        raise SystemExit("The logo is empty")
+    drawn = mark.crop(box)
+    scale = GOOGLE_MARK * GOOGLE_LOGO / max(drawn.size)
+    width, height = (max(1, round(side * scale)) for side in drawn.size)
+    logo = Image.new("RGBA", (GOOGLE_LOGO, GOOGLE_LOGO), BACKGROUND)
+    logo.alpha_composite(
+        drawn.resize((width, height), Image.Resampling.LANCZOS),
+        ((GOOGLE_LOGO - width) // 2, (GOOGLE_LOGO - height) // 2),
+    )
+    logo.convert("RGB").save(OUT / "google-logo-120.png", optimize=True)
+    return ["google-logo-120.png"]
 
 
 def main(nowords: str) -> None:
@@ -153,5 +179,7 @@ if __name__ == "__main__":
         report(marks(open_logo(sys.argv[2], "RGBA")))
     elif sys.argv[1] == "screenshots":
         screenshots(sys.argv[2:])
+    elif sys.argv[1] == "google":
+        report(google_logo(open_logo(sys.argv[2], "RGBA")))
     else:
         main(sys.argv[1])
