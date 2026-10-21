@@ -11,12 +11,19 @@ Copies count, as in Magic Duels: a deck may hold no more copies of a card than t
 counting every printing and Oracle version of the card together. Copies are a limit per deck, not
 spent by one: two decks may each hold the same owned card.
 
+The Godlike tier's custom cards (v0.4.0) are open only to an account at that tier: an alliance
+with their Planeswalker then holds a playset of each, kept apart from the catalog's copies, and
+administrators and SysOp build with them as with any card. Below Godlike the account's library
+holds none, whatever its alliance. Which of them the running engine has loaded is asked once per
+engine start (api/engine_cards.py), for Godlike accounts and SysOp only.
+
 The ten starter decks are content/starter-decks.json, made from the owner's workbook by
 scripts/starter_decks.py. Each card keeps the printing the owner chose for it.
 """
 
 import json
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -26,11 +33,13 @@ from uuid import UUID
 from fastapi import Depends, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
+from api.engine_cards import engine_cards_of
 from api.identity import Active, Db, utcnow
-from api.models import CardConcept, CardPrinting, LibraryGrant, User
-from api.roster import ALLIANCE_COPIES, Planeswalker, alliance_cards, roster_of
-from api.validation import Collection, DeckEntry
+from api.models import CardConcept, CardPrinting, CustomCard, LibraryGrant, ProgressEntry, User
+from api.roster import ALLIANCE_COPIES, GODLIKE, Planeswalker, alliance_cards, roster_of
+from api.validation import CUSTOM_KEY, Collection, DeckEntry, custom_key
 from catalog.text import normalize
 
 UNLIMITED = "library.unlimited"
@@ -38,27 +47,50 @@ UNLIMITED = "library.unlimited"
 
 @dataclass
 class Library:
-    """An account's library: owned copies by construction key, and where each came from."""
+    """An account's library: owned copies by construction key, and where each came from; the
+    custom cards' copies by their own keys (custom:<id>), whether the account is at the Godlike
+    tier, and which custom cards the running engine has loaded (by name, case aside; None when
+    not asked)."""
 
     unlimited: bool
     copies: dict[str, int] = field(default_factory=dict)
     sources: dict[str, set[str]] = field(default_factory=dict)
     alliance: str | None = None
+    godlike: bool = False
+    custom: dict[str, int] = field(default_factory=dict)
+    loaded: Mapping[str, bool] | None = None
 
-    def collection(self) -> Collection | None:
-        return None if self.unlimited else Collection(self.copies)
+    def collection(self) -> Collection:
+        return Collection(
+            None if self.unlimited else {**self.copies, **self.custom},
+            godlike=self.godlike,
+            loaded=self.loaded,
+        )
 
     def owned(self, key: str) -> int | None:
         """Copies owned, or None when the account builds from the whole catalog."""
-        return None if self.unlimited else self.copies.get(key, 0)
+        if self.unlimited:
+            return None
+        return self.custom.get(key, 0) if key.startswith(CUSTOM_KEY) else self.copies.get(key, 0)
+
+
+def at_godlike(db: Session, user_id: UUID) -> bool:
+    """Whether the account's wins, counted and set, reach the Godlike tier (api/progression.py)."""
+    wins = db.scalar(
+        select(func.coalesce(func.sum(ProgressEntry.wins), 0)).where(
+            ProgressEntry.user_id == user_id
+        )
+    )
+    return int(wins or 0) >= GODLIKE.wins
 
 
 def library_of(
     db: Session, user: User, permissions: frozenset[str], roster: dict[str, Planeswalker]
 ) -> Library:
+    godlike = at_godlike(db, user.id)
     if UNLIMITED in permissions:
-        return Library(unlimited=True, alliance=user.alliance)
-    library = Library(unlimited=False, alliance=user.alliance)
+        return Library(unlimited=True, alliance=user.alliance, godlike=godlike)
+    library = Library(unlimited=False, alliance=user.alliance, godlike=godlike)
     copies: dict[str, int] = defaultdict(int)
     sources: dict[str, set[str]] = defaultdict(set)
     granted = db.execute(
@@ -77,6 +109,12 @@ def library_of(
         for key in keys:
             copies[key] += ALLIANCE_COPIES
             sources[key].add("alliance")
+    elif planeswalker is not None and godlike:
+        # The Godlike tier's Planeswalker: a playset of each of its custom cards.
+        for card_id in db.scalars(
+            select(CustomCard.id).where(CustomCard.planeswalker == planeswalker.id)
+        ):
+            library.custom[custom_key(card_id)] = ALLIANCE_COPIES
     library.copies, library.sources = (
         dict(copies),
         {key: set(found) for key, found in sources.items()},
@@ -84,8 +122,21 @@ def library_of(
     return library
 
 
-def current_library(request: Request, principal: Active, db: Db) -> Library:
-    return library_of(db, principal.user, principal.permissions, roster_of(request))
+def custom_names(db: Session) -> list[str]:
+    return list(db.scalars(select(CustomCard.name)))
+
+
+async def current_library(request: Request, principal: Active, db: Db) -> Library:
+    """The account's library; for a Godlike account or SysOp, with which custom cards the running
+    engine has loaded, so the deck builder can say so."""
+    library = await run_in_threadpool(
+        library_of, db, principal.user, principal.permissions, roster_of(request)
+    )
+    if library.godlike or principal.can("custom_cards.manage"):
+        names = await run_in_threadpool(custom_names, db)
+        cards = engine_cards_of(request)
+        library.loaded = await cards.loaded(names) if cards is not None and names else None
+    return library
 
 
 CurrentLibrary = Annotated[Library, Depends(current_library)]

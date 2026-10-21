@@ -185,6 +185,9 @@ export const reasonLabels: Record<string, string> = {
   engine_gate_failed: "The engine's version failed an automatic check",
   characteristics_differ: "The engine's version differs from the Oracle card",
   suspended_by_staff: "Suspended by the site's staff",
+  // The Godlike tier's custom cards (v0.4.0).
+  not_loaded: "Not loaded by this engine",
+  godlike_only: "Only the Godlike tier may play it",
 };
 
 /** A short label for why a card cannot be played; the detail explains more. */

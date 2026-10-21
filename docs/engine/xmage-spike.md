@@ -116,6 +116,10 @@ XMage keeps card metadata in an embedded H2 database at `./db/cards.h2` relative
 - **Peak live heap in a match:** at most 202 MB at skill 6, from GC logs over 10 matches on a 512 MB heap.
 - **Chosen settings:** `-Xms256m -Xmx768m` with G1, `-XX:+ExitOnOutOfMemoryError`, and a 1.5 GB container limit. After matches the container sits around 1.0 GiB, which is the committed heap plus the H2 file's page cache.
 
+## Plugins (v0.4.0)
+
+The engine image runs `java -cp /app/engine.jar:/app/lib/*:/app/plugins/*`. `/app/plugins` ships empty, owned by uid 10001. A derived image (`FROM` the engine image of the same version) adds its card jars there and rebuilds `/app/db` itself, by XMage's classpath scan with the plugin on the classpath, so the shipped database is complete again and startup stays a plain open. The cards are then in the engine's card search, in deck lists and in games like any other; `/health` reports the larger counts. The owner's private image adds the Godlike tier's custom cards this way ([progression](../progression.md#the-godlike-tiers-custom-cards)); this repository holds nothing of them.
+
 ## Driving XMage headless
 
 The engine drives XMage's game objects directly, the same way `Mage.Tests` does. It doesn't start the XMage server, users, sessions or tables. One match does the following (`BotMatchRunner`):

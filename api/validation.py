@@ -14,6 +14,13 @@ Copies are counted by construction key, the card's English name, so another prin
 Oracle version of a card is still that card (T03). Legality comes from the format version: its
 banned list and Scryfall's legality of each card (CAT05). Application limits that are not Magic
 rules (at most 250 cards in a main deck) say so.
+
+Since v0.4.0 a deck may also hold the Godlike tier's custom cards (api/custom_cards.py), from a
+table of their own, while its owner is at the Godlike tier. Each counts as legal in Legacy and
+Commander; it may lead a Commander deck by the same rule as a catalog card; its color identity
+comes from the mana symbols of its cost and rules text; it is playable only when the running
+engine has loaded it. Below Godlike a deck holding one is collection-locked, and nothing about the
+card is named.
 """
 
 import re
@@ -28,10 +35,11 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api.models import CardConcept, CardPrinting, FormatVersion
+from api.models import CardConcept, CardPrinting, CustomCard, FormatVersion
 from api.schemas import Contract
 from catalog.formats import RULES, TECHNICAL_MAX_MAIN
-from catalog.text import ALL_COLORS, colors_of, front, normalize, type_parts
+from catalog.roles import roles
+from catalog.text import ALL_COLORS, COLOR_BITS, colors_of, front, normalize, type_parts
 
 GameFormatName = Literal["legacy", "commander"]
 Location = Literal["main", "sideboard", "commander", "companion", "maybeboard"]
@@ -45,6 +53,11 @@ MAX_QUANTITY = 250
 PERMANENTS = frozenset({"Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"})
 SYMBOL = re.compile(r"\{[^}]+\}")
 KAHEERA_TYPES = frozenset({"Cat", "Elemental", "Nightmare", "Dinosaur", "Beast"})
+# Reminder text, which a card's color identity ignores (rule 903.4).
+REMINDER = re.compile(r"\([^()]*\)")
+# A custom card's construction key: its ID, so it never meets a catalog card's name.
+CUSTOM_KEY = "custom:"
+CUSTOM_LEGAL = {"legacy": "legal", "commander": "legal"}
 
 
 class DeckEntry(Contract):
@@ -128,10 +141,18 @@ class Card:
 
 @dataclass(frozen=True)
 class Collection:
-    """The copies of each card a player owns, by construction key, so another printing or Oracle
-    version of a card counts as that card. Basic lands are never limited."""
+    """What a deck's owner may build with.
 
-    copies: Mapping[str, int]
+    - copies: the copies of each card they own, by construction key, so another printing or
+      Oracle version of a card counts as that card; basic lands are never limited. None for
+      administrators and SysOp, who build from the whole catalog.
+    - godlike: the owner is at the Godlike tier, which opens the custom cards to them (v0.4.0).
+    - loaded: by custom card name, case aside, whether the running engine has loaded it; None
+      when the engine was not asked."""
+
+    copies: Mapping[str, int] | None
+    godlike: bool = False
+    loaded: Mapping[str, bool] | None = None
 
 
 @dataclass(frozen=True)
@@ -230,6 +251,82 @@ def cards_of(session: Session, ids: set[UUID]) -> dict[UUID, Card]:
     }
 
 
+def custom_key(card_id: UUID) -> str:
+    return f"{CUSTOM_KEY}{card_id}"
+
+
+def symbol_value(symbol: str) -> float:
+    """A mana symbol's share of a mana value: {3} is 3, {X} 0, {2/W} 2, any other 1."""
+    inner = symbol.strip("{}").upper()
+    if inner in ("X", "Y", "Z"):
+        return 0.0
+    first = inner.split("/", 1)[0]
+    return float(first) if first.isdigit() else 1.0
+
+
+def mana_value_of(cost: str | None) -> float:
+    return sum(symbol_value(symbol) for symbol in SYMBOL.findall(cost or ""))
+
+
+def symbol_colors(text: str) -> int:
+    """The colors of the mana symbols in a text, as bits: {W/U} is both, {G/P} green."""
+    bits = 0
+    for symbol in SYMBOL.findall(text):
+        for part in symbol.strip("{}").upper().split("/"):
+            bits |= COLOR_BITS.get(part, 0)
+    return bits
+
+
+def custom_identity(mana_cost: str | None, oracle_text: str) -> int:
+    """A custom card's color identity: the mana symbols of its cost and of its rules text,
+    reminder text aside (rule 903.4)."""
+    return symbol_colors(mana_cost or "") | symbol_colors(REMINDER.sub(" ", oracle_text))
+
+
+def custom_rules(row: CustomCard, loaded: bool | None) -> Card:
+    """A custom card as validation reads it: legal in both formats, a commander by the catalog's
+    rule, and not playable when the running engine has not loaded it (None: not known)."""
+    found = roles(row.type_line, row.oracle_text, [])
+    return Card(
+        id=row.id,
+        name=row.name,
+        construction_key=custom_key(row.id),
+        type_line=row.type_line,
+        mana_cost=row.mana_cost,
+        mana_value=mana_value_of(row.mana_cost),
+        identity_mask=custom_identity(row.mana_cost, row.oracle_text),
+        legalities=dict(CUSTOM_LEGAL),
+        status="not_loaded" if loaded is False else "certified",
+        status_detail="it is not loaded by this engine." if loaded is False else None,
+        deck_card=True,
+        removed=False,
+        released=None,
+        commander=found.commander,
+        partner=found.partner,
+        companion=found.companion,
+        copy_limit=found.copy_limit,
+        activated=found.activated,
+        keywords=(),
+    )
+
+
+def custom_cards_of(
+    session: Session, ids: set[UUID], collection: Collection | None
+) -> tuple[dict[UUID, Card], frozenset[UUID]]:
+    """The custom cards among ids: as validation reads them while the deck's owner is at the
+    Godlike tier; below it, only their IDs, which hold the deck back without naming them."""
+    if not ids:
+        return {}, frozenset()
+    rows = session.scalars(select(CustomCard).where(CustomCard.id.in_(ids))).all()
+    if collection is None or not collection.godlike:
+        return {}, frozenset(row.id for row in rows)
+    loaded = collection.loaded
+    return {
+        row.id: custom_rules(row, None if loaded is None else loaded.get(row.name.casefold()))
+        for row in rows
+    }, frozenset()
+
+
 def rules_of(session: Session, fmt: str) -> Rules:
     version = session.scalar(
         select(FormatVersion)
@@ -246,9 +343,14 @@ def validate_deck(
     session: Session, content: DeckContent, today: date, collection: Collection | None = None
 ) -> Validation:
     """The deck by its format's rules and, given the player's collection, the copies they own;
-    without one (administrators, SysOp, or a deck shown without its player), every card is open."""
-    cards = cards_of(session, {entry.card_id for entry in content.entries})
-    return validate(content, cards, rules_of(session, content.format), today, collection)
+    without copies (administrators, SysOp, or a deck shown without its player), every catalog
+    card is open. Custom cards are open only to an owner at the Godlike tier."""
+    ids = {entry.card_id for entry in content.entries}
+    cards = cards_of(session, ids)
+    custom, hidden = custom_cards_of(session, ids - cards.keys(), collection)
+    return validate(
+        content, cards | custom, rules_of(session, content.format), today, collection, hidden
+    )
 
 
 def validate(
@@ -257,14 +359,33 @@ def validate(
     rules: Rules,
     today: date,
     collection: Collection | None = None,
+    hidden: frozenset[UUID] = frozenset(),
 ) -> Validation:
+    """hidden: custom cards the deck holds while its owner is below the Godlike tier."""
     report = Report()
     counts = DeckCounts()
     for entry in content.entries:
         setattr(counts, entry.location, getattr(counts, entry.location) + entry.quantity)
     present = [entry for entry in content.entries if entry.card_id in cards]
+    held_back = list(
+        dict.fromkeys(
+            entry.card_id
+            for entry in content.entries
+            if entry.card_id in hidden and entry.location != "maybeboard"
+        )
+    )
+    if held_back:
+        many = len(held_back) > 1
+        report.error(
+            "custom.godlike_only",
+            f"This deck holds {len(held_back)} Godlike card{'s' if many else ''}: only an "
+            "account at the Godlike tier (100,000 wins) may play " + ("them." if many else "it."),
+            "Remove " + ("them" if many else "it") + ", or reach the Godlike tier again.",
+            kind="collection_locked",
+            card_ids=held_back,
+        )
     for entry in content.entries:
-        if entry.card_id not in cards:
+        if entry.card_id not in cards and entry.card_id not in hidden:
             report.error(
                 "card.unknown",
                 "A card in this deck is not in the catalog.",
@@ -288,12 +409,16 @@ def validate(
     for card_id in dict.fromkeys(entry.card_id for entry in playing):
         card_problems(report, cards[card_id], rules, today)
     copies(report, playing, cards, rules)
-    if collection is not None:
-        owned_copies(report, playing, cards, collection)
+    if collection is not None and collection.copies is not None:
+        owned_copies(report, playing, cards, collection.copies)
     if rules.format == "legacy":
         legacy(report, playing, cards, rules, counts)
     else:
-        commander(report, playing, cards, rules, counts)
+        # A hidden custom commander still leads: the deck is held back, not missing one.
+        hidden_leaders = any(
+            entry.card_id in hidden and entry.location == "commander" for entry in content.entries
+        )
+        commander(report, playing, cards, rules, counts, hidden_leaders)
     # Legal by the format's rules; playable also needs every card supported by the engine and
     # owned in the copies the deck holds.
     legal = all(problem.kind in BLOCKING for problem in report.errors)
@@ -403,7 +528,7 @@ def basic_land(card: Card) -> bool:
 
 
 def owned_copies(
-    report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], collection: Collection
+    report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], copies: Mapping[str, int]
 ) -> None:
     """Copies the player owns, per construction key, outside the maybeboard (DECK08). Copies are a
     limit per deck: two decks may each hold the same owned card."""
@@ -417,7 +542,7 @@ def owned_copies(
         if card.id not in holders[card.construction_key]:
             holders[card.construction_key].append(card.id)
     for key, count in counted.items():
-        have = collection.copies.get(key, 0)
+        have = copies.get(key, 0)
         if count <= have:
             continue
         card = cards[holders[key][0]]
@@ -492,17 +617,19 @@ def commander(
     cards: dict[UUID, Card],
     rules: Rules,
     counts: DeckCounts,
+    hidden_leaders: bool = False,
 ) -> None:
     size = number(rules, "deck_size", 100)
     leaders = [cards[entry.card_id] for entry in entries if entry.location == "commander"]
     leader_count = sum(entry.quantity for entry in entries if entry.location == "commander")
     if leader_count == 0:
-        report.error(
-            "commander.missing",
-            "A Commander deck needs a commander.",
-            "Choose a legendary creature, or a card that can be your commander.",
-            location="commander",
-        )
+        if not hidden_leaders:
+            report.error(
+                "commander.missing",
+                "A Commander deck needs a commander.",
+                "Choose a legendary creature, or a card that can be your commander.",
+                location="commander",
+            )
     elif leader_count > 2 or len(leaders) != leader_count:
         report.error(
             "commander.count",

@@ -17,8 +17,18 @@ previous="$(setting CD_VERSION)"
 printf 'allow %s;\nallow 127.0.0.1;\ndeny all;\n' "$(setting CD_PROXY_ADDRESS)" > web-access.conf
 
 export CD_VERSION="$tag"
-echo "Pulling $tag"
-docker compose pull --quiet
+# The engine may be the owner's private image (CD_ENGINE_IMAGE in .env), which needs the VM's
+# read-only login to ghcr.io (docs/deployment.md).
+engine_image="$(setting CD_ENGINE_IMAGE)"
+echo "Pulling $tag${engine_image:+ (engine: $engine_image:$tag)}"
+if ! docker compose pull --quiet; then
+  echo "Pulling $tag failed; nothing was replaced." >&2
+  if [ -n "$engine_image" ]; then
+    echo "The engine is $engine_image: is the VM logged in to ghcr.io with a read:packages" >&2
+    echo "token, and does that image have the tag $tag? See docs/deployment.md." >&2
+  fi
+  exit 1
+fi
 dump="backups/<the pre-$tag dump>"
 if [ -n "$(docker compose ps -q db 2>/dev/null)" ]; then
   ./backup.sh "pre-$tag"

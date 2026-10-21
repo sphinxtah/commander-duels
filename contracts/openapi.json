@@ -463,6 +463,24 @@
             ],
             "title": "Copy Limit"
           },
+          "custom": {
+            "default": false,
+            "description": "One of the Godlike tier's custom cards (v0.4.0), in its owner's deck only.",
+            "title": "Custom",
+            "type": "boolean"
+          },
+          "custom_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A custom card's own image; null for catalog cards.",
+            "title": "Custom Image"
+          },
           "defense": {
             "anyOf": [
               {
@@ -963,6 +981,24 @@
             ],
             "title": "Copy Limit"
           },
+          "custom": {
+            "default": false,
+            "description": "One of the Godlike tier's custom cards (v0.4.0), in its owner's deck only.",
+            "title": "Custom",
+            "type": "boolean"
+          },
+          "custom_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A custom card's own image; null for catalog cards.",
+            "title": "Custom Image"
+          },
           "defense": {
             "anyOf": [
               {
@@ -1377,6 +1413,10 @@
             ],
             "title": "Artist"
           },
+          "card": {
+            "$ref": "#/components/schemas/CardSummary",
+            "description": "The card as decks hold it (v0.4.0)."
+          },
           "collector_number": {
             "anyOf": [
               {
@@ -1410,9 +1450,21 @@
           },
           "in_library": {
             "default": false,
-            "description": "In your library: you are allied with its Planeswalker.",
+            "description": "In your library: you are allied with its Planeswalker, or you build from the whole catalog.",
             "title": "In Library",
             "type": "boolean"
+          },
+          "loaded": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether the running engine has loaded it (v0.4.0); null when the engine could not be asked.",
+            "title": "Loaded"
           },
           "loyalty": {
             "anyOf": [
@@ -1450,7 +1502,7 @@
           },
           "playable": {
             "default": false,
-            "description": "None can be played yet.",
+            "description": "The running engine has loaded it, so a game can play it.",
             "title": "Playable",
             "type": "boolean"
           },
@@ -1511,7 +1563,8 @@
           "set_code",
           "collector_number",
           "artist",
-          "image_url"
+          "image_url",
+          "card"
         ],
         "title": "CustomCardInfo",
         "type": "object"
@@ -9129,7 +9182,7 @@
     },
     "/api/v1/custom-cards": {
       "get": {
-        "description": "The custom cards, for accounts at the Godlike tier only.",
+        "description": "The custom cards, for accounts at the Godlike tier only, each with whether the running\nengine has loaded it.",
         "operationId": "custom_cards_api_v1_custom_cards_get",
         "responses": {
           "200": {
@@ -10563,6 +10616,7 @@
     },
     "/api/v1/decks/{deck_id}/export": {
       "get": {
+        "description": "The owner's deck as a file, its custom cards by name while the owner is at the Godlike\ntier.",
         "operationId": "export_deck_api_v1_decks__deck_id__export_get",
         "parameters": [
           {
@@ -13234,7 +13288,7 @@
     },
     "/api/v1/shared-decks/{code}": {
       "get": {
-        "description": "A deck shared by link, for anyone signed in: its cards, not its notes (DECK11). It is\nvalidated against the viewer's library, as a copy of it would be.",
+        "description": "A deck shared by link, for anyone signed in: its cards, not its notes (DECK11), and never\nits custom cards. It is validated against the viewer's library, as a copy of it would be.",
         "operationId": "read_shared_api_v1_shared_decks__code__get",
         "parameters": [
           {
@@ -13347,7 +13401,7 @@
     },
     "/api/v1/shared-decks/{code}/copy": {
       "post": {
-        "description": "Copies a shared deck into the viewer's own decks, without its owner's notes.",
+        "description": "Copies a shared deck into the viewer's own decks, without its owner's notes or custom\ncards.",
         "operationId": "copy_shared_api_v1_shared_decks__code__copy_post",
         "parameters": [
           {

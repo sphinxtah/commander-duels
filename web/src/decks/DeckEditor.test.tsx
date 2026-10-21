@@ -8,9 +8,11 @@ import {
 } from "@testing-library/react";
 import { createRef, StrictMode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { customCard } from "../alliance/fixtures";
 import { DeckEditor } from "./DeckEditor";
 import {
   card,
+  customSummary,
   deckDetail,
   entry,
   mockApi,
@@ -334,5 +336,144 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     expect(
       await screen.findByRole("heading", { name: "No such deck." }),
     ).toBeInTheDocument();
+  });
+});
+
+// Made-up stand-ins for the Godlike tier's custom cards (v0.4.0): never the owner's own.
+const sigil = customSummary("Stand-in Sigil", {
+  status: "not_implemented",
+  status_reason: "not_loaded",
+  status_detail: "Not loaded by this engine: a game here cannot play it.",
+  playable: false,
+});
+const paragon = customSummary("Placeholder Paragon", {
+  type_line: "Legendary Creature — Stand-in",
+  mana_cost: "{W}{U}{B}{R}{G}",
+  color_identity: ["W", "U", "B", "R", "G"],
+  commander: true,
+  loyalty: null,
+  power: "5",
+  toughness: "5",
+});
+
+describe("Godlike cards in the deck editor", { timeout: 15_000 }, () => {
+  it("offers a Godlike account its custom cards with their images, and adds them", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deck(3)));
+    api.on(DRAFT, () => saved(4));
+    api.on("GET /api/v1/custom-cards", () =>
+      reply(200, [
+        customCard("Stand-in Sigil", { card: sigil }),
+        customCard("Placeholder Paragon", {
+          card: paragon,
+          loaded: true,
+          playable: true,
+        }),
+      ]),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    const shelf = (
+      await screen.findByText("Godlike cards", undefined, FOUND)
+    ).closest("details")!;
+    const row = within(shelf)
+      .getByRole("button", { name: /^Stand-in Sigil/ })
+      .closest("li")!;
+    expect(row.querySelector("img")).toHaveAttribute("src", sigil.custom_image);
+    expect(row).toHaveTextContent("Not playable");
+    expect(row).toHaveTextContent("In your library: 4");
+    // A Legacy deck: no commander button, even for a legendary creature.
+    const paragonRow = within(shelf)
+      .getByRole("button", { name: /^Placeholder Paragon/ })
+      .closest("li")!;
+    expect(paragonRow).toHaveTextContent("Playable");
+    expect(
+      within(paragonRow).queryByRole("button", { name: "Commander" }),
+    ).toBeNull();
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Add Stand-in Sigil" }),
+    );
+    await waitFor(() => expect(drafts(api)).toHaveLength(1), SAVED);
+    expect(drafts(api)[0]).toEqual({
+      version: 3,
+      entries: [entry(bolt, 4), entry(sigil, 1)],
+    });
+    // The deck shows it, and opening it shows its own image and text, not the catalog's page.
+    const listed = screen
+      .getByRole("button", { name: "Remove Stand-in Sigil" })
+      .closest("li")!;
+    fireEvent.click(
+      within(listed).getByRole("button", { name: /^Stand-in Sigil/ }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Stand-in Sigil",
+    });
+    expect(dialog).toHaveTextContent("+1: Draw a stand-in card.");
+    expect(dialog).toHaveTextContent("Not loaded by this engine");
+    expect(dialog.querySelector("img")).toHaveAttribute(
+      "src",
+      sigil.custom_image,
+    );
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      "GET /api/v1/cards/{card_id}",
+    );
+  });
+
+  it("offers a Commander deck only the custom cards its commander's identity allows", async () => {
+    const api = mockApi();
+    const leader = card("Stand-in Leader", {
+      type_line: "Legendary Creature — Stand-in",
+      color_identity: ["U"],
+      commander: true,
+    });
+    api.on(DECK, () =>
+      reply(
+        200,
+        deckDetail({
+          format: "commander",
+          draft: { version: 1, entries: [entry(leader, 1, "commander")] },
+          cards: { [leader.id]: leader },
+        }),
+      ),
+    );
+    api.on("GET /api/v1/custom-cards", () =>
+      reply(200, [
+        customCard("Stand-in Sigil", { card: sigil }),
+        customCard("Placeholder Paragon", { card: paragon }),
+      ]),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    const shelf = (
+      await screen.findByText("Godlike cards", undefined, FOUND)
+    ).closest("details")!;
+    expect(
+      within(shelf).getByRole("button", { name: /^Stand-in Sigil/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(shelf).queryByRole("button", { name: /^Placeholder Paragon/ }),
+    ).toBeNull();
+    // Without the filter, the five-color one shows, with its commander button.
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: /^Only cards this deck can use/ }),
+    );
+    const paragonRow = within(shelf)
+      .getByRole("button", { name: /^Placeholder Paragon/ })
+      .closest("li")!;
+    expect(
+      within(paragonRow).getByRole("button", { name: "Commander" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows nothing of them below the Godlike tier", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deck(3)));
+    api.on("GET /api/v1/custom-cards", () =>
+      reply(404, { code: "not_found", message: "Not found." }),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    expect(screen.queryByText("Godlike cards")).toBeNull();
   });
 });

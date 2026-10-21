@@ -93,6 +93,24 @@ Set up on 2026-10-19, step by step with discovery first, so that no other site o
    - `duels` redirects HTTP to HTTPS and answered 502 until the first deploy;
    - the eight other sites answer as before.
 
+### The engine with the custom cards (v0.4.0)
+
+The Godlike tier's custom cards play only on an engine that has loaded them ([progression](progression.md#the-godlike-tiers-custom-cards)). Their implementations live in the owner's private repository, whose CI publishes a private engine image: the public engine image with a plugin added to `/app/plugins` and its card database rebuilt ([engine plugins](engine/xmage-spike.md#plugins-v040)). The live site runs that image instead of the public one. Once, on the VM:
+
+1. Log Docker in to GitHub's container registry, if it is not already (step 3 above did it before the repository went public). It needs a **classic** personal access token with only `read:packages`, from the account that owns the private image; type it at the prompt, never into a chat or a file:
+
+   ```sh
+   docker login ghcr.io -u sphinxtah
+   ```
+
+2. In `/srv/commander-duels/.env`, name the private image, without a tag:
+
+   ```sh
+   CD_ENGINE_IMAGE=ghcr.io/sphinxtah/commander-duels-engine-sphinx
+   ```
+
+From then on `deploy.sh` pulls that image with the same tag as the version it deploys (`0.4.0`, or `sha-<commit>` for a build of `main`), so the private repository's CI must publish each version's tag before that version is deployed. If the pull fails, `deploy.sh` stops before anything is replaced and asks whether the VM is logged in and the tag exists. Without `CD_ENGINE_IMAGE` (or with it empty) the site runs the public engine: everything works, and the custom cards show "Not loaded by this engine" in the deck builder and cannot start a game. The deploy's engine status line shows which card database is running (its `cards` counts are higher on the private image).
+
 ### SysOp
 
 After the first deploy, set SysOp's password on the VM. It asks twice, without echo:
@@ -103,7 +121,7 @@ cd /srv/commander-duels && docker compose exec api python -m api.cli sysop-passw
 
 ## Deploying a version
 
-CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` once the verify and engine jobs pass:
+CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` once the verify and engine jobs pass (the live site's engine may instead be the owner's private image, `CD_ENGINE_IMAGE`, above):
 - every push to `main` as `sha-<12-character commit>` and `main`;
 - every version tag as its version (`v0.1.0` → `0.1.0`).
 
@@ -231,6 +249,7 @@ After the first deploy and at each version's close-out:
 | `CD_SYSOP_NETWORKS` | The home LAN, 10.10.1.0/24 |
 | `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 and 6 (v0.1.0's `.env` says 2: change it to 6 when deploying v0.1.1) |
 | `CD_DB_PASSWORD`, `CD_ENGINE_SERVICE_TOKEN` | Generated on the VM by the bootstrap |
+| `CD_ENGINE_IMAGE` | Since v0.4.0: the engine image without its tag. Empty or absent: the public `ghcr.io/sphinxtah/commander-duels/engine`. The live site: `ghcr.io/sphinxtah/commander-duels-engine-sphinx`, the private image with the custom cards ([above](#the-engine-with-the-custom-cards-v040)) |
 
 The API runs with `CD_ENVIRONMENT=production`. In production it refuses to start unless:
 - the public URL is HTTPS and cookies are Secure;

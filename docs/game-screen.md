@@ -52,6 +52,8 @@ Images come from Scryfall by the card's name. The API fetches each once, keeps i
 - `GET /api/v1/card-images?name=&size=normal|large|png` serves the image, for signed-in accounts. The PNG is checked as a PNG and kept up to 8 MB; a printing without one is served at the next size down and never recorded as missing (v0.3.0);
 - `GET /api/v1/card-images/info?name=` gives its artist and printing.
 
+The Godlike tier's custom cards (v0.4.0) are never asked of Scryfall. Their names get each card's own image from the database (`private, no-store`), for a Godlike account and for anyone seated in, or observing, a game where some seat's deck holds the card; anyone else gets the answer of a name Scryfall does not know ([progression](progression.md#playing-them-v040)).
+
 Both routes give back the database connection their sign-in used before any lookup, so a slow Scryfall never holds one.
 
 Scryfall's terms are kept:

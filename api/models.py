@@ -678,6 +678,10 @@ class DeckRevision(Base):
 
 
 class DeckEntryRow(Base):
+    """A card of a revision: a catalog card, or since v0.4.0 one of the Godlike tier's custom
+    cards. A custom card's ID has no foreign key: SysOp may remove the card, and a revision a game
+    played stays as it was."""
+
     __tablename__ = "deck_entries"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="ck_deck_entries_quantity"),
@@ -685,10 +689,14 @@ class DeckEntryRow(Base):
             "location IN ('main', 'sideboard', 'commander', 'companion', 'maybeboard')",
             name="ck_deck_entries_location",
         ),
+        CheckConstraint(
+            "(concept_id IS NULL) != (custom_card_id IS NULL)", name="ck_deck_entries_card"
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     revision_id: Mapped[UUID] = mapped_column(ForeignKey("deck_revisions.id"), index=True)
-    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    concept_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_concepts.id"), index=True)
+    custom_card_id: Mapped[UUID | None]
     printing_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_printings.id"))
     quantity: Mapped[int]
     location: Mapped[str] = mapped_column(String(16))
@@ -795,8 +803,9 @@ class SiteSetting(Base):
 
 class CustomCard(Base):
     """A card of the owner's own making, uploaded by SysOp: never in the catalog's tables, so no
-    search, card page, deck or list of others can reach it. Only accounts at the Godlike tier see
-    it, and none may play it until the engine implements it."""
+    search, card page or list of others can reach it. Only accounts at the Godlike tier see it
+    and may put it in their decks (v0.4.0); a game plays it when the running engine has loaded
+    it, and then every seat at that table sees it."""
 
     __tablename__ = "custom_cards"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)

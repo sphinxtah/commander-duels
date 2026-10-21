@@ -41,9 +41,11 @@ from starlette.concurrency import run_in_threadpool
 
 from api.auth import INPUT_ERRORS
 from api.config import Settings
+from api.custom_play import custom_in_seats
 from api.decklists import parse_deck_list
 from api.decks import publish, revision_entries, starters_of
 from api.economy import pay_game, tokens_from
+from api.engine_cards import engine_cards_of
 from api.identity import (
     SESSION_COOKIE,
     ApiError,
@@ -64,6 +66,7 @@ from api.library import Library, Starter, library_of, starter_entries
 from api.models import (
     CardConcept,
     CatalogRevision,
+    CustomCard,
     Deck,
     FormatVersion,
     Game,
@@ -770,6 +773,15 @@ def own_deck(
             )
         ).all()
     )
+    if library.godlike:
+        # The Godlike tier's custom cards go to the engine by their own names (v0.4.0).
+        names |= dict(
+            db.execute(
+                select(CustomCard.id, CustomCard.name).where(
+                    CustomCard.id.in_({entry.card_id for entry in entries} - names.keys())
+                )
+            ).all()
+        )
     if not validation.playable:
         sysop_ok = principal.can("cards.any") and all(names.get(e.card_id) for e in entries)
         locked = any(problem.kind == "collection_locked" for problem in validation.errors)
@@ -831,6 +843,8 @@ class SeatPlan:
     title: str | None = None
     # A bot's starter deck, sent as a deck list but chosen by the API, not by SysOp.
     starter: bool = False
+    # The Godlike tier's custom cards the deck holds (v0.4.0), by name.
+    custom: list[str] = field(default_factory=list)
 
 
 def starter_seat(db: Session, starter: Starter) -> SeatPlan | None:
@@ -909,10 +923,46 @@ def plan_seats(
                 plans.append(planned)
                 continue
         plans.append(SeatPlan(engine_seat(player, deck, deck_list, fmt, principal)))
+    # Bots never play the Godlike tier's custom cards (v0.4.0). The other seats holding them are
+    # checked against the running engine before the game starts (require_loaded).
+    for index, held in custom_in_seats(db, [plan.engine for plan in plans]).items():
+        if plans[index].engine["player"] == "bot":
+            raise ApiError(
+                422,
+                "custom_cards_for_bots",
+                "Bots never play Godlike cards: choose another deck for the bot.",
+            )
+        plans[index].custom = held
     # Revisions made for the game are kept even if the engine refuses it, and the connection
     # goes back before the engine is asked.
     db.commit()
     return plans
+
+
+async def require_loaded(request: Request, plans: list[SeatPlan]) -> None:
+    """Refuses a game whose decks hold custom cards the running engine has not loaded, asking
+    the engine afresh (v0.4.0). The names are the players' own cards: only a Godlike deck holds
+    them."""
+    wanted = sorted({name for plan in plans for name in plan.custom})
+    if not wanted:
+        return
+    cards = engine_cards_of(request)
+    loaded = await cards.loaded(wanted, fresh=True) if cards is not None else None
+    if loaded is None:
+        raise unavailable()
+    missing = [name for name in wanted if not loaded.get(name.casefold())]
+    if missing:
+        raise ApiError(
+            422,
+            "custom_not_loaded",
+            ", ".join(missing)
+            + (" is" if len(missing) == 1 else " are")
+            + " not loaded by this engine, so this game cannot start. Take "
+            + ("it" if len(missing) == 1 else "them")
+            + " out of the deck, or play where the engine has loaded "
+            + ("it." if len(missing) == 1 else "them."),
+            names=missing,
+        )
 
 
 def record_game(
@@ -992,6 +1042,7 @@ async def create_practice_game(
             422, "invalid_table", f"{FORMAT_NAMES[fmt]} takes {BOTS[fmt]} bots, not {len(bots)}."
         )
     plans = await run_in_threadpool(plan_seats, db, request, principal, body, bots)
+    await require_loaded(request, plans)
     seats = [plan.engine for plan in plans]
     user_id = principal.user.id
     async with hub.locks[user_id]:
@@ -1029,6 +1080,9 @@ async def create_practice_game(
             except EngineUnavailable as error:
                 raise unavailable() from error
             if status == 400 and created.get("code") == "unknown_cards":
+                # Custom cards it was thought to have loaded are asked about again.
+                if (cards := engine_cards_of(request)) is not None:
+                    cards.forget()
                 names = [str(name) for name in created.get("names", [])]
                 raise ApiError(
                     422,

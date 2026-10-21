@@ -6,8 +6,8 @@ live in a table of their own, outside the catalog's, so no search, card page, de
 image route or list of the catalog can reach them. Only an account at the Godlike tier (100,000
 wins; SysOp starts there) can list them or fetch their images, and to everyone else those routes
 answer as routes for things that do not exist. An alliance with the Godlike tier's Planeswalker
-puts them in the library; none can be played until the engine implements them, in a later
-version (the engine plugin from a private repository).
+puts them in the library. Since v0.4.0 a Godlike account may play them in its decks, wherever the
+running engine has loaded them (the engine plugin from a private repository): api/custom_play.py.
 
 The browser makes each image fit Scryfall's 745 x 1040 card size and at most 750 KB before it
 uploads it, base64 in JSON, so a request stays under the proxies' 1 MB limit; the API checks what
@@ -26,6 +26,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.auth import INPUT_ERRORS
+from api.cards import CardSummary
+from api.custom_play import custom_summary, image_url
 from api.identity import (
     Active,
     ApiError,
@@ -36,6 +38,7 @@ from api.identity import (
     require_permission,
     utcnow,
 )
+from api.library import CurrentLibrary, Library
 from api.models import CustomCard
 from api.progression import godlike
 from api.roster import roster_of
@@ -86,13 +89,24 @@ class CustomCardInfo(Contract):
     collector_number: str | None
     artist: str | None
     image_url: str
-    playable: bool = Field(default=False, description="None can be played yet.")
-    in_library: bool = Field(
-        default=False, description="In your library: you are allied with its Planeswalker."
+    playable: bool = Field(
+        default=False, description="The running engine has loaded it, so a game can play it."
     )
+    loaded: bool | None = Field(
+        default=None,
+        description="Whether the running engine has loaded it (v0.4.0); null when the engine "
+        "could not be asked.",
+    )
+    in_library: bool = Field(
+        default=False,
+        description="In your library: you are allied with its Planeswalker, or you build from "
+        "the whole catalog.",
+    )
+    card: CardSummary = Field(description="The card as decks hold it (v0.4.0).")
 
 
-def info(card: CustomCard, allied: str | None) -> CustomCardInfo:
+def info(card: CustomCard, library: Library) -> CustomCardInfo:
+    loaded = None if library.loaded is None else library.loaded.get(card.name.casefold())
     return CustomCardInfo(
         id=card.id,
         name=card.name,
@@ -108,8 +122,11 @@ def info(card: CustomCard, allied: str | None) -> CustomCardInfo:
         set_code=card.set_code,
         collector_number=card.collector_number,
         artist=card.artist,
-        image_url=f"/api/v1/custom-cards/{card.id}/image?v={card.image_sha256[:12]}",
-        in_library=allied == card.planeswalker,
+        image_url=image_url(card),
+        playable=loaded is True,
+        loaded=loaded,
+        in_library=library.unlimited or library.alliance == card.planeswalker,
+        card=custom_summary(card, library),
     )
 
 
@@ -130,11 +147,13 @@ def require_godlike(db: Session, principal: Principal) -> None:
 
 
 @router.get("/custom-cards", response_model=list[CustomCardInfo])
-def custom_cards(principal: Active, db: Db) -> list[CustomCardInfo]:
-    """The custom cards, for accounts at the Godlike tier only."""
-    require_godlike(db, principal)
+def custom_cards(principal: Active, library: CurrentLibrary, db: Db) -> list[CustomCardInfo]:
+    """The custom cards, for accounts at the Godlike tier only, each with whether the running
+    engine has loaded it."""
+    if not library.godlike:
+        raise not_found()
     cards = db.scalars(select(CustomCard).order_by(CustomCard.name))
-    return [info(card, principal.user.alliance) for card in cards]
+    return [info(card, library) for card in cards]
 
 
 @router.get(
@@ -156,13 +175,19 @@ def custom_card_image(card_id: UUID, principal: Active, db: Db) -> Response:
 
 
 @router.get("/admin/custom-cards", response_model=list[CustomCardInfo])
-def uploaded(principal: Uploader, db: Db) -> list[CustomCardInfo]:
+def uploaded(principal: Uploader, library: CurrentLibrary, db: Db) -> list[CustomCardInfo]:
     cards = db.scalars(select(CustomCard).order_by(CustomCard.name))
-    return [info(card, principal.user.alliance) for card in cards]
+    return [info(card, library) for card in cards]
 
 
 @router.post("/admin/custom-cards", response_model=CustomCardInfo)
-def upload(body: CustomCardUpload, request: Request, principal: Uploader, db: Db) -> CustomCardInfo:
+def upload(
+    body: CustomCardUpload,
+    request: Request,
+    principal: Uploader,
+    library: CurrentLibrary,
+    db: Db,
+) -> CustomCardInfo:
     """Adds a custom card, or replaces the one of the same name. The audit trail records its ID,
     never its name or text."""
     planeswalker = roster_of(request).get(body.planeswalker)
@@ -213,7 +238,7 @@ def upload(body: CustomCardUpload, request: Request, principal: Uploader, db: Db
         details={"card": str(card.id), "replaced": replaced},
     )
     db.commit()
-    return info(card, principal.user.alliance)
+    return info(card, library)
 
 
 @router.delete("/admin/custom-cards/{card_id}", status_code=204)

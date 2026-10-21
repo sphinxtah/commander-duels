@@ -99,6 +99,8 @@ case "$*" in
   "compose exec -T db pg_dump"*) echo dump ;;
   "compose exec -T db psql"*"FROM alembic_version") cat "$STUB_DB" ;;
   "compose run --rm -T migrate") migrate || exit 1 ;;
+  "compose pull --quiet")
+    if fails "${STUB_PULL_FAIL:-}" "$CD_VERSION"; then echo "denied" >&2; exit 1; fi ;;
   "compose up -d --wait --remove-orphans")
     if ! migrate || fails "${STUB_UP_FAIL:-}" "$CD_VERSION"; then
       echo none > "$STUB_RUNNING"
@@ -110,20 +112,27 @@ case "$*" in
       echo "wget: server returned error: HTTP/1.1 502 Bad Gateway" >&2; exit 1
     fi
     echo '{"status":"ready"}' ;;
-  "compose pull --quiet"|*"/api/v1/health"|*"/api/v1/engine/status"|"image prune -f") ;;
+  *"/api/v1/health"|*"/api/v1/engine/status"|"image prune -f") ;;
   *) echo "unexpected: docker $*" >&2; exit 99 ;;
 esac
 """
 
 
 def deploy(
-    tmp_path: Path, previous: str, tag: str, running: str = "", db: str = "", **stub: str
+    tmp_path: Path,
+    previous: str,
+    tag: str,
+    running: str = "",
+    db: str = "",
+    settings: str = "",
+    **stub: str,
 ) -> dict[str, str]:
     """Runs deploy.sh <tag> with <previous> in .env, running (unless running="none") on a
-    database at its own last migration (unless db is given)."""
+    database at its own last migration (unless db is given). settings adds lines to .env."""
     kit, env = install(tmp_path, DEPLOY_STUB, "deploy.sh", "backup.sh")
     (kit / ".env").write_text(
         f"CD_VERSION={previous}\nCD_GOOGLE_CLIENT_ID=client\nCD_PROXY_ADDRESS=10.10.50.2\n"
+        + settings
     )
     (tmp_path / "running").write_text(running or previous)
     newer = stub.get("STUB_NEWER", "").split()
@@ -134,6 +143,7 @@ def deploy(
     )
     return {
         "status": str(result.returncode),
+        "stdout": result.stdout,
         "stderr": result.stderr,
         "log": (tmp_path / "docker.log").read_text(),
         "running": (tmp_path / "running").read_text().strip(),
@@ -150,6 +160,48 @@ def test_deploy_migrates_before_replacing_anything(tmp_path):
     migrate = log.index("CD_VERSION=0.1.1 compose run --rm -T migrate")
     assert log.index("pg_dump") < migrate < log.index("CD_VERSION=0.1.1 compose up")
     assert (result["running"], result["env"], result["db"]) == ("0.1.1", "0.1.1", "r2")
+
+
+def test_the_engine_image_may_be_the_owners_private_one():
+    # v0.4.0: CD_ENGINE_IMAGE in .env names another engine image (the one with the Godlike
+    # tier's custom cards), tagged as the version like the others; unset, the public one.
+    compose = (ROOT / "deploy" / "compose.yaml").read_text()
+    images = dict(re.findall(r"^  (\w+):\n(?:    .*\n)*?    image: (\S+)", compose, re.M))
+    assert images["engine"] == (
+        "${CD_ENGINE_IMAGE:-${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/engine}"
+        ":${CD_VERSION:?}"
+    )
+    assert images["web"] == "${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/web:${CD_VERSION:?}"
+    api = re.search(r"^  image: (.+)$", compose, re.M)
+    assert api and api[1] == (
+        "${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/api:${CD_VERSION:?set by deploy.sh}"
+    )
+    # The dev stack builds its engine from this repository.
+    dev = (ROOT / "compose.yaml").read_text()
+    assert "build: {context: ., dockerfile: engine/Dockerfile}" in dev
+    # The image puts a derived image's plugins on the engine's classpath.
+    dockerfile = (ROOT / "engine" / "Dockerfile").read_text()
+    runtime = dockerfile[dockerfile.index("AS runtime") :]
+    assert "chown 10001:10001 /app/plugins" in runtime
+    assert '"-cp", "/app/engine.jar:/app/lib/*:/app/plugins/*"' in runtime
+
+
+@needs_bash
+def test_deploy_names_a_private_engine_and_stops_when_it_cannot_pull(tmp_path):
+    private = "CD_ENGINE_IMAGE=ghcr.io/sphinxtah/commander-duels-engine-sphinx\n"
+    pulled = deploy(tmp_path / "pulled", "0.1.0", "0.1.1", settings=private)
+    assert pulled["status"] == "0"
+    assert "(engine: ghcr.io/sphinxtah/commander-duels-engine-sphinx:0.1.1)" in pulled["stdout"]
+    refused = deploy(
+        tmp_path / "refused", "0.1.0", "0.1.1", settings=private, STUB_PULL_FAIL="0.1.1"
+    )
+    assert refused["status"] == "1"
+    assert "pg_dump" not in refused["log"] and "migrate" not in refused["log"]
+    assert (refused["running"], refused["env"]) == ("0.1.0", "0.1.0")
+    assert "logged in to ghcr.io" in refused["stderr"]
+    # The public engine needs no login, and the message does not suggest one.
+    public = deploy(tmp_path / "public", "0.1.0", "0.1.1", STUB_PULL_FAIL="0.1.1")
+    assert public["status"] == "1" and "ghcr.io" not in public["stderr"]
 
 
 @needs_bash

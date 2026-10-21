@@ -47,9 +47,12 @@ COPY --from=engine-build /build/engine/target/lib ./lib
 COPY --from=engine-build /build/engine/target/licenses/THIRD-PARTY.txt ./licenses/
 COPY engine/decks ./decks
 COPY --from=engine-build /build/engine/target/engine.jar ./engine.jar
+# Plugins (docs/engine/xmage-spike.md): a derived image adds card jars here and rebuilds /app/db
+# with them. This image ships the folder empty.
+RUN mkdir /app/plugins && chown 10001:10001 /app/plugins
 USER 10001:10001
 # h2.bindAddress keeps the TCP listener that XMage's H2 AUTO_SERVER setting starts on loopback.
 ENV CD_ENGINE_DECKS=/app/decks \
     JDK_JAVA_OPTIONS="-Xms256m -Xmx768m -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError -Dh2.bindAddress=127.0.0.1"
 EXPOSE 8090
-CMD ["java", "-cp", "/app/engine.jar:/app/lib/*", "com.commanderduels.EngineServer"]
+CMD ["java", "-cp", "/app/engine.jar:/app/lib/*:/app/plugins/*", "com.commanderduels.EngineServer"]

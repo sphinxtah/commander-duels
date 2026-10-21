@@ -13,6 +13,11 @@ card_images. Browsers only ever talk to this site. A name Scryfall does not know
 misspellings) is recorded as missing and asked about again after a week. Missing rows older than
 that are deleted whenever another name is recorded as missing.
 
+The Godlike tier's custom cards (v0.4.0) are never looked up at Scryfall. Their names give their
+own images, from the database, to the accounts that may see them (api/custom_play.py: Godlike
+accounts, and anyone seated in or observing a game where some seat's deck holds the card), sent
+"private, no-store"; anyone else gets the answer any name Scryfall does not know gets.
+
 Scryfall allows its named-card search 2 requests a second, so this process spaces them at least
 550 ms apart, and after a 429 asks nothing more for as long as Scryfall says (30 s at least);
 downloads from its image host are not limited. Concurrent requests for one name fetch it once.
@@ -44,12 +49,14 @@ from starlette.concurrency import run_in_threadpool
 
 from api.auth import INPUT_ERRORS
 from api.config import Settings
+from api.custom_play import custom_named, may_see
 from api.identity import Active, ApiError, Db, Principal, utcnow
 from api.models import (
     CardAlias,
     CardConcept,
     CardImage,
     CardPrinting,
+    CustomCard,
     DeckEntryRow,
     GameSeat,
 )
@@ -662,6 +669,30 @@ def queue_account(principal: Principal) -> UUID | None:
     return None if principal.user.kind == "sysop" else principal.user.id
 
 
+def custom_image(
+    db: Session, principal: Principal, name: str, game: UUID | None
+) -> tuple[bool, CustomCard | None]:
+    """Whether the name is a custom card's, and the card with its image when the account may
+    see it."""
+    card = custom_named(db, name)
+    if card is None:
+        return False, None
+    if not may_see(db, principal, card, game):
+        return True, None
+    # Loaded now: it is deferred, and the session closes before the reply.
+    _ = card.image
+    return True, card
+
+
+def custom_response(card: CustomCard) -> Response:
+    # Kept out of every shared cache and of the installed app's offline copies.
+    return Response(
+        card.image,
+        media_type=card.image_type,
+        headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
 # Hidden information: these routes only map a name the client already knows to an image. Nothing
 # here prefetches deck lists or other seats' cards; that would let a player probe the cache for
 # another seat's deck.
@@ -694,7 +725,14 @@ async def card_image(
     card_images_busy when the account already waits for many new cards, and 503 when everyone
     does or Scryfall asked us to wait; both carry Retry-After."""
     account = queue_account(principal)
+    custom, card = await run_in_threadpool(custom_image, db, principal, name, game)
     await release(db)
+    if custom:
+        if card is not None:
+            return custom_response(card)
+        # As for a name Scryfall does not know.
+        cache_of(request).require_directory()
+        raise missing()
     seat = (principal.user.id, game) if game else None
     image = await cache_of(request).image(name, size, account, seat)
     # A game's own printing may differ from the card's default, so it is kept for an hour only.
@@ -738,8 +776,22 @@ async def card_image_info(
 ) -> CardImageInfo:
     """The printing and artist behind a name's image, to credit the artist and Scryfall. Never
     fetches: 404 until the image has been requested, unless the catalog names the printing."""
+    custom, card = await run_in_threadpool(custom_image, db, principal, name, game)
     await release(db)
-    info = await cache_of(request).info(name, (principal.user.id, game) if game else None)
+    if custom and card is not None:
+        return CardImageInfo(
+            name=name,
+            status="found",
+            artist=card.artist,
+            set_code=card.set_code,
+            collector_number=card.collector_number,
+        )
+    info: CardImageInfo | None = None
+    if custom:
+        # A custom card the account may not see answers as a name never looked up.
+        cache_of(request).require_directory()
+    else:
+        info = await cache_of(request).info(name, (principal.user.id, game) if game else None)
     if info is None:
         raise ApiError(404, "card_image_unknown", "This card's image has not been looked up.")
     return info

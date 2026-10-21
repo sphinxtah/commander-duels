@@ -14,10 +14,14 @@ new deck: it never replaces one.
 JSON: {"format": "commander-duels-deck", "version": 1, "game_format", "title", "entries": [{
 "oracle_id", "scryfall_id", "name", "set", "number", "quantity", "location"}]}, read back by
 identity, then by name. Notes are included only for the owner.
+
+The Godlike tier's custom cards (v0.4.0) are written by name alone, in their Godlike owner's own
+exports, and read back by exact name for a Godlike owner only.
 """
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 from uuid import UUID
@@ -104,6 +108,15 @@ class ParsedDeck:
     title: str | None = None
     game_format: str | None = None
     notes: str | None = None
+
+
+@dataclass(frozen=True)
+class Exported:
+    """A card as an export names it; a custom card has no Oracle ID."""
+
+    name: str
+    normalized_name: str
+    oracle_id: UUID | None
 
 
 def invalid(message: str) -> ApiError:
@@ -269,7 +282,11 @@ def suggestions(db: Session, name: str) -> list[CardConcept]:
     )
 
 
-def resolve(db: Session, parsed: ParsedDeck) -> list[ImportLine]:
+def resolve(
+    db: Session, parsed: ParsedDeck, custom: Mapping[str, tuple[UUID, str]] | None = None
+) -> list[ImportLine]:
+    """Each line as a card: by identity, then by exact name; custom (a Godlike owner's custom
+    cards by normalized name) matches what the catalog does not."""
     by_oracle = {
         concept.oracle_id: concept
         for concept in db.scalars(
@@ -315,6 +332,20 @@ def resolve(db: Session, parsed: ParsedDeck) -> list[ImportLine]:
                     status="resolved",
                     card_id=concept.id,
                     printing_id=printing_id,
+                )
+            )
+            continue
+        held = custom.get(normalize(line.name)) if custom and not options else None
+        if held is not None:
+            resolved.append(
+                ImportLine(
+                    line=line.line,
+                    text=line.text,
+                    quantity=line.quantity,
+                    location=line.location,
+                    name=held[1],
+                    status="resolved",
+                    card_id=held[0],
                 )
             )
             continue
@@ -372,7 +403,7 @@ def merged(lines: list[ImportLine]) -> list[DeckEntry]:
 def export_text(
     title: str,
     entries: list[DeckEntry],
-    cards: dict[UUID, CardConcept],
+    cards: Mapping[UUID, Exported],
     printings: dict[UUID, CardPrinting],
 ) -> str:
     sections = [
@@ -403,7 +434,7 @@ def export_json(
     title: str,
     game_format: str,
     entries: list[DeckEntry],
-    cards: dict[UUID, CardConcept],
+    cards: Mapping[UUID, Exported],
     printings: dict[UUID, CardPrinting],
     notes: str | None,
 ) -> dict[str, object]:
@@ -414,7 +445,11 @@ def export_json(
         "title": title,
         "entries": [
             {
-                "oracle_id": str(cards[entry.card_id].oracle_id),
+                **(
+                    {"oracle_id": str(oracle_id)}
+                    if (oracle_id := cards[entry.card_id].oracle_id)
+                    else {}
+                ),
                 "name": cards[entry.card_id].name,
                 "quantity": entry.quantity,
                 "location": entry.location,
