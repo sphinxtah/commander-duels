@@ -527,7 +527,8 @@ export interface paths {
         };
         /**
          * Custom Cards
-         * @description The custom cards, for accounts at the Godlike tier only.
+         * @description The custom cards, for accounts at the Godlike tier only, each with whether the running
+         *     engine has loaded it.
          */
         get: operations["custom_cards_api_v1_custom_cards_get"];
         put?: never;
@@ -722,7 +723,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export Deck */
+        /**
+         * Export Deck
+         * @description The owner's deck as a file, its custom cards by name while the owner is at the Godlike
+         *     tier.
+         */
         get: operations["export_deck_api_v1_decks__deck_id__export_get"];
         put?: never;
         post?: never;
@@ -1207,8 +1212,8 @@ export interface paths {
         };
         /**
          * Read Shared
-         * @description A deck shared by link, for anyone signed in: its cards, not its notes (DECK11). It is
-         *     validated against the viewer's library, as a copy of it would be.
+         * @description A deck shared by link, for anyone signed in: its cards, not its notes (DECK11), and never
+         *     its custom cards. It is validated against the viewer's library, as a copy of it would be.
          */
         get: operations["read_shared_api_v1_shared_decks__code__get"];
         put?: never;
@@ -1230,7 +1235,8 @@ export interface paths {
         put?: never;
         /**
          * Copy Shared
-         * @description Copies a shared deck into the viewer's own decks, without its owner's notes.
+         * @description Copies a shared deck into the viewer's own decks, without its owner's notes or custom
+         *     cards.
          */
         post: operations["copy_shared_api_v1_shared_decks__code__copy_post"];
         delete?: never;
@@ -1434,6 +1440,17 @@ export interface components {
             companion: boolean;
             /** Copy Limit */
             copy_limit: number | null;
+            /**
+             * Custom
+             * @description One of the Godlike tier's custom cards (v0.4.0), in its owner's deck only.
+             * @default false
+             */
+            custom: boolean;
+            /**
+             * Custom Image
+             * @description A custom card's own image; null for catalog cards.
+             */
+            custom_image?: string | null;
             /** Defense */
             defense: string | null;
             /** Edhrec Rank */
@@ -1580,6 +1597,17 @@ export interface components {
             companion: boolean;
             /** Copy Limit */
             copy_limit: number | null;
+            /**
+             * Custom
+             * @description One of the Godlike tier's custom cards (v0.4.0), in its owner's deck only.
+             * @default false
+             */
+            custom: boolean;
+            /**
+             * Custom Image
+             * @description A custom card's own image; null for catalog cards.
+             */
+            custom_image?: string | null;
             /** Defense */
             defense: string | null;
             /** Edhrec Rank */
@@ -1686,6 +1714,8 @@ export interface components {
         CustomCardInfo: {
             /** Artist */
             artist: string | null;
+            /** @description The card as decks hold it (v0.4.0). */
+            card: components["schemas"]["CardSummary"];
             /** Collector Number */
             collector_number: string | null;
             /** Flavor Text */
@@ -1699,10 +1729,15 @@ export interface components {
             image_url: string;
             /**
              * In Library
-             * @description In your library: you are allied with its Planeswalker.
+             * @description In your library: you are allied with its Planeswalker, or you build from the whole catalog.
              * @default false
              */
             in_library: boolean;
+            /**
+             * Loaded
+             * @description Whether the running engine has loaded it (v0.4.0); null when the engine could not be asked.
+             */
+            loaded?: boolean | null;
             /** Loyalty */
             loyalty: string | null;
             /** Mana Cost */
@@ -1715,7 +1750,7 @@ export interface components {
             planeswalker: string;
             /**
              * Playable
-             * @description None can be played yet.
+             * @description The running engine has loaded it, so a game can play it.
              * @default false
              */
             playable: boolean;

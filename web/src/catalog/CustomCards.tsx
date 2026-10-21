@@ -14,9 +14,13 @@ export function useCustomCards(): CustomCard[] {
   const [cards, setCards] = useState<CustomCard[]>([]);
   useEffect(() => {
     let active = true;
-    void client.GET("/api/v1/custom-cards").then(({ data }) => {
-      if (active && data) setCards(data);
-    });
+    // A failed request shows none, as below the tier.
+    void client
+      .GET("/api/v1/custom-cards")
+      .then(({ data }) => {
+        if (active && data) setCards(data);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -24,15 +28,25 @@ export function useCustomCards(): CustomCard[] {
   return cards;
 }
 
-/** The custom cards with their images, each marked as not playable here yet: the game engine
- * does not know them, so a deck holding one cannot start a game. */
+/** Whether the running game engine has loaded a custom card (v0.4.0): only then can a deck
+ * holding it start a game. */
+export function engineWords(card: CustomCard): string {
+  if (card.loaded) return "Playable";
+  return card.loaded === false
+    ? "Not loaded by this engine"
+    : "The game engine could not be asked";
+}
+
+/** The custom cards with their images, each saying whether the running game engine has loaded
+ * it: a deck holding one it has not loaded cannot start a game. */
 export function GodlikeCards({ cards }: { cards: CustomCard[] }) {
   return (
     <section className={styles.custom} aria-labelledby="godlike-title">
       <h2 id="godlike-title">Godlike cards</h2>
       <p className={styles.lead}>
-        Custom cards that only the Godlike tier opens. You can read them here;
-        they cannot be played here yet.
+        Custom cards that only the Godlike tier opens. Put them in your decks
+        from the deck builder; a game plays them wherever the game engine has
+        loaded them, and everyone at that table sees them.
       </p>
       <ul className={styles.customList}>
         {cards.map((card) => (
@@ -68,8 +82,11 @@ export function GodlikeCards({ cards }: { cards: CustomCard[] }) {
                 )}
               </div>
               <p className={styles.customState}>
-                <span className={styles.status} data-playable="false">
-                  Not playable here yet
+                <span
+                  className={styles.status}
+                  data-playable={card.playable ? "true" : "false"}
+                >
+                  {engineWords(card)}
                 </span>{" "}
                 {card.in_library
                   ? "In your library."

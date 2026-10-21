@@ -14,6 +14,10 @@ Since v0.3.1 players build from their own library (api/library.py): every valida
 player's deck counts the copies they own, and a deck holding more is collection-locked, saved but
 kept from games until fixed. Each deck's stored flags are refreshed whenever its owner's library
 changes (refresh_decks). The starter decks are the ten in content/starter-decks.json.
+
+Since v0.4.0 a Godlike account's decks may hold the Godlike tier's custom cards
+(api/custom_play.py): its owner sees, imports and exports them; shared decks, their exports and
+copies leave them out.
 """
 
 import hashlib
@@ -33,6 +37,7 @@ from sqlalchemy.orm import Session
 from api import deckio, guided
 from api.auth import INPUT_ERRORS
 from api.cards import CardSummary, mark_owned, summaries_by_id
+from api.custom_play import HIDDEN_NAME, custom_by_name, custom_ids, deck_cards, without_custom
 from api.identity import (
     Active,
     ApiError,
@@ -42,11 +47,19 @@ from api.identity import (
     require_permission,
     settings_of,
 )
-from api.library import CurrentLibrary, Library, Starter, starter_entries, starters_in
+from api.library import (
+    CurrentLibrary,
+    Library,
+    Starter,
+    at_godlike,
+    starter_entries,
+    starters_in,
+)
 from api.models import (
     CardConcept,
     CardPrinting,
     CatalogRevision,
+    CustomCard,
     Deck,
     DeckEntryRow,
     DeckRevision,
@@ -59,6 +72,8 @@ from api.validation import (
     DeckEntry,
     GameFormatName,
     Validation,
+    custom_identity,
+    symbol_colors,
     validate_deck,
 )
 from catalog.text import colors_of, normalize
@@ -242,13 +257,26 @@ def entries_of(deck: Deck) -> list[DeckEntry]:
     return [DeckEntry.model_validate(item) for item in cast(list[object], raw)]
 
 
-def commanders_of(db: Session, entries: list[DeckEntry]) -> list[str]:
+def commanders_of(db: Session, entries: list[DeckEntry], owner_id: UUID | None = None) -> list[str]:
+    """The commanders' names; a custom commander's only while the deck's owner is at the Godlike
+    tier."""
     ids = [entry.card_id for entry in entries if entry.location == "commander"]
     if not ids:
         return []
     names = dict(
         db.execute(select(CardConcept.id, CardConcept.name).where(CardConcept.id.in_(ids))).all()
     )
+    rest = [card_id for card_id in ids if card_id not in names]
+    custom = (
+        dict(
+            db.execute(select(CustomCard.id, CustomCard.name).where(CustomCard.id.in_(rest))).all()
+        )
+        if rest
+        else {}
+    )
+    if custom:
+        shown = owner_id is not None and at_godlike(db, owner_id)
+        names |= {card_id: name if shown else HIDDEN_NAME for card_id, name in custom.items()}
     return [names[card_id] for card_id in ids if card_id in names]
 
 
@@ -262,8 +290,18 @@ def identity_of(db: Session, fmt: str, entries: list[DeckEntry]) -> str:
         return ""
     bits = 0
     column = CardConcept.identity_mask if fmt == "commander" else CardConcept.colors_mask
-    for (mask,) in db.execute(select(column).where(CardConcept.id.in_(wanted))):
+    found = set()
+    for card_id, mask in db.execute(
+        select(CardConcept.id, column).where(CardConcept.id.in_(wanted))
+    ):
         bits |= mask
+        found.add(card_id)
+    rest = set(wanted) - found
+    if rest:
+        for cost, text in db.execute(
+            select(CustomCard.mana_cost, CustomCard.oracle_text).where(CustomCard.id.in_(rest))
+        ):
+            bits |= custom_identity(cost, text) if fmt == "commander" else symbol_colors(cost or "")
     return "".join(colors_of(bits))
 
 
@@ -313,7 +351,7 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
         playable=deck.playable,
         collection_locked=deck.collection_locked,
         identity=deck.identity,
-        commanders=commanders_of(db, entries_of(deck)),
+        commanders=commanders_of(db, entries_of(deck), deck.owner_id),
         latest_revision=deck.latest_revision,
         source=deck.source,
         archived=deck.archived_at is not None,
@@ -346,8 +384,7 @@ def deck_detail(
             today(),
             library.collection(),
         )
-    cards = summaries_by_id(db, {entry.card_id for entry in entries})
-    mark_owned(db, cards.values(), library)
+    cards = deck_cards(db, {entry.card_id for entry in entries}, library)
     revisions = db.scalars(
         select(DeckRevision)
         .where(DeckRevision.deck_id == deck.id)
@@ -452,11 +489,14 @@ def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
     )
     db.add(revision)
     db.flush()
+    custom = custom_ids(db, (entry.card_id for entry in entries))
     for entry in entries:
+        held = entry.card_id in custom
         db.add(
             DeckEntryRow(
                 revision_id=revision.id,
-                concept_id=entry.card_id,
+                concept_id=None if held else entry.card_id,
+                custom_card_id=entry.card_id if held else None,
                 printing_id=entry.printing_id,
                 quantity=entry.quantity,
                 location=entry.location,
@@ -472,7 +512,7 @@ def revision_entries(db: Session, revision: DeckRevision) -> list[DeckEntry]:
     return normalized(
         [
             DeckEntry(
-                card_id=row.concept_id,
+                card_id=row.concept_id or row.custom_card_id,  # type: ignore[arg-type]
                 printing_id=row.printing_id,
                 quantity=row.quantity,
                 location=row.location,  # type: ignore[arg-type]
@@ -624,8 +664,7 @@ def save_draft(
     validation = store_draft(db, deck, body.entries, library)
     deck.draft_version += 1
     db.commit()
-    cards = summaries_by_id(db, {entry.card_id for entry in body.entries})
-    mark_owned(db, cards.values(), library)
+    cards = deck_cards(db, {entry.card_id for entry in body.entries}, library)
     return DraftSaved(
         version=deck.draft_version,
         updated_at=deck.updated_at,
@@ -644,7 +683,9 @@ def save_revision(
 
 
 @router.get("/decks/{deck_id}/revisions/{number}", response_model=RevisionDetail)
-def read_revision(deck_id: UUID, number: int, principal: Builder, db: Db) -> RevisionDetail:
+def read_revision(
+    deck_id: UUID, number: int, principal: Builder, library: CurrentLibrary, db: Db
+) -> RevisionDetail:
     deck = owned(db, principal, deck_id)
     revision = db.scalar(
         select(DeckRevision).where(DeckRevision.deck_id == deck.id, DeckRevision.number == number)
@@ -652,11 +693,14 @@ def read_revision(deck_id: UUID, number: int, principal: Builder, db: Db) -> Rev
     if revision is None:
         raise not_found()
     entries = revision_entries(db, revision)
+    cards = deck_cards(db, {entry.card_id for entry in entries}, library)
+    for card in cards.values():
+        card.owned = None
     return RevisionDetail(
         **revision_summary(revision).model_dump(),
         format=revision.format,  # type: ignore[arg-type]
         entries=entries,
-        cards=summaries_by_id(db, {entry.card_id for entry in entries}),
+        cards=cards,
     )
 
 
@@ -739,13 +783,13 @@ def import_preview(
     fmt = body.format
     if parsed.game_format in ("legacy", "commander"):
         fmt = cast(GameFormatName, parsed.game_format)
-    lines = deckio.resolve(db, parsed)
+    # A Godlike owner's list may name custom cards; nobody else's ever matches one.
+    lines = deckio.resolve(db, parsed, custom_by_name(db) if library.godlike else None)
     entries = deckio.merged(lines)
     validation = validate_deck(
         db, DeckContent(format=fmt, entries=entries), today(), library.collection()
     )
-    cards = summaries_by_id(db, {entry.card_id for entry in entries})
-    mark_owned(db, cards.values(), library)
+    cards = deck_cards(db, {entry.card_id for entry in entries}, library)
     return ImportPreview(
         format=fmt,
         title=parsed.title,
@@ -759,12 +803,20 @@ def import_preview(
 
 
 def export_data(
-    db: Session, entries: list[DeckEntry]
-) -> tuple[dict[UUID, CardConcept], dict[UUID, CardPrinting]]:
+    db: Session, entries: list[DeckEntry], custom: bool = False
+) -> tuple[dict[UUID, deckio.Exported], dict[UUID, CardPrinting]]:
+    """The cards and printings an export names; custom cards by name only, for their Godlike
+    owner (custom), else not at all."""
     ids = {entry.card_id for entry in entries}
     cards = {
-        card.id: card for card in db.scalars(select(CardConcept).where(CardConcept.id.in_(ids)))
+        card.id: deckio.Exported(card.name, card.normalized_name, card.oracle_id)
+        for card in db.scalars(select(CardConcept).where(CardConcept.id.in_(ids)))
     }
+    if custom and ids - cards.keys():
+        for card_id, name in db.execute(
+            select(CustomCard.id, CustomCard.name).where(CustomCard.id.in_(ids - cards.keys()))
+        ):
+            cards[card_id] = deckio.Exported(name, normalize(name), None)
     chosen = {entry.printing_id for entry in entries if entry.printing_id}
     printings = (
         {p.id: p for p in db.scalars(select(CardPrinting).where(CardPrinting.id.in_(chosen)))}
@@ -775,9 +827,15 @@ def export_data(
 
 
 def exported(
-    title: str, fmt: str, entries: list[DeckEntry], db: Session, notes: str | None, kind: str
+    title: str,
+    fmt: str,
+    entries: list[DeckEntry],
+    db: Session,
+    notes: str | None,
+    kind: str,
+    custom: bool = False,
 ) -> Response:
-    cards, printings = export_data(db, entries)
+    cards, printings = export_data(db, entries, custom)
     stem = normalize(title).replace(" ", "-")[:40] or "deck"
     if kind == "json":
         body = deckio.export_json(title, fmt, entries, cards, printings, notes)
@@ -796,8 +854,11 @@ def exported(
 def export_deck(
     deck_id: UUID, principal: Builder, db: Db, kind: Literal["text", "json"] = "text"
 ) -> Response:
+    """The owner's deck as a file, its custom cards by name while the owner is at the Godlike
+    tier."""
     deck = owned(db, principal, deck_id)
-    return exported(deck.title, deck.format, entries_of(deck), db, deck.notes, kind)
+    custom = at_godlike(db, principal.user.id)
+    return exported(deck.title, deck.format, entries_of(deck), db, deck.notes, kind, custom)
 
 
 def shared(db: Session, code: str) -> Deck:
@@ -809,11 +870,11 @@ def shared(db: Session, code: str) -> Deck:
 
 @router.get("/shared-decks/{code}", response_model=SharedDeck)
 def read_shared(code: ShareCode, principal: Active, library: CurrentLibrary, db: Db) -> SharedDeck:
-    """A deck shared by link, for anyone signed in: its cards, not its notes (DECK11). It is
-    validated against the viewer's library, as a copy of it would be."""
+    """A deck shared by link, for anyone signed in: its cards, not its notes (DECK11), and never
+    its custom cards. It is validated against the viewer's library, as a copy of it would be."""
     deck = shared(db, code)
     owner = db.get(User, deck.owner_id)
-    entries = entries_of(deck)
+    entries = without_custom(db, entries_of(deck))
     cards = summaries_by_id(db, {entry.card_id for entry in entries})
     mark_owned(db, cards.values(), library)
     return SharedDeck(
@@ -837,19 +898,20 @@ def export_shared(
     code: ShareCode, principal: Active, db: Db, kind: Literal["text", "json"] = "text"
 ) -> Response:
     deck = shared(db, code)
-    return exported(deck.title, deck.format, entries_of(deck), db, None, kind)
+    return exported(deck.title, deck.format, without_custom(db, entries_of(deck)), db, None, kind)
 
 
 @router.post("/shared-decks/{code}/copy", response_model=DeckDetail, status_code=201)
 def copy_shared(code: ShareCode, principal: Builder, library: CurrentLibrary, db: Db) -> DeckDetail:
-    """Copies a shared deck into the viewer's own decks, without its owner's notes."""
+    """Copies a shared deck into the viewer's own decks, without its owner's notes or custom
+    cards."""
     deck = shared(db, code)
     copied, validation = create_deck(
         db,
         principal,
         deck.title[:73] + " (copy)",
         deck.format,
-        entries_of(deck),
+        without_custom(db, entries_of(deck)),
         library,
         source="duplicate",
     )

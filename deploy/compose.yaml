@@ -65,7 +65,9 @@ services:
     depends_on:
       migrate: {condition: service_completed_successfully}
   engine:
-    image: ${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/engine:${CD_VERSION:?}
+    # The public engine, or with CD_ENGINE_IMAGE in .env the owner's private one, which adds the
+    # Godlike tier's custom cards (v0.4.0; docs/deployment.md). Either way tagged as the version.
+    image: ${CD_ENGINE_IMAGE:-${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/engine}:${CD_VERSION:?}
     restart: unless-stopped
     logging: *logging
     expose: ["8090"]

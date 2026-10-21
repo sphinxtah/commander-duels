@@ -67,6 +67,17 @@ The practice table's deck choices list "Your decks"; since v0.3.1 the engine's f
 
 SysOp's own decks may hold any card the engine implements, as its deck lists may ([games through the API](games.md)).
 
+## The Godlike tier's custom cards (v0.4.0)
+
+An account at the Godlike tier (100,000 wins, SysOp included) may put the owner's custom cards in its decks ([the Planeswalker Alliance](progression.md#playing-them-v040)). Nothing about the cards themselves is in this repository.
+
+- **Finding them.** The search never finds them. The finder lists them under "Godlike cards" above its results, each with its image, its copies in the library, whether the running engine has loaded it, and Add (and Commander, where it may lead). "Only cards this deck can use" keeps to the commander's color identity there too. Opening one shows its own image and text, since the catalog has no page for it.
+- **Validation.** Legal in Legacy and Commander; copies by the format and the library, as for any card (a playset while allied with their Planeswalker; administrators and SysOp unlimited). A legendary creature, or a card that says it can be your commander, may lead; its identity is the colors of the mana symbols in its cost and rules text. A card the running engine has not loaded is "Not loaded by this engine": legal, not playable.
+- **Statistics, versions, export and import** treat them as other cards. Revisions store them as custom cards (`custom_card_id`). The owner's text export names them, and a deck file lists them by name without an Oracle ID. An import resolves their exact names for a Godlike owner only; for anyone else such a line is an unknown card.
+- **Below the tier.** When SysOp lowers the owner's wins below 100,000, the owner's decks are revalidated. A deck holding a custom card becomes collection-locked (`custom.godlike_only`, kind `collection_locked`), shows each such card as a hidden "Godlike card" and its commander as "Godlike card", and exports without them. Reaching the tier again opens them again.
+- **Games.** A deck holding one starts a game only where the running engine has loaded every such card; the API asks the engine at each start and otherwise refuses (`422 custom_not_loaded`). Bots never play them (`422 custom_cards_for_bots`).
+- **Nobody else sees them.** A shared deck shows, exports and copies without them, whoever looks.
+
 ## Routes
 
 All under `/api/v1`, for the signed-in owner only; another account's deck answers 404, as a deck in the trash does except for restoring it.

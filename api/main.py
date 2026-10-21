@@ -19,6 +19,7 @@ from api import (
     custom_cards,
     decks,
     economy,
+    engine_cards,
     games,
     progression,
 )
@@ -136,6 +137,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     else None
                 )
                 app.state.games = games.GameHub(config, app.state.database, engine)
+                # Which custom cards the running engine has loaded (v0.4.0).
+                app.state.engine_cards = engine_cards.EngineCards(engine)
                 await app.state.games.start()
                 try:
                     yield

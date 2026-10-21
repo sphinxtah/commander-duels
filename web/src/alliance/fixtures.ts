@@ -5,6 +5,7 @@ import type {
   StarterDeck,
   TierInfo,
 } from "../api";
+import { customSummary } from "../decks/fixtures";
 
 // Test data for the Planeswalker Alliance (v0.3.1). The roster's names are the public roster's;
 // the starter decks and custom cards are made-up stand-ins, never the owner's own.
@@ -136,7 +137,13 @@ export function customCard(name: string, fields: Partial<CustomCard> = {}) {
     artist: null,
     image_url: `/api/v1/custom-cards/${id}/image?v=1`,
     playable: false,
+    loaded: false,
     in_library: false,
+    card: customSummary(name, {
+      status: "not_implemented",
+      status_reason: "not_loaded",
+      playable: false,
+    }),
     ...fields,
   };
   return card;

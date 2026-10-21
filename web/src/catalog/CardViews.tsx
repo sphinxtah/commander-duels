@@ -34,10 +34,13 @@ export function CardImage({
     setFailed(false);
     setLoaded(false);
   }, [chosen, face, size]);
-  const src =
-    chosen && !failed
-      ? printingImage(chosen, size, faces > 0 ? (face ?? 0) : undefined)
-      : null;
+  // A Godlike card (v0.4.0) has its own image, from the custom card route.
+  const src = failed
+    ? null
+    : (card.custom_image ??
+      (chosen
+        ? printingImage(chosen, size, faces > 0 ? (face ?? 0) : undefined)
+        : null));
   // Once the image has drawn, the frame beneath it is hidden, so a printing of another shape
   // shows the card's background around it rather than fragments of the text.
   return (
@@ -399,6 +402,90 @@ export function CardDetails({
           {shownArtist ? `Illustrated by ${shownArtist}. ` : ""}Card data and
           images from Scryfall; tags from Scryfall Tagger. Magic: The Gathering
           © Wizards of the Coast.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One of the Godlike tier's custom cards (v0.4.0), from the summary its deck or the custom card
+ * list sent: its own image and text. The catalog knows nothing of it, so there are no printings,
+ * rulings or tags to show. In the deck of an owner below the Godlike tier, the server sends only
+ * a hidden "Godlike card", which says so.
+ */
+export function CustomCardDetails({
+  card,
+  actions,
+}: {
+  card: CardSummary;
+  actions?: ReactNode;
+}) {
+  const shown = card.custom_image !== null && card.custom_image !== undefined;
+  return (
+    <div className={styles.detail}>
+      <div className={styles.detailImage}>
+        <CardImage card={card} size="large" />
+      </div>
+      <div className={styles.detailText}>
+        <h2 className={styles.detailName}>
+          {card.name} <ManaCost cost={card.mana_cost} />
+        </h2>
+        <p className={styles.detailType}>{card.type_line}</p>
+        {shown && (
+          <div className={styles.oracle}>
+            {card.oracle_text.split("\n").map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+            {card.power !== null && (
+              <p className={styles.pt}>
+                {card.power}/{card.toughness}
+              </p>
+            )}
+            {card.loyalty && (
+              <p className={styles.pt}>Loyalty {card.loyalty}</p>
+            )}
+          </div>
+        )}
+        <dl className={styles.facts}>
+          <div>
+            <dt>Status</dt>
+            <dd>
+              <StatusBadge card={card} />{" "}
+              {!card.playable && (
+                <span>{card.status_detail ?? statusLabel(card)}</span>
+              )}
+            </dd>
+          </div>
+          {ownedWords(card) && (
+            <div>
+              <dt>Your library</dt>
+              <dd>{ownedWords(card)}</dd>
+            </div>
+          )}
+          {shown && (
+            <>
+              <div>
+                <dt>Color identity</dt>
+                <dd>{colorWords(card.color_identity)}</dd>
+              </div>
+              <div>
+                <dt>Legality</dt>
+                <dd>A Godlike card: legal in Legacy and Commander for you.</dd>
+              </div>
+              {card.commander && (
+                <div>
+                  <dt>Commander</dt>
+                  <dd>Can be your commander</dd>
+                </div>
+              )}
+            </>
+          )}
+        </dl>
+        {actions}
+        <p className={styles.credit}>
+          A Godlike card: only accounts at the Godlike tier see it, and the
+          players at a table where it is played.
         </p>
       </div>
     </div>

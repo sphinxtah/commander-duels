@@ -622,6 +622,53 @@ a.deckTitle:hover {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* The Godlike tier's custom cards (v0.4.0), above the search's results, each with its image. */
+.godlike {
+  margin: 12px 0 0;
+  border: 1px solid #c9a6ff33;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #c9a6ff08;
+}
+.godlike summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.godlike summary small {
+  color: #93a198;
+}
+.godlikeList {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.godlikeList li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #ffffff0d;
+  border-radius: 6px;
+}
+.godlikeList img {
+  width: 56px;
+  height: auto;
+  aspect-ratio: 745 / 1040;
+  border-radius: 3px;
+  grid-row: 1 / span 3;
+  align-self: start;
+}
+.godlikeList .foundName {
+  grid-column: 2;
+}
+.godlikeList .foundOwned,
+.godlikeList .foundActions {
+  grid-column: 2 / -1;
+}
 /* The finder's two scopes: the player's library, or the whole catalog. */
 .scope {
   border: 0;

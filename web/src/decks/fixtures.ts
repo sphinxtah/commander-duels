@@ -48,8 +48,33 @@ export function card(
     edhrec_rank: null,
     image: null,
     owned: null,
+    custom: false,
     ...fields,
   };
+}
+
+/** A made-up Godlike card as decks hold it (v0.4.0): never one of the owner's. */
+export function customSummary(
+  name: string,
+  fields: Partial<CardSummary> = {},
+): CardSummary {
+  const id = `custom-${name.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+  return card(name, {
+    id,
+    mana_cost: "{2}{U}",
+    mana_value: 3,
+    type_line: "Legendary Planeswalker — Stand-in",
+    oracle_text: "+1: Draw a stand-in card.",
+    loyalty: "4",
+    colors: ["U"],
+    color_identity: ["U"],
+    rarity: "mythic",
+    released_at: null,
+    owned: 4,
+    custom: true,
+    custom_image: `/api/v1/custom-cards/${id}/image?v=1`,
+    ...fields,
+  });
 }
 
 /** One of the ten Commander starter decks (v0.3.1), not one the player chose. */

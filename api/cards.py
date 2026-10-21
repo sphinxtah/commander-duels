@@ -107,6 +107,13 @@ class CardSummary(Contract):
         description="Copies in the player's library (v0.3.1); null when not limited: basic "
         "lands, and accounts that build from the whole catalog.",
     )
+    custom: bool = Field(
+        default=False,
+        description="One of the Godlike tier's custom cards (v0.4.0), in its owner's deck only.",
+    )
+    custom_image: str | None = Field(
+        default=None, description="A custom card's own image; null for catalog cards."
+    )
 
 
 class CardPage(Contract):

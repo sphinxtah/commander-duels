@@ -34,7 +34,9 @@ from api.identity import (
     Principal,
     audit,
     not_found,
+    permissions_for,
     require_permission,
+    roles_of,
     utcnow,
 )
 from api.library import CurrentLibrary, grant_starter, library_of, starter_entries
@@ -423,6 +425,12 @@ def change_wins(
     if user is None or (user.kind == "sysop" and user.id != principal.user.id):
         raise not_found()
     before, after = set_wins(db, user, body.wins, body.reason, principal.user)
+    if (before >= GODLIKE.wins) != (after >= GODLIKE.wins):
+        # The custom cards open or close with the Godlike tier (v0.4.0): the account's decks
+        # holding them are revalidated, as after any other change to a library.
+        db.flush()
+        permissions = permissions_for(user, roles_of(db, user))
+        refresh_decks(db, user.id, library_of(db, user, permissions, roster_of(request)))
     if before != after:
         audit(
             db,

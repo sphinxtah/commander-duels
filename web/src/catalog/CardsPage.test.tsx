@@ -53,7 +53,9 @@ const sigil: CustomCard = {
   artist: null,
   image_url: "/api/v1/custom-cards/custom-1/image?v=0123456789ab",
   playable: false,
+  loaded: false,
   in_library: true,
+  card: card("Stand-in Sigil", { custom: true }),
 };
 
 function page(items: ReturnType<typeof card>[]) {
@@ -340,24 +342,33 @@ describe("the Cards page", () => {
     expect(document.body).not.toHaveTextContent(/godlike|custom/i);
   });
 
-  it("shows the Godlike tier's cards in a tab of their own, not playable here yet", async () => {
+  it("shows the Godlike tier's cards in a tab of their own, with whether the engine has loaded each", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
-    api.on("GET /api/v1/custom-cards", () => reply(200, [sigil]));
+    const herald = {
+      ...sigil,
+      id: "custom-2",
+      name: "Stand-in Herald",
+      loaded: true,
+      playable: true,
+    };
+    api.on("GET /api/v1/custom-cards", () => reply(200, [sigil, herald]));
     render(<CardsPage me={player} heading={createRef()} />);
     fireEvent.click(await screen.findByRole("tab", { name: "Godlike cards" }));
     const section = screen.getByRole("region", { name: "Godlike cards" });
-    expect(
-      within(section).getByRole("heading", { name: /^Stand-in Sigil/ }),
-    ).toBeInTheDocument();
-    expect(section).toHaveTextContent("+1: Draw a stand-in card.");
-    expect(section).toHaveTextContent("Loyalty 4");
-    expect(section).toHaveTextContent("Not playable here yet");
-    expect(section).toHaveTextContent("In your library.");
-    expect(section.querySelector("img")).toHaveAttribute(
-      "src",
-      sigil.image_url,
-    );
+    const first = within(section)
+      .getByRole("heading", { name: /^Stand-in Sigil/ })
+      .closest("li")!;
+    expect(first).toHaveTextContent("+1: Draw a stand-in card.");
+    expect(first).toHaveTextContent("Loyalty 4");
+    expect(first).toHaveTextContent("Not loaded by this engine");
+    expect(first).toHaveTextContent("In your library.");
+    expect(first.querySelector("img")).toHaveAttribute("src", sigil.image_url);
+    const second = within(section)
+      .getByRole("heading", { name: /^Stand-in Herald/ })
+      .closest("li")!;
+    expect(second).toHaveTextContent("Playable");
+    expect(second).not.toHaveTextContent("Not loaded");
   });
 });
 

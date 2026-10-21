@@ -8,7 +8,13 @@ import {
 } from "react";
 import { client, describe } from "../api";
 import { ManaCost } from "../game/Card";
-import { CardDetails, OwnedNote, StatusBadge } from "../catalog/CardViews";
+import {
+  CardDetails,
+  CustomCardDetails,
+  OwnedNote,
+  StatusBadge,
+} from "../catalog/CardViews";
+import { useCustomCards } from "../catalog/CustomCards";
 import { SearchControls, useCardSearch } from "../catalog/SearchControls";
 import {
   buildsFromLibrary,
@@ -264,6 +270,30 @@ export function DeckEditor({
       </>
     );
   if (!deck || !validation) return <p role="status">Opening the deck…</p>;
+  const cardActions = opened && (
+    <div className={styles.actions}>
+      {locationsFor(deck.format).map((location) => (
+        <button
+          key={location}
+          type="button"
+          className={styles.secondary}
+          onClick={() => {
+            if (opened.entry) {
+              update(opened.entry, { location });
+              setMessage(
+                `Moved ${opened.card.name} to the ${locationNames[location].toLowerCase()}.`,
+              );
+            } else add(opened.card, location);
+            cardDialog.current?.close();
+          }}
+        >
+          {opened.entry
+            ? `Move to ${locationNames[location].toLowerCase()}`
+            : `Add to ${locationNames[location].toLowerCase()}`}
+        </button>
+      ))}
+    </div>
+  );
   return (
     <div className={styles.editor}>
       <div className={styles.editorHead}>
@@ -347,47 +377,28 @@ export function DeckEditor({
         >
           ×
         </button>
-        {opened && (
-          <CardDetails
-            cardId={opened.card.id}
-            chosenPrinting={opened.entry?.printing_id ?? null}
-            onChoosePrinting={
-              opened.entry
-                ? (printingId) => {
-                    update(opened.entry!, { printing_id: printingId });
-                    setOpened({
-                      ...opened,
-                      entry: { ...opened.entry!, printing_id: printingId },
-                    });
-                  }
-                : undefined
-            }
-            actions={
-              <div className={styles.actions}>
-                {locationsFor(deck.format).map((location) => (
-                  <button
-                    key={location}
-                    type="button"
-                    className={styles.secondary}
-                    onClick={() => {
-                      if (opened.entry) {
-                        update(opened.entry, { location });
-                        setMessage(
-                          `Moved ${opened.card.name} to the ${locationNames[location].toLowerCase()}.`,
-                        );
-                      } else add(opened.card, location);
-                      cardDialog.current?.close();
-                    }}
-                  >
-                    {opened.entry
-                      ? `Move to ${locationNames[location].toLowerCase()}`
-                      : `Add to ${locationNames[location].toLowerCase()}`}
-                  </button>
-                ))}
-              </div>
-            }
-          />
-        )}
+        {opened &&
+          (opened.card.custom ? (
+            // A Godlike card (v0.4.0): the catalog does not know it, so it shows from its summary.
+            <CustomCardDetails card={opened.card} actions={cardActions} />
+          ) : (
+            <CardDetails
+              cardId={opened.card.id}
+              chosenPrinting={opened.entry?.printing_id ?? null}
+              onChoosePrinting={
+                opened.entry
+                  ? (printingId) => {
+                      update(opened.entry!, { printing_id: printingId });
+                      setOpened({
+                        ...opened,
+                        entry: { ...opened.entry!, printing_id: printingId },
+                      });
+                    }
+                  : undefined
+              }
+              actions={cardActions}
+            />
+          ))}
       </dialog>
       <dialog
         ref={conflictDialog}
@@ -592,6 +603,12 @@ function CardFinder({
             : ""}
         </span>
       </label>
+      <GodlikeFinder
+        format={format}
+        identity={fits ? identity : null}
+        onAdd={onAdd}
+        onOpen={onOpen}
+      />
       {error && (
         <p role="alert" className={styles.refusal}>
           {error}
@@ -676,6 +693,93 @@ function CardFinder({
         </div>
       )}
     </section>
+  );
+}
+
+/** Whether a card's color identity fits a commander's ("c": colorless; null: no commander yet). */
+function withinIdentity(card: CardSummary, identity: string | null): boolean {
+  if (!identity) return true;
+  const allowed = identity === "c" ? "" : identity;
+  return card.color_identity.every((color) => allowed.includes(color));
+}
+
+/**
+ * The Godlike tier's custom cards (v0.4.0), for an account at that tier, with their images. The
+ * catalog's search never finds them, so the finder offers them here. Each says whether the
+ * running game engine has loaded it. Below the tier the API lists none, and nothing shows.
+ */
+function GodlikeFinder({
+  format,
+  identity,
+  onAdd,
+  onOpen,
+}: {
+  format: DeckDetail["format"];
+  /** The commander's identity when the finder keeps to what the deck can use. */
+  identity: string | null;
+  onAdd: (card: CardSummary, location: Location) => void;
+  onOpen: (card: CardSummary) => void;
+}) {
+  const custom = useCustomCards();
+  if (custom.length === 0) return null;
+  const shown = custom
+    .map((item) => item.card)
+    .filter((card) => withinIdentity(card, identity));
+  return (
+    <details className={styles.godlike} open>
+      <summary>
+        Godlike cards <small>{shown.length}</small>
+      </summary>
+      {shown.length === 0 && (
+        <p className={styles.hint}>None fits this deck's color identity.</p>
+      )}
+      <ul className={styles.godlikeList}>
+        {shown.map((card) => (
+          <li key={card.id}>
+            {/* The name and type beside it say what the image shows. */}
+            <img
+              src={card.custom_image ?? undefined}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+            <button
+              type="button"
+              className={styles.foundName}
+              onClick={() => onOpen(card)}
+            >
+              <span>{card.name}</span> <ManaCost cost={card.mana_cost} />
+              <small>{card.type_line}</small>
+            </button>
+            <StatusBadge card={card} />
+            {ownedWords(card) && (
+              <div className={styles.foundOwned}>
+                <OwnedNote card={card} />
+              </div>
+            )}
+            <div className={styles.foundActions}>
+              {format === "commander" && card.commander && (
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => onAdd(card, "commander")}
+                >
+                  Commander
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.secondary}
+                aria-label={`Add ${card.name}`}
+                onClick={() => onAdd(card, "main")}
+              >
+                Add
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
