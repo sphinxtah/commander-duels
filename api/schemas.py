@@ -330,6 +330,11 @@ class GameSeat(Contract):
         description="Your own seat's deck (\"custom\" for a deck list); other seats' decks are "
         "private, except to SysOp."
     )
+    left: Literal["conceded", "removed", "eliminated"] | None = Field(
+        default=None,
+        description="A player's seat out of a table's game that went on without it (v0.4.0): it "
+        "conceded, the others removed it while it was away, or it lost.",
+    )
 
 
 class GameResult(Contract):
@@ -344,6 +349,10 @@ class GameResult(Contract):
 
 class GameSummary(Contract):
     id: UUID
+    kind: Literal["practice", "table"] = Field(
+        default="practice",
+        description="A practice game against bots, or a human table's game (v0.4.0).",
+    )
     format: GameFormatId
     status: Literal["active", "finished", "interrupted"]
     seats: list[GameSeat]

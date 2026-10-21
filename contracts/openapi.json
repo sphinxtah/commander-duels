@@ -3047,6 +3047,23 @@
             ],
             "title": "Handle"
           },
+          "left": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conceded",
+                  "removed",
+                  "eliminated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A player's seat out of a table's game that went on without it (v0.4.0): it conceded, the others removed it while it was away, or it lost.",
+            "title": "Left"
+          },
           "player": {
             "enum": [
               "human",
@@ -3143,6 +3160,16 @@
           "id": {
             "format": "uuid",
             "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": "practice",
+            "description": "A practice game against bots, or a human table's game (v0.4.0).",
+            "enum": [
+              "practice",
+              "table"
+            ],
+            "title": "Kind",
             "type": "string"
           },
           "result": {
@@ -5379,6 +5406,37 @@
         "title": "SaleChange",
         "type": "object"
       },
+      "SeatChange": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Another of your decks; unreadies.",
+            "title": "Deck Id"
+          },
+          "ready": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready"
+          }
+        },
+        "title": "SeatChange",
+        "type": "object"
+      },
       "SeatChoice": {
         "additionalProperties": false,
         "description": "A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck\nlist (SysOp).",
@@ -5430,6 +5488,22 @@
           }
         },
         "title": "SeatChoice",
+        "type": "object"
+      },
+      "SeatTaking": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "description": "One of your decks, in the table's format.",
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deck_id"
+        ],
+        "title": "SeatTaking",
         "type": "object"
       },
       "SessionInfo": {
@@ -6142,6 +6216,292 @@
           "stats"
         ],
         "title": "SyncRunInfo",
+        "type": "object"
+      },
+      "TablePlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "deck": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your own seat's deck title; others' decks are private.",
+            "title": "Deck"
+          },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your own seat's deck.",
+            "title": "Deck Id"
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "host": {
+            "title": "Host",
+            "type": "boolean"
+          },
+          "player": {
+            "enum": [
+              "human",
+              "bot"
+            ],
+            "title": "Player",
+            "type": "string"
+          },
+          "portrait": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A player's allied Planeswalker.",
+            "title": "Portrait"
+          },
+          "ready": {
+            "description": "The host is always ready: starting is their ready.",
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "taken": {
+            "description": "Whether a player sits there; bots' seats always are.",
+            "title": "Taken",
+            "type": "boolean"
+          },
+          "you": {
+            "title": "You",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seat",
+          "player",
+          "taken",
+          "handle",
+          "portrait",
+          "host",
+          "ready",
+          "you",
+          "deck",
+          "deck_id"
+        ],
+        "title": "TablePlayer",
+        "type": "object"
+      },
+      "TableRequest": {
+        "additionalProperties": false,
+        "description": "A new table: the host takes the first seat with one of their decks.",
+        "properties": {
+          "bot_skill": {
+            "default": 4,
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Bot Skill",
+            "type": "integer"
+          },
+          "bots": {
+            "default": 0,
+            "description": "Seats bots fill, after the players'; Commander only.",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Bots",
+            "type": "integer"
+          },
+          "deck_id": {
+            "description": "The host's deck.",
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "format": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "seats": {
+            "default": 2,
+            "description": "Every seat, bots included: 2 in Legacy, 2-4 in Commander.",
+            "maximum": 4.0,
+            "minimum": 2.0,
+            "title": "Seats",
+            "type": "integer"
+          },
+          "turn_cap": {
+            "default": 60,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Turn Cap",
+            "type": "integer"
+          },
+          "visibility": {
+            "default": "public",
+            "description": "public tables are listed; a private one is reached by its invite link only.",
+            "enum": [
+              "public",
+              "private"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deck_id"
+        ],
+        "title": "TableRequest",
+        "type": "object"
+      },
+      "TableView": {
+        "additionalProperties": false,
+        "properties": {
+          "bot_skill": {
+            "title": "Bot Skill",
+            "type": "integer"
+          },
+          "bots": {
+            "title": "Bots",
+            "type": "integer"
+          },
+          "can_start": {
+            "description": "You host it, every player's seat is taken and ready.",
+            "title": "Can Start",
+            "type": "boolean"
+          },
+          "code": {
+            "description": "The invite link's code: #tables/<code>.",
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its game, once started; for its players and SysOp.",
+            "title": "Game Id"
+          },
+          "host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The host's handle.",
+            "title": "Host"
+          },
+          "players": {
+            "description": "Every seat in turn order, bots last.",
+            "items": {
+              "$ref": "#/components/schemas/TablePlayer"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "seats": {
+            "title": "Seats",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "started",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "turn_cap": {
+            "title": "Turn Cap",
+            "type": "integer"
+          },
+          "visibility": {
+            "enum": [
+              "public",
+              "private"
+            ],
+            "title": "Visibility",
+            "type": "string"
+          },
+          "your_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Seat"
+          }
+        },
+        "required": [
+          "code",
+          "format",
+          "visibility",
+          "status",
+          "seats",
+          "bots",
+          "bot_skill",
+          "turn_cap",
+          "host",
+          "players",
+          "your_seat",
+          "can_start",
+          "game_id",
+          "created_at"
+        ],
+        "title": "TableView",
         "type": "object"
       },
       "TierInfo": {
@@ -13440,7 +13800,7 @@
     },
     "/api/v1/games/{game_id}": {
       "get": {
-        "description": "The game, with its owner's current seat snapshot while the engine holds it.",
+        "description": "The game, with your seat's current snapshot while the engine holds it (an observer's is the\nfirst player's).",
         "operationId": "get_game_api_v1_games__game_id__get",
         "parameters": [
           {
@@ -13551,7 +13911,7 @@
     },
     "/api/v1/games/{game_id}/close": {
       "post": {
-        "description": "Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game\nas it ended.",
+        "description": "Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game\nas it ended. A table's game goes on for the other players, so its players concede their own\nseat instead; only SysOp closes it while it runs.",
         "operationId": "close_game_api_v1_games__game_id__close_post",
         "parameters": [
           {
@@ -16146,6 +16506,801 @@
           }
         },
         "summary": "Buy"
+      }
+    },
+    "/api/v1/tables": {
+      "get": {
+        "description": "Open tables, newest first: the public ones and your own; SysOp sees every one.",
+        "operationId": "list_tables_api_v1_tables_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TableView"
+                  },
+                  "title": "Response List Tables Api V1 Tables Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Tables"
+      },
+      "post": {
+        "description": "Opens a table with the host in its first seat.",
+        "operationId": "create_table_api_v1_tables_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Create Table"
+      }
+    },
+    "/api/v1/tables/{code}": {
+      "get": {
+        "description": "A table by its code: the invite link.",
+        "operationId": "get_table_api_v1_tables__code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Table"
+      }
+    },
+    "/api/v1/tables/{code}/join": {
+      "post": {
+        "description": "Takes the first free player's seat with one of your decks.",
+        "operationId": "join_table_api_v1_tables__code__join_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeatTaking"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Join Table"
+      }
+    },
+    "/api/v1/tables/{code}/leave": {
+      "post": {
+        "description": "Leaves the table before it starts. The host leaving closes it for everyone.",
+        "operationId": "leave_table_api_v1_tables__code__leave_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Leave Table"
+      }
+    },
+    "/api/v1/tables/{code}/seat": {
+      "patch": {
+        "description": "Changes your deck (which makes you not ready), or whether you are ready.",
+        "operationId": "change_seat_api_v1_tables__code__seat_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeatChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Seat"
+      }
+    },
+    "/api/v1/tables/{code}/start": {
+      "post": {
+        "description": "The host starts the table's game: every player's seat taken and ready, and every player\nunder their limit of running games. The reply names the game; each player plays it over its\nWebSocket.",
+        "operationId": "start_table_api_v1_tables__code__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start Table"
       }
     }
   }

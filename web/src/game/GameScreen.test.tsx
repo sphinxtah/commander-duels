@@ -523,3 +523,129 @@ describe("Escape on the table", () => {
     expect(screen.queryAllByRole("alert")).toEqual([]);
   });
 });
+
+describe("a human table's game (v0.4.0)", () => {
+  it("offers the vote on an away player, then shows what the game paid and leads to the lobby", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const result = {
+      kind: "completed",
+      winner_seat: 0,
+      draw: false,
+      conceded_seats: [1],
+      turns: 12,
+    };
+    const human = (seat: number, handle: string) => ({
+      seat,
+      player: "human",
+      handle,
+      portrait: null,
+      deck: seat === 0 ? "Red deck" : null,
+      left: null,
+    });
+    let finished = false;
+    get.mockImplementation((async () => ({
+      data: {
+        game: {
+          id: "g1",
+          kind: "table",
+          format: "legacy",
+          status: finished ? "finished" : "active",
+          seats: [human(0, "alice"), human(1, "bob")],
+          your_seat: 0,
+          bot_skill: 4,
+          turn_cap: 60,
+          created_at: "2026-10-21T10:00:00Z",
+          finished_at: finished ? "2026-10-21T10:30:00Z" : null,
+          result: finished ? result : null,
+          tokens: finished ? 50 : null,
+        },
+        snapshot: null,
+      },
+    })) as never);
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver(welcome(0, false));
+        socket.deliver({
+          type: "lease",
+          role: "controller",
+          controlled: true,
+          reason: "granted",
+        });
+        socket.deliver({
+          type: "snapshot",
+          snapshot: snapshot(5, priority("A")),
+        });
+        socket.deliver({
+          type: "presence",
+          away_after: 120,
+          seats: [
+            {
+              seat: 0,
+              connected: true,
+              away_seconds: null,
+              left: null,
+              removable: false,
+              yes: [],
+              no: [],
+              needed: 1,
+            },
+            {
+              seat: 1,
+              connected: false,
+              away_seconds: 150,
+              left: null,
+              removable: true,
+              yes: [],
+              no: [],
+              needed: 1,
+            },
+          ],
+        });
+      });
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Vote to remove bob" }),
+      );
+      expect(socket.sent.at(-1)).toEqual({
+        type: "vote",
+        seat: 1,
+        remove: true,
+      });
+      expect(
+        screen.getByRole("heading", { level: 1, name: /Table game/ }),
+      ).toBeInTheDocument();
+      // The other player goes by their handle at the table, not the engine's "Bot 2".
+      expect(
+        screen.getByRole("article", { name: "bob, seat 2" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Bot 2")).toBeNull();
+
+      finished = true;
+      act(() =>
+        socket.deliver({
+          type: "snapshot",
+          snapshot: {
+            ...snapshot(6, null),
+            status: "finished",
+            result: { ...result, error: null },
+          },
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getAllByText("This game paid you 50 tokens."),
+        ).not.toHaveLength(0),
+      );
+      for (const link of screen.getAllByRole("link", {
+        name: "Back to the lobby",
+      }))
+        expect(link).toHaveAttribute("href", "#tables");
+    } finally {
+      get.mockImplementation(original);
+    }
+  });
+});

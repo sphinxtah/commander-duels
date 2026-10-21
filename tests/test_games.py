@@ -478,6 +478,7 @@ def test_a_practice_game_belongs_to_its_owner(
         "handle": "ada",
         "portrait": None,
         "deck": "legacy-mono-red-burn",
+        "left": None,
     }
     assert summary["seats"][1]["player"] == "bot" and summary["seats"][1]["deck"] is None
     assert engine.created[0]["seats"] == [

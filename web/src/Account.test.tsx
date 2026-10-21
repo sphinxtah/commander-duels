@@ -855,7 +855,9 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
     const heading = await screen.findByRole("heading", {
       name: "Choose two starter decks",
     });
-    expect(document.activeElement).toBe(heading);
+    // The heading takes focus once the step has drawn, which a busy machine may finish a tick
+    // after the heading appears.
+    await waitFor(() => expect(document.activeElement).toBe(heading));
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Welcome to the table.",
     );

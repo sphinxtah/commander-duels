@@ -178,11 +178,12 @@ class LoginChallenge(Base):
 class Game(Base):
     """A game the API started in the engine. Its id is the engine's game id. The engine holds the
     game itself, in memory; the seat tokens live only in the API process, so a game still active
-    when the API restarts is marked interrupted."""
+    when the API restarts is marked interrupted. A practice game seats one player against bots; a
+    table game (v0.4.0) seats every player of a human table."""
 
     __tablename__ = "games"
     __table_args__ = (
-        CheckConstraint("kind IN ('practice')", name="ck_games_kind"),
+        CheckConstraint("kind IN ('practice', 'table')", name="ck_games_kind"),
         CheckConstraint("format IN ('legacy', 'commander')", name="ck_games_format"),
         CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
     )
@@ -210,6 +211,10 @@ class GameSeat(Base):
         UniqueConstraint("game_id", "seat"),
         CheckConstraint("player IN ('human', 'bot')", name="ck_game_seats_player"),
         CheckConstraint("(player = 'human') = (user_id IS NOT NULL)", name="ck_game_seats_owner"),
+        CheckConstraint(
+            "left_reason IS NULL OR left_reason IN ('conceded', 'removed', 'eliminated')",
+            name="ck_game_seats_left",
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), index=True)
@@ -222,6 +227,58 @@ class GameSeat(Base):
     deck_list: Mapped[dict[str, object] | None] = mapped_column(JsonType)
     # The player's deck revision the seat played, bound for good (DECK01).
     deck_revision_id: Mapped[UUID | None] = mapped_column(ForeignKey("deck_revisions.id"))
+    # A human seat out of a game that went on without it (v0.4.0): when, and why (it conceded,
+    # the other players removed it while it was away, or it lost). Such a seat no longer counts
+    # against its player's limit of running games.
+    left_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    left_reason: Mapped[str | None] = mapped_column(String(16))
+
+
+class GameTable(Base):
+    """A human table (v0.4.0): the lobby where players take seats with their own decks, then the
+    game it started. It is reached by its code: listed in the lobby when public, by its invite link
+    alone when private. Bots fill the seats after the players'."""
+
+    __tablename__ = "game_tables"
+    __table_args__ = (
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_game_tables_format"),
+        CheckConstraint("visibility IN ('public', 'private')", name="ck_game_tables_visibility"),
+        CheckConstraint("status IN ('open', 'started', 'closed')", name="ck_game_tables_status"),
+        CheckConstraint(
+            "seats BETWEEN 2 AND 4 AND bots >= 0 AND seats - bots >= 2", name="ck_game_tables_seats"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    # Unguessable: the invite link's code.
+    code: Mapped[str] = mapped_column(String(32), unique=True)
+    host_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    format: Mapped[str] = mapped_column(String(16))
+    visibility: Mapped[str] = mapped_column(String(16))
+    # Every seat, bots included; the players' seats come first.
+    seats: Mapped[int]
+    bots: Mapped[int]
+    bot_skill: Mapped[int]
+    turn_cap: Mapped[int]
+    # open (the lobby), started (its game holds the rest) or closed (the host left).
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class TableSeat(Base):
+    """A player's seat at a table in the lobby, with the deck they will play."""
+
+    __tablename__ = "table_seats"
+    __table_args__ = (UniqueConstraint("table_id", "seat"), UniqueConstraint("table_id", "user_id"))
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    table_id: Mapped[UUID] = mapped_column(ForeignKey("game_tables.id"), index=True)
+    seat: Mapped[int]
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
+    ready: Mapped[bool] = mapped_column(default=False)
+    joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
 class CardImage(Base):

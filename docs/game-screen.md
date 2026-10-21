@@ -149,6 +149,10 @@ SysOp's Inspection drawer has the inspect switch: every player's hand and librar
 
 Since v0.3.1 the bots plan only with what their seat may see ([fair bots](engine/fair-bots.md)), and the notice that said they read the player's hand is gone. A player is offered their own decks only (their two starter decks among them; the engine's fixture decks are SysOp's), the table opens on a format they have a playable deck for, and a player with none is pointed to Decks. A deck that needs cards the library does not hold says so. A bot's deck left to the table is chosen by the server: in Commander, one of the ten starter decks.
 
+## Human tables (v0.4.0)
+
+A table's game ([human tables](tables.md)) uses the same screen. The other players go by their handles, on the board, in the turn line, the result and the log. Above the prompt, a Players panel says who is away and for how long, and once they may be voted out offers "Vote to remove" and "Keep waiting" with the votes so far. It also says who conceded or was removed, and tells a removed player so when they come back. Conceding says the other players play on; the result and its dialog lead back to the lobby. Every finished game's result, practice or table, shows the tokens it paid you.
+
 ## Accessibility
 
 - **Names.** Every card is a button named with its name, type, power and toughness, current state, owner when someone else controls it, and options. Players, zone tiles, the stack's objects and "+N" are named buttons too, in the table's order.

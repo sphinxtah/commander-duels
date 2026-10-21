@@ -18,6 +18,7 @@ import { useOnline } from "../app/online";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
+import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
 import { useGame } from "./connection";
@@ -66,7 +67,13 @@ import { createTableUi, useTableUi } from "./table/uiStore";
 import { useTableEvents, useTableModel } from "./table/useTable";
 import { useResponseTimer, useWindowAttention } from "./table/useResponseTimer";
 import { ZoneContents, zoneTitle } from "./table/ZoneContents";
-import type { CardView, CommandEnvelope, PromptOption, Seat } from "./types";
+import type {
+  CardView,
+  CommandEnvelope,
+  PromptOption,
+  Seat,
+  Snapshot,
+} from "./types";
 import styles from "./game.module.css";
 import screen from "./table/screen.module.css";
 
@@ -144,7 +151,16 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   const attention = useWindowAttention();
   const liveNotice = useLiveGameNotice();
 
-  const snapshot = state.snapshot;
+  // At a human table (v0.4.0) a player sees the others by their handles, not the engine's
+  // "Human 2": the view's names are swapped before anything draws them.
+  const snapshot = useMemo(
+    () => withHandles(state.snapshot, summary, state.seat),
+    [state.snapshot, summary, state.seat],
+  );
+  const shown = useMemo(
+    () => (snapshot === state.snapshot ? state : { ...state, snapshot }),
+    [state, snapshot],
+  );
   const view = snapshot?.view ?? null;
   const prompt = snapshot?.prompt ?? null;
   const canAnswer =
@@ -174,13 +190,22 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       document.title = "Commander Duels";
     };
   }, []);
+  // The summary again once the game ends, and until the API has recorded the end: it then holds
+  // the tokens the game paid (v0.4.0).
+  const [summaryTries, setSummaryTries] = useState(0);
   useEffect(() => {
     let active = true;
     void loadSummary(gameId).then((game) => active && game && setSummary(game));
     return () => {
       active = false;
     };
-  }, [gameId, state.ended, snapshot?.result]);
+  }, [gameId, state.ended, snapshot?.result, summaryTries]);
+  const unrecorded = Boolean(snapshot?.result) && summary?.status === "active";
+  useEffect(() => {
+    if (!unrecorded || summaryTries >= 20) return;
+    const timer = window.setTimeout(() => setSummaryTries((n) => n + 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [unrecorded, summaryTries]);
   useEffect(() => {
     if (snapshot?.result && !resultDialog.current?.open)
       resultDialog.current?.showModal();
@@ -451,9 +476,39 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     setInspect(next);
   }
 
+  // A human table's game (v0.4.0): players go by their handles, the others play on after a
+  // concession, and leaving goes back to the lobby.
+  const atTable = summary?.kind === "table";
+  const seatName = (seat: number) =>
+    (atTable
+      ? summary?.seats.find((entry) => entry.seat === seat)?.handle
+      : null) ?? playerName(view, seat, observing);
+  // The engine names players by kind and seat ("Human 2" sits in seat 1); its log lines say the
+  // handles instead at a table.
+  const handlesInLog = (text: string) =>
+    text.replace(/\bHuman ([1-4])\b/g, (words, number: string) => {
+      const entry = summary?.seats.find((s) => s.seat === Number(number) - 1);
+      return entry?.player === "human" && entry.handle ? entry.handle : words;
+    });
   const result = snapshot?.result ?? null;
-  const outcome = result ? resultText(view, state.seat, result) : null;
+  const outcome = result
+    ? resultText(view, state.seat, result, seatName)
+    : null;
   const format = snapshot?.settings.format ?? summary?.format;
+  const back = atTable
+    ? { href: "#tables", text: "Back to the lobby" }
+    : { href: "#play", text: "Back to the table" };
+  const paid =
+    summary?.status === "finished" && summary.tokens ? summary.tokens : null;
+  const tokensLine =
+    paid !== null
+      ? `This game paid you ${paid.toLocaleString()} tokens.`
+      : null;
+  // A player who comes back after the API stopped following the game sees how it ended.
+  const recordedOutcome =
+    state.ended === "not_live" && summary?.result
+      ? resultText(view, summary.your_seat, summary.result, seatName)
+      : null;
   const concedeDisabled = state.role !== "controller" || result !== null;
   const connectionText =
     state.phase === "open"
@@ -474,7 +529,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
         ? null
         : view.active_seat === view.seat && !observing
           ? "Your turn"
-          : `${playerName(view, view.active_seat, observing)}’s turn`,
+          : `${seatName(view.active_seat)}’s turn`,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -509,7 +564,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           >
             <h1 ref={heading} tabIndex={-1} className={styles.visuallyHidden}>
               {format === "commander" ? "Commander" : "Legacy"}
-              <span> · Practice game</span>
+              <span>{atTable ? " · Table game" : " · Practice game"}</span>
             </h1>
 
             <BandHud
@@ -562,12 +617,18 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 {state.ended && (
                   <div className={screen.alert} role="alert">
                     <p>{ended[state.ended] ?? "This game has ended."}</p>
+                    {recordedOutcome && (
+                      <p>
+                        {recordedOutcome.title}: {recordedOutcome.detail}
+                        {tokensLine ? ` ${tokensLine}` : ""}
+                      </p>
+                    )}
                     <a
-                      href="#play"
+                      href={back.href}
                       className={styles.secondaryButton}
                       onClick={leave}
                     >
-                      Back to the table
+                      {back.text}
                     </a>
                   </div>
                 )}
@@ -629,8 +690,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                     }
                   />
                 )}
-                <PromptPanel
+                <AwayPlayers
                   state={state}
+                  name={seatName}
+                  onVote={(seat, remove) => connection?.vote(seat, remove)}
+                />
+                <PromptPanel
+                  state={shown}
                   onAnswer={answer}
                   onTakeControl={() => connection?.takeControl()}
                   onConcede={() => concedeDialog.current?.showModal()}
@@ -644,12 +710,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   >
                     <h2 id="result-side-title">{outcome.title}</h2>
                     <p>{outcome.detail}</p>
+                    {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
                     <a
-                      href="#play"
+                      href={back.href}
                       className={styles.secondaryButton}
                       onClick={leave}
                     >
-                      Back to the table
+                      {back.text}
                     </a>
                   </section>
                 )}
@@ -663,7 +730,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 onClose={closeDrawer}
               >
                 <PriorityPanel
-                  state={state}
+                  state={shown}
                   onSet={(priority) => connection?.setPriority(priority)}
                   showPassing={false}
                 />
@@ -701,7 +768,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               >
                 <section className={styles.log} aria-labelledby="log-title">
                   <h2 id="log-title">Game log</h2>
-                  <GameLog lines={state.log} focusable={drawer === "log"} />
+                  <GameLog
+                    lines={state.log}
+                    focusable={drawer === "log"}
+                    rename={atTable ? handlesInLog : undefined}
+                  />
                 </section>
               </Drawer>
               {drawer === "options" && (
@@ -762,7 +833,12 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
             aria-labelledby="concede-title"
           >
             <h2 id="concede-title">Concede this game?</h2>
-            <p>You lose this game at once. The bots play on without you.</p>
+            <p>
+              You lose this game at once.{" "}
+              {atTable
+                ? "The other players play on without you."
+                : "The bots play on without you."}
+            </p>
             <form method="dialog" className={styles.confirmButtons}>
               <button
                 type="submit"
@@ -787,12 +863,17 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           >
             <h2 id="result-title">{outcome?.title}</h2>
             <p>{outcome?.detail}</p>
+            {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
             <form method="dialog" className={styles.confirmButtons}>
               <button type="submit" className={styles.secondaryButton}>
                 Review the board
               </button>
-              <a href="#play" className={styles.primaryButton} onClick={leave}>
-                Back to the table
+              <a
+                href={back.href}
+                className={styles.primaryButton}
+                onClick={leave}
+              >
+                {back.text}
               </a>
             </form>
           </dialog>
@@ -800,6 +881,33 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       </TableContext.Provider>
     </GameContext.Provider>
   );
+}
+
+/** A player's view at a human table (v0.4.0) with the other players named by their handles. The
+ * engine names seats by kind and number ("Human 2"); a bot keeps its name, and an observer's view
+ * stays as the engine built it. */
+function withHandles(
+  snapshot: Snapshot | null,
+  summary: Summary | undefined,
+  seat: Seat | null,
+): Snapshot | null {
+  if (!snapshot?.view || summary?.kind !== "table" || seat === null)
+    return snapshot;
+  const handles = new Map<Seat, string>();
+  for (const entry of summary.seats)
+    if (entry.player === "human" && entry.handle && entry.seat !== seat)
+      handles.set(entry.seat, entry.handle);
+  if (handles.size === 0) return snapshot;
+  return {
+    ...snapshot,
+    view: {
+      ...snapshot.view,
+      opponents: snapshot.view.opponents.map((player) => {
+        const handle = handles.get(player.seat);
+        return handle ? { ...player, name: handle } : player;
+      }),
+    },
+  };
 }
 
 /** The response timer for the browser tests and assistive technology that reads timers: silent,
@@ -824,9 +932,12 @@ function TimerStatus() {
 function GameLog({
   lines,
   focusable,
+  rename,
 }: {
   lines: { index: number; turn: number; text: string }[];
   focusable: boolean;
+  /** Rewrites a line's player names: the engine's "Human 2" as a handle at a human table. */
+  rename?: (text: string) => string;
 }) {
   const list = useRef<HTMLOListElement>(null);
   const stick = useRef(true);
@@ -851,7 +962,7 @@ function GameLog({
       {lines.length === 0 && <li className={styles.hint}>Nothing yet.</li>}
       {lines.slice(-120).map((line) => (
         <li key={line.index}>
-          <span>T{line.turn}</span> {line.text}
+          <span>T{line.turn}</span> {rename ? rename(line.text) : line.text}
         </li>
       ))}
     </ol>

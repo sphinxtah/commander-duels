@@ -254,6 +254,9 @@ export function resultText(
     draw: boolean;
     turns: number;
   },
+  /** A seat's player by name: at a human table their handle (v0.4.0); else the view's. */
+  nameOf: (winner: Seat) => string = (winner) =>
+    playerName(view, winner, seat === null),
 ): { title: string; detail: string } {
   const turns = `${result.turns} turn${result.turns === 1 ? "" : "s"}`;
   if (result.draw)
@@ -264,7 +267,7 @@ export function resultText(
   if (result.winner_seat !== null) {
     if (result.winner_seat === seat)
       return { title: "Victory", detail: `You won in ${turns}.` };
-    const winner = playerName(view, result.winner_seat, seat === null);
+    const winner = nameOf(result.winner_seat);
     return {
       title: seat === null ? "Game over" : "Defeat",
       detail: `${winner} won in ${turns}.`,

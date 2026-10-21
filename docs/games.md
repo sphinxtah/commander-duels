@@ -30,6 +30,10 @@ browser ──HTTPS──▶ API ──service token + seat token──▶ engin
 
 Views and prompts come back from the engine unchanged, so the engine's leak rules ([the human seat](engine/human-seat.md), [Commander tables](engine/commander-tables.md)) still decide what a seat sees. The API adds nothing to a snapshot, and no payload it sends carries a seat token or the service token. The tests check this for every message.
 
+### Human tables (v0.4.0)
+
+A table's game ([human tables](tables.md)) seats every player of the table in one engine game. The API keeps one token per player's seat and follows each seat with its own task. Each seat's views go only to that seat's connections; an observer (SysOp) sees the first player's seat. Each seat has its own controller lease and its own concession. The game's kind is `table`, and every player's seat records its account, so wins and tokens count as for any game. The engine closes a table's game after an hour with nothing happening, not 15 minutes.
+
 ### Practice games
 
 ```json
@@ -63,11 +67,13 @@ Refusals:
 | --- | --- | --- |
 | `GET /api/v1/games` | Any player | Your games, newest first (50). SysOp may pass `scope=all` for everyone's |
 | `GET /api/v1/games/{id}` | The seat's owner; SysOp | The summary, and the owner's current seat snapshot while the engine holds the game |
-| `POST /api/v1/games/{id}/close` | The seat's owner; SysOp | Ends the game for every seat (result `closed`). The reply waits up to 5 seconds for the result to be recorded, so it shows the game finished. A game no task follows any more (left active by an earlier process) is marked `interrupted` and closed in the engine |
+| `POST /api/v1/games/{id}/close` | The seat's owner; SysOp | Ends the game for every seat (result `closed`). The reply waits up to 5 seconds for the result to be recorded, so it shows the game finished. A game no task follows any more (left active by an earlier process) is marked `interrupted` and closed in the engine. A table's running game goes on for its other players: its players get 409 `table_game` and concede instead; SysOp may close it |
 | `GET /api/v1/games/{id}/inspection` | SysOp (`games.view_concealed`) | The inspection view, below |
 | `GET /api/v1/engine/cards?q=` | SysOp (`cards.any`) | Up to 50 card names the engine implements, for deck lists. It was `GET /api/v1/cards` until v0.2.0, which gave that path to [the card catalog](catalog.md#search-deck03-deck04) |
 
-Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp.
+Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp. Since v0.4.0 a summary also gives the game's `kind` (`practice` or `table`), each seat's `left` (`conceded`, `removed` or `eliminated` while the game went on), and `tokens`, what the finished game paid you.
+
+The account's running games, for `CD_GAMES_PER_ACCOUNT`, are the active games where its seat is still in play (since v0.4.0): a seat out of a table's game that goes on no longer counts.
 
 Since v0.3.1 the transaction that records a finished game also counts its win, when a player's seat won it: one entry in the progression ledger, never two ([the Planeswalker Alliance](progression.md#wins-and-levels)).
 
@@ -97,7 +103,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | 4403 | `origin_refused`, `csrf_failed`, `forbidden` | Another site; a wrong CSRF token; no `games.play`, or `inspect` without SysOp's permission |
 | 4404 | `not_found` | Not your game, or no such game |
 | 4410 | `game_not_live` | The API no longer follows the game (finished long ago, or interrupted); read it over HTTP |
-| 4429 | `too_many_connections` | The account already holds 4 connections to this game, or the game holds 8. SysOp's connections are not counted. Close a tab; the page retries with backoff |
+| 4429 | `too_many_connections` | The account already holds 4 connections to this game, or the game holds 8 for each player's seat. SysOp's connections are not counted. Close a tab; the page retries with backoff |
 | 4400 | `hello_required` | The first message was not a valid hello |
 | 4408 | (none) | The client stopped reading. Reconnect and resynchronize |
 
@@ -109,6 +115,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `{"type": "take_control"}` | Moves the lease to this connection (owner only) |
 | `{"type": "release_control"}` | Gives the lease up |
 | `{"type": "resync", "since": n}` | Sends the current snapshot if it is newer than `n`. New connections, resyncs and `GET /api/v1/games/{id}` share one engine view per revision, so they cost the engine nothing more |
+| `{"type": "vote", "seat": n, "remove": true}` | Since v0.4.0, at a table: a player's vote on removing the away player in seat `n` (`false` votes to keep waiting). Any tab of a player still in the game may vote; the session is checked as for a command. Refusals come as `error` with the `seat` and a `message`: `not_a_player`, `invalid_vote`, `not_in_game`, `not_removable` (not away for 2 minutes), `removal_failed` |
 | `{"type": "ping"}` | Answered with `pong` |
 
 **Messages from the server.**
@@ -119,6 +126,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `command_result` | `action_id`, the engine's HTTP `status` and `body`, unchanged: `accepted` with the new revision, or a refusal such as `stale_prompt`, `stale_revision`, `invalid_option` or `game_over`. The API's own refusals are `not_controller` (409), `invalid_command` (400) and `engine_unavailable` (503) |
 | `lease` | `role` (`controller` or `observer`), `controlled` (whether any tab holds the lease) and `reason`: `granted`, `taken_over`, `released` or `disconnected` |
 | `inspection` | SysOp's inspection view, after each new revision, only to connections that asked to inspect |
+| `presence` | Since v0.4.0, at a table only: `away_after` (120 seconds) and, for each player's seat, `connected`, `away_seconds` (since no tab of theirs has been connected), `left`, `removable`, the seats that voted `yes` and `no`, and the yes votes `needed`. Sent to every connection when it changes, when a seat has been away long enough to be voted on, and after the welcome |
 | `interrupted` | The engine lost the game |
 | `welcome`, `pong`, `error` | As above |
 
@@ -177,6 +185,8 @@ Migration `0003_games` adds two tables:
 - **`game_seats`.** Each seat's player (`human` or `bot`), owner account and deck: a fixture name, or `custom` with the deck list as sent to the engine. A check constraint ties owners to human seats.
 
 Migration `0006_decks` (v0.2.0) adds the deck revision to each seat played with an own deck, and the catalog revision and format version to each game.
+
+Migration `0009_tables` (v0.4.0) adds the human tables and their seats, the `table` kind of game, and when and why a seat left a game that went on ([human tables](tables.md#data)).
 
 One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Recovery and replay journals (NET08–NET09) remain later work.
 

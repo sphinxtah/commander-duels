@@ -378,3 +378,42 @@ describe("priority controls", () => {
     expect(socket.commands()).toEqual([]);
   });
 });
+
+describe("away players at a human table (v0.4.0)", () => {
+  it("keeps who is away, sends votes and says why one was refused", () => {
+    const socket = playing();
+    expect(state.presence).toBeNull();
+    vi.setSystemTime(new Date("2026-10-21T12:00:00Z"));
+    const away = {
+      seat: 1,
+      connected: false,
+      away_seconds: 130,
+      left: null,
+      removable: true,
+      yes: [],
+      no: [],
+      needed: 1,
+    };
+    socket.deliver({ type: "presence", away_after: 120, seats: [away] });
+    expect(state.presence).toEqual({
+      away_after: 120,
+      seats: [away],
+      received: Date.parse("2026-10-21T12:00:00Z"),
+    });
+
+    connection.vote(1, true);
+    expect(socket.sent.at(-1)).toEqual({ type: "vote", seat: 1, remove: true });
+    socket.deliver({
+      type: "error",
+      code: "not_removable",
+      message: "That player is not away.",
+      seat: 1,
+    });
+    expect(state.voteRefusal).toBe("That player is not away.");
+    // Voting again clears it; another error is no vote's refusal.
+    connection.vote(1, false);
+    expect(state.voteRefusal).toBeNull();
+    socket.deliver({ type: "error", code: "invalid_message" });
+    expect(state.voteRefusal).toBeNull();
+  });
+});

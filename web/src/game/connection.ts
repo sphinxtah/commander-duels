@@ -4,6 +4,8 @@ import type {
   CommandEnvelope,
   Inspection,
   LogLine,
+  Presence,
+  Seat,
   ServerMessage,
   Snapshot,
   PriorityControls,
@@ -37,6 +39,11 @@ export interface GameState {
   crowded: boolean;
   /** The priority controls a set_priority reply reported, until the next view shows them. */
   priority: PriorityControls | null;
+  /** At a human table (v0.4.0): who is away and the votes on removing them, with when this tab
+   * received it (Date.now()), so away times count on. Null elsewhere. */
+  presence: (Presence & { received: number }) | null;
+  /** Why the server refused this tab's vote, in words. */
+  voteRefusal: string | null;
 }
 
 export type EndReason =
@@ -63,7 +70,17 @@ const initial: GameState = {
   interrupted: false,
   crowded: false,
   priority: null,
+  presence: null,
+  voteRefusal: null,
 };
+/** The server's refusals of a vote: their message says why. */
+const VOTE_REFUSALS = new Set([
+  "not_a_player",
+  "invalid_vote",
+  "not_in_game",
+  "not_removable",
+  "removal_failed",
+]);
 const LOG_KEPT = 400;
 
 /** crypto.randomUUID needs a secure context; plain-HTTP test hosts get the same from bytes. */
@@ -175,6 +192,12 @@ export class GameConnection {
       type: "set_priority",
       payload: settings,
     });
+  }
+
+  /** At a human table: votes on removing an away player's seat (true), or to wait (false). */
+  vote(seat: Seat, remove: boolean): void {
+    this.update({ voteRefusal: null });
+    this.send({ type: "vote", seat, remove });
   }
 
   /** "Play here": moves the lease to this tab. */
@@ -346,8 +369,21 @@ export class GameConnection {
       case "interrupted":
         this.update({ interrupted: true });
         break;
+      case "presence":
+        this.update({
+          presence: {
+            away_after: message.away_after,
+            seats: message.seats,
+            received: Date.now(),
+          },
+        });
+        break;
       case "error":
         this.lastError = message.code;
+        if (VOTE_REFUSALS.has(message.code))
+          this.update({
+            voteRefusal: message.message ?? "That vote was refused.",
+          });
         break;
       case "pong":
         break;

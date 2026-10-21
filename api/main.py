@@ -23,6 +23,7 @@ from api import (
     games,
     progression,
     shop,
+    tables,
 )
 from api.config import Settings
 from api.database import build_engine, migration_head
@@ -61,8 +62,8 @@ CAPABILITIES = [
         name="Practice play",
         available=True,
         milestone="M0–M3",
-        reason="Practice games against bots are playable in the browser since v0.1.0. Human "
-        "opponents, lobbies and recovery come later.",
+        reason="Practice games against bots are playable in the browser since v0.1.0, and human "
+        "tables, with a lobby and invite links, since v0.4.0. Recovery comes later.",
     ),
     Capability(
         id="alliance",
@@ -314,6 +315,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(admin.router)
     app.include_router(games.router)
+    app.include_router(tables.router)
     app.include_router(card_images.router)
     app.include_router(cards.router)
     app.include_router(decks.router)

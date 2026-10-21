@@ -1,9 +1,15 @@
-"""Practice games through the API: seat ownership, the controller lease and game events.
+"""Games through the API: seat ownership, the controller lease and game events.
 
 The browser never holds an engine seat token. The API starts each game in the engine with the
-service token, keeps the human seat's token in this process's memory, records the game, its
-seats and its result in the database, and forwards commands from the seat's owner. Views come
+service token, keeps each human seat's token in this process's memory, records the game, its
+seats and its result in the database, and forwards commands from each seat's owner. Views come
 back unchanged from the engine, so the engine's leak rules still decide what a seat sees.
+
+A practice game seats one player against bots. A table game (v0.4.0, api/tables.py) seats every
+player of a human table: each seat has its own token, its own follow task and views, its own
+controller lease and connections, and its own concession. At a table, a seat with no connected tab
+for 2 minutes is away; the other players still in the game may then vote to remove it, and a
+majority of them removes it: the API concedes the seat in the engine and the game goes on.
 
 Events go over one WebSocket per game, authenticated by the session cookie and the session's CSRF
 token in the first message. One connection per seat holds the controller lease and may command;
@@ -21,6 +27,7 @@ import json
 import logging
 import random
 import secrets
+import time
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from contextlib import suppress
@@ -28,7 +35,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from typing import Annotated, Any, Literal, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import anyio
 import httpx
@@ -124,8 +131,16 @@ SESSION_CHECK_SECONDS = 60.0
 QUEUE_LIMIT = 512
 # Every connection costs a copy of each snapshot. SysOp's are not counted.
 CONNECTIONS_PER_ACCOUNT = 4
+# For each player's seat: a four-player table may hold four times as many.
 CONNECTIONS_PER_GAME = 8
 RESULT_FIELDS = ("kind", "winner_seat", "draw", "turns", "conceded_seats")
+# At a table, a seat with no connected tab for this long is away, and may be voted out.
+AWAY_SECONDS = 120.0
+# The engine closes a game in which nothing has happened for this long (idle_timeout). A table
+# has no turn timers, so its backstop is the engine's longest: a player thinking for minutes keeps
+# the game, and an away player is voted out long before. Practice games keep the engine's 15.
+TABLE_IDLE_SECONDS = 3600
+LEFT_REASONS = ("conceded", "removed", "eliminated")
 
 # WebSocket close codes: the HTTP status they stand for, in the private-use range.
 CLOSE_UNAUTHENTICATED = 4401
@@ -279,7 +294,8 @@ class Connection:
     id: str
     user_id: UUID
     session_id: UUID
-    owner: bool
+    # The seat its account plays; None for an observer (SysOp), who sees the first player's.
+    seat: int | None
     inspect: bool
     # Whether it counts toward the connection limits: SysOp's do not.
     counted: bool = True
@@ -313,29 +329,64 @@ class Connection:
 
 
 @dataclass(eq=False)
-class LiveGame:
-    """A running game this process started: its owner's seat and token, and who is watching."""
+class LiveSeat:
+    """A player's seat in a running game: its engine token, its controller lease, the views its
+    follow task fetched and, at a table, whether its player is away."""
 
-    id: UUID
-    owner_id: UUID
     seat: int
-    seat_token: str
-    connections: dict[str, Connection] = field(default_factory=dict)
+    user_id: UUID
+    token: str
     controller: str | None = None
-    finished: bool = False
-    # Set once the database holds how the game ended.
-    recorded: asyncio.Event = field(default_factory=asyncio.Event)
     # The follow task's latest snapshot, which carries only the log lines new since the one before.
     snapshot: dict[str, Any] | None = None
     # The latest snapshot with a whole page of the log, for new connections and resyncs.
     page: dict[str, Any] | None = None
     paging: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # Since when no tab of the seat's player is connected (time.monotonic), or None while one is.
+    away_since: float | None = None
+    # Why the seat is out of a game that goes on: conceded, removed or eliminated.
+    left: str | None = None
+    # Votes on removing the seat while it is away, by the voting seat: True for yes.
+    votes: dict[int, bool] = field(default_factory=dict)
+    # A concession or a removal on its way to the engine: the view that shows the seat out is
+    # theirs, not a loss.
+    conceding: bool = False
+    removing: bool = False
+
+
+@dataclass(eq=False)
+class LiveGame:
+    """A running game this process started: its players' seats and tokens, and who is watching."""
+
+    id: UUID
+    seats: dict[int, LiveSeat]
+    kind: str = "practice"
+    connections: dict[str, Connection] = field(default_factory=dict)
+    finished: bool = False
+    # Set once a follow task has begun to record the game's end, which happens once.
+    ending: bool = False
+    # Set once the database holds how the game ended.
+    recorded: asyncio.Event = field(default_factory=asyncio.Event)
     inspecting: bool = False
     inspect_again: bool = False
 
     @property
     def path(self) -> str:
         return f"/games/{self.id}"
+
+    @property
+    def watched(self) -> LiveSeat:
+        """The seat observers see: the first player's."""
+        return self.seats[min(self.seats)]
+
+    def seat_of(self, user_id: UUID) -> LiveSeat | None:
+        return next((seat for seat in self.seats.values() if seat.user_id == user_id), None)
+
+    def viewed(self, connection: Connection) -> LiveSeat:
+        """The seat whose views a connection receives: its own, or the watched one."""
+        if connection.seat is not None and connection.seat in self.seats:
+            return self.seats[connection.seat]
+        return self.watched
 
 
 def log_end(snapshot: dict[str, Any]) -> int:
@@ -418,13 +469,32 @@ class GameHub:
             task.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)
 
+    def reserve(self) -> None:
+        """Takes a game slot under CD_GAMES_MAX for a game about to be created; the caller gives it
+        back (starting -= 1) once the game is registered or refused. Taken before the first await,
+        so requests at once cannot all pass the check."""
+        if self.running() + self.starting >= self.settings.games_max:
+            raise ApiError(
+                429,
+                "games_busy",
+                "Every game slot is in use. Try again shortly.",
+                {"Retry-After": "30"},
+            )
+        self.starting += 1
+
     def register(self, game: LiveGame) -> None:
         self.games[game.id] = game
-        self.spawn(self.follow(game))
+        now = time.monotonic()
+        for seat in game.seats.values():
+            # Nobody has connected yet: a player who never comes is away from the start.
+            seat.away_since = now
+            self.spawn(self.follow(game, seat))
+            if game.kind == "table":
+                self.spawn(self.away_check(game, seat, now))
 
-    async def follow(self, game: LiveGame) -> None:
-        """Long-polls the owner's seat view and publishes every new revision to the game's
-        connections, until the game finishes; then records the result."""
+    async def follow(self, game: LiveGame, seat: LiveSeat) -> None:
+        """Long-polls one seat's view and publishes every new revision to the connections that see
+        that seat, until the game finishes; then records the result, once for the game."""
         engine = self.require_engine()
         since, log_from, failures = -1, 0, 0
         while True:
@@ -432,7 +502,7 @@ class GameHub:
                 status, snapshot = await engine.request(
                     "GET",
                     f"{game.path}/view",
-                    seat_token=game.seat_token,
+                    seat_token=seat.token,
                     params={"since": since, "wait_ms": LONG_POLL_MS, "log_from": log_from},
                     timeout=LONG_POLL_MS / 1000 + 10,
                 )
@@ -450,17 +520,25 @@ class GameHub:
             if snapshot["revision"] != since or finished:
                 since = snapshot["revision"]
                 log_from = snapshot["log_from"] + len(snapshot["log"])
-                game.snapshot = snapshot
-                self.broadcast(game, {"type": "snapshot", "snapshot": snapshot})
-                self.inspect_soon(game)
+                seat.snapshot = snapshot
+                self.publish(game, seat, {"type": "snapshot", "snapshot": snapshot})
+                if seat is game.watched:
+                    self.inspect_soon(game)
+                out = snapshot.get("status") == "eliminated"
+                if out and not finished and not (seat.conceding or seat.removing):
+                    self.seat_left(game, seat, "eliminated")
             if finished:
                 await self.end(game, snapshot["result"])
                 return
 
     async def end(self, game: LiveGame, result: dict[str, Any] | None) -> None:
         """Records how the game ended (a missing game was interrupted), then keeps it readable
-        for a while before forgetting its token. Until the end is recorded the game counts
-        against its owner's limit, so the write retries until it lands."""
+        for a while before forgetting its tokens. Until the end is recorded the game counts
+        against its players' limits, so the write retries until it lands. Every seat's follow task
+        comes here; the first records, and the others' last views still reach their seats."""
+        if game.ending:
+            return
+        game.ending = True
         game.finished = True
         status = "finished" if result is not None else "interrupted"
         if result is None:
@@ -470,6 +548,7 @@ class GameHub:
             f"record the end of game {game.id}",
         )
         game.recorded.set()
+        self.presence_changed(game)
         await asyncio.sleep(RETAIN_FINISHED_SECONDS)
         for connection in list(game.connections.values()):
             connection.close(1000)
@@ -479,27 +558,208 @@ class GameHub:
         for connection in list(game.connections.values()):
             connection.send(message)
 
-    def lease_changed(self, game: LiveGame, reason: str) -> None:
+    def publish(self, game: LiveGame, seat: LiveSeat, message: dict[str, Any]) -> None:
+        """Sends a seat's view to the connections that see it: never to another player's."""
         for connection in list(game.connections.values()):
-            connection.send(
-                {
-                    "type": "lease",
-                    "role": "controller" if game.controller == connection.id else "observer",
-                    "controlled": game.controller is not None,
-                    "reason": reason,
-                }
-            )
+            if game.viewed(connection) is seat:
+                connection.send(message)
+
+    def lease_changed(self, game: LiveGame, seat: LiveSeat, reason: str) -> None:
+        for connection in list(game.connections.values()):
+            if game.viewed(connection) is seat:
+                connection.send(
+                    {
+                        "type": "lease",
+                        "role": "controller" if seat.controller == connection.id else "observer",
+                        "controlled": seat.controller is not None,
+                        "reason": reason,
+                    }
+                )
 
     def take_control(self, game: LiveGame, connection: Connection) -> None:
-        """The lease moves to this connection; any other tab loses it and observes."""
-        taken = game.controller is not None and game.controller != connection.id
-        game.controller = connection.id
-        self.lease_changed(game, "taken_over" if taken else "granted")
+        """The seat's lease moves to this connection; any other tab loses it and observes."""
+        seat = game.viewed(connection)
+        taken = seat.controller is not None and seat.controller != connection.id
+        seat.controller = connection.id
+        self.lease_changed(game, seat, "taken_over" if taken else "granted")
 
     def release(self, game: LiveGame, connection: Connection, reason: str) -> None:
-        if game.controller == connection.id:
-            game.controller = None
-            self.lease_changed(game, reason)
+        seat = game.seats.get(connection.seat) if connection.seat is not None else None
+        if seat is not None and seat.controller == connection.id:
+            seat.controller = None
+            self.lease_changed(game, seat, reason)
+
+    # Players away from a table, and the votes to remove them.
+
+    def arrived(self, game: LiveGame, connection: Connection) -> None:
+        """A tab of the seat's player connected: the seat is back, and votes on it end. The new
+        connection learns who is away."""
+        seat = game.seats.get(connection.seat) if connection.seat is not None else None
+        if seat is not None and seat.away_since is not None:
+            seat.away_since = None
+            seat.votes.clear()
+            self.presence_changed(game)
+        elif game.kind == "table":
+            connection.send(self.presence(game))
+
+    def departed(self, game: LiveGame, connection: Connection) -> None:
+        """A connection closed. When it was its seat's last, the seat is away from now."""
+        seat = game.seats.get(connection.seat) if connection.seat is not None else None
+        if seat is None or seat.away_since is not None or game.finished:
+            return
+        if any(other.seat == seat.seat for other in game.connections.values()):
+            return
+        seat.away_since = time.monotonic()
+        self.presence_changed(game)
+        if game.kind == "table":
+            self.spawn(self.away_check(game, seat, seat.away_since))
+
+    async def away_check(self, game: LiveGame, seat: LiveSeat, since: float) -> None:
+        """Tells the table once a seat has been away long enough to be voted out."""
+        await asyncio.sleep(AWAY_SECONDS)
+        if seat.away_since == since and not game.finished and self.games.get(game.id) is game:
+            self.presence_changed(game)
+
+    def removable(self, game: LiveGame, seat: LiveSeat) -> bool:
+        return (
+            game.kind == "table"
+            and not game.finished
+            and seat.left is None
+            and not seat.removing
+            and seat.away_since is not None
+            and time.monotonic() - seat.away_since >= AWAY_SECONDS
+        )
+
+    @staticmethod
+    def voters(game: LiveGame, seat: LiveSeat) -> list[LiveSeat]:
+        """Who votes on removing a seat: every other player still in the game."""
+        return [other for other in game.seats.values() if other is not seat and other.left is None]
+
+    def presence(self, game: LiveGame) -> dict[str, Any]:
+        """Who is away, for how long, and the votes on removing them."""
+        now = time.monotonic()
+        seats = []
+        for seat in sorted(game.seats.values(), key=lambda found: found.seat):
+            voters = {other.seat for other in self.voters(game, seat)}
+            seats.append(
+                {
+                    "seat": seat.seat,
+                    "connected": seat.away_since is None,
+                    "away_seconds": (
+                        None if seat.away_since is None else int(now - seat.away_since)
+                    ),
+                    "left": seat.left,
+                    "removable": self.removable(game, seat),
+                    "yes": sorted(s for s, yes in seat.votes.items() if yes and s in voters),
+                    "no": sorted(s for s, yes in seat.votes.items() if not yes and s in voters),
+                    "needed": len(voters) // 2 + 1,
+                }
+            )
+        return {"type": "presence", "away_after": int(AWAY_SECONDS), "seats": seats}
+
+    def presence_changed(self, game: LiveGame) -> None:
+        if game.kind == "table":
+            self.broadcast(game, self.presence(game))
+
+    def seat_left(self, game: LiveGame, seat: LiveSeat, reason: str) -> None:
+        """A seat out of a table's game that goes on (it conceded or lost): recorded, so it no
+        longer counts against its player's running games, and shown to the table."""
+        if game.kind != "table" or seat.left is not None or game.finished:
+            return
+        seat.left = reason
+        seat.votes.clear()
+        self.spawn(
+            self.recorded_left(
+                partial(record_left, self.database, game.id, seat.seat, reason),
+                f"record seat {seat.seat} leaving game {game.id}",
+            )
+        )
+        self.presence_changed(game)
+
+    @staticmethod
+    async def recorded_left(work: Callable[[], None], what: str) -> None:
+        await retried(work, what)
+
+    async def vote(
+        self,
+        game: LiveGame,
+        connection: Connection,
+        websocket: WebSocket,
+        target: int,
+        remove: bool,
+    ) -> tuple[str, str] | None:
+        """A player's vote on removing an away seat; None when counted, else the refusal. It passes
+        when a majority of the other players still in the game vote yes (in a two-player game,
+        the one opponent), and the seat is removed then."""
+        voter = game.seats.get(connection.seat) if connection.seat is not None else None
+        seat = game.seats.get(target)
+        if voter is None or game.kind != "table":
+            return "not_a_player", "Only the table's players vote."
+        if seat is None or seat is voter:
+            return "invalid_vote", "There is no such player to vote on."
+        if voter.left is not None:
+            return "not_in_game", "You are out of this game, so you no longer vote."
+        if not self.removable(game, seat):
+            return (
+                "not_removable",
+                "That player is not away, or has not been away for "
+                f"{int(AWAY_SECONDS // 60)} minutes yet.",
+            )
+        seat.votes[voter.seat] = remove
+        voters = self.voters(game, seat)
+        yes = [other for other in voters if seat.votes.get(other.seat)]
+        if len(yes) >= len(voters) // 2 + 1:
+            return await self.remove(game, seat, yes, websocket, voter)
+        self.presence_changed(game)
+        return None
+
+    async def remove(
+        self,
+        game: LiveGame,
+        seat: LiveSeat,
+        voters: list[LiveSeat],
+        websocket: WebSocket,
+        deciding: LiveSeat,
+    ) -> tuple[str, str] | None:
+        """Concedes an away seat the vote removed, in the engine with the seat's own token, and
+        audits it (table.player_removed). The game goes on for the others."""
+        seat.removing = True
+        self.presence_changed(game)
+        body = {
+            "v": 1,
+            "game_id": str(game.id),
+            "action_id": str(uuid4()),
+            "expected_revision": seat.snapshot["revision"] if seat.snapshot else 0,
+            "type": "concede",
+            "payload": {},
+        }
+        try:
+            status, _ = await self.require_engine().request(
+                "POST", f"{game.path}/commands", seat_token=seat.token, body=body
+            )
+        except EngineUnavailable:
+            status = 503
+        if status != 200:
+            seat.removing = False
+            self.presence_changed(game)
+            return "removal_failed", "The rules engine did not remove the player. Vote again."
+        seat.left = "removed"
+        seat.removing = False
+        seat.votes.clear()
+        await retried(
+            partial(
+                record_removal,
+                self.database,
+                websocket,
+                game.id,
+                seat,
+                [other.user_id for other in voters],
+                deciding.user_id,
+            ),
+            f"record the removal of seat {seat.seat} from game {game.id}",
+        )
+        self.presence_changed(game)
+        return None
 
     def inspect_soon(self, game: LiveGame) -> None:
         """Fetches SysOp's inspection view for the game's inspecting connections, one at a time."""
@@ -533,21 +793,21 @@ class GameHub:
         finally:
             game.inspecting = False
 
-    async def snapshot(self, game: LiveGame) -> dict[str, Any] | None:
-        """The owner's seat snapshot now, with the latest page of the log."""
+    async def snapshot(self, game: LiveGame, seat: LiveSeat) -> dict[str, Any] | None:
+        """A seat's snapshot now, with the latest page of the log."""
         status, snapshot = await self.require_engine().request(
-            "GET", f"{game.path}/view", seat_token=game.seat_token
+            "GET", f"{game.path}/view", seat_token=seat.token
         )
         return snapshot if status == 200 and isinstance(snapshot, dict) else None
 
-    async def page(self, game: LiveGame) -> dict[str, Any] | None:
+    async def page(self, game: LiveGame, seat: LiveSeat) -> dict[str, Any] | None:
         """The seat snapshot for a new connection, a resync or a read over HTTP. The engine builds
         one for each revision the follow task sees, and every later ask gets that copy, so opening
         connections or asking to resync costs the engine nothing more."""
-        async with game.paging:
-            if not covers(game.page, game.snapshot):
-                game.page = await self.snapshot(game)
-            return game.page
+        async with seat.paging:
+            if not covers(seat.page, seat.snapshot):
+                seat.page = await self.snapshot(game, seat)
+            return seat.page
 
     async def command(self, game: LiveGame, connection: Connection, raw: object) -> None:
         action_id = raw.get("action_id") if isinstance(raw, dict) else None
@@ -557,7 +817,8 @@ class GameHub:
                 {"type": "command_result", "action_id": action_id, "status": status, "body": body}
             )
 
-        if game.controller != connection.id:
+        seat = game.seats.get(connection.seat) if connection.seat is not None else None
+        if seat is None or seat.controller != connection.id:
             reply(
                 409,
                 {
@@ -577,11 +838,13 @@ class GameHub:
         if game.finished:
             reply(409, {"code": "game_over", "message": "The game has finished."})
             return
+        conceding = command.type == "concede"
+        seat.conceding = seat.conceding or conceding
         try:
             status, body = await self.require_engine().request(
                 "POST",
                 f"{game.path}/commands",
-                seat_token=game.seat_token,
+                seat_token=seat.token,
                 body=command.engine_body(),
             )
         except EngineUnavailable:
@@ -589,7 +852,12 @@ class GameHub:
                 503, {"code": "engine_unavailable", "message": "The game engine is not responding."}
             )
             return
+        finally:
+            if conceding:
+                seat.conceding = False
         reply(status, body)
+        if status == 200 and conceding:
+            self.seat_left(game, seat, "conceded")
 
 
 def hub_of(request: Request | WebSocket) -> GameHub:
@@ -644,12 +912,63 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             db.commit()
 
 
+def record_left(database: Engine, game_id: UUID, seat: int, reason: str) -> None:
+    """A seat out of a game that goes on, once."""
+    with Session(database) as db:
+        db.execute(
+            update(GameSeat)
+            .where(GameSeat.game_id == game_id, GameSeat.seat == seat, GameSeat.left_at.is_(None))
+            .values(left_at=utcnow(), left_reason=reason)
+        )
+        db.commit()
+
+
+def record_removal(
+    database: Engine,
+    websocket: WebSocket,
+    game_id: UUID,
+    seat: LiveSeat,
+    voters: list[UUID],
+    deciding: UUID,
+) -> None:
+    """A seat the other players removed while it was away, and its audit entry, together."""
+    with Session(database) as db:
+        found = db.scalar(
+            select(GameSeat).where(GameSeat.game_id == game_id, GameSeat.seat == seat.seat)
+        )
+        if found is not None and found.left_reason == "removed":
+            return
+        if found is not None:
+            found.left_at = found.left_at or utcnow()
+            found.left_reason = "removed"
+        audit(
+            db,
+            websocket,
+            "table.player_removed",
+            actor_id=deciding,
+            target_user_id=seat.user_id,
+            details={
+                "game": str(game_id),
+                "seat": seat.seat,
+                "voters": [str(voter) for voter in voters],
+            },
+        )
+        db.commit()
+
+
 def active_games_of(db: Session, user_id: UUID) -> int:
+    """The account's running games: those where its seat is still in play. A seat that conceded,
+    was removed or lost while a table's game goes on no longer counts."""
     return (
         db.scalar(
-            select(func.count())
+            select(func.count(func.distinct(Game.id)))
             .select_from(Game)
-            .where(Game.created_by == user_id, Game.status == "active")
+            .join(GameSeat, GameSeat.game_id == Game.id)
+            .where(
+                GameSeat.user_id == user_id,
+                GameSeat.left_at.is_(None),
+                Game.status == "active",
+            )
         )
         or 0
     )
@@ -671,6 +990,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
     your_seat = next((row.seat for row in rows if row.user_id == principal.user.id), None)
     return GameSummary(
         id=game.id,
+        kind=game.kind,  # type: ignore[arg-type]
         format=cast(GameFormatId, game.format),
         status=game.status,  # type: ignore[arg-type]
         seats=[
@@ -680,6 +1000,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
                 handle=handles.get(row.user_id) if row.user_id else None,
                 portrait=alliances.get(row.user_id) if row.user_id else None,
                 deck=row.deck if everything or row.user_id == principal.user.id else None,
+                left=row.left_reason,  # type: ignore[arg-type]
             )
             for row in rows
         ],
@@ -741,14 +1062,19 @@ def practice_options(principal: Player) -> PracticeOptions:
 
 
 def own_deck(
-    db: Session, principal: Principal, deck_id: UUID, fmt: str, library: Library
+    db: Session,
+    owner: User,
+    permissions: frozenset[str],
+    deck_id: UUID,
+    fmt: str,
+    library: Library,
 ) -> tuple[dict[str, object], UUID, str]:
     """One of the account's decks as the engine's deck list, bound to an immutable revision of
     it (DECK01). The revision must be playable: legal, every card certified, and every copy in the
     player's library now (v0.3.1). SysOp's decks need only cards the engine implements, as its
-    deck lists do."""
+    deck lists do. A table's host starts the game with every player's deck (api/tables.py)."""
     deck = db.get(Deck, deck_id)
-    if deck is None or deck.owner_id != principal.user.id or deck.deleted_at is not None:
+    if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
     if deck.format != fmt:
         raise ApiError(
@@ -783,7 +1109,7 @@ def own_deck(
             ).all()
         )
     if not validation.playable:
-        sysop_ok = principal.can("cards.any") and all(names.get(e.card_id) for e in entries)
+        sysop_ok = "cards.any" in permissions and all(names.get(e.card_id) for e in entries)
         locked = any(problem.kind == "collection_locked" for problem in validation.errors)
         if locked and not sysop_ok:
             raise ApiError(
@@ -913,7 +1239,9 @@ def plan_seats(
                 raise ApiError(422, "invalid_seat", "A seat takes one deck.")
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
-            seat, revision, title = own_deck(db, principal, deck_id, fmt, library)
+            seat, revision, title = own_deck(
+                db, principal.user, principal.permissions, deck_id, fmt, library
+            )
             plans.append(SeatPlan({"player": player, **seat}, revision, title))
             continue
         unchosen = deck is None and deck_list is None
@@ -1021,6 +1349,40 @@ def record_game(
     return game
 
 
+async def engine_game(
+    engine: EngineClient, body: dict[str, object], request: Request
+) -> dict[str, Any]:
+    """Asks the engine for a service game; its refusals become the API's. The answer holds each
+    human seat's token, once."""
+    try:
+        status, created = await engine.request("POST", "/games", body=body)
+    except EngineUnavailable as error:
+        raise unavailable() from error
+    if status == 400 and created.get("code") == "unknown_cards":
+        # Custom cards it was thought to have loaded are asked about again.
+        if (cards := engine_cards_of(request)) is not None:
+            cards.forget()
+        names = [str(name) for name in created.get("names", [])]
+        raise ApiError(
+            422,
+            "unknown_cards",
+            "The engine has no card named " + ", ".join(names) + ".",
+            names=names,
+        )
+    if status == 400:
+        raise ApiError(422, "invalid_table", str(created.get("message", "Invalid table.")))
+    if status == 429:
+        raise ApiError(
+            429,
+            "games_busy",
+            "The engine is running every game it can.",
+            {"Retry-After": "30"},
+        )
+    if status != 201:
+        raise unavailable()
+    return cast(dict[str, Any], created)
+
+
 @router.post(
     "/practice-games",
     response_model=GameSummary,
@@ -1057,50 +1419,13 @@ async def create_practice_game(
         # Other accounts' requests do not wait for this lock, so the slot is taken before the
         # first await: requests at once cannot all pass the check. Once registered, the game
         # holds the slot itself.
-        if hub.running() + hub.starting >= hub.settings.games_max:
-            raise ApiError(
-                429,
-                "games_busy",
-                "Every game slot is in use. Try again shortly.",
-                {"Retry-After": "30"},
-            )
-        hub.starting += 1
+        hub.reserve()
         try:
-            try:
-                status, created = await engine.request(
-                    "POST",
-                    "/games",
-                    body={
-                        "format": fmt,
-                        "seats": seats,
-                        "skill": body.bot_skill,
-                        "turn_cap": body.turn_cap,
-                    },
-                )
-            except EngineUnavailable as error:
-                raise unavailable() from error
-            if status == 400 and created.get("code") == "unknown_cards":
-                # Custom cards it was thought to have loaded are asked about again.
-                if (cards := engine_cards_of(request)) is not None:
-                    cards.forget()
-                names = [str(name) for name in created.get("names", [])]
-                raise ApiError(
-                    422,
-                    "unknown_cards",
-                    "The engine has no card named " + ", ".join(names) + ".",
-                    names=names,
-                )
-            if status == 400:
-                raise ApiError(422, "invalid_table", str(created.get("message", "Invalid table.")))
-            if status == 429:
-                raise ApiError(
-                    429,
-                    "games_busy",
-                    "The engine is running every game it can.",
-                    {"Retry-After": "30"},
-                )
-            if status != 201:
-                raise unavailable()
+            created = await engine_game(
+                engine,
+                {"format": fmt, "seats": seats, "skill": body.bot_skill, "turn_cap": body.turn_cap},
+                request,
+            )
             try:
                 game = await run_in_threadpool(
                     record_game, db, request, principal, created, body, plans
@@ -1108,14 +1433,8 @@ async def create_practice_game(
             except SQLAlchemyError:
                 await engine.request("POST", f"/games/{created['game_id']}/close", body={})
                 raise
-            hub.register(
-                LiveGame(
-                    id=game.id,
-                    owner_id=user_id,
-                    seat=0,
-                    seat_token=created["seats"][0]["seat_token"],
-                )
-            )
+            token = created["seats"][0]["seat_token"]
+            hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
         finally:
             hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal)
@@ -1139,7 +1458,8 @@ def list_games(
 
 @router.get("/games/{game_id}", response_model=GameState)
 async def get_game(game_id: UUID, request: Request, principal: Player, db: Db) -> GameState:
-    """The game, with its owner's current seat snapshot while the engine holds it."""
+    """The game, with your seat's current snapshot while the engine holds it (an observer's is the
+    first player's)."""
     game, owner = await run_in_threadpool(visible_game, db, game_id, principal)
     if not owner:
         await run_in_threadpool(observed, db, request, principal, game_id, "game.observed")
@@ -1150,7 +1470,7 @@ async def get_game(game_id: UUID, request: Request, principal: Player, db: Db) -
         # No pooled connection is held while the engine answers.
         await run_in_threadpool(db.commit)
         try:
-            snapshot = await hub.page(live)
+            snapshot = await hub.page(live, live.seat_of(principal.user.id) or live.watched)
         except EngineUnavailable as error:
             raise unavailable() from error
     summary = await run_in_threadpool(summary_of, db, game, principal)
@@ -1167,10 +1487,18 @@ def observed(
 @router.post("/games/{game_id}/close", response_model=GameSummary)
 async def close_game(game_id: UUID, request: Request, principal: Player, db: Db) -> GameSummary:
     """Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game
-    as it ended."""
+    as it ended. A table's game goes on for the other players, so its players concede their own
+    seat instead; only SysOp closes it while it runs."""
     game, owner = await run_in_threadpool(visible_game, db, game_id, principal)
     hub = hub_of(request)
     live = hub.games.get(game_id)
+    table_game = game.kind == "table" and live is not None and not live.finished
+    if table_game and not full_access(principal):
+        raise ApiError(
+            409,
+            "table_game",
+            "This game goes on for the other players: concede your seat in the game instead.",
+        )
     # No pooled connection is held while the engine closes the game.
     await run_in_threadpool(db.commit)
     if live is not None and not live.finished:
@@ -1345,10 +1673,9 @@ async def refuse(websocket: WebSocket, code: int, reason: str) -> None:
 def crowded(game: LiveGame, user_id: UUID) -> bool:
     """Whether the account, or the game, has all the connections it may have."""
     counted = [connection for connection in game.connections.values() if connection.counted]
-    return (
-        sum(connection.user_id == user_id for connection in counted) >= CONNECTIONS_PER_ACCOUNT
-        or len(counted) >= CONNECTIONS_PER_GAME
-    )
+    return sum(
+        connection.user_id == user_id for connection in counted
+    ) >= CONNECTIONS_PER_ACCOUNT or len(counted) >= CONNECTIONS_PER_GAME * len(game.seats)
 
 
 @router.websocket("/games/{game_id}/events")
@@ -1396,11 +1723,12 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
         await refuse(websocket, CLOSE_TOO_MANY, "too_many_connections")
         return
 
+    seat = game.seat_of(principal.user.id) if owner else None
     connection = Connection(
         id=secrets.token_hex(8),
         user_id=principal.user.id,
         session_id=principal.session.id,
-        owner=owner,
+        seat=seat.seat if seat is not None else None,
         inspect=hello.inspect,
         counted=counted,
     )
@@ -1412,12 +1740,13 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
             tasks.start_soon(send_loop, websocket, connection)
             tasks.start_soon(watch_session, database, websocket, connection)
             try:
-                await converse(hub, game, connection, websocket, principal, owner, hello)
+                await converse(hub, game, connection, websocket, principal, hello)
             finally:
                 connection.close(1000)
     finally:
         game.connections.pop(connection.id, None)
         hub.release(game, connection, "disconnected")
+        hub.departed(game, connection)
 
 
 async def converse(
@@ -1426,11 +1755,10 @@ async def converse(
     connection: Connection,
     websocket: WebSocket,
     principal: Principal,
-    owner: bool,
     hello: Hello,
 ) -> None:
     """Welcomes the connection, then serves its messages until it closes."""
-    for action in (["game.observed"] if not owner else []) + (
+    for action in (["game.observed"] if connection.seat is None else []) + (
         ["game.inspection_opened"] if hello.inspect else []
     ):
         await run_in_threadpool(audited, hub.database, websocket, principal, game.id, action)
@@ -1439,14 +1767,15 @@ async def converse(
             "type": "welcome",
             "game_id": str(game.id),
             "connection_id": connection.id,
-            "seat": game.seat if owner else None,
+            "seat": connection.seat,
             "role": "observer",
-            "controlled": game.controller is not None,
+            "controlled": game.viewed(connection).controller is not None,
         }
     )
     if hello.control:
         claim(hub, game, connection)
     await resync(hub, game, connection, hello.since)
+    hub.arrived(game, connection)
     if hello.inspect:
         hub.inspect_soon(game)
     await receive_loop(hub, game, connection, websocket)
@@ -1460,7 +1789,7 @@ def audited(
 
 
 def claim(hub: GameHub, game: LiveGame, connection: Connection) -> None:
-    if connection.owner:
+    if connection.seat is not None:
         hub.take_control(game, connection)
     else:
         connection.send(
@@ -1470,10 +1799,11 @@ def claim(hub: GameHub, game: LiveGame, connection: Connection) -> None:
 
 async def resync(hub: GameHub, game: LiveGame, connection: Connection, since: int) -> None:
     """Sends the seat's current snapshot unless the client already has that revision."""
+    seat = game.viewed(connection)
     try:
-        snapshot = await hub.page(game)
+        snapshot = await hub.page(game, seat)
     except EngineUnavailable:
-        snapshot = game.snapshot
+        snapshot = seat.snapshot
     if snapshot is not None and (since < 0 or snapshot["revision"] != since):
         connection.send({"type": "snapshot", "snapshot": snapshot})
 
@@ -1492,9 +1822,10 @@ async def receive_loop(
         except (ValueError, TypeError, KeyError):
             connection.send({"type": "error", "code": "invalid_message"})
             continue
-        if kind == "command":
-            # Every command checks that the session still stands, and counts as activity. A
-            # command stopped here goes nowhere; after a session refresh the client resends it.
+        if kind in ("command", "vote"):
+            # Every command and vote checks that the session still stands, and counts as
+            # activity. One stopped here goes nowhere; after a session refresh the client resends
+            # a command.
             ended = await run_in_threadpool(
                 partial(session_ended, active=True),
                 hub.database,
@@ -1504,7 +1835,17 @@ async def receive_loop(
             if ended is not None:
                 connection.close(CLOSE_UNAUTHENTICATED, ended)
                 return
-            await hub.command(game, connection, message.get("command"))
+            if kind == "command":
+                await hub.command(game, connection, message.get("command"))
+                continue
+            seat, remove = message.get("seat"), message.get("remove", True)
+            if not isinstance(seat, int) or isinstance(seat, bool) or not isinstance(remove, bool):
+                connection.send({"type": "error", "code": "invalid_message"})
+                continue
+            refused = await hub.vote(game, connection, websocket, seat, remove)
+            if refused is not None:
+                code, text = refused
+                connection.send({"type": "error", "code": code, "message": text, "seat": seat})
         elif kind == "take_control":
             claim(hub, game, connection)
         elif kind == "release_control":
