@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { CardButton, CardRow, useGameContext } from "./Board";
 import type { GameState } from "./connection";
 import {
@@ -8,12 +15,21 @@ import {
   primaryOption,
   words,
 } from "./model";
+import { duelsLabel } from "./table/diamonds";
+import { Icon } from "./table/Icon";
+import { useTableContext } from "./table/TableContext";
+import { timerLive } from "./table/timer";
+import type { PromptTimerProps } from "./table/types";
+import { useTableUi } from "./table/uiStore";
 import type { Prompt, PromptOption } from "./types";
 import styles from "./game.module.css";
+import screenStyles from "./table/screen.module.css";
 
 // The open prompt (UI04, UI08): every option the engine offers, and nothing it does not. Options
 // tied to a card or a player are also answered on the board; this panel lists them all, so the
-// keyboard reaches every one.
+// keyboard reaches every one. As in Magic Duels (v0.3.0, design §10), the moment's main choices
+// lead as big diamonds with an icon and a word: the primary (Continue, Attack, Keep Hand…),
+// Attack With All when it is offered, and Stop Timer while the response timer runs.
 
 const groups: { title: string; actions: PromptOption["action"][] }[] = [
   { title: "Play and cast", actions: ["play_land", "cast"] },
@@ -119,12 +135,14 @@ export function PromptPanel({
   onAnswer,
   onTakeControl,
   onConcede,
+  timer = null,
+  onStopTimer,
 }: {
   state: GameState;
   onAnswer: (payload: { option_id: string } | { amounts: number[] }) => void;
   onTakeControl: () => void;
   onConcede: () => void;
-}) {
+} & Partial<PromptTimerProps>) {
   const game = useGameContext();
   const panel = useRef<HTMLElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
@@ -135,6 +153,17 @@ export function PromptPanel({
   const disabled = !game.canAnswer;
   const primary = primaryOption(prompt);
   const promptId = prompt?.id;
+  const timing = Boolean(timer && timerLive(timer.phase) && onStopTimer);
+
+  // Stopping the timer takes its button away: focus that was on it goes to the first diamond.
+  const onStop = useRef(false);
+  useLayoutEffect(() => {
+    if (timing || !onStop.current) return;
+    onStop.current = false;
+    const active = document.activeElement;
+    if (!active || active === document.body)
+      panel.current?.querySelector<HTMLElement>("[data-first]")?.focus();
+  }, [timing]);
 
   // Keyboard players keep their place: when a new prompt opens while they work in this panel,
   // focus moves to its first control. Where focus is when it opens cannot tell: answering disables
@@ -215,7 +244,12 @@ export function PromptPanel({
       </p>
     );
   else {
-    const others = prompt.options.filter((option) => option !== primary);
+    const allAttack = prompt.options.find(
+      (option) => option.action === "all_attack",
+    );
+    const others = prompt.options.filter(
+      (option) => option !== primary && option !== allAttack,
+    );
     const grouped = groups
       .map((group) => ({
         ...group,
@@ -263,19 +297,45 @@ export function PromptPanel({
               onSubmit={(amounts) => onAnswer({ amounts })}
             />
           )}
-        {primary && (
-          <button
-            type="button"
-            data-first
-            data-option={primary.id}
-            className={styles.primaryButton}
-            disabled={disabled}
-            onClick={() => game.choose(primary)}
-            aria-keyshortcuts="P"
-          >
-            {optionText(primary, game.index, view, game.observing)}
-            <kbd aria-hidden="true">P</kbd>
-          </button>
+        {(primary || allAttack || timing) && (
+          <div className={screenStyles.leads}>
+            {primary && (
+              <Lead
+                option={primary}
+                prompt={prompt}
+                first
+                disabled={disabled}
+                ring={timing && primary.action === "pass"}
+              />
+            )}
+            {allAttack && (
+              <Lead option={allAttack} prompt={prompt} disabled={disabled} />
+            )}
+            {timing && (
+              <button
+                type="button"
+                className={screenStyles.lead}
+                data-timer-stop
+                aria-keyshortcuts="Space T"
+                onFocus={() => {
+                  onStop.current = true;
+                }}
+                onBlur={(event) => {
+                  if (event.relatedTarget) onStop.current = false;
+                }}
+                onClick={() => {
+                  onStop.current = true;
+                  onStopTimer?.();
+                }}
+              >
+                <span className={screenStyles.leadDiamond} aria-hidden="true">
+                  <Icon name="hourglass" />
+                </span>
+                <span className={screenStyles.leadLabel}>Stop Timer</span>
+                <kbd aria-hidden="true">T</kbd>
+              </button>
+            )}
+          </div>
         )}
         {grouped.map((group) => (
           <div key={group.title} className={styles.optionGroup}>
@@ -388,6 +448,80 @@ export function PromptPanel({
   );
 }
 
+/** A lead diamond: a big black diamond with a white icon, its word beside it. */
+function Lead({
+  option,
+  prompt,
+  first = false,
+  disabled,
+  ring = false,
+}: {
+  option: PromptOption;
+  prompt: Prompt;
+  first?: boolean;
+  disabled: boolean;
+  ring?: boolean;
+}) {
+  const game = useGameContext();
+  const text = optionText(option, game.index, game.view, game.observing);
+  const { label, icon, hidden } = duelsLabel(option, prompt, text);
+  return (
+    <button
+      type="button"
+      className={screenStyles.lead}
+      data-first={first || undefined}
+      data-option={option.id}
+      data-action={option.action}
+      disabled={disabled}
+      aria-keyshortcuts={first ? "P" : undefined}
+      onClick={() => game.choose(option)}
+    >
+      <span className={screenStyles.leadDiamond} aria-hidden="true">
+        <Icon name={icon} />
+        {ring && <TimerRing />}
+      </span>
+      <span className={screenStyles.leadLabel}>
+        {label}
+        {/* The space stays outside the hidden words, so the name reads "Continue (Pass priority)". */}
+        {hidden && " "}
+        {hidden && <span className={styles.visuallyHidden}>({hidden})</span>}
+      </span>
+      {first && <kbd aria-hidden="true">P</kbd>}
+    </button>
+  );
+}
+
+/** The countdown around Continue: the share of the response timer left, read from the table's
+ * store ten times a second without drawing the panel again. With reduced motion, the seconds. */
+function TimerRing() {
+  const { ui } = useTableContext();
+  const timer = useTableUi(ui, (s) => s.timer);
+  if (!timer || !timerLive(timer.phase) || timer.totalMs <= 0) return null;
+  const left =
+    timer.phase === "arming"
+      ? 1
+      : Math.max(0, Math.min(1, timer.remainingMs / timer.totalMs));
+  return (
+    <span
+      className={screenStyles.ring}
+      style={{ "--timer-progress": left } as CSSProperties}
+      data-phase={timer.phase}
+    >
+      <svg viewBox="0 0 100 100" focusable="false">
+        <polygon
+          points="50,3 97,50 50,97 3,50"
+          pathLength={100}
+          strokeDasharray="100"
+          strokeDashoffset={100 * (1 - left)}
+        />
+      </svg>
+      <span className={screenStyles.ringSeconds}>
+        {Math.ceil(timer.remainingMs / 1000)}
+      </span>
+    </span>
+  );
+}
+
 function OptionList({
   options,
   disabled,
@@ -408,6 +542,7 @@ function OptionList({
             }
             data-selected={option.selected || undefined}
             data-option={option.id}
+            data-action={option.action}
             onClick={() => game.choose(option)}
             onMouseEnter={() => {
               const located = option.object_id

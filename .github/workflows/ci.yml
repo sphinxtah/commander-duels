@@ -42,10 +42,10 @@ jobs:
       # The deck builder's journeys need a card catalog: Scryfall's test slice, never a download.
       - run: python scripts/load_fixture_catalog.py
       - run: pnpm test:e2e
-      # A failed journey's evidence: its screenshot, trace and error context. The attempt keeps the
-      # name unique when a job is re-run.
+      # The journeys' evidence on every run: the table's screenshots at each size (since v0.3.0), and
+      # a failed journey's trace and error context. The attempt keeps the name unique on a re-run.
       - name: Keep the browser evidence
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: browser-journeys-${{ github.run_attempt }}
@@ -111,7 +111,10 @@ jobs:
       # The game screen (v0.1.0): Legacy games played to the end by mouse and by keyboard, a
       # four-player Commander table, and a second tab with a lost reply, in Chromium through the
       # web proxy against the engine. Since v0.2.0 also a deck of the player's own, from the test
-      # catalog, with the priority controls. Every WebSocket frame is checked for concealed cards.
+      # catalog, with the priority controls. Every WebSocket frame is checked for concealed cards,
+      # and since v0.3.0 the screen's text and every card image asked for too; the table is checked
+      # at 1280 x 720 to 4K, with the response timer and full screen, and the installable app
+      # (manifest, icons, service worker, install banner) on the built image.
       - name: Practice games in the browser
         run: |
           token="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
@@ -130,11 +133,11 @@ jobs:
             -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -v "$PWD:/w" -w /w \
             mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
               && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
-              && pnpm --dir web exec playwright test e2e/game.spec.ts --reporter=line"
+              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/pwa.spec.ts --reporter=line"
           docker compose down
       # As in verify; a failed game's error also lists the test player's last answers.
       - name: Keep the browser games' evidence
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: browser-games-${{ github.run_attempt }}

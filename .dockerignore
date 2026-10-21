@@ -11,3 +11,7 @@
 **/playwright-report
 **/target
 engine/db
+# The owner's private art and custom cards (gitignored): never in an image
+Planeswalkers images
+the sphinx mtg
+.claude

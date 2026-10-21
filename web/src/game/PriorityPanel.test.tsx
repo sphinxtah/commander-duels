@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { GameState } from "./connection";
-import { PriorityPanel } from "./PriorityPanel";
+import { passingText, PriorityPanel } from "./PriorityPanel";
 import type { PriorityControls } from "./types";
 
 beforeAll(() => {
@@ -149,5 +149,29 @@ describe("the priority panel", () => {
     expect(
       screen.getByRole("checkbox", { name: /Full control/ }),
     ).toBeDisabled();
+  });
+});
+
+describe("a pass in progress on the table", () => {
+  it("is said in words the prompt column shows", () => {
+    expect(passingText("until_my_turn")).toBe("Passing until your next turn.");
+    expect(passingText("until_stack_resolved")).toBe(
+      "Passing until the stack resolves.",
+    );
+  });
+
+  it("is left to the column with showPassing off, and Escape still stops it", () => {
+    const onSet = vi.fn();
+    render(
+      <PriorityPanel
+        state={state({ ...defaults, passing: "until_my_turn" })}
+        onSet={onSet}
+        showPassing={false}
+      />,
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop passing" })).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onSet).toHaveBeenCalledWith({ cancel_passes: true });
   });
 });

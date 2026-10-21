@@ -1,0 +1,517 @@
+/* The game screen around the table (v0.3.0, design §6, §7, §9, §10): the viewport and the
+   1920 × 1080 stage scaled into it, the band's HUD, the Game menu, the prompt column, the drawers
+   and the notices. Everything on the stage is in stage units (1 su = 1 px before the stage is
+   scaled); text is in rem, which follows Larger text, so 1.125rem is 18 su. Only leaves take the
+   pointer: buttons, links, the column and the drawers. */
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0a1011;
+  color: #e3e7de;
+}
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  pointer-events: none;
+  /* Above the cards (1–999), the HUD and column (1100–1200) and the drawers (3000); below
+     option menus (5000) and the dialogs in the top layer. */
+  --magnifier-z: 4500;
+}
+
+/* The plain table, drawn when the DOM paints the table (no WebGL, or the setting): a dark stone
+   and the red band across the middle. */
+.plainTable {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, #2b3431 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 85%, #222b29 0%, transparent 55%),
+    linear-gradient(#151c1c, #0b1112);
+}
+.plainBand {
+  position: absolute;
+  left: 0;
+  top: 488px;
+  width: 1920px;
+  height: 44px;
+  box-sizing: border-box;
+  background: linear-gradient(90deg, #6e0f12, #a3161b 50%, #6e0f12);
+  border-block: 2px solid #2a0507;
+  box-shadow: inset 0 1px 0 #e6c68c55;
+}
+
+/* Dialogs sit outside the stage, in the top layer: their text grows with the table on large
+   screens and never shrinks below the site's. */
+.viewport ~ dialog,
+.viewport dialog {
+  font-size: calc(1rem * max(1, var(--stage-k, 1)));
+}
+
+/* ---------- the band's HUD (§8.2) ---------- */
+.band {
+  pointer-events: none;
+}
+.hud {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 1100;
+}
+.hud::before {
+  content: "";
+  position: absolute;
+  inset: 14.645%;
+  rotate: 45deg;
+  background: #050707;
+  border: 2px solid #8a6f43;
+  box-shadow: 0 2px 6px #000a;
+}
+.hud:hover::before,
+.hud[aria-expanded="true"]::before,
+.hud[aria-pressed="true"]::before {
+  border-color: #efcc8d;
+}
+.hud:focus-visible {
+  outline: calc(3px / var(--stage-k, 1)) solid #efcc8d;
+  outline-offset: calc(2px / var(--stage-k, 1));
+}
+.hudIcon {
+  position: relative;
+  width: 52%;
+  height: 52%;
+}
+.turnLine {
+  margin: 0;
+  pointer-events: none;
+}
+.turnText,
+.stepText {
+  position: absolute;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f6e7c8;
+  text-shadow: 0 1px 2px #000;
+}
+.stepText {
+  justify-content: flex-end;
+}
+.status {
+  position: absolute;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: #050707d9;
+  color: #e7cf9b;
+  font-size: 1rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* Connected says nothing on the table, but stays a live region that speaks when it changes. */
+.status[data-connected] {
+  clip-path: inset(50%);
+}
+.status[data-phase="reconnecting"],
+.status[data-phase="connecting"] {
+  color: #f1c27a;
+}
+.status[data-phase="ended"] {
+  color: #ec8f78;
+}
+
+/* Notices just above the HUD: an update waiting, the game kept on screen, a redraw. */
+.notes {
+  position: absolute;
+  left: 16px;
+  bottom: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 580px;
+  pointer-events: none;
+  z-index: 1100;
+}
+.chip {
+  padding: 4px 10px;
+  border: 1px solid #e6c68c44;
+  border-radius: 4px;
+  background: #0c1314e6;
+  color: #e7cf9b;
+  font-size: 1rem;
+}
+
+/* ---------- the Game menu (§9.1) ---------- */
+.gameMenu {
+  position: absolute;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.gameMenu[hidden] {
+  display: none;
+}
+.gameMenu ul {
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+  border: 1px solid #e6c68c55;
+  border-radius: 8px;
+  background: #0c1314f2;
+  box-shadow: 0 12px 30px #000c;
+  pointer-events: auto;
+}
+.gameMenu a,
+.gameMenu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: #f1e3c4;
+  font-size: 1.125rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.gameMenu a:hover,
+.gameMenu button:hover:not(:disabled) {
+  background: #ffffff12;
+}
+.gameMenu button[aria-pressed="true"] {
+  border-left-color: #e6c68c;
+  color: #e6c68c;
+}
+.gameMenu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.gameMenu a:focus-visible,
+.gameMenu button:focus-visible {
+  outline: calc(3px / var(--stage-k, 1)) solid #efcc8d;
+  outline-offset: -2px;
+}
+.gameMenu kbd {
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid #ffffff55;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: #cfd8d2;
+}
+.gameMenu .danger {
+  color: #ec8f78;
+}
+
+/* ---------- the alerts plate (N2–N4, N5) ---------- */
+.alerts {
+  position: absolute;
+  z-index: 3500;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.alert,
+.setup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0;
+  padding: 14px 18px;
+  border: 1px solid #e6c68c66;
+  border-radius: 8px;
+  background: #0c1314f2;
+  font-size: 1.125rem;
+  pointer-events: auto;
+}
+.alert p {
+  margin: 0;
+}
+
+/* ---------- the prompt column (§10) ---------- */
+.aside {
+  pointer-events: none;
+}
+.column {
+  position: absolute;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px 8px 8px 2px;
+  font-size: 1rem;
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #e6c68c55 transparent;
+}
+.note,
+.small {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e6c68c33;
+  border-radius: 6px;
+  background: #0c1314e0;
+  font-size: 0.95rem;
+}
+.note p {
+  flex: 1;
+  margin: 0;
+}
+.note > button {
+  border: 0;
+  background: none;
+  color: #8fa09a;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.passingNotice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #e6c68c55;
+  border-radius: 6px;
+  background: #0c1314e6;
+  color: #e7cf9b;
+}
+
+/* The lead diamonds: a big black diamond with a white icon, the word beside it in white. */
+.leads {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+.lead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  margin: 0;
+  padding: 0 6px 0 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #fff;
+  font-size: 1.375rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.lead:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.lead:focus-visible {
+  outline: calc(3px / var(--stage-k, 1)) solid #efcc8d;
+  outline-offset: 2px;
+}
+.leadDiamond {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+}
+.leadDiamond::before {
+  content: "";
+  position: absolute;
+  inset: 14.645%;
+  rotate: 45deg;
+  background: #050707;
+  border: 2px solid #8a6f43;
+  box-shadow: 0 3px 10px #000c;
+}
+.lead[data-first] .leadDiamond::before {
+  border-color: #c9a668;
+}
+.lead:hover:not(:disabled) .leadDiamond::before {
+  border-color: #efcc8d;
+  background: #141111;
+}
+.leadDiamond > svg {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+.leadLabel {
+  text-shadow: 0 2px 4px #000;
+}
+.lead kbd {
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid #ffffff55;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #cfd8d2;
+}
+/* The countdown ring around Continue: the diamond's edge, emptying as the timer runs. */
+.ring {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.ring svg {
+  position: absolute;
+  inset: 4%;
+  width: 92%;
+  height: 92%;
+  overflow: visible;
+}
+.ring polygon {
+  fill: none;
+  stroke: #b07cff;
+  stroke-width: 6;
+  stroke-linejoin: round;
+}
+.ring[data-phase="paused"] polygon {
+  stroke: #8a7aa8;
+}
+.ringSeconds {
+  display: none;
+}
+:global(html[data-reduced-motion="true"]) .ring svg {
+  display: none;
+}
+:global(html[data-reduced-motion="true"]) .ringSeconds {
+  display: block;
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: #b07cff;
+  color: #120b1c;
+  font-size: 0.8rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring svg {
+    display: none;
+  }
+  .ringSeconds {
+    display: block;
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: #b07cff;
+    color: #120b1c;
+    font-size: 0.8rem;
+  }
+}
+
+/* ---------- the drawers (§6.1) ---------- */
+.drawer {
+  position: absolute;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border: 1px solid #e6c68c44;
+  border-radius: 10px;
+  background: #0c1314f2;
+  box-shadow: 0 18px 40px #000c;
+  font-size: 1rem;
+  pointer-events: auto;
+}
+.drawer[hidden] {
+  display: none;
+}
+.drawerScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px 18px;
+  outline: none;
+  scrollbar-width: thin;
+}
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.drawerHead h2 {
+  margin: 0;
+  font:
+    1.375rem Georgia,
+    serif;
+  color: #e6c68c;
+}
+.drawerClose {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  border: 1px solid #e6c68c44;
+  border-radius: 6px;
+  background: none;
+  color: #f1e3c4;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.drawerClose:hover {
+  background: #ffffff12;
+}
+
+/* Forced colours: the diamonds keep an edge and the chips a border. */
+@media (forced-colors: active) {
+  .hud::before,
+  .leadDiamond::before {
+    border-color: ButtonText;
+    background: ButtonFace;
+  }
+  .hudIcon,
+  .leadDiamond > svg {
+    color: ButtonText;
+  }
+  .ring polygon {
+    stroke: Highlight;
+  }
+}

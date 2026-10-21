@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GameContext, type GameContextValue } from "./Board";
 import type { GameState } from "./connection";
 import { objectIndex, optionsByObject, optionsBySeat } from "./model";
 import { PromptPanel } from "./PromptPanel";
+import type { TimerView } from "./table/types";
 import type { AmountEntry, Prompt, PromptOption, Snapshot } from "./types";
 
 function option(id: string, action: PromptOption["action"]): PromptOption {
@@ -103,7 +104,15 @@ function state(snap: Snapshot, pending = false): GameState {
 }
 
 /** The panel inside the game's context, as GameScreen draws it for one state. */
-function Panel({ game }: { game: GameState }) {
+function Panel({
+  game,
+  timer = null,
+  onStopTimer = vi.fn(),
+}: {
+  game: GameState;
+  timer?: TimerView | null;
+  onStopTimer?: () => void;
+}) {
   const prompt = game.snapshot?.prompt ?? null;
   const context: GameContextValue = {
     view: null,
@@ -125,6 +134,8 @@ function Panel({ game }: { game: GameState }) {
         onAnswer={vi.fn()}
         onTakeControl={vi.fn()}
         onConcede={vi.fn()}
+        timer={timer}
+        onStopTimer={onStopTimer}
       />
     </GameContext.Provider>
   );
@@ -257,5 +268,100 @@ describe("keyboard focus in the prompt panel", () => {
     view.rerender(<Panel game={state(snapshot(6, null))} />);
     view.rerender(<Panel game={state(snapshot(7, priority("B")))} />);
     expect(document.activeElement).toBe(board);
+  });
+});
+
+function attackers(selected: boolean): Prompt {
+  return {
+    id: "d",
+    kind: "declare_attackers",
+    message: "Declare attackers",
+    detail: null,
+    options: [
+      option("1", "done"),
+      { ...option("2", "toggle_attacker"), selected },
+      option("3", "all_attack"),
+    ],
+    amounts: null,
+    piles: null,
+    xmage_query: null,
+  };
+}
+
+describe("the lead diamonds", () => {
+  it("lead with the primary and Attack With All, named with what they do", () => {
+    render(<Panel game={state(snapshot(5, attackers(false)))} />);
+    const first = document.querySelector("[data-first]")!;
+    expect(first).toHaveAccessibleName("No Attacks (Done)");
+    expect(first).toHaveAttribute("aria-keyshortcuts", "P");
+    const all = document.querySelector('[data-action="all_attack"]')!;
+    expect(all).toHaveAccessibleName("Attack With All");
+    // Each option appears once: Attack With All has left the Combat group.
+    const combat = screen.getByRole("heading", {
+      level: 3,
+      name: "Combat",
+    }).parentElement!;
+    expect(
+      within(combat)
+        .getAllByRole("button")
+        .map((button) => button.dataset.action),
+    ).toEqual(["toggle_attacker"]);
+    expect(document.querySelectorAll('[data-option="3"]')).toHaveLength(1);
+  });
+
+  it("say Attack once an attacker is chosen, and Continue for a pass", () => {
+    const view = render(<Panel game={state(snapshot(5, attackers(true)))} />);
+    expect(document.querySelector("[data-first]")).toHaveAccessibleName(
+      "Attack (Done)",
+    );
+    view.rerender(<Panel game={state(snapshot(6, priority("A")))} />);
+    const first = document.querySelector("[data-first]")!;
+    expect(first).toHaveAccessibleName("Continue (Pass priority)");
+    // The words beside the diamond are only Magic Duels' own.
+    expect(
+      first.querySelector("span:not([aria-hidden])")?.firstChild,
+    ).toHaveProperty("textContent", "Continue");
+  });
+
+  it("add Stop Timer after them while the timer runs, and move focus off it once stopped", () => {
+    const running: TimerView = {
+      key: "A|s1",
+      phase: "running",
+      remainingMs: 6000,
+      totalMs: 8000,
+      subject: "Bot 1's Lightning Bolt",
+    };
+    const onStopTimer = vi.fn();
+    const view = render(
+      <Panel
+        game={state(snapshot(5, priority("A")))}
+        timer={running}
+        onStopTimer={onStopTimer}
+      />,
+    );
+    const stop = screen.getByRole("button", { name: "Stop Timer" });
+    expect(stop).toHaveAttribute("data-timer-stop");
+    expect(stop).toHaveAttribute("aria-keyshortcuts", "Space T");
+    expect(stop).not.toHaveAttribute("data-option");
+    const buttons: Element[] = Array.from(document.querySelectorAll("button"));
+    expect(buttons.indexOf(stop)).toBe(
+      buttons.indexOf(
+        document.querySelector<HTMLButtonElement>("[data-first]")!,
+      ) + 1,
+    );
+    stop.focus();
+    fireEvent.click(stop);
+    expect(onStopTimer).toHaveBeenCalledTimes(1);
+    // jsdom keeps focus on a removed button's place as the body, as Chromium does.
+    stop.blur();
+    view.rerender(
+      <Panel
+        game={state(snapshot(5, priority("A")))}
+        timer={{ ...running, phase: "stopped" }}
+        onStopTimer={onStopTimer}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "Stop Timer" })).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector("[data-first]"));
   });
 });

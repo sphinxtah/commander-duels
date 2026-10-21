@@ -47,6 +47,13 @@
   ],
   "screenshots": [
     {
+      "src": "/brand/screenshot-table-1920.webp",
+      "sizes": "1920x1080",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "A Commander game at the table"
+    },
+    {
       "src": "/brand/screenshot-play-1920.webp",
       "sizes": "1920x1080",
       "type": "image/webp",

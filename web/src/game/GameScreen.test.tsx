@@ -16,7 +16,13 @@ import {
   vi,
 } from "vitest";
 import { GameScreen } from "./GameScreen";
-import type { GameView, PlayerView, Prompt, Snapshot } from "./types";
+import type {
+  GameView,
+  PlayerView,
+  PriorityControls,
+  Prompt,
+  Snapshot,
+} from "./types";
 
 vi.mock("../api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api")>()),
@@ -195,6 +201,14 @@ describe("the game screen", () => {
     expect(
       screen.getByRole("region", { name: "Alice's side of the table" }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /^Alice's hand/ }),
+    ).toBeInTheDocument();
+    // jsdom has no WebGL: the DOM paints the table.
+    expect(document.querySelector("[data-renderer]")).toHaveAttribute(
+      "data-renderer",
+      "dom",
+    );
     expect(screen.queryByText("Your hand")).toBeNull();
     expect(screen.queryByText("Your turn", { exact: false })).toBeNull();
   });
@@ -297,5 +311,212 @@ describe("the game screen", () => {
       "This game is open in too many tabs.",
     );
     expect(screen.getByText("Reconnecting…")).toBeInTheDocument();
+  });
+});
+
+const controls: PriorityControls = {
+  passing: null,
+  your_turn: ["main1", "main2"],
+  opponent_turn: ["end_of_turn"],
+  stop_on_new_stack_objects: true,
+  stop_on_attackers: true,
+  stop_on_blockers: true,
+  pass_after_casting: false,
+  full_control: false,
+};
+
+/** Bot 2 has cast a spell in its own turn, and Alice may respond: the response timer's moment. */
+const responding: GameView = {
+  ...view,
+  active_seat: 1,
+  priority_seat: 0,
+  stack: [
+    {
+      id: "s1",
+      kind: "spell",
+      controller_seat: 1,
+      name: "Lightning Bolt",
+      text: null,
+      hidden: false,
+      targets: [],
+    },
+  ],
+  priority: controls,
+};
+
+/** The table with Alice's tab in control, showing `shown` with prompt A at revision 5. */
+function playing(shown: GameView, prompt: Prompt | null = priority("A")) {
+  render(<GameScreen gameId="g1" me={null} />);
+  const socket = FakeSocket.made[0];
+  act(() => {
+    socket.accept();
+    socket.deliver(welcome(0, false));
+    socket.deliver({
+      type: "lease",
+      role: "controller",
+      controlled: true,
+      reason: "granted",
+    });
+    socket.deliver({
+      type: "snapshot",
+      snapshot: { ...snapshot(5, prompt), view: shown },
+    });
+  });
+  return socket;
+}
+
+function advance(ms: number) {
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
+}
+
+describe("the response timer on the table", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("passes for the player once, for the prompt and revision on screen", () => {
+    const socket = playing(responding);
+    const timer = document.querySelector("[data-timer]");
+    expect(timer).toHaveAttribute("role", "timer");
+    expect(timer).toHaveAttribute("data-remaining", "8");
+    expect(screen.getByRole("button", { name: /Stop Timer/ })).toHaveAttribute(
+      "data-timer-stop",
+    );
+    advance(7900);
+    expect(socket.commands()).toEqual([]);
+    advance(300);
+    expect(socket.commands()).toEqual([
+      expect.objectContaining({
+        type: "submit_choice",
+        prompt_id: "A",
+        expected_revision: 5,
+        payload: { option_id: "1" },
+      }),
+    ]);
+    advance(20_000);
+    expect(socket.commands()).toHaveLength(1);
+  });
+
+  it.each([
+    ["Space", { key: " " }],
+    ["T", { key: "t" }],
+  ])(
+    "stops for good with %s, and never presses the focused Continue",
+    (_, key) => {
+      const socket = playing(responding);
+      const first = document.querySelector<HTMLElement>("[data-first]")!;
+      first.focus();
+      const down = new KeyboardEvent("keydown", {
+        ...key,
+        bubbles: true,
+        cancelable: true,
+      });
+      const up = new KeyboardEvent("keyup", {
+        ...key,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        first.dispatchEvent(down);
+        first.dispatchEvent(up);
+      });
+      expect(down.defaultPrevented).toBe(true);
+      if (key.key === " ") expect(up.defaultPrevented).toBe(true);
+      expect(document.querySelector("[data-timer]")).toHaveAttribute(
+        "data-timer",
+        "stopped",
+      );
+      expect(screen.queryByRole("button", { name: /Stop Timer/ })).toBeNull();
+      advance(20_000);
+      expect(socket.commands()).toEqual([]);
+    },
+  );
+
+  it("stops with Stop Timer, and focus goes to Continue", () => {
+    const socket = playing(responding);
+    const stop = screen.getByRole("button", { name: /Stop Timer/ });
+    stop.focus();
+    act(() => stop.click());
+    expect(screen.queryByRole("button", { name: /Stop Timer/ })).toBeNull();
+    expect(document.activeElement).toBe(document.querySelector("[data-first]"));
+    expect(document.activeElement).toHaveAccessibleName(
+      "Continue (Pass priority)",
+    );
+    advance(20_000);
+    expect(socket.commands()).toEqual([]);
+  });
+
+  it("never runs for a choice of the player's own, such as an empty stack in their turn", () => {
+    const socket = playing({ ...view, priority: controls });
+    expect(document.querySelector("[data-timer]")).toBeNull();
+    advance(20_000);
+    expect(socket.commands()).toEqual([]);
+  });
+});
+
+describe("Escape on the table", () => {
+  const passing: GameView = {
+    ...view,
+    priority: { ...controls, passing: "until_end_of_turn" },
+  };
+  const escape = () => {
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      document.body.dispatchEvent(event);
+    });
+    return event;
+  };
+
+  it("stops a pass with the Priority drawer closed", () => {
+    const socket = playing(passing, null);
+    expect(
+      screen.getByText("Passing until the end of the turn."),
+    ).toBeInTheDocument();
+    expect(document.querySelector('[data-drawer="priority"]')).toHaveAttribute(
+      "hidden",
+    );
+    escape();
+    expect(socket.commands()).toEqual([
+      expect.objectContaining({
+        type: "set_priority",
+        payload: { cancel_passes: true },
+      }),
+    ]);
+  });
+
+  it("closes one layer per press before it stops a pass, and drawers are never dialogs", () => {
+    const socket = playing(passing, null);
+    const toggle = screen.getByRole("button", { name: "Game log" });
+    fireEvent.click(toggle);
+    const drawer = document.querySelector('[data-drawer="log"]')!;
+    expect(drawer.tagName).not.toBe("DIALOG");
+    expect(drawer).toHaveAttribute("data-open");
+    fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+    expect(document.getElementById("game-menu")).not.toHaveAttribute("hidden");
+
+    expect(escape().defaultPrevented).toBe(true);
+    expect(document.getElementById("game-menu")).toHaveAttribute("hidden");
+    expect(escape().defaultPrevented).toBe(true);
+    expect(drawer).not.toHaveAttribute("data-open");
+    expect(document.activeElement).toBe(toggle);
+    expect(socket.commands()).toEqual([]);
+
+    escape();
+    expect(socket.commands()).toEqual([
+      expect.objectContaining({ type: "set_priority" }),
+    ]);
+    for (const element of document.querySelectorAll("[data-drawer]"))
+      expect(element.tagName).not.toBe("DIALOG");
+    // The alerts plate (N2–N4) holds the only alerts.
+    expect(screen.queryAllByRole("alert")).toEqual([]);
   });
 });

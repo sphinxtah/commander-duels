@@ -1,8 +1,8 @@
-/* The game screen and the practice table. Colours follow the shell: slate panels, gold accents. */
+/* The game screen's panels, cards and dialogs, and the practice table. Colours follow the shell:
+   slate panels, gold accents. The table itself (the stage, the band, the column and the drawers)
+   is in table/screen.module.css. */
 .screen {
-  --side-w: clamp(300px, 21vw, 380px);
-  --card-w: clamp(56px, 4.9vw, 100px);
-  --hand-w: clamp(70px, 6.2vw, 124px);
+  --card-w: 100px;
   --panel: #142022;
   --panel-2: #182729;
   --line: #ffffff14;
@@ -13,106 +13,6 @@
   --attack: #ec8f78;
   --block: #8fb8e8;
   --danger: #e27d6c;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--side-w);
-  align-content: start;
-  min-height: 100vh;
-  background:
-    radial-gradient(ellipse at 50% 0%, #1d2d2b 0%, transparent 60%), #0f1718;
-}
-.gameBar,
-.notice {
-  grid-column: 1 / -1;
-}
-.gameBar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 10px 18px;
-  border-bottom: 1px solid var(--line);
-  /* Opaque, with no backdrop blur: cards that scroll under the bar are hidden, never blurred
-     (Scryfall's image rules forbid blurring card images). */
-  background: #111b1c;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.gameBar h1 {
-  margin: 0;
-  font:
-    1.2rem Georgia,
-    serif;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.gameBar h1 span,
-.turn {
-  color: var(--muted);
-  font:
-    0.78rem Inter,
-    "Segoe UI",
-    sans-serif;
-  letter-spacing: 0.4px;
-}
-.turn {
-  margin: 0;
-  color: #cfd8d2;
-}
-.back {
-  color: var(--gold);
-  font-size: 0.85rem;
-  padding: 6px 10px;
-  border: 1px solid #e6c68c33;
-  border-radius: 5px;
-}
-.status {
-  margin-left: auto;
-  font-size: 0.72rem;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.status::before {
-  content: "●";
-  margin-right: 6px;
-  color: var(--teal);
-}
-.status[data-phase="reconnecting"]::before,
-.status[data-phase="connecting"]::before {
-  color: var(--gold);
-}
-.status[data-phase="ended"]::before {
-  color: var(--danger);
-}
-.inspectToggle {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  font-size: 0.8rem;
-  color: var(--gold);
-}
-.notice {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 10px 18px 0;
-  padding: 10px 14px;
-  border: 1px solid #e6c68c33;
-  background: #e6c68c0d;
-  border-radius: 6px;
-  font-size: 0.85rem;
-}
-.notice p {
-  margin: 0;
-  flex: 1;
-}
-.notice > button {
-  background: none;
-  border: 0;
-  font-size: 1.3rem;
-  color: var(--muted);
 }
 
 /* Buttons */
@@ -164,62 +64,6 @@
   outline-offset: 2px;
 }
 
-/* The board */
-.board {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 16px 28px;
-}
-.opponents {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 1fr);
-}
-.screen[data-opponents="2"] .opponents {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.screen[data-opponents="3"] .opponents {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.opponent,
-.you {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px 12px;
-  min-width: 0;
-}
-.opponent[data-active],
-.you[data-active] {
-  border-color: #74c7b555;
-  box-shadow: inset 0 2px 0 var(--teal);
-}
-.middle:empty {
-  display: none;
-}
-.middle {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.playerHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  margin-bottom: 8px;
-}
-.playerHeader[data-lost] {
-  opacity: 0.6;
-}
-.playerName {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.95rem;
-}
 .pill {
   font-size: 0.62rem;
   letter-spacing: 1px;
@@ -256,87 +100,19 @@ button.life[data-actionable] {
 button.life[data-selected] {
   border-color: var(--teal);
 }
-.counts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 0.78rem;
-  color: var(--muted);
-}
-.counts button {
-  background: none;
-  border: 0;
-  border-bottom: 1px dotted #8fa09a88;
-  color: #c3cec8;
-  padding: 0;
-  font-size: 0.78rem;
-}
+
 .poolSymbol {
   margin-left: 3px;
   color: #f1e3c4;
 }
-.commanders {
-  flex-basis: 100%;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  font-size: 0.76rem;
-  color: var(--muted);
-}
-.commanders li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-}
-.commanders strong {
-  color: var(--gold);
-  font-weight: 500;
-}
-.battlefield {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+
 .cardRow {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: flex-start;
 }
-.lands {
-  padding-top: 6px;
-  border-top: 1px dashed #ffffff0d;
-}
-.attachGroup {
-  display: flex;
-  gap: 2px;
-  align-items: flex-start;
-}
-.emptyZone {
-  color: #66766f;
-  font-size: 0.8rem;
-  margin: 4px 0;
-}
-/* The hand stays in view while the board scrolls (UI01); phones dock the prompt there instead. */
-.hand {
-  position: sticky;
-  bottom: 0;
-  z-index: 4;
-  margin: 12px -12px -12px;
-  padding: 8px 12px 10px;
-  border-top: 1px solid var(--line);
-  border-radius: 0 0 8px 8px;
-  background: var(--panel);
-  box-shadow: 0 -10px 18px -12px #000c;
-}
-.hand h2,
-.side h2,
+
 .stack h2,
 .combat h2 {
   font-size: 0.68rem;
@@ -348,18 +124,10 @@ button.life[data-selected] {
   gap: 10px;
   align-items: baseline;
 }
-.hand h2 span,
-.side h2 span,
 .stack h2 span {
   color: #66766f;
   letter-spacing: 0.5px;
   text-transform: none;
-}
-.handRow {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  padding: 6px 2px 8px;
-  --card-w: var(--hand-w);
 }
 
 /* Cards */
@@ -371,10 +139,7 @@ button.life[data-selected] {
 .cardSlot[data-small] {
   --card-w: calc(clamp(56px, 4.9vw, 100px) * 0.74);
 }
-.screen[data-opponents="2"] .opponent .cardSlot,
-.screen[data-opponents="3"] .opponent .cardSlot {
-  --card-w: calc(clamp(56px, 4.9vw, 100px) * 0.7);
-}
+
 .card {
   display: block;
   width: 100%;
@@ -479,8 +244,10 @@ button.life[data-selected] {
 .face[data-image="loaded"] img {
   opacity: 1;
 }
+/* The frame stays under the image until it has faded in, so a card never shows blank. */
 .face[data-image="loaded"] .frame {
   visibility: hidden;
+  transition: visibility 0s 0.2s;
 }
 .cardBack {
   background:
@@ -684,52 +451,32 @@ button.life[data-selected] {
   font-size: 0.85rem;
 }
 
-/* The side panel */
-.side {
-  grid-column: 2;
-  position: sticky;
-  top: 56px;
-  align-self: start;
-  max-height: calc(100vh - 56px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px 14px 20px 0;
-}
-.preview {
-  display: grid;
-  grid-template-columns: 42% 1fr;
-  gap: 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 0.78rem;
-  --card-w: 140px;
-}
-.preview > :first-child {
-  position: relative;
-  aspect-ratio: 63 / 88;
-  border-radius: 7px;
-  overflow: hidden;
-}
-.preview p {
-  margin: 4px 0;
-  color: #cfd8d2;
-}
+/* The prompt sits in the table's left column with no panel of its own (as in Magic Duels): a
+   shade behind its words keeps them readable over the table. */
 .prompt {
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px 14px;
+  padding: 8px 10px 10px;
+  border-left: 2px solid transparent;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #050707d9, #05070799 75%, #05070755);
 }
 .prompt[data-yours] {
-  border-color: #e6c68c66;
-  box-shadow: 0 0 0 1px #e6c68c22;
+  border-left-color: #e6c68c;
 }
 .prompt h2 {
+  display: flex;
   justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 6px;
+  font-size: 1.125rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.prompt h2 span {
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
 }
 /* Focus rests on the heading while an answer is sent or the table waits, as on a page's h1. */
 .prompt h2:focus {
@@ -858,6 +605,58 @@ button.life[data-selected] {
   color: var(--muted);
   margin: 6px 0;
 }
+/* On the table (v0.3.0) the panels' text is sized for the stage: 18 su at least, which is 12
+   CSS px on the smallest table (1280 × 720). */
+.screen .promptMessage {
+  font-size: 1.25rem;
+}
+.screen .promptDetail,
+.screen .hint,
+.screen .lease,
+.screen .amounts label,
+.screen .piles,
+.screen .refusal,
+.screen .messages,
+.screen .options button,
+.screen .logLines,
+.screen .inspected h3,
+.screen .inspected h4,
+.screen .passing,
+.screen .switch {
+  font-size: 1.125rem;
+}
+.screen .optionGroup h3,
+.screen .revealed h3 {
+  font-size: 1.125rem;
+  letter-spacing: 0.06em;
+}
+.screen .primaryButton,
+.screen .secondaryButton,
+.screen .dangerButton {
+  font-size: 1.125rem;
+}
+/* Compact diamond rows: the other options, each marked with a small diamond. */
+.screen .options button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: #05070780;
+}
+.screen .options button::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  rotate: 45deg;
+  border: 2px solid #8a6f43;
+  background: #050707;
+}
+.screen .options button[data-selected]::before,
+.screen .options button[aria-pressed="true"]::before {
+  border-color: var(--teal);
+  background: var(--teal);
+}
 .result {
   background: #e6c68c12;
   border: 1px solid #e6c68c55;
@@ -882,7 +681,7 @@ button.life[data-selected] {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 260px;
+  max-height: 860px;
   overflow-y: auto;
   font-size: 0.76rem;
   line-height: 1.45;
@@ -929,7 +728,6 @@ button.life[data-selected] {
 
 /* Dialogs */
 .zoom,
-.zoneDialog,
 .confirm {
   background: #162224;
   color: inherit;
@@ -940,7 +738,6 @@ button.life[data-selected] {
   max-height: calc(100vh - 32px);
 }
 .zoom::backdrop,
-.zoneDialog::backdrop,
 .confirm::backdrop {
   background: #050909cc;
 }
@@ -987,21 +784,7 @@ button.life[data-selected] {
   font-size: 1.5rem;
   color: var(--muted);
 }
-.zoneDialog {
-  width: min(860px, calc(100vw - 32px));
-  --card-w: 92px;
-}
-.zoneDialog h2 {
-  font:
-    1.2rem Georgia,
-    serif;
-}
-.zoneDialog h2 span {
-  font:
-    0.8rem Inter,
-    sans-serif;
-  color: var(--muted);
-}
+
 .confirm {
   width: min(420px, calc(100vw - 32px));
 }
@@ -1187,64 +970,9 @@ button.life[data-selected] {
   display: flex;
   gap: 8px;
 }
-
-/* 1366 x 768 and other mid-size screens */
-@media (max-width: 1440px) {
-  .screen {
-    --card-w: clamp(50px, 4.6vw, 70px);
-    --hand-w: clamp(64px, 5.8vw, 84px);
-  }
-  .cardSlot[data-small],
-  .screen[data-opponents="2"] .opponent .cardSlot,
-  .screen[data-opponents="3"] .opponent .cardSlot {
-    --card-w: 46px;
-  }
-  .preview {
-    display: none;
-  }
-}
-/* Tablets and phones: one column, the prompt docked at the bottom. */
+/* Narrow windows: the practice table and the card zoom in one column. The game screen
+   itself is one 16:9 table that scales (v0.3.0). */
 @media (max-width: 900px) {
-  .screen {
-    grid-template-columns: minmax(0, 1fr);
-    padding-bottom: 42vh;
-    --card-w: 50px;
-    --hand-w: 64px;
-  }
-  .screen[data-opponents="2"] .opponents,
-  .screen[data-opponents="3"] .opponents {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .side {
-    grid-column: 1;
-    position: static;
-    max-height: none;
-    padding: 0 12px 12px;
-  }
-  .prompt {
-    position: fixed;
-    inset: auto 0 0 0;
-    max-height: 40vh;
-    overflow-y: auto;
-    z-index: 12;
-    border-radius: 12px 12px 0 0;
-    box-shadow: 0 -8px 24px #000a;
-  }
-  .board {
-    padding: 10px 12px 16px;
-  }
-  .hand {
-    position: static;
-    box-shadow: none;
-  }
-  .gameBar {
-    gap: 8px 12px;
-    padding: 8px 12px;
-  }
-  .turn {
-    order: 5;
-    flex-basis: 100%;
-  }
   .zoom[open] {
     grid-template-columns: minmax(0, 1fr);
     --card-w: 240px;

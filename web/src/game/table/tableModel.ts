@@ -172,6 +172,9 @@ export const buildTableModel: BuildTableModel = (input) => {
     return null;
   };
 
+  // A permanent someone else controls says whose it is (design §3.2).
+  const ownerName = (seat: Seat | null) =>
+    seat === null ? null : playerName(view, seat, observing);
   const addCard = (
     zone: Zone,
     card: CardView,
@@ -193,7 +196,7 @@ export const buildTableModel: BuildTableModel = (input) => {
       controllerSeat: controller,
       offered,
       mark: markOf(offered, playable),
-      label: withOptions(cardLabel(card, located), offered),
+      label: withOptions(cardLabel(card, located, ownerName(owner)), offered),
       drag: dragOf(zone, offered, controller),
     });
     return key;
@@ -459,7 +462,7 @@ export const buildTableModel: BuildTableModel = (input) => {
         unit.cards.forEach((key, i) => {
           const card = cards.get(key)!;
           card.label = withOptions(
-            `${cardLabel(card.card, card.located)}, ${i + 1} of ${unit.cards.length} grouped`,
+            `${cardLabel(card.card, card.located, ownerName(card.ownerSeat))}, ${i + 1} of ${unit.cards.length} grouped`,
             card.offered,
           );
         });

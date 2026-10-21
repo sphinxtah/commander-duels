@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { occluded, sizeChecks } from "./helpers/checks";
 import type {
   GameView,
   Prompt,
@@ -41,6 +42,13 @@ class Table {
   readonly pending = new Map<string, number>();
   /** Log lines that ran ahead of the board and were confirmed public by a later view. */
   readonly aheadOfView: string[] = [];
+  /** Every command the page sent, in order. */
+  readonly sent: {
+    type: string;
+    prompt_id?: string;
+    expected_revision: number;
+    payload: Record<string, unknown>;
+  }[] = [];
 
   /** Without a page, frames are fed to receive() by the test (a proxied socket). */
   constructor(
@@ -53,7 +61,73 @@ class Table {
       socket.on("framereceived", ({ payload }) =>
         this.receive(String(payload)),
       );
+      socket.on("framesent", ({ payload }) => {
+        const message = JSON.parse(String(payload)) as {
+          type: string;
+          command?: Table["sent"][number];
+        };
+        if (message.type === "command" && message.command)
+          this.sent.push(message.command);
+      });
     });
+    // The page itself: no error, and no request breaks the content security policy.
+    page?.on("pageerror", (error) =>
+      this.problems.push(`page error: ${error.message}`),
+    );
+    page?.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        !message.text().startsWith("Failed to load resource")
+      )
+        this.problems.push(`console: ${message.text()}`);
+    });
+    // T13 for pictures (v0.3.0): the table asks for a card's image only once it is public.
+    page?.on("request", (request) => {
+      const url = new URL(request.url());
+      if (!url.pathname.startsWith("/api/v1/card-images")) return;
+      const name = url.searchParams.get("name");
+      if (name && this.concealed.has(name) && !this.publicNames.has(name))
+        this.problems.push(
+          `the image of ${name} was asked for before it was public`,
+        );
+    });
+  }
+
+  /** T13 on the screen (v0.3.0): no text the table shows or names (every text node, every
+   * aria-label and title under the table, the log aside) says a concealed card before it has
+   * been public. Pictures and log lines have their own checks. */
+  async checkScreen(page: Page) {
+    const texts = await page.evaluate(() => {
+      const root = document.querySelector("[data-screen]");
+      if (!root) return [] as string[];
+      const found: string[] = [];
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode())
+        if (
+          !node.parentElement?.closest("[role=log]") &&
+          node.textContent?.trim()
+        )
+          found.push(node.textContent);
+      for (const element of root.querySelectorAll("[aria-label], [title]"))
+        if (!element.closest("[role=log]"))
+          for (const name of ["aria-label", "title"]) {
+            const value = element.getAttribute(name);
+            if (value) found.push(value);
+          }
+      const csp = (window as unknown as { __csp?: string[] }).__csp ?? [];
+      return [...found, ...csp.map((v) => `\u0000CSP ${v}`)];
+    });
+    for (const text of texts) {
+      if (text.startsWith("\u0000CSP ")) {
+        this.problems.push(`content security policy: ${text.slice(5)}`);
+        continue;
+      }
+      for (const name of this.concealed)
+        if (!this.publicNames.has(name) && phrase(name).test(text))
+          this.problems.push(
+            `the screen says ${name} before it was public: "${text.slice(0, 80)}"`,
+          );
+    }
   }
 
   receive(frame: string) {
@@ -359,14 +433,15 @@ async function play(
   let answered = 0;
   for (let step = 0; step < 600; step += 1) {
     const snapshot = await drawn(page, table);
+    await table.checkScreen(page);
     if (snapshot.result) return { snapshot, answered, kinds };
     await beforeAnswer?.(snapshot);
     const prompt = snapshot.prompt!;
     kinds[prompt.kind] = (kinds[prompt.kind] ?? 0) + 1;
     if (prompt.kind === "unsupported") {
-      await page.getByRole("button", { name: "Concede" }).first().click();
+      await page.getByRole("button", { name: "Concede this game" }).click();
       await page
-        .getByRole("dialog")
+        .getByRole("dialog", { name: "Concede this game?" })
         .getByRole("button", { name: "Concede" })
         .click();
     } else {
@@ -385,6 +460,7 @@ async function play(
         const onBoard =
           card &&
           (await card.count()) > 0 &&
+          (await card.isVisible()) &&
           prompt.options.filter((o) => o.object_id === choice.object_id)
             .length === 1;
         const button = page.locator(`[data-option="${choice.id}"]`).first();
@@ -440,12 +516,40 @@ function note(
   console.log(`[game] ${text}`);
 }
 
-async function noHorizontalScroll(page: Page) {
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
+/** The table at one size (design §24.2): its scale, nothing that scrolls, the canvas at the
+ * screen's pixels, and every card and option in reach where it is drawn. */
+async function atSize(
+  page: Page,
+  table: Table,
+  width: number,
+  height: number,
+  path: string,
+) {
+  await page.setViewportSize({ width, height });
+  await expect(page.locator("[data-screen]")).toHaveAttribute(
+    "data-scale",
+    Math.min(width / 1920, height / 1080).toFixed(3),
+  );
+  await sizeChecks(page, { width, height, dpr: 1 });
+  table.problems.push(
+    ...(await occluded(page)).map(
+      (problem) => `${width}x${height}: ${problem}`,
     ),
-  ).toBe(true);
+  );
+  await page.screenshot({ path, type: "jpeg", quality: 80 });
+}
+
+/** Opens the Game menu and concedes, through the named dialog. */
+async function concede(page: Page) {
+  await page.getByRole("button", { name: "Game menu" }).click();
+  await page
+    .getByRole("group", { name: "Game menu" })
+    .getByRole("button", { name: "Concede" })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Concede this game?" })
+    .getByRole("button", { name: "Concede" })
+    .click();
 }
 
 test.describe("practice games in the browser", () => {
@@ -462,6 +566,11 @@ test.describe("practice games in the browser", () => {
   // context (the second tab's too) starts with these settings.
   test.beforeEach(async ({ context }) => {
     await context.addInitScript(() => {
+      const csp: string[] = [];
+      (window as unknown as { __csp: string[] }).__csp = csp;
+      document.addEventListener("securitypolicyviolation", (event) =>
+        csp.push(`${event.violatedDirective} ${event.blockedURI}`),
+      );
       localStorage.setItem(
         "cd.table.v1",
         JSON.stringify({
@@ -474,6 +583,24 @@ test.describe("practice games in the browser", () => {
         }),
       );
     });
+  });
+
+  // A failed journey leaves its game running: it is closed, so the next journeys find a table.
+  test.afterEach(async ({ page }, testInfo) => {
+    if (testInfo.status === testInfo.expectedStatus) return;
+    await page
+      .evaluate(async () => {
+        const id = /#game\/([0-9a-f-]{36})/.exec(location.hash)?.[1];
+        if (!id) return;
+        const me = (await (await fetch("/api/v1/me")).json()) as {
+          csrf_token: string;
+        };
+        await fetch(`/api/v1/games/${id}/close`, {
+          method: "POST",
+          headers: { "X-CSRF-Token": me.csrf_token },
+        });
+      })
+      .catch(() => undefined);
   });
 
   test("a Legacy game played to the end by mouse, with no concealed card in any payload", async ({
@@ -493,10 +620,15 @@ test.describe("practice games in the browser", () => {
       deck: "legacy-mono-red-burn",
       turnCap: 20,
     });
-    await expect(page.getByRole("note")).toContainText(
-      "bots still read your hand",
+    await expect(
+      page.getByRole("note").filter({ hasText: "bots still read your hand" }),
+    ).toBeVisible();
+    await expect(page.locator("[data-screen]")).toHaveAttribute(
+      "data-renderer",
+      "webgl",
+      { timeout: 30_000 },
     );
-    // On the third turn, the board at each size the scope names, between two answers.
+    // On the third turn, the table at each size the scope names, between two answers.
     let shot = false;
     const { snapshot, answered, kinds } = await play(
       page,
@@ -507,15 +639,18 @@ test.describe("practice games in the browser", () => {
         shot = true;
         for (const [width, height] of [
           [1920, 1080],
+          [1280, 720],
           [1366, 768],
-          [390, 844],
-        ]) {
-          await page.setViewportSize({ width, height });
-          await noHorizontalScroll(page);
-          await page.screenshot({
-            path: testInfo.outputPath(`game-${width}.png`),
-          });
-        }
+          [2560, 1440],
+          [3840, 2160],
+        ])
+          await atSize(
+            page,
+            table,
+            width,
+            height,
+            testInfo.outputPath(`game-${width}.jpg`),
+          );
         await page.setViewportSize({ width: 1920, height: 1080 });
       },
     );
@@ -528,7 +663,11 @@ test.describe("practice games in the browser", () => {
     await expect(
       page.getByRole("dialog", { name: /Victory|Defeat|draw|Game over/ }),
     ).toBeVisible();
-    await page.screenshot({ path: testInfo.outputPath("game-result.png") });
+    await page.screenshot({
+      path: testInfo.outputPath("game-result.jpg"),
+      type: "jpeg",
+      quality: 80,
+    });
     expect(shot || snapshot.result!.turns <= 2).toBe(true);
   });
 
@@ -536,6 +675,7 @@ test.describe("practice games in the browser", () => {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 1366, height: 768 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
     const mine = deckNames("legacy-mono-green-creatures");
     const theirs = deckNames("legacy-mono-red-burn");
     const table = new Table(
@@ -549,6 +689,7 @@ test.describe("practice games in the browser", () => {
       deck: "legacy-mono-green-creatures",
       turnCap: 8,
     });
+    await sizeChecks(page, { width: 1366, height: 768, dpr: 1 });
     const { snapshot, answered, kinds } = await play(page, table, "keyboard");
     note(
       testInfo,
@@ -561,7 +702,7 @@ test.describe("practice games in the browser", () => {
   test("a four-player Commander table, with each bot's deck kept concealed", async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.setViewportSize({ width: 2560, height: 1440 });
     const mine = deckNames("commander-mono-red-raiders");
     const concealed = new Set(
       [
@@ -582,31 +723,37 @@ test.describe("practice games in the browser", () => {
       turnCap: 4,
     });
     await expect(page.getByRole("article")).toHaveCount(3);
+    await sizeChecks(page, { width: 2560, height: 1440, dpr: 1 });
     const { snapshot, answered, kinds } = await play(page, table, "mouse");
     note(
       testInfo,
       `${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts (${JSON.stringify(kinds)})`,
     );
-    expect(table.problems).toEqual([]);
+    // The ended table, reviewed: the result dialog closed, every control reachable at each size.
+    await page
+      .getByRole("dialog", { name: /Victory|Defeat|draw|Game over/ })
+      .getByRole("button", { name: "Review the board" })
+      .click();
     for (const [width, height] of [
+      [2560, 1440],
       [1920, 1080],
-      [1366, 768],
-      [390, 844],
-    ]) {
-      await page.setViewportSize({ width, height });
-      await noHorizontalScroll(page);
-      await page.screenshot({
-        path: testInfo.outputPath(`commander-${width}.png`),
-        fullPage: true,
-      });
-    }
+      [1280, 720],
+    ])
+      await atSize(
+        page,
+        table,
+        width,
+        height,
+        testInfo.outputPath(`commander-${width}.jpg`),
+      );
+    expect(table.problems).toEqual([]);
   });
 
   test("a second tab watches until it takes control, and a lost reply is resent once", async ({
     context,
     page,
   }) => {
-    await page.setViewportSize({ width: 1366, height: 768 });
+    await page.setViewportSize({ width: 1280, height: 720 });
     const mine = deckNames("legacy-mono-red-burn");
     const first = new Table(page, mine, new Set());
     await signInSysop(page);
@@ -690,11 +837,7 @@ test.describe("practice games in the browser", () => {
     expect([...first.problems, ...table.problems]).toEqual([]);
 
     // Close the game for everyone.
-    await second.getByRole("button", { name: "Concede" }).click();
-    await second
-      .getByRole("dialog")
-      .getByRole("button", { name: "Concede" })
-      .click();
+    await concede(second);
     await expect
       .poll(() => Boolean(table.latest?.result), { timeout: 60_000 })
       .toBe(true);
@@ -704,7 +847,7 @@ test.describe("practice games in the browser", () => {
   test("a deck of your own, with full control and a pass until your next turn", async ({
     page,
   }, testInfo) => {
-    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.setViewportSize({ width: 3840, height: 2160 });
     const mine = new Set(["Lightning Bolt", "Hill Giant", "Mountain"]);
     const fixtures = new Set([
       ...deckNames("legacy-mono-red-burn"),
@@ -763,8 +906,14 @@ test.describe("practice games in the browser", () => {
     );
     expect(reached, "no priority prompt offered the pass modes").toBe(true);
 
-    // Full control stops everywhere; turned off, the stops are the defaults again.
-    const priority = page.getByRole("region", { name: "Priority" });
+    // Full control stops everywhere; turned off, the stops are the defaults again. The controls
+    // are in their drawer, opened from the band (v0.3.0).
+    await sizeChecks(page, { width: 3840, height: 2160, dpr: 1 });
+    await page.getByRole("button", { name: "Priority controls" }).click();
+    const priority = page.getByRole("region", {
+      name: "Priority",
+      exact: true,
+    });
     const full = priority.getByRole("checkbox", { name: /Full control/ });
     await expect(full).not.toBeChecked();
     await full.click();
@@ -775,7 +924,13 @@ test.describe("practice games in the browser", () => {
     });
     await full.click();
     await expect(full).not.toBeChecked();
-    await page.screenshot({ path: testInfo.outputPath("priority.png") });
+    await page.screenshot({
+      path: testInfo.outputPath("priority.jpg"),
+      type: "jpeg",
+      quality: 80,
+    });
+    await page.getByRole("button", { name: "Close Priority controls" }).click();
+    await expect(priority).toBeHidden();
 
     // The engine passes for the seat until its next turn, unless something stops it.
     const shown = await drawn(page, table);
@@ -804,6 +959,174 @@ test.describe("practice games in the browser", () => {
       testInfo,
       `${snapshot.result!.kind} after ${snapshot.result!.turns} turns with an own deck`,
     );
+    expect(table.problems).toEqual([]);
+  });
+
+  test("the response timer passes at a response moment, and Space stops it", async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript(() => {
+      const settings = JSON.parse(localStorage.getItem("cd.table.v1") ?? "{}");
+      localStorage.setItem(
+        "cd.table.v1",
+        JSON.stringify({ ...settings, responseTimerSeconds: 5 }),
+      );
+    });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const mine = deckNames("legacy-mono-green-creatures");
+    const theirs = deckNames("legacy-mono-red-burn");
+    const table = new Table(
+      page,
+      mine,
+      new Set([...theirs].filter((n) => !mine.has(n))),
+    );
+    await signInSysop(page);
+    await startGame(page, {
+      format: "Legacy",
+      deck: "legacy-mono-green-creatures",
+      turnCap: 12,
+    });
+
+    // A response moment: the bot's object on top of the stack, or its attack, and a pass to give.
+    const moment = (now: Snapshot) => {
+      const view = now.view;
+      const prompt = now.prompt;
+      if (!view || prompt?.kind !== "priority" || now.status !== "your_prompt")
+        return false;
+      if (!prompt.options.some((o) => o.action === "pass")) return false;
+      if (view.priority?.passing || view.priority?.full_control) return false;
+      const top = view.stack[0];
+      if (top) return top.controller_seat !== view.seat;
+      return (
+        view.active_seat !== view.seat &&
+        (view.step === "declare_attackers" ||
+          view.step === "declare_blockers") &&
+        view.combat.some((group) => group.attackers.length > 0)
+      );
+    };
+    class Reached extends Error {}
+    const until = (after: number) =>
+      play(page, table, "mouse", async (now) => {
+        if (now.revision > after && moment(now)) throw new Reached();
+      }).then(
+        () => null,
+        (error: unknown) => {
+          if (error instanceof Reached) return table.latest;
+          throw error;
+        },
+      );
+
+    // The first moment: nothing is pressed, and the table passes once, for that prompt and
+    // revision, when the timer runs out.
+    const first = await until(-1);
+    test.skip(!first, "The bot gave no response moment before the game ended.");
+    const pass = first!.prompt!.options.find((o) => o.action === "pass")!;
+    const before = table.sent.length;
+    await expect(page.locator("[data-timer]")).toHaveAttribute(
+      "data-timer",
+      /arming|running/,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("timer.jpg"),
+      type: "jpeg",
+      quality: 80,
+    });
+    await expect
+      .poll(() => table.sent.length - before, { timeout: 12_000 })
+      .toBe(1);
+    expect(table.sent.at(-1)).toMatchObject({
+      type: "submit_choice",
+      prompt_id: first!.prompt!.id,
+      expected_revision: first!.revision,
+      payload: { option_id: pass.id },
+    });
+
+    // The next moment: Space stops the timer, and nothing is sent for it.
+    const next = await until(first!.revision);
+    test.skip(!next, "The bot gave no second response moment.");
+    await expect(page.locator("[data-timer]")).toHaveAttribute(
+      "data-timer",
+      /arming|running/,
+    );
+    const sent = table.sent.length;
+    await page.keyboard.press("Space");
+    await expect(page.locator("[data-timer]")).toHaveAttribute(
+      "data-timer",
+      "stopped",
+    );
+    await page.waitForTimeout(7_000);
+    expect(table.sent.length).toBe(sent);
+    await concede(page);
+    await expect
+      .poll(() => Boolean(table.latest?.result), { timeout: 60_000 })
+      .toBe(true);
+    expect(table.problems).toEqual([]);
+  });
+
+  test("a game starts in full screen, F leaves and returns, and the Game menu goes back", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      const settings = JSON.parse(localStorage.getItem("cd.table.v1") ?? "{}");
+      localStorage.setItem(
+        "cd.table.v1",
+        JSON.stringify({ ...settings, fullscreenOnStart: true }),
+      );
+    });
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const table = new Table(page, deckNames("legacy-mono-red-burn"), new Set());
+    await signInSysop(page);
+    await startGame(page, {
+      format: "Legacy",
+      deck: "legacy-mono-red-burn",
+      turnCap: 4,
+    });
+    const full = () => page.evaluate(() => document.fullscreenElement !== null);
+    const entered = await expect
+      .poll(full, { timeout: 10_000 })
+      .toBe(true)
+      .then(
+        () => true,
+        () => false,
+      );
+    if (!entered) await concede(page);
+    test.skip(!entered, "This browser refused full screen on Start.");
+    const root = page.locator("[data-screen]");
+    const locked = (await root.getAttribute("data-keyboard-lock")) === "true";
+    note(test.info(), `Escape locked in full screen: ${locked}`);
+
+    // The Game menu opens over the table; Escape closes it and the table stays in full screen.
+    await page.getByRole("button", { name: "Game menu" }).click();
+    const menu = page.getByRole("group", { name: "Game menu" });
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    if (locked) expect(await full()).toBe(true);
+
+    // F leaves full screen and returns to it.
+    if (await full()) {
+      await page.keyboard.press("f");
+      await expect.poll(full).toBe(false);
+    }
+    await page.keyboard.press("f");
+    await expect.poll(full).toBe(true);
+
+    // Conceding, then the Game menu's Table, leaves the game and its full screen.
+    await concede(page);
+    await expect
+      .poll(() => Boolean(table.latest?.result), { timeout: 60_000 })
+      .toBe(true);
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Review the board" })
+      .click();
+    await page.getByRole("button", { name: "Game menu" }).click();
+    await page
+      .getByRole("group", { name: "Game menu" })
+      .getByRole("link", { name: "Table", exact: true })
+      .click();
+    await expect(page).toHaveURL(/#play$/);
+    await expect.poll(full).toBe(false);
     expect(table.problems).toEqual([]);
   });
 });

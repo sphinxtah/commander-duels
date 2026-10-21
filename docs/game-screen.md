@@ -1,154 +1,173 @@
-# The game screen (v0.1.0, with v0.2.0's additions)
+# The game screen (v0.3.0: the Magic Duels table)
 
-v0.1.0 puts the practice games of v0.0.6 on screen. A signed-in, approved player starts a game against bots from the Play page and plays it to the end in the browser, by mouse or by keyboard alone. The screen shows every prompt the engine types and nothing the seat may not see. It follows the scope's UI01, UI03 to UI05 and UI08, and the first part of UI07. It is built in React DOM, as the scope sets it for now; PixiJS is left for later effects. The protocol underneath is unchanged ([games through the API](games.md)).
+v0.1.0 put the practice games on screen and v0.2.0 added the priority controls. v0.3.0 redraws the screen during play to look like Magic Duels, with Commander and this site's own features added ([the plan](plans/0.3.0.md), [the design](plans/0.3.0-design.md)). The table is drawn with PixiJS in WebGL, behind a layer of real, named buttons that the mouse, the keyboard and screen readers use. The protocol underneath is unchanged ([games through the API](games.md)).
 
 ## Starting a game
 
 The Play page opens with the owner's banner. Below it, the practice table offers:
 - **the format.** Legacy against one bot, or Commander against one to three bots;
-- **your deck, and each bot's:** a starter deck, or since v0.2.0 one of your own playable decks ([decks](decks.md#at-the-practice-table)). "Play it at the practice table" in the deck builder opens the table with that deck chosen;
+- **your deck, and each bot's:** a starter deck, or one of your own playable decks ([decks](decks.md#at-the-practice-table)). "Play it at the practice table" in the deck builder opens the table with that deck chosen;
 - **the bots' skill** (1–6) and a turn limit;
 - **for SysOp, a deck list.** Any card the engine implements, with card-name lookup that adds a line per click.
 
 The table also lists your running games (resume or close) and your recent ones with their results. SysOp may list every player's games and observe any running one.
 
-Signed-out visitors, and accounts waiting for approval or not approved, never reach the table: since v0.3.0 they see [the landing page](identity.md#before-the-app-the-landing-page-v030) at every address, `#game/<id>` included. An active account that may not play sees why.
+**Full screen.** Start, Resume and Observe put the window in full screen, and Escape belongs to the game there (Chrome and Edge hold it with the Keyboard Lock; holding Escape for two seconds still leaves). F, the band's full-screen diamond and the Game menu turn it on and off at any time. Settings › "Full screen when a game starts" turns the automatic part off. A table opened without a click (a reload, a typed address, the installed app's window) plays in the window and says once, on the band: "Full screen: F".
+
+Signed-out visitors, and accounts waiting for approval or not approved, never reach the table: they see [the landing page](identity.md#before-the-app-the-landing-page-v030) at every address, `#game/<id>` included. An active account that may not play sees why.
 
 ## The table
 
-`#game/<id>` opens the game full screen. The header shows:
-- the format, turn, active player and step;
-- the connection's state;
-- for SysOp, the inspection switch;
-- the concede button.
+`#game/<id>` opens one 16:9 table designed at 1920 × 1080. It scales to the window, from 1280 × 720 to 4K (3840 × 2160), and keeps its proportions: a wider window shows more stone at the sides, a taller one at the top and bottom. Nothing scrolls. Below 1280 × 720 the table still scales and says that it is designed for 1280 × 720 at least. Phones and tablets are not supported for play since v0.3.0.
 
-The board:
-- **Opponents.** One panel per opponent, three side by side at four seats. Each shows life, hand and library counts, counters, the mana pool and commanders (zone, tax, commander damage per player). It also has buttons for its graveyard, exile and command zone, and the opponent's battlefield.
-- **Stack and combat.** The stack panel lists every object top first, marking the next to resolve, with its controller, text and targets. The combat panel lists attackers, the defender and blockers.
-- **Your side.** Your header, your battlefield and your hand. Creatures and other permanents sit on one row and lands on another. Attachments follow what they are attached to. Tapped permanents turn sideways and take the turned card's footprint, so they never cover their neighbours or the strip beneath them.
+- **The band.** A red band crosses the middle. At its left are the HUD diamonds: the Game menu, the game log, the priority controls, full screen and (SysOp) the inspection. Then the turn ("Turn 7 · Bot 2’s turn"), the connection's state when it is not connected, the stack at its centre, and at its right the step, the combat icons and the five phase pips. A big diamond emblem with a caption marks a new turn, attacks and blocks.
+- **Opponents** sit above the band: one across the top in a duel, two or three side by side at three and four seats. Each has a grey sigil portrait in a diamond, life in a red diamond, hand, graveyard and library counts in black diamonds, name and title, the pills (active turn, priority, out, winner), counters, mana pool and commander damage. Their battlefield has creatures near the band and lands behind. Graveyard, exile, command zone and library sit on the stone beside it. At three and four seats, Expand opens one opponent's board in place and shrinks the others to chips.
+- **Your side** is below: your portrait, life and counts at the bottom left, with the phase and the response timer's purple bar beside them; creatures near the band and lands behind; your command zone, exile, library and graveyard at the right. "Show the board" lists any battlefield in a drawer.
+- **The hand** fans along the bottom edge, partly off screen. The card under the pointer, or with keyboard focus, rises and grows.
+- **The stack** lies on the band: the next to resolve at the centre, older objects fanned behind it, a "+N" for the rest. A curved line runs from each spell to its caster and to its targets.
+- **The prompt column** at the left (below the band's HUD) holds the prompt (see below), a pass in progress, the practice notice and the result.
+- **Drawers** at the right hold the game log, the priority controls, SysOp's inspection, the table options (from the Game menu) and the zone browser (graveyard, exile, command zone, a battlefield, a pile, the stack). One is open at a time; they are part of the page, never dialogs, so the game goes on beside them.
 
-The side panel holds:
-- a large preview of the card under the pointer or focus (wide screens only);
-- the prompt;
-- the priority controls (since v0.2.0);
-- the result when the game ends;
-- SysOp's inspection;
-- the game log.
+**Portraits.** Each player's portrait is a sigil generated from the account (a bot's from its seat), coloured for you and grey for opponents, until the owner's Planeswalker portraits arrive in v0.3.1.
 
-**Sizes (UI01).** The screen is designed at 1920 x 1080 and stays usable at 1366 x 768 with smaller cards. Below 900 px it becomes one column. The prompt is then docked at the bottom, and the hand scrolls sideways inside its own row; the page itself never scrolls sideways.
+**Token grouping (UI02).** Identical tokens, and identical untapped basic lands, lie in one pile with a count; their options are offered for each card. Up to five members show; "+N" opens the pile in a drawer.
+
+**Animation (UI09).** Cards move between zones, tap and untap, and fly to the stack and back; damage and life changes float up as numbers; a loss cracks the player's portrait. Animation never holds back an answer: every control on screen is the newest prompt's, and a revision the tab missed while hidden is simply drawn. Settings › "Animation speed" (Normal, Fast, Faster) sets the pace, and Reduce motion stills it.
+
+**Sound.** Generated Web Audio effects for drawing, playing a land, casting, resolving, entering, dying, tapping, counters, damage, life, attacks, blocks, phases and your turn, and chimes for victory, defeat and a draw. Nothing sounds before the first click or key press on the page. Settings › "Sound effects volume" and "Mute all sound"; Mute is also in the Game menu.
+
+**The plain table.** Without WebGL, or with Settings › "Draw the table with" › "Plain table without WebGL", the same buttons paint the cards themselves on a plain stone and band. A WebGL context the graphics driver loses draws the plain table until it comes back (a new one is made after 3 seconds, at most three times in five minutes).
 
 ## Cards
 
 Every card is a printed image, drawn over a text frame built from the engine's view: name, cost, type, rules, power and toughness.
-- **The frame stays underneath.** A missing or slow image never hides the rules text or blocks a choice (UI03).
+- **The frame stays underneath.** A missing or slow image never hides the rules text or blocks a choice (UI03); the frame stays until the image has faded in.
 - **Hidden cards.** A face-down or hidden card shows the card back and requests nothing.
-- **State goes beside the card.** Current power and toughness, damage, counters, attacking, blocking, tapped and summoning sickness sit in a strip below each permanent, never over the image.
+- **State on the card.** Power and toughness sit in a tag over the printed box (never over the artist or copyright line), counters as pips, and attacking, blocking, summoning sickness and choices as badges. The card's name says all of it in words.
+- **Highlights.** A card you can act on glows purple; one you can play from your hand glows pink; chosen cards (targets, attackers) glow teal.
+- **Images by resolution.** Each card is asked for at the size it is drawn on this screen: the normal image (488 × 680) for most of the table at 1080p, the large one (672 × 936) where cards are drawn bigger, and for the magnifier the 745 × 1040 PNG where the large one would be stretched (level 2 at 1440p, both levels at 4K), once the card has stayed magnified for 250 ms.
 - **Zoom.** Right-click, Z, or a click on a card with no options opens the large image beside every current characteristic. It credits the artist and Scryfall.
 
 Images come from Scryfall by the card's name. The API fetches each once, keeps it on its own disk and serves it from the site, so browsers only talk to Commander Duels:
-- `GET /api/v1/card-images?name=&size=normal|large` serves the image, for signed-in accounts;
+- `GET /api/v1/card-images?name=&size=normal|large|png` serves the image, for signed-in accounts. The PNG is checked as a PNG and kept up to 8 MB; a printing without one is served at the next size down and never recorded as missing (v0.3.0);
 - `GET /api/v1/card-images/info?name=` gives its artist and printing.
 
 Both routes give back the database connection their sign-in used before any lookup, so a slow Scryfall never holds one.
 
 Scryfall's terms are kept:
-- **No changes to the image.** Images are never cropped, blurred, recoloured, distorted or watermarked, nor covered over the artist or copyright line. Since v0.3.0 the sticky game bar is opaque, so cards scrolling under it are hidden rather than blurred, and a tapped card's ◆ sits over its name, since turning the card moves its artist line to the corner the mark used.
+- **No changes to the image.** Images are never cropped, blurred, recoloured, skewed or watermarked, nor covered over the artist or copyright line. The table lies in perspective, but cards are drawn flat over it at a uniform scale; a tapped card only turns.
 - **Spacing.** Requests to Scryfall's API are at least 550 ms apart, because Scryfall allows its named-card search 2 requests a second.
-- **Rate limiting.** After a 429 the API asks Scryfall nothing for as long as its `Retry-After` says: 30 seconds at least, an hour at most. Retry-After is read as seconds or as an HTTP date. A number too large to hold means the longest pause; an unreadable value counts as no header (30 seconds). Meanwhile, new names answer 503 `card_images_unavailable` with `Retry-After`, and cached images are still served.
+- **Rate limiting.** After a 429 the API asks Scryfall nothing for as long as its `Retry-After` says: 30 seconds at least, an hour at most. Meanwhile, new names answer 503 `card_images_unavailable` with `Retry-After`, and cached images are still served.
 - **No paywall.** Nothing is sold, so no Scryfall data sits behind a payment.
-- **Notices.** The footer carries Wizards of the Coast's Fan Content notice and the credit to Scryfall.
+- **Notices.** The zoom credits the artist and Scryfall, and the site's footer carries Wizards of the Coast's Fan Content notice.
 
-**The queue.** Each new name waits its turn for Scryfall, so one account may have 8 new names waiting and everyone together 24. Beyond that, a request is answered at once, before Scryfall is asked or a row is recorded, and the card keeps its text frame:
-- 429 `card_images_busy` with `Retry-After` when the account is over its share;
-- 503 `card_images_unavailable` with `Retry-After` when the total is reached.
+**The queue.** Each new name waits its turn for Scryfall, so one account may have 8 new names waiting and everyone together 24. Beyond that, a request is answered at once with 429 `card_images_busy` (the account is over its share) or 503 `card_images_unavailable` (the total is reached), and the card keeps its text frame. Cached names and names recorded as missing are never refused; SysOp is never refused.
 
-Cached names, and names recorded as missing, are never refused. SysOp is never refused.
+**What a name lookup could reveal.** The table asks only for names in the seat's current view: nothing prefetches deck lists, so probing the cache cannot reveal another seat's deck. Tokens and names Scryfall does not know show their text frame, and are asked about again after a week.
 
-**What a name lookup could reveal.** It maps a name the browser already knows to an image. Nothing prefetches deck lists, so probing the cache cannot reveal another seat's deck. Tokens and names Scryfall does not know show their text frame, and are asked about again after a week. Their rows are deleted once more than a week old, whenever another name is recorded as missing.
+**Failed images on the page.** The page remembers a name the server has no image for (404 `card_image_missing`) for an hour. Any other failed image is asked for again up to five times, with backoff at least as long as the server's `Retry-After`.
 
-**Failed images on the page.** The page remembers a name the server has no image for (404 `card_image_missing`) for an hour. Any other failed image (Scryfall busy or slow, a deploy, an expired session) is asked for again up to five times. It waits with backoff, at least as long as the server's `Retry-After`, and spread a little so the cards on a board do not all ask at once. If the server has the image by the time the page asks why it failed, the page draws it at once.
+## The magnifier
+
+The card under the pointer, or the one with keyboard focus, is drawn large at the side of the table away from it, as in Magic Duels, with what it is now beside it: its name and cost, type, power and toughness, state, what it is attached to or enchanted by, who controls and owns it, a commander's tax and damage, and a stack object's controller, targets and text. The mouse wheel over a card makes it larger (level 2) or smaller and then away; Escape closes level 2. The magnifier never takes a click: a click always reaches the table beneath it. Screen readers hear the same facts in each card's own name.
 
 ## Answering prompts (UI04, UI08)
 
 The engine's open prompt lists every option. The screen offers exactly those options and nothing more:
-- **On the board.** A card, a stack object or a player with options is outlined in gold and marked ◆. Clicking it answers its one option, or opens a menu when it has several. Chosen options (targets, attackers) are outlined in teal and marked ✓.
-- **In the prompt panel.** Every option is a button there too, so the keyboard reaches each one:
-  - the primary option (pass priority, done, keep or yes) comes first;
-  - the rest follow in groups: play and cast, abilities, mana, combat. A special payment (convoke, delve, improvise) is listed under mana with the other payment options.
-- **Amounts.** Damage assignment and X use a form, filled with the engine's suggestion and checked against each entry's limits and the total. Each prompt starts from its own suggestion, and a new revision of the same prompt keeps what the player typed.
+- **On the table.** A card, a stack object or a player with options glows. Clicking it answers its one option, or opens a menu when it has several. A player's portrait and life are their target button.
+- **Drag and drop (UI04).** Drag a land or a spell from your hand onto your side of the table to play it, a creature onto an opponent's side to attack, or a blocker onto an attacker. A drop with several answers opens the card's menu; one that cannot go there snaps back and says why. A drop that also says the next choice (the defender, the attacker to block) answers it when it is asked within 2 seconds.
+- **In the prompt column.** Every option is a button there too, so the keyboard reaches each one. The moment's main choices lead as big black diamonds with an icon and a word, as in Magic Duels: the primary option (**Continue** for passing priority, **Attack** or **No Attacks**, **Block** or **No Blocks**, **Keep Hand**, **Yes**, **Done**), then **Attack With All** when it is offered, then **Stop Timer** while the response timer runs. A diamond whose word says less than the option keeps the option's own words in its accessible name ("Continue (Pass priority)"). The rest follow in groups: play and cast, abilities, mana, combat, keep passing.
+- **Amounts.** Damage assignment and X use a form, filled with the engine's suggestion and checked against each entry's limits and the total.
 - **Piles.** Fact or Fiction shows each pile's cards.
-- **Revealed and looked-at cards** show in the panel, with the engine's messages.
+- **Revealed and looked-at cards** show in the column, with the engine's messages.
 - **Unsupported choices.** A choice the screen cannot show yet says so and offers to concede.
 
-The engine still checks every answer. A refusal leaves the prompt open, and the panel says why in words.
+The engine still checks every answer. A refusal leaves the prompt open, and the column says why in words.
 
-## Priority controls (UI07, v0.2.0)
+## The response timer (v0.3.0)
 
-The rest of UI07: where the game gives the seat priority, and how long it passes for the player. None of it has a timer; the engine waits for the seat however long it takes.
-- **Keep passing.** A priority prompt also offers, in its "Keep passing" group: pass until the stack resolves (only with something on it), until the next main phase, until the end of the turn, until the next turn, until the end step before your turn, and until your next turn. The engine then passes for the seat until that point. Something new on the stack, attackers or blockers stop the pass, as the stops below say, and a choice the player must make (blockers, targets for a trigger) is still asked.
-- **A pass in progress** shows in the Priority panel ("Passing until your next turn."), with **Stop passing**, which cancels it; Escape does the same anywhere on the screen. The seat's next priority is then the next one the engine would give.
+As in Magic Duels, when an opponent's spell or ability is on top of the stack, or an opponent attacks, and you hold priority with nothing to do but pass, a short timer runs (8 seconds by default) and continues for you when it ends. A purple bar beside your phase and a ring around Continue count down; the last three seconds tick. **Stop Timer**, T or Space stops it for that moment, and so does anything you do: a key, a click on a control, a menu, a drawer, a dialog or a drag. It pauses while the tab is hidden, the window is in the background or an answer is on its way.
+
+It never runs for a choice of your own (mulligan, targets, modes, amounts, piles, ordering, payment, attackers or blockers), for your own object on top, at an empty-stack stop, while a pass is in progress, with full control on, in a tab that is watching, or for SysOp observing. It answers only the pass of the prompt on screen, through the same check as every other answer, and changes nothing on the engine's side: the engine still waits for the seat however long it takes. Settings › "Response timer" sets it to 5, 8, 15, 30 or 90 seconds, or off.
+
+## Priority controls (UI07)
+
+The rest of UI07: where the game gives the seat priority, and how long it passes for the player. They are in the Priority drawer (the band's third diamond).
+- **Keep passing.** A priority prompt also offers, in its "Keep passing" group: pass until the stack resolves, until the next main phase, until the end of the turn, until the next turn, until the end step before your turn, and until your next turn. Something new on the stack, attackers or blockers stop the pass, as the stops below say, and a choice the player must make is still asked.
+- **A pass in progress** shows at the top of the prompt column ("Passing until your next turn."), with **Stop passing**; Escape does the same anywhere on the table once no menu, drawer or magnified card is open.
 - **Full control** stops at every step, in every turn, and holds priority after each spell. Turning it off restores the default stops.
-- **Hold priority after casting** (on by default): after casting a spell or activating an ability, the player keeps priority to respond to it, instead of passing at once.
-- **Stops…** opens the list of steps where the game gives the seat priority with an empty stack, for its own turns and for the other players' (XMage's default: the two main phases, in every turn), and whether new stack objects, declared attackers and declared blockers stop a pass (all on by default).
+- **Hold priority after casting** (on by default): after casting a spell or activating an ability, the player keeps priority to respond to it.
+- **Stops…** opens the list of steps where the game gives the seat priority with an empty stack, for its own turns and the others', and whether new stack objects, declared attackers and declared blockers stop a pass.
 
-Changing a control sends a `set_priority` command, which needs no open prompt: a pass can be cancelled while the engine is passing ([the human seat](engine/human-seat.md#priority-controls)). The panel shows the engine's answer, so a box ticks once the engine has applied it. The controls belong to the seat: the tab playing it changes them, a tab watching it shows them disabled, and a spectator has none. They last for the game.
+Changing a control sends a `set_priority` command ([the human seat](engine/human-seat.md#priority-controls)). The controls belong to the seat: the tab playing it changes them, a tab watching it shows them disabled, and a spectator has none.
+
+## The Game menu
+
+The band's first diamond opens it, above the HUD: **Table** (back to the Play page), **Full screen**, **Mute**, **Table options** (the timer, animation speed, sound and how the table is drawn, in a drawer) and **Concede**. A click elsewhere or Escape closes it.
 
 ## Keyboard (UI04)
 
 | Key | Effect |
 | --- | --- |
-| Tab | Moves between zones and controls. Each zone of cards is one tab stop |
+| Tab | Moves between zones and controls, in order: the HUD, the opponents, the stack, your side, the hand, the prompt column, the drawers. Each zone of cards is one tab stop |
 | Arrow keys, Home, End | Move between the cards of a zone |
 | Enter or Space | Answers a card's option, or opens its menu |
 | Z | Zooms the focused card |
 | P | Answers the primary option: pass priority, done, keep or yes |
-| Escape | Closes a menu or a dialog; otherwise stops a pass in progress (since v0.2.0) |
+| T or Space | Stops the response timer while it runs (Space then presses nothing) |
+| F | Full screen on and off |
+| Mouse wheel over a card | Magnifies it more, or less |
+| Escape | Closes one layer per press: a drag, the Game menu, a drawer, the magnified card at level 2, an expanded board. With none open, it stops a pass in progress. A card's menu and the dialogs keep their own Escape |
 
-When a new prompt opens while the player works in the prompt panel, focus moves to its first control. While an answer is sent or the table waits, focus rests on the panel's heading. After a refused answer it returns to the control the player was on. A card's menu gives focus back to the card when a choice or Escape closes it; a press outside the menu closes it.
+When a new prompt opens while the player works in the prompt column, focus moves to its first control. While an answer is sent or the table waits, focus rests on the prompt's heading. After a refused answer it returns to the control the player was on. Stopping the timer from its button moves focus to Continue. Closing a drawer returns focus to its diamond.
 
 ## The connection
 
 The page speaks the protocol of [games through the API](games.md#the-websocket):
-- **Opening.** It sends the hello with the CSRF token, and resynchronizes by revision on every reconnect.
-- **Commands.** Each answer has a new action ID, and the controls are disabled until its result arrives. Each answer names the prompt and revision on screen. An answer to a prompt that has since been replaced is refused in the page, never sent as an answer to the new one.
-- **Dropped connections.** The page reconnects with backoff. A command whose reply was lost is resent with the same action ID once the tab holds the lease again, so the engine applies it once and returns its first result (T14). If the server still holds the dropped connection's lease, the tab watches until the server lets it go (about 20–40 seconds), then takes the lease back by itself, unless another tab took it. Coming back online reconnects at once, and never opens a second socket.
-- **Two tabs.** A tab opened while another plays the seat watches, and says so. "Play here" takes the lease, and the first tab then watches until it takes the lease back. When the tab playing the seat closes or drops, a tab that was watching takes the lease by itself, unless another tab's "Play here" took the lease from it. If several tabs are watching, the last one to claim the lease keeps it.
-- **Too many tabs.** The server lets an account hold 4 connections to a game, and a game 8 (SysOp's are not counted). A tab refused for that says the game is open in too many tabs, keeps retrying with backoff, and connects by itself once another tab closes.
-- **The session.** If it ends, the page says so. If the account's roles change, even mid-game, or another request rotated the cookie, the page renews the session and reconnects.
+- **Opening.** It sends the hello with the CSRF token, and resynchronizes by revision on every reconnect. The first snapshot after a reconnect is drawn without replaying any animation.
+- **Commands.** Each answer has a new action ID, and the controls are disabled until its result arrives. Each answer names the prompt and revision on screen; an answer to a prompt that has since been replaced is refused in the page.
+- **Dropped connections.** The page reconnects with backoff. A command whose reply was lost is resent with the same action ID once the tab holds the lease again, so the engine applies it once and returns its first result (T14). Coming back online reconnects at once, and the band says "Offline" meanwhile.
+- **Two tabs.** A tab opened while another plays the seat watches, and says so. "Play here" takes the lease, and the first tab then watches.
+- **Too many tabs.** The server lets an account hold 4 connections to a game, and a game 8. A tab refused for that says so and connects by itself once another tab closes.
+- **The session.** If it ends, the page says so. If the account's roles change, or another request rotated the cookie, the page renews the session and reconnects.
+
+## The installable app (v0.3.0)
+
+Chrome and Edge on a PC can install Commander Duels as an app with its own window and desktop icon:
+- **The banner.** A signed-in, active player in a browser tab sees a drop-down banner under the top bar: "Play Commander Duels in its own window, with a desktop icon." **Install** opens the browser's own install window; **Not now** hides the banner for 30 days on this device. When the browser holds its install offer back, the banner and Settings › "Install the app" explain its menu instead. The banner never shows on the landing page, during a game or in the app's own window.
+- **The app.** The installed window opens on the Play page. Opening it again while it runs brings that window forward instead of starting a second one, and a live game in it stays on screen.
+- **Updates never reload a game.** A new version's service worker waits. On the Play page the top bar offers **Update**; at the table the band only says "Update ready: it applies when you leave the table." While any window or tab holds a live game, the update waits for it ("A game is running in another window."), and applies as the player leaves the table. The browser's Back, or the app opening its Play page, keeps a live game on screen.
+- **The worker** caches only the site's own shell, scripts and brand images: never the API, the game's WebSocket, card images or Google's sign-in.
 
 ## SysOp's inspection
 
-SysOp's inspection switch opens the inspection view beside the board: every player's hand and library in order, top first, refreshed with each revision. The panel states that opening it is recorded in the audit trail, which it is (`game.inspection_opened`). SysOp can also start games from deck lists and observe other players' running games. When SysOp observes another player's game, the screen names that player instead of "You", and the result reads "Game over" with the winner's name.
+SysOp's Inspection drawer has the inspect switch: every player's hand and library in order, top first, refreshed with each revision. The drawer states that opening it is recorded in the audit trail, which it is (`game.inspection_opened`). When SysOp observes another player's game, the screen names that player instead of "You", and the result reads "Game over" with the winner's name.
 
 ## The practice notice
 
-The bots still search a full copy of the game, including the player's hand (AI02). Until that audit is done, the table opens with a notice saying so, which the player may dismiss for the session.
+The bots still search a full copy of the game, including the player's hand (AI02; fixed in v0.3.1). Until then, the prompt column opens with a notice saying so, which the player may dismiss for the session.
 
 ## Accessibility
 
-- **Names.** Every card is a button named with its name, type, power and toughness, current state and options.
-- **Not colour alone.** Actionable and chosen cards also carry a mark (◆, ✓), and attacking and blocking are written in the strip.
-- **Focus.** Focus is always visible.
-- **The log** is a live region.
-- **Settings.** Larger text and reduced motion apply as on every page; the sideways turn of a tapped card is not animated with reduced motion.
+- **Names.** Every card is a button named with its name, type, power and toughness, current state, owner when someone else controls it, and options. Players, zone tiles, the stack's objects and "+N" are named buttons too, in the table's order.
+- **Not colour alone.** Highlights also change the card's name ("Options: …"), and attacking and blocking are written in it.
+- **Focus.** Focus is always visible, at least 3 screen pixels however small the table is drawn.
+- **Live regions.** The turn line, the connection's state, the log (in its drawer, still announced when closed) and one polite announcer for the timer ("Bot 2's Lightning Bolt. Continuing in 8 seconds. Press Space or T to stop the timer.") and refused drops.
+- **Settings.** Larger text enlarges the table's text; Reduce motion stills the animation and shows the timer as seconds; forced colours keep the diamonds' edges.
 
 ## Verification
 
-Browser journeys in `web/e2e/game.spec.ts` play against the real engine (CI's engine job, with `CD_E2E_GAMES=1`):
-- **By mouse.** A Legacy game played to the end, with the board at 1920, 1366 and 390 px partway through.
-- **By keyboard.** A Legacy game played to the end by keyboard alone.
-- **Commander.** A four-player Commander table played to its turn limit, at the three sizes.
-- **A second tab and a lost reply.** The second tab watches until "Play here", and a reply lost with the connection is resent once with the same action ID and returns the first result.
-- **Every frame is checked (T13 in the browser).** No seat or service token. The hand holds only the seat's own deck. Opponents carry counts only. No card that only another seat's deck holds is named, as a card, an option or a phrase in the log or a prompt, before it has been public. A card named in the log must become public by a later view or the game's end, as the engine's own check allows. v0.1.1 tried the stricter "public in the same view" once the engine began sending each view with the log as it stood when that view was built, but in CI run #30 a log line still named a bot's card one view before the board showed it, so the later-view rule stays. Each game's summary lists such lines.
-- **Test hooks.** The prompt panel carries `data-prompt` (the prompt ID on screen) and `data-revision` (the snapshot revision on screen). The page answers only the prompt on screen, so the journeys wait for these before they act.
+Unit tests (Vitest) cover the table's model and layout (every arrangement, piles, the hit-box invariants), the events between views, the scene's host, the DOM layer and its names, the pointer, drag and drop, the magnifier, the response timer and its keys, sound cues, the prompt column's diamonds, the drawers and Escape, settings, full screen, the install banner, the service worker's rules and the live-game lock.
 
-Unit tests (Vitest, since v0.1.1) cover the connection (answers to replaced prompts, taking the lease back, the session refresh's backoff, too many tabs, one socket at a time), the prompt panel (focus, amounts, the special payment), card-image retries, the card menu and the observer's wording.
+Browser journeys:
+- **The fake table** (`web/e2e/table.spec.ts`, the verify job, Vite's dev server with no engine): the table from fixtures at 1280 × 720 (1× and 1.5×), 1366 × 768, 1920 × 1080 (1× and 2×), 2560 × 1440 and 3840 × 2160, two to four players, a 240-permanent board, a long stack and a 25-card hand, with WebGL and with the plain table. At each: the scale, nothing scrolling, the canvas at the screen's pixels, and every card and option reachable where it is drawn (the element at its centre is itself). Also P and a card's option answering the prompt on screen, the timer passing once and Space stopping it, Escape closing one layer per press, the magnifier never taking a click, and a lost WebGL context.
+- **Against the real engine** (`web/e2e/game.spec.ts`, CI's engine job, with `CD_E2E_GAMES=1`): Legacy games by mouse (with the table at 1280 × 720 to 4K mid-game) and by keyboard (reduced motion), a four-player Commander table at 2560 × 1440, a second tab with a lost reply, a deck of the player's own with the priority controls, the response timer at a real response moment, and full screen. Every WebSocket frame, every text and name on the table (except the log) and every card image asked for is checked for cards that are not yet public (T13).
+- **The installable app** (`web/e2e/pwa.spec.ts`, the engine job, the built image behind nginx): the manifest, icons and worker headers, the worker controlling the page but never answering the API, and the install banner with Not now. The update that waits for a live game is checked by hand ([verification](verification.md)).
 
-Results are in [the release notes](releases/0.1.0.md) and [verification](verification.md#v010); the v0.1.1 fixes are in [their release notes](releases/0.1.1.md).
+Results are in [the release notes](releases/0.3.0.md) and [verification](verification.md#v030).
 
-## Not in v0.1.0
+## Not yet
 
 - Human opponents, lobbies and matchmaking (NET02–NET03); recovery journals (NET08–NET09).
-- Stops you choose, passing to the end of turn and full control (the rest of UI07); timers.
-- Animation (UI09), sound, help and glossary (UI10–UI11), gamepads (UI12) and drag and drop.
-- Printing-exact images (they arrive with M1's catalog) and grouping of equivalent tokens (UI02).
+- The owner's Planeswalker portraits and the Planeswalker Alliance levels (v0.3.1).
+- Help and glossary (UI10–UI11) and gamepads (UI12).

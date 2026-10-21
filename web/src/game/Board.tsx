@@ -14,19 +14,11 @@ import {
   type RefObject,
 } from "react";
 import { CardFace, cardLabel, permanentState } from "./Card";
-import {
-  isLand,
-  objectName,
-  optionText,
-  playerName,
-  type Located,
-} from "./model";
+import { objectName, optionText, playerName, type Located } from "./model";
 import type {
   CardView,
   GameView,
   ObjectId,
-  PermanentView,
-  PlayerView,
   Prompt,
   PromptOption,
   Seat,
@@ -371,7 +363,13 @@ export function CardButton({
   const state = permanentState(permanent);
   const label =
     table?.label ??
-    cardLabel(card, located) +
+    cardLabel(
+      card,
+      located,
+      permanent
+        ? playerName(game.view, permanent.owner_seat, game.observing)
+        : null,
+    ) +
       (offered.length
         ? `. Options: ${offered.map((o) => optionText(o, game.index, game.view, game.observing)).join("; ")}`
         : "");
@@ -674,205 +672,6 @@ export function OptionMenu({
   );
 }
 
-/** Lands on one row, everything else on another; attachments follow what they are attached to. */
-export function Battlefield({
-  permanents,
-  label,
-  small,
-}: {
-  permanents: PermanentView[];
-  label: string;
-  small?: boolean;
-}) {
-  const game = useGameContext();
-  const ids = new Set(permanents.map((p) => p.id));
-  const attached = new Map<ObjectId, PermanentView[]>();
-  const roots: PermanentView[] = [];
-  for (const permanent of permanents) {
-    if (permanent.attached_to && ids.has(permanent.attached_to)) {
-      const list = attached.get(permanent.attached_to) ?? [];
-      list.push(permanent);
-      attached.set(permanent.attached_to, list);
-    } else roots.push(permanent);
-  }
-  const render = (permanent: PermanentView) => (
-    <div key={permanent.id} className={styles.attachGroup}>
-      <CardButton
-        card={permanent.card}
-        located={game.index.get(permanent.id)}
-        small={small}
-      />
-      {(attached.get(permanent.id) ?? []).map((child) => (
-        <CardButton
-          key={child.id}
-          card={child.card}
-          located={game.index.get(child.id)}
-          small
-        />
-      ))}
-    </div>
-  );
-  const lands = roots.filter((p) => isLand(p.card) && !attached.has(p.id));
-  const others = roots.filter((p) => !lands.includes(p));
-  if (permanents.length === 0)
-    return <p className={styles.emptyZone}>No permanents</p>;
-  return (
-    <div className={styles.battlefield}>
-      {others.length > 0 && (
-        <CardRow label={`${label}: creatures and other permanents`}>
-          {others.map(render)}
-        </CardRow>
-      )}
-      {lands.length > 0 && (
-        <CardRow label={`${label}: lands`} className={styles.lands}>
-          {lands.map(render)}
-        </CardRow>
-      )}
-    </div>
-  );
-}
-
-const poolColours: [keyof PlayerView["mana_pool"], string][] = [
-  ["white", "W"],
-  ["blue", "U"],
-  ["black", "B"],
-  ["red", "R"],
-  ["green", "G"],
-  ["colorless", "C"],
-];
-
-/** A player's public state: life, counts, counters, pool, commanders and zone browsers. Kept only
- * until the game screen draws the table, where PlayerPlate takes its place. */
-export function PlayerHeader({
-  player,
-  onZone,
-}: {
-  player: PlayerView;
-  onZone: (seat: Seat, zone: "graveyard" | "exile" | "command") => void;
-}) {
-  const game = useGameContext();
-  const view = game.view;
-  const options = game.canAnswer ? (game.bySeat.get(player.seat) ?? []) : [];
-  const offered = game.bySeat.get(player.seat) ?? [];
-  const active = view?.active_seat === player.seat;
-  const priority = view?.priority_seat === player.seat;
-  const name =
-    player.seat === view?.seat && !game.observing ? "You" : player.name;
-  const pool = poolColours.filter(([key]) => player.mana_pool[key] > 0);
-  return (
-    <div className={styles.playerHeader} data-lost={player.lost || undefined}>
-      <div className={styles.playerName}>
-        <strong>{name}</strong>
-        {active && <span className={styles.pill}>Active turn</span>}
-        {priority && (
-          <span className={styles.pill} data-tone="priority">
-            Priority
-          </span>
-        )}
-        {player.lost && (
-          <span className={styles.pill} data-tone="lost">
-            Out
-          </span>
-        )}
-        {player.won && (
-          <span className={styles.pill} data-tone="won">
-            Winner
-          </span>
-        )}
-      </div>
-      {offered.length > 0 ? (
-        <button
-          type="button"
-          className={styles.life}
-          data-actionable
-          data-selected={offered.some((o) => o.selected) || undefined}
-          disabled={options.length === 0}
-          aria-label={`${name}: ${player.life} life. ${offered
-            .map((o) => optionText(o, game.index, view, game.observing))
-            .join("; ")}`}
-          onClick={() => options[0] && game.choose(options[0])}
-        >
-          ♥ {player.life}
-        </button>
-      ) : (
-        <span className={styles.life} aria-label={`${player.life} life`}>
-          ♥ {player.life}
-        </span>
-      )}
-      <ul className={styles.counts}>
-        <li aria-label={`${player.hand_count} cards in hand`}>
-          ✋ {player.hand_count}
-        </li>
-        <li aria-label={`${player.library_count} cards in library`}>
-          ▤ {player.library_count}
-        </li>
-        <li>
-          <button
-            type="button"
-            onClick={() => onZone(player.seat, "graveyard")}
-          >
-            Graveyard {player.graveyard.length}
-          </button>
-        </li>
-        <li>
-          <button type="button" onClick={() => onZone(player.seat, "exile")}>
-            Exile {player.exile.length}
-          </button>
-        </li>
-        {(player.command_zone.length > 0 || player.commanders.length > 0) && (
-          <li>
-            <button
-              type="button"
-              onClick={() => onZone(player.seat, "command")}
-            >
-              Command {player.command_zone.length}
-            </button>
-          </li>
-        )}
-        {Object.entries(player.counters).map(([counter, count]) => (
-          <li key={counter}>
-            {count} {counter.replace(/_/g, " ")}
-          </li>
-        ))}
-        {pool.length > 0 && (
-          <li
-            aria-label={`Mana pool: ${pool.map(([key]) => `${player.mana_pool[key]} ${key}`).join(", ")}`}
-          >
-            Pool{" "}
-            {pool.map(([key, symbol]) => (
-              <span
-                key={key}
-                className={styles.poolSymbol}
-                data-symbol={symbol}
-              >
-                {player.mana_pool[key]}
-                {symbol}
-              </span>
-            ))}
-          </li>
-        )}
-      </ul>
-      {player.commanders.length > 0 && (
-        <ul className={styles.commanders}>
-          {player.commanders.map((commander) => (
-            <li key={commander.name}>
-              <strong>{commander.name}</strong>
-              <span>{commander.zone}</span>
-              <span>Tax {commander.tax}</span>
-              {commander.damage_dealt.map((entry) => (
-                <span key={entry.seat}>
-                  {entry.damage} to{" "}
-                  {playerName(view, entry.seat, game.observing)}
-                </span>
-              ))}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 /** The stack, top first (S1). On the table (`lane`) each item is a StackButton at its place on
  * the band, the items beyond those drawn behind a "+N"; without a table model it is the list
  * the screen drew before the table. */
@@ -1039,73 +838,5 @@ export function CombatPanel() {
         ))}
       </ul>
     </section>
-  );
-}
-
-/** Graveyard, exile and command-zone browsers (UI03), with any options their cards have. Kept
- * only until the game screen draws the table, where the zone drawer with ZoneContents takes its
- * place. */
-export function ZoneDialog({
-  target,
-  onClose,
-}: {
-  target: { seat: Seat; zone: "graveyard" | "exile" | "command" } | null;
-  onClose: () => void;
-}) {
-  const game = useGameContext();
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    if (target) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [target]);
-  const player = target
-    ? [game.view?.you, ...(game.view?.opponents ?? [])].find(
-        (p) => p?.seat === target.seat,
-      )
-    : undefined;
-  const cards =
-    !player || !target
-      ? []
-      : target.zone === "graveyard"
-        ? player.graveyard
-        : target.zone === "exile"
-          ? player.exile
-          : player.command_zone;
-  const title = target
-    ? `${target.seat === game.view?.seat && !game.observing ? "Your" : `${player?.name ?? `Seat ${target.seat + 1}`}’s`} ${
-        target.zone === "command" ? "command zone" : target.zone
-      }`
-    : "";
-  return (
-    <dialog
-      ref={dialog}
-      className={styles.zoneDialog}
-      onClose={onClose}
-      aria-labelledby="zone-title"
-    >
-      <button
-        className={styles.zoomClose}
-        aria-label="Close"
-        onClick={() => dialog.current?.close()}
-      >
-        ×
-      </button>
-      <h2 id="zone-title">
-        {title} <span>{cards.length} cards</span>
-      </h2>
-      {cards.length === 0 ? (
-        <p className={styles.emptyZone}>Empty</p>
-      ) : (
-        <CardRow label={title} className={tableStyles.zoneGrid}>
-          {cards.map((card) => (
-            <CardButton
-              key={card.id}
-              card={card}
-              located={game.index.get(card.id)}
-            />
-          ))}
-        </CardRow>
-      )}
-    </dialog>
   );
 }

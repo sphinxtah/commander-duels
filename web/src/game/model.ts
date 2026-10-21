@@ -149,7 +149,7 @@ const verbs: Record<PromptOption["action"], string> = {
   special_payment: "Special payment",
   cancel: "Cancel",
   toggle_attacker: "Attack with",
-  all_attack: "Attack with everything",
+  all_attack: "Attack With All",
   toggle_blocker: "Block with",
   suggested: "Use the suggestion",
   use_ability: "Use",

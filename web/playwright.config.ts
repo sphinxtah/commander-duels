@@ -7,6 +7,7 @@ export default defineConfig({
     // Evidence for a failed journey, which CI keeps as an artifact.
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
+    video: "retain-on-failure",
   },
   // Both servers must answer before any test runs. The API command uses the active Python
   // environment; an API or Vite server that is already running is reused outside CI.

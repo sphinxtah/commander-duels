@@ -19,7 +19,7 @@ const steps: { id: Step; name: string }[] = [
   { id: "end_of_turn", name: "End step" },
 ];
 
-const passing: Record<NonNullable<PriorityControls["passing"]>, string> = {
+const passingUntil: Record<NonNullable<PriorityControls["passing"]>, string> = {
   until_stack_resolved: "until the stack resolves",
   until_next_main: "until the next main phase",
   until_end_of_turn: "until the end of the turn",
@@ -28,12 +28,23 @@ const passing: Record<NonNullable<PriorityControls["passing"]>, string> = {
   until_my_turn: "until your next turn",
 };
 
+/** A pass in progress in words: "Passing until the end of the turn." */
+export function passingText(
+  passing: NonNullable<PriorityControls["passing"]>,
+): string {
+  return `Passing ${passingUntil[passing]}.`;
+}
+
 export function PriorityPanel({
   state,
   onSet,
+  showPassing = true,
 }: {
   state: GameState;
   onSet: (settings: PrioritySettings) => boolean | undefined;
+  /** The game screen shows a pass in progress at the top of its prompt column instead
+   * (PassingNotice); Escape still stops it from here. */
+  showPassing?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const controls = state.priority ?? state.snapshot?.view?.priority ?? null;
@@ -63,9 +74,9 @@ export function PriorityPanel({
   return (
     <section className={styles.priority} aria-labelledby="priority-title">
       <h2 id="priority-title">Priority</h2>
-      {controls.passing && (
+      {showPassing && controls.passing && (
         <p className={styles.passing} role="status">
-          Passing {passing[controls.passing]}.{" "}
+          {passingText(controls.passing)}{" "}
           <button
             type="button"
             className={styles.primaryButton}
