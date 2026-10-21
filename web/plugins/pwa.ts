@@ -17,18 +17,19 @@ export interface BuiltFile {
   content: string | Uint8Array;
 }
 
-// The Planeswalker portraits (v0.3.1: 98 of them in three sizes, about 12 MB) load when a screen
-// shows one, and the HTTP cache keeps them; precaching them would make every install and every
-// update fetch them all.
-const ON_DEMAND = ["portraits/"];
+// Folders left out of the precache. The Planeswalker portraits (v0.3.1: 98 of them in three
+// sizes, about 12 MB) load when a screen shows one, and the HTTP cache keeps them; precaching them
+// would make every install and every update fetch them all. The public pages (v0.4.1: About,
+// Privacy and Terms) are not the app, and the worker never answers for them (src/pwa/swRules.ts).
+const NOT_PRECACHED = ["portraits/", "pages/"];
 
 /**
  * "/" and every file by its URL, sorted: every chunk (lazy ones too), asset and public file,
- * except the folders loaded on demand.
+ * except the folders left out above.
  */
 export function precacheList(names: string[]): string[] {
   const kept = names.filter(
-    (name) => !ON_DEMAND.some((folder) => name.startsWith(folder)),
+    (name) => !NOT_PRECACHED.some((folder) => name.startsWith(folder)),
   );
   return ["/", ...[...new Set(kept)].sort().map((name) => `/${name}`)];
 }

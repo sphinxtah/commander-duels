@@ -65,6 +65,28 @@ Sizing (since v0.1.1): the live site runs at most six games at once (`CD_GAMES_M
 
 In Google Auth Platform (project "Commander Duels"), add `https://duels.thesphinx.co` as an authorized JavaScript origin, on the existing Web client or on a new one for the live site. The client ID is public; it goes in `CD_GOOGLE_CLIENT_ID`. While the consent screen is in **Testing**, only its listed test users can sign in at all. The live site also uses approval sign-up (`CD_SIGNUP_POLICY=approval`): SysOp approves every new account until the site opens to the public at v1.0.0.
 
+**Opening sign-in to the beta testers (v0.4.1).** The owner's steps in Google's consoles, once v0.4.1 is deployed, so that anyone can press "Sign in with Google" and request an account. The site asks Google only for the basic sign-in scopes (`openid`, `email`, `profile`), and that does not change: they need no app verification by Google, only its branding check. The client ID stays the same, so nothing on the VM changes.
+
+1. **Check the public pages** while signed out (in a private window): https://duels.thesphinx.co/about, https://duels.thesphinx.co/privacy and https://duels.thesphinx.co/terms ([identity](identity.md#the-public-pages-v041)). Google's reviewers read them, so read the policy and the terms first: they are drafts for the owner.
+2. **Verify the domain.** In Google Search Console (https://search.google.com/search-console), add the domain property `thesphinx.co`. Search Console shows a TXT record (`google-site-verification=…`); create it at the DNS host of `thesphinx.co`, then press Verify. Use the Google account that owns the Cloud project, or one that is an owner or editor of it, so the domain shows as verified in Google Auth Platform.
+3. **Branding** (Google Cloud Console → Google Auth Platform → Branding):
+
+   | Field | Value |
+   | --- | --- |
+   | App name | `Commander Duels` (as the About page names it) |
+   | User support email | The owner's choice. It must be the owner's own Google account or a Google Group the owner manages; testers see it on the consent screen |
+   | App logo | `web/public/brand/google-logo-120.png` from the repository: a square 120 × 120 PNG (14 KB) of the wordless mark on the site's background, with no Google marks, made by `scripts/brand_assets.py google`. Google takes a square JPG, PNG or BMP of at most 1 MB, 120 × 120 px being best |
+   | Application home page | `https://duels.thesphinx.co/about` (Google refuses a home page that is only a sign-in page) |
+   | Application privacy policy link | `https://duels.thesphinx.co/privacy` |
+   | Application terms of service link | `https://duels.thesphinx.co/terms` |
+   | Authorized domains | `thesphinx.co` |
+   | Developer contact information | An email address of the owner's choice, for Google's messages about the project |
+
+   Save. Under **Data Access**, leave the scopes empty or at `openid`, `email` and `profile` only; any other scope would need Google's verification.
+4. **Audience → Publish app.** The publishing status goes from **Testing** to **In production** (the user type stays External). From then on any Google account can sign in, and each first sign-in is a pending account that waits until SysOp approves it in Administration. The test-user list no longer matters.
+5. **Verify branding.** On the Branding page (or in Verification Center), choose "Verify branding". With only the basic scopes, this is the whole review: Google checks the app name, the logo, the home page, the privacy policy link and the verified domain. It takes from a few minutes to a few business days. Once Google approves the branding, publish it within 7 days, as Google asks.
+6. **Check it** with a Google account that was never a test user: the consent screen names Commander Duels, the account waits for approval with the beta's wording, and SysOp sees it in Administration.
+
 ### On the TSH proxy
 
 Set up on 2026-10-19, step by step with discovery first, so that no other site or certificate changed. Discovery found eight enabled sites, one certificate per site, no wildcard names, no `map` blocks and no `default_server`.
@@ -125,7 +147,7 @@ CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` 
 - every push to `main` as `sha-<12-character commit>` and `main`;
 - every version tag as its version (`v0.1.0` → `0.1.0`).
 
-Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, `update.sh` and `upgrade.sh` (against a real Git clone), and the web container re-resolving the API and limiting sign-in challenges. Its bash tests run in CI's Linux pytest and are skipped on Windows.
+Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, `update.sh` and `upgrade.sh` (against a real Git clone), and the web container re-resolving the API, limiting sign-in challenges and serving the public pages (since v0.4.1). Its bash tests run in CI's Linux pytest and are skipped on Windows.
 
 **Pushing.** On the deploying computer, `git push` sends `main` and, because this checkout sets `push.followTags`, any new version tag with it. CI then publishes the images.
 
@@ -234,6 +256,8 @@ After the first deploy and at each version's close-out:
 | Administration → Card catalog (since v0.2.0) | The last run succeeded, with a catalog revision and the playable count; the Cards page searches |
 | A deck of your own (since v0.2.0) | Imported or built in the deck builder, "Ready to play", and played at the practice table |
 | Google sign-in by a listed test user | A pending account, which SysOp approves under Administration |
+| `/about`, `/privacy` and `/terms`, signed out, on a computer and a phone (since v0.4.1) | Each page in the site's look, with links between them and back to the site; the landing page's line of links opens them |
+| Google sign-in by an account that was never a test user (after the steps [above](#google-sign-in), since v0.4.1) | The consent screen names Commander Duels; the account waits for approval with the beta's wording |
 
 ## Configuration
 

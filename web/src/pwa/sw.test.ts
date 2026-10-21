@@ -90,7 +90,7 @@ beforeEach(() => {
 });
 
 describe("the service worker", () => {
-  it("never answers the API, other hosts or anything but a GET", () => {
+  it("never answers the API, other hosts, the public pages or anything but a GET", () => {
     const fetch = handlers.get("fetch")!;
     for (const event of [
       fetchEvent("GET", "/api/v1/me"),
@@ -102,6 +102,11 @@ describe("the service worker", () => {
       fetchEvent("GET", "https://accounts.google.com/gsi/client"),
       fetchEvent("GET", "https://accounts.google.com/gsi/", "navigate"),
       fetchEvent("GET", "/sw.js"),
+      // The public pages (v0.4.1) are not the app: never the kept shell, even offline.
+      fetchEvent("GET", "/about", "navigate"),
+      fetchEvent("GET", "/privacy", "navigate"),
+      fetchEvent("GET", "/terms", "navigate"),
+      fetchEvent("GET", "/pages/pages.css"),
     ]) {
       fetch(event);
       expect(event.respondWith).not.toHaveBeenCalled();

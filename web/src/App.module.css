@@ -677,6 +677,13 @@ h1 {
   letter-spacing: 0.2px;
   line-height: 1.6;
 }
+/* About · Privacy · Terms (v0.4.1) under the notice. Two classes, so the footer's size wins over
+   the line's own whichever stylesheet loads last. */
+.footer .footerLinks {
+  flex-basis: 100%;
+  font-size: 0.68rem;
+  letter-spacing: 0.2px;
+}
 .footer {
   flex-wrap: wrap;
   gap: 10px;

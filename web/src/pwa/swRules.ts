@@ -17,6 +17,13 @@ export const ACTIVE_CACHE = "cd-meta";
 export const ACTIVE_KEY = "/cd-active-version";
 /** app/liveGame.ts holds a Web Lock under this prefix while a game is live; it cannot be imported here. */
 export const LIVE_GAME_LOCK_PREFIX = "cd-live-game:";
+/**
+ * The public pages (v0.4.1), plain HTML that nginx serves at these addresses from public/pages/.
+ * They are not the app, so the worker never answers for them, not even with the kept shell when
+ * offline, and the build leaves their folder out of the precache (plugins/pwa.ts).
+ */
+export const PUBLIC_PAGES = ["/about", "/privacy", "/terms"];
+export const PUBLIC_PAGES_FOLDER = "/pages/";
 
 export function routeRequest(
   r: { method: string; url: string; mode: string },
@@ -37,6 +44,9 @@ export function routeRequest(
   if (path === "/api" || path.startsWith("/api/")) return "pass";
   // The browser checks the worker's own script for updates; nginx serves it with no-cache.
   if (path === "/sw.js") return "pass";
+  // The public pages and their stylesheet come from the server as they are, like any other site.
+  if (PUBLIC_PAGES.includes(path) || path.startsWith(PUBLIC_PAGES_FOLDER))
+    return "pass";
   if (r.mode === "navigate") return "shell";
   if (path.startsWith("/assets/")) return "asset";
   if (path.startsWith("/brand/") || path === "/manifest.webmanifest")
