@@ -35,6 +35,7 @@ from api.identity import (
     audit,
     not_found,
     permissions_for,
+    refuse_deleted,
     require_permission,
     roles_of,
     utcnow,
@@ -424,6 +425,7 @@ def change_wins(
     user = db.get(User, user_id)
     if user is None or (user.kind == "sysop" and user.id != principal.user.id):
         raise not_found()
+    refuse_deleted(user)
     before, after = set_wins(db, user, body.wins, body.reason, principal.user)
     if (before >= GODLIKE.wins) != (after >= GODLIKE.wins):
         # The custom cards open or close with the Godlike tier (v0.4.0): the account's decks

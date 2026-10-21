@@ -46,13 +46,16 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """An application account. Google users are players; one row is SysOp, the local root."""
+    """An application account. Google users are players; one row is SysOp, the local root. A
+    deleted account (v0.4.1, api/accounts.py) keeps its row as "Deleted player", for the records
+    that refer to it."""
 
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint("kind IN ('player', 'sysop')", name="ck_users_kind"),
         CheckConstraint(
-            "status IN ('active', 'pending', 'denied', 'disabled')", name="ck_users_status"
+            "status IN ('active', 'pending', 'denied', 'disabled', 'deleted')",
+            name="ck_users_status",
         ),
         CheckConstraint(
             "onboarding IN ('handle', 'starters', 'complete')", name="ck_users_onboarding"
@@ -89,6 +92,8 @@ class User(Base):
     alliance_since: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # The two starter decks chosen at onboarding, by ID; null until chosen.
     starter_decks: Mapped[list[str] | None] = mapped_column(JsonType)
+    # When the account was deleted (v0.4.1); its status is then deleted for good.
+    deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class ExternalIdentity(Base):
@@ -713,7 +718,9 @@ class Deck(Base):
 
 
 class DeckRevision(Base):
-    """An immutable copy of a deck: PostgreSQL refuses updates to it and to its entries."""
+    """An immutable copy of a deck: PostgreSQL refuses updates to it and to its entries. The one
+    change it allows (v0.4.1): a deleted account's revision that a game played loses its title and
+    notes (api/accounts.py)."""
 
     __tablename__ = "deck_revisions"
     __table_args__ = (

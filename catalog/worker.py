@@ -8,6 +8,7 @@ import httpx
 from sqlalchemy import Engine, and_, or_, select, update
 from sqlalchemy.orm import Session
 
+from api import accounts
 from api.config import Settings
 from api.database import build_engine
 from api.models import ScheduledJob
@@ -62,21 +63,24 @@ def finish(engine: Engine, job_id: UUID, generation: int, kind: str, now: dateti
 
 
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
-    """One iteration: keep the catalog's and the booster data's schedules queued, then run one
-    due job."""
+    """One iteration: keep the catalog's, the booster data's and the account cleanup's schedules
+    queued, then run one due job."""
     sync.ensure_scheduled(engine, config, datetime.now(UTC))
     boosters.ensure_scheduled(engine, config, datetime.now(UTC))
+    accounts.ensure_scheduled(engine, datetime.now(UTC))
     job = claim(engine, datetime.now(UTC))
     if job is None:
         return
     job_id, generation, kind = job
-    if kind not in (sync.KIND, boosters.KIND):
+    if kind not in (sync.KIND, boosters.KIND, accounts.KIND):
         finish(engine, *job, datetime.now(UTC))
         return
     with Session(engine) as session:
         payload = session.scalar(select(ScheduledJob.payload).where(ScheduledJob.id == job_id))
     claimed = sync.Claimed(job_id, generation, dict(payload or {}))
-    if kind == boosters.KIND:
+    if kind == accounts.KIND:
+        outcome = accounts.handle(engine, datetime.now(UTC))
+    elif kind == boosters.KIND:
         outcome = boosters.handle(engine, config, client, claimed)
     else:
         outcome = sync.handle(engine, config, client, claimed)

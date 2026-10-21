@@ -1,6 +1,23 @@
 {
   "components": {
     "schemas": {
+      "AccountDeletion": {
+        "additionalProperties": false,
+        "description": "Why the account is deleted (v0.4.1), kept in the audit log, which outlives the account:\ndescribe the request, not the person.",
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "AccountDeletion",
+        "type": "object"
+      },
       "AdminProduct": {
         "additionalProperties": false,
         "properties": {
@@ -310,6 +327,19 @@
             "title": "Created At",
             "type": "string"
           },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the account was deleted (v0.4.1); null otherwise.",
+            "title": "Deleted At"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -372,7 +402,8 @@
               "active",
               "pending",
               "denied",
-              "disabled"
+              "disabled",
+              "deleted"
             ],
             "title": "Status",
             "type": "string"
@@ -8611,7 +8642,8 @@
                     "active",
                     "pending",
                     "denied",
-                    "disabled"
+                    "disabled",
+                    "deleted"
                   ],
                   "type": "string"
                 },
@@ -8761,6 +8793,127 @@
           }
         },
         "summary": "List Users"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/delete": {
+      "post": {
+        "description": "Deletes an account for good (v0.4.1, api/accounts.py): its sign-in, profile, sessions,\nroles and decks go; its game results, wins and tokens stay, as \"Deleted player\". Refused 409\nwhile it plays a game. The account's game lock is held meanwhile, so no game of it starts.",
+        "operationId": "delete_user_api_v1_admin_users__user_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountDeletion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete User"
       }
     },
     "/api/v1/admin/users/{user_id}/packs": {

@@ -33,6 +33,7 @@ from api.identity import (
     Principal,
     audit,
     not_found,
+    refuse_deleted,
     require_permission,
     utcnow,
 )
@@ -375,6 +376,7 @@ def give_tokens(
     """SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of
     its own, apart from tokens earned, with the reason, and audited (PROG03)."""
     user = target(db, user_id, principal)
+    refuse_deleted(user)
     entry = grant(db, user, body.amount, body.reason, principal.user)
     audit(
         db,

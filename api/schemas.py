@@ -133,7 +133,7 @@ Permission = Literal[
     "shop.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
-AccountStatus = Literal["active", "pending", "denied", "disabled"]
+AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]
 
 
 class Preferences(Contract):
@@ -226,6 +226,9 @@ class AdminUser(Contract):
     tier: Literal["bronze", "silver", "gold", "platinum", "mythic", "godlike"] = "bronze"
     alliance: str | None = None
     tokens: int = Field(default=0, description="The account's token balance (v0.4.0).")
+    deleted_at: datetime | None = Field(
+        default=None, description="When the account was deleted (v0.4.1); null otherwise."
+    )
 
 
 class UserPage(Contract):
@@ -236,6 +239,13 @@ class UserPage(Contract):
 class StatusChange(Contract):
     status: Literal["active", "denied", "disabled"]
     reason: Annotated[StoredText, Field(max_length=200)] | None = None
+
+
+class AccountDeletion(Contract):
+    """Why the account is deleted (v0.4.1), kept in the audit log, which outlives the account:
+    describe the request, not the person."""
+
+    reason: Annotated[StoredText, Field(min_length=3, max_length=200)]
 
 
 class AuditActor(Contract):

@@ -16,6 +16,7 @@ import {
   type Planeswalker,
 } from "./api";
 import { CustomCards } from "./admin/CustomCards";
+import { DeleteAccount } from "./admin/DeleteAccount";
 import { SetWins } from "./admin/SetWins";
 import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
@@ -30,12 +31,14 @@ import admin from "./admin/admin.module.css";
 
 type Status = AdminUser["status"];
 type GrantableRole = "moderator" | "content_editor" | "administrator";
+// "All accounts" leaves the deleted ones out (v0.4.1): they are listed only when asked for.
 const statuses: (Status | "")[] = [
   "",
   "pending",
   "active",
   "disabled",
   "denied",
+  "deleted",
 ];
 const statusNames: Record<Status | "", string> = {
   "": "All accounts",
@@ -43,6 +46,7 @@ const statusNames: Record<Status | "", string> = {
   active: "Active",
   disabled: "Disabled",
   denied: "Denied",
+  deleted: "Deleted",
 };
 const grantable: { role: GrantableRole; name: string }[] = [
   { role: "moderator", name: "Moderator" },
@@ -72,6 +76,8 @@ function Users({ me }: { me: Me }) {
   // The account whose wins SysOp is setting, if any.
   const [settingWins, setSettingWins] = useState<string>();
   const [givingTokens, setGivingTokens] = useState<string>();
+  // The account whose deletion the dialog asks to confirm (v0.4.1), if any.
+  const [deleting, setDeleting] = useState<AdminUser>();
   const latest = useRef(0);
   // The message a failed load left, so a load that works can take it back.
   const loadFailure = useRef("");
@@ -230,6 +236,8 @@ function Users({ me }: { me: Me }) {
             const name = user.handle ?? user.display_name;
             const isAdministrator = user.roles.includes("administrator");
             const locked = isAdministrator && !administrators;
+            // A deleted account (v0.4.1) is "Deleted player", and nothing changes it.
+            const deleted = user.status === "deleted";
             const allied = user.alliance
               ? roster.find((found) => found.id === user.alliance)
               : undefined;
@@ -237,15 +245,26 @@ function Users({ me }: { me: Me }) {
               <li key={user.id} aria-label={name}>
                 <div className={styles.userHead}>
                   <div>
-                    <strong>{user.handle ?? "No handle yet"}</strong>
-                    <span>{user.display_name}</span>
-                    <small>
-                      {manage
-                        ? `${user.email ?? "No email"} · joined`
-                        : "Joined"}{" "}
-                      {when(user.created_at)} · last seen{" "}
-                      {when(user.last_seen_at)}
-                    </small>
+                    <strong>
+                      {deleted
+                        ? user.display_name
+                        : (user.handle ?? "No handle yet")}
+                    </strong>
+                    {!deleted && <span>{user.display_name}</span>}
+                    {deleted ? (
+                      <small>
+                        Joined {when(user.created_at)} · deleted{" "}
+                        {when(user.deleted_at)}
+                      </small>
+                    ) : (
+                      <small>
+                        {manage
+                          ? `${user.email ?? "No email"} · joined`
+                          : "Joined"}{" "}
+                        {when(user.created_at)} · last seen{" "}
+                        {when(user.last_seen_at)}
+                      </small>
+                    )}
                   </div>
                   <span className={shell.tag} data-status={user.status}>
                     {statusNames[user.status].toUpperCase()}
@@ -307,7 +326,7 @@ function Users({ me }: { me: Me }) {
                     ))}
                   </fieldset>
                 )}
-                {((manage && !locked) || progress || economy) && (
+                {!deleted && ((manage && !locked) || progress || economy) && (
                   <div className={styles.actions}>
                     {/* SysOp sets any account's wins, and so its tier (v0.3.1). */}
                     {progress && settingWins !== user.id && (
@@ -369,6 +388,15 @@ function Users({ me }: { me: Me }) {
                           Restore {name}
                         </button>
                       )}
+                    {/* For good, when its owner asks (v0.4.1); never your own account. */}
+                    {manage && !locked && user.id !== me.id && (
+                      <button
+                        className={styles.danger}
+                        onClick={() => setDeleting(user)}
+                      >
+                        Delete {name}'s account…
+                      </button>
+                    )}
                   </div>
                 )}
                 {progress && settingWins === user.id && (
@@ -413,6 +441,18 @@ function Users({ me }: { me: Me }) {
         <button className={styles.secondary} onClick={() => void load(cursor)}>
           Show more accounts
         </button>
+      )}
+      {deleting && (
+        <DeleteAccount
+          user={deleting}
+          onDeleted={(gone) => {
+            replace(gone);
+            setMessage(
+              `${deleting.handle ?? deleting.display_name}'s account was deleted.`,
+            );
+          }}
+          onClose={() => setDeleting(undefined)}
+        />
       )}
     </section>
   );

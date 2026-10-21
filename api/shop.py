@@ -42,6 +42,7 @@ from api.identity import (
     Principal,
     audit,
     not_found,
+    refuse_deleted,
     require_permission,
     settings_of,
     utcnow,
@@ -646,6 +647,7 @@ def give_packs(
     """SysOp gives unopened packs to any account, its own included: with a reason, audited."""
     ensured(request)
     user = target(db, user_id, principal)
+    refuse_deleted(user)
     product = db.get(ShopProduct, body.product)
     if product is None:
         raise not_found()

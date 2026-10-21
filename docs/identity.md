@@ -140,7 +140,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  |  | ✓ |
 
 **Administrators.**
-- They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, and grant or remove the moderator and content-editor roles.
+- They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
 - They cannot change administrators, SysOp or their own account. This holds whatever the administrator's status: grants survive a disable, so only SysOp can restore, deny, sign out or change the lesser roles of an account holding an administrator grant. The account list reports a disabled, pending or denied account's dormant grants in `roles` (without `player`, which only active accounts hold), so the Administration page locks the row.
 - The account search matches the handle, the display name and, for administrators only, the email, as written: `%`, `_` and `\` are literal, and names and email compare without regard to case.
 - The first administrator is not configured separately (AUTH06): SysOp is the configured bootstrap, and only SysOp makes or removes administrators. No Google account ever becomes an administrator by signing in.
@@ -161,7 +161,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 - 401 when signed out;
 - 403 when the account lacks the permission or is pending or denied;
 - 404, identical to a missing path, for SysOp or another account's session;
-- 409 for conflicts such as a taken handle or a change to your own account;
+- 409 for conflicts such as a taken handle, a change to your own account, or since v0.4.1 a change to a deleted account (`account_deleted`) and deleting an account that is playing (`account_in_game`);
 - 422 `invalid_request` for input the contract does not allow. That includes a NUL character in a display name, a status reason, the account search or the audit filter, which PostgreSQL cannot store.
 
 ## SysOp, the local root account
@@ -215,9 +215,56 @@ Actions recorded:
 - **Sessions:** `auth.logout`, `auth.logout_all` and `auth.session_revoked`.
 - **SysOp:** `auth.sysop_login`, `auth.sysop_login_failed`, `auth.sysop_logout`, `account.sysop_password_changed` and `account.sysop_password_set` (from the console).
 - **Profile:** `profile.updated`.
-- **Administration:** `admin.user_status_changed`, `admin.role_granted`, `admin.role_revoked` and `admin.sessions_revoked`.
+- **Administration:** `admin.user_status_changed`, `admin.role_granted`, `admin.role_revoked`, `admin.sessions_revoked` and, since v0.4.1, `admin.user_deleted`.
+- **The system** (v0.4.1, no actor): `account.unapproved_deleted`.
 
-Administrators read the trail newest first in the Administration page, filtered by action prefix, without regard to case. A player without a handle appears as `<display name> (no handle, <first 8 characters of its id>)`, so no player can pass for the Site administrator or another player.
+Administrators read the trail newest first in the Administration page, filtered by action prefix, without regard to case. A player without a handle appears as `<display name> (no handle, <first 8 characters of its id>)`, so no player can pass for the Site administrator or another player. A deleted account appears as `Deleted player (<first 8 characters of its id>)`.
+
+## Deleting an account (v0.4.1)
+
+Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions-at-the-start-of-v041)). Someone who wants their data removed asks, as the privacy policy says, and SysOp or an administrator deletes the account in Administration. Requests never approved are deleted on their own after 30 days. One function does both (`api/accounts.py`).
+
+**Who may delete.**
+- SysOp and administrators (`admin.users.manage`), under the rules of every account change: never SysOp, never your own account, and only SysOp deletes an account that holds an administrator grant, whatever its status.
+- The sign-in must be at most `CD_REAUTH_MINUTES` old.
+- The request gives a reason of 3–200 characters. The audit trail keeps it, so it should describe the request, not the person.
+- In the Accounts list, "Delete *handle*'s account…" opens a dialog that says what is removed and what is kept. Its button works once the reason is given and the account's handle is typed (DELETE for an account without one), in any case.
+
+**What is removed.**
+- **Sign-in.** The Google identity, with its subject and email (`external_identities`). If the same Google account signs in again, it makes a new account, pending approval, that knows nothing of the old one.
+- **Sessions.** All of them. A game connection still open closes at its next session check, within a minute, as for a disabled account. A session made at that very moment counts as signed out: the status check refuses deleted accounts.
+- **Roles.** Every grant.
+- **The profile.** The handle, which anyone may then take; the name, which becomes "Deleted player"; the avatar, the locale, the accessibility settings, the alliance and the time last seen.
+- **Decks.** Every deck, revision and entry that no game played. A revision a game played stays, with its cards as the game played them (DECK01), and loses its title and notes. Its deck stays only as the row that revision belongs to: emptied, private and in the trash. The game's seats that played it name it "Deleted deck". Share links stop working.
+- **Tables.** The account leaves every open table, as leaving does: a table it hosts closes for everyone.
+- **Bug reports** (v0.4.1) and their screenshots. Each feature that keeps rows of its own about an account removes them in the same transaction, through `CLEANUPS` in `api/accounts.py`.
+
+**What is kept, and why.**
+- The account's row, as "Deleted player", with the status `deleted` and the time. Other players' records refer to it and stay whole.
+- Game results and seats. Other players see the seat without a name.
+- The progression and token ledgers, packs and their openings, and the library grants. They hold no contact data, and they count wins and tokens against other players, so they stay as they are. Most are append-only anyway.
+- The audit trail, which is append-only (below).
+
+**Afterwards.** Administration lists deleted accounts only under the status "Deleted", with their wins and tokens. Nothing changes them: a status, a role, a sign-out, wins, tokens or packs answer 409 `account_deleted`. Their records can still be read.
+
+**While the account plays.** Deleting is refused with 409 `account_in_game` while the account holds a seat in a running game. Delete it once the game ends, or its seat concedes or is voted out; a table's game ends at the latest after its hour without an answer. Conceding for it would change a game that other players are still playing, so the deletion waits instead. The deletion holds the account's game lock, so no game of it starts meanwhile.
+
+**What stays without a time limit.**
+- **In the audit trail**, which a deletion leaves as it was:
+  - the source address of every event the account caused: its sign-ins and sign-outs, profile and alliance changes, starter choices and votes to remove a player;
+  - each event's time and request ID;
+  - the reasons staff wrote, as they wrote them: `admin.user_status_changed`, `admin.user_deleted`, `progress.wins_set`, `economy.tokens_granted` and `shop.packs_granted`.
+  - The code itself writes no name, handle or email into the trail: `profile.updated` lists the fields changed, not their values, and `auth.google_signup` only the status.
+- **In the ledgers**, the reasons staff wrote for wins set, tokens given and packs given.
+- **In backups** ([backups](deployment.md#backups)), everything as it was when each was made, until newer ones replace it: the nightly dumps for two weeks; the pre-deploy and pre-restore dumps until 10 deploys or 5 restores later, however long that takes; the VM's backups on the NAS by the owner's own schedule.
+
+**Requests never approved.** The worker's daily job `account_cleanup` runs at 04:00 UTC; today's and tomorrow's runs stay queued, one a day. It deletes, the same way, every account still pending or denied 30 days after it was created, in one transaction. It records one audit entry, `account.unapproved_deleted`, with no actor and no account: only the count and the age (`after_days`). A run that finds none records nothing.
+
+**The database.** Migration `0013_account_deletion` adds the status `deleted` and `users.deleted_at`. On PostgreSQL the revisions' trigger now allows one update: a deleted account's revision may change its title to "Deleted deck" and its notes to none, with every other column as it was. Entries stay immutable. Going back to v0.4.0 marks deleted accounts disabled, which that version refuses at sign-in.
+
+**Routes.**
+- `POST /api/v1/admin/users/{id}/delete` with `{"reason": "…"}` answers with the account as Administration now lists it.
+- `GET /api/v1/admin/users?status=deleted` lists deleted accounts. Without a status, they are left out.
 
 ## Data
 
@@ -232,6 +279,6 @@ Timestamps are UTC-aware, and identifiers are UUIDs.
 ## Not in v0.0.5
 
 - Routing games through the API, seat ownership and controller leases. The inspection view, SysOp's practice games and its any-card test decks are part of that work (v0.0.6).
-- Account deletion and data export; moderation reports; content publishing (the roles exist, their tools do not).
+- Account deletion and data export; moderation reports; content publishing (the roles exist, their tools do not). Deletion arrived in v0.4.1 ([deleting an account](#deleting-an-account-v041)).
 - Signing in from the installed PWA (T01's second half arrives with M5).
 - A second factor for SysOp, by decision.

@@ -1,9 +1,10 @@
 """Administration: accounts, roles and the audit trail (AUTH06, SEC05).
 
-Administrators approve, deny, disable and restore accounts and grant the moderator and
+Administrators approve, deny, disable, restore and delete accounts and grant the moderator and
 content-editor roles. Only SysOp makes or removes administrators. SysOp itself never appears
 here: it cannot be listed, changed, demoted or disabled through the interface, and other viewers
-see its audit events as the site administrator's.
+see its audit events as the site administrator's. A deleted account (v0.4.1, api/accounts.py) is
+listed only when asked for, as "Deleted player", and nothing changes it afterwards.
 """
 
 import base64
@@ -16,9 +17,12 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import Select, and_, delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
+from api.accounts import DELETED_NAME, delete_account
 from api.auth import ERRORS
 from api.economy import balance_of
+from api.games import hub_of
 from api.identity import (
     ROLE_PERMISSIONS,
     ApiError,
@@ -27,6 +31,7 @@ from api.identity import (
     audit,
     email_of,
     not_found,
+    refuse_deleted,
     require_permission,
     require_recent_sign_in,
     revoke_sessions,
@@ -36,6 +41,7 @@ from api.identity import (
 from api.models import AuditEvent, ExternalIdentity, RoleGrant, User
 from api.progression import admin_progress
 from api.schemas import (
+    AccountDeletion,
     AccountStatus,
     AdminUser,
     AuditActor,
@@ -96,6 +102,7 @@ def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
         tier=tier,
         alliance=user.alliance,
         tokens=balance_of(db, user.id),
+        deleted_at=user.deleted_at,
     )
 
 
@@ -109,8 +116,8 @@ def list_users(
     cursor: str | None = None,
 ) -> UserPage:
     query: Select[User] = select(User).where(User.kind == "player")
-    if status:
-        query = query.where(User.status == status)
+    # Deleted accounts only when asked for: there is nothing left to do with them.
+    query = query.where(User.status == status if status else User.status != "deleted")
     if q and (term := q.strip()):
         # The text is matched as written: autoescape makes % _ and \ literal, and names and
         # email compare through the database's own lower(), as they are stored.
@@ -143,12 +150,13 @@ def list_users(
 
 
 def managed_user(db: Session, principal: Principal, user_id: UUID) -> User:
-    """The target of an account change: never SysOp, never yourself."""
+    """The target of an account change: never SysOp, never yourself, never a deleted account."""
     user = db.get(User, user_id)
     if user is None or user.kind != "player":
         raise not_found()
     if user.id == principal.user.id:
         raise ApiError(409, "self_change", "You cannot change your own account here.")
+    refuse_deleted(user)
     # The grant, not the account's current roles: a disabled administrator restored by anyone
     # but SysOp would be an administrator again.
     if "administrator" in granted_roles(db, user) and not principal.can(
@@ -259,12 +267,44 @@ def sign_out_user(user_id: UUID, request: Request, principal: CanManageUsers, db
     return admin_user(db, user, principal)
 
 
+@router.post("/users/{user_id}/delete", response_model=AdminUser)
+async def delete_user(
+    user_id: UUID, body: AccountDeletion, request: Request, principal: CanManageUsers, db: Db
+) -> AdminUser:
+    """Deletes an account for good (v0.4.1, api/accounts.py): its sign-in, profile, sessions,
+    roles and decks go; its game results, wins and tokens stay, as "Deleted player". Refused 409
+    while it plays a game. The account's game lock is held meanwhile, so no game of it starts."""
+    require_recent_sign_in(request, principal)
+    user = await run_in_threadpool(managed_user, db, principal, user_id)
+    async with hub_of(request).locks[user.id]:
+        return await run_in_threadpool(deleted_by, db, request, principal, user, body.reason)
+
+
+def deleted_by(
+    db: Session, request: Request, principal: Principal, user: User, reason: str
+) -> AdminUser:
+    removed = delete_account(db, user, utcnow())
+    audit(
+        db,
+        request,
+        "admin.user_deleted",
+        actor_id=principal.user.id,
+        target_user_id=user.id,
+        details={"from": removed.status, "reason": reason},
+    )
+    db.commit()
+    return admin_user(db, user, principal)
+
+
 def actor_label(user: User | None, viewer: Principal) -> AuditActor | None:
     if user is None:
         return None
     if user.kind == "sysop":
         label = "SysOp" if viewer.user.kind == "sysop" else SITE_ADMINISTRATOR
         return AuditActor(id=user.id if viewer.user.kind == "sysop" else None, label=label)
+    if user.status == "deleted":
+        # Told apart by the start of the ID, which names nobody; no player's label has this form.
+        return AuditActor(id=user.id, label=f"{DELETED_NAME} ({str(user.id)[:8]})")
     # A display name is free text: alone it could read "Site administrator" or another player's
     # handle. A handle has no spaces or brackets, so this label can be neither.
     label = user.handle or f"{user.display_name} (no handle, {str(user.id)[:8]})"
