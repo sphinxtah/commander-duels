@@ -154,6 +154,8 @@ def pay_game(db: Session, game: Game) -> None:
     owner = next((seat.user_id for seat in seats if seat.seat == winner), None)
     if owner is None:
         return
+    # Two of the winner's games ending at once count today's paid wins one after the other.
+    lock_account(db, owner)
     now = utcnow()
     start, end = arizona_day(now)
     today = (
