@@ -402,4 +402,50 @@ class CommanderGameTest {
         assertEquals(Set.of(0, 1), Set.copyOf(last.result().concededSeats()));
         assertTrue(BotMatchRunner.join(game.thread(), 10_000));
     }
+
+    /**
+     * Two players at a human table (v0.4.0): one concedes while the other holds a prompt, and the
+     * game ends at once with the other's win. XMage alone would wait for the winner's next answer.
+     */
+    @Test
+    void aConcessionThatLeavesOnePlayerEndsTheGameAtOnce() throws Exception {
+        Tables.actAsClient();
+        HumanGame game = Tables.start(table("human,human", 79, 30), HumanGame.Hooks.NONE);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        Integer holder = null;
+        while (holder == null) {
+            assertTrue(System.nanoTime() < deadline, "no prompt of the game itself within 60 s");
+            for (int seat : List.of(0, 1)) {
+                HumanGame.Snapshot snapshot = game.snapshot(seat, -1, 0, 0);
+                PromptView prompt = snapshot.prompt();
+                if (prompt == null) {
+                    continue;
+                }
+                if (prompt.kind().equals("priority")) {
+                    holder = seat;
+                } else {
+                    // Who plays first, then the mulligans: answered until the game itself asks.
+                    String choice = prompt.options().stream()
+                        .filter(option -> option.action().equals("keep") || option.action().equals("yes"))
+                        .findFirst().orElse(prompt.options().get(0)).id();
+                    assertEquals(200, game.submit(seat, Tables.answer(game, UUID.randomUUID().toString(),
+                        snapshot.revision(), prompt.id(), choice)).status());
+                }
+                break;
+            }
+            if (holder == null) {
+                Thread.sleep(50);
+            }
+        }
+        int other = 1 - holder;
+        HumanGame.Snapshot theirs = game.snapshot(other, -1, 0, 0);
+        assertNull(theirs.prompt(), "both seats hold a prompt");
+        assertEquals(200, game.concede(other, Tables.concede(game, theirs.revision())).status());
+        // The holder never answers: the end comes without it.
+        HumanGame.Snapshot last = Tables.finalSnapshot(game, holder);
+        assertEquals("completed", last.result().kind(), last.result().toString());
+        assertEquals(holder, last.result().winnerSeat());
+        assertEquals(List.of(other), last.result().concededSeats());
+        assertTrue(BotMatchRunner.join(game.thread(), 10_000));
+    }
 }

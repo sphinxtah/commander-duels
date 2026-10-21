@@ -618,6 +618,11 @@ describe("a human table's game (v0.4.0)", () => {
       expect(
         screen.getByRole("heading", { level: 1, name: /Table game/ }),
       ).toBeInTheDocument();
+      // The other player goes by their handle at the table, not the engine's "Bot 2".
+      expect(
+        screen.getByRole("article", { name: "bob, seat 2" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Bot 2")).toBeNull();
 
       finished = true;
       act(() =>

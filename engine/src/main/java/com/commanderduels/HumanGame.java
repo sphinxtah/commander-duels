@@ -800,8 +800,44 @@ final class HumanGame {
             if (promptOpen && player != null) {
                 // Wakes the waiting choice even when XMage has no priority player yet (mulligans).
                 player.signalPlayerConcede(true);
+            } else if (lastStanding(current, playerId)) {
+                // XMage applies another player's concession at the next answer of the player who
+                // holds priority or a choice. When the concession leaves that player alone (two
+                // players at a human table, v0.4.0), the game would wait for the winner to act, so
+                // the waiting player is woken: XMage applies the concession, the game ends, and
+                // otherwise it goes on waiting for the same answer.
+                Player waiting = waitingPlayer(current);
+                if (waiting != null && !waiting.getId().equals(playerId)) {
+                    waiting.signalPlayerConcede(true);
+                }
             }
         }
+    }
+
+    /** Whether at most one player stays in the game once this concession and earlier ones apply. */
+    private boolean lastStanding(Game current, UUID conceding) {
+        List<UUID> leaving = new ArrayList<>();
+        synchronized (this) {
+            for (Seat seat : humans) {
+                if (seat.concedeRequested) {
+                    leaving.add(seat.id);
+                }
+            }
+        }
+        long standing = current.getPlayers().values().stream()
+            .filter(player -> !player.hasLost() && !player.hasLeft())
+            .filter(player -> !player.getId().equals(conceding) && !leaving.contains(player.getId()))
+            .count();
+        return standing <= 1;
+    }
+
+    /** The player XMage waits for: who holds priority, or else who makes a choice. */
+    private static Player waitingPlayer(Game current) {
+        UUID id = current.getState().getPriorityPlayerId();
+        if (id == null) {
+            id = current.getState().getChoosingPlayerId();
+        }
+        return id == null ? null : current.getPlayer(id);
     }
 
     private static boolean over(Game game) {
