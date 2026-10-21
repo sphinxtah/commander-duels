@@ -22,7 +22,7 @@ Validated locally on Windows on October 20, 2026, on the work as committed for v
 
 **Not covered by the journeys, and not yet checked by hand** (design §24.5's manual list, for the live site after the deploy): Google sign-in in the installed window; install from the banner and from the browser's menu, and the desktop icon; relaunching the app during a live game; an update during a live game in the installed app (T25: the browser cannot be given a new worker version reliably mid-test; the unit tests cover the waiting and applying); holding Escape to leave full screen; Windows display scaling at 125, 150 and 200%; a real GPU at 4K; sound; NVDA through one turn; forced colours.
 
-**Hosted CI.** Recorded in [the release notes](releases/0.3.0.md#verification).
+**Hosted CI.** Recorded in [the release notes](releases/0.3.0.md#verification): run #52 failed once on the screen check's Cancel; run #53 passed in 15 m 2 s, with 146 pytest, 705 Vitest tests and 36 browser journeys in verify, and 10 game and app journeys against the engine.
 
 ## v0.2.0
 
