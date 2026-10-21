@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     # Bounds on one bulk file: compressed, and unpacked.
     catalog_max_download_mb: int = Field(default=1024, ge=1, le=16384)
     catalog_max_dataset_mb: int = Field(default=4096, ge=1, le=65536)
+    # MTGJSON's set files, whose booster data gives Leng's card shop its pull ratios (v0.4.0). The
+    # worker reads them weekly into the catalog folder's mtgjson/; the catalog folder being empty
+    # turns this off too.
+    booster_url: HttpUrl = HttpUrl("https://mtgjson.com/api/v5")
     # The Planeswalker roster and the starter decks, content/ in the repository (the API image
     # holds a copy).
     content_dir: str = "content"

@@ -21,6 +21,7 @@ import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
 import { TierBadge } from "./alliance/TierBadge";
 import { CatalogAdmin } from "./catalog/CatalogAdmin";
+import { ShopAdmin } from "./shop/ShopAdmin";
 import styles from "./Account.module.css";
 import shell from "./App.module.css";
 import admin from "./admin/admin.module.css";
@@ -501,11 +502,12 @@ export function canAdminister(me: Me | null | undefined) {
     (me.permissions.includes("admin.users.read") ||
       me.permissions.includes("admin.audit.read") ||
       me.permissions.includes("catalog.manage") ||
-      me.permissions.includes("custom_cards.manage")),
+      me.permissions.includes("custom_cards.manage") ||
+      me.permissions.includes("shop.manage")),
   );
 }
 
-type Tab = "users" | "audit" | "catalog" | "custom";
+type Tab = "users" | "audit" | "catalog" | "shop" | "custom";
 
 export function Admin({
   me,
@@ -545,10 +547,13 @@ export function Admin({
   const catalog = me!.permissions.includes("catalog.manage");
   // The Godlike tier's custom cards, SysOp's alone (v0.3.1).
   const custom = me!.permissions.includes("custom_cards.manage");
+  // Leng's card shop: prices, sale and the booster data (v0.4.0).
+  const shop = me!.permissions.includes("shop.manage");
   const available = [
     users && "users",
     audit && "audit",
     catalog && "catalog",
+    shop && "shop",
     custom && "custom",
   ].filter(Boolean) as Tab[];
   const shown = available.includes(tab) ? tab : available[0];
@@ -594,6 +599,15 @@ export function Admin({
             Card catalog
           </button>
         )}
+        {shop && (
+          <button
+            role="tab"
+            aria-selected={shown === "shop"}
+            onClick={() => setTab("shop")}
+          >
+            Card shop
+          </button>
+        )}
         {custom && (
           <button
             role="tab"
@@ -611,6 +625,8 @@ export function Admin({
           <Audit />
         ) : shown === "catalog" ? (
           <CatalogAdmin />
+        ) : shown === "shop" ? (
+          <ShopAdmin me={me!} />
         ) : (
           <CustomCards />
         )}

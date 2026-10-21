@@ -21,6 +21,7 @@ from api import (
     economy,
     games,
     progression,
+    shop,
 )
 from api.config import Settings
 from api.database import build_engine, migration_head
@@ -69,6 +70,14 @@ CAPABILITIES = [
         milestone="M4",
         reason="Wins raise your level, which opens Planeswalkers to ally with; an alliance brings "
         "its Planeswalker's cards into your library (v0.3.1).",
+    ),
+    Capability(
+        id="shop",
+        name="Leng's card shop",
+        available=True,
+        milestone="M4",
+        reason="Tokens from wins buy booster packs from Revised to the current set, with real "
+        "pull ratios; their cards join your library for good (v0.4.0).",
     ),
     Capability(
         id="campaign",
@@ -308,4 +317,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(progression.router)
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
+    app.include_router(shop.router)
     return app

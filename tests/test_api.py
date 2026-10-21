@@ -20,9 +20,10 @@ def test_framework_is_live_and_practice_play_cards_and_decks_are_available(tmp_p
         bootstrap = client.get("/api/v1/bootstrap").json()
         assert bootstrap["collection_policy"] == "earned_collection"
         # Practice games against bots are playable since v0.1.0, the card catalog and decks since
-        # v0.2.0 and the Planeswalker Alliance since v0.3.1; the rest is still planned.
+        # v0.2.0, the Planeswalker Alliance since v0.3.1 and Leng's card shop since v0.4.0; the
+        # rest is still planned.
         available = {item["id"] for item in bootstrap["capabilities"] if item["available"]}
-        assert available == {"gameplay", "catalog", "decks", "alliance"}
+        assert available == {"gameplay", "catalog", "decks", "alliance", "shop"}
         gameplay = next(item for item in bootstrap["capabilities"] if item["id"] == "gameplay")
         assert gameplay["name"] == "Practice play" and "playable" in gameplay["reason"]
         formats = client.get("/api/v1/formats").json()

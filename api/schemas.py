@@ -130,6 +130,7 @@ Permission = Literal[
     "progress.manage",
     "custom_cards.manage",
     "economy.manage",
+    "shop.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled"]
