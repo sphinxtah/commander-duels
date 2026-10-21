@@ -42,6 +42,10 @@ export type Planeswalker = components["schemas"]["PlaneswalkerInfo"];
 export type StarterDeck = components["schemas"]["StarterDeck"];
 export type CustomCard = components["schemas"]["CustomCardInfo"];
 export type CustomCardUpload = components["schemas"]["CustomCardUpload"];
+// Tokens (v0.4.0): what wins pay, SysOp's grants and the economy's settings.
+export type Tokens = components["schemas"]["Tokens"];
+export type TokenLine = components["schemas"]["TokenLine"];
+export type EconomySettings = components["schemas"]["EconomySettings"];
 
 /**
  * Whether the account still has a step of onboarding ahead: its handle, then its two starter

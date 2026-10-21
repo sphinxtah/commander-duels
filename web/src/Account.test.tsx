@@ -152,6 +152,16 @@ beforeEach(() => {
   // Profile's progress and the roster (v0.3.1).
   on("GET /api/v1/me/progress", () => reply(200, progress()));
   on("GET /api/v1/planeswalkers", () => reply(200, roster));
+  // Profile's tokens (v0.4.0).
+  on("GET /api/v1/me/tokens", () =>
+    reply(200, {
+      balance: 1000,
+      earned: 0,
+      given: 1000,
+      spent: 0,
+      entries: [],
+    }),
+  );
   setCsrfToken("token-1");
   // Google's script stays away unless a test brings its own.
   vi.mocked(loadGoogle).mockReturnValue(new Promise(() => {}));

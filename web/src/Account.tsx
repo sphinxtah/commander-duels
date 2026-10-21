@@ -21,6 +21,8 @@ import {
   type SessionSummary,
 } from "./api";
 import { SetWins } from "./admin/SetWins";
+import { GiveTokens } from "./tokens/GiveTokens";
+import { TokensPanel } from "./tokens/TokensPanel";
 import { Portrait } from "./alliance/Portrait";
 import {
   AllianceOffer,
@@ -836,6 +838,8 @@ export function Account({
     ? standing.roster?.find((found) => found.id === me.alliance)
     : undefined;
   const progress = standing.progress;
+  // A grant SysOp gives itself here shows in the tokens panel at once.
+  const [tokensShown, setTokensShown] = useState(0);
   return (
     <>
       <span className={shell.eyebrow}>YOUR ACCOUNT</span>
@@ -919,6 +923,7 @@ export function Account({
               </section>
             )
           )}
+          <TokensPanel refresh={tokensShown} />
           <AlliancePanel
             me={me}
             standing={standing}
@@ -948,6 +953,22 @@ export function Account({
               // A new tier opens or closes Planeswalkers: the roster is asked for again.
               standing.reload();
             }}
+          />
+        </section>
+      )}
+      {/* SysOp gives itself tokens here too, to try Leng's card shop (v0.4.0). */}
+      {me.permissions.includes("economy.manage") && (
+        <section className={styles.panel} aria-labelledby="own-tokens-title">
+          <h2 id="own-tokens-title">Give yourself tokens</h2>
+          <p className={styles.fine}>
+            SysOp may give tokens to any account, its own included, or take them
+            back. A grant is kept apart from the tokens won in games, and the
+            audit log records it with its reason.
+          </p>
+          <GiveTokens
+            userId={me.id}
+            subject="your"
+            onGiven={() => setTokensShown((value) => value + 1)}
           />
         </section>
       )}

@@ -576,6 +576,99 @@ describe("wins, tiers and alliances (v0.3.1)", () => {
   });
 });
 
+describe("tokens (v0.4.0)", () => {
+  const sysop: Me = {
+    ...administrator,
+    permissions: [...administrator.permissions, "economy.manage"],
+  };
+  const balance = (amount: number) => ({
+    balance: amount,
+    earned: 0,
+    given: amount,
+    spent: 0,
+    entries: [],
+  });
+
+  it("show each account's balance; only SysOp gives tokens, with a reason", async () => {
+    on(USERS, () => page([user("ann", "active", { tokens: 1000 })]));
+    const view = render(<Admin me={administrator} heading={createRef()} />);
+    const ann = await screen.findByRole("listitem", { name: "ann" });
+    expect(ann).toHaveTextContent("Tokens1,000");
+    expect(
+      screen.queryByRole("button", { name: /^Give tokens to/ }),
+    ).toBeNull();
+    view.unmount();
+
+    on("POST /api/v1/admin/users/{user_id}/tokens", () =>
+      reply(200, balance(1500)),
+    );
+    render(<Admin me={sysop} heading={createRef()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Give tokens to ann" }),
+    );
+    const form = screen.getByRole("form", { name: "Give tokens to ann" });
+    const amount = within(form).getByLabelText(/^Tokens/);
+    fireEvent.change(amount, { target: { value: "0" } });
+    fireEvent.submit(form);
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "Give a whole number of tokens",
+    );
+    fireEvent.change(amount, { target: { value: "500" } });
+    fireEvent.change(within(form).getByLabelText(/^Reason/), {
+      target: { value: "Testing the shop" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Give tokens" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "ann: 1,500 tokens.",
+      ),
+    );
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/admin/users/{user_id}/tokens",
+      {
+        params: { path: { user_id: "id-ann" } },
+        body: { amount: 500, reason: "Testing the shop" },
+      },
+    );
+    expect(screen.getByRole("listitem", { name: "ann" })).toHaveTextContent(
+      "Tokens1,500",
+    );
+  });
+
+  it("have their rules and SysOp's daily cap on bots in their own section", async () => {
+    on(USERS, () => page([]));
+    on("GET /api/v1/admin/economy", () => reply(200, { bot_daily_cap: null }));
+    on("PUT /api/v1/admin/economy", () => reply(200, { bot_daily_cap: 200 }));
+    const view = render(<Admin me={administrator} heading={createRef()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Tokens" }));
+    expect(
+      await screen.findByText("Bots pay without a daily cap."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    view.unmount();
+
+    render(<Admin me={sysop} heading={createRef()} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Tokens" }));
+    fireEvent.click(
+      await screen.findByRole("checkbox", {
+        name: "Cap the tokens bots pay each account in a day",
+      }),
+    );
+    fireEvent.change(screen.getByLabelText("Daily cap in tokens"), {
+      target: { value: "200" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(
+      await screen.findByText(
+        "Bots now pay each account at most 200 tokens a day.",
+      ),
+    ).toBeInTheDocument();
+    expect(client.PUT).toHaveBeenCalledWith("/api/v1/admin/economy", {
+      body: { bot_daily_cap: 200 },
+    });
+  });
+});
+
 describe("the custom cards (v0.3.1)", () => {
   const sysop: Me = {
     ...administrator,

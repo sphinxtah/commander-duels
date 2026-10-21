@@ -21,6 +21,8 @@ import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
 import { TierBadge } from "./alliance/TierBadge";
 import { CatalogAdmin } from "./catalog/CatalogAdmin";
+import { EconomySettings } from "./tokens/EconomySettings";
+import { GiveTokens } from "./tokens/GiveTokens";
 import styles from "./Account.module.css";
 import shell from "./App.module.css";
 import admin from "./admin/admin.module.css";
@@ -68,6 +70,7 @@ function Users({ me }: { me: Me }) {
   const [roster, setRoster] = useState<Planeswalker[]>([]);
   // The account whose wins SysOp is setting, if any.
   const [settingWins, setSettingWins] = useState<string>();
+  const [givingTokens, setGivingTokens] = useState<string>();
   const latest = useRef(0);
   // The message a failed load left, so a load that works can take it back.
   const loadFailure = useRef("");
@@ -75,6 +78,8 @@ function Users({ me }: { me: Me }) {
   const roles = me.permissions.includes("admin.roles.manage");
   const administrators = me.permissions.includes("admin.roles.administrator");
   const progress = me.permissions.includes("progress.manage");
+  // SysOp gives and takes back tokens (v0.4.0).
+  const economy = me.permissions.includes("economy.manage");
   useEffect(() => {
     let active = true;
     void client
@@ -260,6 +265,10 @@ function Users({ me }: { me: Me }) {
                     </dd>
                   </div>
                   <div>
+                    <dt>Tokens</dt>
+                    <dd>{user.tokens.toLocaleString("en-US")}</dd>
+                  </div>
+                  <div>
                     <dt>Alliance</dt>
                     <dd>
                       {user.alliance ? (
@@ -297,7 +306,7 @@ function Users({ me }: { me: Me }) {
                     ))}
                   </fieldset>
                 )}
-                {((manage && !locked) || progress) && (
+                {((manage && !locked) || progress || economy) && (
                   <div className={styles.actions}>
                     {/* SysOp sets any account's wins, and so its tier (v0.3.1). */}
                     {progress && settingWins !== user.id && (
@@ -306,6 +315,14 @@ function Users({ me }: { me: Me }) {
                         onClick={() => setSettingWins(user.id)}
                       >
                         Set wins for {name}
+                      </button>
+                    )}
+                    {economy && givingTokens !== user.id && (
+                      <button
+                        className={styles.secondary}
+                        onClick={() => setGivingTokens(user.id)}
+                      >
+                        Give tokens to {name}
                       </button>
                     )}
                     {manage && !locked && user.status === "pending" && (
@@ -370,6 +387,20 @@ function Users({ me }: { me: Me }) {
                       );
                     }}
                     onCancel={() => setSettingWins(undefined)}
+                  />
+                )}
+                {economy && givingTokens === user.id && (
+                  <GiveTokens
+                    userId={user.id}
+                    subject={name}
+                    onGiven={(changed) => {
+                      replace({ ...user, tokens: changed.balance });
+                      setGivingTokens(undefined);
+                      setMessage(
+                        `${name}: ${changed.balance.toLocaleString("en-US")} tokens.`,
+                      );
+                    }}
+                    onCancel={() => setGivingTokens(undefined)}
                   />
                 )}
               </li>
@@ -505,7 +536,7 @@ export function canAdminister(me: Me | null | undefined) {
   );
 }
 
-type Tab = "users" | "audit" | "catalog" | "custom";
+type Tab = "users" | "economy" | "audit" | "catalog" | "custom";
 
 export function Admin({
   me,
@@ -547,6 +578,7 @@ export function Admin({
   const custom = me!.permissions.includes("custom_cards.manage");
   const available = [
     users && "users",
+    users && "economy",
     audit && "audit",
     catalog && "catalog",
     custom && "custom",
@@ -574,6 +606,15 @@ export function Admin({
             onClick={() => setTab("users")}
           >
             Accounts
+          </button>
+        )}
+        {users && (
+          <button
+            role="tab"
+            aria-selected={shown === "economy"}
+            onClick={() => setTab("economy")}
+          >
+            Tokens
           </button>
         )}
         {audit && (
@@ -607,6 +648,10 @@ export function Admin({
       <div role="tabpanel">
         {shown === "users" ? (
           <Users me={me!} />
+        ) : shown === "economy" ? (
+          <EconomySettings
+            canChange={me!.permissions.includes("economy.manage")}
+          />
         ) : shown === "audit" ? (
           <Audit />
         ) : shown === "catalog" ? (
