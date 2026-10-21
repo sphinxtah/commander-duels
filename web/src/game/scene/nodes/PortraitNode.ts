@@ -1,12 +1,16 @@
+import { containFit, portraitBox, portraitSize } from "../../table/portrait";
 import type { Diamond, PlayerNode, Rect, TablePlayer } from "../../table/types";
 import type { SceneKit } from "../createTableScene";
 import { diamondPath } from "../icons";
 import { BitmapText, Container, Graphics, Sprite } from "../pixi";
 
-// A player's portrait (design §8.4, §8.6–§8.8): their sigil in a diamond frame, black-rimmed with
-// a gold hairline (yours in colour, opponents' grey with a thinner bevel), life in a red diamond
-// below it and the counts of hand, graveyard and library in small black diamonds beside it. The
-// names, the life numeral and the pills are the DOM's text; the count numerals are drawn here.
+// A player's portrait (design §8.4, §8.6–§8.8): their picture in a diamond frame, black-rimmed
+// with a gold hairline (yours in colour, opponents' grey with a thinner bevel), life in a red
+// diamond below it and the counts of hand, graveyard and library in small black diamonds beside
+// it. The picture is their allied Planeswalker's portrait (v0.3.1), standing upright in front of
+// the frame and fitted whole, or else their sigil, cut to the diamond; while a portrait is on its
+// way the frame stays empty, so neither flashes in for the other. The names, the life numeral and
+// the pills are the DOM's text; the count numerals are drawn here.
 // The active player's portrait glows gold and an active opponent's column is lit; a player who
 // lost is cracked and dimmed, with a shade over their column (the scene plays both in as the
 // player is eliminated, design §14). Your portrait also carries the purple bar: the response
@@ -46,6 +50,7 @@ export class PortraitNode {
   readonly root = new Container();
   private readonly frame = new Graphics();
   private readonly sigil = new Sprite();
+  private readonly picture = new Sprite();
   private readonly crack = new Sprite();
   private readonly life = new Graphics();
   private readonly counts = new Container();
@@ -63,9 +68,11 @@ export class PortraitNode {
     this.crack.texture = kit.art.crack;
     this.crack.visible = false;
     this.shade.alpha = 0;
+    this.picture.visible = false;
     this.root.addChild(
       this.frame,
       this.sigil,
+      this.picture,
       this.crack,
       this.life,
       this.counts,
@@ -81,7 +88,17 @@ export class PortraitNode {
     this.node = node;
     this.lost = player.lost;
     const p = player.player;
+    const box = portraitBox(node.portrait);
+    const picture = player.portrait
+      ? this.kit.portrait(
+          player.portrait,
+          portraitSize(box.w * this.kit.resolution()),
+          player.sigil.grey,
+        )
+      : "missing";
     const signature = [
+      player.portrait,
+      typeof picture === "string" ? picture : picture.uid,
       node.portrait.cx,
       node.portrait.cy,
       node.portrait.side,
@@ -126,11 +143,22 @@ export class PortraitNode {
       color: 0xd9b56e,
     });
     const inner = portrait.side - rim * 2;
-    this.sigil.texture = this.kit.sigil(player.sigil.seed, player.sigil.grey);
-    this.sigil.anchor.set(0.5);
-    this.sigil.position.set(portrait.cx, portrait.cy);
-    this.sigil.width = inner * Math.SQRT2;
-    this.sigil.height = inner * Math.SQRT2;
+    this.sigil.visible = picture === "missing";
+    if (this.sigil.visible) {
+      this.sigil.texture = this.kit.sigil(player.sigil.seed, player.sigil.grey);
+      this.sigil.anchor.set(0.5);
+      this.sigil.position.set(portrait.cx, portrait.cy);
+      this.sigil.width = inner * Math.SQRT2;
+      this.sigil.height = inner * Math.SQRT2;
+    }
+    this.picture.visible = typeof picture !== "string";
+    if (typeof picture !== "string") {
+      const fit = containFit(box, picture.width, picture.height);
+      this.picture.texture = picture;
+      this.picture.position.set(fit.x, fit.y);
+      this.picture.width = fit.w;
+      this.picture.height = fit.h;
+    }
     // The crack's and the dimming's strength is the scene's (setLost), which plays them in.
     this.crack.anchor.set(0.5);
     this.crack.position.set(portrait.cx, portrait.cy);
@@ -232,7 +260,7 @@ export class PortraitNode {
     this.life.scale.set(scale);
   }
 
-  /** How far a player's loss shows, 0 to 1: the crack spreads over the sigil, the portrait fades
+  /** How far a player's loss shows, 0 to 1: the crack spreads over the picture, the portrait fades
    * and the shade darkens their column. */
   setLost(amount: number): void {
     this.crack.visible = amount > 0;

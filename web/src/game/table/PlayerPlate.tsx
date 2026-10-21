@@ -1,10 +1,17 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { boxStyle, OptionMenu, useGameContext, useOptionMenu } from "../Board";
 import { CardFace } from "../Card";
 import { playerName, words } from "../model";
 import type { ManaPool, Seat } from "../types";
 import { MENU, diamondBox } from "./geometry";
 import { noteBlur, noteFocus } from "./pointer";
+import {
+  isPortraitId,
+  portraitBox,
+  portraitName,
+  portraitSize,
+  portraitUrl,
+} from "./portrait";
 import { sigilSpec } from "./sigil";
 import { SigilSvg } from "./SigilSvg";
 import { useTableContext } from "./TableContext";
@@ -26,7 +33,8 @@ import styles from "./table.module.css";
 // A player's plate on the table (P1–P5, design §9.2): name and title, the pills, the portrait and
 // life (a button when the prompt offers the player), the counts, the zone tiles, the status row
 // and the board's Expand or Show button. Names, life and status are DOM text at every scale; the
-// scene draws the diamonds, the sigil and the counts' numerals unless the dom painter does.
+// scene draws the diamonds, the portrait or sigil and the counts' numerals unless the dom painter
+// does. A Planeswalker portrait (v0.3.1) is named in both painters.
 
 const poolColours: [keyof ManaPool, string][] = [
   ["white", "W"],
@@ -85,6 +93,88 @@ function commanderWords(
     .map((entry) => `, ${entry.damage} to ${name(entry.seat)}`)
     .join("");
   return `${commander.name}: ${zone}, tax ${commander.tax}${dealt}`;
+}
+
+/** The generated sigil in the portrait's diamond, drawn by the dom painter; named when it stands
+ * in for a portrait that did not load. */
+function Sigil({
+  player,
+  node,
+  label,
+}: {
+  player: TablePlayer;
+  node: PlayerNode;
+  label?: string;
+}) {
+  return (
+    <span
+      className={`${styles.diamond} ${styles.portrait}`}
+      {...(label
+        ? { role: "img", "aria-label": label }
+        : { "aria-hidden": true })}
+      style={diamondStyle(node.portrait)}
+    >
+      <SigilSvg
+        spec={sigilSpec(player.sigil.seed, player.sigil.grey)}
+        size={node.portrait.side * Math.SQRT2}
+      />
+    </span>
+  );
+}
+
+/** The player's picture in their diamond: their allied Planeswalker's portrait, upright in front
+ * of the frame and fitted whole (grey for an opponent), or else the sigil. The scene draws it for
+ * the webgl painter, so only its name is here then. A portrait that does not load keeps the
+ * sigil. */
+function Portrait({ player, node }: { player: TablePlayer; node: PlayerNode }) {
+  const scene = useTableContext();
+  const painted = scene.painter === "dom";
+  const [failed, setFailed] = useState<string | null>(null);
+  const id = isPortraitId(player.portrait) ? player.portrait : null;
+  if (!id) return painted ? <Sigil player={player} node={node} /> : null;
+  const label = `${portraitName(id)} portrait`;
+  const box = portraitBox(node.portrait);
+  if (!painted)
+    return (
+      <span
+        className={styles.slot}
+        role="img"
+        aria-label={label}
+        style={boxStyle(box)}
+      />
+    );
+  const url = portraitUrl(
+    id,
+    portraitSize(box.w * (scene.fit?.resolution ?? 1)),
+  );
+  if (failed === url)
+    return <Sigil player={player} node={node} label={label} />;
+  const frame = diamondBox(node.portrait);
+  return (
+    <span
+      className={styles.diamond}
+      role="img"
+      aria-label={label}
+      data-portrait={id}
+      style={boxStyle(frame)}
+    >
+      <img
+        className={styles.picture}
+        src={url}
+        alt=""
+        decoding="async"
+        draggable={false}
+        data-grey={player.sigil.grey || undefined}
+        style={{
+          left: box.x - frame.x,
+          top: box.y - frame.y,
+          width: box.w,
+          height: box.h,
+        }}
+        onError={() => setFailed(url)}
+      />
+    </span>
+  );
 }
 
 /** The portrait and life: a button when the prompt offers this player (P3), answering its one
@@ -476,18 +566,7 @@ export function PlayerPlate({
           </span>
         )}
       </span>
-      {painted && (
-        <span
-          className={`${styles.diamond} ${styles.portrait}`}
-          aria-hidden="true"
-          style={diamondStyle(node.portrait)}
-        >
-          <SigilSvg
-            spec={sigilSpec(player.sigil.seed, player.sigil.grey)}
-            size={node.portrait.side * Math.SQRT2}
-          />
-        </span>
-      )}
+      <Portrait key={player.portrait ?? ""} player={player} node={node} />
       <PlayerTarget player={player} node={node} />
       <span
         className={`${styles.diamond} ${styles.life}`}

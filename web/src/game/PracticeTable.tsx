@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { client, describe, type Me } from "../api";
 import {
   canFullscreen,
@@ -71,6 +77,8 @@ function outcome(game: GameSummary): string {
   return `${kinds[result.kind] ?? "Finished"} after ${turns}`;
 }
 
+/** The account's own decks, then the engine's fixture decks: offered to SysOp only (v0.3.1), so
+ * a player's lists are empty and get no group. */
 function DeckOptions({
   fixtures,
   own,
@@ -90,13 +98,15 @@ function DeckOptions({
           ))}
         </optgroup>
       )}
-      <optgroup label="Starter decks">
-        {fixtures.map((d) => (
-          <option key={d} value={d}>
-            {deckName(d)}
-          </option>
-        ))}
-      </optgroup>
+      {fixtures.length > 0 && (
+        <optgroup label="Fixture decks">
+          {fixtures.map((d) => (
+            <option key={d} value={d}>
+              {deckName(d)}
+            </option>
+          ))}
+        </optgroup>
+      )}
     </>
   );
 }
@@ -184,8 +194,11 @@ function Table({ me }: { me: Me }) {
   const [deckList, setDeckList] = useState("");
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<string[]>([]);
-  const [ownDecks, setOwnDecks] = useState<OwnDeck[]>([]);
+  /** The account's decks; null until they have been asked for. */
+  const [ownDecks, setOwnDecks] = useState<OwnDeck[] | null>(null);
   const [requested, setRequested] = useState(requestedDeck);
+  /** Whether the format was chosen (by the player, or a "Play it" link) rather than defaulted. */
+  const formatChosen = useRef(false);
 
   const refresh = useCallback(async () => {
     const { data } = await client.GET("/api/v1/games", {
@@ -207,6 +220,7 @@ function Table({ me }: { me: Me }) {
           .then(({ data: decks }) => {
             if (active) setOwnDecks(decks ?? []);
           });
+      else if (data) setOwnDecks([]);
     });
     return () => {
       active = false;
@@ -233,8 +247,9 @@ function Table({ me }: { me: Me }) {
   useEffect(() => {
     // A deck asked for by a link from the deck builder: its format, then the deck itself. It
     // runs after the reset above, which a change of format also triggers.
-    const wanted = ownDecks.find((d) => d.id === requested);
+    const wanted = ownDecks?.find((d) => d.id === requested);
     if (!wanted) return;
+    formatChosen.current = true;
     if (wanted.format !== format) setFormat(wanted.format);
     else {
       setDeck(`${OWN}${wanted.id}`);
@@ -242,6 +257,19 @@ function Table({ me }: { me: Me }) {
       setRequested(undefined);
     }
   }, [ownDecks, requested, format]);
+  useEffect(() => {
+    // A player plays their own decks (v0.3.1), so the table opens on a format they have one for:
+    // Commander, when their only playable decks are the Commander starter decks. Once only, and
+    // never over a format they or a "Play it" link chose.
+    if (formatChosen.current || requested || !options || ownDecks === null)
+      return;
+    formatChosen.current = true;
+    const here = (id: string) =>
+      options.formats.some((f) => f.id === id && f.decks.length > 0) ||
+      ownDecks.some((d) => d.format === id && d.playable);
+    const other = ownDecks.find((d) => d.playable);
+    if (!here(format) && other) setFormat(other.format);
+  }, [options, ownDecks, requested, format]);
   useEffect(() => {
     if (!useList || query.trim().length < 2) {
       setFound([]);
@@ -258,6 +286,15 @@ function Table({ me }: { me: Me }) {
   }, [query, useList]);
 
   const chosenFormat = options?.formats.find((f) => f.id === format);
+  const fixtures = chosenFormat?.decks ?? [];
+  const ownHere = (ownDecks ?? []).filter((d) => d.format === format);
+  // A player has no fixture decks (v0.3.1): they play a deck of their own, the first playable
+  // one unless they choose another. SysOp may leave it to the engine's free fixture decks.
+  const firstPlayable = ownHere.find((d) => d.playable);
+  const ownOnly = options !== undefined && fixtures.length === 0;
+  const chosenDeck =
+    deck || (ownOnly && firstPlayable ? `${OWN}${firstPlayable.id}` : "");
+  const noDeck = ownOnly && ownDecks !== null && !firstPlayable && !useList;
 
   async function start(event: FormEvent) {
     event.preventDefault();
@@ -275,7 +312,7 @@ function Table({ me }: { me: Me }) {
       ),
       ...(useList && deckList.trim()
         ? { deck_list: deckList }
-        : seatChoice(deck)),
+        : seatChoice(chosenDeck)),
     };
     // A request that throws (the network dropped) is a failure like a refusal: no game, so the
     // full screen asked for above ends and the button comes back.
@@ -331,7 +368,10 @@ function Table({ me }: { me: Me }) {
                 name="format"
                 value={f.id}
                 checked={format === f.id}
-                onChange={() => setFormat(f.id)}
+                onChange={() => {
+                  formatChosen.current = true;
+                  setFormat(f.id);
+                }}
               />
               <span>
                 <strong>{f.name}</strong>
@@ -344,21 +384,28 @@ function Table({ me }: { me: Me }) {
             </label>
           ))}
         </fieldset>
-        <label className={styles.field}>
-          <span>Your deck</span>
-          <select
-            aria-label="Your deck"
-            value={deck}
-            disabled={useList}
-            onChange={(event) => setDeck(event.target.value)}
-          >
-            <option value="">Any free fixture deck</option>
-            <DeckOptions
-              fixtures={chosenFormat?.decks ?? []}
-              own={ownDecks.filter((d) => d.format === format)}
-            />
-          </select>
-        </label>
+        {noDeck ? (
+          <div className={styles.field} data-no-deck>
+            <span>Your deck</span>
+            <span>
+              You have no playable {chosenFormat?.name ?? ""} deck yet. Build
+              one, or fix one, in <a href="#decks">Decks</a>.
+            </span>
+          </div>
+        ) : (
+          <label className={styles.field}>
+            <span>Your deck</span>
+            <select
+              aria-label="Your deck"
+              value={chosenDeck}
+              disabled={useList}
+              onChange={(event) => setDeck(event.target.value)}
+            >
+              {!ownOnly && <option value="">Any free fixture deck</option>}
+              <DeckOptions fixtures={fixtures} own={ownHere} />
+            </select>
+          </label>
+        )}
         {chosenFormat && chosenFormat.bots.length > 1 && (
           <label className={styles.field}>
             <span>Bots</span>
@@ -389,11 +436,10 @@ function Table({ me }: { me: Me }) {
                 )
               }
             >
-              <option value="">Any free fixture deck</option>
-              <DeckOptions
-                fixtures={chosenFormat?.decks ?? []}
-                own={ownDecks.filter((d) => d.format === format)}
-              />
+              {/* Left to the server: Commander bots play the starter decks, Legacy bots the
+                  engine's fixture decks. */}
+              <option value="">Chosen by the table</option>
+              <DeckOptions fixtures={fixtures} own={ownHere} />
             </select>
           </label>
         ))}
@@ -482,7 +528,11 @@ function Table({ me }: { me: Me }) {
           <button
             type="submit"
             className={styles.primaryButton}
-            disabled={starting || !options || (useList && !deckList.trim())}
+            disabled={
+              starting ||
+              !options ||
+              (useList ? !deckList.trim() : ownOnly && !chosenDeck)
+            }
           >
             {starting ? "Shuffling…" : "Start the game"}
           </button>

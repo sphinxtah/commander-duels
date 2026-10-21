@@ -280,7 +280,6 @@
   scrollbar-width: thin;
   scrollbar-color: #e6c68c55 transparent;
 }
-.note,
 .small {
   display: flex;
   align-items: flex-start;
@@ -291,17 +290,6 @@
   border-radius: 6px;
   background: #0c1314e0;
   font-size: 0.95rem;
-}
-.note p {
-  flex: 1;
-  margin: 0;
-}
-.note > button {
-  border: 0;
-  background: none;
-  color: #8fa09a;
-  font-size: 1.4rem;
-  line-height: 1;
 }
 .passingNotice {
   display: flex;

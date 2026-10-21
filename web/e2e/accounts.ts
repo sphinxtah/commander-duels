@@ -7,6 +7,10 @@ import type { Me } from "../src/api";
  * password. The stand-in may neither play nor build decks, so no page asks the API for anything
  * on its behalf, and /me keeps the preferences a PATCH saves, as the server does. The returned
  * function changes the account, as an approval would; the page sees it the next time it asks.
+ *
+ * By default it is past onboarding (v0.3.1: its handle, then two starter decks), with no
+ * alliance; the starter decks are chosen through `POST /api/v1/me/starters`, which needs a deck
+ * builder, so a stand-in is seeded past that step rather than walked through it.
  */
 export async function standIn(page: Page, changes: Partial<Me> = {}) {
   const account: Me = {
@@ -14,6 +18,7 @@ export async function standIn(page: Page, changes: Partial<Me> = {}) {
     kind: "player",
     status: "active",
     onboarding: "complete",
+    alliance: null,
     handle: "stand-in",
     display_name: "Stand-in",
     email: "stand-in@example.com",

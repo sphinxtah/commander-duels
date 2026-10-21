@@ -308,3 +308,64 @@ describe("a player's plate", () => {
     expect(document.querySelector('svg[data-sigil="grey"]')).not.toBeNull();
   });
 });
+
+describe("a player's Planeswalker portrait (v0.3.1)", () => {
+  /** The duel, with Alice allied with `mine` and seat 1 a human allied with `theirs`. */
+  function allied(mine: string | null, theirs: string | null): TableFixture {
+    const f = tableFixture("duel");
+    f.summarySeats = [
+      { ...f.summarySeats[0], portrait: mine },
+      { seat: 1, player: "human", handle: "bob", deck: null, portrait: theirs },
+    ];
+    return f;
+  }
+
+  it("stands in your diamond instead of the sigil, in colour and named", () => {
+    plate(allied("rowan", null), 0);
+    const portrait = screen.getByRole("img", { name: "Rowan portrait" });
+    expect(portrait).toHaveAttribute("data-portrait", "rowan");
+    const picture = portrait.querySelector("img")!;
+    expect(picture).toHaveAttribute("src", "/portraits/rowan-256.webp");
+    expect(picture).toHaveAttribute("alt", "");
+    expect(picture).not.toHaveAttribute("data-grey");
+    expect(picture).toHaveClass(styles.picture);
+    // Upright in front of the frame, never cut to it: not inside the sigil's clipped diamond.
+    expect(portrait).not.toHaveClass(styles.portrait);
+    expect(document.querySelector("svg[data-sigil]")).toBeNull();
+    // Your life is still your life.
+    expect(screen.getByRole("img", { name: "18 life" })).toBeInTheDocument();
+  });
+
+  it("is grey for an opponent, as their sigil is", () => {
+    plate(allied(null, "chandra"), 1);
+    const picture = screen
+      .getByRole("img", { name: "Chandra portrait" })
+      .querySelector("img")!;
+    expect(picture).toHaveAttribute("data-grey");
+  });
+
+  it("keeps the sigil, still named, when the picture does not load", () => {
+    plate(allied("the-sphinx", null), 0);
+    const portrait = screen.getByRole("img", { name: "The Sphinx portrait" });
+    fireEvent.error(portrait.querySelector("img")!);
+    const fallback = screen.getByRole("img", { name: "The Sphinx portrait" });
+    expect(fallback.querySelector("img")).toBeNull();
+    expect(fallback.querySelector('svg[data-sigil="colour"]')).not.toBeNull();
+  });
+
+  it("keeps the sigil for anything that is not a roster ID, asking for nothing", () => {
+    plate(allied("../api/v1/me", null), 0);
+    expect(document.querySelector('img[src^="/portraits/"]')).toBeNull();
+    expect(screen.queryByRole("img", { name: /portrait/ })).toBeNull();
+    expect(document.querySelector('svg[data-sigil="colour"]')).not.toBeNull();
+  });
+
+  it("is only named with the webgl painter, which draws it on the canvas", () => {
+    plate(allied("rowan", null), 0, { painter: "webgl" });
+    expect(
+      screen.getByRole("img", { name: "Rowan portrait" }),
+    ).toBeInTheDocument();
+    expect(document.querySelector('img[src^="/portraits/"]')).toBeNull();
+    expect(document.querySelector("svg[data-sigil]")).toBeNull();
+  });
+});

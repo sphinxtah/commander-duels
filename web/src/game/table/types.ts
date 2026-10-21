@@ -87,6 +87,7 @@ export interface TablePlayer {
   title: string | null; // your deck name for yourself; "Bot"/"Player" otherwise; deck name only for SysOp
   kind: "human" | "bot" | null;
   sigil: { seed: string; grey: boolean }; // seed: `handle:<h>` | `bot:<seat>` | `seat:<seat>`
+  portrait: string | null; // a human's allied Planeswalker (v0.3.1), shown instead of the sigil
   active: boolean;
   priority: boolean;
   lost: boolean;
@@ -155,6 +156,7 @@ export interface SummarySeat {
   player: "human" | "bot";
   handle: string | null;
   deck: string | null;
+  portrait?: string | null; // a human's allied Planeswalker, by roster ID (v0.3.1)
 }
 export interface BuildInput {
   gameId: string;
@@ -172,6 +174,7 @@ export interface BuildInput {
   viewSeat: Seat | null; // state.seat
   summarySeats: SummarySeat[] | null;
   selfHandle: string | null; // me.handle
+  selfPortrait?: string | null; // me.alliance, until the summary says
   sysop: boolean; // games.view_concealed
 }
 export type BuildTableModel = (input: BuildInput) => TableModel;

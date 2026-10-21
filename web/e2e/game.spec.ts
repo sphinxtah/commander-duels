@@ -639,14 +639,14 @@ test.describe("practice games in the browser", () => {
       deck: "legacy-mono-red-burn",
       turnCap: 20,
     });
-    await expect(
-      page.getByRole("note").filter({ hasText: "bots still read your hand" }),
-    ).toBeVisible();
     await expect(page.locator("[data-screen]")).toHaveAttribute(
       "data-renderer",
       "webgl",
       { timeout: 30_000 },
     );
+    // The bots plan only on what their seat may see (AI02, v0.3.1): the practice table no longer
+    // warns that they read your hand.
+    await expect(page.getByText(/read your hand/)).toHaveCount(0);
     // On the third turn, the table at each size the scope names, between two answers.
     let shot = false;
     const { snapshot, answered, kinds } = await play(
