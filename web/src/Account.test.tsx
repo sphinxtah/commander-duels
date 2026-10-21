@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { createRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +16,7 @@ import {
   setCsrfToken,
   type Me,
 } from "./api";
+import { progress, roster, starterDecks } from "./alliance/fixtures";
 import { loadGoogle, type GoogleId } from "./google";
 
 vi.mock("./google", () => ({ loadGoogle: vi.fn() }));
@@ -144,9 +146,12 @@ function Page({
 beforeEach(() => {
   calls = [];
   queues.clear();
-  for (const method of ["GET", "POST", "PATCH", "DELETE"] as const)
+  for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"] as const)
     vi.spyOn(client, method).mockImplementation(serve(method));
   on("GET /api/v1/me/sessions", () => reply(200, []));
+  // Profile's progress and the roster (v0.3.1).
+  on("GET /api/v1/me/progress", () => reply(200, progress()));
+  on("GET /api/v1/planeswalkers", () => reply(200, roster));
   setCsrfToken("token-1");
   // Google's script stays away unless a test brings its own.
   vi.mocked(loadGoogle).mockReturnValue(new Promise(() => {}));
@@ -816,5 +821,511 @@ describe("the Google button", () => {
     expect(screen.queryByText("Signing you in…")).toBeNull();
     // Google's answer is spent: the button comes back with a new challenge.
     await ready("nonce-2");
+  });
+});
+
+describe("the starter decks at onboarding (v0.3.1)", () => {
+  const choosing = () => account({ onboarding: "starters" });
+  beforeEach(() => {
+    on("GET /api/v1/decks/starters", () => reply(200, starterDecks));
+  });
+
+  it("follow the handle, with focus on their heading", async () => {
+    on("PATCH /api/v1/me", () => reply(200, choosing()));
+    render(
+      <Page
+        initial={account({ onboarding: "handle", handle: null })}
+        auth={google}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Handle"), {
+      target: { value: "alice" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save handle" }));
+    const heading = await screen.findByRole("heading", {
+      name: "Choose two starter decks",
+    });
+    expect(document.activeElement).toBe(heading);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Welcome to the table.",
+    );
+    // The profile, the alliance and the progress wait until onboarding is done.
+    expect(screen.queryByLabelText("Display name")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Your alliance" })).toBeNull();
+  });
+
+  it("show each deck's commander, colours, description, how to play it and what it teaches, and take exactly two", async () => {
+    render(<Page initial={choosing()} auth={google} />);
+    const skies = await screen.findByRole("checkbox", {
+      name: "Stand-in Skies",
+    });
+    const item = skies.closest("li")!;
+    expect(item.querySelector("img")).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/printing-starter_one?size=normal",
+    );
+    expect(item).toHaveTextContent("White / Blue · Azorius");
+    expect(item).toHaveTextContent("Commander: Stand-in Skies Leader");
+    expect(skies).toHaveAccessibleDescription(
+      /^Stand-in Skies plays a stand-in game\.\s*How to play\. Play Stand-in Skies with care\.\s*Teaches\. Stand-in lessons\.$/,
+    );
+    // A commander with no printing shows its name in a frame instead.
+    const embers = screen.getByRole("checkbox", { name: "Stand-in Embers" });
+    expect(embers.closest("li")!.querySelector("img")).toBeNull();
+    expect(embers.closest("li")).toHaveTextContent("Stand-in Embers Leader");
+
+    const confirm = screen.getByRole("button", {
+      name: "Confirm these two decks",
+    });
+    expect(confirm).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("No deck chosen yet.")).toBeInTheDocument();
+    fireEvent.click(skies);
+    expect(
+      screen.getByText("Chosen: Stand-in Skies. Choose one more."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
+    expect(
+      screen.getByText("Chosen: Stand-in Skies and Stand-in Graves."),
+    ).toBeInTheDocument();
+    // Two are the most: the third waits until one of the two is let go.
+    expect(embers).toBeDisabled();
+    expect(confirm).toHaveAttribute("aria-disabled", "false");
+    fireEvent.click(skies);
+    expect(embers).toBeEnabled();
+    expect(confirm).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("say so when Confirm is pressed before two are chosen", async () => {
+    render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm these two decks" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose two starter decks first.",
+    );
+    expect(count("POST /api/v1/me/starters")).toBe(0);
+  });
+
+  it("are sent in the order chosen, then an alliance is offered, which can wait until later", async () => {
+    on("POST /api/v1/me/starters", () =>
+      reply(201, { decks: ["deck-1", "deck-2"] }),
+    );
+    on("GET /api/v1/me", () => reply(200, account()));
+    const seen = vi.fn();
+    render(<Page initial={choosing()} auth={google} seen={seen} />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Stand-in Graves" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Skies" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm these two decks" }),
+    );
+    const offer = await screen.findByRole("heading", {
+      name: "Choose an alliance",
+    });
+    expect(document.activeElement).toBe(offer);
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/me/starters", {
+      body: { decks: ["starter_two", "starter_one"] },
+    });
+    expect(seen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ onboarding: "complete" }),
+    );
+    // The roster by tier: open ones to ally with, locked ones not.
+    expect(
+      screen.getByRole("button", { name: "Ally with Rowan" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ally with Kaya" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Later" }));
+    const alliance = await screen.findByRole("heading", {
+      name: "Your alliance",
+    });
+    expect(document.activeElement).toBe(alliance);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Welcome back, Alice.",
+    );
+    expect(
+      screen.getByText(
+        "You are in no alliance yet, so your profile shows your avatar.",
+      ),
+    ).toBeInTheDocument();
+    expect(count("PUT /api/v1/me/alliance")).toBe(0);
+  });
+
+  it("lead to an alliance chosen at once, which the profile then shows", async () => {
+    on("POST /api/v1/me/starters", () =>
+      reply(201, { decks: ["deck-1", "deck-2"] }),
+    );
+    on(
+      "GET /api/v1/me",
+      () => reply(200, account()),
+      () => reply(200, account({ alliance: "rowan" })),
+    );
+    on("PUT /api/v1/me/alliance", () =>
+      reply(
+        200,
+        progress({ alliance: "rowan", alliance_since: "2026-10-21T10:00:00Z" }),
+      ),
+    );
+    render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm these two decks" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Ally with Rowan" }),
+    );
+    expect(
+      await screen.findByText(
+        "You are allied with Rowan. Their Planeswalker cards are in your library, four copies of each.",
+      ),
+    ).toBeInTheDocument();
+    expect(client.PUT).toHaveBeenCalledWith("/api/v1/me/alliance", {
+      body: { planeswalker: "rowan" },
+    });
+    expect(
+      screen.getByRole("heading", { name: "Your alliance" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Account" })).toHaveTextContent(
+      "Allied with Rowan",
+    );
+    expect(
+      screen.getByRole("button", { name: "Leave the alliance with Rowan" }),
+    ).toBeInTheDocument();
+  });
+
+  it("go on when another tab chose them first", async () => {
+    on("POST /api/v1/me/starters", () =>
+      reply(409, {
+        code: "starters_chosen",
+        message: "Your starter decks are already chosen.",
+      }),
+    );
+    on("GET /api/v1/me", () => reply(200, account()));
+    render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm these two decks" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Choose an alliance" }),
+    ).toBeInTheDocument();
+  });
+
+  it("say why they could not be chosen, and stay", async () => {
+    on("POST /api/v1/me/starters", () =>
+      reply(503, {
+        code: "starters_unavailable",
+        message:
+          "The card catalog is not ready for the starter decks yet. Try again later.",
+      }),
+    );
+    render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Confirm these two decks" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The card catalog is not ready for the starter decks yet.",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Choose two starter decks" }),
+    ).toBeInTheDocument();
+    expect(count("GET /api/v1/me")).toBe(0);
+  });
+
+  it("offer Try again when the list does not arrive", async () => {
+    on(
+      "GET /api/v1/decks/starters",
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      () => reply(200, starterDecks),
+    );
+    render(<Page initial={choosing()} auth={google} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The application service is unavailable. Try again.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("progress and the alliance on Profile (v0.3.1)", () => {
+  it("shows the alliance's portrait with the tier's crest, the wins and the way to the next tier", async () => {
+    on("GET /api/v1/me/progress", () =>
+      reply(
+        200,
+        progress({
+          wins: 120,
+          counted_wins: 20,
+          set_wins: 100,
+          alliance: "rowan",
+          alliance_since: "2026-10-20T10:00:00Z",
+        }),
+      ),
+    );
+    render(<Page initial={account({ alliance: "rowan" })} auth={google} />);
+    const card = screen.getByRole("region", { name: "Account" });
+    expect(
+      await within(card).findByRole("img", { name: "Gold tier" }),
+    ).toBeInTheDocument();
+    const portrait = within(card).getByRole("img", {
+      name: "Rowan, painted for the tests.",
+    });
+    expect(portrait).toHaveAttribute("src", "/portraits/rowan-256.webp");
+    expect(portrait).toHaveAttribute(
+      "srcset",
+      "/portraits/rowan-128.webp 128w, /portraits/rowan-256.webp 256w, /portraits/rowan-512.webp 512w",
+    );
+    expect(card).toHaveTextContent("Allied with Rowan");
+    const bar = screen.getByRole("progressbar", {
+      name: "Progress to Platinum",
+    });
+    expect(bar).toHaveAttribute("aria-valuenow", "20");
+    expect(bar).toHaveAttribute("aria-valuemax", "900");
+    expect(bar).toHaveAttribute("aria-valuetext", "120 wins of 1,000 wins");
+    expect(
+      screen.getByText("880 more wins to reach Platinum at 1,000 wins."),
+    ).toBeInTheDocument();
+    // SysOp's settings are said apart from the games won.
+    expect(
+      screen.getByText("20 wins from games · +100 set by SysOp"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("2 cards playable here · allied since Oct 20, 2026"),
+    ).toBeInTheDocument();
+    // Only SysOp sets wins.
+    expect(screen.queryByRole("form", { name: "Set your wins" })).toBeNull();
+  });
+
+  it("keeps the avatar with no alliance, and says when the tier is the highest", async () => {
+    on("GET /api/v1/me/progress", () => reply(200, progress({ wins: 100000 })));
+    render(<Page initial={account()} auth={google} />);
+    const card = screen.getByRole("region", { name: "Account" });
+    expect(
+      await within(card).findByRole("img", { name: "Godlike tier" }),
+    ).toBeInTheDocument();
+    expect(card.querySelector("img")).toBeNull();
+    expect(
+      screen.getByText(
+        "Godlike is the highest tier: every Planeswalker is open to you.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(
+      screen.getByText(
+        "You are in no alliance yet, so your profile shows your avatar.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a placeholder for an alliance with no portrait yet", async () => {
+    render(
+      <Page initial={account({ alliance: "the-sphinx" })} auth={google} />,
+    );
+    const card = screen.getByRole("region", { name: "Account" });
+    expect(
+      await within(card).findByRole("img", {
+        name: "The Sphinx: no portrait yet",
+      }),
+    ).toBeInTheDocument();
+    expect(card.querySelector("img")).toBeNull();
+  });
+
+  it("groups every Planeswalker by tier: open ones to ally with, locked ones with the wins that open them", async () => {
+    on("PUT /api/v1/me/alliance", () =>
+      reply(200, progress({ alliance: "abian" })),
+    );
+    on("GET /api/v1/me", () => reply(200, account({ alliance: "abian" })));
+    const seen = vi.fn();
+    render(<Page initial={account()} auth={google} seen={seen} />);
+    const choose = await screen.findByRole("button", {
+      name: "Choose an alliance",
+    });
+    expect(choose).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(choose);
+    expect(
+      screen.getByRole("button", { name: "Hide the Planeswalkers" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual([
+      "BronzeOpen from the start",
+      "SilverOpens at 10 wins",
+      "MythicOpens at 10,000 wins",
+      "GodlikeOpens at 100,000 wins",
+    ]);
+    const silver = screen.getByRole("region", { name: /^Silver/ });
+    expect(within(silver).queryByRole("button")).toBeNull();
+    expect(within(silver).getByRole("listitem")).toHaveTextContent(
+      "KayaOpens at 10 wins1 card playable here",
+    );
+    // The Godlike tier's Planeswalker has no portrait yet: a placeholder stands in.
+    const godlike = screen.getByRole("region", { name: /^Godlike/ });
+    expect(godlike.querySelector("svg[data-placeholder]")).not.toBeNull();
+    expect(godlike).toHaveTextContent("The Sphinx");
+
+    const abian = screen.getByRole("button", { name: "Ally with Abian" });
+    expect(abian).toHaveAccessibleDescription(
+      "No cards playable here yet Abian, painted for the tests.",
+    );
+    expect(abian.querySelector("img")).toHaveAttribute(
+      "src",
+      "/portraits/abian-128.webp",
+    );
+    fireEvent.click(abian);
+    expect(
+      await screen.findByText(
+        "You are allied with Abian. None of their cards can be played here yet.",
+      ),
+    ).toBeInTheDocument();
+    expect(client.PUT).toHaveBeenCalledWith("/api/v1/me/alliance", {
+      body: { planeswalker: "abian" },
+    });
+    expect(seen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alliance: "abian" }),
+    );
+    // The picker marks the alliance now, and offers the others.
+    expect(
+      screen.queryByRole("button", { name: "Ally with Abian" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Ally with Rowan" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: /^Bronze/ })).getByText(
+        "Your alliance",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the alliance", async () => {
+    on("GET /api/v1/me/progress", () =>
+      reply(200, progress({ alliance: "rowan" })),
+    );
+    on("DELETE /api/v1/me/alliance", () => reply(200, progress()));
+    on("GET /api/v1/me", () => reply(200, account()));
+    render(<Page initial={account({ alliance: "rowan" })} auth={google} />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Leave the alliance with Rowan",
+      }),
+    );
+    expect(
+      await screen.findByText(
+        "You left the alliance with Rowan. Their cards have left your library, except copies you own another way.",
+      ),
+    ).toBeInTheDocument();
+    expect(count("DELETE /api/v1/me/alliance")).toBe(1);
+    expect(
+      screen.getByText(
+        "You are in no alliance yet, so your profile shows your avatar.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("says why an alliance was refused, and keeps the one there was", async () => {
+    on("PUT /api/v1/me/alliance", () =>
+      reply(403, {
+        code: "alliance_locked",
+        message: "Rowan opens at 10 wins.",
+      }),
+    );
+    const seen = vi.fn();
+    render(<Page initial={account()} auth={google} seen={seen} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Choose an alliance" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ally with Rowan" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Rowan opens at 10 wins.",
+    );
+    expect(seen).not.toHaveBeenCalled();
+    expect(count("GET /api/v1/me")).toBe(0);
+  });
+
+  it("offers Try again when the progress does not arrive", async () => {
+    on(
+      "GET /api/v1/me/progress",
+      () => reply(502),
+      () => reply(200, progress()),
+    );
+    render(<Page initial={account()} auth={google} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The application service is unavailable. Try again.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(
+      await screen.findByRole("heading", { name: "Your progress" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("lets SysOp set its own wins with a reason, and asks for the roster again", async () => {
+    const sysop = account({
+      kind: "sysop",
+      handle: "sysop",
+      display_name: "SysOp",
+      email: null,
+      roles: ["sysop"],
+      permissions: ["progress.manage"],
+    });
+    on(
+      "GET /api/v1/me/progress",
+      () =>
+        reply(
+          200,
+          progress({ wins: 100000, counted_wins: 0, set_wins: 100000 }),
+        ),
+      () =>
+        reply(200, progress({ wins: 1000, counted_wins: 0, set_wins: 1000 })),
+    );
+    on("POST /api/v1/admin/users/{user_id}/wins", () =>
+      reply(200, progress({ wins: 1000, counted_wins: 0, set_wins: 1000 })),
+    );
+    render(<Page initial={sysop} auth={google} />);
+    const form = await screen.findByRole("form", { name: "Set your wins" });
+    const wins = within(form).getByLabelText("Wins");
+    await waitFor(() => expect(wins).toHaveValue(100000));
+    // A reason is required.
+    fireEvent.change(wins, { target: { value: "1000" } });
+    fireEvent.submit(form);
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "Give a reason of 3 to 200 characters.",
+    );
+    expect(count("POST /api/v1/admin/users/{user_id}/wins")).toBe(0);
+    fireEvent.change(within(form).getByLabelText(/^Reason/), {
+      target: { value: "Testing Platinum" },
+    });
+    fireEvent.click(within(form).getByRole("button", { name: "Save wins" }));
+    expect(
+      await within(form).findByText("Your wins are now 1,000: Platinum tier."),
+    ).toBeInTheDocument();
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/admin/users/{user_id}/wins",
+      {
+        params: { path: { user_id: sysop.id } },
+        body: { wins: 1000, reason: "Testing Platinum" },
+      },
+    );
+    await waitFor(() => expect(count("GET /api/v1/planeswalkers")).toBe(2));
+    expect(
+      await screen.findByRole("img", { name: "Platinum tier" }),
+    ).toBeInTheDocument();
   });
 });

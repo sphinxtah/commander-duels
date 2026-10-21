@@ -1,0 +1,361 @@
+/* The Planeswalker Alliance (v0.3.1): portraits, tier crests, the alliance picker, the progress
+   bar and the starter decks. The colours are the shell's own; only the crests' metal is not. */
+
+/* A portrait keeps its transparency and its whole picture: contain-fit, never a circle. */
+.portrait {
+  display: block;
+  flex-shrink: 0;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+.placeholderHalo {
+  fill: #d5b77c14;
+  stroke: #d5b77c40;
+  stroke-width: 1;
+}
+.placeholderSpark {
+  fill: #d5b77c;
+  opacity: 0.85;
+}
+.placeholderCore {
+  fill: #101819;
+}
+.placeholder {
+  color: #d5b77c;
+}
+
+/* The crests: their edge is the page's own dark, so the metal reads on light ground as well. */
+.crest {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1.5px #00000070);
+}
+.crestEdge {
+  stroke: #101819;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The account's progress. */
+.standing {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0 0 4px;
+}
+.standing strong {
+  font:
+    1.35rem Georgia,
+    serif;
+}
+.standing span {
+  color: #c9d0c6;
+  font-size: 0.9rem;
+}
+.bar {
+  height: 10px;
+  max-width: 520px;
+  margin: 14px 0 0;
+  border: 1px solid #ffffff1c;
+  border-radius: 5px;
+  background: #101819;
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  background: linear-gradient(90deg, #a8864f, #e6c68c);
+}
+
+/* The current alliance on Profile. */
+.current {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px 24px;
+  margin: 6px 0 10px;
+}
+.current .portrait {
+  filter: drop-shadow(0 8px 16px #00000090);
+}
+.current > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  flex: 1;
+  min-width: 200px;
+}
+.current strong {
+  font:
+    1.4rem Georgia,
+    serif;
+}
+.current span {
+  color: #c9d0c6;
+  font-size: 0.82rem;
+}
+.current button {
+  margin-top: 8px;
+}
+.offerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 6px;
+}
+
+/* The picker: every Planeswalker, by tier. */
+.tiers {
+  display: grid;
+  gap: 24px;
+  margin-top: 20px;
+}
+.tierHeading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 0 0 12px;
+  font:
+    1.15rem Georgia,
+    serif;
+}
+.tierHeading small {
+  font:
+    0.7rem Inter,
+    "Segoe UI",
+    sans-serif;
+  color: #8d9b95;
+}
+.roster {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+}
+.roster li {
+  display: flex;
+  min-width: 0;
+}
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 8px 12px;
+  border: 1px solid #ffffff16;
+  border-radius: 6px;
+  background: #101819;
+  color: #ebece6;
+  font: inherit;
+  text-align: center;
+}
+.tile .portrait {
+  margin-bottom: 4px;
+}
+.tile strong {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.tile small {
+  color: #8d9b95;
+  font-size: 0.64rem;
+  line-height: 1.4;
+}
+button.tile:hover {
+  border-color: #d5b77c;
+  background: #d5b77c0f;
+}
+button.tile:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+button.tile[aria-disabled="true"] {
+  opacity: 0.7;
+}
+.tile[data-current] {
+  border-color: #d5b77c;
+  background: #d5b77c14;
+}
+.tile[data-current] small {
+  color: #dec38b;
+  font-weight: 600;
+}
+/* Locked: shown, greyed, with the wins that open it. */
+.tile[data-locked] .portrait {
+  filter: grayscale(1) brightness(0.6);
+  opacity: 0.75;
+}
+.tile[data-locked] strong {
+  color: #a5b0a3;
+}
+
+/* The starter decks at onboarding: two of ten. */
+.starterSet {
+  border: 0;
+  padding: 0;
+  margin: 16px 0 0;
+  min-width: 0;
+}
+.starters {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 14px;
+}
+.starters li {
+  display: flex;
+  min-width: 0;
+}
+.starter {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #ffffff16;
+  border-radius: 6px;
+  background: #101819;
+  cursor: pointer;
+}
+.starter:hover {
+  border-color: #d5b77c88;
+}
+.starter:focus-within {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.starters li[data-chosen] .starter {
+  border-color: #d5b77c;
+  background: #d5b77c12;
+  box-shadow: inset 0 0 0 1px #d5b77c;
+}
+.starter:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.starter input {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #d5b77c;
+  cursor: inherit;
+}
+.starterArt {
+  flex: 0 0 112px;
+}
+.starterArt img {
+  display: block;
+  width: 112px;
+  height: auto;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px #00000088;
+}
+.starterFrame {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  aspect-ratio: 63 / 88;
+  padding: 8px;
+  border: 1px solid #ffffff26;
+  border-radius: 5px;
+  color: #c9d0c6;
+  font-size: 0.7rem;
+  text-align: center;
+}
+.starterText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 26px;
+}
+.starterText strong {
+  font:
+    1.15rem Georgia,
+    serif;
+}
+.starterColors {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #dec38b;
+  font-size: 0.74rem;
+}
+.starterCommander {
+  color: #c9d0c6;
+  font-size: 0.74rem;
+}
+.starterAbout {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+.starterAbout b {
+  color: #c9d0c6;
+  font-weight: 600;
+}
+.pips {
+  display: inline-flex;
+  gap: 3px;
+}
+.pips span {
+  width: 12px;
+  height: 12px;
+  border: 1px solid #ffffff55;
+  border-radius: 50%;
+}
+.pips [data-color="W"] {
+  background: #f8f6d8;
+}
+.pips [data-color="U"] {
+  background: #3f8fd1;
+}
+.pips [data-color="B"] {
+  background: #4a3f4b;
+}
+.pips [data-color="R"] {
+  background: #e0453a;
+}
+.pips [data-color="G"] {
+  background: #2f9a5a;
+}
+@media (max-width: 480px) {
+  .starter {
+    flex-direction: column;
+  }
+  .starterArt {
+    flex-basis: auto;
+  }
+  .current > div {
+    min-width: 0;
+  }
+}

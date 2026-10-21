@@ -7,6 +7,7 @@ import {
 } from "react";
 import { Account, SignIn, Waiting, avatars } from "./Account";
 import { Admin, SysopSignIn, canAdminister } from "./Admin";
+import { Portrait } from "./alliance/Portrait";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { InstallBanner } from "./app/InstallBanner";
 import { Landing } from "./app/Landing";
@@ -20,6 +21,7 @@ import {
   client,
   loadFoundation,
   loadMe,
+  onboarding,
   setCsrfToken,
   sysopEntrance,
   type Bootstrap,
@@ -442,9 +444,20 @@ export function App() {
             ))}
         </nav>
         <a className={styles.sidebarBottom} href="#profile">
-          <span className={styles.monogram} aria-hidden="true">
-            {avatars[me.avatar]}
-          </span>
+          {/* The alliance's portrait is the account's picture; with none, its avatar (v0.3.1). */}
+          {me.alliance ? (
+            <Portrait
+              id={me.alliance}
+              size={40}
+              thumbnail
+              decorative
+              className={styles.sidebarPortrait}
+            />
+          ) : (
+            <span className={styles.monogram} aria-hidden="true">
+              {avatars[me.avatar]}
+            </span>
+          )}
           <div>
             {me.handle ?? me.display_name}
             <small>
@@ -452,7 +465,9 @@ export function App() {
                 ? "Local administrator"
                 : me.onboarding === "handle"
                   ? "Choose your handle"
-                  : "Signed in"}
+                  : me.onboarding === "starters"
+                    ? "Choose your starter decks"
+                    : "Signed in"}
             </small>
           </div>
         </a>
@@ -484,13 +499,25 @@ export function App() {
             COMMANDER DUELS <span>/</span> {shown.toUpperCase()}
           </div>
           {/* Sign-in and approval keep the address, so a new account rarely lands on Profile,
-              where it chooses its handle: every other page points the way until it has one. */}
-          {me.onboarding === "handle" && page !== "Profile" && (
+              where it chooses its handle and then its two starter decks (v0.3.1): every other
+              page points the way until both are done. */}
+          {onboarding(me) && page !== "Profile" && (
             <p className={styles.handleNotice}>
-              Other players know you by your handle.{" "}
-              <a href="#profile">
-                Choose yours on Profile <span aria-hidden="true">→</span>
-              </a>
+              {me.onboarding === "handle" ? (
+                <>
+                  Other players know you by your handle.{" "}
+                  <a href="#profile">
+                    Choose yours on Profile <span aria-hidden="true">→</span>
+                  </a>
+                </>
+              ) : (
+                <>
+                  Two starter decks of your choice begin your card library.{" "}
+                  <a href="#profile">
+                    Choose them on Profile <span aria-hidden="true">→</span>
+                  </a>
+                </>
+              )}
             </p>
           )}
           {page === "Profile" ? (
