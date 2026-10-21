@@ -60,9 +60,11 @@ FILE_HOSTS = frozenset({"mtgjson.com"})
 HEADERS = {"User-Agent": f"CommanderDuels/{APP_VERSION}", "Accept": "*/*"}
 FOLDER = "mtgjson"
 SET_LIST = "SetList"
-# Bounds on one file: as downloaded (xz), and as JSON.
-MAX_DOWNLOAD = 64 << 20
-MAX_JSON = 512 << 20
+# Bounds on one file: as downloaded (xz), and as JSON. The largest set file the shop reads (The
+# List) was 1.9 MB packed and 17 MB of JSON on 2026-10-21; a file is read whole, so the bound
+# keeps a broken or hostile one from taking the worker's memory.
+MAX_DOWNLOAD = 32 << 20
+MAX_JSON = 96 << 20
 DOWNLOAD_SECONDS = 300.0
 # Between two requests to MTGJSON.
 PAUSE_SECONDS = 0.5
@@ -81,6 +83,16 @@ BOOSTER_WORDS = {
     "default": "Booster Pack",
 }
 COLOR_ORDER = "WUBRG"
+RESERVED_NAMES = frozenset(
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        *(f"COM{n}" for n in range(1, 10)),
+        *(f"LPT{n}" for n in range(1, 10)),
+    }
+)
 # Runs wait this long for the catalog's first import, or for another run, without an attempt.
 WAIT = timedelta(minutes=5)
 
@@ -191,6 +203,13 @@ class Fetched:
     last_modified: str | None
 
 
+def file_url(base_url: str, name: str) -> str:
+    """MTGJSON's address of a file. Set codes that are reserved file names on Windows (Conflux,
+    CON) are served with an underscore: CON_.json.xz."""
+    stem = f"{name}_" if name.upper() in RESERVED_NAMES else name
+    return f"{base_url.rstrip('/')}/{stem}.json.xz"
+
+
 def fetch(
     client: httpx.Client,
     base_url: str,
@@ -200,14 +219,14 @@ def fetch(
 ) -> Fetched | None:
     """One file from MTGJSON (<name>.json.xz) into the folder: only if it changed since the last
     fetch, when the file from then is still here. None when MTGJSON has no such file."""
-    url = f"{base_url.rstrip('/')}/{name}.json.xz"
+    url = file_url(base_url, name)
     parts = urlsplit(url)
     if parts.scheme != "https" or parts.hostname not in FILE_HOSTS:
         raise SyncError(
             "mtgjson_host_refused", f"Booster data is not fetched from {parts.hostname}."
         )
     folder.mkdir(parents=True, exist_ok=True)
-    target = folder / f"{name}.json.xz"
+    target = folder / url.rsplit("/", 1)[-1]
     headers = dict(HEADERS)
     kept = previous is not None and target.exists() and sha256_of(target) == previous.sha256
     if kept and previous is not None:
@@ -709,7 +728,7 @@ class Run:
             if source is None:
                 source = BoosterSource(name=name, fetched_at=now)
                 session.add(source)
-            source.url = f"{self.base.rstrip('/')}/{name}.json.xz"
+            source.url = file_url(self.base, name)
             source.sha256 = got.sha256
             source.size = got.path.stat().st_size
             source.etag = got.etag

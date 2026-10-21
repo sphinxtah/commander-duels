@@ -328,6 +328,8 @@
 }
 .tabs {
   display: flex;
+  /* Five sections since v0.4.0's Card shop: on a phone they take a second row. */
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 25px;
   border-bottom: 1px solid #ffffff16;

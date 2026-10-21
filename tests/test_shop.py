@@ -284,6 +284,10 @@ def test_finishes_follow_the_sheet_and_the_printing():
     assert boosters.finish_of(True, "foil", ("nonfoil", "foil")) == "foil"
     assert boosters.finish_of(True, "etchedFoil", ("etched",)) == "etched"
     assert boosters.finish_of(True, "foilRare", ("etched",)) == "etched"
+    # Conflux's code is a reserved file name on Windows; MTGJSON serves it with an underscore.
+    base = "https://mtgjson.com/api/v5"
+    assert boosters.file_url(base, "CON") == f"{base}/CON_.json.xz"
+    assert boosters.file_url(base, "ZNR") == f"{base}/ZNR.json.xz"
 
 
 # The booster data job.
