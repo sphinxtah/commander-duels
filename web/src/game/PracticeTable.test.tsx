@@ -54,6 +54,7 @@ function summary(fields: Partial<DeckSummary>): DeckSummary {
     card_count: 60,
     legal: true,
     playable: true,
+    collection_locked: false,
     identity: "R",
     commanders: [],
     latest_revision: null,
@@ -256,6 +257,24 @@ describe("the practice table for a player (v0.3.1)", () => {
       body: { format: "commander", deck_id: "deck-a", bots: [{}, {}, {}] },
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/busy/);
+  });
+
+  it("says which decks need cards the library does not hold", async () => {
+    await sitDown([
+      summary({ id: "deck-a", title: "Skyward Patrol", format: "commander" }),
+      summary({
+        id: "deck-b",
+        title: "Borrowed Burn",
+        format: "commander",
+        playable: false,
+        collection_locked: true,
+      }),
+    ]);
+    const locked = within(screen.getByLabelText("Your deck")).getByRole(
+      "option",
+      { name: "Borrowed Burn (needs cards you don't own)" },
+    );
+    expect(locked).toBeDisabled();
   });
 
   it("is told to build or fix a deck when they have none to play", async () => {

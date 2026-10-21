@@ -93,7 +93,11 @@ function DeckOptions({
           {own.map((d) => (
             <option key={d.id} value={`${OWN}${d.id}`} disabled={!d.playable}>
               {d.title}
-              {d.playable ? "" : " (not playable yet)"}
+              {d.playable
+                ? ""
+                : d.collection_locked
+                  ? " (needs cards you don't own)"
+                  : " (not playable yet)"}
             </option>
           ))}
         </optgroup>
