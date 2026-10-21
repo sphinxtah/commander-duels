@@ -4,11 +4,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import mage.Mana;
 import mage.MageObject;
@@ -48,13 +51,41 @@ final class Prompts {
     private static final String RIGHT_BUTTON = "UI.right.btn.text";
     /** XMage's message for its TargetDefender, which HumanPlayer uses when there is more than one defender. */
     static final String DEFENDER_MESSAGE = "Select a player, planeswalker, or battle to attack";
-    /** Larger choices (naming a card, for instance) stay unsupported rather than becoming huge prompts. */
-    static final int MAX_CHOICE_OPTIONS = 64;
+    /**
+     * Choices up to this long are offered as options: a creature type, for instance, is one of about
+     * 300. Longer ones (naming a card, one of tens of thousands) become choose_name, a name the seat
+     * types, checked against the list.
+     */
+    static final int MAX_CHOICE_OPTIONS = 1_000;
+    /** A choose_name prompt offers the names of at most this many cards the seat can see. */
+    static final int MAX_NAME_SUGGESTIONS = 12;
+    /** A refusal of a typed name suggests at most this many names that start like it. */
+    static final int MAX_NEAR_NAMES = 5;
 
-    /** An open prompt: what the seat sees and the XMage answer behind each option id. */
-    record Prompt(PromptView view, Map<String, Answer> answers) {
+    /**
+     * An open prompt: what the seat sees and the XMage answer behind each option id.
+     *
+     * @param names for choose_name only: every name the choice accepts, keyed by {@link #fold}
+     */
+    record Prompt(PromptView view, Map<String, Answer> answers, Map<String, String> names) {
         boolean supported() {
             return !view.kind().equals("unsupported");
+        }
+
+        /** The answer for a typed name, or null when this prompt takes none or the list lacks it. */
+        Answer name(String text) {
+            String found = names == null ? null : names.get(fold(text));
+            return found == null ? null : new StringAnswer(found);
+        }
+
+        /** Names in the list that start like the text, alphabetically, for a refusal to suggest. */
+        List<String> near(String text) {
+            if (names == null) {
+                return List.of();
+            }
+            String start = fold(text);
+            return names.entrySet().stream().filter(entry -> entry.getKey().startsWith(start))
+                .map(Map.Entry::getValue).sorted().limit(MAX_NEAR_NAMES).toList();
         }
 
         /**
@@ -140,7 +171,7 @@ final class Prompts {
         if (prompt.view().kind().equals("choose_defender") && prompt.view().detail() == null && attacker != null) {
             PromptView view = prompt.view();
             prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message(), "Attacker: " + attacker,
-                view.options(), view.amounts(), view.piles(), view.xmageQuery()), prompt.answers());
+                view.options(), view.amounts(), view.piles(), view.xmageQuery()), prompt.answers(), prompt.names());
         }
         return prompt;
     }
@@ -150,6 +181,7 @@ final class Prompts {
         String message = SeatViews.plain(event.getMessage());
         PromptView.Amounts amounts = null;
         List<List<String>> piles = null;
+        Map<String, String> names = null;
         String detail = extra.get(Constants.Option.SECOND_MESSAGE) instanceof String second
             && !SeatViews.plain(second).isEmpty() ? SeatViews.plain(second) : null;
         String kind;
@@ -204,10 +236,17 @@ final class Prompts {
                 break;
             case CHOOSE_CHOICE: {
                 Choice choice = event.getChoice();
-                if (choice == null || !choice(choice)) {
+                if (choice == null) {
                     return unsupported(event, promptId, message, detail);
                 }
-                kind = "choose_choice";
+                if (choice(choice)) {
+                    kind = "choose_choice";
+                } else if (!choice.isKeyChoice() && choice.getChoices().size() > MAX_CHOICE_OPTIONS) {
+                    kind = "choose_name";
+                    names = names(choice);
+                } else {
+                    return unsupported(event, promptId, message, detail);
+                }
                 message = SeatViews.plain(choice.getMessage());
                 String sub = SeatViews.plain(choice.getSubMessage());
                 detail = sub.isEmpty() ? null : sub;
@@ -237,14 +276,19 @@ final class Prompts {
                 return unsupported(event, promptId, message, detail);
         }
         return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, piles,
-            null), Map.copyOf(answers));
+            null), Map.copyOf(answers), names);
     }
 
     private Prompt unsupported(PlayerQueryEvent event, String promptId, String message, String detail) {
         options.clear();
         answers.clear();
         return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null, null,
-            event.getQueryType().name()), Map.of());
+            event.getQueryType().name()), Map.of(), null);
+    }
+
+    /** A name as the seat may type it: case, surrounding spaces and curly apostrophes do not matter. */
+    static String fold(String name) {
+        return name.strip().replace('’', '\'').toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -319,7 +363,7 @@ final class Prompts {
     }
 
     /**
-     * One of a fixed list of choices: a colour, or which replacement effect applies first. A key
+     * One of a fixed list of choices: a colour, a creature type, or which replacement effect applies first. A key
      * choice answers with its key (for replacement effects, an XMage id that stays on the server),
      * any other with the text. Returns false when the list is too long to offer.
      */
@@ -345,6 +389,31 @@ final class Prompts {
             add("cancel", "Cancel", null, null, false, new StringAnswer(""));
         }
         return true;
+    }
+
+    /**
+     * A choice too long to list, such as naming a card: the seat types any name the choice accepts.
+     * The names of cards the seat can see that the choice accepts are offered as options, so the
+     * usual answers are one press away; the list names no card the seat cannot see.
+     */
+    private Map<String, String> names(Choice choice) {
+        Set<String> accepted = choice.getChoices();
+        Map<String, String> folded = new HashMap<>();
+        for (String name : accepted) {
+            folded.putIfAbsent(fold(name), name);
+        }
+        Set<String> seen = new TreeSet<>();
+        for (Card card : game.getCards()) {
+            if (accepted.contains(card.getName()) && Visibility.identityVisible(game, card.getId(), human.getId())) {
+                seen.add(card.getName());
+            }
+        }
+        seen.stream().limit(MAX_NAME_SUGGESTIONS)
+            .forEach(name -> add("choose", name, null, null, false, new StringAnswer(name)));
+        if (!choice.isRequired()) {
+            add("cancel", "Cancel", null, null, false, new StringAnswer(""));
+        }
+        return Map.copyOf(folded);
     }
 
     private void priority() {

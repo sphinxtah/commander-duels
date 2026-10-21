@@ -34,6 +34,7 @@ def test_engine_contract_rejects_unsupported_versions_and_client_seats():
     }
     validator.validate(command)
     validator.validate(command | {"payload": {"amounts": [2, 0, 3]}})
+    validator.validate(command | {"payload": {"text": "Black Lotus"}})
     validator.validate(command | {"type": "concede", "payload": {}})
     for changes in [
         {"v": 2},
@@ -42,6 +43,9 @@ def test_engine_contract_rejects_unsupported_versions_and_client_seats():
         {"expected_revision": -1},
         {"payload": {}},
         {"payload": {"option_id": "1", "amounts": [1]}},
+        {"payload": {"option_id": "1", "text": "Island"}},
+        {"payload": {"text": ""}},
+        {"payload": {"text": "x" * 201}},
         {"payload": {"option_id": "1", "seat": 1}},
         {"payload": {"amounts": [-1]}},
         {"type": "concede", "payload": {"option_id": "1"}},

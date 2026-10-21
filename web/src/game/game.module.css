@@ -567,6 +567,40 @@ button.life[data-selected] {
   padding: 5px 8px;
   color: inherit;
 }
+.longChoice,
+.nameForm {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.filter,
+.nameForm label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+.filter input,
+.nameForm input {
+  background: #0d1415;
+  border: 1px solid #ffffff22;
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: inherit;
+  font: inherit;
+}
+/* A long list scrolls inside the panel, so the filter stays in view above it. */
+.choiceScroll {
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.seenNames {
+  font-size: 0.66rem;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #66766f;
+  margin: 8px 0 4px;
+}
 .piles {
   display: grid;
   gap: 6px;
@@ -614,6 +648,8 @@ button.life[data-selected] {
 .screen .hint,
 .screen .lease,
 .screen .amounts label,
+.screen .filter,
+.screen .nameForm label,
 .screen .piles,
 .screen .refusal,
 .screen .messages,
@@ -626,6 +662,7 @@ button.life[data-selected] {
   font-size: 1.125rem;
 }
 .screen .optionGroup h3,
+.screen .seenNames,
 .screen .revealed h3 {
   font-size: 1.125rem;
   letter-spacing: 0.06em;

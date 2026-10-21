@@ -94,6 +94,11 @@ class ScriptedPlayer {
                 var choices = byAction(options, "choose");
                 yield choices.isEmpty() ? pick(options) : pick(choices);
             }
+            case "choose_name" -> {
+                // A visible card's name when one is offered; otherwise a name in every card-name list.
+                var choices = byAction(options, "choose");
+                yield !choices.isEmpty() ? pick(choices) : Tables.TEXT + "Black Lotus";
+            }
             case "choose_mode" -> {
                 var done = byAction(options, "done");
                 var modes = byAction(options, "choose_mode");

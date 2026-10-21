@@ -1,11 +1,23 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { client } from "../api";
 import { GameContext, type GameContextValue } from "./Board";
 import type { GameState } from "./connection";
 import { objectIndex, optionsByObject, optionsBySeat } from "./model";
 import { PromptPanel } from "./PromptPanel";
 import type { TimerView } from "./table/types";
 import type { AmountEntry, Prompt, PromptOption, Snapshot } from "./types";
+
+vi.mock("../api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api")>()),
+  client: { GET: vi.fn(async () => ({ data: undefined })) },
+}));
 
 function option(id: string, action: PromptOption["action"]): PromptOption {
   return {
@@ -108,10 +120,14 @@ function Panel({
   game,
   timer = null,
   onStopTimer = vi.fn(),
+  onAnswer = vi.fn(),
+  choose = vi.fn(),
 }: {
   game: GameState;
   timer?: TimerView | null;
   onStopTimer?: () => void;
+  onAnswer?: (payload: object) => void;
+  choose?: (option: PromptOption) => void;
 }) {
   const prompt = game.snapshot?.prompt ?? null;
   const context: GameContextValue = {
@@ -122,7 +138,7 @@ function Panel({
     bySeat: optionsBySeat(prompt),
     canAnswer: game.pending === null,
     observing: false,
-    choose: vi.fn(),
+    choose,
     zoom: vi.fn(),
     preview: vi.fn(),
   };
@@ -131,7 +147,7 @@ function Panel({
       <button type="button">Elsewhere on the board</button>
       <PromptPanel
         state={game}
-        onAnswer={vi.fn()}
+        onAnswer={onAnswer}
         onTakeControl={vi.fn()}
         onConcede={vi.fn()}
         timer={timer}
@@ -363,5 +379,106 @@ describe("the lead diamonds", () => {
     );
     expect(screen.queryByRole("button", { name: "Stop Timer" })).toBeNull();
     expect(document.activeElement).toBe(document.querySelector("[data-first]"));
+  });
+});
+
+function labelled(id: string, label: string): PromptOption {
+  return { ...option(id, "choose"), label };
+}
+
+describe("long choices", () => {
+  it("are filtered as the player types, and Enter takes the only match", () => {
+    const labels = [
+      ...Array.from({ length: 300 }, (_, i) => `Type ${i}`),
+      "Goblin",
+    ];
+    const prompt: Prompt = {
+      id: "c",
+      kind: "choose_choice",
+      message: "Choose a creature type",
+      detail: null,
+      options: labels.map((label, i) => labelled(String(i + 1), label)),
+      amounts: null,
+      piles: null,
+      xmage_query: null,
+    };
+    const choose = vi.fn();
+    render(<Panel game={state(snapshot(5, prompt))} choose={choose} />);
+    const filter = screen.getByRole("searchbox", {
+      name: "Filter 301 choices",
+    });
+    fireEvent.change(filter, { target: { value: "gob" } });
+    const shown = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-action="choose"]'),
+    ).map((button) => button.textContent);
+    expect(shown).toEqual(["Goblin"]);
+    fireEvent.keyDown(filter, { key: "Enter" });
+    expect(choose).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "Goblin" }),
+    );
+  });
+
+  it("keep a short list as plain buttons", () => {
+    const prompt: Prompt = {
+      id: "c",
+      kind: "choose_choice",
+      message: "Choose a color",
+      detail: null,
+      options: ["White", "Blue", "Black", "Red", "Green"].map((label, i) =>
+        labelled(String(i + 1), label),
+      ),
+      amounts: null,
+      piles: null,
+      xmage_query: null,
+    };
+    render(<Panel game={state(snapshot(5, prompt))} />);
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(screen.getByRole("button", { name: "Green" })).toBeEnabled();
+  });
+});
+
+describe("naming a card", () => {
+  const prompt: Prompt = {
+    id: "n",
+    kind: "choose_name",
+    message: "Choose a card name",
+    detail: null,
+    options: [labelled("1", "Three Tree City")],
+    amounts: null,
+    piles: null,
+    xmage_query: null,
+  };
+
+  it("sends the typed name, and offers the cards the player can see", async () => {
+    vi.useFakeTimers();
+    const search = vi.mocked(client.GET);
+    search.mockResolvedValue({
+      data: { items: [{ name: "Black Lotus" }] },
+    } as never);
+    const onAnswer = vi.fn();
+    render(<Panel game={state(snapshot(5, prompt))} onAnswer={onAnswer} />);
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Cards you can see" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Three Tree City" }),
+    ).toBeEnabled();
+    const input = screen.getByRole("combobox", { name: "Card name" });
+    fireEvent.change(input, { target: { value: "  black lot" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(search).toHaveBeenCalledWith("/api/v1/cards", {
+      params: { query: { q: '"black lot"', page_size: 8 } },
+    });
+    expect(
+      Array.from(document.querySelectorAll("datalist option")).map(
+        (option) => (option as HTMLOptionElement).value,
+      ),
+    ).toEqual(["Black Lotus"]);
+    fireEvent.change(input, { target: { value: " Black Lotus " } });
+    fireEvent.click(screen.getByRole("button", { name: "Name this card" }));
+    expect(onAnswer).toHaveBeenCalledWith({ text: "Black Lotus" });
+    vi.useRealTimers();
   });
 });

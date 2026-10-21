@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { client } from "../api";
 import { CardButton, CardRow, useGameContext } from "./Board";
 import type { GameState } from "./connection";
 import {
@@ -52,6 +53,140 @@ const groups: { title: string; actions: PromptOption["action"][] }[] = [
     ],
   },
 ];
+
+/** Lists with more choices than this get a filter box: a creature type is one of about 300. */
+const FILTER_FROM = 12;
+
+/** A long list of choices, narrowed by what the player types; Enter takes the only match. */
+function LongChoice({
+  options,
+  disabled,
+}: {
+  options: PromptOption[];
+  disabled: boolean;
+}) {
+  const game = useGameContext();
+  const [filter, setFilter] = useState("");
+  const needle = filter.trim().toLowerCase();
+  const choices = options.filter((option) => option.action === "choose");
+  const matches = needle
+    ? choices.filter((option) =>
+        (option.label ?? "").toLowerCase().includes(needle),
+      )
+    : choices;
+  // Cancel and the like stay in reach whatever the filter.
+  const shown = options.filter(
+    (option) => option.action !== "choose" || matches.includes(option),
+  );
+  return (
+    <div className={styles.longChoice}>
+      <label className={styles.filter}>
+        <span>Filter {choices.length.toLocaleString()} choices</span>
+        <input
+          type="search"
+          value={filter}
+          autoComplete="off"
+          spellCheck={false}
+          data-filter
+          disabled={disabled}
+          onChange={(event) => setFilter(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && matches.length === 1) {
+              event.preventDefault();
+              game.choose(matches[0]);
+            }
+          }}
+        />
+      </label>
+      <p className={styles.hint} aria-live="polite">
+        {needle &&
+          (matches.length === 1
+            ? "1 match: press Enter to choose it."
+            : `${matches.length.toLocaleString()} matches.`)}
+      </p>
+      <div className={styles.choiceScroll}>
+        <OptionList options={shown} disabled={disabled} />
+      </div>
+    </div>
+  );
+}
+
+/** Card names from the catalog that contain what the player typed, a moment after the last key. */
+function useNameSuggestions(text: string): string[] {
+  const [names, setNames] = useState<string[]>([]);
+  const wanted = text.trim().replace(/"/g, "");
+  useEffect(() => {
+    if (wanted.length < 2) {
+      setNames([]);
+      return;
+    }
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void client
+        .GET("/api/v1/cards", {
+          params: { query: { q: `"${wanted}"`, page_size: 8 } as never },
+        })
+        .then(({ data }) => {
+          if (active) setNames(data ? data.items.map((card) => card.name) : []);
+        });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [wanted]);
+  return names;
+}
+
+/** Naming a card (choose_name): any name the rules allow, typed, which the engine checks. */
+function NameForm({
+  prompt,
+  disabled,
+  onSubmit,
+}: {
+  prompt: Prompt;
+  disabled: boolean;
+  onSubmit: (text: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const suggestions = useNameSuggestions(name);
+  const listId = `names-${prompt.id}`;
+  return (
+    <form
+      className={styles.nameForm}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (name.trim()) onSubmit(name.trim());
+      }}
+    >
+      <label>
+        <span>Card name</span>
+        <input
+          value={name}
+          list={listId}
+          maxLength={200}
+          autoComplete="off"
+          spellCheck={false}
+          data-name
+          onChange={(event) => setName(event.target.value)}
+        />
+      </label>
+      <datalist id={listId}>
+        {suggestions.map((suggestion) => (
+          <option key={suggestion} value={suggestion} />
+        ))}
+      </datalist>
+      <button
+        type="submit"
+        data-name-submit
+        className={styles.primaryButton}
+        disabled={disabled || !name.trim()}
+      >
+        Name this card
+      </button>
+    </form>
+  );
+}
 
 function AmountForm({
   prompt,
@@ -139,7 +274,9 @@ export function PromptPanel({
   onStopTimer,
 }: {
   state: GameState;
-  onAnswer: (payload: { option_id: string } | { amounts: number[] }) => void;
+  onAnswer: (
+    payload: { option_id: string } | { amounts: number[] } | { text: string },
+  ) => void;
   onTakeControl: () => void;
   onConcede: () => void;
 } & Partial<PromptTimerProps>) {
@@ -337,13 +474,30 @@ export function PromptPanel({
             )}
           </div>
         )}
+        {prompt.kind === "choose_name" && (
+          <NameForm
+            key={prompt.id}
+            prompt={prompt}
+            disabled={disabled}
+            onSubmit={(text) => onAnswer({ text })}
+          />
+        )}
         {grouped.map((group) => (
           <div key={group.title} className={styles.optionGroup}>
             <h3>{group.title}</h3>
             <OptionList options={group.options} disabled={disabled} />
           </div>
         ))}
-        {rest.length > 0 && <OptionList options={rest} disabled={disabled} />}
+        {prompt.kind === "choose_name" &&
+          rest.some((option) => option.action === "choose") && (
+            <h3 className={styles.seenNames}>Cards you can see</h3>
+          )}
+        {rest.filter((option) => option.action === "choose").length >
+        FILTER_FROM ? (
+          <LongChoice key={prompt.id} options={rest} disabled={disabled} />
+        ) : (
+          rest.length > 0 && <OptionList options={rest} disabled={disabled} />
+        )}
       </>
     );
   }

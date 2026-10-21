@@ -13,6 +13,7 @@ export type PromptKind =
   | "choose_defender"
   | "choose_ability"
   | "choose_choice"
+  | "choose_name"
   | "choose_mode"
   | "choose_amount"
   | "order_triggers"
@@ -329,6 +330,7 @@ export interface CommandEnvelope {
   payload:
     | { option_id: string }
     | { amounts: number[] }
+    | { text: string }
     | PrioritySettings
     | Record<string, never>;
 }

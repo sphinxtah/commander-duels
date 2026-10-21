@@ -186,6 +186,8 @@ class ChoicePayload(BaseModel):
     amounts: list[Annotated[int, Field(ge=0, le=10_000)]] | None = Field(
         default=None, min_length=1, max_length=32
     )
+    # A typed name, for choose_name prompts (naming a card); the engine checks it against its list.
+    text: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 PriorityStep = Literal[
@@ -230,9 +232,13 @@ class GameCommand(BaseModel):
             return self
         if not isinstance(self.payload, ChoicePayload):
             raise ValueError("submit_choice and concede take a choice payload")
-        chosen = (self.payload.option_id is not None) + (self.payload.amounts is not None)
+        chosen = (
+            (self.payload.option_id is not None)
+            + (self.payload.amounts is not None)
+            + (self.payload.text is not None)
+        )
         if self.type == "submit_choice" and (self.prompt_id is None or chosen != 1):
-            raise ValueError("submit_choice needs prompt_id and one of option_id and amounts")
+            raise ValueError("submit_choice needs prompt_id and one of option_id, amounts and text")
         if self.type == "concede" and chosen:
             raise ValueError("concede takes an empty payload")
         return self

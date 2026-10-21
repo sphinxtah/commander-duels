@@ -27,6 +27,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 from sqlalchemy import Engine, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -1133,3 +1134,22 @@ def test_priority_settings_reach_the_engine_without_a_prompt(
         assert send({"cancel_passes": True}, prompt_id=str(uuid.uuid4()))["status"] == 400
     sent = [c for c in engine.game(game["id"]).actions.values()]
     assert len(sent) == 1
+
+
+def test_a_typed_name_goes_to_the_engine_as_text() -> None:
+    """Naming a card (choose_name) answers with text; it never rides along with an option."""
+    base = {
+        "v": 1,
+        "game_id": str(uuid.uuid4()),
+        "action_id": str(uuid.uuid4()),
+        "expected_revision": 3,
+        "prompt_id": str(uuid.uuid4()),
+        "type": "submit_choice",
+    }
+    named = games.GameCommand.model_validate(base | {"payload": {"text": "Black Lotus"}})
+    assert named.engine_body()["payload"] == {"text": "Black Lotus"}
+    for payload in [{"text": ""}, {"text": "x" * 201}, {"text": "Island", "option_id": "1"}]:
+        with pytest.raises(ValidationError):
+            games.GameCommand.model_validate(base | {"payload": payload})
+    with pytest.raises(ValidationError):
+        games.GameCommand.model_validate(base | {"type": "concede", "payload": {"text": "Island"}})

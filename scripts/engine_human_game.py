@@ -30,6 +30,8 @@ from typing import Any
 UUID_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 OBJECT_ID = re.compile(r"^o[0-9a-f]{16}$")
 FINISHED = {"completed", "turn_limit", "humans_eliminated"}
+# The scripted seat's answer to a choose_name prompt that offers no visible card's name: typed.
+TYPED_NAME: dict[str, Any] = {"id": "-", "action": "text", "label": "Black Lotus"}
 
 
 class Engine:
@@ -180,12 +182,18 @@ class ScriptedSeat:
             return pick(by("choose_pile"))
         if kind == "choose_choice" and by("choose"):
             return pick(by("choose"))
+        if kind == "choose_name":
+            # A visible card's name when one is offered; otherwise a name in every card-name list.
+            return pick(by("choose")) if by("choose") else TYPED_NAME
         if kind == "assign_amounts":
             return by("suggested")[0]
         return pick(options)
 
     def payload(self, prompt: dict[str, Any], choice: dict[str, Any]) -> dict[str, Any]:
-        """The answer: the option, or for choose_amount sometimes a number above the minimum."""
+        """The answer: the option, a typed name, or for choose_amount sometimes a number above the
+        minimum."""
+        if choice is TYPED_NAME:
+            return {"text": choice["label"]}
         if prompt["kind"] == "choose_amount" and prompt["amounts"]:
             entry = prompt["amounts"]["entries"][0]
             value = entry["min"] + self.random.randint(0, min(2, entry["max"] - entry["min"]))

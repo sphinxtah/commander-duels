@@ -10,16 +10,18 @@ import java.util.Set;
 /**
  * One command from a seat, in the envelope of {@code contracts/engine-command.schema.json}. The
  * seat comes from the caller's seat token, never from the body. {@code submit_choice} answers the
- * open prompt with one option id, or an assign_amounts prompt with a list of amounts;
- * {@code concede} needs no prompt.
+ * open prompt with one option id, an assign_amounts prompt with a list of amounts, or a choose_name
+ * prompt with a typed name; {@code concede} needs no prompt.
  *
  * @param fingerprint identifies the command's content, so a repeated action id with a different
  *                    body is refused instead of being treated as a retry
  */
 public record SeatCommand(String actionId, long expectedRevision, String promptId, String type, String optionId,
-                          List<Integer> amounts, Priority.Settings priority, String fingerprint) {
+                          List<Integer> amounts, String text, Priority.Settings priority, String fingerprint) {
     static final int MAX_AMOUNTS = 32;
     static final int MAX_AMOUNT = 10_000;
+    /** The longest card name is under 150 characters. */
+    static final int MAX_TEXT = 200;
     public static final String SUBMIT_CHOICE = "submit_choice";
     public static final String CONCEDE = "concede";
     /** Changes the seat's priority controls; it needs no prompt (see {@link Priority}). */
@@ -62,6 +64,7 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
         String promptId = null;
         String optionId = null;
         List<Integer> amounts = null;
+        String text = null;
         Priority.Settings priority = null;
         if (type.equals(SET_PRIORITY)) {
             if (json.has("prompt_id")) {
@@ -73,14 +76,16 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
                 throw new JsonRequest.Invalid("submit_choice needs prompt_id");
             }
             promptId = JsonRequest.uuid(json, "prompt_id");
-            JsonRequest.onlyFields(payload, Set.of("option_id", "amounts"), "payload.");
-            if (payload.has("option_id") == payload.has("amounts")) {
-                throw new JsonRequest.Invalid("payload needs exactly one of option_id and amounts");
+            JsonRequest.onlyFields(payload, Set.of("option_id", "amounts", "text"), "payload.");
+            if (payload.size() != 1) {
+                throw new JsonRequest.Invalid("payload needs exactly one of option_id, amounts and text");
             }
             if (payload.has("option_id")) {
                 optionId = JsonRequest.string(payload, "option_id", 16);
-            } else {
+            } else if (payload.has("amounts")) {
                 amounts = amounts(payload.get("amounts"));
+            } else {
+                text = JsonRequest.string(payload, "text", MAX_TEXT);
             }
         } else {
             if (json.has("prompt_id")) {
@@ -88,9 +93,10 @@ public record SeatCommand(String actionId, long expectedRevision, String promptI
             }
             JsonRequest.onlyFields(payload, Set.of(), "payload.");
         }
-        String fingerprint = type + "|" + promptId + "|" + optionId + "|" + amounts + "|" + revision + "|"
+        String fingerprint = type + "|" + promptId + "|" + optionId + "|" + amounts + "|"
+            + (text == null ? "" : text.length() + ":" + text) + "|" + revision + "|"
             + (priority == null ? "" : priority.fingerprint());
-        return new SeatCommand(actionId, revision, promptId, type, optionId, amounts, priority, fingerprint);
+        return new SeatCommand(actionId, revision, promptId, type, optionId, amounts, text, priority, fingerprint);
     }
 
     private static List<Integer> amounts(JsonElement element) throws JsonRequest.Invalid {

@@ -45,7 +45,8 @@ The seat never sends XMage identifiers. Option IDs are numbers scoped to one pro
 | `declare_blockers` | `SELECT` with possible blockers | `toggle_blocker` per creature; `done` | UUID; boolean |
 | `assign_amounts` | `MULTI_AMOUNT` (combat damage among blockers, with or without trample) | `suggested` (XMage's default split); `cancel` when allowed; or a payload of one amount per entry | space-separated amounts; boolean |
 | `choose_defender`, `choose_ability`, `choose_choice`, `choose_mode`, `choose_amount`, `order_triggers`, `choose_pile` | Added in v0.0.4; see [Commander tables](commander-tables.md#prompts) | | |
-| `unsupported` | `CHOOSE_CHOICE` lists longer than 64 entries, and `PLAY_X_MANA`, which XMage's human player never sends at the pin | none | The game waits until the seat concedes or the game is closed |
+| `choose_name` | Added in v0.4.0; see [Commander tables](commander-tables.md#prompts) | | |
+| `unsupported` | `CHOOSE_CHOICE` key choices longer than 1,000 entries, and `PLAY_X_MANA`, which XMage's human player never sends at the pin | none | The game waits until the seat concedes or the game is closed |
 
 None of the unsupported families occurred in the scripted games: the fixture decks have no modal spells, X costs, named choices, piles or simultaneous triggers that need ordering. XMage's `PERSONAL_MESSAGE` events ("You have to attack with...") become the view's `messages`, not prompts.
 

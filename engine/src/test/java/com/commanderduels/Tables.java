@@ -34,8 +34,13 @@ final class Tables {
 
     /** A policy's answer that is a custom number, "amounts:3", rather than an option id. */
     static final String AMOUNTS = "amounts:";
+    /** A policy's answer that is a typed name, "text:Black Lotus", rather than an option id. */
+    static final String TEXT = "text:";
 
-    /** Chooses a seat's answer: an option id, {@link #AMOUNTS} and a number, or null to concede. */
+    /**
+     * Chooses a seat's answer: an option id, {@link #AMOUNTS} and a number, {@link #TEXT} and a name,
+     * or null to concede.
+     */
     interface Policy {
         String choose(int seat, PromptView prompt, SeatView view);
     }
@@ -83,6 +88,14 @@ final class Tables {
         return SeatCommand.parse("{\"v\":1,\"game_id\":\"" + game.id() + "\",\"action_id\":\"" + UUID.randomUUID()
             + "\",\"expected_revision\":" + revision + ",\"prompt_id\":\"" + promptId
             + "\",\"type\":\"submit_choice\",\"payload\":{\"amounts\":" + values + "}}", game.id());
+    }
+
+    static SeatCommand text(HumanGame game, long revision, String promptId, String text) throws JsonRequest.Invalid {
+        var payload = new com.google.gson.JsonObject();
+        payload.addProperty("text", text);
+        return SeatCommand.parse("{\"v\":1,\"game_id\":\"" + game.id() + "\",\"action_id\":\"" + UUID.randomUUID()
+            + "\",\"expected_revision\":" + revision + ",\"prompt_id\":\"" + promptId
+            + "\",\"type\":\"submit_choice\",\"payload\":" + payload + "}", game.id());
     }
 
     static SeatCommand concede(HumanGame game, long revision) throws JsonRequest.Invalid {
@@ -133,6 +146,10 @@ final class Tables {
                 reply = game.submit(seat, amounts(game, snapshot.revision(), prompt.id(),
                     List.of(Integer.parseInt(option.substring(AMOUNTS.length())))));
                 coverage.kinds.merge(prompt.kind() + " (custom)", 1, Integer::sum);
+            } else if (option.startsWith(TEXT)) {
+                reply = game.submit(seat, text(game, snapshot.revision(), prompt.id(),
+                    option.substring(TEXT.length())));
+                coverage.kinds.merge(prompt.kind() + " (typed)", 1, Integer::sum);
             } else {
                 reply = game.submit(seat, answer(game, UUID.randomUUID().toString(), snapshot.revision(), prompt.id(),
                     option));

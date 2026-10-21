@@ -1318,7 +1318,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.3.1
+             * @default 0.4.0
              */
             version: string;
         };
@@ -2180,7 +2180,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.3.1
+             * @default 0.4.0
              */
             version: string;
         };

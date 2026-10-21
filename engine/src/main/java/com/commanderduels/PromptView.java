@@ -4,11 +4,14 @@ import java.util.List;
 
 /**
  * A typed choice for one seat. Every XMage request becomes a new prompt with a fresh id, and the
- * seat answers with one option id, or for assign_amounts and choose_amount optionally with amounts.
+ * seat answers with one option id, for assign_amounts and choose_amount optionally with amounts, and
+ * for choose_name optionally with a typed name.
  * Kinds: priority, mulligan, yes_no, choose_target, choose_defender (which player, planeswalker or
  * battle an attacker attacks), choose_ability (which of an object's abilities to use, or how to cast
- * a card), choose_choice (one of a short list, such as a colour or the order of replacement
- * effects), choose_mode (a modal spell's modes), choose_amount (a number, such as X), order_triggers
+ * a card), choose_choice (one of a list of at most 1,000, such as a colour, a creature type or the
+ * order of replacement effects), choose_name (a name from a longer list, such as naming a card: the
+ * options are the visible cards' names, and any other name in the list is typed), choose_mode (a
+ * modal spell's modes), choose_amount (a number, such as X), order_triggers
  * (which of several simultaneous triggers goes on the stack first), choose_pile, pay_mana,
  * declare_attackers, declare_blockers, assign_amounts, and unsupported (an XMage request this version
  * does not type; the game waits until the seat concedes or the game is closed).

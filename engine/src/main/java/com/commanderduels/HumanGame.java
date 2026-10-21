@@ -629,6 +629,15 @@ final class HumanGame {
                     return reject(seat, 422, "invalid_amounts", prompt.view().amounts() == null
                         ? "This prompt does not take amounts" : "The amounts break the prompt's limits");
                 }
+            } else if (command.text() != null) {
+                answer = prompt.name(command.text());
+                if (answer == null) {
+                    List<String> near = prompt.near(command.text());
+                    return reject(seat, 422, "invalid_name", prompt.names() == null
+                        ? "This prompt does not take a typed name"
+                        : "No card by that name can be chosen here"
+                            + (near.isEmpty() ? "." : ". Did you mean " + String.join(", ", near) + "?"));
+                }
             } else {
                 answer = prompt.answers().get(command.optionId());
                 if (answer == null) {

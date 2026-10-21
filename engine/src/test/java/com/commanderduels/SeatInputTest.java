@@ -95,6 +95,12 @@ class SeatInputTest {
         assertEquals(List.of(2, 0, 3), split.amounts());
         assertFalse(split.fingerprint().equals(choice.fingerprint()));
 
+        SeatCommand named = SeatCommand.parse(command("submit_choice", "{\"text\":\"Lightning Bolt\"}"), GAME);
+        assertEquals("Lightning Bolt", named.text());
+        assertNull(named.optionId());
+        assertFalse(named.fingerprint().equals(SeatCommand.parse(
+            command("submit_choice", "{\"text\":\"Lightning Helix\"}"), GAME).fingerprint()));
+
         SeatCommand concede = SeatCommand.parse(command("concede", "{}"), GAME);
         assertEquals(SeatCommand.CONCEDE, concede.type());
         assertTrue(concede.fingerprint().startsWith("concede"));
@@ -105,6 +111,10 @@ class SeatInputTest {
         for (String body : new String[]{
             command("submit_choice", "{}"),
             command("submit_choice", "{\"option_id\":\"1\",\"amounts\":[1]}"),
+            command("submit_choice", "{\"option_id\":\"1\",\"text\":\"Island\"}"),
+            command("submit_choice", "{\"text\":\"\"}"),
+            command("submit_choice", "{\"text\":\"" + "x".repeat(201) + "\"}"),
+            command("submit_choice", "{\"text\":7}"),
             command("submit_choice", "{\"option_id\":\"\"}"),
             command("submit_choice", "{\"option_id\":\"12345678901234567\"}"),
             command("submit_choice", "{\"amounts\":[]}"),

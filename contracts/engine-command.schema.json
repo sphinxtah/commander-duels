@@ -31,14 +31,15 @@
   ],
   "$defs": {
     "choice": {
-      "description": "Exactly one option id from the open prompt, or one amount per entry of an assign_amounts prompt.",
+      "description": "Exactly one option id from the open prompt, one amount per entry of an assign_amounts prompt, or a typed name for a choose_name prompt.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "option_id": {"type": "string", "minLength": 1, "maxLength": 16},
-        "amounts": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"type": "integer", "minimum": 0, "maximum": 10000}}
+        "amounts": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"type": "integer", "minimum": 0, "maximum": 10000}},
+        "text": {"type": "string", "minLength": 1, "maxLength": 200}
       },
-      "oneOf": [{"required": ["option_id"]}, {"required": ["amounts"]}]
+      "oneOf": [{"required": ["option_id"]}, {"required": ["amounts"]}, {"required": ["text"]}]
     },
     "priority": {
       "description": "A change to the seat's priority controls (UI07); settings left out stay as they are. Steps are where the seat stops with an empty stack. full_control stops everywhere; false returns to the default stops. cancel_passes ends a pass at once.",
