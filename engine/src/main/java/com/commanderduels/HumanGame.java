@@ -12,11 +12,11 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import mage.cards.decks.Deck;
+import mage.constants.RangeOfInfluence;
 import mage.game.Game;
 import mage.game.events.PlayerQueryEvent;
 import mage.game.events.TableEvent;
 import mage.game.match.Match;
-import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.player.human.HumanPlayer;
 import mage.players.Player;
 import mage.players.net.UserData;
@@ -25,7 +25,8 @@ import mage.util.ThreadUtils;
 
 /**
  * One development game: two to four seats in turn order, each XMage's own {@link HumanPlayer} or a
- * "Computer - mad" player, with fixture decks under Legacy or Commander rules.
+ * {@link FairBot} (XMage's "Computer - mad" AI with only its seat's information), with fixture decks
+ * under Legacy or Commander rules.
  *
  * <p>XMage's human player blocks the game thread until it gets an answer, and XMage asks one player
  * at a time, so at most one prompt is open per game. Each request it fires (a
@@ -102,9 +103,17 @@ final class HumanGame {
 
     private record Recorded(String fingerprint, Reply reply) {}
 
-    /** Test hooks, called on the game thread while XMage's state is consistent. */
+    /** Test hooks, called on the game thread while XMage's state is consistent (except {@link #bot}). */
     interface Hooks {
         Hooks NONE = new Hooks() {};
+
+        /**
+         * The player for a bot seat, made when the game is created: the fair bot, with a random
+         * source seeded from the game's seed and the seat. Tests may substitute XMage's own bot.
+         */
+        default Player bot(int seat, String name, RangeOfInfluence range, int skill, long seed) {
+            return new FairBot(name, range, skill, FairBot.seedFor(seed, seat));
+        }
 
         default void beforeStart(Game game, List<UUID> seatIds) {}
 
@@ -213,7 +222,7 @@ final class HumanGame {
                 seated.add(human);
                 bySeat.add(new Seat(index, human));
             } else {
-                seated.add(new ComputerPlayerControllableProxy(name(seat, index), format.range(), request.skill()));
+                seated.add(hooks.bot(index, name(seat, index), format.range(), request.skill(), request.seed()));
                 bySeat.add(null);
             }
         }

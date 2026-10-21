@@ -14,21 +14,22 @@ import mage.constants.RangeOfInfluence;
 import mage.game.Game;
 import mage.game.GameException;
 import mage.game.match.Match;
-import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.players.Player;
 import mage.util.RandomUtil;
 import mage.util.ThreadUtils;
 
 /**
- * Plays one Legacy-rules Two Player Duel between two XMage "Computer - mad" players, driving the
- * game objects directly as XMage's own test framework does (no server, users or sessions). Like the
- * test framework, it registers the players with a match that is never started: the AI's search
- * copies each player's match record and fails without one.
+ * Plays one Legacy-rules Two Player Duel between two {@link FairBot}s (XMage's "Computer - mad" AI
+ * with only its seat's information), driving the game objects directly as XMage's own test
+ * framework does (no server, users or sessions). Like the test framework, it registers the players
+ * with a match that is never started: the AI's search copies each player's match record and fails
+ * without one.
  *
  * <p>The game runs on its own platform thread, named with XMage's GAME prefix because engine code
  * asserts it runs on a game thread. The caller's thread enforces the wall-clock budget. XMage stops
- * a game when its thread is interrupted, but its AI catches InterruptedException while waiting on a
- * search and clears the flag, so the stop path keeps interrupting until the thread exits.
+ * a game when its thread is interrupted, but code in XMage may catch InterruptedException and clear
+ * the flag (its own AI does while waiting on a search; the fair bot keeps it), so the stop path
+ * keeps interrupting until the thread exits.
  */
 public final class BotMatchRunner {
     public static final List<String> DECKS = LegacyDuel.DECKS;
@@ -136,8 +137,8 @@ public final class BotMatchRunner {
         Match match = LegacyDuel.newMatch("Commander Duels bot match");
         List<Player> players = new ArrayList<>();
         for (int seat = 0; seat < DECKS.size(); seat++) {
-            Player player = new ComputerPlayerControllableProxy(SEAT_NAMES[seat], RangeOfInfluence.ONE,
-                request.skill());
+            Player player = new FairBot(SEAT_NAMES[seat], RangeOfInfluence.ONE, request.skill(),
+                FairBot.seedFor(request.seed(), seat));
             LegacyDuel.seat(game, match, player, decks.get(seat));
             players.add(player);
         }

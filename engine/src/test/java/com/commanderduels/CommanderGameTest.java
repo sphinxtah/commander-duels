@@ -14,10 +14,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import mage.cards.decks.Deck;
+import mage.constants.RangeOfInfluence;
 import mage.game.CommanderDuel;
 import mage.game.CommanderFreeForAll;
 import mage.game.Game;
 import mage.game.GameCommanderImpl;
+import mage.players.Player;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -97,7 +99,15 @@ class CommanderGameTest {
     void scriptedCommanderTablesFinishWithoutLeaks(String players, long seed) throws Exception {
         int seatCount = players.split(",").length;
         HumanGameRequest request = table(players, seed, 8 * seatCount + 6);
-        var check = new SeatChecks(request);
+        List<FairBot> bots = new CopyOnWriteArrayList<>();
+        var check = new SeatChecks(request) {
+            @Override
+            public Player bot(int seat, String name, RangeOfInfluence range, int skill, long botSeed) {
+                var bot = (FairBot) super.bot(seat, name, range, skill, botSeed);
+                bots.add(bot);
+                return bot;
+            }
+        };
         Map<Integer, ScriptedPlayer> scripted = new ConcurrentHashMap<>();
         HumanGame game = Tables.start(request, check);
         long started = System.nanoTime();
@@ -116,11 +126,29 @@ class CommanderGameTest {
         REACHED.addAll(check.reached);
         MAX_TAX.add(check.maxTax.get());
         MAX_DAMAGE.add(check.maxCommanderDamage.get());
+        // AI05 on the largest boards the fixtures reach: every search stopped when told to, and no
+        // decision took longer than its budget and the stop grace.
+        long searches = 0;
+        long continued = 0;
+        long timedOut = 0;
+        long longest = 0;
+        for (FairBot bot : bots) {
+            FairBot.Stats stats = bot.stats();
+            assertEquals(0, stats.abandoned(), bot.getName() + " abandoned a search");
+            assertTrue(stats.longestMillis() <= bot.budget().thinkMillis() + FairBot.STOP_GRACE_MILLIS + 1_000,
+                bot.getName() + " took " + stats.longestMillis() + " ms over one decision");
+            searches += stats.searches();
+            continued += stats.continued();
+            timedOut += stats.timedOut();
+            longest = Math.max(longest, stats.longestMillis());
+        }
         System.out.printf("Commander %s seed %d: %s after %d turns in %d s, %d prompts answered %s, %d views checked;"
-                + " highest tax %d, most commander damage %d%n", players, seed,
+                + " highest tax %d, most commander damage %d; bots searched %d times, continued %d chains,"
+                + " %d searches timed out, longest %d ms%n", players, seed,
             result.kind() + (result.winnerSeat() == null ? "" : " (seat " + result.winnerSeat() + " won)"),
             result.turns(), TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - started), played.answered(),
-            played.answeredBySeat(), check.viewsChecked.get(), check.maxTax.get(), check.maxCommanderDamage.get());
+            played.answeredBySeat(), check.viewsChecked.get(), check.maxTax.get(), check.maxCommanderDamage.get(),
+            searches, continued, timedOut, longest);
     }
 
     /**
