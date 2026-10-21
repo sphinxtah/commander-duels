@@ -3,8 +3,8 @@ WORKDIR /app
 COPY requirements.lock pyproject.toml alembic.ini VERSION ./
 COPY api ./api
 COPY catalog ./catalog
-# The Planeswalker roster and the starter decks.
-COPY content/planeswalkers.json content/starter-decks.json ./content/
+# The Planeswalker roster, the starter decks and the shop's price list.
+COPY content/planeswalkers.json content/starter-decks.json content/pack-prices.json ./content/
 ENV CD_CONTENT_DIR=/app/content
 RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 # The card image cache and the catalog's bulk files; named volumes mounted here start with this owner.

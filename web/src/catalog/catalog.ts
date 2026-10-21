@@ -148,6 +148,7 @@ export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
   starter: "Starter decks",
   alliance: "Your alliance",
   grandfathered: "Your earlier decks",
+  pack: "Packs you opened",
 };
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */

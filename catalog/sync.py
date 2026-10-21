@@ -43,6 +43,8 @@ KIND = "catalog_sync"
 MAX_ATTEMPTS = 6
 BACKOFF_SECONDS = 60
 MAX_BACKOFF_SECONDS = 3600
+# Outcomes that wait for something else, not retries: they count no attempt.
+WAITING = frozenset({"waiting_for_other_run", "waiting_for_catalog"})
 
 
 @dataclass
@@ -423,7 +425,7 @@ def settle(engine: Engine, job: Claimed, outcome: Outcome, now: datetime) -> boo
     values: dict[str, Any] = {"lease_until": None, "result_code": outcome.code[:64]}
     if outcome.status == "pending":
         attempt = int(job.payload.get("attempt", 1))
-        if outcome.code != "waiting_for_other_run":
+        if outcome.code not in WAITING:
             attempt += 1
         values.update(
             status="pending",

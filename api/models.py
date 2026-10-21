@@ -801,6 +801,192 @@ class SiteSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
+# Leng's card shop (v0.4.0, PROG02): booster products, their collations from MTGJSON's booster
+# data, the packs players buy or SysOp gives, and the packs opened. Collations, packs and openings
+# are append-only: PostgreSQL refuses updates and deletes, so what a pack held stays recorded.
+
+
+class ShopProduct(Base):
+    """A booster product: one MTGJSON set and booster name. Its market price comes from
+    content/pack-prices.json (or none, for a set after that list); SysOp and administrators may
+    set its price or take it off sale here, apart from the content file. A product is sold only
+    while its collation is ready: every card in it found in the catalog."""
+
+    __tablename__ = "shop_products"
+    __table_args__ = (
+        UniqueConstraint("set_code", "booster"),
+        CheckConstraint("origin IN ('price_list', 'mtgjson')", name="ck_shop_products_origin"),
+        CheckConstraint(
+            "data_status IN ('waiting', 'ready', 'unresolved', 'missing')",
+            name="ck_shop_products_data_status",
+        ),
+        CheckConstraint(
+            "price_override IS NULL OR price_override > 0", name="ck_shop_products_price"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    # MTGJSON's set code and booster name, exactly as given.
+    set_code: Mapped[str] = mapped_column(String(16))
+    booster: Mapped[str] = mapped_column(String(48))
+    set_name: Mapped[str] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text)
+    released: Mapped[date | None] = mapped_column(Date)
+    # price_list: from content/pack-prices.json; mtgjson: a set released after that list.
+    origin: Mapped[str] = mapped_column(String(16))
+    # The market price of one pack in US dollars, its method and source; staff see it, players
+    # never do.
+    usd: Mapped[float | None] = mapped_column(Float)
+    usd_method: Mapped[str | None] = mapped_column(String(16))
+    usd_source: Mapped[str | None] = mapped_column(Text)
+    # Staff's settings, each change audited: a price in tokens over the curve's, and sale.
+    price_override: Mapped[int | None] = mapped_column(BigInteger)
+    price_reason: Mapped[str | None] = mapped_column(Text)
+    on_sale: Mapped[bool] = mapped_column(default=True)
+    sale_reason: Mapped[str | None] = mapped_column(Text)
+    changed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    changed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # The booster data: waiting (never read yet), ready, unresolved (cards the catalog lacks) or
+    # missing (MTGJSON describes no such booster). The current collation opens packs; no foreign
+    # key, since the collation points at its product.
+    data_status: Mapped[str] = mapped_column(String(16), default="waiting")
+    collation_id: Mapped[UUID | None]
+    pack_size: Mapped[int | None]
+    unresolved_count: Mapped[int] = mapped_column(default=0)
+    # A few of the unresolved cards: {scryfall_id, name, set, sheet}.
+    unresolved: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
+    checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class BoosterCollation(Base):
+    """One revision of a product's collation (PROG02): its booster layouts with their weights,
+    and its sheets, each card a catalog printing with its weight, colors and finish, as MTGJSON's
+    booster data gave them. A new revision only when they change. Append-only."""
+
+    __tablename__ = "booster_collations"
+    __table_args__ = (UniqueConstraint("product_id", "revision"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("shop_products.id"), index=True)
+    revision: Mapped[int]
+    # MTGJSON's meta.version of the set file, and the SHA-256 of the files it was read from.
+    mtgjson_version: Mapped[str] = mapped_column(String(64))
+    source_sha256: Mapped[str] = mapped_column(String(64))
+    # SHA-256 of the layouts and sheets: the same collation read again makes no revision.
+    digest: Mapped[str] = mapped_column(String(64))
+    # [{contents: {sheet: count}, weight}]
+    layouts: Mapped[list[dict[str, object]]] = mapped_column(JsonType)
+    # {sheet: {foil, fixed, balance_colors, allow_duplicates, cards: [[printing, weight, colors,
+    # finish]]}}
+    sheets: Mapped[dict[str, object]] = mapped_column(JsonType)
+    cards: Mapped[int]
+    sync_run_id: Mapped[UUID | None] = mapped_column(ForeignKey("booster_sync_runs.id"))
+    catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class BoosterSyncRun(Base):
+    """One run of the booster data job, scheduled or asked for: what it did, or why it failed."""
+
+    __tablename__ = "booster_sync_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'succeeded', 'unchanged', 'failed', 'fenced')",
+            name="ck_booster_sync_runs_status",
+        ),
+        CheckConstraint("trigger IN ('schedule', 'manual')", name="ck_booster_sync_runs_trigger"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    job_id: Mapped[UUID | None] = mapped_column(ForeignKey("scheduled_jobs.id"), index=True)
+    generation: Mapped[int] = mapped_column(default=0)
+    trigger: Mapped[str] = mapped_column(String(16))
+    requested_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    attempt: Mapped[int] = mapped_column(default=1)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime(), index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    status: Mapped[str] = mapped_column(String(16), default="running")
+    error_code: Mapped[str | None] = mapped_column(String(64))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    stats: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class BoosterSource(Base):
+    """A file MTGJSON serves (a set file, or the set list), as last fetched: its validators for
+    conditional requests, and its SHA-256 to tell a change."""
+
+    __tablename__ = "booster_sources"
+    name: Mapped[str] = mapped_column(String(32), primary_key=True)
+    url: Mapped[str] = mapped_column(Text)
+    etag: Mapped[str | None] = mapped_column(Text)
+    last_modified: Mapped[str | None] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(String(64))
+    size: Mapped[int] = mapped_column(BigCount)
+    mtgjson_version: Mapped[str | None] = mapped_column(String(64))
+    fetched_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    checked_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class Pack(Base):
+    """A pack an account holds, bought with tokens (ledger key pack:<id>) or given by SysOp. It is
+    unopened until an opening names it. A purchase carries the client's key, so a retried request
+    buys once. Append-only."""
+
+    __tablename__ = "packs"
+    __table_args__ = (
+        UniqueConstraint("user_id", "request_key"),
+        CheckConstraint("source IN ('purchase', 'grant')", name="ck_packs_source"),
+        CheckConstraint("tokens >= 0", name="ck_packs_tokens"),
+        CheckConstraint("(source = 'grant') = (actor_id IS NOT NULL)", name="ck_packs_actor"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("shop_products.id"))
+    source: Mapped[str] = mapped_column(String(16))
+    # Tokens paid; 0 for a pack given.
+    tokens: Mapped[int] = mapped_column(BigInteger)
+    request_key: Mapped[str | None] = mapped_column(String(64))
+    # One grant of several packs shares its ID.
+    grant_id: Mapped[UUID | None]
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class PackOpening(Base):
+    """A pack opened: once per pack, drawn from one collation revision with the server's secure
+    randomness. Its cards joined the library under grant key pack:<id>. Append-only."""
+
+    __tablename__ = "pack_openings"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    pack_id: Mapped[UUID] = mapped_column(ForeignKey("packs.id"), unique=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    product_id: Mapped[UUID] = mapped_column(ForeignKey("shop_products.id"))
+    collation_id: Mapped[UUID] = mapped_column(ForeignKey("booster_collations.id"))
+    # Which of the collation's layouts the pack drew.
+    layout: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class PackCard(Base):
+    """A card in an opened pack, in the order it is revealed: its printing, finish and sheet, and
+    whether it was new to the library then. Append-only."""
+
+    __tablename__ = "pack_cards"
+    __table_args__ = (
+        UniqueConstraint("opening_id", "position"),
+        CheckConstraint("finish IN ('nonfoil', 'foil', 'etched')", name="ck_pack_cards_finish"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    opening_id: Mapped[UUID] = mapped_column(ForeignKey("pack_openings.id"), index=True)
+    position: Mapped[int] = mapped_column(SmallInteger)
+    printing_id: Mapped[UUID] = mapped_column(ForeignKey("card_printings.id"))
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    finish: Mapped[str] = mapped_column(String(8))
+    sheet: Mapped[str] = mapped_column(String(64))
+    new: Mapped[bool]
+
+
 class CustomCard(Base):
     """A card of the owner's own making, uploaded by SysOp: never in the catalog's tables, so no
     search, card page or list of others can reach it. Only accounts at the Godlike tier see it

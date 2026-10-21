@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0011_custom_play"
-down_revision = "0008_tokens"
+down_revision = "0010_shop"
 branch_labels = None
 depends_on = None
 

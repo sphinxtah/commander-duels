@@ -111,7 +111,7 @@ class StarterResult(Contract):
 class LibraryCard(Contract):
     card: CardSummary
     copies: int | None = Field(description="Copies owned; null for basic lands.")
-    sources: list[Literal["starter", "grandfathered", "alliance"]]
+    sources: list[Literal["starter", "grandfathered", "alliance", "pack"]]
 
 
 class LibraryView(Contract):

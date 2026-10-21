@@ -159,6 +159,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/shop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shop Admin
+         * @description Every product with its price, sale and booster data, and the job's state.
+         */
+        get: operations["shop_admin_api_v1_admin_shop_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/shop/products/{product_id}/price": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Price
+         * @description Sets a product's price in tokens, or returns it to the curve (null); audited.
+         */
+        put: operations["change_price_api_v1_admin_shop_products__product_id__price_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/shop/products/{product_id}/sale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Sale
+         * @description Takes a product off sale, or puts it back; audited. Packs already held still open.
+         */
+        put: operations["change_sale_api_v1_admin_shop_products__product_id__sale_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/shop/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shop Runs */
+        get: operations["shop_runs_api_v1_admin_shop_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/shop/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Booster Sync
+         * @description Queues a booster data run now; the worker starts it within seconds.
+         */
+        post: operations["request_booster_sync_api_v1_admin_shop_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -170,6 +267,27 @@ export interface paths {
         get: operations["list_users_api_v1_admin_users_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/packs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Account Packs */
+        get: operations["account_packs_api_v1_admin_users__user_id__packs_get"];
+        put?: never;
+        /**
+         * Give Packs
+         * @description SysOp gives unopened packs to any account, its own included: with a reason, audited.
+         */
+        post: operations["give_packs_api_v1_admin_users__user_id__packs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1262,10 +1380,200 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/shop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shop
+         * @description What Leng sells, the account's tokens and unopened packs, and where the data comes from.
+         */
+        get: operations["shop_api_v1_shop_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shop/openings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Openings
+         * @description The account's opened packs, newest first.
+         */
+        get: operations["openings_api_v1_shop_openings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shop/openings/{opening_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Opening */
+        get: operations["opening_api_v1_shop_openings__opening_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shop/packs/{pack_id}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open One
+         * @description Opens one of the account's packs. A pack opens once: asking again returns its cards.
+         */
+        post: operations["open_one_api_v1_shop_packs__pack_id__open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shop/purchases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy
+         * @description Buys one pack: its price leaves the balance and the pack joins the inventory, together.
+         */
+        post: operations["buy_api_v1_shop_purchases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AdminProduct */
+        AdminProduct: {
+            /**
+             * Booster
+             * @description MTGJSON's booster name.
+             */
+            booster: string;
+            /** Changed At */
+            changed_at: string | null;
+            /** Checked At */
+            checked_at: string | null;
+            /** Collation Revision */
+            collation_revision: number | null;
+            /**
+             * Curve Price
+             * @description The market price's tokens on the curve.
+             */
+            curve_price: number | null;
+            /**
+             * Data Status
+             * @enum {string}
+             */
+            data_status: "waiting" | "ready" | "unresolved" | "missing";
+            /**
+             * Era
+             * @enum {string}
+             */
+            era: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special";
+            /** Mtgjson Version */
+            mtgjson_version: string | null;
+            /** Name */
+            name: string;
+            /**
+             * On Sale
+             * @description Staff's setting; selling needs the booster data too.
+             */
+            on_sale: boolean;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "price_list" | "mtgjson";
+            /**
+             * Pack Size
+             * @description Cards in the usual pack.
+             */
+            pack_size: number | null;
+            /**
+             * Price
+             * @description In tokens.
+             */
+            price: number;
+            /**
+             * Price Basis
+             * @description market: from the pack's market price; set: set by the site's staff; unpriced: not priced yet.
+             * @enum {string}
+             */
+            price_basis: "market" | "set" | "unpriced";
+            /** Price Override */
+            price_override: number | null;
+            /** Price Reason */
+            price_reason: string | null;
+            /** Released */
+            released: string | null;
+            /** Sale Reason */
+            sale_reason: string | null;
+            /** Selling */
+            selling: boolean;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
+            /** Unresolved */
+            unresolved: components["schemas"]["UnresolvedCard"][];
+            /** Unresolved Count */
+            unresolved_count: number;
+            /** Usd */
+            usd: number | null;
+            /** Usd Method */
+            usd_method: string | null;
+            /** Usd Source */
+            usd_source: string | null;
+        };
         /** AdminUser */
         AdminUser: {
             /** Alliance */
@@ -1367,6 +1675,35 @@ export interface components {
              * @enum {string}
              */
             signup_policy: "open" | "approval";
+        };
+        /** BoosterRun */
+        BoosterRun: {
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Trigger */
+            trigger: string;
         };
         /** Bootstrap */
         Bootstrap: {
@@ -2077,6 +2414,21 @@ export interface components {
             status: "unavailable" | "loading" | "ready" | "failed";
             xmage?: components["schemas"]["XmageBuild"] | null;
         };
+        /** EraInfo */
+        EraInfo: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            /** Name */
+            name: string;
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+        };
         /** Error */
         Error: {
             /** Code */
@@ -2381,6 +2733,23 @@ export interface components {
              */
             text: string;
         };
+        /** InventoryItem */
+        InventoryItem: {
+            /** Count */
+            count: number;
+            /**
+             * Next Pack
+             * Format: uuid
+             * @description The oldest unopened pack, the next to open.
+             */
+            next_pack: string;
+            /**
+             * Openable
+             * @description Whether its booster data has been read.
+             */
+            openable: boolean;
+            product: components["schemas"]["ProductRef"];
+        };
         /** LibraryCard */
         LibraryCard: {
             card: components["schemas"]["CardSummary"];
@@ -2390,7 +2759,7 @@ export interface components {
              */
             copies: number | null;
             /** Sources */
-            sources: ("starter" | "grandfathered" | "alliance")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack")[];
         };
         /** LibraryView */
         LibraryView: {
@@ -2450,7 +2819,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -2460,6 +2829,75 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "denied";
+        };
+        /** Opening */
+        Opening: {
+            /** Cards */
+            cards: components["schemas"]["PulledCard"][];
+            /** Collation Revision */
+            collation_revision: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Mtgjson Version */
+            mtgjson_version: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            /**
+             * Pack
+             * Format: uuid
+             */
+            pack: string;
+            product: components["schemas"]["ProductRef"];
+        };
+        /** OpeningSummary */
+        OpeningSummary: {
+            /**
+             * Best
+             * @description The rarest card's rarity.
+             */
+            best: string;
+            /** Cards */
+            cards: number;
+            /** Foils */
+            foils: number;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** New Cards */
+            new_cards: number;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            product: components["schemas"]["ProductRef"];
+        };
+        /** PackGrant */
+        PackGrant: {
+            /** Count */
+            count: number;
+            /**
+             * Product
+             * Format: uuid
+             */
+            product: string;
+            /** Reason */
+            reason: string;
+        };
+        /** PacksGranted */
+        PacksGranted: {
+            /** Granted */
+            granted: number;
+            /** Inventory */
+            inventory: components["schemas"]["InventoryItem"][];
         };
         /** PlaneswalkerInfo */
         PlaneswalkerInfo: {
@@ -2588,6 +3026,16 @@ export interface components {
              */
             reduced_motion: boolean;
         };
+        /** PriceChange */
+        PriceChange: {
+            /** Reason */
+            reason: string;
+            /**
+             * Tokens
+             * @description null: back to the curve.
+             */
+            tokens: number | null;
+        };
         /** PrintingSummary */
         PrintingSummary: {
             /** Artist */
@@ -2642,6 +3090,74 @@ export interface components {
             /** Remedy */
             remedy: string;
         };
+        /** ProductInfo */
+        ProductInfo: {
+            /**
+             * Booster
+             * @description MTGJSON's booster name.
+             */
+            booster: string;
+            /**
+             * Era
+             * @enum {string}
+             */
+            era: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special";
+            /** Name */
+            name: string;
+            /**
+             * Pack Size
+             * @description Cards in the usual pack.
+             */
+            pack_size: number | null;
+            /**
+             * Price
+             * @description In tokens.
+             */
+            price: number;
+            /**
+             * Price Basis
+             * @description market: from the pack's market price; set: set by the site's staff; unpriced: not priced yet.
+             * @enum {string}
+             */
+            price_basis: "market" | "set" | "unpriced";
+            /** Released */
+            released: string | null;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
+        };
+        /** ProductRef */
+        ProductRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special";
+            /** Name */
+            name: string;
+            /** Released */
+            released: string | null;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
+        };
         /** ProfileUpdate */
         ProfileUpdate: {
             /** Avatar */
@@ -2676,6 +3192,84 @@ export interface components {
             tiers: components["schemas"]["TierInfo"][];
             /** Wins */
             wins: number;
+        };
+        /** PulledCard */
+        PulledCard: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Collector Number */
+            collector_number: string;
+            /**
+             * Faces
+             * @description Faces with images of their own; 0 for one image.
+             */
+            faces: number;
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /** Mana Cost */
+            mana_cost: string | null;
+            /** Name */
+            name: string;
+            /**
+             * New
+             * @description No copy of it was in the library for good before.
+             */
+            new: boolean;
+            /** Position */
+            position: number;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Rarity */
+            rarity: string;
+            /** Set Code */
+            set_code: string;
+            /** Sheet */
+            sheet: string;
+            /** Type Line */
+            type_line: string;
+        };
+        /** Purchase */
+        Purchase: {
+            /** Balance */
+            balance: number;
+            /**
+             * Pack
+             * Format: uuid
+             */
+            pack: string;
+            product: components["schemas"]["ProductRef"];
+            /**
+             * Repeated
+             * @description The key had bought this pack already.
+             */
+            repeated: boolean;
+            /**
+             * Tokens
+             * @description The price paid.
+             */
+            tokens: number;
+        };
+        /** PurchaseRequest */
+        PurchaseRequest: {
+            /**
+             * Key
+             * @description The client's own key for this purchase: a retry buys once.
+             */
+            key: string;
+            /**
+             * Product
+             * Format: uuid
+             */
+            product: string;
         };
         /** Readiness */
         Readiness: {
@@ -2807,6 +3401,13 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** SaleChange */
+        SaleChange: {
+            /** On Sale */
+            on_sale: boolean;
+            /** Reason */
+            reason: string;
+        };
         /**
          * SeatChoice
          * @description A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck
@@ -2926,6 +3527,48 @@ export interface components {
              */
             updated_at: string;
             validation: components["schemas"]["Validation"];
+        };
+        /** ShopAdminView */
+        ShopAdminView: {
+            /**
+             * Enabled
+             * @description The booster data job runs (the catalog folder is set).
+             */
+            enabled: boolean;
+            last_run: components["schemas"]["BoosterRun"] | null;
+            /** Next Run At */
+            next_run_at: string | null;
+            /** Prices As Of */
+            prices_as_of: string | null;
+            /** Products */
+            products: components["schemas"]["AdminProduct"][];
+        };
+        /** ShopData */
+        ShopData: {
+            /**
+             * Checked At
+             * @description When the booster data was last read.
+             */
+            checked_at: string | null;
+            /** Mtgjson Version */
+            mtgjson_version: string | null;
+            /** Prices As Of */
+            prices_as_of: string | null;
+        };
+        /** ShopView */
+        ShopView: {
+            /** Balance */
+            balance: number;
+            data: components["schemas"]["ShopData"];
+            /** Eras */
+            eras: components["schemas"]["EraInfo"][];
+            /** Inventory */
+            inventory: components["schemas"]["InventoryItem"][];
+            /**
+             * Products
+             * @description The products on sale, newest first.
+             */
+            products: components["schemas"]["ProductInfo"][];
         };
         /** StarterChoice */
         StarterChoice: {
@@ -3131,6 +3774,17 @@ export interface components {
              * @description On packs, as a positive number.
              */
             spent: number;
+        };
+        /** UnresolvedCard */
+        UnresolvedCard: {
+            /** Mtgjson Uuid */
+            mtgjson_uuid: string | null;
+            /** Name */
+            name: string | null;
+            /** Scryfall Id */
+            scryfall_id: string | null;
+            /** Sheet */
+            sheet: string;
         };
         /** UserPage */
         UserPage: {
@@ -4148,6 +4802,480 @@ export interface operations {
             };
         };
     };
+    shop_admin_api_v1_admin_shop_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopAdminView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_price_api_v1_admin_shop_products__product_id__price_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriceChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProduct"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_sale_api_v1_admin_shop_products__product_id__sale_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaleChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProduct"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    shop_runs_api_v1_admin_shop_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoosterRun"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    request_booster_sync_api_v1_admin_shop_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncQueued"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     list_users_api_v1_admin_users_get: {
         parameters: {
             query?: {
@@ -4223,6 +5351,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    account_packs_api_v1_admin_users__user_id__packs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InventoryItem"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    give_packs_api_v1_admin_users__user_id__packs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PacksGranted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */
@@ -9857,6 +11177,477 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    shop_api_v1_shop_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShopView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    openings_api_v1_shop_openings_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                before?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpeningSummary"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    opening_api_v1_shop_openings__opening_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                opening_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Opening"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    open_one_api_v1_shop_packs__pack_id__open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Opening"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    buy_api_v1_shop_purchases_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Purchase"];
+                };
             };
             /** @description Bad Request */
             400: {

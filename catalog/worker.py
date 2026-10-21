@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from api.config import Settings
 from api.database import build_engine
 from api.models import ScheduledJob
-from catalog import sync
+from catalog import boosters, sync
 
 logger = logging.getLogger(__name__)
 
@@ -62,21 +62,26 @@ def finish(engine: Engine, job_id: UUID, generation: int, kind: str, now: dateti
 
 
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
-    """One iteration: keep the catalog schedule queued, then run one due job."""
+    """One iteration: keep the catalog's and the booster data's schedules queued, then run one
+    due job."""
     sync.ensure_scheduled(engine, config, datetime.now(UTC))
+    boosters.ensure_scheduled(engine, config, datetime.now(UTC))
     job = claim(engine, datetime.now(UTC))
     if job is None:
         return
     job_id, generation, kind = job
-    if kind != sync.KIND:
+    if kind not in (sync.KIND, boosters.KIND):
         finish(engine, *job, datetime.now(UTC))
         return
     with Session(engine) as session:
         payload = session.scalar(select(ScheduledJob.payload).where(ScheduledJob.id == job_id))
     claimed = sync.Claimed(job_id, generation, dict(payload or {}))
-    outcome = sync.handle(engine, config, client, claimed)
+    if kind == boosters.KIND:
+        outcome = boosters.handle(engine, config, client, claimed)
+    else:
+        outcome = sync.handle(engine, config, client, claimed)
     if not sync.settle(engine, claimed, outcome, datetime.now(UTC)):
-        logger.warning("Catalog job %s was taken over before it settled", job_id)
+        logger.warning("Job %s (%s) was taken over before it settled", job_id, kind)
 
 
 def main() -> None:

@@ -49,6 +49,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "catalog.manage",
             # Builds from the whole catalog, not a library of its own (v0.3.1).
             "library.unlimited",
+            # Leng's card shop: prices, sale and the booster data job (v0.4.0).
+            "shop.manage",
         }
     ),
 }

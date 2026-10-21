@@ -21,7 +21,14 @@ export type Cue =
   | "victory"
   | "defeat"
   | "drawGame"
-  | "refused";
+  | "refused"
+  // Leng's card shop (v0.4.0): opening a pack.
+  | "packTear"
+  | "cardDeal"
+  | "cardFlip"
+  | "rareReveal"
+  | "mythicReveal"
+  | "foilShimmer";
 
 interface Timing {
   /** When the part starts, from the cue's start (default 0). */
@@ -74,6 +81,8 @@ const F4 = 349.23;
 const G5 = 783.99;
 const A4 = 440;
 const C6 = 1046.5;
+const B5 = 987.77;
+const E6 = 1318.51;
 
 export const RECIPES: Record<Cue, Recipe> = {
   // A card slid off the library: a breath of noise rising through a band-pass.
@@ -225,6 +234,66 @@ export const RECIPES: Record<Cue, Recipe> = {
         ms: 90,
         lowpass: 1800,
       },
+    ],
+  },
+  // Leng's card shop (v0.4.0). The wrapper tearing: noise ripping upward through a band-pass,
+  // soft-clipped, over a low thump.
+  packTear: {
+    ms: 420,
+    gain: 0.4,
+    parts: [
+      {
+        kind: "noise",
+        filter: "bandpass",
+        hz: 1200,
+        toHz: 5200,
+        q: 0.9,
+        ms: 360,
+        clip: true,
+      },
+      { kind: "tone", wave: "sine", hz: 120, toHz: 70, ms: 160, level: 0.6 },
+    ],
+  },
+  // A card dealt face down: a short swish.
+  cardDeal: {
+    ms: 90,
+    gain: 0.18,
+    parts: [{ kind: "noise", filter: "highpass", hz: 2600, toHz: 4200 }],
+  },
+  // A card turned over: a flick of noise and a soft tick.
+  cardFlip: {
+    ms: 110,
+    gain: 0.22,
+    parts: [
+      { kind: "noise", filter: "bandpass", hz: 2400, toHz: 1600, q: 1.4 },
+      { kind: "tone", wave: "sine", hz: 880, ms: 40, level: 0.4 },
+    ],
+  },
+  // A rare: two bells a fifth apart.
+  rareReveal: {
+    ms: 800,
+    gain: 0.3,
+    parts: [note(E5, 0, 500), note(B5, 140, 660, 0.8)],
+  },
+  // A mythic rare: a rising chord that rings.
+  mythicReveal: {
+    ms: 1200,
+    gain: 0.32,
+    parts: [
+      note(C5, 0, 700),
+      note(G5, 120, 760, 0.8),
+      note(C6, 240, 820, 0.7),
+      note(E6, 360, 840, 0.6),
+    ],
+  },
+  // A foil: quiet high sparkles.
+  foilShimmer: {
+    ms: 700,
+    gain: 0.16,
+    parts: [
+      { kind: "tone", wave: "sine", hz: 2093, ms: 260 },
+      { kind: "tone", wave: "sine", hz: 2637, atMs: 140, ms: 280, level: 0.8 },
+      { kind: "tone", wave: "sine", hz: 3136, atMs: 300, ms: 400, level: 0.6 },
     ],
   },
 };

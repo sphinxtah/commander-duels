@@ -1,0 +1,848 @@
+{
+ "meta": {
+  "date": "2026-10-21",
+  "version": "5.3.0+fixture"
+ },
+ "data": {
+  "code": "ZNR",
+  "name": "Zendikar Rising",
+  "releaseDate": "2020-09-25",
+  "type": "expansion",
+  "booster": {
+   "draft": {
+    "name": "Zendikar Rising Draft Booster (test fixture)",
+    "boosters": [
+     {
+      "contents": {
+       "common": 10,
+       "uncommon": 3,
+       "rareMythic": 1,
+       "land": 1
+      },
+      "weight": 2
+     },
+     {
+      "contents": {
+       "common": 9,
+       "uncommon": 3,
+       "rareMythic": 1,
+       "land": 1,
+       "foil": 1
+      },
+      "weight": 1
+     }
+    ],
+    "boostersTotalWeight": 3,
+    "sheets": {
+     "common": {
+      "cards": {
+       "d223994c-0100-50a3-80df-7aaea02681d8": 1,
+       "b11edb6c-656e-5115-b17b-f6600b371f39": 1,
+       "378dc15e-4799-5638-9754-426b0df25569": 1,
+       "422c13ad-02f3-566a-92ae-b194f6e46d83": 1,
+       "b33c1197-982b-5f66-9fd0-983f882100be": 1,
+       "dc42537a-470b-5413-a5c4-27d6d800d81f": 1,
+       "98366bfa-d134-57c7-acd4-5d64ca8b7374": 1,
+       "cd422325-a2c9-5acf-b679-bb8722a7148d": 1,
+       "ae06be18-af5c-50f8-a7f2-01e37cc188bc": 1,
+       "8de1ee40-53d8-57f7-bbc6-a2c931d10cb3": 1,
+       "b775e2ba-1ed9-5e8b-9dd3-099141b80218": 1
+      },
+      "foil": false,
+      "totalWeight": 11,
+      "balanceColors": true
+     },
+     "uncommon": {
+      "cards": {
+       "389f8104-7c5b-523d-ae70-1edc0d156fb4": 1,
+       "944ca150-b8a9-5f54-a964-82ed75942cf1": 1,
+       "b6e310b3-193a-5088-9c9a-ce734fdf1b32": 1,
+       "cebb71d5-968b-5a8a-a3a8-0376d4921066": 1,
+       "f6da2e18-39ae-5973-9d87-0d2f2ef16a7b": 1,
+       "dc6ee2bd-abff-50c2-8f11-b5f9d6fc15f1": 1,
+       "dda6e2c1-a923-5437-bc98-dc25202cef5d": 1,
+       "44e1d555-da1d-527c-aaa7-2141978a2582": 1
+      },
+      "foil": false,
+      "totalWeight": 8
+     },
+     "rareMythic": {
+      "cards": {
+       "a51e10ee-b43e-5609-8633-53d0ae753769": 2,
+       "1850bfc3-f8c6-5bf9-8344-65ec17094aa5": 2,
+       "bb61f472-afa3-5f32-b482-3150051c2c0f": 2,
+       "c2a36bbb-356d-5e9d-a91d-166b80f7f091": 2,
+       "5cfe9ad0-725e-5157-a031-d75be489fb2a": 2,
+       "abb8ac2d-45f1-5fdf-9614-bc32a15869e5": 2,
+       "9678a196-9214-5b57-9037-29c32bcb792b": 2,
+       "2fa0d928-030c-5526-be27-c8b842fda3bc": 2,
+       "98829921-0935-5c6c-aa85-ca5c1820c709": 2,
+       "cdbe10f9-740f-545f-b701-34e310ff6ee6": 2,
+       "91bc1504-230a-592d-babd-a3409b0630a4": 2,
+       "1675f529-9293-5da6-bf73-bc53a022c9c4": 2,
+       "69a21737-62c9-51e3-b588-ca67f02888f2": 2,
+       "16767468-713f-530d-9430-e887c9b21b98": 2,
+       "16d8726d-e53b-530a-8e48-eb75774a04e6": 1,
+       "01eff95e-7ca2-55bd-8208-9dd0fa19f229": 1,
+       "d241ae15-7058-51e0-ab75-d31c61fcb8b4": 1,
+       "ce5c9881-6a39-5150-8d2c-e5273bad3707": 1,
+       "bdf1c2a5-2b7c-5d68-ae66-d8a9d4607380": 1,
+       "ddf19e3d-1314-5004-af15-2d1bd13798e9": 1
+      },
+      "foil": false,
+      "totalWeight": 34
+     },
+     "land": {
+      "cards": {
+       "a1e2cc89-f87b-5551-bd30-f67e983d6e0a": 1,
+       "0e1979c9-adac-5063-b96c-8b6cebc74a98": 1,
+       "66abfcf3-70cf-5ec5-9f09-92c579f566f4": 1,
+       "560f8a96-ea39-59dd-ac26-c89b999f990e": 1,
+       "2ea794ed-5281-5a1d-9d01-363f86bee2e7": 1
+      },
+      "foil": false,
+      "totalWeight": 5
+     },
+     "foil": {
+      "cards": {
+       "d223994c-0100-50a3-80df-7aaea02681d8": 10,
+       "b11edb6c-656e-5115-b17b-f6600b371f39": 10,
+       "378dc15e-4799-5638-9754-426b0df25569": 10,
+       "422c13ad-02f3-566a-92ae-b194f6e46d83": 10,
+       "b33c1197-982b-5f66-9fd0-983f882100be": 10,
+       "dc42537a-470b-5413-a5c4-27d6d800d81f": 10,
+       "98366bfa-d134-57c7-acd4-5d64ca8b7374": 10,
+       "cd422325-a2c9-5acf-b679-bb8722a7148d": 10,
+       "ae06be18-af5c-50f8-a7f2-01e37cc188bc": 10,
+       "8de1ee40-53d8-57f7-bbc6-a2c931d10cb3": 10,
+       "b775e2ba-1ed9-5e8b-9dd3-099141b80218": 10,
+       "389f8104-7c5b-523d-ae70-1edc0d156fb4": 3,
+       "944ca150-b8a9-5f54-a964-82ed75942cf1": 3,
+       "b6e310b3-193a-5088-9c9a-ce734fdf1b32": 3,
+       "cebb71d5-968b-5a8a-a3a8-0376d4921066": 3,
+       "f6da2e18-39ae-5973-9d87-0d2f2ef16a7b": 3,
+       "dc6ee2bd-abff-50c2-8f11-b5f9d6fc15f1": 3,
+       "dda6e2c1-a923-5437-bc98-dc25202cef5d": 3,
+       "44e1d555-da1d-527c-aaa7-2141978a2582": 3,
+       "a51e10ee-b43e-5609-8633-53d0ae753769": 2,
+       "1850bfc3-f8c6-5bf9-8344-65ec17094aa5": 2,
+       "bb61f472-afa3-5f32-b482-3150051c2c0f": 2,
+       "c2a36bbb-356d-5e9d-a91d-166b80f7f091": 2,
+       "5cfe9ad0-725e-5157-a031-d75be489fb2a": 2,
+       "abb8ac2d-45f1-5fdf-9614-bc32a15869e5": 2,
+       "9678a196-9214-5b57-9037-29c32bcb792b": 2,
+       "2fa0d928-030c-5526-be27-c8b842fda3bc": 2,
+       "98829921-0935-5c6c-aa85-ca5c1820c709": 2,
+       "cdbe10f9-740f-545f-b701-34e310ff6ee6": 2,
+       "91bc1504-230a-592d-babd-a3409b0630a4": 2,
+       "1675f529-9293-5da6-bf73-bc53a022c9c4": 2,
+       "69a21737-62c9-51e3-b588-ca67f02888f2": 2,
+       "16767468-713f-530d-9430-e887c9b21b98": 2,
+       "16d8726d-e53b-530a-8e48-eb75774a04e6": 1,
+       "01eff95e-7ca2-55bd-8208-9dd0fa19f229": 1,
+       "d241ae15-7058-51e0-ab75-d31c61fcb8b4": 1,
+       "ce5c9881-6a39-5150-8d2c-e5273bad3707": 1,
+       "bdf1c2a5-2b7c-5d68-ae66-d8a9d4607380": 1,
+       "ddf19e3d-1314-5004-af15-2d1bd13798e9": 1
+      },
+      "foil": true,
+      "totalWeight": 168
+     }
+    },
+    "sourceSetCodes": [
+     "ZNR"
+    ],
+    "languages": [
+     "en"
+    ]
+   }
+  },
+  "cards": [
+   {
+    "uuid": "d223994c-0100-50a3-80df-7aaea02681d8",
+    "name": "Adventurous Eater // Have a Bite",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "B"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "d40cc7da-c731-418e-8547-7033d1939450"
+    }
+   },
+   {
+    "uuid": "b11edb6c-656e-5115-b17b-f6600b371f39",
+    "name": "Brainstorm",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "U"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0359f212-9564-41a9-870b-d2c57455a695"
+    }
+   },
+   {
+    "uuid": "378dc15e-4799-5638-9754-426b0df25569",
+    "name": "Counterspell",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "U"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "02da8709-4228-4fed-9d2d-781e686661df"
+    }
+   },
+   {
+    "uuid": "422c13ad-02f3-566a-92ae-b194f6e46d83",
+    "name": "Dark Ritual",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "B"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0690f724-eb95-416b-b064-f1239e2a30e8"
+    }
+   },
+   {
+    "uuid": "b33c1197-982b-5f66-9fd0-983f882100be",
+    "name": "Delver of Secrets // Insectile Aberration",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "U"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "11bf83bb-c95b-4b4f-9a56-ce7a1816307a"
+    }
+   },
+   {
+    "uuid": "dc42537a-470b-5413-a5c4-27d6d800d81f",
+    "name": "Grizzly Bears",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "G"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "10c845b8-40f1-44df-9e91-dab7606f6271"
+    }
+   },
+   {
+    "uuid": "98366bfa-d134-57c7-acd4-5d64ca8b7374",
+    "name": "Hill Giant",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0ddb98e8-13fe-4786-83f7-b72c56db135a"
+    }
+   },
+   {
+    "uuid": "cd422325-a2c9-5acf-b679-bb8722a7148d",
+    "name": "Lightning Bolt",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0ef3c273-ec92-41d0-9abe-0f99e33db4f5"
+    }
+   },
+   {
+    "uuid": "ae06be18-af5c-50f8-a7f2-01e37cc188bc",
+    "name": "Llanowar Elves",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "G"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "01c6f877-6b00-4d57-8a88-36cd3b16edbc"
+    }
+   },
+   {
+    "uuid": "8de1ee40-53d8-57f7-bbc6-a2c931d10cb3",
+    "name": "Temple of Khonshu",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "2369ddb5-fa0b-46a0-a393-f213ec86818d"
+    }
+   },
+   {
+    "uuid": "b775e2ba-1ed9-5e8b-9dd3-099141b80218",
+    "name": "Lightning Bolt",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "02e20655-321c-4194-ab72-b4a5473238d1"
+    }
+   },
+   {
+    "uuid": "389f8104-7c5b-523d-ae70-1edc0d156fb4",
+    "name": "Dark Ritual",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "B"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "055d3a93-6c9a-4c03-a2f4-17a41fa8f0b1"
+    }
+   },
+   {
+    "uuid": "944ca150-b8a9-5f54-a964-82ed75942cf1",
+    "name": "Fire // Ice",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "R",
+     "U"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0a76d227-c899-409f-a01b-d3ca16b56ddc"
+    }
+   },
+   {
+    "uuid": "b6e310b3-193a-5088-9c9a-ce734fdf1b32",
+    "name": "Lightning Bolt",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0852f9f3-d7ef-4d31-93e3-93bc7c5a4ec9"
+    }
+   },
+   {
+    "uuid": "cebb71d5-968b-5a8a-a3a8-0376d4921066",
+    "name": "Lim-Dûl's Vault",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "B",
+     "U"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "44d117d8-222b-4d10-b02b-c1ff110a1c50"
+    }
+   },
+   {
+    "uuid": "f6da2e18-39ae-5973-9d87-0d2f2ef16a7b",
+    "name": "Nazgûl",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "B"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "15bab0bd-3467-429f-897a-188e11ff101e"
+    }
+   },
+   {
+    "uuid": "dc6ee2bd-abff-50c2-8f11-b5f9d6fc15f1",
+    "name": "Relentless Rats",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "B"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "1c9caf97-75c6-4e12-8724-1abe32212bef"
+    }
+   },
+   {
+    "uuid": "dda6e2c1-a923-5437-bc98-dc25202cef5d",
+    "name": "Sol Ring",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "04002706-2236-4b79-bdea-4f263e43cb9c"
+    }
+   },
+   {
+    "uuid": "44e1d555-da1d-527c-aaa7-2141978a2582",
+    "name": "Swords to Plowshares",
+    "setCode": "ZNR",
+    "rarity": "uncommon",
+    "colors": [
+     "W"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "057d2410-30d3-4b7a-9dc3-f2512c1cf31c"
+    }
+   },
+   {
+    "uuid": "a51e10ee-b43e-5609-8633-53d0ae753769",
+    "name": "Birds of Paradise",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "G"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "01e7b0bc-1c6c-48f4-8b72-1a809f536c6c"
+    }
+   },
+   {
+    "uuid": "1850bfc3-f8c6-5bf9-8344-65ec17094aa5",
+    "name": "Bonecrusher Giant // Stomp",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "09fd2d9c-1793-4beb-a3fb-7a869f660cd4"
+    }
+   },
+   {
+    "uuid": "bb61f472-afa3-5f32-b482-3150051c2c0f",
+    "name": "Gyruda, Doom of Depths",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "B",
+     "U"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "0d59bf12-f898-40ad-a8a9-2f31f733cf15"
+    }
+   },
+   {
+    "uuid": "c2a36bbb-356d-5e9d-a91d-166b80f7f091",
+    "name": "Jegantha, the Wellspring",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "G",
+     "R"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "1d52e527-3835-4350-8c01-0f2d5d623b9c"
+    }
+   },
+   {
+    "uuid": "5cfe9ad0-725e-5157-a031-d75be489fb2a",
+    "name": "Keruga, the Macrosage",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "G",
+     "U"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "1206f4fc-6ebf-4205-90d3-1cb3a9caaa82"
+    }
+   },
+   {
+    "uuid": "abb8ac2d-45f1-5fdf-9614-bc32a15869e5",
+    "name": "Lurrus of the Dream-Den",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "B",
+     "W"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "2c89beb2-3467-4be0-a066-919f54331942"
+    }
+   },
+   {
+    "uuid": "9678a196-9214-5b57-9037-29c32bcb792b",
+    "name": "Lutri, the Spellchaser",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "R",
+     "U"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "12c01a00-2128-4b6c-874f-a206eca3a756"
+    }
+   },
+   {
+    "uuid": "2fa0d928-030c-5526-be27-c8b842fda3bc",
+    "name": "Obosh, the Preypiercer",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "B",
+     "R"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "451507de-9c42-43ee-b9ba-1f69e9aa29d2"
+    }
+   },
+   {
+    "uuid": "98829921-0935-5c6c-aa85-ca5c1820c709",
+    "name": "Umori, the Collector",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "B",
+     "G"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "10576f29-1ab8-4157-b5a0-8ad94a1ff634"
+    }
+   },
+   {
+    "uuid": "cdbe10f9-740f-545f-b701-34e310ff6ee6",
+    "name": "Yorion, Sky Nomad",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "U",
+     "W"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "275426c4-c14e-47d0-a9d4-24da7f6f6911"
+    }
+   },
+   {
+    "uuid": "91bc1504-230a-592d-babd-a3409b0630a4",
+    "name": "Zirda, the Dawnwaker",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "R",
+     "W"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "1bd8e61c-2ee8-4243-a848-7008810db8a0"
+    }
+   },
+   {
+    "uuid": "1675f529-9293-5da6-bf73-bc53a022c9c4",
+    "name": "Wrath of God",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "W"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "0619d670-7b53-4185-a25d-2fab5db1aab5"
+    }
+   },
+   {
+    "uuid": "69a21737-62c9-51e3-b588-ca67f02888f2",
+    "name": "Teferi, Temporal Archmage",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "U"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "368c6e60-804c-447c-bc2b-ac9dc4cab5e7"
+    }
+   },
+   {
+    "uuid": "16767468-713f-530d-9430-e887c9b21b98",
+    "name": "Raised by Giants",
+    "setCode": "ZNR",
+    "rarity": "rare",
+    "colors": [
+     "G"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "11c93414-935e-462b-ad89-27ca21d01bf9"
+    }
+   },
+   {
+    "uuid": "16d8726d-e53b-530a-8e48-eb75774a04e6",
+    "name": "Dockside Extortionist",
+    "setCode": "ZNR",
+    "rarity": "mythic",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "47fdac35-d709-4078-8205-ad7c79b6644c"
+    }
+   },
+   {
+    "uuid": "01eff95e-7ca2-55bd-8208-9dd0fa19f229",
+    "name": "Gisela, the Broken Blade",
+    "setCode": "ZNR",
+    "rarity": "mythic",
+    "colors": [
+     "W"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "04506bad-3856-4184-8dda-941ded60f41a"
+    }
+   },
+   {
+    "uuid": "d241ae15-7058-51e0-ab75-d31c61fcb8b4",
+    "name": "Kenrith, the Returned King",
+    "setCode": "ZNR",
+    "rarity": "mythic",
+    "colors": [
+     "W"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "029ff21a-b175-4e81-8712-4dae185ad790"
+    }
+   },
+   {
+    "uuid": "ce5c9881-6a39-5150-8d2c-e5273bad3707",
+    "name": "Relentless Rats",
+    "setCode": "ZNR",
+    "rarity": "mythic",
+    "colors": [
+     "B"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "1cc70d4e-662e-42c7-8a21-f3a002198fea"
+    }
+   },
+   {
+    "uuid": "bdf1c2a5-2b7c-5d68-ae66-d8a9d4607380",
+    "name": "Grist, the Hunger Tide",
+    "setCode": "ZNR",
+    "rarity": "mythic",
+    "colors": [
+     "B",
+     "G"
+    ],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "1925dc45-4dee-4772-aa16-3b4ca54be6c7"
+    }
+   },
+   {
+    "uuid": "ddf19e3d-1314-5004-af15-2d1bd13798e9",
+    "name": "Karlach, Fury of Avernus",
+    "setCode": "ZNR",
+    "rarity": "mythic",
+    "colors": [
+     "R"
+    ],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "47a6c502-08ba-4c0d-aee9-98ce40058227"
+    }
+   },
+   {
+    "uuid": "a1e2cc89-f87b-5551-bd30-f67e983d6e0a",
+    "name": "Forest",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "0000419b-0bba-4488-8f7a-6194544ce91e"
+    }
+   },
+   {
+    "uuid": "0e1979c9-adac-5063-b96c-8b6cebc74a98",
+    "name": "Island",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [],
+    "finishes": [
+     "nonfoil",
+     "foil"
+    ],
+    "identifiers": {
+     "scryfallId": "000f1f50-08e5-4d83-8159-98f06a0e2279"
+    }
+   },
+   {
+    "uuid": "66abfcf3-70cf-5ec5-9f09-92c579f566f4",
+    "name": "Swamp",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "00030770-5e99-4943-819d-8d807c24cc14"
+    }
+   },
+   {
+    "uuid": "560f8a96-ea39-59dd-ac26-c89b999f990e",
+    "name": "Mountain",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "00f0ab3f-86c5-49f6-948b-ace35bc03889"
+    }
+   },
+   {
+    "uuid": "2ea794ed-5281-5a1d-9d01-363f86bee2e7",
+    "name": "Plains",
+    "setCode": "ZNR",
+    "rarity": "common",
+    "colors": [],
+    "finishes": [
+     "nonfoil"
+    ],
+    "identifiers": {
+     "scryfallId": "00293ce4-3475-4064-8510-9e8c02faf3bf"
+    }
+   }
+  ],
+  "tokens": []
+ }
+}

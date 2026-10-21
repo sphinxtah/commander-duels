@@ -33,6 +33,7 @@ import { CardsPage } from "./catalog/CardsPage";
 import { DeckEditor } from "./decks/DeckEditor";
 import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
+import { ShopPage } from "./shop/ShopPage";
 import { GameScreen } from "./game/GameScreen";
 import { PracticeTable } from "./game/PracticeTable";
 import {
@@ -48,6 +49,7 @@ const pages = [
   "Learn",
   "Decks",
   "Cards",
+  "Shop",
   "Collection",
   "Profile",
   "Settings",
@@ -55,11 +57,18 @@ const pages = [
 ] as const;
 // SysOp's entrance has no navigation entry; it opens only from the SysOp networks.
 type Page = (typeof pages)[number] | "SysOp";
-const glyphs = ["◇", "▱", "✧", "▤", "▦", "◈", "○", "⚙", "⚖"];
+const glyphs = ["◇", "▱", "✧", "▤", "▦", "⬡", "◈", "○", "⚙", "⚖"];
 const details: Record<
   Exclude<
     Page,
-    "Play" | "Settings" | "Profile" | "Admin" | "SysOp" | "Decks" | "Cards"
+    | "Play"
+    | "Settings"
+    | "Profile"
+    | "Admin"
+    | "SysOp"
+    | "Decks"
+    | "Cards"
+    | "Shop"
   >,
   { title: string; description: string; next: string; milestone: string }
 > = {
@@ -545,6 +554,8 @@ export function App() {
             <DecksPage me={me} heading={heading} />
           ) : page === "Cards" ? (
             <CardsPage me={me} heading={heading} />
+          ) : page === "Shop" ? (
+            <ShopPage me={me} heading={heading} />
           ) : page === "SysOp" && entrance ? (
             <SysopSignIn onSignedIn={accountChanged} heading={heading} />
           ) : page === "Play" || page === "SysOp" ? (
