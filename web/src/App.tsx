@@ -7,12 +7,19 @@ import {
 } from "react";
 import { Account, SignIn, Waiting, avatars } from "./Account";
 import { Admin, SysopSignIn, canAdminister } from "./Admin";
+import {
+  countsTotal,
+  countsWords,
+  useAdminCounts,
+  useCountTitle,
+} from "./admin/counts";
 import { Portrait } from "./alliance/Portrait";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { InstallBanner } from "./app/InstallBanner";
 import { Landing } from "./app/Landing";
 import { guardLiveGame } from "./app/liveGame";
 import { useOnline } from "./app/online";
+import { ReportButton } from "./app/ReportProblem";
 import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { UpdateNotice } from "./app/UpdateNotice";
@@ -194,6 +201,11 @@ export function App() {
   const shownBefore = useRef<string | undefined>(undefined);
   // A #game/<id> opens the table for an active account only; before then it is the landing page.
   const atTable = Boolean(game) && admitted;
+  // What waits for SysOp and administrators (v0.4.1): on Admin in the navigation, on
+  // Administration's tabs and in the tab's title, asked again every minute.
+  const { counts, refresh: refreshCounts } = useAdminCounts(me);
+  const waiting = countsTotal(counts);
+  useCountTitle(waiting);
 
   useEffect(() => {
     const change = (event: HashChangeEvent) => {
@@ -452,12 +464,22 @@ export function App() {
                 href={`#${item.toLowerCase()}`}
                 aria-current={shown === item ? "page" : undefined}
                 className={shown === item ? styles.active : ""}
+                aria-label={
+                  item === "Admin" && waiting > 0
+                    ? `Admin, ${countsWords(counts)}`
+                    : undefined
+                }
               >
                 <span aria-hidden="true">{glyphs[pages.indexOf(item)]}</span>
                 {item}
                 {item === "Play" && (
                   <span className={styles.navArrow} aria-hidden="true">
                     ↗
+                  </span>
+                )}
+                {item === "Admin" && waiting > 0 && (
+                  <span className={styles.navBadge} aria-hidden="true">
+                    {waiting}
                   </span>
                 )}
               </a>
@@ -511,6 +533,8 @@ export function App() {
                     : "Service unavailable"}
             </span>
             <UpdateNotice />
+            {/* On every page of the app (v0.4.1); the table has its own, in the Game menu. */}
+            <ReportButton className={styles.report} />
             <span className={styles.version}>v{__APP_VERSION__}</span>
           </div>
         </header>
@@ -548,7 +572,12 @@ export function App() {
               heading={heading}
             />
           ) : page === "Admin" ? (
-            <Admin me={me} heading={heading} />
+            <Admin
+              me={me}
+              heading={heading}
+              counts={counts}
+              onCounts={refreshCounts}
+            />
           ) : page === "Decks" && deckRoute.deck ? (
             <DeckEditor
               key={deckRoute.deck}

@@ -48,6 +48,22 @@ def test_web_proxy_limits_google_sign_in_challenges():
     assert "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;" in location[1]
 
 
+def test_both_proxies_take_a_report_with_its_screenshot():
+    # A 5 MB screenshot is about 7 MB in base64; every other request stays within nginx's 1 MB.
+    for path, forwarded in (
+        (ROOT / "web" / "nginx.conf", "$proxy_add_x_forwarded_for"),
+        (ROOT / "deploy" / "nginx" / "duels.thesphinx.co", "$remote_addr"),
+    ):
+        conf = path.read_text()
+        assert len(re.findall(r"client_max_body_size", conf)) == 1, path
+        location = re.search(r"location = /api/v1/reports \{(.*?)\n\s*\}", conf, re.S)
+        assert location, path
+        size = re.search(r"client_max_body_size (\d+)m;", location[1])
+        assert size and 7 <= int(size[1]) <= 10, path
+        assert re.search(r"proxy_pass http://\S+;", location[1]), path
+        assert f"proxy_set_header X-Forwarded-For {forwarded};" in location[1], path
+
+
 def test_restore_empties_the_database_and_stops_at_the_first_error():
     script = (ROOT / "deploy" / "restore.sh").read_text()
     drop = script.index("DROP DATABASE commander WITH (FORCE)")

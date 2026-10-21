@@ -1,7 +1,93 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { answered, onboarding, describe as words, type Me } from "./api";
+import {
+  RECENT_REQUESTS,
+  answered,
+  forgetRequests,
+  onboarding,
+  recentRequests,
+  describe as words,
+  type Me,
+} from "./api";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  forgetRequests();
+});
+
+describe("the latest requests, for a problem report (v0.4.1)", () => {
+  it("keeps each request's method, path, status and ID, never its query or body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("{}", {
+            status: 201,
+            headers: { "X-Request-ID": "6f1d2c3b-aaaa-4bbb-8ccc-0123456789ab" },
+          }),
+      ),
+    );
+    await answered(
+      new Request("http://localhost/api/v1/cards/search?q=secret+words", {
+        method: "POST",
+        body: JSON.stringify({ private: "body" }),
+      }),
+    );
+    expect(recentRequests()).toEqual([
+      {
+        method: "POST",
+        path: "/api/v1/cards/search",
+        status: 201,
+        request_id: "6f1d2c3b-aaaa-4bbb-8ccc-0123456789ab",
+        at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+      },
+    ]);
+    expect(JSON.stringify(recentRequests())).not.toMatch(/secret|private/);
+  });
+
+  it("notes a request that got no answer, and an ID it does not trust, as none", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+        .mockResolvedValueOnce(
+          new Response(null, {
+            status: 502,
+            headers: { "X-Request-ID": "<script>" },
+          }),
+        ),
+    );
+    await answered(new Request("http://localhost/api/v1/games"));
+    await answered(new Request("http://localhost/api/v1/me"));
+    expect(
+      recentRequests().map(({ path, status, request_id }) => ({
+        path,
+        status,
+        request_id,
+      })),
+    ).toEqual([
+      { path: "/api/v1/games", status: 0, request_id: null },
+      { path: "/api/v1/me", status: 502, request_id: null },
+    ]);
+  });
+
+  it("keeps only the latest, leaves out the minute's counts, and hands out copies", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 200 })),
+    );
+    for (let index = 0; index < RECENT_REQUESTS + 5; index += 1)
+      await answered(new Request(`http://localhost/api/v1/decks/${index}`));
+    await answered(new Request("http://localhost/api/v1/admin/counts"));
+    await answered(new Request("http://localhost/brand/mark.webp"));
+    const kept = recentRequests();
+    expect(kept).toHaveLength(RECENT_REQUESTS);
+    expect(kept[0]!.path).toBe("/api/v1/decks/5");
+    expect(kept.at(-1)!.path).toBe(`/api/v1/decks/${RECENT_REQUESTS + 4}`);
+    kept[0]!.path = "/changed";
+    expect(recentRequests()[0]!.path).toBe("/api/v1/decks/5");
+  });
+});
 
 describe("the API client's fetch", () => {
   it("passes every answer the service gives through as it is", async () => {

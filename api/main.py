@@ -22,6 +22,7 @@ from api import (
     engine_cards,
     games,
     progression,
+    reports,
     shop,
     tables,
 )
@@ -323,4 +324,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
     app.include_router(shop.router)
+    app.include_router(reports.router)
     return app

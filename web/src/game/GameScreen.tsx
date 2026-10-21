@@ -15,6 +15,7 @@ import {
 } from "../app/liveGame";
 import { useLargeText, useMotionLevel } from "../app/motion";
 import { useOnline } from "../app/online";
+import { ReportDialog } from "../app/ReportProblem";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
@@ -131,6 +132,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
   const [zone, setZone] = useState<ZoneBrowserTarget | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // "Report a problem" from the Game menu (v0.4.1): the report names this game and its turn.
+  const [reporting, setReporting] = useState(false);
   const [expandedSeat, setExpandedSeat] = useState<Seat | null>(null);
   const [sceneStatus, setSceneStatus] = useState<SceneStatus | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -604,6 +607,10 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               muted={settings.muted}
               onMute={(muted) => updateSettings({ muted })}
               onOptions={() => openDrawer("options")}
+              onReport={() => {
+                closeMenu(false);
+                setReporting(true);
+              }}
               onConcede={() => {
                 closeMenu(false);
                 concedeDialog.current?.showModal();
@@ -856,6 +863,23 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               </button>
             </form>
           </dialog>
+          <ReportDialog
+            open={reporting}
+            game={{ id: gameId, turn: view?.turn ?? null }}
+            onClose={() => {
+              setReporting(false);
+              // The Game menu closed as the dialog opened: focus goes back to its diamond.
+              const active = document.activeElement;
+              if (
+                !active ||
+                active === document.body ||
+                active.closest("[hidden]")
+              )
+                document
+                  .querySelector<HTMLElement>("[data-menu-toggle]")
+                  ?.focus({ preventScroll: true });
+            }}
+          />
           <dialog
             ref={resultDialog}
             className={styles.confirm}

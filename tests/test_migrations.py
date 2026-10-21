@@ -30,6 +30,7 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "pack_cards",
         "library_grants",
         "custom_cards",
+        "problem_reports",
         "external_identities",
         "rules_bundles",
         "scheduled_jobs",

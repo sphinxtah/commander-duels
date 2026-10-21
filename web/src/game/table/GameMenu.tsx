@@ -5,9 +5,9 @@ import type { FullscreenState } from "./types";
 import styles from "./screen.module.css";
 
 // The Game menu (design §9.1): a popover above the band's menu diamond with the way back to the
-// Table, Full screen, Mute, the table options and Concede. It is a list of ordinary links and
-// buttons that Tab moves through, never a dialog: the game goes on behind it. Escape closes it
-// (the table's Escape chain), and so does a press anywhere else.
+// Table, Full screen, Mute, the table options, Report a problem (v0.4.1) and Concede. It is a
+// list of ordinary links and buttons that Tab moves through, never a dialog: the game goes on
+// behind it. Escape closes it (the table's Escape chain), and so does a press anywhere else.
 
 export const GAME_MENU_ID = "game-menu";
 
@@ -18,6 +18,7 @@ export function GameMenu({
   muted,
   onMute,
   onOptions,
+  onReport,
   onConcede,
   concedeDisabled,
   onLeave,
@@ -28,6 +29,8 @@ export function GameMenu({
   muted: boolean;
   onMute(muted: boolean): void;
   onOptions(): void;
+  /** Opens "Report a problem" with this game and its turn. */
+  onReport(): void;
   onConcede(): void;
   concedeDisabled: boolean;
   onLeave(): void;
@@ -98,6 +101,11 @@ export function GameMenu({
             onClick={onOptions}
           >
             Table options
+          </button>
+        </li>
+        <li>
+          <button type="button" aria-haspopup="dialog" onClick={onReport}>
+            Report a problem
           </button>
         </li>
         <li>

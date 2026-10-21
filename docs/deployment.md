@@ -93,6 +93,8 @@ Set up on 2026-10-19, step by step with discovery first, so that no other site o
    - `duels` redirects HTTP to HTTPS and answered 502 until the first deploy;
    - the eight other sites answer as before.
 
+5. **Problem reports with screenshots (v0.4.1, the owner's step).** nginx refuses requests over 1 MB unless told otherwise, and a report's screenshot may be 5 MB, about 7 MB in base64 ([problem reports](reports.md#the-screenshot)). The repository's site file now has a `location = /api/v1/reports` block that takes up to 8 MB on that one route; every other request keeps the 1 MB limit. Certbot edited the live file, so copy only that block into it, inside the server block that certbot gave `listen 443 ssl` (the one with `location /`), keeping a copy of the file first. Then `sudo nginx -t` and reload. The web container's own nginx takes the same 8 MB on that route with the image. Until the proxy has the block, a report whose screenshot is over 750 KB is refused on the way, and the page sends it again with the screenshot made smaller, so reports still arrive.
+
 ### The engine with the custom cards (v0.4.0)
 
 The Godlike tier's custom cards play only on an engine that has loaded them ([progression](progression.md#the-godlike-tiers-custom-cards)). Their implementations live in the owner's private repository, whose CI publishes a private engine image: the public engine image with a plugin added to `/app/plugins` and its card database rebuilt ([engine plugins](engine/xmage-spike.md#plugins-v040)). The live site runs that image instead of the public one. Once, on the VM:
@@ -217,7 +219,7 @@ Without the restore, `deploy.sh` refuses the previous tag at its migrate step, b
 
   The database ends up exactly as dumped, or empty if the restore fails. It is never a mix of the dump and the tables, columns or rows a newer version added, as v0.1.0's `pg_restore --clean` into the live database could leave. The API and the worker stay stopped until `deploy.sh` starts the version with that last migration. A `pre-<tag>` dump belongs to the version that ran before `<tag>`. A nightly or `pre-restore` dump belongs to the version running when it was taken. The web container keeps running: its nginx asks Docker's DNS for the API's new address every 10 seconds.
 
-The card image cache (`card_images` volume) needs no backup: the API fetches any missing image again. Nor do Scryfall's bulk files (`catalog_data`, since v0.2.0): the worker downloads them again. The catalog itself is in the database, so the dumps hold it, and a restore brings back its revisions with the decks that refer to them.
+The card image cache (`card_images` volume) needs no backup: the API fetches any missing image again. Nor do Scryfall's bulk files (`catalog_data`, since v0.2.0): the worker downloads them again. The catalog itself is in the database, so the dumps hold it, and a restore brings back its revisions with the decks that refer to them. So are the players' problem reports with their screenshots (v0.4.1, [problem reports](reports.md#storage-and-backups)).
 
 ## Checking the live site
 

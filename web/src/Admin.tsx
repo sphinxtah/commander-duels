@@ -10,12 +10,15 @@ import {
   client,
   describe,
   sysopSignIn,
+  type AdminCounts,
   type AdminUser,
   type AuditEntry,
   type Me,
   type Planeswalker,
 } from "./api";
+import { pendingWords, unreadWords } from "./admin/counts";
 import { CustomCards } from "./admin/CustomCards";
+import { Reports } from "./admin/Reports";
 import { SetWins } from "./admin/SetWins";
 import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
@@ -59,7 +62,16 @@ function when(value: string | null | undefined) {
     : "—";
 }
 
-function Users({ me }: { me: Me }) {
+function Users({
+  me,
+  pending,
+  onCounts,
+}: {
+  me: Me;
+  /** How many accounts wait for approval (v0.4.1), when this account may approve them. */
+  pending?: number | null;
+  onCounts?: () => void;
+}) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [status, setStatus] = useState<Status | "">("");
@@ -152,6 +164,8 @@ function Users({ me }: { me: Me }) {
       setMessage(
         `${user.handle ?? user.display_name}: ${statusNames[data.status]}.`,
       );
+      // An approval or a denial changes how many wait (v0.4.1).
+      onCounts?.();
     } else setMessage(describe(error));
   }
   async function toggleRole(user: AdminUser, role: GrantableRole, on: boolean) {
@@ -189,6 +203,25 @@ function Users({ me }: { me: Me }) {
   return (
     <section className={styles.panel} aria-labelledby="users-title">
       <h2 id="users-title">Accounts</h2>
+      {/* The way to the requests that wait (v0.4.1), unless they are shown already. */}
+      {pending ? (
+        <p className={admin.shortcut}>
+          <span>{pendingWords(pending)}.</span>
+          {status !== "pending" && (
+            <button
+              type="button"
+              className={styles.secondary}
+              onClick={() => {
+                setStatus("pending");
+                setQuery("");
+                setSearch("");
+              }}
+            >
+              Show the waiting {pending === 1 ? "account" : "accounts"}
+            </button>
+          )}
+        </p>
+      ) : null}
       <form className={styles.filters} onSubmit={find} role="search">
         <label className={styles.field}>
           <span>Show</span>
@@ -534,18 +567,39 @@ export function canAdminister(me: Me | null | undefined) {
       me.permissions.includes("admin.audit.read") ||
       me.permissions.includes("catalog.manage") ||
       me.permissions.includes("custom_cards.manage") ||
-      me.permissions.includes("shop.manage")),
+      me.permissions.includes("shop.manage") ||
+      me.permissions.includes("reports.manage")),
   );
 }
 
-type Tab = "users" | "economy" | "audit" | "catalog" | "shop" | "custom";
+type Tab =
+  "users" | "reports" | "economy" | "audit" | "catalog" | "shop" | "custom";
+
+/** A tab's count, with words for screen readers ("Accounts, 2 accounts waiting…"). */
+function TabCount({ count, words }: { count: number; words: string }) {
+  if (!count) return null;
+  return (
+    <>
+      <span className={admin.count} aria-hidden="true">
+        {count}
+      </span>
+      <span className={styles.visuallyHidden}>, {words}</span>
+    </>
+  );
+}
 
 export function Admin({
   me,
   heading,
+  counts,
+  onCounts,
 }: {
   me: Me | null | undefined;
   heading: RefObject<HTMLHeadingElement | null>;
+  /** What waits (v0.4.1): accounts to approve and unread reports; null when not known. */
+  counts?: AdminCounts | null;
+  /** Asks for the counts again, after something here changed them. */
+  onCounts?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("users");
   if (!canAdminister(me))
@@ -580,8 +634,13 @@ export function Admin({
   const custom = me!.permissions.includes("custom_cards.manage");
   // Leng's card shop: prices, sale and the booster data (v0.4.0).
   const shop = me!.permissions.includes("shop.manage");
+  // The players' problem reports, for SysOp and administrators (v0.4.1).
+  const reports = me!.permissions.includes("reports.manage");
+  const pending = counts?.pending_accounts ?? 0;
+  const unread = counts?.unread_reports ?? 0;
   const available = [
     users && "users",
+    reports && "reports",
     users && "economy",
     audit && "audit",
     catalog && "catalog",
@@ -596,8 +655,8 @@ export function Admin({
         Keep the table running.
       </h1>
       <p className={shell.lead}>
-        Approve new players, assign roles, review what changed and by whom, and
-        keep the card catalog current.
+        Approve new players, read their problem reports, assign roles, review
+        what changed and by whom, and keep the card catalog current.
       </p>
       <div
         className={styles.tabs}
@@ -611,6 +670,17 @@ export function Admin({
             onClick={() => setTab("users")}
           >
             Accounts
+            <TabCount count={pending} words={pendingWords(pending)} />
+          </button>
+        )}
+        {reports && (
+          <button
+            role="tab"
+            aria-selected={shown === "reports"}
+            onClick={() => setTab("reports")}
+          >
+            Reports
+            <TabCount count={unread} words={unreadWords(unread)} />
           </button>
         )}
         {users && (
@@ -661,7 +731,13 @@ export function Admin({
       </div>
       <div role="tabpanel">
         {shown === "users" ? (
-          <Users me={me!} />
+          <Users
+            me={me!}
+            pending={counts?.pending_accounts}
+            onCounts={onCounts}
+          />
+        ) : shown === "reports" ? (
+          <Reports onCounts={onCounts} />
         ) : shown === "economy" ? (
           <EconomySettings
             canChange={me!.permissions.includes("economy.manage")}
