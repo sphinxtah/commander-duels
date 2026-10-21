@@ -117,10 +117,9 @@ describe("the service worker build", () => {
     ).not.toBe(a);
     expect(precacheList(["b", "a", "a"])).toEqual(["/", "/a", "/b"]);
     // Portraits load on demand.
-    expect(precacheList(["portraits/jace-128.webp", "brand/mark.webp"])).toEqual([
-      "/",
-      "/brand/mark.webp",
-    ]);
+    expect(
+      precacheList(["portraits/jace-128.webp", "brand/mark.webp"]),
+    ).toEqual(["/", "/brand/mark.webp"]);
     expect(
       writePlaceholders("f('__CD_PRECACHE__',`__CD_SW_VERSION__`)", {
         precache: ["/"],

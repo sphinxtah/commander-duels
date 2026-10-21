@@ -27,7 +27,9 @@ const ON_DEMAND = ["portraits/"];
  * except the folders loaded on demand.
  */
 export function precacheList(names: string[]): string[] {
-  const kept = names.filter((name) => !ON_DEMAND.some((folder) => name.startsWith(folder)));
+  const kept = names.filter(
+    (name) => !ON_DEMAND.some((folder) => name.startsWith(folder)),
+  );
   return ["/", ...[...new Set(kept)].sort().map((name) => `/${name}`)];
 }
 

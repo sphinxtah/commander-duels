@@ -227,13 +227,20 @@ class Table {
         );
       }
     for (const line of log)
-      for (const name of this.concealed)
-        if (
-          !this.publicNames.has(name) &&
-          !this.pending.has(name) &&
-          phrase(name).test(line.text)
-        )
+      for (const name of this.concealed) {
+        if (this.publicNames.has(name) || !phrase(name).test(line.text))
+          continue;
+        // A card the log says was revealed is public by the rules: XMage reveals to every player
+        // (what one player alone sees, it logs as "looks at"). No view may show it, though, when
+        // none is published while XMage keeps it in its revealed list, as when Goblin Guide's
+        // trigger reveals the top of a library mid-combat (a local run in v0.3.1). The engine's
+        // own check counts XMage's revealed list as public.
+        if (/\breveals\b/.test(line.text)) {
+          this.publicNames.add(name);
+          this.pending.delete(name);
+        } else if (!this.pending.has(name))
           this.pending.set(name, snapshot.revision);
+      }
     if (snapshot.result)
       for (const [name, revision] of this.pending)
         this.problems.push(

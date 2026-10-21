@@ -1,5 +1,28 @@
 # Verification
 
+## v0.3.1
+
+Validated locally on Windows on October 21, 2026, on the work as merged for v0.3.1. Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container; the engine built and tested in its own Docker build.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 71 files formatted, 48 Python source files type-checked |
+| Python suite | 148 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New in `tests/test_progression.py`: the two starter decks at onboarding (grants, decks, once only), building from the library (collection-locked decks, owned copies, the library search, guided proposals within the library, administrators unlimited), alliances by tier with their cards and decks revalidated on leaving, wins counted once from recorded results (a replayed end and a second count write nothing; turn limits, bot wins and draws count for no one), SysOp's settings of wins with their reason and audit, the tiers and the roster's card matching, the content files holding nothing private, the custom cards seen only at Godlike (404 like any missing route below it, never in the catalog's search, the audit trail naming IDs only, `private, no-store` images), and migration 0007 carrying accounts over. PostgreSQL also refuses updates and deletes in the progression ledger |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated; no drift |
+| Engine (JUnit) | 95 passed in the engine image's Maven build, among them `DeterminizerTest` (5) and `FairBotTest` (2) for the fair bots, and `CommanderGameTest` checking every bot's budget ([fair bots](engine/fair-bots.md)) |
+| Vitest, TypeScript and the production build | 782 tests in 60 files: the starter picker, the profile's progress and alliance picker, the tier crests and portraits, administration's wins and custom-card upload (the image fitted to 745 × 1040 and under 750 KB), the deck builder's and Cards page's library, owned copies and collection-locked decks, the practice table for players, and the table's portraits |
+| Browser journeys against the API | 38 passed (10 skipped that need the engine) on Vite's dev server against an API from the working tree on PostgreSQL with the test catalog and a generated SysOp: the shell, identity, the deck builder and Cards page as SysOp, and the fake table, now with portraits in colour for your seat, grey for an opponent and the sigil for a missing one, on the canvas and the plain table |
+| Game journeys | 7 passed against the development engine image with the fair bots and the bots kept on fixture decks (`CD_BOT_DECKS=fixtures`): a Legacy game by mouse completed in 12 turns (100 prompts, 212 snapshots, no concealed card in any payload), Legacy by keyboard, the four-player Commander table, the second tab and resend, an own deck with full control, the response timer and full screen. The PWA journeys need the web image behind nginx and run in CI |
+| Real data | On a copy of the development database (the full catalog, an existing player and SysOp), migration 0007 counted the player's past win, gave SysOp its 100,000 wins and moved the player to the starter-deck step. A Commander game through the API against three bots then ran 20 turns to its turn limit with the bots on three different starter decks (Wild Stampede, Graveyard Shift, Life and Legacy): 516 payloads validated against the contracts with no problem, no deck-list audit for the bots' decks, and no errors or "thinks too long" in the engine's log |
+| The ten starter decks | Each exactly 100 cards; every card in the catalog, certified and Commander-legal; none a Game Changer (checked against the full catalog on 2026-10-20) |
+
+**Seen while checking, then fixed:**
+- **A deck list asked for every unplayable deck** to tell a library's lock from an engine problem; decks now store and list `collection_locked`.
+- **The game journey's leak check flagged a revealed card.** "Bot 2 reveals Garruk's Companion" (Goblin Guide's trigger) names a card the rules make public, but no view was published while XMage kept it revealed, so the check said it never became public. A card a log line says was revealed now counts as public, as the engine's own check counts XMage's revealed list.
+- **The custom-card image budget.** An 800 KB image is more than 1 MB in base64, over the proxies' limit; the browser now keeps it under 750 KB.
+
+**Not checked by hand yet** (for the live site after the deploy): choosing the starter decks and an alliance as a real player; the portraits at the table with a real GPU; uploading the custom cards as SysOp, with a real canvas WebP encode.
+
 ## v0.3.0
 
 Validated locally on Windows on October 20, 2026, on the work as committed for v0.3.0 (86cdedf, and the screen check's fix after it). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` container on a copy, with WebGL2 on SwiftShader as in CI.

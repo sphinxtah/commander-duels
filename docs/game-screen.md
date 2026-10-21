@@ -25,10 +25,10 @@ Signed-out visitors, and accounts waiting for approval or not approved, never re
 - **Your side** is below: your portrait, life and counts at the bottom left, with the phase and the response timer's purple bar beside them; creatures near the band and lands behind; your command zone, exile, library and graveyard at the right. "Show the board" lists any battlefield in a drawer.
 - **The hand** fans along the bottom edge, partly off screen. The card under the pointer, or with keyboard focus, rises and grows.
 - **The stack** lies on the band: the next to resolve at the centre, older objects fanned behind it, a "+N" for the rest. A curved line runs from each spell to its caster and to its targets.
-- **The prompt column** at the left (below the band's HUD) holds the prompt (see below), a pass in progress, the practice notice and the result.
+- **The prompt column** at the left (below the band's HUD) holds the prompt (see below), a pass in progress and the result.
 - **Drawers** at the right hold the game log, the priority controls, SysOp's inspection, the table options (from the Game menu) and the zone browser (graveyard, exile, command zone, a battlefield, a pile, the stack). One is open at a time; they are part of the page, never dialogs, so the game goes on beside them.
 
-**Portraits.** Each player's portrait is a sigil generated from the account (a bot's from its seat), coloured for you and grey for opponents, until the owner's Planeswalker portraits arrive in v0.3.1.
+**Portraits.** Since v0.3.1 a player allied with a Planeswalker is shown by that Planeswalker's portrait (`GameSeat.portrait`, and `me.alliance` for your own seat until the game's summary arrives): fitted whole into the diamond's box, never cropped, standing slightly above its frame, in colour for you and grey for opponents, with the life badge over its foot. The 256- or 512-pixel file is chosen by the screen's resolution. A bot, a player with no alliance, or a portrait that is missing, slow (over 10 seconds) or not an image shows the sigil generated from the account (a bot's from its seat) instead. The plain table shows the same portrait as an image with the same fallback. Each portrait has its own accessible name ("Rowan portrait"), apart from the player's life ([the Planeswalker Alliance](progression.md#alliances)).
 
 **Token grouping (UI02).** Identical tokens, and identical untapped basic lands, lie in one pile with a count; their options are offered for each card. Up to five members show; "+N" opens the pile in a drawer.
 
@@ -143,9 +143,9 @@ Chrome and Edge on a PC can install Commander Duels as an app with its own windo
 
 SysOp's Inspection drawer has the inspect switch: every player's hand and library in order, top first, refreshed with each revision. The drawer states that opening it is recorded in the audit trail, which it is (`game.inspection_opened`). When SysOp observes another player's game, the screen names that player instead of "You", and the result reads "Game over" with the winner's name.
 
-## The practice notice
+## The practice table
 
-The bots still search a full copy of the game, including the player's hand (AI02; fixed in v0.3.1). Until then, the prompt column opens with a notice saying so, which the player may dismiss for the session.
+Since v0.3.1 the bots plan only with what their seat may see ([fair bots](engine/fair-bots.md)), and the notice that said they read the player's hand is gone. A player is offered their own decks only (their two starter decks among them; the engine's fixture decks are SysOp's), the table opens on a format they have a playable deck for, and a player with none is pointed to Decks. A deck that needs cards the library does not hold says so. A bot's deck left to the table is chosen by the server: in Commander, one of the ten starter decks.
 
 ## Accessibility
 

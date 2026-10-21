@@ -9,8 +9,9 @@ answer as routes for things that do not exist. An alliance with the Godlike tier
 puts them in the library; none can be played until the engine implements them, in a later
 version (the engine plugin from a private repository).
 
-The browser makes each image fit Scryfall's 745 x 1040 card size before it uploads it, so a
-request stays under the proxies' 1 MB limit; the API checks what it receives is an image.
+The browser makes each image fit Scryfall's 745 x 1040 card size and at most 750 KB before it
+uploads it, base64 in JSON, so a request stays under the proxies' 1 MB limit; the API checks what
+it receives is an image.
 """
 
 import base64
