@@ -5995,7 +5995,8 @@
               "default": "normal",
               "enum": [
                 "normal",
-                "large"
+                "large",
+                "png"
               ],
               "title": "Size",
               "type": "string"
@@ -6023,6 +6024,12 @@
           "200": {
             "content": {
               "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
                 "schema": {
                   "format": "binary",
                   "type": "string"
@@ -6288,7 +6295,8 @@
               "default": "normal",
               "enum": [
                 "normal",
-                "large"
+                "large",
+                "png"
               ],
               "title": "Size",
               "type": "string"
@@ -6299,6 +6307,12 @@
           "200": {
             "content": {
               "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
                 "schema": {
                   "format": "binary",
                   "type": "string"

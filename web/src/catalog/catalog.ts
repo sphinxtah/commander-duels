@@ -107,7 +107,8 @@ export function searchQuery(
 /** A catalog printing's image, from our own server's cache of Scryfall's. */
 export function printingImage(
   printingId: string,
-  size: "normal" | "large" | "small" = "normal",
+  // The sizes the API serves (png since v0.3.0).
+  size: "normal" | "large" | "png" = "normal",
   face?: number,
 ): string {
   const faced = face === undefined ? "" : `&face=${face}`;

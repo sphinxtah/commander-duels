@@ -3854,7 +3854,7 @@ export interface operations {
             query: {
                 /** @description The card's exact name, as the game shows it. */
                 name: string;
-                size?: "normal" | "large";
+                size?: "normal" | "large" | "png";
                 game?: string | null;
             };
             header?: never;
@@ -3870,6 +3870,7 @@ export interface operations {
                 };
                 content: {
                     "image/jpeg": string;
+                    "image/png": string;
                 };
             };
             /** @description Bad Request */
@@ -4046,7 +4047,7 @@ export interface operations {
         parameters: {
             query?: {
                 face?: number | null;
-                size?: "normal" | "large";
+                size?: "normal" | "large" | "png";
             };
             header?: never;
             path: {
@@ -4063,6 +4064,7 @@ export interface operations {
                 };
                 content: {
                     "image/jpeg": string;
+                    "image/png": string;
                 };
             };
             /** @description Bad Request */

@@ -60,7 +60,16 @@ from catalog.text import normalize
 log = logging.getLogger("api.card_images")
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
-ImageSize = Literal["normal", "large"]
+# normal (488 x 680) and large (672 x 936) are JPEGs; png (745 x 1040), Scryfall's largest, is a
+# PNG with transparent corners, asked for by the table's magnifier on large screens (v0.3.0).
+ImageSize = Literal["normal", "large", "png"]
+# A printing without a png is served at the next size down, and is never recorded as missing
+# for want of one: the magnifier then shows the large image it already had.
+SIZES_TO_TRY: dict[str, tuple[ImageSize, ...]] = {
+    "png": ("png", "large", "normal"),
+    "large": ("large",),
+    "normal": ("normal",),
+}
 # 1-200 characters, none of them control characters (Unicode category Cc).
 CardName = Annotated[
     str,
@@ -83,13 +92,21 @@ LOOKUPS_PER_ACCOUNT = 8
 LOOKUPS_WAITING = 24
 MISSING_RETRY = timedelta(days=7)
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
+MAX_PNG_BYTES = 8 * 1024 * 1024
 JPEG_MAGIC = b"\xff\xd8\xff"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 IMAGE_HOST = "scryfall.io"
 # The browser keeps an image for a week: a file name's content never changes.
 IMAGE_CACHE_CONTROL = "private, max-age=604800, immutable"
 USER_AGENT = f"CommanderDuels/{APP_VERSION}"
 API_HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 IMAGE_HEADERS = {"User-Agent": USER_AGENT, "Accept": "image/jpeg"}
+PNG_HEADERS = {"User-Agent": USER_AGENT, "Accept": "image/png"}
+
+
+def media_type(image: bytes) -> str:
+    """What a served image is, by its own bytes: a png request answered with large is a JPEG."""
+    return "image/png" if image.startswith(PNG_MAGIC) else "image/jpeg"
 
 
 @dataclass(frozen=True)
@@ -232,7 +249,8 @@ def retry_after(response: httpx.Response) -> float:
 
 def file_name(scryfall_id: UUID, face: int | None, size: ImageSize) -> str:
     """The image's file: Scryfall's card ID (a UUID, so never a path), its face and its size."""
-    return f"{scryfall_id}{'' if face is None else f'-f{face}'}-{size}.jpg"
+    extension = "png" if size == "png" else "jpg"
+    return f"{scryfall_id}{'' if face is None else f'-f{face}'}-{size}.{extension}"
 
 
 def text_of(source: dict[str, Any], key: str) -> str | None:
@@ -403,25 +421,28 @@ class CardImageCache:
         self, directory: Path, chosen: Chosen, size: ImageSize, account: UUID | None
     ) -> bytes:
         """A catalog image from disk, or downloaded once from Scryfall's image host. Downloads
-        need no API request, but still count against the account's share of the queue."""
-        path = directory / file_name(chosen.scryfall_id, chosen.face, size)
-        image = await run_in_threadpool(read_image, path)
-        if image is not None:
-            return image
-        async with self.locked(path.name):
+        need no API request, but still count against the account's share of the queue. A png
+        the printing lacks is served as its large image, then its normal one."""
+        for each in SIZES_TO_TRY[size]:
+            path = directory / file_name(chosen.scryfall_id, chosen.face, each)
             image = await run_in_threadpool(read_image, path)
             if image is not None:
                 return image
-            url = image_url(chosen.source, size)
+            url = image_url(chosen.source, each)
             if url is None:
-                raise missing()
-            with self.counted(account):
-                image = await self.download(url)
-            try:
-                await run_in_threadpool(write_atomically, path, image)
-            except OSError as error:
-                raise unavailable(f"could not write {path.name}: {error}") from error
-            return image
+                continue
+            async with self.locked(path.name):
+                image = await run_in_threadpool(read_image, path)
+                if image is not None:
+                    return image
+                with self.counted(account):
+                    image = await self.download(url, each)
+                try:
+                    await run_in_threadpool(write_atomically, path, image)
+                except OSError as error:
+                    raise unavailable(f"could not write {path.name}: {error}") from error
+                return image
+        raise missing()
 
     async def image(
         self,
@@ -515,7 +536,15 @@ class CardImageCache:
     async def fetch(self, directory: Path, name: str, size: ImageSize) -> bytes:
         card = await self.named(name)
         chosen = chosen_face(card, name) if card is not None else None
-        url = image_url(chosen[1], size) if chosen is not None else None
+        # The size asked for, or (for png) the next size down the printing has.
+        served, url = next(
+            (
+                (each, address)
+                for each in SIZES_TO_TRY[size]
+                if chosen is not None and (address := image_url(chosen[1], each)) is not None
+            ),
+            (size, None),
+        )
         if card is None or chosen is None or url is None:
             # Scryfall knows no such card, or has no image of it.
             await run_in_threadpool(record_missing, self.database, name)
@@ -525,10 +554,10 @@ class CardImageCache:
         except (KeyError, ValueError) as error:
             raise unavailable("Scryfall's card has no valid id") from error
         face, source = chosen
-        path = directory / file_name(scryfall_id, face, size)
+        path = directory / file_name(scryfall_id, face, served)
         image = await run_in_threadpool(read_image, path)
         if image is None:
-            image = await self.download(url)
+            image = await self.download(url, served)
             try:
                 await run_in_threadpool(write_atomically, path, image)
             except OSError as error:
@@ -590,22 +619,30 @@ class CardImageCache:
             raise unavailable(f"Scryfall's API answered {response.status_code}")
         return body
 
-    async def download(self, url: str) -> bytes:
-        """The JPEG from Scryfall's image host: at most MAX_IMAGE_BYTES, never a redirect."""
+    async def download(self, url: str, size: ImageSize = "normal") -> bytes:
+        """The image from Scryfall's image host, never a redirect: a JPEG of at most
+        MAX_IMAGE_BYTES, or for png a PNG of at most MAX_PNG_BYTES."""
+        png = size == "png"
+        expected, magic, limit = (
+            ("image/png", PNG_MAGIC, MAX_PNG_BYTES)
+            if png
+            else ("image/jpeg", JPEG_MAGIC, MAX_IMAGE_BYTES)
+        )
+        headers = PNG_HEADERS if png else IMAGE_HEADERS
         try:
-            async with self.client.stream("GET", url, headers=IMAGE_HEADERS) as response:
+            async with self.client.stream("GET", url, headers=headers) as response:
                 kind = response.headers.get("content-type", "").split(";")[0].strip().lower()
-                if response.status_code != 200 or kind != "image/jpeg":
+                if response.status_code != 200 or kind != expected:
                     raise unavailable(f"the image host answered {response.status_code} {kind}")
                 image = bytearray()
                 async for chunk in response.aiter_bytes():
                     image += chunk
-                    if len(image) > MAX_IMAGE_BYTES:
-                        raise unavailable("the image is larger than 2 MB")
+                    if len(image) > limit:
+                        raise unavailable(f"the image is larger than {limit // 1024 // 1024} MB")
         except httpx.HTTPError as error:
             raise unavailable(f"the image host: {type(error).__name__}") from error
-        if not image.startswith(JPEG_MAGIC):
-            raise unavailable("the image is not a JPEG")
+        if not image.startswith(magic):
+            raise unavailable(f"the image is not a {'PNG' if png else 'JPEG'}")
         return bytes(image)
 
 
@@ -636,7 +673,10 @@ def queue_account(principal: Principal) -> UUID | None:
     responses={
         200: {
             "description": "The card's image.",
-            "content": {"image/jpeg": {"schema": {"type": "string", "format": "binary"}}},
+            "content": {
+                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+                "image/png": {"schema": {"type": "string", "format": "binary"}},
+            },
         }
     },
 )
@@ -659,7 +699,7 @@ async def card_image(
     image = await cache_of(request).image(name, size, account, seat)
     # A game's own printing may differ from the card's default, so it is kept for an hour only.
     control = IMAGE_CACHE_CONTROL if game is None else "private, max-age=3600"
-    return Response(image, media_type="image/jpeg", headers={"Cache-Control": control})
+    return Response(image, media_type=media_type(image), headers={"Cache-Control": control})
 
 
 @router.get(
@@ -668,7 +708,10 @@ async def card_image(
     responses={
         200: {
             "description": "The printing's image.",
-            "content": {"image/jpeg": {"schema": {"type": "string", "format": "binary"}}},
+            "content": {
+                "image/jpeg": {"schema": {"type": "string", "format": "binary"}},
+                "image/png": {"schema": {"type": "string", "format": "binary"}},
+            },
         }
     },
 )
@@ -684,7 +727,9 @@ async def printing_image(
     account = queue_account(principal)
     await release(db)
     image = await cache_of(request).printing(printing_id, face, size, account)
-    return Response(image, media_type="image/jpeg", headers={"Cache-Control": IMAGE_CACHE_CONTROL})
+    return Response(
+        image, media_type=media_type(image), headers={"Cache-Control": IMAGE_CACHE_CONTROL}
+    )
 
 
 @router.get("/card-images/info", response_model=CardImageInfo)

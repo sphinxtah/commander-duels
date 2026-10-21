@@ -43,16 +43,18 @@ INFO = "/api/v1/card-images/info"
 SYSOP_NETWORK, SYSOP_ADDRESS = "10.20.0.0/24", ("10.20.0.5", 50000)
 ACCOUNT = UUID("5d1f4a8e-0c2b-4f7e-9a63-2b8c7e1d4f00")
 JPEG = b"\xff\xd8\xff\xe0\x00\x10JFIF"
+PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
 BOLT_ID = "77c6fa74-5543-42ac-9ead-0e890b188e99"
 DELVER_ID = "11bf83bb-c95b-4b4f-9a56-ce7a1816307a"
 FIRE_ICE_ID = "2f0b6ab0-7ad4-4a5c-8c4a-2b4b5c0a3e11"
 
 
 def image_uris(stem: str) -> dict[str, str]:
-    return {
+    uris = {
         size: f"https://cards.scryfall.io/{size}/front/{stem}.jpg?1562"
         for size in ("small", "normal", "large")
     }
+    return {**uris, "png": f"https://cards.scryfall.io/png/front/{stem}.png?1562"}
 
 
 BOLT = {
@@ -140,7 +142,13 @@ class FakeScryfall:
         self.downloads.append(str(request.url))
         if self.image_failure is not None:
             return self.image_failure
-        # Each image is the JPEG signature and its own path, so a test can tell which it got.
+        # Each image is its format's signature and its own path, so a test can tell which it got.
+        if request.url.path.startswith("/png/"):
+            assert request.headers["accept"] == "image/png"
+            return httpx.Response(
+                200, content=PNG + request.url.path.encode(), headers={"content-type": "image/png"}
+            )
+        assert request.headers["accept"] == "image/jpeg"
         return httpx.Response(
             200, content=JPEG + request.url.path.encode(), headers={"content-type": "image/jpeg"}
         )
@@ -480,6 +488,48 @@ def test_scryfall_failures_record_nothing(
     assert client.get(IMAGES, params={"name": "Lightning Bolt"}, headers=ada).status_code == 200
 
 
+def test_the_png_size_is_a_png_and_falls_back_when_a_printing_has_none(
+    client: TestClient, app: FastAPI, scryfall: FakeScryfall, directory: Path
+) -> None:
+    """The magnifier's png (v0.3.0): checked as a PNG, kept under its own name, up to 8 MB; a
+    printing without one is served at the next size down and never recorded as missing."""
+    ada = signed_in(app)
+    png = client.get(IMAGES, params={"name": "Lightning Bolt", "size": "png"}, headers=ada)
+    assert png.status_code == 200, png.text
+    assert png.headers["content-type"] == "image/png"
+    assert png.content == PNG + b"/png/front/bolt.png"
+    assert files(directory) == [f"{BOLT_ID}-png.png"]
+    # From disk the next time, and the JPEG sizes stay their own files.
+    again = client.get(IMAGES, params={"name": "Lightning Bolt", "size": "png"}, headers=ada)
+    assert again.content == png.content and len(scryfall.downloads) == 1
+    normal = client.get(IMAGES, params={"name": "Lightning Bolt"}, headers=ada)
+    assert normal.headers["content-type"] == "image/jpeg"
+    assert files(directory) == [f"{BOLT_ID}-normal.jpg", f"{BOLT_ID}-png.png"]
+
+    # Not a PNG, too large, or the wrong type: refused, and nothing is kept.
+    big = PNG + b"0" * (8 * 1024 * 1024)
+    for failure in [
+        httpx.Response(200, content=JPEG + b"x", headers={"content-type": "image/png"}),
+        httpx.Response(200, content=PNG + b"x", headers={"content-type": "image/jpeg"}),
+        httpx.Response(200, content=big, headers={"content-type": "image/png"}),
+    ]:
+        scryfall.image_failure = failure
+        refused = client.get(IMAGES, params={"name": "Fire", "size": "png"}, headers=ada)
+        assert refused.status_code == 503, failure
+    scryfall.image_failure = None
+    assert not any("png" in name and FIRE_ICE_ID in name for name in files(directory))
+
+    # A printing Scryfall has no png for: its large image, and the name is still found.
+    del scryfall.cards["fire"]["image_uris"]["png"]
+    fallback = client.get(IMAGES, params={"name": "Fire", "size": "png"}, headers=ada)
+    assert fallback.status_code == 200, fallback.text
+    assert fallback.headers["content-type"] == "image/jpeg"
+    assert fallback.content == served("fire-ice", "large")
+    found = entry(app, "Fire")
+    assert found is not None and found.status == "found"
+    assert client.get(IMAGES, params={"name": "Fire"}, headers=ada).status_code == 200
+
+
 def test_image_addresses_off_scryfalls_image_host_are_refused(
     client: TestClient, app: FastAPI, scryfall: FakeScryfall, directory: Path
 ) -> None:
@@ -540,8 +590,10 @@ def test_names_are_validated(client: TestClient, app: FastAPI, scryfall: FakeScr
             response = client.get(path, params=params, headers=ada)
             assert response.status_code == 422, params
             assert response.json()["code"] == "invalid_request"
-    png = client.get(IMAGES, params={"name": "Lightning Bolt", "size": "png"}, headers=ada)
-    assert png.status_code == 422
+    # Only normal, large and png (since v0.3.0) are served.
+    for size in ("small", "art_crop", "border_crop"):
+        other = client.get(IMAGES, params={"name": "Lightning Bolt", "size": size}, headers=ada)
+        assert other.status_code == 422, size
     assert scryfall.api_calls == []
     # Any other name of up to 200 characters is asked about.
     longest = client.get(IMAGES, params={"name": "Æ" * 200}, headers=ada)
