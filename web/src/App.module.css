@@ -485,6 +485,21 @@ h1 {
   padding: 10px 15px;
   border-radius: 3px;
 }
+/* A new account's way to Profile, where it chooses its handle (v0.3.0). */
+.handleNotice {
+  margin: -12px 0 24px;
+  padding: 12px 16px;
+  border: 1px solid #b89e6655;
+  border-radius: 6px;
+  color: #acb4a7;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+.handleNotice a {
+  color: #e2c78f;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .skip {
   position: fixed;
   left: 20px;

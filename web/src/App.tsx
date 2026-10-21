@@ -10,6 +10,7 @@ import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { UpdateNotice } from "./app/UpdateNotice";
 import {
+  answerTimeout,
   client,
   loadFoundation,
   loadMe,
@@ -141,6 +142,26 @@ export function App() {
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
+  // At #sysop nothing shows until the server says whether this is SysOp's network: off it, the
+  // address is the landing page like any other. A service that did not answer shows the sign-in
+  // with its Try again, never the mark alone with nothing to press.
+  const checking =
+    (me === undefined && connection !== "unavailable") ||
+    (!me && page === "SysOp" && entrance === undefined);
+  // What the page shows once it knows: the app, an account's wait (by its status), SysOp's
+  // entrance or the sign-in.
+  const view = admitted
+    ? "app"
+    : checking
+      ? undefined
+      : me
+        ? me.status
+        : page === "SysOp" && entrance
+          ? "sysop"
+          : "sign-in";
+  const shownBefore = useRef<string | undefined>(undefined);
+  // A #game/<id> opens the table for an active account only; before then it is the landing page.
+  const atTable = Boolean(game) && admitted;
 
   useEffect(() => {
     const change = (event: HashChangeEvent) => {
@@ -165,20 +186,30 @@ export function App() {
   useEffect(() => {
     // The table fills the window and never scrolls; the other pages scroll as ever, and so does
     // the landing page that a #game/<id> shows before sign-in.
-    document.documentElement.dataset.route =
-      game && admitted ? "game" : "shell";
-  }, [game, admitted]);
-  const settled = me !== undefined;
+    document.documentElement.dataset.route = atTable ? "game" : "shell";
+  }, [atTable]);
   useEffect(() => {
-    // The app opening from the landing page, after a sign-in or an approval, moves focus as
-    // following a link does.
-    if (settled && !admitted) navigated.current = true;
-  }, [settled, admitted]);
+    if (view === undefined) return;
+    const before = shownBefore.current;
+    shownBefore.current = view;
+    if (before === undefined || before === view) return;
+    // Once the page has settled, a change in what it shows (a sign-in, one that must wait, an
+    // approval, a refusal found on a check, a sign-out) moves focus as following a link does.
+    navigated.current = true;
+    if (!atTable) heading.current?.focus();
+    // The session ending at the table (it expired, or Sign out everywhere ended it from another
+    // browser) swaps the game for the landing page without a change of address. The table's
+    // full screen, with Escape held, ends here, and a waiting update applies, as leaving does.
+    if (before === "app" && game) {
+      void exitTableFullscreen();
+      leaveTable();
+    }
+  }, [view, game, atTable]);
   useEffect(() => {
     // Leaving a game also lands on a page (usually Play, whose state never changed), so focus
     // follows the game route too; the game screen focuses its own heading.
-    if (navigated.current && !game) heading.current?.focus();
-  }, [page, game, admitted]);
+    if (navigated.current && !atTable) heading.current?.focus();
+  }, [page, atTable]);
   useEffect(() => {
     // Either change is a reason to ask the service again.
     const update = () => setAttempt((value) => value + 1);
@@ -190,11 +221,13 @@ export function App() {
     };
   }, []);
   useEffect(() => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 7000);
+    // Each question has its own time to answer: the foundation answering must not leave the
+    // landing page waiting on a stalled account check, with nothing to press.
+    const foundation = answerTimeout();
+    const account = answerTimeout();
     let active = true;
     setConnection("loading");
-    loadFoundation(controller.signal)
+    loadFoundation(foundation.signal)
       .then((data) => {
         if (active) {
           setBootstrap(data.bootstrap);
@@ -205,22 +238,23 @@ export function App() {
       .catch(() => {
         if (active) setConnection("unavailable");
       })
-      .finally(() => window.clearTimeout(timeout));
-    loadMe()
+      .finally(foundation.done);
+    loadMe(account.signal)
       .then((value) => {
         if (active) changeMe(value);
       })
       .catch(() => {
-        // An unreachable service says nothing about the session: a network blip must not sign
-        // the page out and throw away open forms, so a known account stays. A first load
-        // that fails still settles on signed out.
+        // An unreachable service, or one that did not answer in time, says nothing about the
+        // session: a network blip must not sign the page out and throw away open forms, so a
+        // known account stays. A first load that fails still settles on signed out.
         if (active)
           setMe((current) => (current === undefined ? null : current));
-      });
+      })
+      .finally(account.done);
     return () => {
       active = false;
-      window.clearTimeout(timeout);
-      controller.abort();
+      foundation.abort();
+      account.abort();
     };
   }, [attempt]);
   useEffect(() => {
@@ -233,11 +267,18 @@ export function App() {
     if (selected) dialog.current?.showModal();
   }, [selected]);
   useEffect(() => {
+    if (page !== "SysOp") return;
     let active = true;
-    if (page === "SysOp")
-      void sysopEntrance().then((open) => active && setEntrance(open));
+    // A check that has not answered in time counts as off the network, so #sysop never stays
+    // the mark alone.
+    const check = answerTimeout();
+    void sysopEntrance(check.signal).then((open) => {
+      check.done();
+      if (active) setEntrance(open);
+    });
     return () => {
       active = false;
+      check.abort();
     };
   }, [page]);
   // Off the SysOp networks, #sysop is indistinguishable from any unknown address.
@@ -297,25 +338,26 @@ export function App() {
   // (v0.3.0). Every address shows the landing page and stays as it was, so the screen it names
   // opens after sign-in and approval; a #game/<id> never opens the game's WebSocket.
   if (!me || me.status !== "active") {
-    // At #sysop nothing shows until the server says whether this is SysOp's network: off it, the
-    // address is the landing page like any other.
-    const checking =
-      me === undefined ||
-      (me === null && page === "SysOp" && entrance === undefined);
     return (
       <Landing>
-        {checking ? undefined : me === null && page === "SysOp" && entrance ? (
+        {checking ? undefined : me ? (
+          <Waiting
+            me={me}
+            onChange={changeMe}
+            onSignedOut={signedOut}
+            heading={heading}
+          />
+        ) : page === "SysOp" && entrance ? (
           <SysopSignIn onSignedIn={changeMe} heading={heading} />
-        ) : me === null ? (
+        ) : (
           <SignIn
             auth={bootstrap?.auth}
             unavailable={connection === "unavailable"}
             onRetry={retry}
             notice={notice}
             onSignedIn={changeMe}
+            heading={heading}
           />
-        ) : (
-          <Waiting me={me} onChange={changeMe} onSignedOut={signedOut} />
         )}
       </Landing>
     );
@@ -376,7 +418,11 @@ export function App() {
           <div>
             {me.handle ?? me.display_name}
             <small>
-              {me.kind === "sysop" ? "Local administrator" : "Signed in"}
+              {me.kind === "sysop"
+                ? "Local administrator"
+                : me.onboarding === "handle"
+                  ? "Choose your handle"
+                  : "Signed in"}
             </small>
           </div>
         </a>
@@ -407,6 +453,16 @@ export function App() {
           <div className={styles.breadcrumb}>
             COMMANDER DUELS <span>/</span> {shown.toUpperCase()}
           </div>
+          {/* Sign-in and approval keep the address, so a new account rarely lands on Profile,
+              where it chooses its handle: every other page points the way until it has one. */}
+          {me.onboarding === "handle" && page !== "Profile" && (
+            <p className={styles.handleNotice}>
+              Other players know you by your handle.{" "}
+              <a href="#profile">
+                Choose yours on Profile <span aria-hidden="true">→</span>
+              </a>
+            </p>
+          )}
           {page === "Profile" ? (
             <Account
               me={me}

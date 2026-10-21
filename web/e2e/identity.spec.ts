@@ -221,6 +221,55 @@ test("the landing page fits a phone and 1080p, with Larger text and Reduce motio
   }
 });
 
+test("a service that holds its answers still leaves Try again to press", async ({
+  page,
+}) => {
+  // A proxy may hold a stalled request for an hour; the page gives up on it after 7 seconds.
+  const hold = () => {};
+  for (const path of ["bootstrap", "formats", "me"])
+    await page.route(`**/api/v1/${path}`, hold);
+  await page.goto("/#decks");
+  const retry = page.getByRole("button", { name: "Try again" });
+  await expect(retry).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/did not answer/)).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await page.keyboard.press("Tab");
+  await expect(retry).toBeFocused();
+  // Once the service answers, Try again leads to the sign-in, at the same address.
+  for (const path of ["bootstrap", "formats", "me"])
+    await page.unroute(`**/api/v1/${path}`, hold);
+  await retry.click();
+  await expectLanding(page);
+  await expect(page).toHaveURL(/#decks$/);
+});
+
+test("an account check that stalls alone still ends on the sign-in", async ({
+  page,
+}) => {
+  await page.route("**/api/v1/me", () => {});
+  await page.goto("/#play");
+  await expect(googleButton(page)).toBeVisible({ timeout: 15_000 });
+  await expectLanding(page);
+});
+
+test.describe("on a high-density phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3 });
+
+  test("the landing page's mark stays sharp", async ({ page }) => {
+    await page.goto("/#play");
+    const mark = page.locator('img[src="/brand/mark.webp"]');
+    await expect(mark).toBeVisible();
+    // Shown at 104 CSS px, so 312 device pixels: the 3x copy, 384 px, covers them.
+    await expect
+      .poll(() =>
+        mark.evaluate((image: HTMLImageElement) =>
+          image.complete ? new URL(image.currentSrc).pathname : "",
+        ),
+      )
+      .toBe("/brand/mark-384.webp");
+  });
+});
+
 test("the SysOp address looks like any unknown address off its network", async ({
   page,
 }) => {
@@ -393,6 +442,11 @@ test("an account waiting for approval sees only its wait, and approval opens the
   ).toBeVisible();
   await expect(page.getByRole("navigation")).toBeVisible();
   await expect(page).toHaveURL(/#settings$/);
+  // Its handle is still to choose, and the page points the way.
+  await page.getByRole("link", { name: "Choose yours on Profile" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Choose your handle" }),
+  ).toBeVisible();
 });
 
 test("a denied account sees that it was not approved, and signs out to the landing page", async ({
@@ -418,5 +472,9 @@ test("a denied account sees that it was not approved, and signs out to the landi
   await page.getByRole("button", { name: "Sign out" }).click();
   await expectLanding(page);
   await expect(page.getByText("You signed out.")).toBeVisible();
+  // The button went with the page: focus is on the sign-in, not lost to <body>.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Sign in" }),
+  ).toBeFocused();
   await expect(page).toHaveURL(/#decks$/);
 });

@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  answerTimeout,
   client,
   describe,
   loadMe,
@@ -239,6 +240,7 @@ export function SignIn({
   onRetry,
   notice,
   onSignedIn,
+  heading,
 }: {
   auth: Bootstrap["auth"] | undefined;
   /** The bootstrap failed to load, so sign-in's settings are unknown. */
@@ -247,10 +249,14 @@ export function SignIn({
   /** What the sign-out that led here said, if anything; a sign-in clears it. */
   notice: string;
   onSignedIn: (me: Me) => void;
+  /** Focused when the page arrives here from another screen, as after a sign-out. */
+  heading: RefObject<HTMLHeadingElement | null>;
 }) {
   return (
     <div className={styles.signIn}>
-      <h1 className={styles.visuallyHidden}>Sign in</h1>
+      <h1 ref={heading} tabIndex={-1} className={styles.visuallyHidden}>
+        Sign in
+      </h1>
       {/* Sign-in's settings come with the bootstrap: until it loads, nothing is known. */}
       {auth === undefined ? (
         unavailable ? (
@@ -643,10 +649,13 @@ export function Waiting({
   me,
   onChange,
   onSignedOut,
+  heading,
 }: {
   me: Me;
   onChange: (me: Me) => void;
   onSignedOut: (notice: string) => void;
+  /** Focused when the page arrives here, as after a sign-in that must wait. */
+  heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const { message, busy, signingOut, signedOut, signOut } = useSignOut(
     me,
@@ -671,8 +680,10 @@ export function Waiting({
       asking.current = true;
       setChecking(true);
       if (asked) setNote("");
+      // A check the service holds on to must not hold off every later one, Check again's too.
+      const timeout = answerTimeout();
       try {
-        const current = await loadMe();
+        const current = await loadMe(timeout.signal);
         // A sign-out begun meanwhile, or a page that has moved on, has the last word.
         if (!shown.current || signingOut.current) return;
         // The session ended elsewhere: the sign-in page, with nothing to add.
@@ -684,6 +695,7 @@ export function Waiting({
         // An unreachable service says nothing about the account: it stays as it is.
         if (asked) setNote(describe(undefined));
       } finally {
+        timeout.done();
         asking.current = false;
         setChecking(false);
       }
@@ -707,7 +719,7 @@ export function Waiting({
   }, [pending, check]);
   return (
     <div className={styles.waiting}>
-      <h1>
+      <h1 ref={heading} tabIndex={-1}>
         {pending
           ? "Your account is waiting for approval."
           : "Your account was not approved."}

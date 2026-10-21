@@ -4,7 +4,9 @@
   the sidebar mark and the favicon. The home-screen icon puts it on the site's background, because
   iOS fills transparency with black. The installed app's icons (v0.3.0) come from it too: "icons
   <file>" makes only those, the transparent icon-192/512 and the maskable-192/512, whose mark sits
-  inside the 80% circle that a launcher may crop to.
+  inside the 80% circle that a launcher may crop to. The landing page (v0.3.0) shows the mark
+  alone at 128 CSS px, so it has 2x and 3x copies: "marks <file>" makes only mark.webp and those,
+  mark-256 and mark-384.
 - commander.duels.banner.png (1916 x 821) leads the Play page: "banner <file>" makes its two
   widths and the phone crop of its logo half.
 - "screenshots <files>" turns 16:9 captures of the site (play.png, table.png from the browser
@@ -74,11 +76,22 @@ def app_icons(mark: Image.Image) -> list[str]:
     return names
 
 
+def marks(mark: Image.Image) -> list[str]:
+    """The 128 px mark of the sidebar and the landing page, and the landing page's 2x and 3x."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    names = []
+    for size in (128, 256, 384):
+        name = "mark.webp" if size == 128 else f"mark-{size}.webp"
+        mark.resize((size, size), Image.Resampling.LANCZOS).save(OUT / name, quality=90, method=6)
+        names.append(name)
+    return names
+
+
 def main(nowords: str) -> None:
     mark = open_logo(nowords, "RGBA")
     OUT.mkdir(parents=True, exist_ok=True)
     lanczos = Image.Resampling.LANCZOS
-    mark.resize((128, 128), lanczos).save(OUT / "mark.webp", quality=90, method=6)
+    marks(mark)
     for size in (32, 64):
         mark.resize((size, size), lanczos).save(OUT / f"favicon-{size}.png", optimize=True)
     touch = Image.new("RGBA", (180, 180), BACKGROUND)
@@ -136,6 +149,8 @@ if __name__ == "__main__":
         banner(sys.argv[2])
     elif sys.argv[1] == "icons":
         icons(sys.argv[2])
+    elif sys.argv[1] == "marks":
+        report(marks(open_logo(sys.argv[2], "RGBA")))
     elif sys.argv[1] == "screenshots":
         screenshots(sys.argv[2:])
     else:

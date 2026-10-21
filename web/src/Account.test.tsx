@@ -8,13 +8,19 @@ import {
 import { createRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Account, SignIn, Waiting } from "./Account";
-import { client, currentCsrfToken, setCsrfToken, type Me } from "./api";
+import {
+  ANSWER_MS,
+  client,
+  currentCsrfToken,
+  setCsrfToken,
+  type Me,
+} from "./api";
 import { loadGoogle, type GoogleId } from "./google";
 
 vi.mock("./google", () => ({ loadGoogle: vi.fn() }));
 
 // The API, answered route by route. Each route takes its answers in order and keeps the last.
-type Answer = () => unknown;
+type Answer = (init?: { signal?: AbortSignal }) => unknown;
 const queues = new Map<string, Answer[]>();
 let calls: { route: string; csrf?: string }[] = [];
 function on(route: string, ...answers: Answer[]) {
@@ -34,14 +40,21 @@ function deferred<T>() {
   return { promise, resolve };
 }
 function serve(method: string) {
-  return (async (path: string) => {
+  return (async (path: string, init?: { signal?: AbortSignal }) => {
     const route = `${method} ${path}`;
     calls.push({ route, csrf: currentCsrfToken() });
     const queue = queues.get(route);
     if (!queue?.length) throw new Error(`No answer for ${route}`);
-    return (queue.length > 1 ? queue.shift()! : queue[0])();
+    return (queue.length > 1 ? queue.shift()! : queue[0])(init);
   }) as never;
 }
+/** A request the service holds on to, as a stalled proxy does, until the page gives up on it. */
+const stall: Answer = (init) =>
+  new Promise((_, fail) =>
+    init?.signal?.addEventListener("abort", () =>
+      fail(new DOMException("The operation was aborted.", "AbortError")),
+    ),
+  );
 
 function account(overrides: Partial<Me> = {}): Me {
   return {
@@ -106,10 +119,18 @@ function Page({
         onRetry={onRetry}
         notice={notice}
         onSignedIn={change}
+        heading={createRef()}
       />
     );
   if (me.status !== "active")
-    return <Waiting me={me} onChange={change} onSignedOut={signedOut} />;
+    return (
+      <Waiting
+        me={me}
+        onChange={change}
+        onSignedOut={signedOut}
+        heading={createRef()}
+      />
+    );
   return (
     <Account
       me={me}
@@ -445,6 +466,31 @@ describe("the wait for approval", () => {
       screen.getByRole("heading", {
         name: "Your account is waiting for approval.",
       }),
+    ).toBeInTheDocument();
+  });
+
+  it("gives up on a check the service holds on to, so the next one can ask", async () => {
+    on("GET /api/v1/me", stall, () =>
+      reply(200, account({ onboarding: "handle", handle: null, roles: [] })),
+    );
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    render(<Page initial={pending()} auth={google} />);
+    const check = screen.getByRole("button", { name: "Check again" });
+    fireEvent.click(check);
+    await act(() => vi.advanceTimersByTimeAsync(ANSWER_MS - 1));
+    expect(check).toHaveAttribute("aria-disabled", "true");
+    // Window focus asks nothing while a check is under way.
+    act(() => void window.dispatchEvent(new Event("focus")));
+    expect(count("GET /api/v1/me")).toBe(1);
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(
+      screen.getByText("The application service is unavailable. Try again."),
+    ).toBeInTheDocument();
+    expect(check).toHaveAttribute("aria-disabled", "false");
+    fireEvent.click(check);
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(
+      screen.getByRole("heading", { name: "Welcome to the table." }),
     ).toBeInTheDocument();
   });
 

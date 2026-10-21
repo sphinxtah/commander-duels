@@ -17,6 +17,7 @@ import {
 } from "vitest";
 import { App } from "./App";
 import {
+  ANSWER_MS,
   client,
   setCsrfToken,
   type Bootstrap,
@@ -53,7 +54,7 @@ vi.mock("./app/serviceWorker", async (importOriginal) => ({
 }));
 
 // The API, answered route by route. Each route takes its answers in order and keeps the last.
-type Answer = () => unknown;
+type Answer = (init?: { signal?: AbortSignal }) => unknown;
 const queues = new Map<string, Answer[]>();
 let calls: string[] = [];
 function on(route: string, ...answers: Answer[]) {
@@ -63,13 +64,20 @@ function reply(status: number, body?: unknown) {
   const response = new Response(null, { status });
   return response.ok ? { data: body, response } : { error: body, response };
 }
+/** A request the service holds on to, as a stalled proxy does, until the page gives up on it. */
+const stall: Answer = (init) =>
+  new Promise((_, fail) =>
+    init?.signal?.addEventListener("abort", () =>
+      fail(new DOMException("The operation was aborted.", "AbortError")),
+    ),
+  );
 function serve(method: string) {
-  return (async (path: string) => {
+  return (async (path: string, init?: { signal?: AbortSignal }) => {
     const route = `${method} ${path}`;
     calls.push(route);
     const queue = queues.get(route);
     if (!queue?.length) throw new Error(`No answer for ${route}`);
-    return (queue.length > 1 ? queue.shift()! : queue[0])();
+    return (queue.length > 1 ? queue.shift()! : queue[0])(init);
   }) as never;
 }
 function count(route: string) {
@@ -78,6 +86,10 @@ function count(route: string) {
 /** Lets every pending answer arrive. */
 async function settle() {
   await act(() => new Promise((done) => setTimeout(done, 20)));
+}
+/** Under fake timeouts: lets the page's clock run on, and every answer due by then arrive. */
+async function later(ms: number) {
+  await act(() => vi.advanceTimersByTimeAsync(ms));
 }
 
 const bootstrap: Bootstrap = {
@@ -177,6 +189,11 @@ function expectLanding() {
   const images = document.querySelectorAll("img");
   expect(images).toHaveLength(1);
   expect(images[0]).toHaveAttribute("src", "/brand/mark.webp");
+  // Shown large and alone, it stays sharp on high-density screens.
+  expect(images[0]).toHaveAttribute(
+    "srcset",
+    "/brand/mark.webp 1x, /brand/mark-256.webp 2x, /brand/mark-384.webp 3x",
+  );
   expect(images[0]).toHaveAttribute("alt", "");
   expect(screen.getByRole("main")).toContainElement(images[0]!);
   expect(screen.queryByRole("navigation")).toBeNull();
@@ -213,6 +230,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
   setCsrfToken(undefined);
 });
 
@@ -246,6 +264,8 @@ describe("the landing page", () => {
       // A game's address does not take over the window either.
       expect(document.documentElement.dataset.route).toBe("shell");
       expect(insideCalls()).toEqual([]);
+      // The page as it first settles leaves focus where the browser put it.
+      expect(document.activeElement).toBe(document.body);
       unmount();
     }
     expect(GameScreen).not.toHaveBeenCalled();
@@ -289,6 +309,47 @@ describe("the landing page", () => {
     expect(screen.queryByText(/not set up/)).toBeNull();
   });
 
+  it("offers a retry when the service holds every answer, instead of the mark alone", async () => {
+    // A proxy may hold a stalled request for an hour.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.mocked(exitTableFullscreen).mockClear();
+    vi.mocked(leaveTable).mockClear();
+    on("GET /api/v1/bootstrap", stall, () => reply(200, bootstrap));
+    on("GET /api/v1/formats", stall, () => reply(200, formats));
+    on("GET /api/v1/me", stall, () => reply(401, signedOut));
+    window.location.hash = `#game/${gameId}`;
+    render(<App />);
+    await later(ANSWER_MS - 1);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Checking your sign-in…",
+    );
+    await later(1);
+    expect(screen.getByText(/did not answer/)).toBeInTheDocument();
+    expectLanding();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await later(0);
+    expect(screen.getByText("Preparing Google sign-in…")).toBeInTheDocument();
+    expect(window.location.hash).toBe(`#game/${gameId}`);
+    expect(GameScreen).not.toHaveBeenCalled();
+    // No table was shown, so there was none to leave.
+    expect(exitTableFullscreen).not.toHaveBeenCalled();
+    expect(leaveTable).not.toHaveBeenCalled();
+  });
+
+  it("shows the sign-in when only the account check stalls", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    on("GET /api/v1/me", stall);
+    window.location.hash = "#play";
+    render(<App />);
+    await later(ANSWER_MS - 1);
+    expect(screen.queryByRole("heading")).toBeNull();
+    // The foundation answered long ago; the account check gives up and settles on signed out.
+    await later(1);
+    expect(screen.getByText("Preparing Google sign-in…")).toBeInTheDocument();
+    expectLanding();
+    expect(insideCalls()).toEqual([]);
+  });
+
   it("signing in opens the address the visitor came to", async () => {
     const configs: Parameters<GoogleId["initialize"]>[0][] = [];
     vi.mocked(loadGoogle).mockResolvedValueOnce({
@@ -318,6 +379,46 @@ describe("the landing page", () => {
     expect(screen.getByRole("navigation")).toBeInTheDocument();
     // Focus lands on the page's heading, as after following a link.
     expect(document.activeElement).toBe(heading);
+  });
+
+  it("a sign-in that must wait moves focus to the wait, and signing out back to the sign-in", async () => {
+    const configs: Parameters<GoogleId["initialize"]>[0][] = [];
+    vi.mocked(loadGoogle).mockResolvedValueOnce({
+      initialize: (config) => void configs.push(config),
+      renderButton: (parent) => {
+        const button = document.createElement("button");
+        button.textContent = "Sign in with Google";
+        parent.replaceChildren(button);
+      },
+      disableAutoSelect: () => {},
+    });
+    on("POST /api/v1/auth/google/start", () =>
+      reply(200, { client_id: "client", nonce: "nonce-1" }),
+    );
+    on("POST /api/v1/auth/google", () => reply(200, waiting));
+    on("POST /api/v1/auth/logout", () => reply(204));
+    window.location.hash = "#decks";
+    render(<App />);
+    const button = await screen.findByRole("button", {
+      name: "Sign in with Google",
+    });
+    button.focus();
+    await act(async () => {
+      await configs[0]!.callback({ credential: "header.payload.signature" });
+    });
+    // The button went with the sign-in: a screen reader hears where it led instead of nothing.
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", {
+        name: "Your account is waiting for approval.",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText("You signed out.")).toBeInTheDocument();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Sign in" }),
+    );
+    expectLanding();
+    expect(window.location.hash).toBe("#decks");
   });
 
   it("opens SysOp's entrance under the mark on SysOp's network, and the app after it", async () => {
@@ -377,6 +478,25 @@ describe("the landing page", () => {
     expectLanding();
     expect(screen.queryByLabelText("Password")).toBeNull();
     expect(document.body).not.toHaveTextContent(/sysop/i);
+    expect(window.location.hash).toBe("#sysop");
+  });
+
+  it("treats #sysop as any other address when its check does not answer", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      (_input, init) =>
+        stall({ signal: init?.signal ?? undefined }) as Promise<Response>,
+    );
+    window.location.hash = "#sysop";
+    render(<App />);
+    await later(ANSWER_MS - 1);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Checking your sign-in…",
+    );
+    await later(1);
+    expect(screen.getByText("Preparing Google sign-in…")).toBeInTheDocument();
+    expectLanding();
+    expect(screen.queryByLabelText("Password")).toBeNull();
     expect(window.location.hash).toBe("#sysop");
   });
 });
@@ -477,11 +597,31 @@ describe("an account that is not active", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(await screen.findByText("You signed out.")).toBeInTheDocument();
-    expect(
+    expect(document.activeElement).toBe(
       screen.getByRole("heading", { name: "Sign in" }),
-    ).toBeInTheDocument();
+    );
     expectLanding();
     expect(window.location.hash).toBe("#play");
+  });
+
+  it("a check that finds the account refused says so, with focus on it", async () => {
+    on(
+      "GET /api/v1/me",
+      () => reply(200, waiting),
+      () => reply(200, { ...waiting, status: "denied" }),
+    );
+    window.location.hash = "#play";
+    render(<App />);
+    const check = await screen.findByRole("button", { name: "Check again" });
+    check.focus();
+    fireEvent.click(check);
+    const heading = await screen.findByRole("heading", {
+      name: "Your account was not approved.",
+    });
+    // Check again went with the wait.
+    expect(screen.queryByRole("button", { name: "Check again" })).toBeNull();
+    expect(document.activeElement).toBe(heading);
+    expectLanding();
   });
 });
 
@@ -558,6 +698,30 @@ describe("navigation", () => {
     expect(leaveTable).toHaveBeenCalledTimes(1);
   });
 
+  it("a session that ends at the table leaves its full screen and applies a waiting update", async () => {
+    on(
+      "GET /api/v1/me",
+      () => reply(200, alice),
+      () => reply(401, signedOut),
+    );
+    vi.mocked(exitTableFullscreen).mockClear();
+    vi.mocked(leaveTable).mockClear();
+    window.location.hash = `#game/${gameId}`;
+    render(<App />);
+    await screen.findByRole("link", { name: "Back to the table" });
+    expect(document.documentElement.dataset.route).toBe("game");
+    // Back online, the page finds the session over (its time ran out, or Sign out everywhere
+    // ended it from another browser): the landing page replaces the table at the same address.
+    act(() => void window.dispatchEvent(new Event("online")));
+    const signIn = await screen.findByRole("heading", { name: "Sign in" });
+    expectLanding();
+    expect(window.location.hash).toBe(`#game/${gameId}`);
+    expect(document.documentElement.dataset.route).toBe("shell");
+    expect(exitTableFullscreen).toHaveBeenCalledTimes(1);
+    expect(leaveTable).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(signIn);
+  });
+
   it("leaving the table for a version that took over reloads instead of drawing the page", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
     vi.mocked(leaveTable).mockClear();
@@ -598,11 +762,67 @@ describe("the account", () => {
     expect(screen.getByText("Signed in")).toBeInTheDocument();
 
     act(() => void window.dispatchEvent(new Event("online")));
-    expect(
-      await screen.findByRole("heading", { name: "Sign in" }),
-    ).toBeInTheDocument();
+    const signIn = await screen.findByRole("heading", { name: "Sign in" });
     expectLanding();
     expect(window.location.hash).toBe("#profile");
+    // Profile went with the session: focus moves to the sign-in, not to <body>.
+    expect(document.activeElement).toBe(signIn);
+  });
+
+  it("signing out on Profile moves focus to the sign-in", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    on("POST /api/v1/auth/logout", () => reply(204));
+    window.location.hash = "#profile";
+    render(<App />);
+    const signOut = await screen.findByRole("button", { name: "Sign out" });
+    signOut.focus();
+    fireEvent.click(signOut);
+    expect(await screen.findByText("You signed out.")).toBeInTheDocument();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Sign in" }),
+    );
+    expectLanding();
+  });
+});
+
+describe("a new account's handle", () => {
+  it("every page but Profile points there until the account has one", async () => {
+    const fresh: Me = { ...alice, onboarding: "handle", handle: null };
+    on("GET /api/v1/me", () => reply(200, fresh));
+    on("PATCH /api/v1/me", () =>
+      reply(200, { ...fresh, onboarding: "complete", handle: "alice" }),
+    );
+    // The landing page kept the address, so the first page is rarely Profile.
+    window.location.hash = "#play";
+    render(<App />);
+    const link = await screen.findByRole("link", {
+      name: "Choose yours on Profile",
+    });
+    expect(link).toHaveAttribute("href", "#profile");
+    expect(screen.getByRole("main")).toHaveTextContent(
+      "Other players know you by your handle.",
+    );
+    // So does the sidebar, where the handle would be.
+    expect(
+      screen.getByRole("link", { name: /Alice\s*Choose your handle/ }),
+    ).toHaveAttribute("href", "#profile");
+
+    window.location.hash = "#profile";
+    await screen.findByRole("heading", { name: "Welcome to the table." });
+    expect(
+      screen.queryByRole("link", { name: "Choose yours on Profile" }),
+    ).toBeNull();
+    fireEvent.change(screen.getByLabelText("Handle"), {
+      target: { value: "alice" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save handle" }));
+    await screen.findByText("Signed in");
+
+    window.location.hash = "#play";
+    await screen.findByRole("heading", { name: /Gather your cards/ });
+    expect(
+      screen.queryByText("Other players know you by your handle."),
+    ).toBeNull();
   });
 });
 

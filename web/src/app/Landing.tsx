@@ -10,10 +10,12 @@ import styles from "./Landing.module.css";
 export function Landing({ children }: { children?: ReactNode }) {
   return (
     <main className={styles.landing}>
-      {/* Decorative: the page's heading, hidden or not, says what it is for. */}
+      {/* Decorative: the page's heading, hidden or not, says what it is for. Shown large and
+          alone, it has 2x and 3x copies to stay sharp on high-density screens and phones. */}
       <img
         className={styles.mark}
         src="/brand/mark.webp"
+        srcSet="/brand/mark.webp 1x, /brand/mark-256.webp 2x, /brand/mark-384.webp 3x"
         alt=""
         width={128}
         height={128}
