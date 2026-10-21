@@ -328,6 +328,8 @@
 }
 .tabs {
   display: flex;
+  /* On a phone the sections wrap to a second row rather than widen the page. */
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 25px;
   border-bottom: 1px solid #ffffff16;
