@@ -25,16 +25,44 @@
   line-height: 1.6;
   margin: 12px 0;
 }
-.google {
+/* The landing page's sign-in and the wait for approval (v0.3.0): centred under the mark, and
+   what they say below the buttons stays small. */
+.signIn,
+.google,
+.waiting {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  text-align: center;
+}
+.google {
   gap: 8px;
-  padding: 18px 0 4px;
-  border-top: 1px solid #ffffff12;
 }
 .googleButton {
   min-height: 44px;
+}
+.signIn .fine,
+.waiting .fine,
+.signIn .error,
+.waiting .error {
+  margin: 6px 0;
+}
+.email {
+  color: #c9d0c6;
+  font-size: 0.86rem;
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+.waiting .actions {
+  justify-content: center;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .secondary,
 .danger {

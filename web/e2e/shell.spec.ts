@@ -1,10 +1,19 @@
 import { readFileSync } from "node:fs";
 import { test, expect } from "@playwright/test";
+import { standIn } from "./accounts";
 
 const version = readFileSync(
   new URL("../../VERSION", import.meta.url),
   "utf8",
 ).trim();
+
+// The shell opens only for an active account (v0.3.0; identity.spec.ts covers the landing page
+// before it). These journeys need no data of their own, so they sign in as a stand-in account
+// rather than as SysOp: they run without SysOp's password, and the Larger text and Reduce motion
+// they switch on stay off SysOp's real account, which the deck journeys use meanwhile.
+test.beforeEach(async ({ page }) => {
+  await standIn(page);
+});
 
 test("connected shell, all navigation, format dialog and saved preferences", async ({
   page,
@@ -33,23 +42,13 @@ test("connected shell, all navigation, format dialog and saved preferences", asy
   await expect(page.getByRole("dialog")).not.toContainText("planned");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
+  // Decks and Cards have their own journeys, as SysOp, in decks.spec.ts.
   for (const name of ["Campaign", "Learn", "Collection"]) {
     await page
       .getByRole("navigation")
       .getByRole("link", { name, exact: true })
       .click();
     await expect(page.getByText(`NOT AVAILABLE IN v${version}`)).toBeVisible();
-  }
-  // Decks and cards (v0.2.0) ask a visitor to sign in.
-  for (const [name, heading] of [
-    ["Decks", "A strategy to call your own."],
-    ["Cards", "Discover your next centerpiece."],
-  ]) {
-    await page
-      .getByRole("navigation")
-      .getByRole("link", { name, exact: true })
-      .click();
-    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
   }
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("checkbox", { name: "Larger text" }).check();

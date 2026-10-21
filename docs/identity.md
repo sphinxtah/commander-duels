@@ -14,11 +14,27 @@ Agreed on 2026-10-18 at the start of v0.0.5:
   - **Any card.** SysOp can put any card in the card database into its own library, to test specific combinations.
 - **Screens.** Sign-in, the profile and administration screens in the browser. No game, so this stays a 0.0.x version.
 
+## Before the app: the landing page (v0.3.0)
+
+Asked for by the owner on 2026-10-20 ([the plan](plans/0.3.0.md#added-during-v030-the-sign-in-landing-page)). Nothing of the app is drawn or asked for until the account is active.
+
+**A visitor who is not signed in** sees the landing page at every address:
+- **What it shows.** The owner's wordless CD mark (the favicon's, `/brand/mark.webp`) in the middle of the window, and the Google sign-in button below it. There are no words above the button, and none of the app: no sidebar, navigation, top bar, version, banner art, footer, Fan Content notice, install banner or update notice. A heading that only screen readers hear, "Sign in", names the page; the mark is decorative.
+- **What it says.** Anything the page must say comes below the button, small: a refused sign-in, an unreachable service with Try again, sign-in not set up on the server, "Signing you in…", and after a sign-out "You signed out." (or why the other sessions could not be ended). While the page checks the sign-in or loads Google's script, it shows the mark alone and says so to screen readers only. The old Profile sign-in's note on what Google shares, and its line on approval, are gone with it.
+- **The address is kept** (T01), so the screen it names opens after sign-in and approval. This replaces v0.0.5's return to the intended screen, which went through Profile. A `#game/<id>` address never opens the table or its WebSocket before then.
+- **SysOp's entrance.** `#sysop` stays unlinked. On SysOp's networks it shows the SysOp password form under the mark, and Administration opens after it as before; off them it is the landing page like any address. Nothing shows at `#sysop` until the server has said which.
+
+**An account waiting for approval** (`pending`) sees only a plain page under the mark: "Your account is waiting for approval.", its email address, Check again and Sign out. It chooses its handle on Profile once approved.
+- The page asks `GET /api/v1/me` again every minute while it is shown, whenever the window regains focus or is shown again, and on Check again. So an approval opens the app, at the address it was given, without a reload. A hidden page waits, and a sign-out under way has the last word.
+- **A denied account**, or any other that is not active, sees "Your account was not approved." and "Contact the operator of this server if you think this is a mistake.", its email address and Sign out.
+
+**Nothing is asked for.** The API refuses pending and denied accounts their data (403). Before the account is active, the page asks only for the bootstrap, the formats, `/api/v1/me`, a sign-in challenge and SysOp's entrance check; no page of the app is drawn, so none asks for decks, cards, games or sessions.
+
 ## Google sign-in (AUTH01–AUTH05)
 
 **Primary flow.** Google Identity Services' ID-token flow with a JavaScript callback (`ux_mode: popup`, FedCM for the button where Chrome supports it). The authorization-code redirect flow is not used.
 
-1. The Profile page asks `POST /api/v1/auth/google/start`. The server creates a sign-in challenge:
+1. The sign-in page (the Profile page before v0.3.0, [the landing page](#before-the-app-the-landing-page-v030) since) asks `POST /api/v1/auth/google/start`. The server creates a sign-in challenge:
    - the browser gets a random secret in the `cd_google` cookie (HttpOnly, Secure, SameSite=Strict, path `/api/v1/auth/google`, 10 minutes);
    - the server keeps only the nonce, which is the secret's SHA-256 hash.
 2. The page loads Google's script and initializes it with the client ID and that nonce. Google signs the nonce into the ID token.
@@ -57,7 +73,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 - **Two first sign-ins at once** of one Google account: the second gets 409 `sign_in_conflict`, which asks the player to try again.
 - **Google being unreachable** returns 503 `provider_unavailable`. It is never counted as a failure, so it is reported even to an address at its limit, and the challenge stays unspent.
 - **On the page.** A cancelled or denied Google prompt simply never calls back. A network failure while posting Google's token shows the service-unavailable message, and the page asks Google again with a new challenge.
-- **Not set up.** Without `CD_GOOGLE_CLIENT_ID`, sign-in reports `sign_in_unavailable` and the page says the server is not set up. Until the bootstrap loads, the Profile page says sign-in is being prepared; if the service did not answer, it says so, with a Try again button.
+- **Not set up.** Without `CD_GOOGLE_CLIENT_ID`, sign-in reports `sign_in_unavailable` and the page says the server is not set up. Until the bootstrap loads, the landing page tells screen readers that sign-in is being prepared; if the service did not answer, it says so below the mark, with a Try again button.
 
 **Challenge limits.** The web container lets each visitor address ask for 10 challenges a minute (`POST /api/v1/auth/google/start`), after a first burst of 20, because each one is a database row. Past that it answers 429 with the API's error shape (`too_many_attempts`). It keys on `X-Forwarded-For`, which on the live site only the TSH proxy sets, to the visitor's address alone; requests without the header (local runs, the browser tests) are not limited. Challenges are deleted a day after they expire.
 
@@ -96,7 +112,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
   - *Sign out everywhere* ends all of the account's sessions.
   - The Profile page lists the active sessions and ends any one of them.
   - **On the page** (since v0.1.1):
-    - The page shows the signed-out screen only when the server confirms. A 401 also counts, because the session had already ended. Any other refusal, or a network failure, shows the error and keeps the account.
+    - The page shows the signed-out screen only when the server confirms. A 401 also counts, because the session had already ended. Any other refusal, or a network failure, shows the error and keeps the account. Since v0.3.0 the signed-out screen is the landing page, which says "You signed out." below its button, at the same address.
     - While a sign-out is pending, further presses of Sign out and Sign out everywhere are ignored: a second request would find the session already ended.
     - *Sign out everywhere* from a session that had already ended says the account's other sessions could not be ended from this browser.
     - On `csrf_failed` (another tab signed this browser in since the page loaded), the page refreshes its token from `/api/v1/me` and tries once more. If the browser now holds another account, the page shows that account and asks to sign out again. After *Sign out everywhere* it also says the first account's sessions were not ended, and that ending them means signing in as that account and choosing *Sign out everywhere*.
@@ -124,7 +140,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 - The first administrator is not configured separately (AUTH06): SysOp is the configured bootstrap, and only SysOp makes or removes administrators. No Google account ever becomes an administrator by signing in.
 
 **Pending and denied accounts.**
-- In approval mode, a new account is `pending` until approved. It can sign in, see its state and choose a handle, and nothing more.
+- In approval mode, a new account is `pending` until approved. It can sign in, see its state and change its own profile, and nothing more. Since v0.3.0 the page offers the handle only once the account is approved ([what it sees](#before-the-app-the-landing-page-v030)); the API still accepts one before.
 - A denied account sees that it was not approved.
 - A disabled account cannot sign in.
 

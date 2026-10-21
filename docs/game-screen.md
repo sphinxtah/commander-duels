@@ -12,7 +12,7 @@ The Play page opens with the owner's banner. Below it, the practice table offers
 
 The table also lists your running games (resume or close) and your recent ones with their results. SysOp may list every player's games and observe any running one.
 
-Signed-out visitors see a sign-in link. Accounts waiting for approval, or not approved, see why they cannot play.
+Signed-out visitors, and accounts waiting for approval or not approved, never reach the table: since v0.3.0 they see [the landing page](identity.md#before-the-app-the-landing-page-v030) at every address, `#game/<id>` included. An active account that may not play sees why.
 
 ## The table
 

@@ -1,0 +1,50 @@
+/* The page before the app (v0.3.0): the mark in the middle of the window on the site's own
+   background, and below it only what to do next. */
+.landing {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  padding: 48px 16px;
+  background: #101819;
+}
+/* No shadow: on the plain background it shows as a faint square around the mark. */
+.mark {
+  display: block;
+  width: 128px;
+  height: 128px;
+}
+/* Room for the sign-in button and a line below it, kept while they load, so the mark stays put
+   when they arrive. */
+.content {
+  width: min(100%, 440px);
+  min-height: 7rem;
+}
+/* SysOp's entrance and the wait for approval: headings sized for the narrow column. */
+.content h1 {
+  font-size: 1.6rem;
+  line-height: 1.3;
+  letter-spacing: 0;
+  margin: 0 0 14px;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 600px) {
+  .landing {
+    gap: 28px;
+    padding: 32px 16px;
+  }
+  .mark {
+    width: 104px;
+    height: 104px;
+  }
+}

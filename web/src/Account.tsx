@@ -39,7 +39,6 @@ const roleNames: Record<string, string> = {
   administrator: "Administrator",
   sysop: "SysOp",
 };
-const RETURN_KEY = "cd.returnTo";
 // The server's sign-in challenge and its cookie last 10 minutes. The page renews an idle one a
 // minute early, and checks its age often by the wall clock, because timers stop while a
 // computer or phone sleeps but the challenge keeps ageing.
@@ -49,26 +48,8 @@ const CHALLENGE_CHECK_MS = 15 * 1000;
 // Google says nothing when its window is closed without signing in. A press this old, once the
 // page has focus again, counts as given up, so it no longer holds off the early renewal.
 const PRESS_GIVEN_UP_MS = 2 * 60 * 1000;
-
-/** Remember where to come back to after signing in (T01: return to the intended screen). */
-export function signInFrom(hash: string) {
-  try {
-    sessionStorage.setItem(RETURN_KEY, hash);
-  } catch {
-    // Without storage the user simply stays on Profile.
-  }
-}
-
-function returnAfterSignIn() {
-  try {
-    const target = sessionStorage.getItem(RETURN_KEY);
-    sessionStorage.removeItem(RETURN_KEY);
-    if (target && target.startsWith("#") && target !== "#profile")
-      window.location.hash = target;
-  } catch {
-    // Storage unavailable: stay here.
-  }
-}
+// A pending account asks the server again this often while its page is shown.
+const APPROVAL_CHECK_MS = 60 * 1000;
 
 function when(value: string | null | undefined) {
   return value
@@ -166,8 +147,9 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
               });
               if (result.data) {
                 setCsrfToken(result.data.csrf_token);
+                // The landing page never changed the address, so the screen it names opens
+                // now (T01).
                 onSignedIn(result.data);
-                returnAfterSignIn();
                 return;
               }
               setError(describe(result.error));
@@ -216,8 +198,16 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
         onPointerEnter={renewIfOld}
         onFocus={renewIfOld}
       />
-      {state === "loading" && <p role="status">Preparing Google sign-in…</p>}
-      {state === "verifying" && <p role="status">Signing you in…</p>}
+      {state === "loading" && (
+        <p role="status" className={styles.visuallyHidden}>
+          Preparing Google sign-in…
+        </p>
+      )}
+      {state === "verifying" && (
+        <p role="status" className={styles.fine}>
+          Signing you in…
+        </p>
+      )}
       {error && (
         <p role="alert" className={styles.error}>
           {error}
@@ -238,74 +228,60 @@ function GoogleSignIn({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   );
 }
 
-function SignedOut({
+/**
+ * The landing page's sign-in (v0.3.0): the Google button under the mark, with no words above it.
+ * Anything the page must say (a refusal, an outage, what a sign-out left to say) comes below the
+ * button, small; the heading and the "Preparing" states are for screen readers only.
+ */
+export function SignIn({
   auth,
   unavailable,
   onRetry,
   notice,
   onSignedIn,
-  heading,
 }: {
   auth: Bootstrap["auth"] | undefined;
+  /** The bootstrap failed to load, so sign-in's settings are unknown. */
   unavailable: boolean;
   onRetry: () => void;
+  /** What the sign-out that led here said, if anything; a sign-in clears it. */
   notice: string;
   onSignedIn: (me: Me) => void;
-  heading: RefObject<HTMLHeadingElement | null>;
 }) {
   return (
-    <>
-      <span className={shell.eyebrow}>M1 · ACCOUNTS</span>
-      <h1 ref={heading} tabIndex={-1}>
-        Your place at the table.
-      </h1>
-      <p className={shell.lead}>
-        Sign in with Google to create your Commander Duels account. One Google
-        account is one player.
-      </p>
-      {notice && (
-        <div className={shell.notice} role="status">
-          <p>{notice}</p>
-        </div>
-      )}
-      <section className={styles.panel} aria-labelledby="sign-in-title">
-        <h2 id="sign-in-title">Sign in</h2>
-        {/* Sign-in's settings come with the bootstrap: until it loads, nothing is known. */}
-        {auth === undefined ? (
-          unavailable ? (
-            <>
-              <p className={styles.fine} role="status">
-                The application service did not answer, so sign-in cannot start
-                yet.
-              </p>
-              <button className={styles.secondary} onClick={onRetry}>
-                Try again
-              </button>
-            </>
-          ) : (
-            <p className={styles.fine} role="status">
-              Preparing sign-in…
-            </p>
-          )
-        ) : auth.google_client_id ? (
+    <div className={styles.signIn}>
+      <h1 className={styles.visuallyHidden}>Sign in</h1>
+      {/* Sign-in's settings come with the bootstrap: until it loads, nothing is known. */}
+      {auth === undefined ? (
+        unavailable ? (
           <>
-            <GoogleSignIn onSignedIn={onSignedIn} />
-            <p className={styles.fine}>
-              Google tells Commander Duels only your name, email address and
-              account ID. Your email stays private: other players see the handle
-              you choose.
-              {auth.signup_policy === "approval" &&
-                " New accounts wait for an administrator's approval."}
+            <p className={styles.fine} role="status">
+              The application service did not answer, so sign-in cannot start
+              yet.
             </p>
+            <button className={styles.secondary} onClick={onRetry}>
+              Try again
+            </button>
           </>
         ) : (
-          <p className={styles.fine}>
-            Google sign-in is not set up on this server yet. The operator needs
-            to add a Google OAuth client ID.
+          <p className={styles.visuallyHidden} role="status">
+            Preparing sign-in…
           </p>
-        )}
-      </section>
-    </>
+        )
+      ) : auth.google_client_id ? (
+        <GoogleSignIn onSignedIn={onSignedIn} />
+      ) : (
+        <p className={styles.fine}>
+          Google sign-in is not set up on this server yet. The operator needs to
+          add a Google OAuth client ID.
+        </p>
+      )}
+      {notice && (
+        <p className={styles.fine} role="status">
+          {notice}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -428,38 +404,29 @@ function ProfileForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
   );
 }
 
-function Sessions({
-  me,
-  onChange,
-  onSignedOut,
-}: {
-  me: Me;
-  onChange: (me: Me) => void;
-  onSignedOut: (notice?: string) => void;
-}) {
-  const [sessions, setSessions] = useState<SessionSummary[]>();
+/**
+ * Sign out and Sign out everywhere for the account on show, on Profile and on the page an account
+ * waits on for approval. The page shows the signed-out screen only once the server confirms: a
+ * refused sign-out leaves the session alive, and saying otherwise would be false comfort.
+ */
+function useSignOut(
+  me: Me,
+  onChange: (me: Me) => void,
+  onSignedOut: (notice: string) => void,
+) {
   const [message, setMessage] = useState("");
   // One sign-out at a time. A second click's request would find this session already ended,
   // and its 401 would wrongly say the other sessions could not be ended.
   const [busy, setBusy] = useState(false);
   const signingOut = useRef(false);
-  async function load() {
-    const { data } = await client.GET("/api/v1/me/sessions");
-    setSessions(data);
-  }
-  useEffect(() => {
-    void load();
-  }, [me.session.id]);
-  async function end(session: SessionSummary) {
-    const { error } = await client.DELETE("/api/v1/me/sessions/{session_id}", {
-      params: { path: { session_id: session.id } },
-    });
-    if (error) setMessage(describe(error));
-    else if (session.current) onSignedOut();
-    else await load();
-  }
-  // The page shows the signed-out screen only once the server confirms: a refused sign-out
-  // leaves the session alive, and saying otherwise would be false comfort.
+  // The notice is what the sign-in page then says below its button.
+  const signedOut = useCallback(
+    (notice = "You signed out.") => {
+      setCsrfToken(undefined);
+      onSignedOut(notice);
+    },
+    [onSignedOut],
+  );
   async function signOut(everywhere: boolean) {
     if (signingOut.current) return;
     signingOut.current = true;
@@ -483,7 +450,7 @@ function Sessions({
         // stale. Sign out only the account shown here; if the browser now holds another one,
         // show that one instead.
         const current = await loadMe();
-        if (current === null) return onSignedOut(gone);
+        if (current === null) return signedOut(gone);
         if (current.id !== me.id) {
           onChange(current);
           const other = current.handle ?? current.display_name;
@@ -496,9 +463,9 @@ function Sessions({
         }
         ({ response, error } = await send());
       }
-      if (response.ok) onSignedOut();
+      if (response.ok) signedOut();
       // 401: the session had already ended, so this browser is signed out either way.
-      else if (response.status === 401) onSignedOut(gone);
+      else if (response.status === 401) signedOut(gone);
       else setMessage(describe(error));
     } catch {
       setMessage(describe(undefined));
@@ -506,6 +473,39 @@ function Sessions({
       signingOut.current = false;
       setBusy(false);
     }
+  }
+  return { message, setMessage, busy, signingOut, signedOut, signOut };
+}
+
+function Sessions({
+  me,
+  onChange,
+  onSignedOut,
+}: {
+  me: Me;
+  onChange: (me: Me) => void;
+  onSignedOut: (notice: string) => void;
+}) {
+  const [sessions, setSessions] = useState<SessionSummary[]>();
+  const { message, setMessage, busy, signedOut, signOut } = useSignOut(
+    me,
+    onChange,
+    onSignedOut,
+  );
+  async function load() {
+    const { data } = await client.GET("/api/v1/me/sessions");
+    setSessions(data);
+  }
+  useEffect(() => {
+    void load();
+  }, [me.session.id]);
+  async function end(session: SessionSummary) {
+    const { error } = await client.DELETE("/api/v1/me/sessions/{session_id}", {
+      params: { path: { session_id: session.id } },
+    });
+    if (error) setMessage(describe(error));
+    else if (session.current) signedOut();
+    else await load();
   }
   return (
     <section className={styles.panel} aria-labelledby="sessions-title">
@@ -633,54 +633,135 @@ function SysopPassword({ onChange }: { onChange: (me: Me) => void }) {
   );
 }
 
+/**
+ * All an account sees until it is approved (v0.3.0), under the landing page's mark: its state, its
+ * email address and Sign out. A pending account asks the server again every minute while shown,
+ * when the window regains focus or is shown again, and on Check again, so an approval opens the
+ * app without a reload; it chooses its handle once approved. Any other account can only sign out.
+ */
+export function Waiting({
+  me,
+  onChange,
+  onSignedOut,
+}: {
+  me: Me;
+  onChange: (me: Me) => void;
+  onSignedOut: (notice: string) => void;
+}) {
+  const { message, busy, signingOut, signedOut, signOut } = useSignOut(
+    me,
+    onChange,
+    onSignedOut,
+  );
+  const pending = me.status === "pending";
+  const [note, setNote] = useState("");
+  const [checking, setChecking] = useState(false);
+  // Focus and visibility often change together: one question at a time.
+  const asking = useRef(false);
+  const shown = useRef(false);
+  useEffect(() => {
+    shown.current = true;
+    return () => {
+      shown.current = false;
+    };
+  }, []);
+  const check = useCallback(
+    async (asked: boolean) => {
+      if (asking.current || signingOut.current) return;
+      asking.current = true;
+      setChecking(true);
+      if (asked) setNote("");
+      try {
+        const current = await loadMe();
+        // A sign-out begun meanwhile, or a page that has moved on, has the last word.
+        if (!shown.current || signingOut.current) return;
+        // The session ended elsewhere: the sign-in page, with nothing to add.
+        if (!current) return signedOut("");
+        onChange(current);
+        if (asked && current.status === "pending")
+          setNote("Still waiting for approval.");
+      } catch {
+        // An unreachable service says nothing about the account: it stays as it is.
+        if (asked) setNote(describe(undefined));
+      } finally {
+        asking.current = false;
+        setChecking(false);
+      }
+    },
+    [onChange, signedOut, signingOut],
+  );
+  useEffect(() => {
+    if (!pending) return;
+    // A hidden page waits: being shown again asks at once.
+    const again = () => {
+      if (document.visibilityState !== "hidden") void check(false);
+    };
+    const timer = window.setInterval(again, APPROVAL_CHECK_MS);
+    window.addEventListener("focus", again);
+    document.addEventListener("visibilitychange", again);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", again);
+      document.removeEventListener("visibilitychange", again);
+    };
+  }, [pending, check]);
+  return (
+    <div className={styles.waiting}>
+      <h1>
+        {pending
+          ? "Your account is waiting for approval."
+          : "Your account was not approved."}
+      </h1>
+      {!pending && (
+        <p className={styles.fine}>
+          Contact the operator of this server if you think this is a mistake.
+        </p>
+      )}
+      {me.email && <p className={styles.email}>{me.email}</p>}
+      <p role="status" className={styles.fine}>
+        {note}
+      </p>
+      {message && (
+        <p role="alert" className={styles.error}>
+          {message}
+        </p>
+      )}
+      {/* aria-disabled, as on Profile: a disabled button loses keyboard focus. */}
+      <div className={styles.actions}>
+        {pending && (
+          <button
+            className={styles.secondary}
+            aria-disabled={checking}
+            onClick={() => void check(true)}
+          >
+            Check again
+          </button>
+        )}
+        <button
+          className={styles.secondary}
+          aria-disabled={busy}
+          onClick={() => void signOut(false)}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The Profile page. App shows it, like every page, only to an active account (v0.3.0). */
 export function Account({
   me,
-  auth,
-  unavailable,
-  onRetry,
   onChange,
+  onSignedOut,
   heading,
 }: {
-  me: Me | null | undefined;
-  auth: Bootstrap["auth"] | undefined;
-  /** The bootstrap failed to load, so sign-in's settings are unknown. */
-  unavailable: boolean;
-  onRetry: () => void;
-  onChange: (me: Me | null) => void;
+  me: Me;
+  onChange: (me: Me) => void;
+  /** This browser's session ended; the notice is what the sign-in page then says. */
+  onSignedOut: (notice: string) => void;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
-  // What the signed-out screen says about the sign-out that led to it; a sign-in clears it.
-  const [notice, setNotice] = useState("");
-  useEffect(() => {
-    if (me) setNotice("");
-  }, [me]);
-  if (me === undefined)
-    return (
-      <>
-        <h1 ref={heading} tabIndex={-1}>
-          Your place at the table.
-        </h1>
-        <p role="status" className={shell.lead}>
-          Checking your sign-in…
-        </p>
-      </>
-    );
-  if (me === null)
-    return (
-      <SignedOut
-        auth={auth}
-        unavailable={unavailable}
-        onRetry={onRetry}
-        notice={notice}
-        onSignedIn={onChange}
-        heading={heading}
-      />
-    );
-  const signedOut = (said = "") => {
-    setCsrfToken(undefined);
-    setNotice(said);
-    onChange(null);
-  };
   return (
     <>
       <span className={shell.eyebrow}>YOUR ACCOUNT</span>
@@ -689,23 +770,6 @@ export function Account({
           ? "Welcome to the table."
           : `Welcome back, ${me.display_name}.`}
       </h1>
-      {me.status === "pending" && (
-        <div className={shell.notice} role="status">
-          <strong>Your account is waiting for approval.</strong>
-          <p>
-            An administrator will review it. You can choose your handle while
-            you wait.
-          </p>
-        </div>
-      )}
-      {me.status === "denied" && (
-        <div className={shell.notice} role="status">
-          <strong>Your account was not approved.</strong>
-          <p>
-            Contact the operator of this server if you think this is a mistake.
-          </p>
-        </div>
-      )}
       <section className={styles.card} aria-label="Account">
         <span className={styles.avatar} aria-hidden="true">
           {avatars[me.avatar]}
@@ -723,23 +787,22 @@ export function Account({
           ))}
         </ul>
       </section>
-      {me.status !== "denied" &&
-        (me.onboarding === "handle" ? (
-          <section className={styles.panel}>
-            {/* Keyed by account: a form must never keep another account's values. */}
-            <HandleForm key={me.id} me={me} onChange={onChange} />
-          </section>
-        ) : (
-          <section className={styles.panel}>
-            <ProfileForm key={me.id} me={me} onChange={onChange} />
-          </section>
-        ))}
+      {me.onboarding === "handle" ? (
+        <section className={styles.panel}>
+          {/* Keyed by account: a form must never keep another account's values. */}
+          <HandleForm key={me.id} me={me} onChange={onChange} />
+        </section>
+      ) : (
+        <section className={styles.panel}>
+          <ProfileForm key={me.id} me={me} onChange={onChange} />
+        </section>
+      )}
       {me.kind === "sysop" && (
         <section className={styles.panel}>
           <SysopPassword onChange={onChange} />
         </section>
       )}
-      <Sessions me={me} onChange={onChange} onSignedOut={signedOut} />
+      <Sessions me={me} onChange={onChange} onSignedOut={onSignedOut} />
     </>
   );
 }

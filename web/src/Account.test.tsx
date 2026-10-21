@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { createRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Account } from "./Account";
+import { Account, SignIn, Waiting } from "./Account";
 import { client, currentCsrfToken, setCsrfToken, type Me } from "./api";
 import { loadGoogle, type GoogleId } from "./google";
 
@@ -70,7 +70,10 @@ function account(overrides: Partial<Me> = {}): Me {
 }
 const google = { google_client_id: "client", signup_policy: "open" } as const;
 
-/** Account inside a page that keeps the account it is handed, as App does. */
+/**
+ * The account's screens inside a page that keeps the account it is handed, as App does: the
+ * sign-in when signed out, the wait until approval, and Profile once active.
+ */
 function Page({
   initial,
   auth,
@@ -79,22 +82,39 @@ function Page({
   seen,
 }: {
   initial: Me | null;
-  auth: Parameters<typeof Account>[0]["auth"];
+  auth: Parameters<typeof SignIn>[0]["auth"];
   unavailable?: boolean;
   onRetry?: () => void;
   seen?: (me: Me | null) => void;
 }) {
   const [me, setMe] = useState<Me | null>(initial);
+  const [notice, setNotice] = useState("");
+  const change = (value: Me | null) => {
+    seen?.(value);
+    setMe(value);
+    if (value) setNotice("");
+  };
+  const signedOut = (said: string) => {
+    setNotice(said);
+    change(null);
+  };
+  if (!me)
+    return (
+      <SignIn
+        auth={auth}
+        unavailable={unavailable}
+        onRetry={onRetry}
+        notice={notice}
+        onSignedIn={change}
+      />
+    );
+  if (me.status !== "active")
+    return <Waiting me={me} onChange={change} onSignedOut={signedOut} />;
   return (
     <Account
       me={me}
-      auth={auth}
-      unavailable={unavailable}
-      onRetry={onRetry}
-      onChange={(value) => {
-        seen?.(value);
-        setMe(value);
-      }}
+      onChange={change}
+      onSignedOut={signedOut}
       heading={createRef()}
     />
   );
@@ -226,7 +246,13 @@ describe("signing out", () => {
     expect(
       await screen.findByRole("heading", { name: "Sign in" }),
     ).toBeInTheDocument();
+    // Below the sign-in button, the one line the page has to say.
+    expect(screen.getByText("You signed out.")).toHaveAttribute(
+      "role",
+      "status",
+    );
     expect(screen.queryByText(/could not be ended/)).not.toBeInTheDocument();
+    expect(currentCsrfToken()).toBeUndefined();
   });
 
   it("names each other session's button by its browser, apart from this browser's", async () => {
@@ -298,7 +324,201 @@ describe("signing out", () => {
   });
 });
 
+describe("the wait for approval", () => {
+  const pending = () =>
+    account({
+      status: "pending",
+      onboarding: "handle",
+      handle: null,
+      email: "new@example.com",
+      permissions: [],
+      roles: [],
+    });
+  let visibility: DocumentVisibilityState;
+
+  beforeEach(() => {
+    visibility = "visible";
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => visibility,
+    });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(document, "visibilityState");
+  });
+
+  /** Lets every pending answer arrive (setTimeout stays real under the fake intervals). */
+  async function settle() {
+    await act(() => new Promise((done) => setTimeout(done, 0)));
+  }
+  async function later(ms: number) {
+    await act(async () => {
+      vi.advanceTimersByTime(ms);
+    });
+    await settle();
+  }
+
+  it("shows the account's state, its email and Sign out, and nothing more", async () => {
+    render(<Page initial={pending()} auth={google} />);
+    expect(
+      screen.getByRole("heading", {
+        name: "Your account is waiting for approval.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("new@example.com")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button").map((button) => button.textContent),
+    ).toEqual(["Check again", "Sign out"]);
+    // The handle comes after approval, and so does everything else.
+    expect(screen.queryByLabelText("Handle")).toBeNull();
+    await settle();
+    expect(calls).toEqual([]);
+  });
+
+  it("asks again every minute while shown, and when the window comes back", async () => {
+    on("GET /api/v1/me", () => reply(200, pending()));
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    render(<Page initial={pending()} auth={google} />);
+    await later(59 * 1000);
+    expect(count("GET /api/v1/me")).toBe(0);
+    await later(1000);
+    expect(count("GET /api/v1/me")).toBe(1);
+    // A hidden page waits; being shown again asks at once.
+    visibility = "hidden";
+    await later(2 * 60 * 1000);
+    expect(count("GET /api/v1/me")).toBe(1);
+    visibility = "visible";
+    act(() => void document.dispatchEvent(new Event("visibilitychange")));
+    await settle();
+    expect(count("GET /api/v1/me")).toBe(2);
+    act(() => void window.dispatchEvent(new Event("focus")));
+    await settle();
+    expect(count("GET /api/v1/me")).toBe(3);
+    // Focus and visibility arriving together ask once.
+    act(() => {
+      window.dispatchEvent(new Event("focus"));
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    await settle();
+    expect(count("GET /api/v1/me")).toBe(4);
+  });
+
+  it("says when Check again finds it still waiting, and an approval opens the account", async () => {
+    on(
+      "GET /api/v1/me",
+      () => reply(200, pending()),
+      () =>
+        reply(200, account({ onboarding: "handle", handle: null, roles: [] })),
+    );
+    const seen = vi.fn();
+    render(<Page initial={pending()} auth={google} seen={seen} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(
+      await screen.findByText("Still waiting for approval."),
+    ).toHaveAttribute("role", "status");
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(
+      await screen.findByRole("heading", { name: "Welcome to the table." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Choose your handle" }),
+    ).toBeInTheDocument();
+    expect(seen).toHaveBeenLastCalledWith(
+      expect.objectContaining({ status: "active" }),
+    );
+  });
+
+  it("keeps the account when the service does not answer", async () => {
+    on("GET /api/v1/me", () =>
+      Promise.reject(new TypeError("Failed to fetch")),
+    );
+    const seen = vi.fn();
+    render(<Page initial={pending()} auth={google} seen={seen} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(
+      await screen.findByText(
+        "The application service is unavailable. Try again.",
+      ),
+    ).toBeInTheDocument();
+    expect(seen).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("heading", {
+        name: "Your account is waiting for approval.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("leads to the sign-in when the session ended elsewhere", async () => {
+    on("GET /api/v1/me", () =>
+      reply(401, { code: "not_signed_in", message: "Sign in." }),
+    );
+    const seen = vi.fn();
+    render(<Page initial={pending()} auth={google} seen={seen} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(
+      await screen.findByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(seen).toHaveBeenCalledWith(null);
+    expect(screen.queryByText("You signed out.")).toBeNull();
+    expect(currentCsrfToken()).toBeUndefined();
+  });
+
+  it("lets a sign-out win over a look that was under way", async () => {
+    const look = deferred<unknown>();
+    on("GET /api/v1/me", () => look.promise);
+    on("POST /api/v1/auth/logout", () => reply(204));
+    render(<Page initial={pending()} auth={google} />);
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText("You signed out.")).toBeInTheDocument();
+    await act(async () => look.resolve(reply(200, pending())));
+    await settle();
+    expect(
+      screen.getByRole("heading", { name: "Sign in" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "Your account is waiting for approval.",
+      }),
+    ).toBeNull();
+  });
+
+  it("tells a denied account so, and lets it only sign out", async () => {
+    on("POST /api/v1/auth/logout", () => reply(204));
+    render(<Page initial={account({ status: "denied" })} auth={google} />);
+    expect(
+      screen.getByRole("heading", { name: "Your account was not approved." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Contact the operator of this server if you think this is a mistake.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("alice@example.com")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button").map((button) => button.textContent),
+    ).toEqual(["Sign out"]);
+    act(() => void window.dispatchEvent(new Event("focus")));
+    await settle();
+    expect(count("GET /api/v1/me")).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText("You signed out.")).toBeInTheDocument();
+  });
+});
+
 describe("the signed-out screen", () => {
+  it("has nothing to read: its heading and its states are for screen readers", () => {
+    render(<Page initial={null} auth={google} />);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Sign in",
+    );
+    // While Google's script loads, only the hidden heading and status are there: no privacy
+    // note or sign-up policy any more (v0.3.0).
+    expect(document.body).toHaveTextContent(
+      /^Sign in\s*Preparing Google sign-in…$/,
+    );
+  });
+
   it("does not claim sign-in is unconfigured before the bootstrap loads", () => {
     render(<Page initial={null} auth={undefined} />);
     expect(screen.getByText("Preparing sign-in…")).toBeInTheDocument();

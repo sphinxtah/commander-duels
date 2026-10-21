@@ -1,7 +1,9 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
+import { standIn } from "./accounts";
 
 // SysOp's password, set before the run with `python -m api.cli sysop-password --stdin`.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
+const gameId = "00000000-0000-4000-8000-0000000000aa";
 
 // Google's script, replaced: the button it renders hands the page a credential the server
 // cannot verify, so the page's whole sign-in path runs without a Google account.
@@ -20,34 +22,131 @@ window.google = { accounts: { id: {
   disableAutoSelect() {},
 } } };`;
 
+// What a page may ask the API for before its account is active (v0.3.0): the foundation, the
+// account, a sign-in challenge and SysOp's entrance. Anything else is the inside of the app.
+const beforeSignIn = new Set([
+  "/api/v1/bootstrap",
+  "/api/v1/formats",
+  "/api/v1/me",
+  "/api/v1/auth/google/start",
+  "/api/v1/sysop/entrance",
+]);
+
+/** The API requests from the inside of the app, and the game WebSockets, as the page makes them. */
+function watchInside(page: Page) {
+  const inside: string[] = [];
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.startsWith("/api/") && !beforeSignIn.has(path)) inside.push(path);
+  });
+  page.on("websocket", (socket) => {
+    if (socket.url().includes("/api/")) inside.push(socket.url());
+  });
+  return inside;
+}
+
 async function nav(page: Page) {
   return page.getByRole("navigation").getByRole("link").allTextContents();
 }
 
-test("signed-out visitors see sign-in, and administration stays closed", async ({
-  page,
-}) => {
+function googleButton(page: Page) {
+  return page.getByRole("button", { name: "Sign in with Google" });
+}
+
+/**
+ * The words a sighted visitor can read above the element. Text for screen readers only sits in
+ * a 1 px box, so it does not count.
+ */
+async function wordsAbove(target: Locator): Promise<string[]> {
+  return target.evaluate((element) => {
+    const top = element.getBoundingClientRect().top;
+    const words: string[] = [];
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const parent = node.parentElement;
+      const text = node.textContent?.trim();
+      if (!parent || !text) continue;
+      const box = parent.getBoundingClientRect();
+      if (box.width <= 1 || box.height <= 1) continue;
+      if (
+        !parent.checkVisibility({
+          checkOpacity: true,
+          checkVisibilityCSS: true,
+        })
+      )
+        continue;
+      if (box.top < top) words.push(text);
+    }
+    return words;
+  });
+}
+
+/** The landing page and nothing else: the mark, the Google button under it, no words above it. */
+async function expectLanding(page: Page) {
+  const mark = page.locator('img[src="/brand/mark.webp"]');
+  await expect(mark).toBeVisible();
+  await expect(mark).toHaveAttribute("alt", "");
+  await expect(page.locator("img")).toHaveCount(1);
+  const button = page.getByRole("main").getByRole("button", {
+    name: "Sign in with Google",
+  });
+  await expect(button).toBeVisible();
+  expect((await mark.boundingBox())!.y).toBeLessThan(
+    (await button.boundingBox())!.y,
+  );
+  expect(await wordsAbove(button)).toEqual([]);
+  // For screen readers, the page still says what it is.
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Sign in" }),
+  ).toBeAttached();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await expect(page.getByRole("banner")).toHaveCount(0);
+  await expect(page.getByText(/Fan Content|Testing preview/)).toHaveCount(0);
+}
+
+test.beforeEach(async ({ page }) => {
   await page.route("https://accounts.google.com/gsi/client", (route) =>
     route.fulfill({ contentType: "text/javascript", body: fakeGoogle }),
   );
-  await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Sign in to continue." }),
-  ).toBeVisible();
-  expect((await nav(page)).some((name) => name.includes("Admin"))).toBe(false);
+});
 
-  // The link remembers this screen, so a successful sign-in comes back here (T01).
-  await page.getByRole("main").getByRole("link", { name: "Sign in" }).click();
-  expect(await page.evaluate(() => sessionStorage.getItem("cd.returnTo"))).toBe(
+test("a signed-out visitor sees only the landing page at every address, which it keeps", async ({
+  page,
+}) => {
+  const inside = watchInside(page);
+  for (const route of [
+    "#play",
+    "#decks",
+    "#cards",
+    `#deck/${gameId}`,
+    `#game/${gameId}`,
     "#admin",
-  );
-  await expect(
-    page.getByRole("heading", { name: "Your place at the table." }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Sign in with Google" }).click();
+    "#profile",
+    "#nowhere",
+  ]) {
+    // A fresh load each time: a change of hash alone would not reload the page.
+    await page.goto("about:blank");
+    await page.goto(`/${route}`);
+    await expectLanding(page);
+    expect(new URL(page.url()).hash).toBe(route);
+  }
+  // No page of the app asked for anything, and no game's WebSocket opened.
+  expect(inside).toEqual([]);
+});
+
+test("a refused sign-in says so below the button, asks Google again and keeps the address", async ({
+  page,
+}) => {
+  await page.goto("/#admin");
+  await expectLanding(page);
+  await googleButton(page).click();
   // The server refuses the unverifiable credential; the page says so and asks Google again
   // with a fresh challenge.
-  await expect(page.getByRole("alert")).toContainText(/Google/);
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText(/Google/);
   await expect
     .poll(() =>
       page.evaluate(
@@ -60,6 +159,66 @@ test("signed-out visitors see sign-in, and administration stays closed", async (
   );
   expect(new Set(nonces).size).toBe(2);
   expect(nonces[0]).toMatch(/^[0-9a-f]{64}$/);
+  await expect(googleButton(page)).toBeVisible();
+  expect((await alert.boundingBox())!.y).toBeGreaterThan(
+    (await googleButton(page).boundingBox())!.y,
+  );
+  expect(await wordsAbove(googleButton(page))).toEqual([]);
+  await expect(page).toHaveURL(/#admin$/);
+});
+
+test("the landing page fits a phone and 1080p, with Larger text and Reduce motion", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/#play");
+  await expectLanding(page);
+  for (const large of [false, true]) {
+    if (large) {
+      // The preferences a visitor set on this device before; the landing page has no Settings.
+      await page.evaluate(() =>
+        localStorage.setItem(
+          "cd.preferences.v1",
+          JSON.stringify({ largeText: true, reducedMotion: true }),
+        ),
+      );
+      await page.reload();
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-large-text",
+        "true",
+      );
+      await expect(page.locator("html")).toHaveAttribute(
+        "data-reduced-motion",
+        "true",
+      );
+    }
+    for (const [width, height] of [
+      [1920, 1080],
+      [390, 844],
+    ]) {
+      await page.setViewportSize({ width, height });
+      await expectLanding(page);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+      // The mark and the button sit inside the window, without scrolling.
+      for (const element of [
+        page.locator('img[src="/brand/mark.webp"]'),
+        googleButton(page),
+      ]) {
+        const box = (await element.boundingBox())!;
+        expect(box.x).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width).toBeLessThanOrEqual(width);
+        expect(box.y + box.height).toBeLessThanOrEqual(height);
+      }
+      await page.screenshot({
+        path: testInfo.outputPath(
+          `landing-${width}${large ? "-large-text" : ""}.png`,
+        ),
+      });
+    }
+  }
 });
 
 test("the SysOp address looks like any unknown address off its network", async ({
@@ -72,14 +231,13 @@ test("the SysOp address looks like any unknown address off its network", async (
     }),
   );
   await page.goto("/#sysop");
-  await expect(
-    page.getByRole("heading", { name: "Commander", exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText("COMMANDER DUELS / PLAY")).toBeVisible();
+  await expectLanding(page);
+  await expect(page.getByLabel("Password")).toHaveCount(0);
   await expect(page.getByText(/sysop/i)).toHaveCount(0);
+  await expect(page).toHaveURL(/#sysop$/);
 });
 
-test("SysOp signs in, administers and sees its own audit trail", async ({
+test("SysOp signs in at its entrance under the mark, administers and sees its own audit trail", async ({
   page,
 }, testInfo) => {
   test.skip(!sysopPassword, "Set CD_E2E_SYSOP_PASSWORD after creating SysOp.");
@@ -87,6 +245,11 @@ test("SysOp signs in, administers and sees its own audit trail", async ({
   await expect(
     page.getByRole("heading", { name: "SysOp sign-in" }),
   ).toBeVisible();
+  // The landing page's mark above the form, and none of the shell.
+  await expect(page.locator('img[src="/brand/mark.webp"]')).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await expect(googleButton(page)).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("sysop-sign-in.png") });
   await page.getByLabel("Password").fill("not the password");
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert")).toHaveText(
@@ -171,7 +334,89 @@ test("SysOp signs in, administers and sees its own audit trail", async ({
     ),
   ).toBe(true);
 
+  // Signing out leaves the app for the landing page, at the same address.
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
-  expect((await nav(page)).some((name) => name.includes("Admin"))).toBe(false);
+  await expectLanding(page);
+  await expect(page.getByText("You signed out.")).toBeVisible();
+  await expect(page).toHaveURL(/#profile$/);
+});
+
+// No Google account can be made to wait in a browser test, so the account is a stand-in that
+// page.route answers for; its approval is the stand-in turning active.
+test("an account waiting for approval sees only its wait, and approval opens the app where it was", async ({
+  page,
+}, testInfo) => {
+  const inside = watchInside(page);
+  const change = await standIn(page, {
+    status: "pending",
+    onboarding: "handle",
+    handle: null,
+    permissions: [],
+    roles: [],
+  });
+  await page.goto("/#settings");
+  await expect(
+    page.getByRole("heading", {
+      name: "Your account is waiting for approval.",
+    }),
+  ).toBeVisible();
+  await expect(page.locator('img[src="/brand/mark.webp"]')).toBeVisible();
+  await expect(page.getByText("stand-in@example.com")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await expect(page.getByLabel("Handle")).toHaveCount(0);
+  for (const [width, height] of [
+    [1920, 1080],
+    [390, 844],
+  ]) {
+    await page.setViewportSize({ width, height });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(`waiting-${width}.png`),
+    });
+  }
+  await page.setViewportSize({ width: 1366, height: 900 });
+  expect(inside).toEqual([]);
+
+  change({
+    status: "active",
+    roles: ["player"],
+    permissions: ["profile.edit"],
+  });
+  await page.getByRole("button", { name: "Check again" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Make yourself at home." }),
+  ).toBeVisible();
+  await expect(page.getByRole("navigation")).toBeVisible();
+  await expect(page).toHaveURL(/#settings$/);
+});
+
+test("a denied account sees that it was not approved, and signs out to the landing page", async ({
+  page,
+}) => {
+  await standIn(page, { status: "denied", permissions: [], roles: [] });
+  await page.route("**/api/v1/auth/logout", (route) =>
+    route.fulfill({ status: 204 }),
+  );
+  await page.goto("/#decks");
+  await expect(
+    page.getByRole("heading", { name: "Your account was not approved." }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Contact the operator of this server if you think this is a mistake.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check again" })).toHaveCount(
+    0,
+  );
+  await expect(page.getByRole("navigation")).toHaveCount(0);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expectLanding(page);
+  await expect(page.getByText("You signed out.")).toBeVisible();
+  await expect(page).toHaveURL(/#decks$/);
 });

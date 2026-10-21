@@ -14,7 +14,6 @@ import {
   type AuditEntry,
   type Me,
 } from "./api";
-import { signInFrom } from "./Account";
 import { CatalogAdmin } from "./catalog/CatalogAdmin";
 import styles from "./Account.module.css";
 import shell from "./App.module.css";
@@ -438,11 +437,7 @@ export function Admin({
               : "Administrators sign in with their Google account."}
           </p>
           {!me && (
-            <a
-              className={shell.primary}
-              href="#profile"
-              onClick={() => signInFrom("#admin")}
-            >
+            <a className={shell.primary} href="#profile">
               Sign in <span aria-hidden="true">→</span>
             </a>
           )}

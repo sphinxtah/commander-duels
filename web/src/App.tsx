@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Account, avatars } from "./Account";
+import { Account, SignIn, Waiting, avatars } from "./Account";
 import { Admin, SysopSignIn, canAdminister } from "./Admin";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { InstallBanner } from "./app/InstallBanner";
+import { Landing } from "./app/Landing";
 import { guardLiveGame } from "./app/liveGame";
 import { useOnline } from "./app/online";
 import { leaveTable } from "./app/serviceWorker";
@@ -131,7 +132,12 @@ export function App() {
   const [selected, setSelected] = useState<Format>();
   // undefined while loading, null when signed out.
   const [me, setMe] = useState<Me | null>();
-  const [entrance, setEntrance] = useState(false);
+  // Only an active account sees the app; everyone else, the landing page (v0.3.0).
+  const admitted = me?.status === "active";
+  // What the sign-in page says about the sign-out that led to it; a sign-in clears it.
+  const [notice, setNotice] = useState("");
+  // Whether #sysop is SysOp's entrance here: undefined until the server answers.
+  const [entrance, setEntrance] = useState<boolean>();
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
@@ -157,14 +163,22 @@ export function App() {
     return () => window.removeEventListener("hashchange", change);
   }, []);
   useEffect(() => {
-    // The table fills the window and never scrolls; the other pages scroll as ever.
-    document.documentElement.dataset.route = game ? "game" : "shell";
-  }, [game]);
+    // The table fills the window and never scrolls; the other pages scroll as ever, and so does
+    // the landing page that a #game/<id> shows before sign-in.
+    document.documentElement.dataset.route =
+      game && admitted ? "game" : "shell";
+  }, [game, admitted]);
+  const settled = me !== undefined;
+  useEffect(() => {
+    // The app opening from the landing page, after a sign-in or an approval, moves focus as
+    // following a link does.
+    if (settled && !admitted) navigated.current = true;
+  }, [settled, admitted]);
   useEffect(() => {
     // Leaving a game also lands on a page (usually Play, whose state never changed), so focus
     // follows the game route too; the game screen focuses its own heading.
     if (navigated.current && !game) heading.current?.focus();
-  }, [page, game]);
+  }, [page, game, admitted]);
   useEffect(() => {
     // Either change is a reason to ask the service again.
     const update = () => setAttempt((value) => value + 1);
@@ -230,6 +244,7 @@ export function App() {
   const shown: Page = page === "SysOp" && !entrance ? "Play" : page;
   const changeMe = useCallback((value: Me | null) => {
     setMe(value);
+    if (value) setNotice("");
     // An account's accessibility settings follow it to every device it signs in on.
     if (value && value.status === "active") {
       const next = {
@@ -240,6 +255,13 @@ export function App() {
       savePreferences(next);
     }
   }, []);
+  const signedOut = useCallback(
+    (said: string) => {
+      setNotice(said);
+      changeMe(null);
+    },
+    [changeMe],
+  );
   const retry = () => setAttempt((value) => value + 1);
 
   function updatePreference(key: keyof Preferences, value: boolean) {
@@ -271,15 +293,36 @@ export function App() {
         });
   }
 
-  // The table waits for the account, whose CSRF token the game's WebSocket needs.
-  if (game)
-    return me === undefined ? (
-      <p className={styles.tableLoading} role="status">
-        Opening the table…
-      </p>
-    ) : (
-      <GameScreen key={game} gameId={game} me={me} />
+  // Nothing of the app is drawn, or asks the API for anything, before the account is active
+  // (v0.3.0). Every address shows the landing page and stays as it was, so the screen it names
+  // opens after sign-in and approval; a #game/<id> never opens the game's WebSocket.
+  if (!me || me.status !== "active") {
+    // At #sysop nothing shows until the server says whether this is SysOp's network: off it, the
+    // address is the landing page like any other.
+    const checking =
+      me === undefined ||
+      (me === null && page === "SysOp" && entrance === undefined);
+    return (
+      <Landing>
+        {checking ? undefined : me === null && page === "SysOp" && entrance ? (
+          <SysopSignIn onSignedIn={changeMe} heading={heading} />
+        ) : me === null ? (
+          <SignIn
+            auth={bootstrap?.auth}
+            unavailable={connection === "unavailable"}
+            onRetry={retry}
+            notice={notice}
+            onSignedIn={changeMe}
+          />
+        ) : (
+          <Waiting me={me} onChange={changeMe} onSignedOut={signedOut} />
+        )}
+      </Landing>
     );
+  }
+
+  // The account is known by now, with the CSRF token that the game's WebSocket needs.
+  if (game) return <GameScreen key={game} gameId={game} me={me} />;
 
   return (
     <div className={styles.app}>
@@ -328,26 +371,14 @@ export function App() {
         </nav>
         <a className={styles.sidebarBottom} href="#profile">
           <span className={styles.monogram} aria-hidden="true">
-            {me ? avatars[me.avatar] : "CD"}
+            {avatars[me.avatar]}
           </span>
-          {me ? (
-            <div>
-              {me.handle ?? me.display_name}
-              <small>
-                {me.kind === "sysop"
-                  ? "Local administrator"
-                  : me.status === "pending"
-                    ? "Waiting for approval"
-                    : me.status === "denied"
-                      ? "Not approved"
-                      : "Signed in"}
-              </small>
-            </div>
-          ) : (
-            <div>
-              Welcome, traveler<small>{me === null ? "Sign in" : " "}</small>
-            </div>
-          )}
+          <div>
+            {me.handle ?? me.display_name}
+            <small>
+              {me.kind === "sysop" ? "Local administrator" : "Signed in"}
+            </small>
+          </div>
         </a>
       </aside>
       <div className={styles.workspace}>
@@ -379,21 +410,19 @@ export function App() {
           {page === "Profile" ? (
             <Account
               me={me}
-              auth={bootstrap?.auth}
-              unavailable={connection === "unavailable"}
-              onRetry={retry}
               onChange={changeMe}
+              onSignedOut={signedOut}
               heading={heading}
             />
           ) : page === "Admin" ? (
             <Admin me={me} heading={heading} />
-          ) : page === "Decks" && deckRoute.deck && me ? (
+          ) : page === "Decks" && deckRoute.deck ? (
             <DeckEditor
               key={deckRoute.deck}
               deckId={deckRoute.deck}
               heading={heading}
             />
-          ) : page === "Decks" && deckRoute.shared && me ? (
+          ) : page === "Decks" && deckRoute.shared ? (
             <SharedDeck
               key={deckRoute.shared}
               code={deckRoute.shared}
