@@ -730,16 +730,67 @@ class LibraryGrant(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "grant_key", "concept_id"),
         CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
-        CheckConstraint("source IN ('starter', 'grandfathered')", name="ck_library_grants_source"),
+        CheckConstraint(
+            "source IN ('starter', 'grandfathered', 'pack')", name="ck_library_grants_source"
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
     quantity: Mapped[int]
     source: Mapped[str] = mapped_column(String(16))
-    # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1.
+    # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,
+    # pack:<opening>.
     grant_key: Mapped[str] = mapped_column(String(96))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class TokenEntry(Base):
+    """The economy ledger (PROG03, v0.4.0): tokens paid for wins, each from a committed result,
+    the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought.
+    Append-only: PostgreSQL refuses updates and deletes. A balance is the sum of its entries."""
+
+    __tablename__ = "token_ledger"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack')",
+            name="ck_token_ledger_kind",
+        ),
+        CheckConstraint(
+            "(kind IN ('bot_win', 'human_win', 'back_pay')) = (game_id IS NOT NULL)",
+            name="ck_token_ledger_game",
+        ),
+        CheckConstraint("kind IN ('grant', 'pack') OR amount >= 0", name="ck_token_ledger_earned"),
+        CheckConstraint("kind != 'pack' OR amount <= 0", name="ck_token_ledger_spent"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))
+    # Tokens in (earned, given) or out (spent, taken back); 0 for a win past a limit.
+    amount: Mapped[int] = mapped_column(BigInteger)
+    # Unique per fact, so retries and replays write nothing twice: tokens:<game>:<seat>:<beaten
+    # seat>, welcome:<account>, grant:<id>, pack:<opening>.
+    key: Mapped[str] = mapped_column(String(128), unique=True)
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"), index=True)
+    # The seat beaten, and its player when a human sat there.
+    opponent_seat: Mapped[int | None] = mapped_column(SmallInteger)
+    opponent_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    # The rule an entry was paid under, recorded with it (PROG05).
+    policy: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class SiteSetting(Base):
+    """A setting SysOp changes in Administration (v0.4.0: the daily cap on bot tokens). Each
+    change is audited."""
+
+    __tablename__ = "site_settings"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[object | None] = mapped_column(JsonType)
+    updated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
 class CustomCard(Base):

@@ -285,6 +285,11 @@ def new_account(
         raise ApiError(
             409, "sign_in_conflict", "This account is signing in elsewhere. Try again."
         ) from None
+    # Every new account starts with the welcome grant (v0.4.0). Imported here: the economy's
+    # routes use this module's error responses.
+    from api.economy import welcome
+
+    welcome(db, user)
     return user, identity
 
 

@@ -90,6 +90,7 @@ function user(
     wins: 0,
     tier: "bronze",
     alliance: null,
+    tokens: 0,
     ...fields,
   };
 }

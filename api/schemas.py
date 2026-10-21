@@ -129,6 +129,7 @@ Permission = Literal[
     "library.unlimited",
     "progress.manage",
     "custom_cards.manage",
+    "economy.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled"]
@@ -223,6 +224,7 @@ class AdminUser(Contract):
     wins: int = 0
     tier: Literal["bronze", "silver", "gold", "platinum", "mythic", "godlike"] = "bronze"
     alliance: str | None = None
+    tokens: int = Field(default=0, description="The account's token balance (v0.4.0).")
 
 
 class UserPage(Contract):
@@ -350,6 +352,10 @@ class GameSummary(Contract):
     created_at: datetime
     finished_at: datetime | None
     result: GameResult | None
+    tokens: int | None = Field(
+        default=None,
+        description="Tokens the game paid you (v0.4.0); null while it runs or without a seat.",
+    )
 
 
 class GameState(Contract):

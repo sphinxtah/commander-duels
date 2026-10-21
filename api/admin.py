@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.auth import ERRORS
+from api.economy import balance_of
 from api.identity import (
     ROLE_PERMISSIONS,
     ApiError,
@@ -94,6 +95,7 @@ def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
         wins=wins,
         tier=tier,
         alliance=user.alliance,
+        tokens=balance_of(db, user.id),
     )
 
 

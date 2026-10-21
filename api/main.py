@@ -11,7 +11,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
-from api import admin, auth, card_images, cards, custom_cards, decks, games, progression
+from api import (
+    admin,
+    auth,
+    card_images,
+    cards,
+    custom_cards,
+    decks,
+    economy,
+    games,
+    progression,
+)
 from api.config import Settings
 from api.database import build_engine, migration_head
 from api.google import CachingTransport, GoogleVerifier
@@ -297,4 +307,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(decks.router)
     app.include_router(progression.router)
     app.include_router(custom_cards.router)
+    app.include_router(economy.router)
     return app

@@ -200,6 +200,8 @@ def test_google_sign_in_creates_one_account_with_a_private_session(app: FastAPI)
     assert me["roles"] == ["player"]
     assert me["permissions"] == ["decks.edit", "games.play", "profile.edit"]
     assert "1001" not in response.text  # the Google subject is never returned
+    # Every new account starts with the welcome grant of tokens (v0.4.0).
+    assert client.get("/api/v1/me/tokens").json()["balance"] == 1_000
     cookie = next(
         value for value in response.headers.get_list("set-cookie") if "cd_session=" in value
     )

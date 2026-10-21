@@ -43,6 +43,7 @@ from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.decklists import parse_deck_list
 from api.decks import publish, revision_entries, starters_of
+from api.economy import pay_game, tokens_from
 from api.identity import (
     SESSION_COOKIE,
     ApiError,
@@ -625,7 +626,8 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
 
 def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, Any] | None) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
-    won it (api/progression.py), so a result is never recorded without its win, or twice."""
+    won it (api/progression.py) and the tokens it pays (api/economy.py), so a result is never
+    recorded without its win and its pay, or twice."""
     with Session(database) as db:
         game = db.get(Game, game_id)
         if game is not None and game.status == "active":
@@ -635,6 +637,7 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             game.result = {key: result.get(key) for key in RESULT_FIELDS} if result else None
             db.flush()
             count_win(db, game)
+            pay_game(db, game)
             db.commit()
 
 
@@ -683,6 +686,11 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
         created_at=game.created_at,
         finished_at=game.finished_at,
         result=GameResult.model_validate(game.result) if game.result else None,
+        tokens=(
+            tokens_from(db, game.id, principal.user.id)
+            if your_seat is not None and game.status == "finished"
+            else None
+        ),
     )
 
 

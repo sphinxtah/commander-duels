@@ -165,6 +165,7 @@ def client(url: str, content: Path, engine: FakeEngine):
         with Session(app.state.database) as db:
             db.execute(text("DELETE FROM custom_cards"))
             db.execute(text("DELETE FROM progress_ledger"))
+            db.execute(text("DELETE FROM token_ledger"))
             db.execute(text("DELETE FROM game_seats"))
             db.execute(text("DELETE FROM games"))
             for table in ACCOUNT_TABLES:

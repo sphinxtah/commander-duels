@@ -28,6 +28,8 @@ from api.models import CardConcept, CardPrinting, RoleGrant, User, UserSession
 
 # Tables a test empties after itself, children first; the catalog stays.
 ACCOUNT_TABLES = (
+    "token_ledger",
+    "site_settings",
     "library_grants",
     "progress_ledger",
     "deck_entries",

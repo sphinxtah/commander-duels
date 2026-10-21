@@ -101,6 +101,19 @@ def test_migrations_and_append_only_audit_trail(monkeypatch):
         for statement in ("UPDATE progress_ledger SET wins = 9", "DELETE FROM progress_ledger"):
             with pytest.raises(DBAPIError, match="append-only"), engine.begin() as connection:
                 connection.execute(text(statement))
+        # So is the economy ledger (v0.4.0): tokens once paid or spent stay recorded.
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO token_ledger (id, user_id, kind, amount, key, policy, "
+                    "created_at) VALUES (:id, :user, 'welcome', 1000, 'welcome:test', "
+                    "'tokens-v1', now())"
+                ),
+                {"id": uuid4(), "user": player},
+            )
+        for statement in ("UPDATE token_ledger SET amount = 9", "DELETE FROM token_ledger"):
+            with pytest.raises(DBAPIError, match="append-only"), engine.begin() as connection:
+                connection.execute(text(statement))
         # SysOp is unique; a second root account is refused by the database itself.
         with pytest.raises(IntegrityError), engine.begin() as connection:
             for handle in ("sysop", "sysop2"):

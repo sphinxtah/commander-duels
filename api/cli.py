@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from api.config import Settings
 from api.database import build_engine
+from api.economy import welcome
 from api.identity import revoke_sessions, utcnow
 from api.models import AuditEvent, User
 from api.passwords import MIN_LENGTH, hash_password
@@ -58,8 +59,10 @@ def set_sysop_password(database_url: str, password: str) -> bool:
             sysop.password_hash = password_hash
             sysop.updated_at = now
             db.flush()
-            # SysOp starts at 100,000 wins (v0.3.1), so every tier is open to it.
+            # SysOp starts at 100,000 wins (v0.3.1), so every tier is open to it, and with the
+            # welcome grant of tokens every account gets (v0.4.0).
             sysop_start(db, sysop)
+            welcome(db, sysop)
             revoke_sessions(db, sysop.id, "password_set")
             db.add(
                 AuditEvent(

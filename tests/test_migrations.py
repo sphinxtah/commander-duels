@@ -19,6 +19,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "alembic_version",
         "users",
         "progress_ledger",
+        "token_ledger",
+        "site_settings",
         "library_grants",
         "custom_cards",
         "external_identities",
