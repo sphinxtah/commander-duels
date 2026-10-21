@@ -124,6 +124,7 @@ export function deckDetail(fields: Partial<DeckDetail> = {}): DeckDetail {
     card_count: 0,
     legal: true,
     playable: true,
+    collection_locked: false,
     identity: "R",
     commanders: [],
     latest_revision: null,

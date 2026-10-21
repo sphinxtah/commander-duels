@@ -14,7 +14,7 @@ What it proves:
 What it does not prove:
 - Anything about a browser client, sign-in or seat ownership.
 - Recovery, timers, multiplayer, or prompt families the fixture decks never reach.
-- That the bot plays fairly. The bot still searches a full copy of the game state, including the human's hand (AI02, unchanged).
+- That the bot plays fairly. The bot still searched a full copy of the game state, including the human's hand (AI02; fixed in v0.3.1, see [fair bots](fair-bots.md)).
 
 ## How a prompt works
 
@@ -172,7 +172,7 @@ Results:
 
 ## Open items
 
-- **AI hidden information (AI02).** The bot's search reads the human's hand. Its own backlog row.
+- **AI hidden information (AI02).** The bot's search read the human's hand. Fixed in v0.3.1 ([fair bots](fair-bots.md)).
 - **Recovery.** Journals, snapshots, reconnect and worker fencing (NET08–10).
 - **Seats.** The human is always seat 0, with no seat ownership, sign-in or controller lease. FastAPI does not route game actions yet.
 - **Timers.** No timers or clocks (NET11–12). Configurable stops and pass modes arrived in v0.2.0 (UI07).

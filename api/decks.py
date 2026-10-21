@@ -79,6 +79,9 @@ class DeckSummary(Contract):
     card_count: int
     legal: bool
     playable: bool
+    collection_locked: bool = Field(
+        description="Legal, but the player's library holds too few copies of a card (v0.3.1)."
+    )
     # The commanders' color identity, or the deck's colors in Legacy, as letters.
     identity: str
     commanders: list[str]
@@ -264,6 +267,10 @@ def identity_of(db: Session, fmt: str, entries: list[DeckEntry]) -> str:
     return "".join(colors_of(bits))
 
 
+def locked(validation: Validation) -> bool:
+    return any(problem.kind == "collection_locked" for problem in validation.errors)
+
+
 def store_draft(
     db: Session, deck: Deck, entries: list[DeckEntry], library: Library | None
 ) -> Validation:
@@ -280,6 +287,7 @@ def store_draft(
     deck.card_count = counts.main + counts.commander
     deck.legal = validation.legal
     deck.playable = validation.playable
+    deck.collection_locked = locked(validation)
     deck.identity = identity_of(db, deck.format, clean)
     deck.updated_at = now()
     return validation
@@ -303,6 +311,7 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
         card_count=deck.card_count,
         legal=deck.legal,
         playable=deck.playable,
+        collection_locked=deck.collection_locked,
         identity=deck.identity,
         commanders=commanders_of(db, entries_of(deck)),
         latest_revision=deck.latest_revision,
@@ -405,6 +414,7 @@ def refresh_decks(db: Session, user_id: UUID, library: Library) -> None:
             library.collection(),
         )
         deck.legal, deck.playable = validation.legal, validation.playable
+        deck.collection_locked = locked(validation)
 
 
 def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:

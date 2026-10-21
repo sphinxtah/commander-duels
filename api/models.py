@@ -643,6 +643,8 @@ class Deck(Base):
     card_count: Mapped[int] = mapped_column(default=0)
     legal: Mapped[bool] = mapped_column(default=False)
     playable: Mapped[bool] = mapped_column(default=False)
+    # Legal, but the owner's library holds too few copies of a card (v0.3.1).
+    collection_locked: Mapped[bool] = mapped_column(default=False)
     identity: Mapped[str] = mapped_column(String(8), default="")
     latest_revision: Mapped[int | None]
     # How it began: empty, imported, duplicated, starter or guided.

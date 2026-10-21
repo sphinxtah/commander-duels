@@ -12,7 +12,7 @@ What it proves:
 What it does not prove:
 - Anything about a browser client, sign-in, seat ownership or lobbies.
 - Recovery, timers, Two-Headed Giant ([the feasibility note](two-headed-giant.md)), or choices too long to offer (naming a card).
-- That the bots play fairly: they still search a full copy of the game, including every human's hand (AI02).
+- That the bots play fairly: they still searched a full copy of the game, including every human's hand (AI02). Fixed in v0.3.1: each search re-deals what the bot's seat cannot see ([fair bots](fair-bots.md)).
 
 ## Tables
 
@@ -150,7 +150,7 @@ Results are in [the release notes](../releases/0.0.4.md) and [verification](../v
 ## Open items
 
 - **Two-Headed Giant (FMT08–FMT10).** See [the feasibility note](two-headed-giant.md).
-- **AI hidden information (AI02).** Unchanged.
+- **AI hidden information (AI02).** Unchanged here; fixed in v0.3.1 ([fair bots](fair-bots.md)).
 - **Lobbies and settings.** Readiness (NET02–NET03) and Rule Zero settings (FMT03–FMT04) are not built.
 - **Prompt families.** Only choices longer than 64 entries (naming a card) are still `unsupported`.
 - **Spectator delay.** Delay is in seconds. Delays counted in turns, and replays (NET14), are later work.

@@ -13,7 +13,6 @@ import { GuidedDialog } from "./GuidedDialog";
 import { ImportDialog } from "./ImportDialog";
 import { LockIcon } from "./ProblemList";
 import {
-  collectionLocked,
   type DeckEntry,
   type DeckFormat,
   type DeckSummary,
@@ -39,39 +38,6 @@ function StateBadge({ state }: { state: DeckState }) {
       {stateWords[state]}
     </span>
   );
-}
-
-/**
- * The listed decks that the player's library holds back (DECK08). A deck's summary says only
- * whether it is legal and playable, and a legal deck may fail to play for two reasons: cards the
- * engine cannot play yet, or more copies than the library holds. So each legal deck that cannot
- * play is asked for its validation, to tell the two apart; until it answers, the deck shows as
- * legal and not playable yet.
- */
-function useLockedDecks(decks: DeckSummary[] | undefined): Set<string> {
-  const [locked, setLocked] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    let active = true;
-    const held = (decks ?? []).filter((deck) => deck.legal && !deck.playable);
-    void Promise.all(
-      held.map((deck) =>
-        client
-          .GET("/api/v1/decks/{deck_id}", {
-            params: { path: { deck_id: deck.id } },
-          })
-          .then(({ data }) =>
-            data && collectionLocked(data.validation) ? deck.id : null,
-          ),
-      ),
-    ).then((found) => {
-      if (active)
-        setLocked(new Set(found.filter((id): id is string => id !== null)));
-    });
-    return () => {
-      active = false;
-    };
-  }, [decks]);
-  return locked;
 }
 
 export function IdentityPips({ identity }: { identity: string }) {
@@ -165,8 +131,6 @@ function Decks({
 }) {
   const [view, setView] = useState<View>("active");
   const [decks, setDecks] = useState<DeckSummary[]>();
-  // Trashed decks cannot be opened, so they are not asked for.
-  const locked = useLockedDecks(view === "trash" ? undefined : decks);
   const [starters, setStarters] = useState<StarterDeck[]>([]);
   const [message, setMessage] = useState("");
   const [title, setTitle] = useState("");
@@ -340,7 +304,7 @@ function Decks({
                 state={
                   deck.playable
                     ? "playable"
-                    : locked.has(deck.id)
+                    : deck.collection_locked
                       ? "locked"
                       : deck.legal
                         ? "legal"

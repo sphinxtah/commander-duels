@@ -67,7 +67,9 @@ Refusals:
 | `GET /api/v1/games/{id}/inspection` | SysOp (`games.view_concealed`) | The inspection view, below |
 | `GET /api/v1/engine/cards?q=` | SysOp (`cards.any`) | Up to 50 card names the engine implements, for deck lists. It was `GET /api/v1/cards` until v0.2.0, which gave that path to [the card catalog](catalog.md#search-deck03-deck04) |
 
-Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle. A seat's deck is shown only to that seat's owner, and to SysOp.
+Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp.
+
+Since v0.3.1 the transaction that records a finished game also counts its win, when a player's seat won it: one entry in the progression ledger, never two ([the Planeswalker Alliance](progression.md#wins-and-levels)).
 
 ## The WebSocket
 
@@ -189,6 +191,8 @@ A short database outage cannot leave a game active and its owner blocked (since 
 | `CD_ENGINE_SERVICE_TOKEN` | Empty: games are off. API and engine; at least 32 characters. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and put it in `.env` |
 | `CD_GAMES_PER_ACCOUNT` | 1 (1–8); SysOp is not limited |
 | `CD_GAMES_MAX` | 2 (1–8): games the API runs at once |
+| `CD_BOT_DECKS` | `starters` (v0.3.1): Commander bots with no deck chosen play the ten starter decks, a different one each. `fixtures` keeps them on the engine's fixture decks, as CI's browser game journeys need |
+| `CD_CONTENT_DIR` | `content` (v0.3.1): the Planeswalker roster and the starter decks; the API image holds a copy in `/app/content` |
 | `CD_DB_PORT` | Compose only: PostgreSQL's host port, default 5432. Set another (this computer uses 15432) when Windows reserves 5432 |
 
 ## Verification

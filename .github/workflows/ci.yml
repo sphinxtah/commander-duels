@@ -96,6 +96,7 @@ jobs:
           echo "::add-mask::$token"
           echo "::add-mask::$password"
           export CD_ENGINE_SERVICE_TOKEN="$token"
+          export CD_BOT_DECKS=fixtures
           docker compose build migrate api
           docker compose up -d --wait --no-build db migrate api engine
           printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin
@@ -122,6 +123,9 @@ jobs:
           echo "::add-mask::$token"
           echo "::add-mask::$password"
           export CD_ENGINE_SERVICE_TOKEN="$token"
+          # The leak checks tell concealed cards apart by name, so the bots keep the engine's
+          # fixture decks, whose card names are unique to each deck.
+          export CD_BOT_DECKS=fixtures
           docker compose build migrate api web
           docker compose up -d --wait --no-build db migrate api engine web
           printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin

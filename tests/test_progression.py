@@ -270,7 +270,7 @@ def test_players_build_from_their_library(client, engine):
     deck = ada.send(
         "POST", "/api/v1/decks", {"title": "Burn", "format": "legacy", "entries": burn}
     ).json()
-    assert deck["legal"] is True and deck["playable"] is False
+    assert deck["legal"] is True and deck["playable"] is False and deck["collection_locked"]
     (problem,) = deck["validation"]["errors"]
     assert (problem["code"], problem["kind"], problem["quantity"]) == (
         "collection.locked",
@@ -291,6 +291,8 @@ def test_players_build_from_their_library(client, engine):
         "PUT", f"/api/v1/decks/{deck['id']}/draft", {"version": 1, "entries": fixed}
     ).json()
     assert saved["validation"]["playable"] is True
+    listed = {item["id"]: item for item in ada.get("/api/v1/decks").json()}
+    assert listed[deck["id"]]["collection_locked"] is False
     started = ada.send(
         "POST", "/api/v1/practice-games", {"format": "legacy", "deck_id": deck["id"]}
     )
@@ -360,6 +362,7 @@ def test_alliances_open_by_tier_and_bring_their_cards(client):
     assert left["alliance"] is None
     listed = {item["id"]: item for item in ada.get("/api/v1/decks").json()}
     assert listed[deck["id"]]["playable"] is False and listed[deck["id"]]["legal"] is True
+    assert listed[deck["id"]]["collection_locked"] is True
     done = [action for action, _ in actions(client)]
     assert "alliance.joined" in done and "alliance.left" in done
 

@@ -1763,6 +1763,11 @@ export interface components {
             cards: {
                 [key: string]: components["schemas"]["CardSummary"];
             };
+            /**
+             * Collection Locked
+             * @description Legal, but the player's library holds too few copies of a card (v0.3.1).
+             */
+            collection_locked: boolean;
             /** Commanders */
             commanders: string[];
             /** Deleted At */
@@ -1845,6 +1850,11 @@ export interface components {
             archived: boolean;
             /** Card Count */
             card_count: number;
+            /**
+             * Collection Locked
+             * @description Legal, but the player's library holds too few copies of a card (v0.3.1).
+             */
+            collection_locked: boolean;
             /** Commanders */
             commanders: string[];
             /** Deleted At */

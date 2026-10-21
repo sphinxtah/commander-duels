@@ -43,6 +43,10 @@ def upgrade() -> None:
         users.create_check_constraint(
             "ck_users_onboarding", "onboarding IN ('handle', 'starters', 'complete')"
         )
+    with op.batch_alter_table("decks") as decks:
+        decks.add_column(
+            sa.Column("collection_locked", sa.Boolean(), nullable=False, server_default=sa.false())
+        )
 
     op.create_table(
         "progress_ledger",
@@ -286,6 +290,8 @@ def downgrade() -> None:
     op.drop_table("library_grants")
     op.drop_index("ix_progress_ledger_user_id", "progress_ledger")
     op.drop_table("progress_ledger")
+    with op.batch_alter_table("decks") as decks_table:
+        decks_table.drop_column("collection_locked")
     with op.batch_alter_table("users") as users_table:
         users_table.drop_constraint("ck_users_onboarding", type_="check")
         users_table.create_check_constraint(

@@ -266,6 +266,7 @@ describe("the decks page", () => {
       id: "deck-locked",
       title: "Borrowed Elves",
       playable: false,
+      collection_locked: true,
     };
     const unsupported = {
       ...summary,
@@ -277,45 +278,18 @@ describe("the decks page", () => {
       reply(200, [summary, locked, unsupported]),
     );
     api.on("GET /api/v1/decks/starters", () => reply(200, []));
-    api.on("GET /api/v1/decks/{deck_id}", () =>
-      reply(
-        200,
-        deckDetail({
-          id: asked(api),
-          validation: validation({
-            playable: false,
-            errors: [
-              asked(api) === "deck-locked"
-                ? problem()
-                : problem({
-                    code: "card.not_implemented",
-                    kind: "not_implemented",
-                  }),
-            ],
-          }),
-        }),
-      ),
-    );
     render(<DecksPage me={player} heading={createRef()} />);
     const row = (name: string) =>
       screen.getByRole("link", { name }).closest("li")!;
     await screen.findByRole("link", { name: "Borrowed Elves" });
-    await waitFor(() =>
-      expect(row("Borrowed Elves")).toHaveTextContent(
-        "Needs cards you don't own",
-      ),
+    expect(row("Borrowed Elves")).toHaveTextContent(
+      "Needs cards you don't own",
     );
     expect(row("Odd Wizards")).toHaveTextContent("Legal, not playable yet");
     expect(row("Mono-Red Burn")).toHaveTextContent("Ready to play");
-    // Only the two that cannot play were asked about.
+    // The list says so itself (collection_locked): no deck is asked for.
     expect(
-      api.calls
-        .filter((call) => call.route === "GET /api/v1/decks/{deck_id}")
-        .map(
-          (call) =>
-            (call.options as { params: { path: { deck_id: string } } }).params
-              .path.deck_id,
-        ),
-    ).toEqual(["deck-locked", "deck-engine"]);
+      api.calls.filter((call) => call.route === "GET /api/v1/decks/{deck_id}"),
+    ).toEqual([]);
   });
 });

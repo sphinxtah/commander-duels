@@ -91,7 +91,7 @@ An unknown key or a malformed term is refused with a message that says what was 
 
 | Route | Who | |
 | --- | --- | --- |
-| `GET /api/v1/cards` | signed-in players | Search |
+| `GET /api/v1/cards` | signed-in players | Search. Since v0.3.1 each card carries `owned`, the copies in the player's library (null when not limited), and `owned=true` keeps to the library ([the Planeswalker Alliance](progression.md#the-library)) |
 | `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags, status and newest 60 printings; `?printing=<id>` also lists that printing of the card when it is older (since v0.3.0, for a deck entry's chosen printing) |
 | `GET /api/v1/cards/{id}/printings` | signed-in players | Its English printings, newest first |
 | `GET /api/v1/sets` | signed-in players | Sets, for the set filter |
@@ -102,7 +102,7 @@ An unknown key or a malformed term is refused with a message that says what was 
 | `GET /api/v1/admin/catalog/reviews` | `catalog.manage` | Cards to review, and suspended cards |
 | `POST /api/v1/admin/catalog/cards/{id}/review` | `catalog.manage` | Accept, suspend or restore a card (audited) |
 
-`catalog.manage` belongs to administrators and SysOp. Card images for catalog printings come through the API's image cache at `GET /api/v1/card-images/printings/{id}`, so the browser still makes no request to Scryfall ([the game screen](game-screen.md#cards)).
+`catalog.manage` belongs to administrators and SysOp. The Godlike tier's custom cards (v0.3.1) are not part of the catalog: they live in a table of their own, which no route above reads ([the custom cards](progression.md#the-godlike-tiers-custom-cards)). Card images for catalog printings come through the API's image cache at `GET /api/v1/card-images/printings/{id}`, so the browser still makes no request to Scryfall ([the game screen](game-screen.md#cards)).
 
 ## On screen
 

@@ -1767,6 +1767,11 @@
             "title": "Cards",
             "type": "object"
           },
+          "collection_locked": {
+            "description": "Legal, but the player's library holds too few copies of a card (v0.3.1).",
+            "title": "Collection Locked",
+            "type": "boolean"
+          },
           "commanders": {
             "items": {
               "type": "string"
@@ -1880,6 +1885,7 @@
           "card_count",
           "legal",
           "playable",
+          "collection_locked",
           "identity",
           "commanders",
           "latest_revision",
@@ -1997,6 +2003,11 @@
             "title": "Card Count",
             "type": "integer"
           },
+          "collection_locked": {
+            "description": "Legal, but the player's library holds too few copies of a card (v0.3.1).",
+            "title": "Collection Locked",
+            "type": "boolean"
+          },
           "commanders": {
             "items": {
               "type": "string"
@@ -2082,6 +2093,7 @@
           "card_count",
           "legal",
           "playable",
+          "collection_locked",
           "identity",
           "commanders",
           "latest_revision",

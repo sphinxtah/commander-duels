@@ -60,6 +60,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 - The account is keyed by issuer and Google's stable `sub`, never by email. A changed email address updates the private record, with no duplicate account.
 - Google establishes identity only (AUTH04). No Google scopes beyond the ID token's own are requested, and nothing grants roles automatically.
 - A first sign-in creates the internal UUID and an account with the Google display name. The player then chooses a unique handle: 3–20 letters, digits, hyphens or underscores, case-insensitively unique, with names such as `sysop`, `admin` and `site-administrator` reserved.
+- Since v0.3.1, onboarding has a second step: after the handle (`onboarding` goes from `handle` to `starters`) the player chooses two of the ten starter decks, and only then is it `complete` ([the starter decks](progression.md#the-starter-decks)). Players who had finished onboarding before v0.3.1 were moved back to `starters` by migration 0007.
 - Avatars are one of eight built-in symbols, so no remote image is ever fetched.
 - The profile also holds the display name, locale, onboarding state and the accessibility preferences, which follow the account across devices.
 - Email and the Google subject are private:
@@ -134,6 +135,9 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `admin.roles.administrator` |  |  |  |  | ✓ |
 | `games.view_concealed` |  |  |  |  | ✓ |
 | `cards.any` |  |  |  |  | ✓ |
+| `library.unlimited` (v0.3.1: build from the whole catalog) |  |  |  | ✓ | ✓ |
+| `progress.manage` (v0.3.1: set any account's wins) |  |  |  |  | ✓ |
+| `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  |  | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, and grant or remove the moderator and content-editor roles.
@@ -147,7 +151,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 - A disabled account cannot sign in.
 
 **SysOp-only permissions.**
-- Three permissions belong to SysOp alone, and no role can be granted them: `admin.roles.administrator`, `games.view_concealed` and `cards.any`.
+- Five permissions belong to SysOp alone, and no role can be granted them: `admin.roles.administrator`, `games.view_concealed`, `cards.any`, and since v0.3.1 `progress.manage` and `custom_cards.manage`.
 - The last two took effect in v0.0.6 ([games through the API](games.md#sysops-powers)):
   - **Inspection.** SysOp's view of every hand and library, in any running game, audited at every opening.
   - **Any card.** Deck lists naming any card in the engine's card database, on SysOp's practice games.

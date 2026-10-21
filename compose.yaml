@@ -38,6 +38,9 @@ services:
       # Scryfall's bulk files for the card catalog, in the worker's catalog_data volume. The worker
       # imports them on its first start and then daily.
       CD_CATALOG_DIR: /var/lib/commander-duels/catalog
+      # What Commander bots play when no deck is chosen for them (v0.3.1): the ten starter decks,
+      # or "fixtures", the engine's test decks, which CI's browser game journeys need.
+      CD_BOT_DECKS: ${CD_BOT_DECKS:-starters}
     command: ["alembic", "upgrade", "head"]
     depends_on:
       db: {condition: service_healthy}

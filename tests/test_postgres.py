@@ -81,6 +81,26 @@ def test_migrations_and_append_only_audit_trail(monkeypatch):
             assert connection.execute(text("SELECT action FROM audit_events")).scalar() == (
                 "test.event"
             )
+        # The progression ledger (v0.3.1) is append-only too: a win, once counted, stays.
+        player = uuid4()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, normalized_handle, created_at, kind) "
+                    "VALUES (:id, 'ada', now(), 'player')"
+                ),
+                {"id": player},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO progress_ledger (id, user_id, kind, wins, key, policy, "
+                    "created_at) VALUES (:id, :user, 'wins_set', 5, 'set:test', 'wins-v1', now())"
+                ),
+                {"id": uuid4(), "user": player},
+            )
+        for statement in ("UPDATE progress_ledger SET wins = 9", "DELETE FROM progress_ledger"):
+            with pytest.raises(DBAPIError, match="append-only"), engine.begin() as connection:
+                connection.execute(text(statement))
         # SysOp is unique; a second root account is refused by the database itself.
         with pytest.raises(IntegrityError), engine.begin() as connection:
             for handle in ("sysop", "sysop2"):
