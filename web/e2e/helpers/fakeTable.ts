@@ -10,7 +10,9 @@ import type { TableSettings } from "../../src/game/table/types";
 // The fake table (design §24.2): the game screen on Vite's dev server with no engine. The page's
 // account, the game's summary and the card images are answered here, and the game's WebSocket
 // is a fake server that greets the tab, gives it the seat and sends a snapshot built from the
-// table fixtures (src/game/table/fixtures.ts), recording every command the tab sends.
+// table fixtures (src/game/table/fixtures.ts), recording every command the tab sends. The
+// Planeswalker portraits (v0.3.1) are the real files Vite serves from web/public/portraits: the
+// summary gives Alice, the fixtures' one human, Rowan's, unless a journey says otherwise.
 
 /** A plain stand-in card picture: no card art. */
 const CARD = readFileSync(new URL("./card.jpg", import.meta.url));
@@ -49,12 +51,18 @@ function gameId(): string {
   return `00000000-0000-4000-8000-${String(games).padStart(12, "0")}`;
 }
 
-/** Opens the game screen on a fixture, signed in as an active SysOp. */
+/** The portrait the fake summary gives the fixtures' own player, Alice (seat 0). */
+export const ALICE_PORTRAIT = "rowan";
+
+/** Opens the game screen on a fixture, signed in as an active SysOp. `portraits` sets the
+ * summary's portrait of each seat it names (a human's allied Planeswalker, or null for none);
+ * Alice has Rowan's unless it says otherwise. */
 export async function openTable(
   page: Page,
   options: {
     fixture: FixtureName | TableFixture;
     settings?: Partial<TableSettings>;
+    portraits?: Record<number, string | null>;
   },
 ): Promise<FakeTable> {
   const fixture =
@@ -63,6 +71,15 @@ export async function openTable(
       : options.fixture;
   const id = gameId();
   fixture.snapshot.game_id = id;
+  const portraits: Record<number, string | null> = {
+    0: ALICE_PORTRAIT,
+    ...options.portraits,
+  };
+  const seats = fixture.summarySeats.map((seat) =>
+    seat.player === "human" && seat.seat in portraits
+      ? { ...seat, portrait: portraits[seat.seat] }
+      : seat,
+  );
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`page error: ${error.message}`));
   page.on("console", (message) => {
@@ -76,7 +93,6 @@ export async function openTable(
   await page.addInitScript(
     (settings) => {
       localStorage.setItem("cd.table.v1", JSON.stringify(settings));
-      sessionStorage.setItem("cd.ai-notice", "1");
       const seen: string[] = [];
       (window as unknown as { __csp: string[] }).__csp = seen;
       document.addEventListener("securitypolicyviolation", (event) =>
@@ -133,6 +149,9 @@ export async function openTable(
         onboarding: "complete",
         display_name: "Alice",
         handle: fixture.selfHandle ?? "alice",
+        // The account's alliance: its portrait at its own seat until the summary says.
+        alliance:
+          fixture.seat === null ? null : (portraits[fixture.seat] ?? null),
         email: null,
         avatar: "sigil",
         locale: "en",
@@ -167,7 +186,7 @@ export async function openTable(
           created_at: "2026-10-20T00:00:00Z",
           finished_at: null,
           result: null,
-          seats: fixture.summarySeats,
+          seats,
           your_seat: fixture.seat,
         },
         snapshot: null,

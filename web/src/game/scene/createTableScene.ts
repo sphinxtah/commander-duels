@@ -1,4 +1,5 @@
 import { HAND, PLANE } from "../table/geometry";
+import { isPortraitId, portraitUrl } from "../table/portrait";
 import { sigilSpec } from "../table/sigil";
 import type {
   CardNode as Placed,
@@ -31,6 +32,7 @@ import {
   stone,
   textFrame,
 } from "./art";
+import { drawPortrait } from "./drawPortrait";
 import { drawSigil } from "./drawSigil";
 import { diamondPath } from "./icons";
 import { BandNode } from "./nodes/BandNode";
@@ -112,9 +114,15 @@ export interface SceneKit {
   waitForFrame(node: CardNode): void;
   fadeImage(node: CardNode): void;
   sigil(seed: string, grey: boolean): Texture;
+  /** A Planeswalker's portrait for a player's diamond (v0.3.1): its texture once it has loaded,
+   * "loading" while it is on its way, or "missing" when there is none to show and the sigil
+   * stands in. The diamonds are drawn again when one arrives. */
+  portrait(id: string, size: 256 | 512, grey: boolean): Texture | PortraitState;
   /** Asks for a frame to be drawn. */
   request(): void;
 }
+
+export type PortraitState = "loading" | "missing";
 
 /** A picture's look, independent of where its pose's pivot is: centre, height, turn, opacity. */
 interface Visual {
@@ -164,6 +172,8 @@ const IDLE = new Set(["breath"]);
 const NO_EVENTS: TableDiff = { baseline: false, events: [] };
 const BAND_Y = 510;
 const NUDGE = 16;
+/** How long a portrait may take to arrive before the sigil stands in for good. */
+const PORTRAIT_WAIT_MS = 10_000;
 const FONT_NAME = "cd-bold";
 let fontInstalled = false;
 
@@ -297,6 +307,14 @@ class PixiTableScene implements TableScene {
   private readonly backCanvas: HTMLCanvasElement;
   private readonly kit: SceneKit;
   private readonly sigils = new Map<string, Texture>();
+  /** The Planeswalker portraits asked for, by id, size and greyness: each a texture, still
+   * "loading", or "missing" (no file, not a picture, or too slow). Kept while the scene lives:
+   * a table shows at most four. */
+  private readonly portraitPictures = new Map<
+    string,
+    Texture | PortraitState
+  >();
+  private readonly portraitLoads = new Set<AbortController>();
   private fit: StageFit;
   private motion: MotionLevel;
   private state: SceneStatus = {
@@ -451,6 +469,7 @@ class PixiTableScene implements TableScene {
         }
       },
       sigil: (seed, grey) => scene.sigil(seed, grey),
+      portrait: (id, size, grey) => scene.portrait(id, size, grey),
       request: () => scene.requestFrame(),
     };
 
@@ -562,6 +581,8 @@ class PixiTableScene implements TableScene {
     this.destroyed = true;
     // Stop asking for images, stop drawing, stop listening; then let go of the GPU.
     this.textures.stop();
+    for (const load of this.portraitLoads) load.abort();
+    this.portraitLoads.clear();
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     clearTimeout(this.retier);
@@ -585,6 +606,9 @@ class PixiTableScene implements TableScene {
     for (const texture of [...Object.values(this.art), ...this.sigils.values()])
       texture.destroy(true);
     this.sigils.clear();
+    for (const picture of this.portraitPictures.values())
+      if (typeof picture !== "string") picture.destroy(true);
+    this.portraitPictures.clear();
     this.listeners.clear();
   }
 
@@ -1864,6 +1888,78 @@ class PixiTableScene implements TableScene {
     return texture;
   }
 
+  private portrait(
+    id: string,
+    size: 256 | 512,
+    grey: boolean,
+  ): Texture | PortraitState {
+    if (!isPortraitId(id)) return "missing";
+    const key = `${id}|${size}|${grey}`;
+    let state = this.portraitPictures.get(key);
+    if (state === undefined) {
+      state = "loading";
+      this.portraitPictures.set(key, state);
+      void this.loadPortrait(key, portraitUrl(id, size), grey);
+    }
+    if (typeof state !== "string") return state;
+    // While a sharper size is on its way after a resize, or if it never comes, the size already
+    // here stays: a diamond does not empty itself.
+    const other = this.portraitPictures.get(
+      `${id}|${size === 256 ? 512 : 256}|${grey}`,
+    );
+    return other !== undefined && typeof other !== "string" ? other : state;
+  }
+
+  /** Fetches and decodes a portrait, then draws the diamonds again. One that is missing, is no
+   * picture (a missing file may come back as the app's page) or takes longer than
+   * PORTRAIT_WAIT_MS leaves the sigil. */
+  private async loadPortrait(
+    key: string,
+    url: string,
+    grey: boolean,
+  ): Promise<void> {
+    const abort = new AbortController();
+    this.portraitLoads.add(abort);
+    const timer = setTimeout(() => abort.abort(), PORTRAIT_WAIT_MS);
+    let texture: Texture | null = null;
+    try {
+      const response = await fetch(url, {
+        credentials: "same-origin",
+        signal: abort.signal,
+      });
+      if (response.ok) {
+        const bitmap = await createImageBitmap(await response.blob());
+        try {
+          if (!this.destroyed && !abort.signal.aborted)
+            texture = new Texture({
+              source: new CanvasSource({
+                resource: drawPortrait(bitmap, grey),
+                autoGenerateMipmaps: this.webgl2,
+                scaleMode: "linear",
+              }),
+            });
+        } finally {
+          bitmap.close();
+        }
+      }
+    } catch {
+      // Missing, too slow or not a picture: the sigil stands in.
+    } finally {
+      clearTimeout(timer);
+      this.portraitLoads.delete(abort);
+    }
+    if (this.destroyed) {
+      texture?.destroy(true);
+      return;
+    }
+    this.portraitPictures.set(key, texture ?? "missing");
+    // The diamonds on screen take it now; a lost context draws them all when it comes back.
+    if (this.frame && !this.lost) {
+      this.applyPortraits(this.frame.model, this.frame.layout, this.ui.get());
+      this.requestFrame();
+    }
+  }
+
   /** Draws the site's mark onto the card back once its image has loaded. */
   private async loadMark(): Promise<void> {
     try {
@@ -1895,6 +1991,9 @@ class PixiTableScene implements TableScene {
     if (this.destroyed || this.lost) return;
     for (const [key, placed] of this.placed)
       this.cards.get(key)?.place(placed.card, placed.placement);
+    // Portraits too take the size the new resolution needs.
+    if (this.frame)
+      this.applyPortraits(this.frame.model, this.frame.layout, this.ui.get());
     this.textures.sweep();
     this.frames.sweep();
     this.requestFrame();

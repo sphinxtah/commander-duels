@@ -231,6 +231,9 @@ describe("the game screen", () => {
       });
     });
     expect(screen.getByText("Prompt A")).toBeInTheDocument();
+    // The bots plan only on what their seat may see (AI02, v0.3.1): no notice says otherwise.
+    expect(screen.queryByText(/read your hand/)).toBeNull();
+    expect(screen.queryByRole("note")).toBeNull();
 
     // Prompt B arrives, and P is pressed before React draws it: prompt A is still on screen.
     socket.deliver({ type: "snapshot", snapshot: snapshot(7, priority("B")) });

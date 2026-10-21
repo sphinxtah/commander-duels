@@ -249,6 +249,47 @@ describe("players", () => {
     expect(model(f).anchored!.sigil.seed).toBe("handle:alice");
   });
 
+  it("show a human's allied Planeswalker's portrait, never a bot's (v0.3.1)", () => {
+    expect(fixtureModel("duel").anchored!.portrait).toBeNull();
+    const f = tableFixture("duel");
+    f.summarySeats = [
+      { ...f.summarySeats[0], portrait: "rowan" },
+      { seat: 1, player: "bot", handle: null, deck: null, portrait: "jace" },
+    ];
+    let m = model(f);
+    expect(m.anchored!.portrait).toBe("rowan");
+    expect(m.opponents[0].portrait).toBeNull();
+    f.summarySeats[1] = {
+      seat: 1,
+      player: "human",
+      handle: "bob",
+      deck: null,
+      portrait: "chandra",
+    };
+    m = model(f);
+    expect(m.opponents[0].portrait).toBe("chandra");
+    // The portrait is the player's picture only: the sigil stays their fallback, grey for an
+    // opponent, and their life is still their own.
+    expect(m.opponents[0].sigil).toEqual({ seed: "handle:bob", grey: true });
+    expect(m.opponents[0].targetLabel).toContain(
+      `${m.opponents[0].player.life} life`,
+    );
+    expect(m.opponents[0].targetLabel).not.toMatch(/chandra|loyalty/i);
+  });
+
+  it("take your own portrait from your account until the summary arrives", () => {
+    const f = tableFixture("duel");
+    const input = { ...fixtureInput(f), selfPortrait: "rowan" };
+    input.summarySeats = null;
+    let m = buildTableModel(input);
+    expect(m.anchored!.portrait).toBe("rowan");
+    expect(m.opponents[0].portrait).toBeNull();
+    // Once it has, the summary says: here, no alliance.
+    input.summarySeats = f.summarySeats;
+    m = buildTableModel(input);
+    expect(m.anchored!.portrait).toBeNull();
+  });
+
   it("title you with your deck, others Bot or Player, and deck names only for SysOp", () => {
     const f = tableFixture("duel");
     // Even if a summary named another seat's deck, only SysOp may see it (§23.4).

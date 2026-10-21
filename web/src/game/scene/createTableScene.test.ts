@@ -4,6 +4,7 @@ import {
   fixtureInput,
   tableFixture,
   type FixtureName,
+  type TableFixture,
 } from "../table/fixtures";
 import { layoutTable } from "../table/layout";
 import { stageFit } from "../table/stage";
@@ -89,10 +90,13 @@ let frameId = 0;
 const frames = new Map<number, FrameRequestCallback>();
 /** "hang": card image requests never answer (until aborted). */
 let images: "ok" | "hang" = "ok";
+/** How the Planeswalker portraits answer: "missing" is a 404, "hang" never answers. */
+let portraits: "ok" | "missing" | "hang" = "ok";
 
 beforeEach(() => {
   clock = 10_000;
   images = "ok";
+  portraits = "ok";
   frames.clear();
   vi.spyOn(performance, "now").mockImplementation(() => clock);
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -111,9 +115,12 @@ beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
-      if (!url.startsWith("/api/v1/card-images"))
+      const portrait = url.startsWith("/portraits/");
+      if (!url.startsWith("/api/v1/card-images") && !portrait)
         return { ok: false, status: 404 } as Response;
-      if (images === "hang")
+      if (portrait && portraits === "missing")
+        return { ok: false, status: 404 } as Response;
+      if (portrait ? portraits === "hang" : images === "hang")
         return new Promise<Response>((_resolve, reject) =>
           init?.signal?.addEventListener("abort", () =>
             reject(new DOMException("aborted", "AbortError")),
@@ -154,7 +161,12 @@ interface Internals {
   cards: Map<string, CardInternals>;
   ghosts: Map<string, CardInternals>;
   tiles: Map<string, { root: Container; seat: number; top: CardInternals }>;
-  portraits: Map<number, { root: Container; shade: Container }>;
+  portraits: Map<
+    number,
+    { root: Container; shade: Container; sigil: Sprite; picture: Sprite }
+  >;
+  portraitPictures: Map<string, Texture | string>;
+  portraitLoads: Set<AbortController>;
   curves: Map<string, { drawnShare: number; root: Container }>;
   floats: Map<string, { root: Container }>;
   emblem: { root: Container; caption: { text: string } };
@@ -180,8 +192,9 @@ class Table {
   private readonly fixture;
   private previous: TableModel | null = null;
 
-  constructor(name: FixtureName) {
+  constructor(name: FixtureName, change?: (f: TableFixture) => void) {
     this.fixture = tableFixture(name);
+    change?.(this.fixture);
     this.snapshot = structuredClone(this.fixture.snapshot);
   }
 
@@ -591,5 +604,104 @@ describe("the stack", () => {
     for (const view of table.internals.cards.values())
       expect(ribbons(view)).toBe(0);
     table.scene.destroy();
+  });
+});
+
+describe("Planeswalker portraits (v0.3.1)", () => {
+  /** The duel with Alice allied with Rowan, and seat 1 a human allied with `theirs` (else the
+   * fixture's bot). */
+  function allied(theirs?: string): (f: TableFixture) => void {
+    return (f) => {
+      f.summarySeats[0] = { ...f.summarySeats[0], portrait: "rowan" };
+      if (theirs)
+        f.summarySeats[1] = {
+          seat: 1,
+          player: "human",
+          handle: "bob",
+          deck: null,
+          portrait: theirs,
+        };
+    };
+  }
+  const asked = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.map(([url]) => String(url))
+      .filter((url) => url.startsWith("/portraits/"));
+
+  it("stand in a human's diamond once they arrive, grey for an opponent; a bot keeps its sigil", async () => {
+    const table = new Table("duel", allied());
+    await table.start("none");
+    expect(asked()).toEqual(["/portraits/rowan-256.webp"]);
+    const yours = table.internals.portraits.get(0)!;
+    expect(yours.picture.visible).toBe(true);
+    expect(yours.picture.texture).toBe(
+      table.internals.portraitPictures.get("rowan|256|false"),
+    );
+    expect(yours.sigil.visible).toBe(false);
+    const bot = table.internals.portraits.get(1)!;
+    expect(bot.picture.visible).toBe(false);
+    expect(bot.sigil.visible).toBe(true);
+    table.scene.destroy();
+
+    const human = new Table("duel", allied("chandra"));
+    await human.start("none");
+    expect(asked()).toContain("/portraits/chandra-256.webp");
+    expect(human.internals.portraits.get(1)!.picture.visible).toBe(true);
+    expect(
+      human.internals.portraitPictures.get("chandra|256|true"),
+    ).toBeInstanceOf(Texture);
+    human.scene.destroy();
+  });
+
+  it("take the sharper file at 4K, keeping the one shown until it comes", async () => {
+    const table = new Table("duel", allied());
+    await table.start("none");
+    const small = table.internals.portraitPictures.get("rowan|256|false");
+    portraits = "hang";
+    table.scene.resize(stageFit(3840, 2160, 1));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await run(50);
+    expect(asked()).toContain("/portraits/rowan-512.webp");
+    const yours = table.internals.portraits.get(0)!;
+    expect(yours.picture.visible).toBe(true);
+    expect(yours.picture.texture).toBe(small);
+    table.scene.destroy();
+    // Stopping the scene stops the request; nothing arrives after it.
+    expect(table.internals.portraitLoads.size).toBe(0);
+    await run(50);
+  });
+
+  it("leave the frame empty while on their way, without holding the table", async () => {
+    portraits = "hang";
+    const table = new Table("duel", allied());
+    const first = await table.start("none");
+    const yours = table.internals.portraits.get(0)!;
+    expect(yours.picture.visible).toBe(false);
+    expect(yours.sigil.visible).toBe(false);
+    expect(table.scene.status().settledRevision).toBe(first.model.revision);
+    table.scene.destroy();
+    await run(50);
+  });
+
+  it("keep the sigil when there is none to show", async () => {
+    portraits = "missing";
+    const table = new Table("duel", allied());
+    await table.start("none");
+    const yours = table.internals.portraits.get(0)!;
+    expect(yours.picture.visible).toBe(false);
+    expect(yours.sigil.visible).toBe(true);
+    expect(table.internals.portraitPictures.get("rowan|256|false")).toBe(
+      "missing",
+    );
+    // An ID that is not the roster's is never asked for.
+    const odd = new Table("duel", (f) => {
+      f.summarySeats[0] = { ...f.summarySeats[0], portrait: "../api/v1/me" };
+    });
+    await odd.start("none");
+    expect(asked()).toEqual(["/portraits/rowan-256.webp"]);
+    expect(odd.internals.portraits.get(0)!.sigil.visible).toBe(true);
+    table.scene.destroy();
+    odd.scene.destroy();
   });
 });

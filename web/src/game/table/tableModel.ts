@@ -76,6 +76,7 @@ function sentence(text: string): string {
 export const buildTableModel: BuildTableModel = (input) => {
   const { snapshot, context, viewSeat, summarySeats, selfHandle, sysop } =
     input;
+  const selfPortrait = input.selfPortrait ?? null;
   const view = context.view;
   const prompt = context.prompt;
   const observing = context.observing;
@@ -390,6 +391,15 @@ export const buildTableModel: BuildTableModel = (input) => {
         : handle
           ? `handle:${handle}`
           : `seat:${seat}`;
+    // A human's portrait is their allied Planeswalker's (v0.3.1): the summary's, or your own
+    // account's until the summary arrives. Bots have none.
+    const portrait = summary
+      ? summary.player === "human"
+        ? (summary.portrait ?? null)
+        : null
+      : self
+        ? selfPortrait
+        : null;
     const offered = context.bySeat.get(seat) ?? [];
     const units = groupUnits(
       view.battlefield.filter((p) => p.controller_seat === seat),
@@ -409,6 +419,7 @@ export const buildTableModel: BuildTableModel = (input) => {
       title,
       kind,
       sigil: { seed, grey: !anchored },
+      portrait,
       active: view.active_seat === seat,
       priority: view.priority_seat === seat,
       lost: player.lost,

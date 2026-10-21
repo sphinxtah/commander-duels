@@ -260,6 +260,18 @@
   width: 100%;
   height: 100%;
 }
+/* A Planeswalker's portrait (v0.3.1): upright in front of the diamond's frame, fitted whole, and
+   free to rise past it. Opponents' are grey, as their sigils are. */
+.picture {
+  position: absolute;
+  max-width: none;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+.picture[data-grey] {
+  filter: grayscale(1);
+}
 .numeral {
   position: relative;
   font-weight: 700;

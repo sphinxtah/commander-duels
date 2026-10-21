@@ -121,9 +121,6 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     card: CardView;
     located?: Located;
   } | null>(null);
-  const [noticeHidden, setNoticeHidden] = useState(() =>
-    remembered("cd.ai-notice"),
-  );
   const [drawer, setDrawer] = useState<DrawerId | null>(null);
   const [zone, setZone] = useState<ZoneBrowserTarget | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -246,10 +243,21 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
             viewSeat: state.seat,
             summarySeats: summary?.seats ?? null,
             selfHandle: me?.handle ?? null,
+            selfPortrait: me?.alliance ?? null,
             sysop,
           }
         : null,
-    [gameId, snapshot, view, context, state.seat, summary, me?.handle, sysop],
+    [
+      gameId,
+      snapshot,
+      view,
+      context,
+      state.seat,
+      summary,
+      me?.handle,
+      me?.alliance,
+      sysop,
+    ],
   );
   const { model, layout } = useTableModel({
     input,
@@ -607,25 +615,6 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   <p role="status" className={screen.small}>
                     The table is designed for a window of at least 1280 × 720.
                   </p>
-                )}
-                {!noticeHidden && (
-                  <div className={screen.note} role="note">
-                    <p>
-                      <strong>Practice table.</strong> The bots still read your
-                      hand while they plan (the AI audit, AI02, is not done
-                      yet), so their play is not a fair test of yours.
-                    </p>
-                    <button
-                      type="button"
-                      aria-label="Dismiss the practice notice"
-                      onClick={() => {
-                        remember("cd.ai-notice", true);
-                        setNoticeHidden(true);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
                 )}
                 {state.seat !== null && (
                   <PassingNotice

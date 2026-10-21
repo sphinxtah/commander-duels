@@ -1,5 +1,9 @@
 import { test, expect, type Browser, type Page } from "@playwright/test";
-import type { FixtureName } from "../src/game/table/fixtures";
+import {
+  tableFixture,
+  type FixtureName,
+  type TableFixture,
+} from "../src/game/table/fixtures";
 import { occluded, sizeChecks } from "./helpers/checks";
 import { openTable, respondingFixture } from "./helpers/fakeTable";
 
@@ -254,5 +258,154 @@ test.describe("playing on the table", () => {
     await expect(root).toHaveAttribute("data-renderer", "webgl", {
       timeout: 15_000,
     });
+  });
+});
+
+// The Planeswalker portraits (v0.3.1), the real files from web/public/portraits. The three-player
+// table with both opponents human: Alice allied with Rowan (in colour, hers), Bob with Ugin
+// (grey, an opponent's) and Carol with The Sphinx, which has no picture yet and keeps the sigil.
+test.describe("Planeswalker portraits", () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
+
+  const PORTRAITS = { 0: "rowan", 1: "ugin", 2: "the-sphinx" };
+
+  function allied(): TableFixture {
+    const f = tableFixture("three");
+    f.summarySeats[1] = { seat: 1, player: "human", handle: "bob", deck: null };
+    f.summarySeats[2] = {
+      seat: 2,
+      player: "human",
+      handle: "carol",
+      deck: null,
+    };
+    return f;
+  }
+
+  /** The mean colour of the screen's (2r+1)-pixel square around (x, y), and its luminance and
+   * chroma: read from a screenshot, so it is what the canvas showed. */
+  async function colourAt(page: Page, x: number, y: number, r = 1) {
+    const png = await page.screenshot({
+      clip: { x: x - r, y: y - r, width: 2 * r + 1, height: 2 * r + 1 },
+    });
+    const [red, green, blue] = await page.evaluate(async (base64) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const bitmap = await createImageBitmap(
+        new Blob([bytes], { type: "image/png" }),
+      );
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(bitmap, 0, 0);
+      const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+      const sum = [0, 0, 0];
+      for (let i = 0; i < data.length; i += 4)
+        for (let c = 0; c < 3; c++) sum[c] += data[i + c];
+      const n = data.length / 4;
+      return sum.map((s) => s / n);
+    }, png.toString("base64"));
+    return {
+      red,
+      green,
+      blue,
+      luminance: 0.2126 * red + 0.7152 * green + 0.0722 * blue,
+      chroma: Math.max(red, green, blue) - Math.min(red, green, blue),
+    };
+  }
+
+  test("stand in the players' diamonds on the canvas: yours in colour, an opponent's grey, a missing one the sigil", async ({
+    page,
+  }, testInfo) => {
+    const rowan = page.waitForResponse("**/portraits/rowan-256.webp");
+    const ugin = page.waitForResponse("**/portraits/ugin-256.webp");
+    const table = await openTable(page, {
+      fixture: allied(),
+      portraits: PORTRAITS,
+    });
+    await sizeChecks(page, { width: 1920, height: 1080, dpr: 1 });
+    for (const response of [await rowan, await ugin]) {
+      expect(response.status()).toBe(200);
+      expect(response.headers()["content-type"]).toBe("image/webp");
+    }
+    // Each is named for screen readers apart from the player and their life.
+    for (const name of ["Rowan", "Ugin", "The Sphinx"])
+      await expect(
+        page.getByRole("img", { name: `${name} portrait` }),
+      ).toHaveCount(1);
+    await expect(page.getByRole("img", { name: /portrait/ })).toHaveCount(3);
+
+    // Points where a portrait rises past its frame, which a sigil never does: Rowan's red cloak
+    // at your right shoulder (your diamond ◇(118,912) 124), Ugin's glowing horn above Bob's
+    // (◇(880,86) 100), and the same place above Carol's (◇(1840,86) 100), which shows the stone.
+    await expect
+      .poll(async () => {
+        const cloak = await colourAt(page, 189, 946);
+        return cloak.red > 120 && cloak.red > 2.5 * cloak.green;
+      })
+      .toBe(true);
+    await expect
+      .poll(async () => {
+        const horn = await colourAt(page, 917, 34);
+        return horn.luminance > 120 && horn.chroma < 16;
+      })
+      .toBe(true);
+    const stone = await colourAt(page, 1877, 34);
+    expect(stone.luminance).toBeLessThan(115);
+    // The Sphinx has no picture: Carol's diamond shows her sigil, bright at its core.
+    await expect
+      .poll(async () => (await colourAt(page, 1840, 86)).luminance)
+      .toBeGreaterThan(100);
+    await page.screenshot({
+      path: testInfo.outputPath("table-portraits.jpg"),
+      quality: 80,
+    });
+    expect(await occluded(page)).toEqual([]);
+    expect(await table.problems()).toEqual([]);
+  });
+
+  test("stand in the plain table too, grey for an opponent, and a missing one keeps the sigil", async ({
+    page,
+  }, testInfo) => {
+    const table = await openTable(page, {
+      fixture: allied(),
+      portraits: PORTRAITS,
+      settings: { painter: "dom" },
+    });
+    await sizeChecks(page, { width: 1920, height: 1080, dpr: 1 }, "dom");
+    const loaded = (name: string) =>
+      page
+        .getByRole("img", { name: `${name} portrait` })
+        .locator("img")
+        .evaluate((image: HTMLImageElement) =>
+          image.complete ? image.naturalWidth : 0,
+        );
+    await expect.poll(() => loaded("Rowan")).toBe(256);
+    await expect.poll(() => loaded("Ugin")).toBe(256);
+    const rowan = page
+      .getByRole("img", { name: "Rowan portrait" })
+      .locator("img");
+    await expect(rowan).toHaveAttribute("src", "/portraits/rowan-256.webp");
+    await expect(rowan).not.toHaveAttribute("data-grey");
+    const ugin = page
+      .getByRole("img", { name: "Ugin portrait" })
+      .locator("img");
+    await expect(ugin).toHaveAttribute("data-grey", "true");
+    expect(await ugin.evaluate((image) => getComputedStyle(image).filter)).toBe(
+      "grayscale(1)",
+    );
+    // Upright in front of the frame and fitted whole: nothing clips it to the diamond.
+    expect(
+      await rowan.evaluate((image) => [
+        getComputedStyle(image).objectFit,
+        getComputedStyle(image.parentElement!).clipPath,
+      ]),
+    ).toEqual(["contain", "none"]);
+    const sphinx = page.getByRole("img", { name: "The Sphinx portrait" });
+    await expect(sphinx.locator("img")).toHaveCount(0);
+    await expect(sphinx.locator('svg[data-sigil="grey"]')).toHaveCount(1);
+    await page.screenshot({
+      path: testInfo.outputPath("table-portraits-dom.jpg"),
+      quality: 80,
+    });
+    expect(await occluded(page)).toEqual([]);
+    expect(await table.problems()).toEqual([]);
   });
 });
