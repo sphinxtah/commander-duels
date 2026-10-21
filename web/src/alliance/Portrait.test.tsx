@@ -41,10 +41,10 @@ describe("the portraits", () => {
 
   it("show a placeholder for a Planeswalker without one, and for a picture that is missing", () => {
     const { rerender } = render(
-      <Portrait id="the-sphinx" name="The Sphinx" portrait={false} />,
+      <Portrait id="ezra" name="Ezra" portrait={false} />,
     );
     expect(
-      screen.getByRole("img", { name: "The Sphinx: no portrait yet" }),
+      screen.getByRole("img", { name: "Ezra: no portrait yet" }),
     ).toHaveAttribute("data-placeholder");
 
     rerender(<Portrait id="rowan" name="Rowan" />);

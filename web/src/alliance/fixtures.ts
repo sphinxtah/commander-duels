@@ -69,8 +69,6 @@ export const roster: Planeswalker[] = [
   planeswalker("kaya", "Kaya", tiers[1]!, false, { playable_cards: 1 }),
   planeswalker("jace", "Jace", tiers[4]!, false),
   planeswalker("the-sphinx", "The Sphinx", tiers[5]!, false, {
-    portrait: false,
-    description: null,
     cards: 0,
     playable_cards: 0,
     custom: true,

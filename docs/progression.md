@@ -89,5 +89,5 @@ Since v0.4.0 the custom cards are playable in every game, practice games and hum
 
 ## The portraits and badges
 
-- **Portraits.** The owner's 98 portraits (1254 × 1254, transparent) stay outside the repository. `scripts/planeswalkers.py portraits` writes their web sizes, WebP with alpha at 128, 256 and 512 pixels, contain-fitted and never cropped, to `web/public/portraits/<id>-<size>.webp` (about 12 MB). The installed app does not precache them: a screen fetches one when it shows it, and the web server lets browsers keep them for a week. `docs/asset-provenance.csv` records them.
+- **Portraits.** The owner's 98 portraits (1254 × 1254, transparent), and since v0.4.1 The Sphinx's, the Godlike tier's, stay outside the repository. `scripts/planeswalkers.py portraits` writes their web sizes, WebP with alpha at 128, 256 and 512 pixels, contain-fitted and never cropped, to `web/public/portraits/<id>-<size>.webp` (about 12 MB). The installed app does not precache them: a screen fetches one when it shows it, and the web server lets browsers keep them for a week. `docs/asset-provenance.csv` records them.
 - **Badges.** Until the owner's own arrive, each tier's badge is a generated metal crest (bronze, silver, gold and platinum metal, Mythic in the mythic rarity's orange-red, Godlike prismatic in the five colours), drawn as SVG in the page.

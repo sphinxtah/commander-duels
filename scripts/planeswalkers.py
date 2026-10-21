@@ -4,8 +4,9 @@
   (docs/plans/0.3.1-planeswalkers.csv) and the portrait folder's avatar-roster.json and
   avatar-guide-descriptions.json: each Planeswalker's stable ID, name, tier, Planeswalker subtype,
   first Planeswalker card and a one-line description of its portrait for alternative text. The
-  Godlike tier's Planeswalker is added by hand below; its cards are uploaded by SysOp and never
-  named here. Standard library only.
+  Godlike tier's Planeswalker is added by hand below, with its portrait since v0.4.1 (the owner's
+  the.sphinx.png in the same folder); its cards are uploaded by SysOp and never named here.
+  Standard library only.
 - "portraits" makes the web sizes of the owner's 1254 x 1254 portraits (WebP with alpha, 128, 256
   and 512 px, contain-fitted, never cropped) into web/public/portraits/<id>-<size>.webp. The masters
   stay outside the repository. It needs Pillow, which the application does not use, so run it in
@@ -37,10 +38,14 @@ GODLIKE = {
     "subtype": "Sphinx",
     "first_card": None,
     "first_printed": None,
-    "description": None,
-    "portrait": False,
+    "description": "A winged sphinx with a lion's face and a long pale mane braided with gold "
+    "beads, a gold crown set with a violet gem, and purple and gold robes hung with jewelled "
+    "chains.",
+    "portrait": True,
     "custom": True,
 }
+# The Godlike portrait's master (v0.4.1); the folder's avatar-roster.json lists only the 98.
+GODLIKE_FILE = "the.sphinx.png"
 
 
 def slug(name: str) -> str:
@@ -102,6 +107,7 @@ def portraits(folder: Path) -> None:
         entry["character"]: entry["filename"]
         for entry in json.loads((folder / "avatar-roster.json").read_text("utf-8"))
     }
+    files[str(GODLIKE["name"])] = GODLIKE_FILE
     PORTRAITS.mkdir(parents=True, exist_ok=True)
     total = 0
     for entry in entries:

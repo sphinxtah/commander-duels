@@ -1144,17 +1144,17 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a placeholder for an alliance with no portrait yet", async () => {
+  it("shows the Godlike Planeswalker's portrait for its alliance (v0.4.1)", async () => {
     render(
       <Page initial={account({ alliance: "the-sphinx" })} auth={google} />,
     );
     const card = screen.getByRole("region", { name: "Account" });
     expect(
       await within(card).findByRole("img", {
-        name: "The Sphinx: no portrait yet",
+        name: "The Sphinx, painted for the tests.",
       }),
-    ).toBeInTheDocument();
-    expect(card.querySelector("img")).toBeNull();
+    ).toHaveAttribute("src", "/portraits/the-sphinx-256.webp");
+    expect(card.querySelector("svg[data-placeholder]")).toBeNull();
   });
 
   it("groups every Planeswalker by tier: open ones to ally with, locked ones with the wins that open them", async () => {
@@ -1187,9 +1187,13 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     expect(within(silver).getByRole("listitem")).toHaveTextContent(
       "KayaOpens at 10 wins1 card playable here",
     );
-    // The Godlike tier's Planeswalker has no portrait yet: a placeholder stands in.
+    // The Godlike tier's Planeswalker has its portrait since v0.4.1.
     const godlike = screen.getByRole("region", { name: /^Godlike/ });
-    expect(godlike.querySelector("svg[data-placeholder]")).not.toBeNull();
+    expect(godlike.querySelector("svg[data-placeholder]")).toBeNull();
+    expect(godlike.querySelector("img")).toHaveAttribute(
+      "src",
+      "/portraits/the-sphinx-128.webp",
+    );
     expect(godlike).toHaveTextContent("The Sphinx");
 
     const abian = screen.getByRole("button", { name: "Ally with Abian" });

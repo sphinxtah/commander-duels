@@ -5,7 +5,8 @@ import styles from "./alliance.module.css";
 // A Planeswalker's portrait (v0.3.1), by the owner's handoff rules: the transparency stays, the
 // picture is contain-fit and never cropped to a circle, and its box is square with room for horns
 // and hoods. Thumbnails take the 128 px file; larger pictures choose among the three sizes. A
-// Planeswalker without a portrait yet (the Godlike tier's) shows a placeholder spark.
+// Planeswalker without a portrait (none since v0.4.1, when the Godlike tier's arrived), or whose
+// picture fails to load, shows a placeholder spark.
 
 export function Portrait({
   id,
