@@ -15,16 +15,28 @@ import {
   Graphics,
   NineSliceSprite,
   Sprite,
-  type Texture,
+  Texture,
 } from "../pixi";
-import { tierFor, type Priority, type TextureHandle } from "../textures";
+import {
+  tierFor,
+  type LazyHandle,
+  type Priority,
+  type TextureHandle,
+  type Tier,
+} from "../textures";
 import type { Pose } from "../timeline";
+import { drawRibbon } from "./StackNode";
 
 // One card on the table: its text frame, its printed image over it, the glow behind it and the
 // marks around it (design §8.10). The image is only ever scaled evenly and turned: never
 // stretched, skewed, tinted, filtered or masked, and nothing is drawn over it but Magic Duels'
 // power and toughness tag over the printed box and the ◆/✓ badge on the frame's corner. Glows
 // and rings lie behind or outside the picture.
+//
+// A card holds the textures it shows. When it needs a new one (a new tier after a resize, a new
+// power for its frame) it keeps showing, and holding, the old one until the new one is ready, so
+// the caches never let go of a texture on screen; when it becomes another card it shows only its
+// own frame until its own picture arrives.
 
 /** Where and how a card is drawn: the layout's node, or a zone tile's top card. */
 export interface CardPlacement {
@@ -43,6 +55,8 @@ export interface CardPlacement {
   priority: Priority;
   /** The anchored player's card: its attack mark is an arrow beside it, not a sword below. */
   yours: boolean;
+  /** An ability on the stack: where its "Ability" ribbon goes, above the picture. */
+  ribbon: Rect | null;
 }
 
 const COLOURS = {
@@ -112,6 +126,15 @@ function sameMarks(a: CardPlacement, b: CardPlacement): boolean {
   const db = b.pivot;
   const same = (p: Point, q: Point) =>
     near(p.x - da.x, q.x - db.x) && near(p.y - da.y, q.y - db.y);
+  if (!a.ribbon !== !b.ribbon) return false;
+  if (
+    a.ribbon &&
+    b.ribbon &&
+    (!same(a.ribbon, b.ribbon) ||
+      !near(a.ribbon.w, b.ribbon.w) ||
+      !near(a.ribbon.h, b.ribbon.h))
+  )
+    return false;
   if (!a.tag !== !b.tag) return false;
   if (
     a.tag &&
@@ -177,10 +200,21 @@ export class CardNode {
   private readonly ring = new Graphics();
   private readonly marks = new Container();
   private readonly kit: SceneKit;
+  /** The picture this card wants now. */
   private handle: TextureHandle<Texture> | null = null;
   private handleKey = "";
+  /** The picture still on screen while `handle` is on its way (the same card at another tier). */
+  private held: TextureHandle<Texture> | null = null;
+  /** Whose picture the image shows. */
+  private imageName: string | null = null;
   private card: CardView | null = null;
+  /** The text frame this card wants now ("back" while it is face down). */
   private frameKey = "";
+  private frameHandle: LazyHandle<Texture> | null = null;
+  /** The frame still drawn while `frameHandle`'s is being made (the same card, changed). */
+  private frameHeld: LazyHandle<Texture> | null = null;
+  /** Whose frame the frame sprite shows, or null for the back or the plain placeholder. */
+  private frameName: string | null = null;
   private tier = 0;
   private faceUp = false;
   private marksDrawn = false;
@@ -286,58 +320,120 @@ export class CardNode {
     this.faceUp = p.faceUp;
     if (!p.faceUp || !card.name) {
       this.releaseImage();
+      this.releaseFrame();
       this.frameKey = "back";
       this.frame.texture = this.kit.art.back;
-      this.image.visible = false;
+      this.hideImage();
       return;
     }
-    const frameKey = frameKeyOf(card, tier);
-    if (frameKey !== this.frameKey) {
-      const texture = this.kit.frameTexture(card, tier);
-      this.frame.texture = texture ?? this.kit.art.blank;
-      this.frameKey = texture ? frameKey : "";
-      if (!texture) this.kit.waitForFrame(this);
+    this.setFrame(card, tier);
+    this.setImage(card.name, tier, p.priority);
+  }
+
+  /** The text frame for the card's current characteristics, made a few a frame by the scene. */
+  private setFrame(card: CardView, tier: Tier): void {
+    const key = frameKeyOf(card, tier);
+    if (key === this.frameKey) return;
+    const previous = this.frameHandle;
+    const next = this.kit.frame(card, tier);
+    this.frameKey = key;
+    this.frameHandle = next;
+    if (next.texture) {
+      this.showFrame(next.texture, card.name);
+      previous?.release();
+      return;
     }
-    const handleKey = `${card.name}|${tier}`;
-    if (handleKey === this.handleKey) return;
+    this.kit.waitForFrame(this);
+    // Until it is made, the same card keeps the frame it has (its power changed, or its tier);
+    // another card gets the plain placeholder, never this one's words.
+    const drawn = this.frameHeld ?? (previous?.texture ? previous : null);
+    if (drawn && this.frameName === card.name) {
+      if (drawn !== previous) previous?.release();
+      this.frameHeld = drawn;
+    } else {
+      previous?.release();
+      this.frameHeld?.release();
+      this.frameHeld = null;
+      this.frame.texture = this.kit.art.blank;
+      this.frameName = null;
+    }
+  }
+
+  private showFrame(texture: Texture, name: string | null): void {
+    this.frame.texture = texture;
+    this.frameName = name;
+    this.frameHeld?.release();
+    this.frameHeld = null;
+  }
+
+  /** The printed image, at the tier the card's drawn size needs. */
+  private setImage(name: string, tier: Tier, priority: Priority): void {
+    const key = `${name}|${tier}`;
+    if (key === this.handleKey) return;
     const previous = this.handle;
-    this.handleKey = handleKey;
-    this.handle = this.kit.textures.acquire(card.name, tier, p.priority);
-    const handle = this.handle;
-    if (handle.texture) this.showImage(handle.texture, previous !== null);
-    else {
-      // Keep the old tier on screen until the new one is ready, so a resize never blanks a card.
-      if (!previous?.texture) this.image.visible = false;
-      handle.onSettle((state) => {
-        if (this.handle !== handle) return;
-        if (state === "ready" && handle.texture)
-          this.showImage(handle.texture, false);
-        else this.image.visible = false;
-        this.kit.request();
-      });
+    // The handle whose picture is on screen now, if any.
+    const shown = this.image.visible ? (this.held ?? previous) : null;
+    this.handleKey = key;
+    const handle = this.kit.textures.acquire(name, tier, priority);
+    this.handle = handle;
+    if (handle.texture) {
+      this.showImage(handle.texture, name, previous !== null);
+      previous?.release();
+      return;
     }
-    previous?.release();
+    if (shown?.texture && this.imageName === name) {
+      // The same picture at another tier: it stays on screen, held, until the new one settles,
+      // so a resize never blanks a card and the cache never lets go of a texture it shows.
+      if (shown !== previous) previous?.release();
+      this.held = shown;
+    } else {
+      // Another card's picture is never left over this one's frame.
+      previous?.release();
+      this.dropHeld();
+      this.hideImage();
+    }
+    handle.onSettle((state) => {
+      if (this.handle !== handle) return;
+      if (state === "ready" && handle.texture)
+        this.showImage(handle.texture, name, false);
+      else {
+        this.dropHeld();
+        this.hideImage();
+      }
+      this.kit.request();
+    });
   }
 
-  /** Called when its text frame has been made. */
+  private dropHeld(): void {
+    this.held?.release();
+    this.held = null;
+  }
+
+  /** Called when its text frame may have been made. */
   refreshFrame(): void {
-    const card = this.card;
-    const p = this.placement;
-    if (!card?.name || !p?.faceUp || this.frameKey) return;
-    const tier = tierFor(p.tierHeight * 0.716 * this.kit.resolution());
-    const texture = this.kit.frameTexture(card, tier);
-    if (texture) {
-      this.frame.texture = texture;
-      this.frameKey = frameKeyOf(card, tier);
-    } else this.kit.waitForFrame(this);
+    const handle = this.frameHandle;
+    if (!handle || this.frameKey === "back") return;
+    if (handle.texture) this.showFrame(handle.texture, this.card?.name ?? null);
+    else this.kit.waitForFrame(this);
   }
 
-  private showImage(texture: Texture, instant: boolean): void {
+  private showImage(texture: Texture, name: string, instant: boolean): void {
     this.image.texture = texture;
     this.image.visible = true;
+    this.imageName = name;
+    this.dropHeld();
     this.fitImage();
     if (instant || this.imageAlpha >= 1) this.imageAlpha = 1;
     else this.kit.fadeImage(this);
+    this.applyImageAlpha();
+  }
+
+  /** Hides the image and lets go of its texture: a card never points at one it does not hold. */
+  private hideImage(): void {
+    this.image.visible = false;
+    this.image.texture = Texture.EMPTY;
+    this.imageName = null;
+    this.imageAlpha = 0;
     this.applyImageAlpha();
   }
 
@@ -345,7 +441,7 @@ export class CardNode {
   private fitImage(): void {
     const p = this.placement;
     const texture = this.image.texture;
-    if (!p || !texture || texture.height <= 0) return;
+    if (!p || !this.image.visible || !texture || texture.height <= 0) return;
     const s = p.face.h / texture.height;
     this.image.scale.set(s, s);
   }
@@ -361,12 +457,17 @@ export class CardNode {
     this.frame.visible = !(this.image.visible && this.imageAlpha >= 1);
   }
 
-  /** A face-down arrival turning face up: the back fades out around 60% of the way. */
-  /** How far a face-down arrival has turned face up: 0 shows the back, 1 the face. */
+  /** How far a face-down arrival has turned face up: 0 shows the back, 1 the face. The back
+   * fades out around 60% of the way. */
   setShown(shown: number): void {
-    const t = Math.min(1, Math.max(0, (shown - 0.55) / 0.1));
-    this.back.visible = t < 1 && this.frameKey !== "back";
-    this.back.alpha = 1 - t;
+    this.showBack(1 - Math.min(1, Math.max(0, (shown - 0.55) / 0.1)));
+  }
+
+  /** Our card back over the face, 0 to 1: an arrival from a hidden zone, or a departure into
+   * one. A card already face down has nothing to cover. */
+  showBack(amount: number): void {
+    this.back.visible = amount > 0 && this.frameKey !== "back";
+    this.back.alpha = amount;
   }
 
   setPose(pose: Pose): void {
@@ -410,7 +511,8 @@ export class CardNode {
   }
 
   private drawMarks(p: CardPlacement): void {
-    const none = !p.tag && p.pips.length === 0 && p.badges.length === 0;
+    const none =
+      !p.tag && !p.ribbon && p.pips.length === 0 && p.badges.length === 0;
     if (none && this.marks.children.length === 0) return;
     for (const child of this.marks.removeChildren()) child.destroy();
     if (none) return;
@@ -421,6 +523,7 @@ export class CardNode {
     const g = new Graphics();
     this.marks.addChild(g);
     const texts: BitmapText[] = [];
+    if (p.ribbon) texts.push(drawRibbon(g, { ...p.ribbon, ...at(p.ribbon) }));
     if (p.tag) {
       const r = p.tag.rect;
       const local = at({ x: r.x, y: r.y });
@@ -558,14 +661,25 @@ export class CardNode {
     this.handle?.release();
     this.handle = null;
     this.handleKey = "";
+    this.dropHeld();
     this.imageAlpha = 0;
   }
 
-  /** Back to the pool: lets go of its texture and leaves the scene graph. */
+  private releaseFrame(): void {
+    this.frameHandle?.release();
+    this.frameHandle = null;
+    this.frameHeld?.release();
+    this.frameHeld = null;
+    this.frameName = null;
+    this.frameKey = "";
+  }
+
+  /** Back to the pool: lets go of its textures and leaves the scene graph. */
   recycle(): void {
     this.releaseImage();
-    this.image.visible = false;
-    this.frameKey = "";
+    this.releaseFrame();
+    this.hideImage();
+    this.frame.texture = this.kit.art.blank;
     this.tier = 0;
     this.faceUp = false;
     this.marksDrawn = false;
@@ -580,6 +694,7 @@ export class CardNode {
 
   destroy(): void {
     this.releaseImage();
+    this.releaseFrame();
     this.root.destroy({ children: true });
     this.under.destroy({ children: true });
   }

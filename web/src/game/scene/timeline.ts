@@ -179,10 +179,11 @@ export class Timeline {
     return track !== undefined && now < track.start + track.ms;
   }
 
-  /** Whether any tween is still running: the scene keeps drawing frames while this holds. */
-  busy(now = this.clock()): boolean {
-    for (const track of this.tracks.values())
-      if (now < track.start + track.ms) return true;
+  /** Whether any tween is still running: the scene keeps drawing frames while this holds. Keys
+   * in `except` are left out (an idle glow is not something the table waits on). */
+  busy(now = this.clock(), except?: ReadonlySet<string>): boolean {
+    for (const [key, track] of this.tracks)
+      if (now < track.start + track.ms && !except?.has(key)) return true;
     return false;
   }
 

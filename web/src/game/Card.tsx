@@ -166,12 +166,24 @@ export function permanentState(permanent: PermanentView | undefined): string[] {
   return parts;
 }
 
-export function cardLabel(card: CardView, located?: Located): string {
+/**
+ * A card's accessible name: its name, type, power and toughness and state. `owner` is the
+ * owner's name as the screen says it (model.ts's playerName); given, a permanent controlled by
+ * someone else says whose it is, ", owned by Bot 2" (design §3.2).
+ */
+export function cardLabel(
+  card: CardView,
+  located?: Located,
+  owner?: string | null,
+): string {
   if (card.hidden || !card.name) return "A face-down card";
   const parts = [card.name];
   if (card.type_line) parts.push(card.type_line);
   if (card.power !== null) parts.push(`${card.power}/${card.toughness}`);
-  parts.push(...permanentState(located?.permanent));
+  const permanent = located?.permanent;
+  parts.push(...permanentState(permanent));
+  if (owner && permanent && permanent.owner_seat !== permanent.controller_seat)
+    parts.push(`owned by ${owner}`);
   return parts.join(", ");
 }
 

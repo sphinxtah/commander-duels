@@ -2,7 +2,12 @@ import { render } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CardFace } from "../Card";
-import { knownMissing, rememberMissing } from "../images";
+import {
+  RETRIES,
+  knownMissing,
+  rememberMissing,
+  type TryAgain,
+} from "../images";
 import type { CardImageSize } from "../table/types";
 import {
   LazyTextures,
@@ -20,7 +25,7 @@ interface Request {
   name: string;
   size: CardImageSize;
   signal: AbortSignal;
-  resolve(value: Blob | "missing"): void;
+  resolve(value: Blob | "missing" | TryAgain): void;
   reject(error: unknown): void;
 }
 
@@ -51,8 +56,13 @@ function fakeAdapter() {
 
 const blob = () => new Blob(["image"]);
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+/** Lets promise chains run without timers (for tests on fake timers). */
+async function ticks(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -227,7 +237,7 @@ describe("the texture cache", () => {
     expect(requests).toHaveLength(3);
   });
 
-  it("shares the missing memory with the DOM's card faces through fetchCardImage", async () => {
+  it("shares the missing memory with the DOM's card faces through images.ts", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -273,28 +283,201 @@ describe("the texture cache", () => {
     expect(destroyed).toEqual(["192"]);
     expect(requests[1].signal.aborted).toBe(true);
   });
+
+  it("never lets go of a texture a card still holds while it waits for the next tier", async () => {
+    let now = 0;
+    const { adapter, requests, destroyed } = fakeAdapter();
+    const cache = new TextureCache(adapter, { now: () => now });
+    const shown = cache.acquire("Forest", 192, 1);
+    requests[0].resolve(blob());
+    await settle();
+    cache.pump();
+    // The card wants a larger tier and keeps the one it shows until that one settles.
+    const next = cache.acquire("Forest", 384, 1);
+    now = 61_000;
+    cache.sweep();
+    expect(destroyed).toEqual([]);
+    expect(shown.texture).not.toBeNull();
+    requests[1].resolve(blob());
+    await settle();
+    cache.pump();
+    expect(next.state).toBe("ready");
+    shown.release();
+    now = 122_000;
+    cache.sweep();
+    expect(destroyed).toEqual(["192"]);
+  });
+
+  it("counts bytes held elsewhere against its budget", async () => {
+    const { adapter, requests, destroyed } = fakeAdapter();
+    let other = 0;
+    // One texture of about 0.35 MB fits alone; with 0.6 MB of frames it does not.
+    const cache = new TextureCache(adapter, {
+      budget: 0.8 * MB,
+      otherBytes: () => other,
+    });
+    const unused = cache.acquire("Plains", 256, 1);
+    requests[0].resolve(blob());
+    await settle();
+    cache.pump();
+    unused.release();
+    cache.sweep();
+    expect(destroyed).toEqual([]);
+    other = 0.6 * MB;
+    cache.sweep();
+    expect(destroyed).toEqual(["256"]);
+  });
+});
+
+describe("trying a failed image again", () => {
+  it("waits outside the six in flight, so other cards are asked for meanwhile", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { adapter, requests } = fakeAdapter();
+    const cache = new TextureCache(adapter, { now: () => Date.now() });
+    for (let i = 0; i < 6; i++) cache.acquire(`Busy ${i}`, 192, 3);
+    for (const r of requests) r.resolve({ retryAfter: 0 });
+    await ticks();
+    expect(cache.stats).toMatchObject({ inFlight: 0, pending: 6 });
+    // A card drawn into the hand now is asked for at once.
+    cache.acquire("Hand card", 488, 0);
+    expect(requests.map((r) => r.name).slice(6)).toEqual(["Hand card"]);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(requests).toHaveLength(7);
+    // CardFace's first backoff later, the waiting cards try again, as many as fit.
+    await vi.advanceTimersByTimeAsync(1);
+    expect(requests.map((r) => r.name).slice(7)).toEqual([
+      "Busy 0",
+      "Busy 1",
+      "Busy 2",
+      "Busy 3",
+      "Busy 4",
+    ]);
+    expect(cache.stats.inFlight).toBe(6);
+  });
+
+  it("waits at least as long as the server asks", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { adapter, requests } = fakeAdapter();
+    const cache = new TextureCache(adapter, { now: () => Date.now() });
+    cache.acquire("Mox Ruby", 192, 1);
+    requests[0].resolve({ retryAfter: 30 });
+    await ticks();
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(requests).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(requests).toHaveLength(2);
+  });
+
+  it("gives up after as many tries as CardFace", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const { adapter, requests } = fakeAdapter();
+    const cache = new TextureCache(adapter, { now: () => Date.now() });
+    const handle = cache.acquire("Time Walk", 192, 1);
+    for (let i = 0; i <= RETRIES; i++) {
+      requests[i].resolve({ retryAfter: 0 });
+      await ticks();
+      await vi.advanceTimersByTimeAsync(60_000);
+    }
+    expect(requests).toHaveLength(RETRIES + 1);
+    expect(handle.state).toBe("failed");
+    expect(cache.stats.pending).toBe(0);
+  });
+
+  it("stops waiting when the last card lets go", async () => {
+    vi.useFakeTimers();
+    const { adapter, requests } = fakeAdapter();
+    const cache = new TextureCache(adapter, { now: () => Date.now() });
+    const handle = cache.acquire("Ancestral Recall", 192, 1);
+    requests[0].resolve({ retryAfter: 0 });
+    await ticks();
+    handle.release();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(requests).toHaveLength(1);
+    expect(cache.stats.pending).toBe(0);
+  });
 });
 
 describe("lazily made textures", () => {
-  it("make a few a frame within a time budget, at least one", () => {
-    let now = 0;
+  function lazyTextures(o: { budget?: number; other?: () => number } = {}) {
+    const clock = { now: 0 };
     const made: string[] = [];
-    const lazy = new LazyTextures<string>(
-      () => undefined,
-      () => now,
-    );
-    for (const key of ["a", "b", "c"])
-      expect(
-        lazy.get(key, () => {
-          now += 3;
-          made.push(key);
-          return key;
-        }),
-      ).toBeNull();
+    const destroyed: string[] = [];
+    const lazy = new LazyTextures<string>({
+      destroy: (texture) => destroyed.push(texture),
+      bytes: () => 100,
+      now: () => clock.now,
+      budget: o.budget ?? 10_000,
+      otherBytes: o.other,
+    });
+    const make = (key: string) => () => {
+      clock.now += 3;
+      made.push(key);
+      return key;
+    };
+    return { lazy, clock, made, destroyed, make };
+  }
+
+  it("make a few a frame within a time budget, at least one", () => {
+    const { lazy, made, make } = lazyTextures();
+    const handles = ["a", "b", "c"].map((key) => lazy.acquire(key, make(key)));
+    expect(handles.map((h) => h.texture)).toEqual([null, null, null]);
     expect(lazy.pump(5)).toBe(1);
     expect(made).toEqual(["a", "b"]);
-    expect(lazy.get("a", () => "again")).toBe("a");
+    expect(handles[0].texture).toBe("a");
+    expect(lazy.acquire("a", make("again")).texture).toBe("a");
     expect(lazy.pump(1)).toBe(0);
     expect(made).toEqual(["a", "b", "c"]);
+    expect(lazy.bytesHeld).toBe(300);
+  });
+
+  it("let go of one no card has shown for a minute", () => {
+    const { lazy, clock, destroyed, make } = lazyTextures();
+    const a = lazy.acquire("a", make("a"));
+    const b = lazy.acquire("b", make("b"));
+    lazy.pump(10);
+    a.release();
+    clock.now += 59_000;
+    lazy.sweep();
+    expect(destroyed).toEqual([]);
+    clock.now += 1_000;
+    lazy.sweep();
+    expect(destroyed).toEqual(["a"]);
+    expect(b.texture).toBe("b");
+    expect(lazy).toMatchObject({ size: 1, bytesHeld: 100 });
+  });
+
+  it("let go of the oldest unused while a budget shared with the images is spent", () => {
+    let other = 0;
+    const { lazy, clock, destroyed, make } = lazyTextures({
+      budget: 250,
+      other: () => other,
+    });
+    const [a, b, c] = ["a", "b", "c"].map((key) =>
+      lazy.acquire(key, make(key)),
+    );
+    lazy.pump(100);
+    // Over the budget, but every one is in use.
+    expect(destroyed).toEqual([]);
+    clock.now = 100;
+    b.release();
+    clock.now = 200;
+    a.release();
+    lazy.sweep();
+    expect(destroyed).toEqual(["b"]);
+    other = 100;
+    lazy.sweep();
+    expect(destroyed).toEqual(["b", "a"]);
+    expect(c.texture).toBe("c");
+  });
+
+  it("never make one nobody wants any more", () => {
+    const { lazy, made, make } = lazyTextures();
+    lazy.acquire("x", make("x")).release();
+    expect(lazy.pending).toBe(0);
+    lazy.pump(10);
+    expect(made).toEqual([]);
   });
 });

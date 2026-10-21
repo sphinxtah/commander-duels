@@ -4,12 +4,14 @@ import type {
   TableModel,
   ZoneTile,
 } from "../../table/types";
+import type { Seat } from "../../types";
 import { HAND } from "../../table/geometry";
 import { fanHand } from "../../table/layout";
 import type { SceneKit } from "../createTableScene";
 import { diamondPath } from "../icons";
 import { BitmapText, Container, Graphics, Sprite } from "../pixi";
 import { CardNode, restPose } from "./CardNode";
+import { LOST_DIM } from "./PortraitNode";
 
 // The zone tiles (design §8.4, §8.6–§8.8): each library a face-down pile on a raised stone block
 // with its count cut into the front, each graveyard and exile its top card (or an empty outline),
@@ -57,13 +59,21 @@ export class PileNode {
   private top: CardNode | null = null;
   private signature = "";
   private readonly kit: SceneKit;
+  /** Whose tile it is. */
+  seat: Seat | null = null;
 
   constructor(kit: SceneKit) {
     this.kit = kit;
     this.root.addChild(this.ground, this.backs, this.labels);
   }
 
+  /** How far its player's loss shows, 0 to 1: the tile fades with their portrait. */
+  setLost(amount: number): void {
+    this.root.alpha = 1 - LOST_DIM.fade * amount;
+  }
+
   update(tile: ZoneTile, model: TableModel, drawTop: boolean): void {
+    this.seat = tile.seat;
     const card = drawTop && tile.topKey ? model.cards.get(tile.topKey) : null;
     // A tile glows when something in it can be chosen now.
     const player = [model.anchored, ...model.opponents].find(
@@ -96,6 +106,7 @@ export class PileNode {
         tierHeight: face.h,
         priority: 4 as const,
         yours: false,
+        ribbon: null,
       };
       this.top.place(card.card, placement);
       this.top.setPose(restPose(placement));

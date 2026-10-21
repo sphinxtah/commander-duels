@@ -75,6 +75,18 @@ describe("the timeline", () => {
     expect(timeline.busy()).toBe(false);
   });
 
+  it("can leave idle effects out of whether it is busy", () => {
+    const time = clock();
+    const timeline = new Timeline(time.now);
+    timeline.to("breath", { t: 0 }, { t: 1 }, 2400);
+    timeline.to("p:a", rest, { ...rest, x: 10 }, 100);
+    const idle = new Set(["breath"]);
+    expect(timeline.busy(time.now(), idle)).toBe(true);
+    time.advance(100);
+    expect(timeline.busy(time.now(), idle)).toBe(false);
+    expect(timeline.busy()).toBe(true);
+  });
+
   it("reports progress for effects that are not poses", () => {
     const time = clock();
     const timeline = new Timeline(time.now);

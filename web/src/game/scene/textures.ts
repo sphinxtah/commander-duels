@@ -1,4 +1,11 @@
-import { fetchCardImage, knownMissing } from "../images";
+import {
+  RETRIES,
+  backoff,
+  isTryAgain,
+  knownMissing,
+  requestCardImage,
+  type TryAgain,
+} from "../images";
 import type { CardImageSize } from "../table/types";
 
 // The table's card textures (design §11). Each card picture is decoded at the smallest of a few
@@ -6,7 +13,9 @@ import type { CardImageSize } from "../table/types";
 // so a board of 240 permanents at 4K costs what it shows and no more. Textures are shared and
 // reference-counted by name and tier, fetched six at a time with the hand first, handed to the
 // GPU at most eight a frame, and kept within a memory budget, oldest unused first. A name the
-// server has no image for is remembered in images.ts, where CardFace looks too.
+// server has no image for is remembered in images.ts, where CardFace looks too. A failed request
+// is tried again with CardFace's backoff, but the wait happens here, outside the six: a card
+// waiting to try again never holds up another card's first request.
 //
 // Nothing here imports PixiJS: the scene passes an adapter that makes and destroys textures, so
 // the cache's rules are tested in jsdom without WebGL.
@@ -55,11 +64,13 @@ export interface TextureAdapter<T, B extends Decoded = Decoded> {
   destroy(texture: T, bitmap: B): void;
   /** Bytes the texture holds on the GPU (mipmaps included). */
   bytes?(bitmap: B): number;
+  /** One request for an image (images.ts's requestCardImage unless a test says otherwise). A
+   * TryAgain is tried again later; a rejection gives up. */
   fetch?: (
     name: string,
     size: CardImageSize,
     o: { signal?: AbortSignal },
-  ) => Promise<Blob | "missing">;
+  ) => Promise<Blob | "missing" | TryAgain>;
 }
 
 export type TextureState = "loading" | "ready" | "missing" | "failed";
@@ -79,7 +90,15 @@ interface Entry<T, B> {
   tier: Tier;
   priority: Priority;
   order: number;
-  phase: "queued" | "fetching" | "decoded" | "ready" | "missing" | "failed";
+  /** "waiting": a request failed and the next one may start at `notBefore`. */
+  phase:
+    | "queued"
+    | "fetching"
+    | "waiting"
+    | "decoded"
+    | "ready"
+    | "missing"
+    | "failed";
   refs: number;
   lastUsed: number;
   controller: AbortController | null;
@@ -87,6 +106,9 @@ interface Entry<T, B> {
   texture: T | null;
   bytes: number;
   listeners: ((state: TextureState) => void)[];
+  /** Requests made so far that failed and may be tried again. */
+  attempt: number;
+  notBefore: number;
 }
 
 export interface TextureCacheOptions {
@@ -98,6 +120,8 @@ export interface TextureCacheOptions {
   now?: () => number;
   /** Something changed that the scene should draw: a texture is ready to hand over, or settled. */
   onChange?: () => void;
+  /** Bytes held elsewhere that count against the same budget (the cards' text frames). */
+  otherBytes?: () => number;
 }
 
 export interface TextureCacheStats {
@@ -116,10 +140,14 @@ export class TextureCache<T, B extends Decoded = Decoded> {
   private readonly idleMs: number;
   private readonly now: () => number;
   private readonly onChange: () => void;
+  private readonly otherBytes: () => number;
   private inFlight = 0;
   private order = 0;
   private bytes = 0;
   private disposed = false;
+  /** Wakes the queue when the soonest waiting card may try again. */
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private wakeAt = Infinity;
 
   constructor(adapter: TextureAdapter<T, B>, o: TextureCacheOptions = {}) {
     this.adapter = adapter;
@@ -129,6 +157,11 @@ export class TextureCache<T, B extends Decoded = Decoded> {
     this.idleMs = o.idleMs ?? 60_000;
     this.now = o.now ?? (() => performance.now());
     this.onChange = o.onChange ?? (() => undefined);
+    this.otherBytes = o.otherBytes ?? (() => 0);
+  }
+
+  private overBudget(): boolean {
+    return this.bytes + this.otherBytes() > this.budget;
   }
 
   /** A handle on the picture of `name` at `tier`. Release it when the card stops showing it. */
@@ -150,6 +183,8 @@ export class TextureCache<T, B extends Decoded = Decoded> {
         texture: null,
         bytes: 0,
         listeners: [],
+        attempt: 0,
+        notBefore: 0,
       };
       this.entries.set(key, entry);
     } else if (priority < entry.priority) entry.priority = priority;
@@ -195,16 +230,29 @@ export class TextureCache<T, B extends Decoded = Decoded> {
     if (entry.refs > 0) return;
     entry.listeners = [];
     // Nobody wants it any more: stop asking, and forget what was not worth keeping.
-    if (entry.phase === "queued" || entry.phase === "fetching") {
+    if (
+      entry.phase === "queued" ||
+      entry.phase === "fetching" ||
+      entry.phase === "waiting"
+    ) {
       entry.controller?.abort();
       this.entries.delete(entry.key);
     } else if (entry.phase === "missing" || entry.phase === "failed")
       this.entries.delete(entry.key);
   }
 
-  /** Starts fetches while fewer than six are in flight, the most wanted first. */
+  /** Starts fetches while fewer than six are in flight, the most wanted first, and sets a timer
+   * for the soonest card waiting to try again. */
   private drain(): void {
-    while (this.inFlight < this.maxInFlight && !this.disposed) {
+    if (this.disposed) return;
+    const now = this.now();
+    let soonest = Infinity;
+    for (const entry of this.entries.values())
+      if (entry.phase === "waiting") {
+        if (entry.notBefore <= now) entry.phase = "queued";
+        else soonest = Math.min(soonest, entry.notBefore);
+      }
+    while (this.inFlight < this.maxInFlight) {
       let next: Entry<T, B> | null = null;
       for (const entry of this.entries.values())
         if (
@@ -214,9 +262,33 @@ export class TextureCache<T, B extends Decoded = Decoded> {
             (entry.priority === next.priority && entry.order < next.order))
         )
           next = entry;
-      if (!next) return;
+      if (!next) break;
       this.start(next);
     }
+    if (soonest < this.wakeAt) {
+      clearTimeout(this.timer);
+      this.wakeAt = soonest;
+      this.timer = setTimeout(
+        () => {
+          this.timer = undefined;
+          this.wakeAt = Infinity;
+          this.drain();
+        },
+        Math.max(0, soonest - now),
+      );
+    }
+  }
+
+  /** A request failed in a way worth trying again: wait (outside the six in flight) as long as
+   * CardFace would, or give up after as many tries. */
+  private later(entry: Entry<T, B>, retryAfter: number): void {
+    if (entry.attempt >= RETRIES) {
+      this.settle(entry, "failed");
+      return;
+    }
+    entry.phase = "waiting";
+    entry.notBefore = this.now() + backoff(entry.attempt, retryAfter);
+    entry.attempt += 1;
   }
 
   private start(entry: Entry<T, B>): void {
@@ -224,7 +296,7 @@ export class TextureCache<T, B extends Decoded = Decoded> {
     const controller = new AbortController();
     entry.controller = controller;
     this.inFlight += 1;
-    const fetch = this.adapter.fetch ?? fetchCardImage;
+    const fetch = this.adapter.fetch ?? requestCardImage;
     const live = () =>
       !this.disposed &&
       !controller.signal.aborted &&
@@ -236,6 +308,10 @@ export class TextureCache<T, B extends Decoded = Decoded> {
         if (!live()) return;
         if (blob === "missing") {
           this.settle(entry, "missing");
+          return;
+        }
+        if (isTryAgain(blob)) {
+          this.later(entry, blob.retryAfter);
           return;
         }
         const bitmap = await this.adapter.decode(blob, entry.tier);
@@ -279,19 +355,20 @@ export class TextureCache<T, B extends Decoded = Decoded> {
       this.bytes += entry.bytes;
       this.settle(entry, "ready");
     }
-    if (this.bytes > this.budget) this.sweep();
+    if (this.overBudget()) this.sweep();
     return Math.max(0, ready.length - this.uploadsPerFrame);
   }
 
   /** Lets go of unused textures: any idle for a minute, then the oldest unused while over the
-   * budget. Textures in use are never let go. */
+   * budget. A texture someone holds is never let go: a card keeps holding the picture it shows
+   * until the one replacing it is ready. */
   sweep(): void {
     const now = this.now();
     const unused = [...this.entries.values()]
       .filter((entry) => entry.refs <= 0 && entry.phase === "ready")
       .sort((a, b) => a.lastUsed - b.lastUsed);
     for (const entry of unused)
-      if (now - entry.lastUsed >= this.idleMs || this.bytes > this.budget)
+      if (now - entry.lastUsed >= this.idleMs || this.overBudget())
         this.evict(entry);
   }
 
@@ -310,6 +387,7 @@ export class TextureCache<T, B extends Decoded = Decoded> {
       else if (
         entry.phase === "queued" ||
         entry.phase === "fetching" ||
+        entry.phase === "waiting" ||
         entry.phase === "decoded"
       )
         pending += 1;
@@ -317,9 +395,16 @@ export class TextureCache<T, B extends Decoded = Decoded> {
     return { textures, bytes: this.bytes, pending, inFlight: this.inFlight };
   }
 
+  /** The bytes its textures hold now (stats.bytes, without counting the rest). */
+  get bytesHeld(): number {
+    return this.bytes;
+  }
+
   /** Stops every fetch and starts no more; the textures made so far stay until dispose(). */
   stop(): void {
     this.disposed = true;
+    clearTimeout(this.timer);
+    this.timer = undefined;
     for (const entry of this.entries.values()) entry.controller?.abort();
   }
 
@@ -336,55 +421,150 @@ export class TextureCache<T, B extends Decoded = Decoded> {
   }
 }
 
+export interface LazyHandle<T> {
+  readonly key: string;
+  /** The texture once it has been made, null while it waits its turn. */
+  readonly texture: T | null;
+  release(): void;
+}
+
+interface LazyEntry<T> {
+  key: string;
+  make: (() => T) | null;
+  texture: T | null;
+  refs: number;
+  lastUsed: number;
+  bytes: number;
+}
+
+export interface LazyTexturesOptions<T> {
+  destroy(texture: T): void;
+  /** Bytes the texture holds, counted against the budget. */
+  bytes?(texture: T): number;
+  budget?: number;
+  /** An unused texture older than this is let go even within the budget. */
+  idleMs?: number;
+  now?: () => number;
+  /** Bytes held elsewhere that count against the same budget (the card images). */
+  otherBytes?: () => number;
+}
+
 /**
  * Pictures made on the main thread (the text frames under every card face) in small slices, so
  * a first board of many names never makes one long task: each frame makes as many as fit in a
- * few milliseconds, and the cards wait on a plain placeholder until theirs is made.
+ * few milliseconds, and the cards wait on a plain placeholder until theirs is made. They are
+ * shared and reference-counted as the card images are, count against the same budget, and go
+ * when no card has shown them for a minute or the budget is spent: a creature whose power keeps
+ * changing makes a new frame each time, and the old ones must not pile up for the whole game.
  */
 export class LazyTextures<T> {
-  private readonly made = new Map<string, T>();
-  private readonly queue = new Map<string, () => T>();
+  private readonly entries = new Map<string, LazyEntry<T>>();
   private readonly destroy: (texture: T) => void;
+  private readonly bytesOf: (texture: T) => number;
+  private readonly budget: number;
+  private readonly idleMs: number;
   private readonly now: () => number;
+  private readonly otherBytes: () => number;
+  private held = 0;
 
-  constructor(
-    destroy: (texture: T) => void,
-    now: () => number = () => performance.now(),
-  ) {
-    this.destroy = destroy;
-    this.now = now;
+  constructor(o: LazyTexturesOptions<T>) {
+    this.destroy = o.destroy;
+    this.bytesOf = o.bytes ?? (() => 0);
+    this.budget = o.budget ?? textureBudget();
+    this.idleMs = o.idleMs ?? 60_000;
+    this.now = o.now ?? (() => performance.now());
+    this.otherBytes = o.otherBytes ?? (() => 0);
   }
 
-  /** The texture for `key` if made; otherwise queues `make` and returns null. */
-  get(key: string, make: () => T): T | null {
-    const texture = this.made.get(key);
-    if (texture !== undefined) return texture;
-    if (!this.queue.has(key)) this.queue.set(key, make);
-    return null;
+  /** A handle on the texture for `key`, made by `make` in a later pump() if it is not made yet.
+   * Release it when the card stops showing it. */
+  acquire(key: string, make: () => T): LazyHandle<T> {
+    let entry = this.entries.get(key);
+    if (!entry) {
+      entry = { key, make, texture: null, refs: 0, lastUsed: 0, bytes: 0 };
+      this.entries.set(key, entry);
+    }
+    entry.refs += 1;
+    entry.lastUsed = this.now();
+    const held = entry;
+    let released = false;
+    return {
+      key,
+      get texture() {
+        return held.texture;
+      },
+      release: () => {
+        if (released) return;
+        released = true;
+        held.refs -= 1;
+        held.lastUsed = this.now();
+        // Not made yet, and nobody wants it made.
+        if (held.refs <= 0 && !held.texture) this.entries.delete(held.key);
+      },
+    };
   }
 
   /** Makes queued textures until `budgetMs` has passed (at least one). Returns how many wait. */
   pump(budgetMs: number): number {
     const start = this.now();
-    for (const [key, make] of this.queue) {
-      this.queue.delete(key);
-      this.made.set(key, make());
+    for (const entry of this.entries.values()) {
+      if (!entry.make) continue;
+      const make = entry.make;
+      entry.make = null;
+      try {
+        entry.texture = make();
+        entry.bytes = this.bytesOf(entry.texture);
+        this.held += entry.bytes;
+      } catch {
+        // The cards keep their placeholder.
+      }
       if (this.now() - start >= budgetMs) break;
     }
-    return this.queue.size;
+    if (this.overBudget()) this.sweep();
+    return this.pending;
+  }
+
+  private overBudget(): boolean {
+    return this.held + this.otherBytes() > this.budget;
+  }
+
+  /** Lets go of unused textures: any idle for a minute, then the oldest unused while over the
+   * budget. A texture someone holds is never let go. */
+  sweep(): void {
+    const now = this.now();
+    const unused = [...this.entries.values()]
+      .filter((entry) => entry.refs <= 0 && entry.texture !== null)
+      .sort((a, b) => a.lastUsed - b.lastUsed);
+    for (const entry of unused)
+      if (now - entry.lastUsed >= this.idleMs || this.overBudget()) {
+        this.destroy(entry.texture!);
+        this.held -= entry.bytes;
+        this.entries.delete(entry.key);
+      }
   }
 
   get pending(): number {
-    return this.queue.size;
+    let pending = 0;
+    for (const entry of this.entries.values()) if (entry.make) pending += 1;
+    return pending;
   }
 
+  /** How many have been made and are kept. */
   get size(): number {
-    return this.made.size;
+    let made = 0;
+    for (const entry of this.entries.values()) if (entry.texture) made += 1;
+    return made;
+  }
+
+  /** The bytes the textures made so far hold. */
+  get bytesHeld(): number {
+    return this.held;
   }
 
   dispose(): void {
-    for (const texture of this.made.values()) this.destroy(texture);
-    this.made.clear();
-    this.queue.clear();
+    for (const entry of this.entries.values())
+      if (entry.texture) this.destroy(entry.texture);
+    this.entries.clear();
+    this.held = 0;
   }
 }

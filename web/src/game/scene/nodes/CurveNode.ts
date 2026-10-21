@@ -92,8 +92,16 @@ export class CurveNode {
     });
   }
 
-  setVisible(visible: boolean): void {
+  /** Shows or hides the line; says whether that changed anything to draw. */
+  setVisible(visible: boolean): boolean {
+    if (this.root.visible === visible) return false;
     this.root.visible = visible;
+    return true;
+  }
+
+  /** How much of the line is drawn now, 0 to 1. */
+  get drawnShare(): number {
+    return this.drawn < 0 ? 1 : this.drawn;
   }
 
   destroy(): void {

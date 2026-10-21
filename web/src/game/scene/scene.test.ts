@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 // The scene's rules about card images (design §8.10, §11), checked on its source: jsdom has no
-// WebGL, so the scene itself never runs in unit tests, and these rules must hold in every
-// module of it. The browser journeys check the pictures themselves.
+// WebGL, so the scene runs in unit tests only on a stand-in renderer (createTableScene.test.ts),
+// and these rules must hold in every module of it. The browser journeys check the pictures
+// themselves.
 
 const sources = import.meta.glob(["./**/*.ts", "!./**/*.test.ts"], {
   query: "?raw",

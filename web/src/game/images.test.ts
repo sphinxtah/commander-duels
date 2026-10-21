@@ -7,10 +7,15 @@ import {
   imageSizeFor,
   knownMissing,
   rememberMissing,
+  requestCardImage,
 } from "./images";
 
 /** A fetch that answers each call with the next status in `statuses` (the last one repeats). */
-function serving(statuses: (number | "error")[], code = "card_images_busy") {
+function serving(
+  statuses: (number | "error")[],
+  code = "card_images_busy",
+  headers: Record<string, string> = {},
+) {
   let call = 0;
   const fetch = vi.fn(async (_url: string, init?: RequestInit) => {
     if (init?.signal?.aborted) throw new DOMException("aborted", "AbortError");
@@ -20,7 +25,7 @@ function serving(statuses: (number | "error")[], code = "card_images_busy") {
     return {
       ok: status >= 200 && status < 300,
       status,
-      headers: new Headers(),
+      headers: new Headers(headers),
       json: async () => ({ code }),
       blob: async () => new Blob(["image"], { type: "image/jpeg" }),
     } as unknown as Response;
@@ -64,6 +69,37 @@ describe("image addresses and sizes", () => {
     expect(backoff(0, 30)).toBe(30_000);
     vi.mocked(Math.random).mockReturnValue(0.99);
     expect(backoff(0, 0)).toBeCloseTo(2_495, 0);
+  });
+});
+
+describe("one request for an image, for the table's texture cache", () => {
+  it("returns the image, or remembers that the server has none", async () => {
+    serving([200]);
+    expect(await requestCardImage("Plains", "normal")).toBeInstanceOf(Blob);
+    serving([404], "card_image_missing");
+    expect(await requestCardImage("Squirrel Token", "normal")).toBe("missing");
+    expect(knownMissing("Squirrel Token")).toBe(true);
+  });
+
+  it("says how long to wait after any other failure, and never waits itself", async () => {
+    const fetch = serving([429], "card_images_busy", { "Retry-After": "12" });
+    expect(await requestCardImage("Mox Jet", "normal")).toEqual({
+      retryAfter: 12,
+    });
+    serving(["error"]);
+    expect(await requestCardImage("Mox Jet", "normal")).toEqual({
+      retryAfter: 0,
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects when the image is no longer wanted", async () => {
+    serving([200]);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      requestCardImage("Timetwister", "normal", { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 });
 

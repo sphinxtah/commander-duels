@@ -46,7 +46,7 @@ import { FLOAT_COLOURS, FloatNode } from "./nodes/FloatNode";
 import { HandNode } from "./nodes/HandNode";
 import { MoreBadge, PileNode, fitCard } from "./nodes/PileNode";
 import { PortraitNode } from "./nodes/PortraitNode";
-import { StackNode } from "./nodes/StackNode";
+import { ribbonRect } from "./nodes/StackNode";
 import {
   Application,
   BitmapFont,
@@ -62,10 +62,18 @@ import {
   LazyTextures,
   TextureCache,
   textureBudget,
+  type LazyHandle,
   type TextureAdapter,
   type Tier,
 } from "./textures";
-import { Timeline, duration, easeInOut, linear, type Pose } from "./timeline";
+import {
+  Timeline,
+  duration,
+  easeInOut,
+  easeOut,
+  linear,
+  type Pose,
+} from "./timeline";
 
 // The PixiJS table (design §11): one canvas behind the DOM layer, aria-hidden and taking no
 // pointer events, drawing the stone table in perspective, the band, the zone tiles, the cards,
@@ -98,8 +106,9 @@ export interface SceneKit {
   readonly textures: TextureCache<Texture, ImageBitmap>;
   /** Device pixels per stage unit. */
   resolution(): number;
-  /** A card's text frame at a tier, or null while it waits to be made. */
-  frameTexture(card: CardView, tier: Tier): Texture | null;
+  /** A handle on a card's text frame at a tier, made a few a frame; release it when the card
+   * stops showing it. */
+  frame(card: CardView, tier: Tier): LazyHandle<Texture>;
   waitForFrame(node: CardNode): void;
   fadeImage(node: CardNode): void;
   sigil(seed: string, grey: boolean): Texture;
@@ -124,11 +133,20 @@ interface Arrival {
   token: boolean;
 }
 
+interface Exiting {
+  visual: Visual | null;
+  ms: number;
+  /** Into a hand or a library: it turns to our back on the way (design §14). */
+  hides: boolean;
+}
+
 interface Plan {
   arrivals: Map<string, Arrival>;
-  exits: Map<string, { visual: Visual | null; ms: number }>;
+  exits: Map<string, Exiting>;
   /** Cards that became another card: their successor starts where they are, so they go at once. */
   paired: Set<string>;
+  /** Stack items just cast: their lines draw themselves on. */
+  cast: Set<string>;
   effects: TableEvent[];
 }
 
@@ -141,6 +159,9 @@ interface PlacedCard {
 
 /** More events than this in one diff is a jump: snap to it rather than play it. */
 const MAX_EVENTS = 24;
+/** Tweens that are an idle effect, not a change being shown: nothing waits for them. */
+const IDLE = new Set(["breath"]);
+const NO_EVENTS: TableDiff = { baseline: false, events: [] };
 const BAND_Y = 510;
 const NUDGE = 16;
 const FONT_NAME = "cd-bold";
@@ -330,6 +351,8 @@ class PixiTableScene implements TableScene {
   private readonly animated = new Set<string>();
   private readonly pool: CardNode[] = [];
   private readonly ghosts = new Map<string, CardNode>();
+  /** Departing ghosts that turn to our back on the way: they go into a hand or a library. */
+  private readonly hiding = new Set<string>();
   private readonly flyers = new Map<string, Sprite>();
   private readonly tiles = new Map<string, PileNode>();
   private readonly mores = new Map<string, MoreBadge>();
@@ -339,7 +362,6 @@ class PixiTableScene implements TableScene {
   private readonly waitingFrames = new Set<CardNode>();
   private readonly fading = new Map<CardNode, number>();
   private readonly band: BandNode;
-  private readonly stack: StackNode;
   private readonly hand: HandNode;
   private readonly emblem = new EmblemNode();
   private dragCurve: CurveNode | null = null;
@@ -348,6 +370,8 @@ class PixiTableScene implements TableScene {
   private readonly dragShadow: Sprite;
   private serial = 0;
   private promptId: string | null = null;
+  /** The last diff whose events were played: a new frame carrying the same diff plays none. */
+  private playedDiff: TableDiff | null = null;
 
   constructor(
     app: Application,
@@ -390,18 +414,27 @@ class PixiTableScene implements TableScene {
     };
     const memory = (navigator as Navigator & { deviceMemory?: number })
       .deviceMemory;
+    // The card images and the text frames share one budget.
+    const budget = textureBudget(memory);
     this.textures = new TextureCache(adapter, {
-      budget: textureBudget(memory),
+      budget,
       onChange: () => this.requestFrame(),
+      otherBytes: () => this.frames.bytesHeld,
     });
-    this.frames = new LazyTextures<Texture>((texture) => texture.destroy(true));
+    this.frames = new LazyTextures<Texture>({
+      destroy: (texture) => texture.destroy(true),
+      bytes: (texture) =>
+        texture.source.pixelWidth * texture.source.pixelHeight * 4,
+      budget,
+      otherBytes: () => this.textures.bytesHeld,
+    });
     const scene = this;
     this.kit = {
       art: this.art,
       textures: this.textures,
       resolution: () => scene.fit.resolution,
-      frameTexture: (card, tier) =>
-        scene.frames.get(
+      frame: (card, tier) =>
+        scene.frames.acquire(
           `${card.name}|${card.type_line}|${card.power}/${card.toughness}|${card.mana_cost}|${tier}`,
           () => canvasTexture(textFrame(card, tier)),
         ),
@@ -429,8 +462,6 @@ class PixiTableScene implements TableScene {
     this.table.addChild(this.plane, this.grooves);
     this.band = new BandNode(this.kit);
     this.bandLayer.addChild(this.band.root);
-    this.stack = new StackNode();
-    this.stackLayer.addChild(this.stack.root);
     this.hand = new HandNode(this.kit);
     this.dragShadow = new Sprite(this.art.shadow);
     this.dragShadow.visible = false;
@@ -477,15 +508,18 @@ class PixiTableScene implements TableScene {
       return;
     }
     this.apply(frame, false);
-    this.render();
-    // Pictures no card has shown for a minute, or the oldest unused over the budget, go.
+    // Pictures and frames no card has shown for a minute, or the oldest unused over the budget,
+    // go. Cards hold what they show, so nothing on screen is let go.
     this.textures.sweep();
-    const busy = this.busy();
+    this.frames.sweep();
+    this.render();
     this.setStatus({
       drawnRevision: frame.model.revision,
-      settledRevision: busy ? this.state.settledRevision : frame.model.revision,
+      settledRevision: this.unsettled()
+        ? this.state.settledRevision
+        : frame.model.revision,
     });
-    if (busy) this.requestFrame();
+    if (this.busy()) this.requestFrame();
   }
 
   resize(fit: StageFit): void {
@@ -606,7 +640,7 @@ class PixiTableScene implements TableScene {
     this.lastRender = this.timeline.now();
     const t = this.textures.stats;
     this.stats.textures = t.textures + this.frames.size;
-    this.stats.textureBytes = t.bytes;
+    this.stats.textureBytes = t.bytes + this.frames.bytesHeld;
     this.stats.pending = t.pending + this.frames.pending;
   }
 
@@ -631,13 +665,23 @@ class PixiTableScene implements TableScene {
     this.step(now);
     this.render();
     if (this.busy()) this.requestFrame();
-    else if (this.frame)
+    if (this.frame && !this.unsettled())
       this.setStatus({ settledRevision: this.frame.model.revision });
   };
 
+  /** Whether another frame is wanted: anything moving, fading or waiting to be drawn. */
   private busy(): boolean {
+    return this.timeline.busy() || this.drawing();
+  }
+
+  /** Whether the commit is still being shown: everything busy() counts but the idle glow's
+   * breath, which the settled revision (and the response timer after it) never waits for. */
+  private unsettled(): boolean {
+    return this.timeline.busy(this.timeline.now(), IDLE) || this.drawing();
+  }
+
+  private drawing(): boolean {
     return (
-      this.timeline.busy() ||
       this.fading.size > 0 ||
       this.waitingFrames.size > 0 ||
       this.frames.pending > 0 ||
@@ -695,9 +739,15 @@ class PixiTableScene implements TableScene {
     for (const [key, ghost] of this.ghosts) {
       const pose = this.timeline.sample(`p:${key}`, now) as Pose | null;
       if (pose) ghost.setPose(pose);
+      // Into a hand or a library: our back covers the face from 60% of the way.
+      if (this.hiding.has(key)) {
+        const p = this.timeline.progress(`p:${key}`, now) ?? 1;
+        ghost.showBack(Math.min(1, Math.max(0, (p - 0.55) / 0.1)));
+      }
       if (!this.timeline.active(`p:${key}`, now)) {
         this.timeline.cancel(`p:${key}`);
         this.ghosts.delete(key);
+        this.hiding.delete(key);
         this.recycle(ghost);
       }
     }
@@ -726,7 +776,7 @@ class PixiTableScene implements TableScene {
     for (const [key, curve] of this.curves) {
       const t = this.timeline.progress(`k:${key}`, now);
       if (t === null) continue;
-      curve.setDrawn(t);
+      curve.setDrawn(easeOut(t));
       if (t >= 1) this.timeline.cancel(`k:${key}`);
     }
     for (const [seat, portrait] of this.portraits) {
@@ -735,10 +785,10 @@ class PixiTableScene implements TableScene {
         portrait.pulseLife(1 + 0.25 * Math.sin(Math.PI * life));
         if (life >= 1) this.timeline.cancel(`l:${seat}`);
       }
-      const cracked = this.timeline.progress(`c:${seat}`, now);
-      if (cracked !== null) {
-        portrait.setCrack(cracked);
-        if (cracked >= 1) this.timeline.cancel(`c:${seat}`);
+      const lost = this.timeline.progress(`c:${seat}`, now);
+      if (lost !== null) {
+        this.showLoss(seat, lost);
+        if (lost >= 1) this.timeline.cancel(`c:${seat}`);
       }
     }
     const emblem = this.timeline.progress("emblem", now);
@@ -772,6 +822,8 @@ class PixiTableScene implements TableScene {
     return Math.sin(t * Math.PI * 8) * 4 * (1 - t);
   }
 
+  /** Lands everything where it is going. The timeline is cleared first (or is about to be), so
+   * nothing comes back on the next frame. */
   private finishAll(): void {
     for (const key of this.animated) {
       const view = this.cards.get(key);
@@ -782,6 +834,7 @@ class PixiTableScene implements TableScene {
     this.animated.clear();
     for (const ghost of this.ghosts.values()) this.recycle(ghost);
     this.ghosts.clear();
+    this.hiding.clear();
     for (const sprite of this.flyers.values()) sprite.destroy();
     this.flyers.clear();
     for (const float of this.floats.values()) float.destroy();
@@ -790,8 +843,24 @@ class PixiTableScene implements TableScene {
     this.fading.clear();
     for (const curve of this.curves.values()) curve.setDrawn(1);
     for (const portrait of this.portraits.values()) portrait.pulseLife(1);
+    this.landLosses();
     this.emblem.setAlpha(0);
     for (const view of this.cards.values()) view.setGlowAlpha(1);
+  }
+
+  /** How far a player's loss shows, 0 to 1: their portrait cracked and faded, their zone tiles
+   * faded and a shade over their column. */
+  private showLoss(seat: Seat, amount: number): void {
+    this.portraits.get(seat)?.setLost(amount);
+    for (const tile of this.tiles.values())
+      if (tile.seat === seat) tile.setLost(amount);
+  }
+
+  /** Every player's loss as it stands, except one whose elimination is still playing. */
+  private landLosses(): void {
+    for (const [seat, portrait] of this.portraits)
+      if (!this.timeline.has(`c:${seat}`))
+        this.showLoss(seat, portrait.lost ? 1 : 0);
   }
 
   /* ---------- the stage and the table plane ---------- */
@@ -948,6 +1017,10 @@ class PixiTableScene implements TableScene {
       tierHeight: hand ? face.h * HAND.rise.scale : node.drawHeight,
       priority: hand ? 0 : node.role === "stack" ? 2 : yours ? 1 : 3,
       yours,
+      ribbon:
+        node.role === "stack" && card.located.stack?.kind === "ability"
+          ? ribbonRect(face, node.footprint)
+          : null,
     };
   }
 
@@ -1051,8 +1124,9 @@ class PixiTableScene implements TableScene {
   /** What the diff's events ask of the cards: where arrivals start, where departures go. */
   private plan(diff: TableDiff, model: TableModel, layout: TableLayout): Plan {
     const arrivals = new Map<string, Arrival>();
-    const exits = new Map<string, { visual: Visual | null; ms: number }>();
+    const exits = new Map<string, Exiting>();
     const paired = new Set<string>();
+    const cast = new Set<string>();
     const effects: TableEvent[] = [];
     const ms = (name: Parameters<typeof duration>[0]) =>
       duration(name, this.motion);
@@ -1084,17 +1158,19 @@ class PixiTableScene implements TableScene {
     const to = (
       exit: Extract<TableEvent, { type: "leave" }>["to"],
       time: number,
-    ) =>
+    ): Exiting =>
       exit.kind === "anchor"
         ? {
             visual: this.anchorVisual(exit.anchor, exit.seat, layout, model),
             ms: time,
+            hides: exit.anchor === "hand" || exit.anchor === "library",
           }
-        : { visual: null, ms: ms("fade") };
+        : { visual: null, ms: ms("fade"), hides: false };
     for (const event of diff.events)
       switch (event.type) {
         case "cast":
           arrivals.set(event.key, from(event.from, ms("cast")));
+          cast.add(event.key.slice("stack:".length));
           break;
         case "enter":
           if (!arrivals.has(event.key))
@@ -1135,7 +1211,7 @@ class PixiTableScene implements TableScene {
         default:
           effects.push(event);
       }
-    return { arrivals, exits, paired, effects };
+    return { arrivals, exits, paired, cast, effects };
   }
 
   private apply(frame: SceneFrame, snapAll: boolean): void {
@@ -1143,14 +1219,24 @@ class PixiTableScene implements TableScene {
     const { model, layout, diff } = frame;
     const previous = this.frame;
     this.frame = frame;
+    // A diff's events play once: a new frame object that carries the same diff (the screen
+    // rebuilt it for some other reason) moves cards to the new layout and plays nothing again.
+    const played = diff === this.playedDiff;
+    this.playedDiff = diff;
     const animate =
       !snapAll &&
       previous !== null &&
       previous.model.gameId === model.gameId &&
       !diff.baseline &&
       diff.events.length <= MAX_EVENTS;
-    const plan = animate ? this.plan(diff, model, layout) : null;
-    if (!animate) this.finishAll();
+    const plan = animate
+      ? this.plan(played ? NO_EVENTS : diff, model, layout)
+      : null;
+    if (!animate) {
+      // A jump: whatever was playing stops where it would have ended, and stays there.
+      this.timeline.clear();
+      this.finishAll();
+    }
     const ui = this.ui.get();
     const moving = this.motion !== "none";
 
@@ -1281,18 +1367,19 @@ class PixiTableScene implements TableScene {
       });
       view.root.zIndex = view.root.zIndex + 1;
       this.ghosts.set(ghostKey, view);
+      if (exit?.visual && moving && exit.hides) this.hiding.add(ghostKey);
     }
 
     /* --- the rest of the table --- */
     this.drawGrooves(layout);
     this.band.resize(layout.band, this.span.left, this.span.right);
     this.band.update(layout.band, model.phase, model.step);
-    this.stack.update(model, layout);
     this.hand.setBacks(model.handBacks);
     this.applyTiles(model, layout);
     this.applyMores(layout);
     this.applyPortraits(model, layout, ui);
-    this.applyCurves(layout, ui);
+    this.landLosses();
+    this.applyCurves(layout, ui, plan?.cast);
     this.applyDrag(ui);
     if (plan) this.playEffects(plan.effects, model, layout);
     if (model.promptId !== this.promptId) {
@@ -1372,7 +1459,7 @@ class PixiTableScene implements TableScene {
       if (!view) {
         view = new PortraitNode(this.kit);
         this.portraits.set(player.seat, view);
-        this.floor.addChild(view.floor);
+        this.floor.addChild(view.floor, view.shade);
         this.portraitLayer.addChild(view.root);
       }
       // An active opponent's column is lit, with a gold line along its foot.
@@ -1409,34 +1496,56 @@ class PixiTableScene implements TableScene {
     return timer.phase === "arming" ? 1 : timer.remainingMs / timer.totalMs;
   }
 
-  private applyCurves(layout: TableLayout, ui: TableUiSnapshot): void {
+  /** The lines on the table. Those of an item just cast (`cast`, by stack id) draw themselves
+   * on. Says whether anything drawn changed. */
+  private applyCurves(
+    layout: TableLayout,
+    ui: TableUiSnapshot,
+    cast?: ReadonlySet<string>,
+  ): boolean {
+    let changed = false;
     const seen = new Set<string>();
     const pointed = new Set(
       [ui.hover, ui.focus, ui.magnified?.key].filter(
         (key): key is string => !!key,
       ),
     );
+    const drawOn = duration("cast", this.motion);
     for (const curve of layout.curves) {
       seen.add(curve.key);
+      // The stack item a cast or target line belongs to.
+      const item = curve.key.match(/^(?:cast|target):([^:]+)/)?.[1];
       let view = this.curves.get(curve.key);
       if (!view) {
         view = new CurveNode(this.kit);
         this.curves.set(curve.key, view);
         this.curveLayer.addChild(view.root);
-      }
-      view.update(curve);
+        view.update(curve);
+        if (item && cast?.has(item) && drawOn > 0) {
+          view.setDrawn(0);
+          this.timeline.to(`k:${curve.key}`, { t: 0 }, { t: 1 }, drawOn, {
+            ease: linear,
+          });
+        }
+        changed = true;
+      } else view.update(curve);
       // Lines of items below the top of the stack show while that item is pointed at.
-      const item = curve.key.match(/^(?:cast|target):([^:]+)/)?.[1];
-      view.setVisible(
-        curve.emphasis === "always" || (!!item && pointed.has(`stack:${item}`)),
-      );
+      if (
+        view.setVisible(
+          curve.emphasis === "always" ||
+            (!!item && pointed.has(`stack:${item}`)),
+        )
+      )
+        changed = true;
     }
     for (const [key, view] of this.curves)
       if (!seen.has(key)) {
         view.destroy();
         this.curves.delete(key);
         this.timeline.cancel(`k:${key}`);
+        changed = true;
       }
+    return changed;
   }
 
   /** A drag in progress: the drop zones it may end in, lit; the one under the pointer brighter;
@@ -1514,7 +1623,8 @@ class PixiTableScene implements TableScene {
     const moving = this.motion !== "none";
     const floatAt = (at: StagePoint, value: string, colour: number) => {
       const key = `float:${this.serial++}`;
-      const float = new FloatNode(key, value, at, colour);
+      // With reduced motion a number appears where it is and only fades.
+      const float = new FloatNode(key, value, at, colour, { rises: moving });
       this.effectLayer.addChild(float.root);
       this.floats.set(key, float);
       this.timeline.to(
@@ -1620,13 +1730,15 @@ class PixiTableScene implements TableScene {
               caption =
                 active && active.seat === model.viewSeat && !model.observing
                   ? "Your Turn"
-                  : `${active?.name ?? "Next"}'s Turn`;
+                  : `${active?.name ?? "Next"}’s Turn`;
             }
             this.showEmblem(event.emblem, caption, layout, "emblem");
           }
           break;
         case "eliminated":
-          if (this.portraits.has(event.seat))
+          // The crack spreads, and the player's portrait, tiles and column dim, from nothing.
+          if (this.portraits.has(event.seat)) {
+            this.showLoss(event.seat, 0);
             this.timeline.to(
               `c:${event.seat}`,
               { t: 0 },
@@ -1636,6 +1748,7 @@ class PixiTableScene implements TableScene {
                 ease: linear,
               },
             );
+          }
           break;
         case "result": {
           const captions: Record<typeof event.outcome, [EmblemKind, string]> = {
@@ -1673,6 +1786,9 @@ class PixiTableScene implements TableScene {
 
   /* ---------- the ui store ---------- */
 
+  // The store changes far more often than the table does (the pointer moves, a menu or drawer
+  // opens, focus shows), so a frame is drawn only when something the canvas draws changed: a
+  // hand card rising or a drag, a stack item's lines shown or hidden, the timer bar.
   private onUi = (): void => {
     if (this.destroyed) return;
     const ui = this.ui.get();
@@ -1680,6 +1796,7 @@ class PixiTableScene implements TableScene {
     this.lastUi = ui;
     const frame = this.frame;
     if (!frame) return;
+    let draw = false;
     if (ui.risen !== last.risen || ui.drag !== last.drag) {
       const ms = duration("rise", this.motion);
       for (const [key, placed] of this.placed) {
@@ -1695,8 +1812,12 @@ class PixiTableScene implements TableScene {
         const z =
           placed.node.z +
           (ui.risen?.key === key || ui.drag?.key === key ? 500_000 : 0);
-        if (view.root.zIndex !== z) view.root.zIndex = z;
+        if (view.root.zIndex !== z) {
+          view.root.zIndex = z;
+          draw = true;
+        }
         if (samePose(view.rest, target)) continue;
+        draw = true;
         // A dragged card follows the pointer at once; a rise eases.
         const following = ui.drag?.key === key && last.drag?.key === key;
         if (following || ms <= 0) {
@@ -1709,19 +1830,26 @@ class PixiTableScene implements TableScene {
           this.animated.add(key);
         }
       }
+      // A drag draws its zones, its shadow or its line wherever the pointer is.
+      if (ui.drag || last.drag) draw = true;
       this.applyDrag(ui);
     }
     if (
-      ui.hover !== last.hover ||
-      ui.focus !== last.focus ||
-      ui.magnified !== last.magnified
+      (ui.hover !== last.hover ||
+        ui.focus !== last.focus ||
+        ui.magnified !== last.magnified) &&
+      this.applyCurves(frame.layout, ui)
     )
-      this.applyCurves(frame.layout, ui);
-    if (ui.timer !== last.timer && frame.model.anchored)
+      draw = true;
+    if (
+      ui.timer !== last.timer &&
+      frame.model.anchored &&
       this.portraits
         .get(frame.model.anchored.seat)
-        ?.setBar(frame.model.phase, this.timerShare(ui));
-    this.requestFrame();
+        ?.setBar(frame.model.phase, this.timerShare(ui))
+    )
+      draw = true;
+    if (draw) this.requestFrame();
   };
 
   /* ---------- textures that need the scene ---------- */
@@ -1768,6 +1896,7 @@ class PixiTableScene implements TableScene {
     for (const [key, placed] of this.placed)
       this.cards.get(key)?.place(placed.card, placed.placement);
     this.textures.sweep();
+    this.frames.sweep();
     this.requestFrame();
   }
 }

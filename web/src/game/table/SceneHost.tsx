@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type {
   CreateTableScene,
+  SceneFrame,
   SceneHostProps,
   SceneStatus,
   TableScene,
@@ -15,10 +16,23 @@ import type {
 // A lost context the browser does not restore within 3 s gets a new canvas and scene, at most
 // three times in five minutes; after that the status stays "failed" and the game screen draws
 // the table with the DOM.
+//
+// A frame is committed when it says something new: a new frame object whose model, layout and
+// diff are the very ones already committed (the screen re-rendered for another reason) is not
+// sent again, so its events never play twice.
 
 const RESTORE_MS = 3_000;
 const RECREATIONS = 3;
 const RECREATION_WINDOW_MS = 5 * 60_000;
+
+function sameFrame(a: SceneFrame | null, b: SceneFrame): boolean {
+  return (
+    a !== null &&
+    a.model === b.model &&
+    a.layout === b.layout &&
+    a.diff === b.diff
+  );
+}
 
 let probed: boolean | null = null;
 
@@ -66,6 +80,8 @@ export function SceneHost({
 }: SceneHostProps) {
   const host = useRef<HTMLDivElement>(null);
   const scene = useRef<TableScene | null>(null);
+  /** What the current scene was last given. */
+  const committed = useRef<SceneFrame | null>(null);
   const latest = useRef({ frame, fit, motion, onStatus });
   const [generation, setGeneration] = useState(0);
   const recreations = useRef<number[]>([]);
@@ -136,12 +152,16 @@ export function SceneHost({
         }
         made = started;
         scene.current = started;
+        committed.current = null;
         unsubscribe = started.subscribe(handle);
         // Whatever changed while it started, it draws what is on screen now.
         const now = latest.current;
         started.resize(now.fit);
         started.setMotion(now.motion);
-        if (now.frame) started.commit(now.frame);
+        if (now.frame) {
+          committed.current = now.frame;
+          started.commit(now.frame);
+        }
         handle(started.status());
       },
       () => {
@@ -157,14 +177,20 @@ export function SceneHost({
       unsubscribe();
       if (made) {
         made.destroy();
-        if (scene.current === made) scene.current = null;
+        if (scene.current === made) {
+          scene.current = null;
+          committed.current = null;
+        }
       }
       canvas.remove();
     };
   }, [generation, create, ui]);
 
   useLayoutEffect(() => {
-    if (frame) scene.current?.commit(frame);
+    const current = scene.current;
+    if (!frame || !current || sameFrame(committed.current, frame)) return;
+    committed.current = frame;
+    current.commit(frame);
   }, [frame]);
   useLayoutEffect(() => {
     scene.current?.resize(fit);

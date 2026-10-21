@@ -158,6 +158,27 @@ describe("the scene's host", () => {
     expect(made[0].motions.at(-1)).toBe("faster");
   });
 
+  it("does not commit a new frame object that carries the frame already committed", async () => {
+    const { create, made } = factory();
+    const first = frame();
+    const props = {
+      fit,
+      motion: "normal" as const,
+      ui,
+      create,
+      onStatus: () => {},
+    };
+    const view = render(<SceneHost frame={first} {...props} />);
+    await flush();
+    // The screen re-rendered and rebuilt the frame from the same parts: nothing new to play.
+    view.rerender(<SceneHost frame={{ ...first }} {...props} />);
+    expect(made[0].commits).toEqual([first]);
+    // A new diff over the same model and layout is new.
+    const again = { ...first, diff: { baseline: false, events: [] } };
+    view.rerender(<SceneHost frame={again} {...props} />);
+    expect(made[0].commits).toEqual([first, again]);
+  });
+
   it("removes its canvas and destroys the scene when it unmounts", async () => {
     const { create, made } = factory();
     const view = render(

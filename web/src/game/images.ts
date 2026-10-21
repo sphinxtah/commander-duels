@@ -105,40 +105,66 @@ function wait(ms: number, signal: AbortSignal | undefined): Promise<void> {
   });
 }
 
+/** A failure worth trying again: how many seconds the server asked the page to wait (0 when it
+ * did not say). */
+export interface TryAgain {
+  retryAfter: number;
+}
+
+export function isTryAgain(
+  result: Blob | "missing" | TryAgain,
+): result is TryAgain {
+  return typeof result === "object" && "retryAfter" in result;
+}
+
 /**
- * A card image's bytes, for the table's textures: "missing" when the server has none for the name
- * (remembered, as CardFace remembers it), otherwise the image. Other failures are retried with
- * the same backoff and limit as CardFace; after the last one the promise rejects, and the card
- * keeps its text frame. An aborted signal rejects at once with an AbortError.
+ * One request for a card image's bytes: the image; "missing" when the server has none for the
+ * name (remembered, as CardFace remembers it); or, for any other failure, how long the server
+ * asked the page to wait before trying again. An aborted signal rejects with an AbortError. The
+ * table's texture cache calls this and waits between tries itself, so a card waiting to try
+ * again never holds one of the few requests it lets run at once.
+ */
+export async function requestCardImage(
+  name: string,
+  size: CardImageSize,
+  o: { signal?: AbortSignal } = {},
+): Promise<Blob | "missing" | TryAgain> {
+  if (knownMissing(name)) return "missing";
+  if (o.signal?.aborted) throw abortError();
+  try {
+    const response = await fetch(cardImageUrl(name, size), {
+      credentials: "same-origin",
+      signal: o.signal,
+    });
+    if (response.ok) return await response.blob();
+    if (response.status === 404 && (await saysMissing(response))) {
+      rememberMissing(name);
+      return "missing";
+    }
+    return { retryAfter: Number(response.headers.get("Retry-After")) || 0 };
+  } catch (error) {
+    if (o.signal?.aborted) throw abortError();
+    if (error instanceof DOMException && error.name === "AbortError")
+      throw error;
+    return { retryAfter: 0 };
+  }
+}
+
+/**
+ * A card image's bytes: "missing" when the server has none for the name, otherwise the image.
+ * Other failures are retried with the same backoff and limit as CardFace; after the last one the
+ * promise rejects. An aborted signal rejects at once with an AbortError.
  */
 export async function fetchCardImage(
   name: string,
   size: CardImageSize,
   o: { signal?: AbortSignal } = {},
 ): Promise<Blob | "missing"> {
-  if (knownMissing(name)) return "missing";
-  const url = cardImageUrl(name, size);
   for (let attempt = 0; ; attempt += 1) {
-    if (o.signal?.aborted) throw abortError();
-    let retryAfter = 0;
-    try {
-      const response = await fetch(url, {
-        credentials: "same-origin",
-        signal: o.signal,
-      });
-      if (response.ok) return await response.blob();
-      if (response.status === 404 && (await saysMissing(response))) {
-        rememberMissing(name);
-        return "missing";
-      }
-      retryAfter = Number(response.headers.get("Retry-After")) || 0;
-    } catch (error) {
-      if (o.signal?.aborted) throw abortError();
-      if (error instanceof DOMException && error.name === "AbortError")
-        throw error;
-    }
+    const result = await requestCardImage(name, size, o);
+    if (!isTryAgain(result)) return result;
     if (attempt >= RETRIES)
       throw new Error(`No image for ${name} after ${RETRIES + 1} tries.`);
-    await wait(backoff(attempt, retryAfter), o.signal);
+    await wait(backoff(attempt, result.retryAfter), o.signal);
   }
 }

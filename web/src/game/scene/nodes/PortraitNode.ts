@@ -8,8 +8,13 @@ import { BitmapText, Container, Graphics, Sprite } from "../pixi";
 // below it and the counts of hand, graveyard and library in small black diamonds beside it. The
 // names, the life numeral and the pills are the DOM's text; the count numerals are drawn here.
 // The active player's portrait glows gold and an active opponent's column is lit; a player who
-// lost is cracked and dimmed. Your portrait also carries the purple bar: the response timer
-// while it runs, otherwise how far the turn has come.
+// lost is cracked and dimmed, with a shade over their column (the scene plays both in as the
+// player is eliminated, design §14). Your portrait also carries the purple bar: the response
+// timer while it runs, otherwise how far the turn has come.
+
+/** How much a lost player's portrait and zone tiles fade, and how dark the shade over their
+ * column grows. */
+export const LOST_DIM = { fade: 0.45, shade: 0.35 } as const;
 
 const PHASES = [
   "beginning",
@@ -36,6 +41,8 @@ function count(value: number, d: Diamond): BitmapText {
 export class PortraitNode {
   /** Drawn under the cards: the lit floor of an active opponent's column. */
   readonly floor = new Graphics();
+  /** Drawn under the cards: the shade over a lost player's column. */
+  readonly shade = new Graphics();
   readonly root = new Container();
   private readonly frame = new Graphics();
   private readonly sigil = new Sprite();
@@ -48,11 +55,14 @@ export class PortraitNode {
   private node: PlayerNode | null = null;
   private barValue = -1;
   private barTimer = false;
+  /** Whether the player has lost, as of the last update. */
+  lost = false;
 
   constructor(kit: SceneKit) {
     this.kit = kit;
     this.crack.texture = kit.art.crack;
     this.crack.visible = false;
+    this.shade.alpha = 0;
     this.root.addChild(
       this.frame,
       this.sigil,
@@ -69,11 +79,16 @@ export class PortraitNode {
     o: { column: Rect | null; activeLine: number | null },
   ): void {
     this.node = node;
+    this.lost = player.lost;
     const p = player.player;
     const signature = [
       node.portrait.cx,
       node.portrait.cy,
       node.portrait.side,
+      node.area.x,
+      node.area.y,
+      node.area.w,
+      node.area.h,
       node.chip,
       player.sigil.seed,
       player.sigil.grey,
@@ -116,12 +131,16 @@ export class PortraitNode {
     this.sigil.position.set(portrait.cx, portrait.cy);
     this.sigil.width = inner * Math.SQRT2;
     this.sigil.height = inner * Math.SQRT2;
-    this.crack.visible = player.lost;
+    // The crack's and the dimming's strength is the scene's (setLost), which plays them in.
     this.crack.anchor.set(0.5);
     this.crack.position.set(portrait.cx, portrait.cy);
     this.crack.width = inner * Math.SQRT2;
     this.crack.height = inner * Math.SQRT2;
-    this.root.alpha = player.lost ? 0.55 : 1;
+    const shade = this.shade;
+    shade.clear();
+    shade
+      .rect(node.area.x, node.area.y, node.area.w, node.area.h)
+      .fill({ color: 0x000000, alpha: 1 });
 
     // Life: a red diamond with a dark rim; the numeral over it is the DOM's.
     const l = this.life;
@@ -179,13 +198,14 @@ export class PortraitNode {
   }
 
   /** The purple bar beside your portrait: `timer` is the share of the response timer left, or
-   * null to show how far the turn has come. */
-  setBar(phase: string | null, timer: number | null): void {
+   * null to show how far the turn has come. Says whether it drew anything new. */
+  setBar(phase: string | null, timer: number | null): boolean {
     const bar = this.node?.phase?.bar;
-    if (!bar) return;
+    if (!bar) return false;
     const value =
       timer ?? Math.max(0, PHASES.indexOf(phase ?? "")) / (PHASES.length - 1);
-    if (value === this.barValue && (timer !== null) === this.barTimer) return;
+    if (value === this.barValue && (timer !== null) === this.barTimer)
+      return false;
     this.barValue = value;
     this.barTimer = timer !== null;
     const g = this.bar;
@@ -204,6 +224,7 @@ export class PortraitNode {
     diamondPath(g, bar.x + w, bar.y + bar.h / 2, 9).fill(
       timer !== null ? 0xc9a6ff : 0x9b74e0,
     );
+    return true;
   }
 
   /** The life diamond's pulse when life changes, 1 at rest. */
@@ -211,14 +232,19 @@ export class PortraitNode {
     this.life.scale.set(scale);
   }
 
-  /** The crack spreading over a player who just lost, 0 to 1. */
-  setCrack(amount: number): void {
+  /** How far a player's loss shows, 0 to 1: the crack spreads over the sigil, the portrait fades
+   * and the shade darkens their column. */
+  setLost(amount: number): void {
     this.crack.visible = amount > 0;
     this.crack.alpha = amount;
+    this.root.alpha = 1 - LOST_DIM.fade * amount;
+    this.shade.alpha = LOST_DIM.shade * amount;
+    this.shade.visible = amount > 0;
   }
 
   destroy(): void {
     this.floor.destroy();
+    this.shade.destroy();
     this.root.destroy({ children: true });
   }
 }
