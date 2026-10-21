@@ -32,6 +32,8 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "login_challenges",
         "games",
         "game_seats",
+        "game_tables",
+        "table_seats",
         "card_images",
         "catalog_sync_runs",
         "catalog_revisions",

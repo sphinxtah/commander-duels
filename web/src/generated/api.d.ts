@@ -883,7 +883,8 @@ export interface paths {
         };
         /**
          * Get Game
-         * @description The game, with its owner's current seat snapshot while the engine holds it.
+         * @description The game, with your seat's current snapshot while the engine holds it (an observer's is the
+         *     first player's).
          */
         get: operations["get_game_api_v1_games__game_id__get"];
         put?: never;
@@ -906,7 +907,8 @@ export interface paths {
         /**
          * Close Game
          * @description Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game
-         *     as it ended.
+         *     as it ended. A table's game goes on for the other players, so its players concede their own
+         *     seat instead; only SysOp closes it while it runs.
          */
         post: operations["close_game_api_v1_games__game_id__close_post"];
         delete?: never;
@@ -1250,6 +1252,132 @@ export interface paths {
         get: operations["export_shared_api_v1_shared_decks__code__export_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tables
+         * @description Open tables, newest first: the public ones and your own; SysOp sees every one.
+         */
+        get: operations["list_tables_api_v1_tables_get"];
+        put?: never;
+        /**
+         * Create Table
+         * @description Opens a table with the host in its first seat.
+         */
+        post: operations["create_table_api_v1_tables_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Table
+         * @description A table by its code: the invite link.
+         */
+        get: operations["get_table_api_v1_tables__code__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join Table
+         * @description Takes the first free player's seat with one of your decks.
+         */
+        post: operations["join_table_api_v1_tables__code__join_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Table
+         * @description Leaves the table before it starts. The host leaving closes it for everyone.
+         */
+        post: operations["leave_table_api_v1_tables__code__leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/seat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change Seat
+         * @description Changes your deck (which makes you not ready), or whether you are ready.
+         */
+        patch: operations["change_seat_api_v1_tables__code__seat_patch"];
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Table
+         * @description The host starts the table's game: every player's seat taken and ready, and every player
+         *     under their limit of running games. The reply names the game; each player plays it over its
+         *     WebSocket.
+         */
+        post: operations["start_table_api_v1_tables__code__start_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2122,6 +2250,11 @@ export interface components {
             /** Handle */
             handle: string | null;
             /**
+             * Left
+             * @description A player's seat out of a table's game that went on without it (v0.4.0): it conceded, the others removed it while it was away, or it lost.
+             */
+            left?: ("conceded" | "removed" | "eliminated") | null;
+            /**
              * Player
              * @enum {string}
              */
@@ -2166,6 +2299,13 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Kind
+             * @description A practice game against bots, or a human table's game (v0.4.0).
+             * @default practice
+             * @enum {string}
+             */
+            kind: "practice" | "table";
             result: components["schemas"]["GameResult"] | null;
             /** Seats */
             seats: components["schemas"]["GameSeat"][];
@@ -2772,6 +2912,16 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** SeatChange */
+        SeatChange: {
+            /**
+             * Deck Id
+             * @description Another of your decks; unreadies.
+             */
+            deck_id?: string | null;
+            /** Ready */
+            ready?: boolean | null;
+        };
         /**
          * SeatChoice
          * @description A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck
@@ -2787,6 +2937,15 @@ export interface components {
              * @description SysOp only (cards.any): one card per line, any card the engine implements.
              */
             deck_list?: string | null;
+        };
+        /** SeatTaking */
+        SeatTaking: {
+            /**
+             * Deck Id
+             * Format: uuid
+             * @description One of your decks, in the table's format.
+             */
+            deck_id: string;
         };
         /** SessionInfo */
         SessionInfo: {
@@ -3022,6 +3181,152 @@ export interface components {
             status: string;
             /** Trigger */
             trigger: string;
+        };
+        /** TablePlayer */
+        TablePlayer: {
+            /**
+             * Deck
+             * @description Your own seat's deck title; others' decks are private.
+             */
+            deck: string | null;
+            /**
+             * Deck Id
+             * @description Your own seat's deck.
+             */
+            deck_id: string | null;
+            /** Handle */
+            handle: string | null;
+            /** Host */
+            host: boolean;
+            /**
+             * Player
+             * @enum {string}
+             */
+            player: "human" | "bot";
+            /**
+             * Portrait
+             * @description A player's allied Planeswalker.
+             */
+            portrait: string | null;
+            /**
+             * Ready
+             * @description The host is always ready: starting is their ready.
+             */
+            ready: boolean;
+            /** Seat */
+            seat: number;
+            /**
+             * Taken
+             * @description Whether a player sits there; bots' seats always are.
+             */
+            taken: boolean;
+            /** You */
+            you: boolean;
+        };
+        /**
+         * TableRequest
+         * @description A new table: the host takes the first seat with one of their decks.
+         */
+        TableRequest: {
+            /**
+             * Bot Skill
+             * @default 4
+             */
+            bot_skill: number;
+            /**
+             * Bots
+             * @description Seats bots fill, after the players'; Commander only.
+             * @default 0
+             */
+            bots: number;
+            /**
+             * Deck Id
+             * Format: uuid
+             * @description The host's deck.
+             */
+            deck_id: string;
+            /**
+             * Format
+             * @default legacy
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Seats
+             * @description Every seat, bots included: 2 in Legacy, 2-4 in Commander.
+             * @default 2
+             */
+            seats: number;
+            /**
+             * Turn Cap
+             * @default 60
+             */
+            turn_cap: number;
+            /**
+             * Visibility
+             * @description public tables are listed; a private one is reached by its invite link only.
+             * @default public
+             * @enum {string}
+             */
+            visibility: "public" | "private";
+        };
+        /** TableView */
+        TableView: {
+            /** Bot Skill */
+            bot_skill: number;
+            /** Bots */
+            bots: number;
+            /**
+             * Can Start
+             * @description You host it, every player's seat is taken and ready.
+             */
+            can_start: boolean;
+            /**
+             * Code
+             * @description The invite link's code: #tables/<code>.
+             */
+            code: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Game Id
+             * @description Its game, once started; for its players and SysOp.
+             */
+            game_id: string | null;
+            /**
+             * Host
+             * @description The host's handle.
+             */
+            host: string | null;
+            /**
+             * Players
+             * @description Every seat in turn order, bots last.
+             */
+            players: components["schemas"]["TablePlayer"][];
+            /** Seats */
+            seats: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "started" | "closed";
+            /** Turn Cap */
+            turn_cap: number;
+            /**
+             * Visibility
+             * @enum {string}
+             */
+            visibility: "public" | "private";
+            /** Your Seat */
+            your_seat: number | null;
         };
         /** TierInfo */
         TierInfo: {
@@ -9822,6 +10127,672 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    list_tables_api_v1_tables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    create_table_api_v1_tables_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_table_api_v1_tables__code__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    join_table_api_v1_tables__code__join_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeatTaking"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    leave_table_api_v1_tables__code__leave_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_seat_api_v1_tables__code__seat_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeatChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    start_table_api_v1_tables__code__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
             };
             /** @description Bad Request */
             400: {
