@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # Games one account may have running at once; SysOp is not limited. The engine's own cap
     # (CD_ENGINE_MAX_GAMES) and games_max bound the total.
     games_per_account: int = Field(default=1, ge=1, le=8)
-    games_max: int = Field(default=2, ge=1, le=8)
+    games_max: int = Field(default=2, ge=1, le=64)
     # Card images are fetched from Scryfall once, kept in this folder and served from our own
     # origin; browsers never contact Scryfall. Empty turns card images off.
     card_image_dir: str = ""

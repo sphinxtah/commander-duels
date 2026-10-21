@@ -206,5 +206,24 @@ class FairBotTest {
             "a decision took " + stats.longestMillis() + " ms");
         System.out.printf("1 ms budget: %d searches, %d completed, %d timed out, %d abandoned, longest %d ms%n",
             stats.searches(), stats.completed(), stats.timedOut(), stats.abandoned(), stats.longestMillis());
+        assertEquals(0, stats.unstarted(), "an idle pool started every search");
+    }
+
+    @Test
+    void theSearchPoolHasAThreadPerProcessorUnlessConfigured() {
+        assertEquals(16, FairBot.searchThreads(null, 16));
+        assertEquals(16, FairBot.searchThreads(" ", 16));
+        assertEquals(8, FairBot.searchThreads(" 8 ", 16));
+        assertEquals(256, FairBot.searchThreads("1000", 16));
+        assertEquals(1, FairBot.searchThreads("0", 16));
+        assertEquals(16, FairBot.searchThreads("many", 16));
+        assertEquals(1, FairBot.searchThreads(null, 0));
+    }
+
+    @Test
+    void anEngineRunsAtMostSixtyFourGames() {
+        assertEquals(64, new HumanGames(SeatChecks.DECKS, 100).maxActive());
+        assertEquals(64, new HumanGames(SeatChecks.DECKS, 64).maxActive());
+        assertEquals(1, new HumanGames(SeatChecks.DECKS, 0).maxActive());
     }
 }

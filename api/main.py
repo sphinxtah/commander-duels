@@ -127,6 +127,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 httpx.AsyncClient(
                     timeout=10.0,
                     trust_env=False,
+                    # Every human seat holds a long poll (games.LONG_POLL_MS), up to four a game, so
+                    # httpx's default of 100 connections would leave commands waiting behind them.
+                    limits=httpx.Limits(
+                        max_connections=None, max_keepalive_connections=4 * config.games_max + 16
+                    ),
                     transport=getattr(app.state, "engine_transport", None),
                 ) as engine_client,
                 httpx.AsyncClient(

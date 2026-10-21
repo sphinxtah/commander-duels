@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 final class HumanGames {
     static final int DEFAULT_MAX_ACTIVE = 2;
-    static final int MAX_ACTIVE_LIMIT = 8;
+    static final int MAX_ACTIVE_LIMIT = 64;
     static final long RETAIN_FINISHED_MILLIS = TimeUnit.MINUTES.toMillis(10);
     static final int MAX_FINISHED = 16;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -193,7 +193,8 @@ final class HumanGames {
             .filter(entry -> entry.game.finished() && entry.finishedAtNanos != 0)
             .sorted(Comparator.comparingLong(entry -> entry.finishedAtNanos))
             .toList();
-        for (int i = 0; i < finished.size() - MAX_FINISHED; i++) {
+        // At least as many as may run, so games that end together all stay readable for the API.
+        for (int i = 0; i < finished.size() - Math.max(MAX_FINISHED, maxActive); i++) {
             games.remove(finished.get(i).game.id());
         }
     }

@@ -520,7 +520,8 @@ public final class EngineServer {
         System.out.printf("Commander Duels engine on port %d: XMage %s (%s); development bot matches and"
             + " games %s; service games %s%s%n", port, pin.version(), pin.commit(),
             devEndpoints ? "enabled" : "disabled", engine.serviceGamesEnabled() ? "enabled" : "disabled",
-            games != null ? " (at most " + games.maxActive() + " games at once)" : "");
+            games != null ? " (at most " + games.maxActive() + " games at once, " + FairBot.SEARCH_THREADS
+                + " bot search threads)" : "");
         System.out.println(implementations.summary() == null ? "No implementation list"
             : "Implementation list " + implementations.summary().build() + ": "
                 + implementations.summary().cards() + " cards");

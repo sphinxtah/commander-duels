@@ -284,6 +284,16 @@ final class HumanGame {
         } finally {
             finish(failure);
             onFinished.accept(this);
+            logBots();
+        }
+    }
+
+    /** Each fair bot's searches, for the engine's log: shows whether bots ran short of time or threads. */
+    private void logBots() {
+        for (Player player : players) {
+            if (player instanceof FairBot bot && bot.stats().searches() > 0) {
+                System.out.println("Human game " + id + " bot " + bot.getName() + ": " + bot.stats());
+            }
         }
     }
 

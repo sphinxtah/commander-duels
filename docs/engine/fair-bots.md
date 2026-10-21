@@ -70,12 +70,13 @@ XMage's own bounds on a search, at the pinned commit (MAD `ComputerPlayer6`):
 Only priority decisions in the main phases and the declare attackers and blockers steps search; the bot passes in the other steps. What XMage leaves open: after a time-out it reads the search tree while the cancelled search may still be writing it, because cancelling only interrupts the thread. It also swallows the game thread's interrupt while waiting, which the stop path has to repeat.
 
 `FairBot.addActionsTimed` keeps XMage's search, depth, node limit and think time (`FairBot.Budget.forSkill`) and changes how a search ends:
-- The search runs on the bot's own pool of five threads, named with XMage's AI prefix as XMage requires.
+- The search runs on the bots' own pool, shared by every bot in the engine, with threads named with XMage's AI prefix as XMage requires. It had five threads, as XMage's own pool does; since v0.4.1 it has one per processor the engine sees, or `CD_ENGINE_AI_THREADS` (1–256). The engine's start-up line says how many.
+- **The budget is thinking time** (since v0.4.1). It starts when a pool thread takes the search, not when the bot asks for one. Before, a search that waited for a thread spent its budget waiting, so with many games at once the bots ran out of time before they began and passed. A search still waiting after `QUEUE_WAIT_MILLIS` (60 seconds) is claimed so it never starts, and the bot passes.
 - When the budget runs out, the bot cancels the search and waits up to `STOP_GRACE_MILLIS` (2 seconds) for it to stop. A search that never started is claimed so it cannot start late.
 - Once the search has stopped, the bot plays the best action it found, as XMage does. That action was legal in the copy, and XMage checks it again when the bot plays it in the real game.
 - If the search does not stop within the grace period, the bot drops its tree and passes. Passing is always legal.
 - An interrupt of the game thread (the game is being stopped) cancels the search the same way, makes the bot pass, and stays set so XMage stops the game.
-- `FairBot.Stats` counts samples, searches, completions, time-outs, failures, abandoned searches and continued chains, and keeps the longest decision.
+- `FairBot.Stats` counts samples, searches, completions, time-outs, failures, abandoned searches, searches that never found a thread and continued chains, and keeps the longest decision and the longest wait for a thread. Since v0.4.1 the engine logs each bot's counts when its game ends ("Human game … bot …").
 - XMage's "AI player thinks too long" warning, which filled the engine log on large Commander boards, no longer appears: running out of budget is an expected end to a search and is only counted. The bot logs a warning for a search that fails or has to be abandoned.
 
 A decision that searches therefore returns within its think time plus 2 seconds, plus the time to copy the game for the root. `CommanderGameTest` checks this for every bot of every table it plays, and that no search was abandoned.

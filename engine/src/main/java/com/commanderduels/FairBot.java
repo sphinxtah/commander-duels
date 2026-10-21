@@ -48,6 +48,11 @@ import org.apache.log4j.Logger;
  *       before reading its tree; it then plays the best action found so far, or passes if there is
  *       none. A search that does not stop in time is abandoned and the bot passes, so a decision
  *       never reads a tree that another thread is still writing.</li>
+ *   <li>Every bot in the engine shares one pool of search threads, one per processor unless
+ *       {@code CD_ENGINE_AI_THREADS} says otherwise (v0.4.1; XMage's own pool has five). The budget
+ *       starts when the search does: time spent waiting for a free thread, when many games run at
+ *       once, is not thinking time. A search still waiting after {@link #QUEUE_WAIT_MILLIS} never
+ *       starts, and the bot passes.</li>
  *   <li>XMage's choice of a creature type walks the bot's library from the top, following its
  *       concealed order; this bot walks it in name order.</li>
  * </ul>
@@ -59,8 +64,11 @@ final class FairBot extends ComputerPlayerControllableProxy {
     private static final Logger LOG = Logger.getLogger(FairBot.class);
     /** How long a cancelled search may take to stop before the bot gives up on its result. */
     static final long STOP_GRACE_MILLIS = 2_000;
-    /** As many search threads as XMage's own pool for its AI. */
-    private static final int SEARCH_THREADS = 5;
+    /** How long a decision waits for a free search thread before the bot passes instead. */
+    static final long QUEUE_WAIT_MILLIS = 60_000;
+    /** XMage's own pool for its AI has five threads; a busy engine needs one per processor. */
+    static final int SEARCH_THREADS = searchThreads(System.getenv("CD_ENGINE_AI_THREADS"),
+        Runtime.getRuntime().availableProcessors());
     private static final ThreadPoolExecutor SEARCHES = searchPool();
 
     /** The wall-clock time one decision's search may take. */
@@ -86,6 +94,8 @@ final class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong failed = new AtomicLong();
         private final AtomicLong abandoned = new AtomicLong();
         private final AtomicLong longestMillis = new AtomicLong();
+        private final AtomicLong longestWaitMillis = new AtomicLong();
+        private final AtomicLong unstarted = new AtomicLong();
         private final AtomicLong continued = new AtomicLong();
 
         /** Determinized copies made: one per search. */
@@ -119,6 +129,23 @@ final class FairBot extends ComputerPlayerControllableProxy {
         /** The longest a single search decision took, from start to a usable result. */
         long longestMillis() {
             return longestMillis.get();
+        }
+
+        /** The longest a search waited for a free search thread before it started. */
+        long longestWaitMillis() {
+            return longestWaitMillis.get();
+        }
+
+        /** Searches that found no free thread within {@link #QUEUE_WAIT_MILLIS}: the bot passed. */
+        long unstarted() {
+            return unstarted.get();
+        }
+
+        @Override
+        public String toString() {
+            return searches() + " searches, " + completed() + " completed, " + timedOut() + " cut off by the budget, "
+                + abandoned() + " abandoned, " + unstarted() + " unstarted, " + failed() + " failed; longest "
+                + longestMillis() + " ms, longest wait " + longestWaitMillis() + " ms";
         }
 
         /** Decisions that continued a planned chain of actions instead of searching again. */
@@ -223,25 +250,34 @@ final class FairBot extends ComputerPlayerControllableProxy {
     protected Integer addActionsTimed() {
         SimulationNode2 searched = root;
         AtomicBoolean claimed = new AtomicBoolean();
+        CountDownLatch began = new CountDownLatch(1);
+        AtomicLong startedAt = new AtomicLong();
         CountDownLatch stopped = new CountDownLatch(1);
         FutureTask<Integer> search = new FutureTask<>(() -> {
             if (!claimed.compareAndSet(false, true)) {
                 return null; // cancelled before it started
             }
+            startedAt.set(System.nanoTime());
+            began.countDown();
             try {
                 return addActions(searched, maxDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
             } finally {
                 stopped.countDown();
             }
         });
-        long started = System.nanoTime();
+        long submitted = System.nanoTime();
         stats.searches.incrementAndGet();
         SEARCHES.execute(search);
         Integer score = null;
         boolean interrupted = false;
         try {
-            score = search.get(budget.thinkMillis(), TimeUnit.MILLISECONDS);
-            stats.completed.incrementAndGet();
+            // The budget is thinking time: it starts when a search thread takes the search.
+            if (began.await(QUEUE_WAIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                score = search.get(budget.thinkMillis(), TimeUnit.MILLISECONDS);
+                stats.completed.incrementAndGet();
+            } else {
+                stats.unstarted.incrementAndGet();
+            }
         } catch (TimeoutException e) {
             stats.timedOut.incrementAndGet();
         } catch (InterruptedException e) {
@@ -268,7 +304,11 @@ final class FairBot extends ComputerPlayerControllableProxy {
             root = null;
             Thread.currentThread().interrupt();
         }
-        stats.longestMillis.accumulateAndGet(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), Math::max);
+        long started = startedAt.get();
+        if (started != 0) {
+            stats.longestWaitMillis.accumulateAndGet(TimeUnit.NANOSECONDS.toMillis(started - submitted), Math::max);
+            stats.longestMillis.accumulateAndGet(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), Math::max);
+        }
         return score == null ? 0 : score;
     }
 
@@ -325,6 +365,18 @@ final class FairBot extends ComputerPlayerControllableProxy {
             : shown.getHand().size() + " cards";
         LOG.info("[" + shown.getName() + "] life " + shown.getLife() + ", score "
             + GameStateEvaluator2.evaluate(shownId, game).getTotalScore() + ", hand " + hand);
+    }
+
+    /** The pool's size: {@code CD_ENGINE_AI_THREADS} when it is a number from 1 to 256, else one per processor. */
+    static int searchThreads(String configured, int processors) {
+        if (configured != null && !configured.isBlank()) {
+            try {
+                return Math.max(1, Math.min(256, Integer.parseInt(configured.strip())));
+            } catch (NumberFormatException e) {
+                LOG.warn("CD_ENGINE_AI_THREADS is not a number: " + configured);
+            }
+        }
+        return Math.max(1, processors);
     }
 
     private static ThreadPoolExecutor searchPool() {

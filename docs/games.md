@@ -200,7 +200,7 @@ A short database outage cannot leave a game active and its owner blocked (since 
 | --- | --- |
 | `CD_ENGINE_SERVICE_TOKEN` | Empty: games are off. API and engine; at least 32 characters. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"` and put it in `.env` |
 | `CD_GAMES_PER_ACCOUNT` | 1 (1–8); SysOp is not limited |
-| `CD_GAMES_MAX` | 2 (1–8): games the API runs at once |
+| `CD_GAMES_MAX` | 2 (1–64 since v0.4.1): games the API runs at once |
 | `CD_BOT_DECKS` | `starters` (v0.3.1): Commander bots with no deck chosen play the ten starter decks, a different one each. `fixtures` keeps them on the engine's fixture decks, as CI's browser game journeys need |
 | `CD_CONTENT_DIR` | `content` (v0.3.1): the Planeswalker roster and the starter decks; the API image holds a copy in `/app/content` |
 | `CD_DB_PORT` | Compose only: PostgreSQL's host port, default 5432. Set another (this computer uses 15432) when Windows reserves 5432 |
