@@ -156,4 +156,22 @@ class SeatInputTest {
         assertFalse(amounts.accepts(List.of(3)), "one amount per entry");
         assertEquals("2 0 3", Prompts.encode(List.of(2, 0, 3)));
     }
+
+    @Test
+    void aRefusedNameNeverSuggestsAHiddenCard() {
+        var view = new PromptView(PROMPT, "choose_name", "Choose a card name", null, List.of(), null, null, null);
+        var names = java.util.Map.of("black lotus", "Black Lotus", "black knight", "Black Knight",
+            "black vise", "Black Vise");
+        var prompt = new Prompts.Prompt(view, java.util.Map.of(), names);
+        try {
+            HiddenCards.use(java.util.Set.of("Black Lotus"));
+            assertEquals(List.of("Black Knight", "Black Vise"), prompt.near("black"));
+            // Typed in full, a hidden card's name is still a name the rules let the seat choose.
+            assertTrue(prompt.name("  BLACK LOTUS ") instanceof Prompts.StringAnswer answer
+                && answer.value().equals("Black Lotus"));
+        } finally {
+            HiddenCards.use(java.util.Set.of());
+        }
+        assertEquals(List.of("Black Knight", "Black Lotus", "Black Vise"), prompt.near("Black "));
+    }
 }

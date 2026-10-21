@@ -78,14 +78,18 @@ final class Prompts {
             return found == null ? null : new StringAnswer(found);
         }
 
-        /** Names in the list that start like the text, alphabetically, for a refusal to suggest. */
+        /**
+         * Names in the list that start like the text, alphabetically, for a refusal to suggest;
+         * never a hidden card's name ({@link HiddenCards}), which a refusal would otherwise reveal.
+         */
         List<String> near(String text) {
             if (names == null) {
                 return List.of();
             }
             String start = fold(text);
             return names.entrySet().stream().filter(entry -> entry.getKey().startsWith(start))
-                .map(Map.Entry::getValue).sorted().limit(MAX_NEAR_NAMES).toList();
+                .map(Map.Entry::getValue).filter(name -> !HiddenCards.hidden(name)).sorted()
+                .limit(MAX_NEAR_NAMES).toList();
         }
 
         /**
