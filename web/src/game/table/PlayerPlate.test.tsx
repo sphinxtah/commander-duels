@@ -14,6 +14,7 @@ import { buildTableModel } from "./tableModel";
 import { TableContext } from "./TableContext";
 import type { Painter } from "./types";
 import { createTableUi } from "./uiStore";
+import styles from "./table.module.css";
 
 function plate(
   f: TableFixture | FixtureName,
@@ -288,6 +289,18 @@ describe("a player's plate", () => {
     unmount();
     plate("three", 0);
     expect(screen.getByText("Combat")).toBeInTheDocument();
+  });
+
+  it("sizes life and the counts in rem, so Larger text enlarges them as it does names", () => {
+    plate("duel", 0);
+    const life = document.querySelector<HTMLElement>(`.${styles.numeral}`)!;
+    expect(life).toHaveTextContent("18");
+    expect(life.style.fontSize).toMatch(/^\d+(\.\d+)?rem$/);
+    const counts = document.querySelectorAll<HTMLElement>(`.${styles.count}`);
+    expect(counts.length).toBeGreaterThan(0);
+    counts.forEach((count) =>
+      expect(count.style.fontSize).toMatch(/^\d+(\.\d+)?rem$/),
+    );
   });
 
   it("draws an opponent's sigil grey", () => {

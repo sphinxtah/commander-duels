@@ -55,6 +55,12 @@ function textStyle(t: PlayerNode["name"]): CSSProperties {
   };
 }
 
+/** A size in stage units as rem, so it follows Larger text (16 su at the normal size) as the
+ * plate's other text does. Names need none: the layout already scales them. */
+function rem(su: number): string {
+  return `${su / 16}rem`;
+}
+
 function diamondStyle(d: Diamond): CSSProperties {
   return boxStyle(diamondBox(d));
 }
@@ -170,7 +176,7 @@ function Count({
         ? { role: "img", "aria-label": label }
         : { "aria-hidden": true })}
     >
-      <span className={styles.count} style={{ fontSize: at.side * 0.6 }}>
+      <span className={styles.count} style={{ fontSize: rem(at.side * 0.6) }}>
         {count}
       </span>
     </span>
@@ -490,7 +496,7 @@ export function PlayerPlate({
       >
         <span
           className={styles.numeral}
-          style={{ fontSize: Math.max(18, node.life.side * 0.5) }}
+          style={{ fontSize: rem(Math.max(18, node.life.side * 0.5)) }}
         >
           {p.life}
         </span>

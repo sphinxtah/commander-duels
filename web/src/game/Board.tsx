@@ -375,9 +375,15 @@ export function CardButton({
       (offered.length
         ? `. Options: ${offered.map((o) => optionText(o, game.index, game.view, game.observing)).join("; ")}`
         : "");
-  // The table's key for this card. Only the placed button answers to it in the store's `menu`:
-  // the same card in a drawer opens its own menu.
-  const key = place?.key ?? table?.key;
+  // The table's key for this card, which hover, focus and the magnifier go by. A card listed off
+  // the table without its table card (the prompt's revealed rows) is found in the model by the
+  // zone it is in; one the model does not have (Inspection's) has no key. Only the placed button
+  // answers to the key in the store's `menu`: the same card in a drawer opens its own menu.
+  const listed = located && `${located.zone}:${card.id}`;
+  const key =
+    place?.key ??
+    table?.key ??
+    (listed && scene.model?.cards.has(listed) ? listed : undefined);
   const menu = useOptionMenu(
     place?.key ?? `${key ?? "card"}#${own}`,
     options.length,

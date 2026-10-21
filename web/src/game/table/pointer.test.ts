@@ -1,3 +1,4 @@
+import { renderHook } from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -17,6 +18,7 @@ import {
   createTablePointer,
   noteBlur,
   noteFocus,
+  useTablePointer,
   type ClickSample,
   type Clock,
   type TablePointer,
@@ -210,6 +212,65 @@ describe("hovering", () => {
     expect(onClear).toHaveBeenCalledTimes(1);
   });
 
+  it("opens the magnifier away from the pointer for a card off the table, not from where it lies", () => {
+    // A battlefield card drawn left of the middle, listed again in a drawer at the stage's right.
+    const left = [...layout.nodes.values()].find(
+      (node): node is CardNode =>
+        node.kind === "card" &&
+        node.role === "battlefield" &&
+        node.hit !== null &&
+        centre(node.face).x < 960,
+    )!;
+    const listed = document.createElement("button");
+    listed.dataset.card = left.id;
+    listed.dataset.hover = left.key;
+    document.body.append(listed);
+    const there = { clientX: 1600, clientY: 500, target: listed };
+    pointer.move(there);
+    clock.advance(HOVER_DWELL_MS);
+    expect(ui.get().magnified).toEqual({
+      key: left.key,
+      side: "left",
+      level: 1,
+    });
+    pointer.wheel({ ...there, deltaY: -100, ctrlKey: false });
+    expect(ui.get().magnified).toEqual({
+      key: left.key,
+      side: "left",
+      level: 2,
+    });
+    // On the table, the same card opens it on the side away from its face.
+    pointer.wheel({ ...there, deltaY: 100, ctrlKey: false });
+    pointer.wheel({ ...there, deltaY: 100, ctrlKey: false });
+    pointer.wheel({
+      clientX: 1600,
+      clientY: 500,
+      target: button(left.key),
+      deltaY: -100,
+      ctrlKey: false,
+    });
+    expect(ui.get().magnified?.side).toBe("right");
+    listed.remove();
+  });
+
+  it("hovers the control again after a drag that started on it, and nothing during the drag", () => {
+    move(land, landPoint);
+    clock.advance(HOVER_DWELL_MS);
+    expect(ui.get().hover).toBe(land);
+    // A drag starts from the land: the drag controller clears the hover.
+    ui.set({
+      drag: { key: land, point: landPoint, over: null, valid: [] },
+      hover: null,
+    });
+    move(hand, handPoint);
+    clock.advance(HOVER_DWELL_MS);
+    expect(ui.get()).toMatchObject({ hover: null, risen: null });
+    ui.set({ drag: null });
+    move(land, landPoint);
+    clock.advance(HOVER_DWELL_MS);
+    expect(ui.get().hover).toBe(land);
+  });
+
   it("shows a graveyard's top card from its tile", () => {
     const tile = layout.zones.find((t) => t.zone === "graveyard" && t.topKey)!;
     pointer.move({
@@ -245,6 +306,30 @@ describe("the risen hand card", () => {
     move(hand, handPoint);
     pointer.leave();
     expect(ui.get().risen).toBeNull();
+  });
+
+  it("falls when the pointer moves onto something drawn over its picture off the table", () => {
+    // The prompt column or a drawer, which hold no table controls.
+    const column = document.createElement("div");
+    const item = document.createElement("button");
+    column.append(item);
+    document.body.append(column);
+    move(hand, handPoint);
+    pointer.move({
+      clientX: handPoint.x,
+      clientY: handPoint.y - 30,
+      target: item,
+    });
+    expect(ui.get().risen).toBeNull();
+    // A card's own menu on the table keeps it up.
+    move(hand, handPoint);
+    pointer.move({
+      clientX: handPoint.x,
+      clientY: handPoint.y - 30,
+      target: root.querySelector('[role="menu"] button'),
+    });
+    expect(ui.get().risen).toEqual({ key: hand, source: "pointer" });
+    column.remove();
   });
 
   it("falls when its card leaves the hand", () => {
@@ -306,6 +391,35 @@ describe("a click under the risen card", () => {
     expect(click(land, landPoint).redirected).toBe(false);
   });
 
+  it("goes to the risen card from the bare table under its picture, never from off the table", () => {
+    const risenClick = vi.fn();
+    button(hand).addEventListener("click", risenClick);
+    const bare = (target: Element, p: Point) =>
+      pointer.click({
+        clientX: p.x,
+        clientY: p.y,
+        target,
+        detail: 1,
+        currentTarget: window,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
+    // Between the lands, nothing takes the pointer: the click lands on what holds the table.
+    const between = { x: handPoint.x, y: risen.y + 20 };
+    move(hand, handPoint);
+    walk(handPoint, between, 6);
+    expect(ui.get().risen).toEqual({ key: hand, source: "pointer" });
+    expect(bare(document.body, between)).toBe(true);
+    expect(risenClick).toHaveBeenCalledTimes(1);
+    // Outside the picture, or on the column drawn over it, it stays where it fell.
+    expect(bare(document.body, { x: risen.x - 10, y: between.y })).toBe(false);
+    const column = document.createElement("div");
+    document.body.append(column);
+    expect(bare(column, between)).toBe(false);
+    column.remove();
+    expect(risenClick).toHaveBeenCalledTimes(1);
+  });
+
   it("is never redirected from the keyboard or a menu", () => {
     walkUp(6);
     clock.advance(REDIRECT_DWELL_MS);
@@ -354,11 +468,113 @@ describe("the wheel", () => {
     });
   });
 
+  it("magnifies the risen hand card, not the land under its picture", () => {
+    move(hand, handPoint);
+    walk(handPoint, landPoint, 6);
+    expect(ui.get().risen).toEqual({ key: hand, source: "pointer" });
+    expect(wheel(land, -100)).toBe(true);
+    expect(ui.get().magnified).toEqual({
+      key: hand,
+      side: centre(risen).x < 960 ? "right" : "left",
+      level: 2,
+    });
+    // As large as it goes: the next turn of the wheel is left to scroll.
+    expect(wheel(land, -100)).toBe(false);
+  });
+
   it("leaves the browser's zoom alone, and anything that is not a card", () => {
     expect(wheel(land, -100, true)).toBe(false);
     const more = [...layout.nodes.values()].find((n) => n.kind === "more");
     if (more) expect(wheel(more.key, -100)).toBe(false);
     expect(ui.get().magnified).toBeNull();
+  });
+});
+
+describe("several users of one pointer", () => {
+  it("reads the first user's layout, calls every user's onClear, and stops when the last goes", () => {
+    const shared = createTablePointer(ui, clock);
+    const layerClear = vi.fn();
+    const layer = shared.attach();
+    layer.bind(layout, fit, layerClear);
+    // A drawer drawn without the table's layout, with nothing of its own to clear.
+    const drawer = shared.attach();
+    drawer.bind(null, null);
+    const at = (target: Element, p: Point) =>
+      shared.move({ clientX: p.x, clientY: p.y, target });
+    at(button(land), landPoint);
+    clock.advance(HOVER_DWELL_MS);
+    expect(ui.get().magnified).toEqual({
+      key: land,
+      side: centre(cardNode(land).face).x < 960 ? "right" : "left",
+      level: 1,
+    });
+    at(document.body, { x: 960, y: 300 });
+    // The drawer closes while the hover clears: the layer still hears of it (V4).
+    drawer.detach();
+    clock.advance(HOVER_CLEAR_MS);
+    expect(ui.get().hover).toBeNull();
+    expect(layerClear).toHaveBeenCalledTimes(1);
+    // The last user going stops what was pending.
+    at(button(land), landPoint);
+    layer.detach();
+    clock.advance(HOVER_DWELL_MS);
+    expect(ui.get().hover).toBeNull();
+  });
+
+  it("listens on the window once for every component using it, until the last unmounts", () => {
+    vi.useFakeTimers();
+    try {
+      const store = createTableUi();
+      const cleared = vi.fn();
+      const layer = renderHook(() =>
+        useTablePointer(store, layout, fit, { onClear: cleared }),
+      );
+      const drawer = renderHook(() => useTablePointer(store, null, null));
+      // A later render of the other user changes nothing of the layer's.
+      drawer.rerender();
+      const moveOn = (target: Element, p: Point) =>
+        target.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            clientX: p.x,
+            clientY: p.y,
+          }),
+        );
+      moveOn(button(land), landPoint);
+      vi.advanceTimersByTime(HOVER_DWELL_MS);
+      expect(store.get().hover).toBe(land);
+      moveOn(document.body, { x: 960, y: 300 });
+      drawer.unmount();
+      vi.advanceTimersByTime(HOVER_CLEAR_MS);
+      expect(store.get().hover).toBeNull();
+      expect(cleared).toHaveBeenCalledTimes(1);
+      // The wheel over a card anywhere on the page, the column's included, reaches it.
+      const wheel = new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY: -100,
+        clientX: 200,
+        clientY: 600,
+      });
+      const listed = document.createElement("button");
+      listed.dataset.card = cardNode(land).id;
+      listed.dataset.hover = land;
+      document.body.append(listed);
+      listed.dispatchEvent(wheel);
+      expect(wheel.defaultPrevented).toBe(true);
+      expect(store.get().magnified).toEqual({
+        key: land,
+        side: "right",
+        level: 2,
+      });
+      listed.remove();
+      layer.unmount();
+      moveOn(button(land), landPoint);
+      vi.advanceTimersByTime(HOVER_DWELL_MS);
+      expect(store.get().hover).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

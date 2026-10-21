@@ -75,10 +75,13 @@ export interface DragDeps {
 }
 
 /** What a drop already said about the prompt expected next (C12): the defender an attacker was
- * dropped on, or the attacker a blocker was dropped on. */
-type Intent =
-  | { kind: "choose_defender"; seat: Seat; at: number; promptId: string | null }
-  | { kind: "choose_target"; key: string; at: number; promptId: string | null };
+ * dropped on, or the attacker a blocker was dropped on. `answered` is the prompt the drop
+ * answered; `awaiting` is the next prompt once it is drawn, while this tab cannot answer it yet
+ * (the snapshot that draws it can come before the result of the answer that led to it). */
+type Intent = (
+  | { kind: "choose_defender"; seat: Seat }
+  | { kind: "choose_target"; key: string }
+) & { at: number; answered: string | null; awaiting: string | null };
 
 export interface DragEngine extends DragController {
   /** The prompt or the lease changed: a held card is let go, a chained choice is tried. */
@@ -110,6 +113,10 @@ export function createDragController(
   clock: { now(): number } = { now: () => performance.now() },
   events: Listening = window,
 ): DragEngine {
+  // A press goes from "pressed" (under the threshold: still a click) to "dragging", and from
+  // there to "cancelled" when Escape or a new prompt ends the drag while the button is still
+  // down: the ghost has gone, but the press lasts until its release, whose click must still be
+  // swallowed.
   let press: {
     card: TableCard;
     x0: number;
@@ -117,7 +124,7 @@ export function createDragController(
     pointerId: number;
     element: Element | null;
     promptKey: string | null;
-    active: boolean;
+    phase: "pressed" | "dragging" | "cancelled";
     valid: DropZone[];
   } | null = null;
   let swallow: { id: ObjectId; until: number } | null = null;
@@ -128,6 +135,7 @@ export function createDragController(
     method.call(events, "pointermove", onMove as EventListener, true);
     method.call(events, "pointerup", onUp as EventListener, true);
     method.call(events, "pointercancel", onCancel as EventListener, true);
+    method.call(events, "pointerdown", onDown as EventListener, true);
   };
 
   function end() {
@@ -135,17 +143,45 @@ export function createDragController(
     press = null;
   }
 
-  /** Lets go of a dragged card: the ghost goes, and the click its release makes is swallowed. */
-  function letGo() {
-    if (!press?.active) return;
-    swallow = { id: press.card.id, until: clock.now() + CLICK_SWALLOW_MS };
+  /** The press is over: the click its release makes on the card is swallowed, for a moment
+   * from now. After a cancel the pointer is no longer held to the card, so a release elsewhere
+   * makes no click on it, and nothing is swallowed. */
+  function released(target: EventTarget | null) {
+    if (!press || press.phase === "pressed") return;
+    const on = elementOf(target);
+    const onCard =
+      press.phase === "dragging" || !press.element || !on
+        ? true
+        : press.element.contains(on);
+    swallow = onCard
+      ? { id: press.card.id, until: clock.now() + CLICK_SWALLOW_MS }
+      : null;
+  }
+
+  /** Cancels the press. One still under the threshold is forgotten: its click is a click. A drag
+   * ends with the button still down: the ghost goes, the card stays where it is, and the press
+   * waits for its release, however late it comes. */
+  function abandon() {
+    if (press?.phase === "pressed") end();
+    if (press?.phase !== "dragging") return;
+    press.phase = "cancelled";
+    // No end to the swallow until the release starts its moment.
+    swallow = { id: press.card.id, until: Number.POSITIVE_INFINITY };
+    try {
+      // The pointer goes back to what is under it, for hovering and for the release.
+      press.element?.releasePointerCapture?.(press.pointerId);
+    } catch {
+      // Capture already ended with the press.
+    }
     deps().ui.set({ drag: null });
   }
 
   function onMove(event: PointerEvent) {
     if (!press || event.pointerId !== press.pointerId) return;
+    if (press.phase === "cancelled") return;
     const d = deps();
-    if (!press.active) {
+    let start = false;
+    if (press.phase === "pressed") {
       const moved = Math.hypot(
         event.clientX - press.x0,
         event.clientY - press.y0,
@@ -155,7 +191,8 @@ export function createDragController(
         end();
         return;
       }
-      press.active = true;
+      press.phase = "dragging";
+      start = true;
       const card = press.card;
       const model = d.model ?? null;
       press.valid = d.layout.drops.filter(
@@ -169,22 +206,35 @@ export function createDragController(
     }
     if (!d.layout || !d.fit) return;
     const point = toDesign(d.fit, event.clientX, event.clientY);
+    const drag = {
+      key: press.card.key,
+      point,
+      over: dropZoneAt(d.layout, point),
+      valid: press.valid,
+    };
+    if (!start) {
+      d.ui.set({ drag });
+      return;
+    }
+    // The card is carried now. Nothing rises or is hovered under it until it is let go (the
+    // captured pointer would name only the carried card), and the magnifier a hover opened
+    // closes, so it covers nothing the card is aimed at.
+    const magnified = d.ui.get().magnified;
     d.ui.set({
-      drag: {
-        key: press.card.key,
-        point,
-        over: dropZoneAt(d.layout, point),
-        valid: press.valid,
-      },
+      drag,
+      risen: null,
+      hover: null,
+      ...(magnified?.level === 1 ? { magnified: null } : {}),
     });
   }
 
   function onUp(event: PointerEvent) {
     if (!press || event.pointerId !== press.pointerId) return;
     const held = press;
-    letGo();
+    released(event.target);
+    if (held.phase === "dragging") deps().ui.set({ drag: null });
     end();
-    if (!held.active) return;
+    if (held.phase !== "dragging") return;
     const d = deps();
     if (d.promptKey !== held.promptKey) {
       d.status(DROP_STALE);
@@ -200,19 +250,30 @@ export function createDragController(
     else if (options.length > 1) d.openMenu(held.card.key, options);
     else {
       d.choose(options[0]);
-      const promptId = model?.promptId ?? null;
+      const answered = model?.promptId ?? null;
       const at = clock.now();
-      if (zone?.kind === "attack" && zone.seat !== null)
-        intent = { kind: "choose_defender", seat: zone.seat, at, promptId };
-      else if (zone?.kind === "card")
-        intent = { kind: "choose_target", key: zone.key, at, promptId };
+      const chain = { at, answered, awaiting: null };
+      if (model && zone?.kind === "attack" && zone.seat !== null)
+        intent = { kind: "choose_defender", seat: zone.seat, ...chain };
+      else if (model && zone?.kind === "card")
+        intent = { kind: "choose_target", key: zone.key, ...chain };
       else intent = null;
     }
   }
 
   function onCancel(event: PointerEvent) {
     if (!press || event.pointerId !== press.pointerId) return;
-    letGo();
+    released(event.target);
+    if (press.phase === "dragging") deps().ui.set({ drag: null });
+    end();
+  }
+
+  // The same pointer pressed again before its release was heard (it was let go outside the
+  // window): that press is over, and nothing it would have swallowed is coming. (A press's own
+  // pointerdown has passed the window by the time it is listened for.)
+  function onDown(event: PointerEvent) {
+    if (!press || event.pointerId !== press.pointerId) return;
+    if (press.phase !== "pressed") swallow = null;
     end();
   }
 
@@ -230,7 +291,7 @@ export function createDragController(
         pointerId: event.pointerId,
         element: target?.closest("[data-card]") ?? target,
         promptKey: deps().promptKey,
-        active: false,
+        phase: "pressed",
         valid: [],
       };
       listen(true);
@@ -244,33 +305,50 @@ export function createDragController(
     },
 
     cancel() {
-      letGo();
-      end();
+      abandon();
     },
 
     get active() {
-      return press?.active ?? false;
+      return press?.phase === "dragging";
     },
 
     promptChanged() {
       const d = deps();
-      if (press && d.promptKey !== press.promptKey) {
-        if (press.active) d.status(DROP_STALE);
-        letGo();
-        end();
+      if (
+        press &&
+        press.phase !== "cancelled" &&
+        d.promptKey !== press.promptKey
+      ) {
+        if (press.phase === "dragging") d.status(DROP_STALE);
+        abandon();
       }
       if (!intent) return;
       const model = d.model ?? null;
-      // The prompt the drop answered is still the one on screen: wait for the next.
-      if ((model?.promptId ?? null) === intent.promptId) return;
+      const promptId = model?.promptId ?? null;
+      if (intent.awaiting === null) {
+        // The prompt the drop answered is still the one on screen, or none is drawn yet: wait
+        // for the next.
+        if (promptId === intent.answered || promptId === null) return;
+      } else if (promptId !== intent.awaiting) {
+        // Another prompt came before this tab could answer the one it waited for.
+        intent = null;
+        return;
+      }
+      if (
+        !model ||
+        clock.now() - intent.at > CHAIN_MS ||
+        model.promptKind !== intent.kind
+      ) {
+        intent = null;
+        return;
+      }
+      // Drawn, but the answer that led here is still in flight: wait on this same prompt.
+      if (!model.canAnswer) {
+        intent = { ...intent, awaiting: promptId };
+        return;
+      }
       const pending = intent;
       intent = null;
-      if (
-        !model?.canAnswer ||
-        clock.now() - pending.at > CHAIN_MS ||
-        model.promptKind !== pending.kind
-      )
-        return;
       const options = chained(model, pending);
       if (options.length === 1) d.choose(options[0]);
     },
@@ -293,10 +371,11 @@ export function useDragController(a: DragDeps): DragController {
     () => createDragController(() => deps.current),
     [],
   );
-  // After the commit that drew a new prompt, so a chained choice answers what is on screen.
+  // After the commit that drew a new prompt, or let this tab answer it, so a chained choice
+  // answers what is on screen.
   useLayoutEffect(
     () => controller.promptChanged(),
-    [controller, a.promptKey, a.model?.promptId],
+    [controller, a.promptKey, a.model?.promptId, a.model?.canAnswer],
   );
   useEffect(() => () => controller.dispose(), [controller]);
   return controller;

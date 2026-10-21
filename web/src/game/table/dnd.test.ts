@@ -102,7 +102,7 @@ function setup(name: FixtureName, change?: (f: TableFixture) => void) {
       (c) => c.card.name === named && c.zone === zone,
     )!;
   const pointer = (
-    type: "pointermove" | "pointerup" | "pointercancel",
+    type: "pointerdown" | "pointermove" | "pointerup" | "pointercancel",
     p: Point,
   ) =>
     events.dispatchEvent(
@@ -299,6 +299,132 @@ describe("dragging", () => {
     expect(controller.consumeClick(forest.id)).toBe(true);
   });
 
+  it("swallows the release's click however long the button is held after Escape", () => {
+    const { card, press, pointer, controller, deps, ui, tick } = setup("duel");
+    const forest = card("Forest");
+    press(forest, { x: 600, y: 1000 });
+    pointer("pointermove", YOUR_SIDE);
+    controller.cancel();
+    controller.cancel(); // Escape again changes nothing
+    expect(controller.active).toBe(false);
+    tick(CLICK_SWALLOW_MS + 500);
+    // Moves while the button is still down carry nothing.
+    pointer("pointermove", THEIR_HALF);
+    expect(ui.get().drag).toBeNull();
+    pointer("pointerup", YOUR_SIDE);
+    expect(deps.choose).not.toHaveBeenCalled();
+    expect(controller.consumeClick(forest.id)).toBe(true);
+    expect(controller.consumeClick(forest.id)).toBe(false);
+  });
+
+  it("swallows a late release's click after the prompt changed under the held card", () => {
+    const { card, press, pointer, controller, deps, tick } = setup("duel");
+    const forest = card("Forest");
+    press(forest, { x: 600, y: 1000 });
+    pointer("pointermove", YOUR_SIDE);
+    deps.promptKey = "p-other|13";
+    controller.promptChanged();
+    tick(2000);
+    controller.promptChanged();
+    pointer("pointerup", YOUR_SIDE);
+    expect(deps.status).toHaveBeenCalledTimes(1);
+    expect(controller.consumeClick(forest.id)).toBe(true);
+    // The moment starts at the release: a click that never comes is still forgotten.
+    press(forest, { x: 600, y: 1000 });
+    pointer("pointermove", YOUR_SIDE);
+    controller.cancel();
+    pointer("pointerup", YOUR_SIDE);
+    tick(CLICK_SWALLOW_MS + 1);
+    expect(controller.consumeClick(forest.id)).toBe(false);
+  });
+
+  it("swallows nothing when a cancelled drag is let go off the card", () => {
+    // After Escape the pointer is no longer held to the card, so a release elsewhere makes its
+    // click on what the two have in common, never on the card.
+    const f = tableFixture("duel");
+    const model = modelOf(f);
+    const deps: DragDeps = {
+      layout: layoutTable(model, { expandedSeat: null, textScale: 1 }),
+      fit,
+      ui: createTableUi(),
+      promptKey: `${model.promptId}|${model.revision}`,
+      choose: vi.fn(),
+      openMenu: vi.fn(),
+      status: vi.fn(),
+      model,
+    };
+    const controller = createDragController(() => deps, { now: () => 0 });
+    const forest = [...model.cards.values()].find(
+      (c) => c.card.name === "Forest" && c.zone === "hand",
+    )!;
+    const button = document.createElement("button");
+    button.dataset.card = forest.id;
+    const table = document.createElement("div");
+    document.body.append(button, table);
+    button.addEventListener("pointerdown", (event) =>
+      controller.onPointerDown(event, forest),
+    );
+    const init = (p: Point) => ({
+      clientX: p.x,
+      clientY: p.y,
+      pointerId: 1,
+      pointerType: "mouse",
+      button: 0,
+      bubbles: true,
+    });
+    button.dispatchEvent(new PointerEvent("pointerdown", init(YOUR_SIDE)));
+    button.dispatchEvent(new PointerEvent("pointermove", init(THEIR_HALF)));
+    expect(controller.active).toBe(true);
+    controller.cancel();
+    table.dispatchEvent(new PointerEvent("pointerup", init(THEIR_HALF)));
+    expect(controller.consumeClick(forest.id)).toBe(false);
+    // Let go on the card itself, its click is swallowed.
+    button.dispatchEvent(new PointerEvent("pointerdown", init(YOUR_SIDE)));
+    button.dispatchEvent(new PointerEvent("pointermove", init(THEIR_HALF)));
+    controller.cancel();
+    button.dispatchEvent(new PointerEvent("pointerup", init(YOUR_SIDE)));
+    expect(controller.consumeClick(forest.id)).toBe(true);
+    button.remove();
+    table.remove();
+    controller.dispose();
+  });
+
+  it("forgets a cancelled press whose release was never heard", () => {
+    const { card, press, pointer, controller } = setup("duel");
+    const forest = card("Forest");
+    press(forest, { x: 600, y: 1000 });
+    pointer("pointermove", YOUR_SIDE);
+    controller.cancel();
+    // The next press of the same pointer: the first was let go outside the window.
+    pointer("pointerdown", YOUR_SIDE);
+    pointer("pointerup", YOUR_SIDE);
+    expect(controller.consumeClick(forest.id)).toBe(false);
+  });
+
+  it("lowers a risen card and closes a hover's magnifier when the drag starts", () => {
+    const { card, press, pointer, ui } = setup("three");
+    const giant = card("Hill Giant", "battlefield");
+    ui.set({
+      hover: giant.key,
+      risen: { key: "hand:somewhere", source: "pointer" },
+      magnified: { key: giant.key, side: "left", level: 1 },
+    });
+    press(giant, { x: 600, y: 700 });
+    pointer("pointermove", { x: 600, y: 600 });
+    expect(ui.get()).toMatchObject({
+      hover: null,
+      risen: null,
+      magnified: null,
+    });
+    pointer("pointerup", { x: 600, y: 600 });
+    // One the wheel opened stays: the player asked for it.
+    const asked = { key: giant.key, side: "left", level: 2 } as const;
+    ui.set({ magnified: asked });
+    press(giant, { x: 600, y: 700 });
+    pointer("pointermove", { x: 600, y: 600 });
+    expect(ui.get().magnified).toEqual(asked);
+  });
+
   it("forgets the swallowed click when it never comes", () => {
     const { card, drag, controller, tick } = setup("duel");
     const forest = card("Forest");
@@ -368,6 +494,55 @@ describe("chained choices (C12)", () => {
     s.controller.promptChanged();
     show(s, next("three", defenders(1, 2)));
     expect(s.deps.choose).toHaveBeenCalledTimes(2);
+  });
+
+  it("waits for the tab to be able to answer a prompt drawn before its answer came back", () => {
+    // The snapshot that draws the next prompt and the result of the answer that led to it come
+    // in either order; while the result is out, the tab cannot answer.
+    const s = attackBot2();
+    s.deps.promptKey = null;
+    s.controller.promptChanged();
+    s.deps.model = next("three", defenders(1, 2), false);
+    s.controller.promptChanged();
+    expect(s.deps.choose).toHaveBeenCalledTimes(1);
+    show(s, next("three", defenders(1, 2)));
+    expect(s.deps.choose).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: "d0", seat: 1 }),
+    );
+    expect(s.deps.choose).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops a waiting choice when another prompt comes before the tab can answer", () => {
+    const s = attackBot2();
+    s.deps.promptKey = null;
+    s.deps.model = next("three", defenders(1, 2), false);
+    s.controller.promptChanged();
+    show(
+      s,
+      next(
+        "three",
+        promptOf("p-defender-again", "choose_defender", [
+          choice("e0", { seat: 1 }),
+          choice("e1", { seat: 2 }),
+        ]),
+      ),
+    );
+    expect(s.deps.choose).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits through a snapshot that draws no prompt, but not past two seconds", () => {
+    const s = attackBot2();
+    show(s, next("three", null));
+    show(s, next("three", defenders(1, 2)));
+    expect(s.deps.choose).toHaveBeenCalledTimes(2);
+
+    const slow = attackBot2();
+    slow.deps.promptKey = null;
+    slow.deps.model = next("three", defenders(1, 2), false);
+    slow.controller.promptChanged();
+    slow.tick(CHAIN_MS + 1);
+    show(slow, next("three", defenders(1, 2)));
+    expect(slow.deps.choose).toHaveBeenCalledTimes(1);
   });
 
   it("chooses nothing when the drop does not name exactly one option", () => {

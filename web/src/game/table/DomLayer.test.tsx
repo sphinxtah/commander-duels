@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
+import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GameContext, type GameContextValue } from "../Board";
+import {
+  CardButton,
+  CardRow,
+  GameContext,
+  type GameContextValue,
+} from "../Board";
 import { cardLabel } from "../Card";
 import { optionText } from "../model";
 import type { PromptOption } from "../types";
@@ -20,7 +26,7 @@ import { HOVER_DWELL_MS } from "./pointer";
 import { stageFit } from "./stage";
 import { buildTableModel } from "./tableModel";
 import { TableContext } from "./TableContext";
-import type { MoreNode, Painter } from "./types";
+import type { MoreNode, Painter, TableModel } from "./types";
 import { createTableUi } from "./uiStore";
 import gameStyles from "../game.module.css";
 import styles from "./table.module.css";
@@ -35,6 +41,8 @@ function setup(
     expandedSeat?: number | null;
     /** The stage at scale 1, and a drag controller answering through the game's choose. */
     live?: boolean;
+    /** What the screen draws beside the layer: the prompt column, a drawer. */
+    beside?: (model: TableModel, game: GameContextValue) => ReactNode;
   } = {},
 ) {
   const input = fixtureInput(f);
@@ -76,6 +84,7 @@ function setup(
           onBrowse={onBrowse}
           onExpand={onExpand}
         />
+        {options.beside?.(model, game)}
       </TableContext.Provider>
     </GameContext.Provider>,
   );
@@ -547,5 +556,105 @@ describe("the layer under the pointer", () => {
         .filter(Boolean),
     ).toHaveLength(2);
     expect(s.ui.get().menu).toBe(key);
+  });
+
+  it("gives a click on the bare table inside the risen picture to the risen card", () => {
+    const s = live();
+    const risen = s.layout.risen.get(s.hand)!;
+    // Up from the Forest's slice to the stone above it, where no control takes the pointer.
+    const stone = { x: s.handAt.x, y: risen.y + 20 };
+    fireEvent.pointerMove(placed(s.hand)[0], at(s.handAt));
+    for (let i = 1; i <= 6; i++)
+      fireEvent.pointerMove(
+        s.container,
+        at({
+          x: stone.x,
+          y: s.handAt.y + ((stone.y - s.handAt.y) * i) / 6,
+        }),
+      );
+    expect(s.ui.get().risen).toEqual({ key: s.hand, source: "pointer" });
+    fireEvent.click(s.container, { ...at(stone), detail: 1 });
+    expect(s.game.choose).toHaveBeenCalledTimes(1);
+    expect(s.game.choose).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "play_land" }),
+    );
+  });
+
+  it("raises nothing and hovers nothing while a card is carried", () => {
+    vi.useFakeTimers();
+    const s = live();
+    const forest = placed(s.hand)[0];
+    const mouse = { pointerId: 1, pointerType: "mouse", button: 0 };
+    fireEvent.pointerMove(forest, at(s.handAt));
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    expect(s.ui.get()).toMatchObject({
+      hover: s.hand,
+      risen: { key: s.hand, source: "pointer" },
+    });
+    fireEvent.pointerDown(forest, { ...mouse, ...at(s.handAt) });
+    fireEvent.pointerMove(window, { ...mouse, clientX: 900, clientY: 800 });
+    expect(s.ui.get().drag?.key).toBe(s.hand);
+    // The captured pointer's moves name the carried card, wherever the pointer is.
+    fireEvent.pointerMove(forest, { ...mouse, clientX: 1000, clientY: 700 });
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    expect(s.ui.get()).toMatchObject({ hover: null, risen: null });
+  });
+
+  it("magnifies the prompt's revealed cards and a drawer's, away from the pointer", () => {
+    vi.useFakeTimers();
+    const s = setup(tableFixture("revealed"), "webgl", {
+      live: true,
+      beside: (model, game) => (
+        <>
+          {/* As PromptPanel lists them: no table card, only where the card is. */}
+          <CardRow label="Bot 2's hand">
+            {game.view!.revealed[0].cards.map((card) => (
+              <CardButton
+                key={card.id}
+                card={card}
+                located={game.index.get(card.id)}
+                small
+              />
+            ))}
+          </CardRow>
+          {/* As the battlefield browser lists them, with their table cards. */}
+          <CardRow label="Bot 2's battlefield">
+            {[...model.cards.values()]
+              .filter((c) => c.zone === "battlefield" && c.ownerSeat === 1)
+              .map((c) => (
+                <CardButton
+                  key={c.key}
+                  card={c.card}
+                  located={c.located}
+                  table={c}
+                />
+              ))}
+          </CardRow>
+        </>
+      ),
+    });
+    const revealed = within(
+      screen.getByRole("group", { name: "Bot 2's hand" }),
+    ).getAllByRole("button")[0];
+    const key = `revealed:${revealed.dataset.card}`;
+    expect(revealed.dataset.hover).toBe(key);
+    // The prompt column lies at the stage's left.
+    const column = { x: 200, y: 600 };
+    fireEvent.pointerMove(revealed, at(column));
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    expect(s.ui.get().magnified).toEqual({ key, side: "right", level: 1 });
+    fireEvent.wheel(revealed, { deltaY: -120, ...at(column) });
+    expect(s.ui.get().magnified).toEqual({ key, side: "right", level: 2 });
+    // A drawer at the stage's right: its card opens on the left, wherever it lies on the table.
+    const listed = within(
+      screen.getByRole("group", { name: "Bot 2's battlefield" }),
+    ).getAllByRole("button")[0];
+    fireEvent.pointerMove(listed, at({ x: 1600, y: 500 }));
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    expect(s.ui.get().magnified).toEqual({
+      key: listed.dataset.hover,
+      side: "left",
+      level: 1,
+    });
   });
 });
