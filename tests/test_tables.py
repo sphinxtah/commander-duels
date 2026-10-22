@@ -265,17 +265,41 @@ def commander_table(
     return code
 
 
+def matches(message: dict[str, Any], match: dict[str, dict[str, Any]]) -> bool:
+    """Whether a presence message's seats match, by seat: {"2": {field: value}}."""
+    seats = {str(entry["seat"]): entry for entry in message["seats"]}
+    return all(
+        all(seats[seat].get(k) == v for k, v in wanted.items()) for seat, wanted in match.items()
+    )
+
+
 def presence(tab: Tab, **match: dict[str, Any]) -> dict[str, Any]:
     """The next presence message whose seats match, by seat: {"2": {field: value}}."""
     for _ in range(100):
         message = tab.until("presence")
-        seats = {str(entry["seat"]): entry for entry in message["seats"]}
-        if all(
-            all(seats[seat].get(k) == v for k, v in wanted.items())
-            for seat, wanted in match.items()
-        ):
+        if matches(message, match):
             return message
     raise AssertionError(f"no presence matching {match}")
+
+
+def snapshot_and_presence(
+    tab: Tab, revision: int, **match: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """A snapshot at the revision or later and a matching presence, in whichever order they come.
+    The server sends a connection the snapshot it holds, then the presence, and a newer snapshot
+    after them when the game has moved on: waiting for the snapshot first could read past the
+    presence and then wait for it forever (CI run #90 hung so)."""
+    snapshot: dict[str, Any] | None = None
+    found: dict[str, Any] | None = None
+    for _ in range(200):
+        message = tab.receive()
+        if message["type"] == "snapshot" and message["snapshot"]["revision"] >= revision:
+            snapshot = snapshot or message["snapshot"]
+        elif message["type"] == "presence" and matches(message, match):
+            found = found or message
+        if snapshot is not None and found is not None:
+            return snapshot, found
+    raise AssertionError(f"no snapshot at revision {revision} and presence matching {match}")
 
 
 def opened(account: Account, game_id: str, seen: list[str], stack: ExitStack) -> Tab:
@@ -399,9 +423,9 @@ def test_a_table_from_the_lobby_to_the_result(client, engine):
         bob_tab = opened(bob, game_id, seen_bob, stack)
         assert ada_tab.until("lease")["role"] == "controller"
         assert bob_tab.until("lease")["role"] == "controller"
-        assert ada_tab.snapshot(1)["seat"] == 0
+        both = {"0": {"connected": True}, "1": {"connected": True}}
+        assert snapshot_and_presence(ada_tab, 1, **both)[0]["seat"] == 0
         assert bob_tab.snapshot(1)["seat"] == 1
-        presence(ada_tab, **{"0": {"connected": True}, "1": {"connected": True}})
         # A player's close does not end the game for the other: they concede instead.
         closing = bob.send("POST", f"/api/v1/games/{game_id}/close")
         assert (closing.status_code, closing.json()["code"]) == (409, "table_game")
@@ -461,9 +485,12 @@ def test_away_players_are_voted_out(client, engine, monkeypatch):
         # Coming back, she is shown that she is out.
         with cara.socket(game_id) as cara_socket:
             cara_socket.send_json(cara.hello())
-            back = Tab(cara_socket, [])
-            assert back.snapshot(fake.revision)["status"] == "eliminated"
-            presence(back, **{"2": {"left": "removed", "connected": True}})
+            back, _ = snapshot_and_presence(
+                Tab(cara_socket, []),
+                fake.revision,
+                **{"2": {"left": "removed", "connected": True}},
+            )
+            assert back["status"] == "eliminated"
     assert "Secret of seat 2" not in "\n".join(seen)
     with Session(client.app.state.database) as db:
         removed = db.scalar(select(AuditEvent).where(AuditEvent.action == "table.player_removed"))
