@@ -1,0 +1,695 @@
+/* Finding players, friends, presence and the bell (v0.4.3), in the app's colours: the dark
+   green panels, the gold of its buttons, and its quiet grey-green text. */
+
+.eyebrow {
+  color: #bdab80;
+  font-size: 0.6rem;
+  letter-spacing: 2.1px;
+  font-weight: 600;
+}
+.lead {
+  color: #aeb8ac;
+  font-size: 0.86rem;
+  line-height: 1.8;
+  max-width: 46rem;
+}
+.lead a {
+  color: #e8d3a6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.quiet {
+  color: #a5b0a3;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.said {
+  color: #b8d1bf;
+  font-size: 0.8rem;
+  margin: 10px 0;
+}
+.said:empty {
+  display: none;
+}
+.rowError {
+  display: block;
+  color: #f0b4a0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 6px 0;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.panel {
+  border: 1px solid #ffffff16;
+  background: #18221f;
+  border-radius: 6px;
+  padding: 22px 25px;
+  margin: 22px 0;
+}
+.panel > h2 {
+  font:
+    1.35rem Georgia,
+    serif;
+  margin-bottom: 14px;
+}
+.subTitle {
+  font:
+    1.05rem Georgia,
+    serif;
+  margin: 22px 0 8px;
+}
+
+/* Buttons. */
+.primary,
+.secondary,
+.danger,
+.small,
+.smallQuiet,
+.quietButton,
+.more {
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-height: 40px;
+}
+.primary {
+  background: #d5b77c;
+  border: 1px solid #e0c58f;
+  color: #192220;
+  padding: 11px 19px;
+}
+.primary:hover {
+  background: #e6cc99;
+}
+.secondary,
+.more {
+  background: transparent;
+  border: 1px solid #d5b77c;
+  color: #ebece6;
+  padding: 10px 16px;
+}
+.secondary:hover,
+.more:hover {
+  background: #d5b77c1a;
+}
+.danger {
+  background: transparent;
+  border: 1px solid #d98f78;
+  color: #f0c2b3;
+  padding: 10px 16px;
+}
+.danger:hover {
+  background: #d98f781a;
+}
+.small,
+.smallQuiet {
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+}
+.small {
+  background: #d5b77c;
+  border: 1px solid #e0c58f;
+  color: #192220;
+}
+.small:hover {
+  background: #e6cc99;
+}
+.smallQuiet {
+  background: transparent;
+  border: 1px solid #ffffff2a;
+  color: #c9d0c6;
+}
+.smallQuiet:hover {
+  border-color: #d5b77c88;
+  color: #e6c68c;
+}
+.quietButton {
+  background: transparent;
+  border: none;
+  color: #a5b0a3;
+  padding: 10px 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.quietButton:hover {
+  color: #f0c2b3;
+}
+.more {
+  margin: 18px 0;
+}
+button:disabled {
+  opacity: 0.6;
+}
+
+/* A player's picture: a portrait, or the avatar's monogram in a ring. */
+.picture {
+  flex: none;
+}
+.monogram {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #73877b45;
+  border-radius: 50%;
+  color: #bac7bc;
+  font-family: Georgia, serif;
+}
+
+/* Presence: green online, gold in a game, amber idle, grey offline. */
+.presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #b9c3b6;
+  font-size: 0.78rem;
+}
+.dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #5f6b66;
+  box-shadow: 0 0 0 2px #101819;
+}
+.dot[data-state="online"] {
+  background: #7fc394;
+}
+.dot[data-state="in_game"] {
+  background: #e6c68c;
+}
+.dot[data-state="idle"] {
+  background: #c59b65;
+  background: radial-gradient(circle at 70% 30%, #101819 0 35%, #c59b65 36%);
+}
+
+/* The search, in the middle of the top bar. */
+.search {
+  position: relative;
+  width: min(100%, 420px);
+}
+.search form {
+  position: relative;
+  margin: 0;
+}
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-52%);
+  color: #82918a;
+  font-size: 1.05rem;
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px 9px 34px;
+  background: #0c1314;
+  border: 1px solid #ffffff1f;
+  border-radius: 20px;
+  color: #ebece6;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+}
+.search input::placeholder {
+  color: #7d8b84;
+}
+.search input:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.results {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #18221f;
+  border: 1px solid #ffffff22;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px #0009;
+  padding: 6px;
+  letter-spacing: 0;
+}
+.results ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.result {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #ebece6;
+}
+.result:hover,
+.result[aria-selected="true"] {
+  background: #d5b77c1f;
+}
+.resultText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.resultText strong {
+  font-size: 0.86rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resultText small {
+  color: #a5b0a3;
+  font-size: 0.7rem;
+}
+.searchStatus {
+  margin: 4px 8px;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+.searchStatus:empty {
+  display: none;
+}
+
+/* The bell, in the top bar's right-hand corner. */
+.bell {
+  position: relative;
+}
+.bellButton {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #ffffff1c;
+  background: transparent;
+  color: #d8dccf;
+}
+.bellButton:hover,
+.bellButton[aria-expanded="true"] {
+  border-color: #d5b77c88;
+  color: #e6c68c;
+}
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #d9714f;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #101819;
+}
+.bubble {
+  position: absolute;
+  z-index: 45;
+  top: calc(100% + 10px);
+  right: -6px;
+  width: min(360px, calc(100vw - 32px));
+  background: #18221f;
+  border: 1px solid #ffffff22;
+  border-radius: 8px;
+  box-shadow: 0 18px 44px #000a;
+  padding: 14px 14px 10px;
+  letter-spacing: 0;
+  text-align: left;
+}
+.bubble::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  right: 19px;
+  width: 12px;
+  height: 12px;
+  background: #18221f;
+  border-left: 1px solid #ffffff22;
+  border-top: 1px solid #ffffff22;
+  transform: rotate(45deg);
+}
+.bubble:focus {
+  outline: none;
+}
+.bubbleTitle {
+  font:
+    1.05rem Georgia,
+    serif;
+  color: #ebece6;
+  margin: 0 0 8px;
+}
+.notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 6px;
+  border-top: 1px solid #ffffff0d;
+  color: #dfe3da;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.note:first-child {
+  border-top: none;
+}
+.note[data-unread] {
+  background: linear-gradient(90deg, #d5b77c14, transparent 70%);
+}
+.note[data-unread] .noteText::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d9714f;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+.noteLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.noteText {
+  min-width: 0;
+}
+.noteLink small {
+  display: block;
+  color: #93a198;
+  font-size: 0.68rem;
+  margin-top: 2px;
+}
+a.noteLink:hover {
+  color: #e6c68c;
+}
+.answer {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.answered {
+  color: #b8d1bf;
+  font-size: 0.74rem;
+}
+.seeAll {
+  display: block;
+  margin-top: 6px;
+  padding: 10px 6px 4px;
+  border-top: 1px solid #ffffff12;
+  color: #e6c68c;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.seeAll:hover {
+  color: #f3dcae;
+}
+.history {
+  max-width: 46rem;
+  border: 1px solid #ffffff16;
+  border-radius: 6px;
+  background: #18221f;
+  padding: 6px 14px;
+  margin-top: 18px;
+}
+.history .note {
+  padding: 12px 6px;
+}
+
+/* New notifications pop up under the bell for a moment. */
+.toasts {
+  position: fixed;
+  z-index: 60;
+  top: 82px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(330px, calc(100vw - 32px));
+  pointer-events: none;
+  letter-spacing: 0;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1e2a26;
+  border: 1px solid #d5b77c55;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px #000a;
+  padding: 10px 8px 10px 12px;
+  color: #ebece6;
+  font-size: 0.8rem;
+  animation: toastIn 0.25s ease-out;
+}
+.toast a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.toastClose {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #a5b0a3;
+  font-size: 1.1rem;
+}
+.toastClose:hover {
+  color: #ebece6;
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+:global(html[data-reduced-motion="true"]) .toast {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+/* A player's profile. */
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  margin: 14px 0 22px;
+}
+.profileText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+}
+.profileText h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.tierLine {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: #c9d0c6;
+  font-size: 0.82rem;
+}
+.friendsTag {
+  margin: 0;
+  color: #b8d1bf;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.actions > .quiet {
+  margin: 0 6px 0 0;
+}
+.pending {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 17px;
+  background: #ffffff0f;
+  color: #c9d0c6;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.confirm {
+  flex-basis: 100%;
+  border: 1px solid #d98f7855;
+  background: #2a1d1a66;
+  border-radius: 6px;
+  padding: 14px 16px;
+  max-width: 40rem;
+}
+.confirm p {
+  color: #e6d6cf;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.confirm button + button {
+  margin-left: 10px;
+}
+.backLink {
+  display: inline-block;
+  margin-top: 8px;
+  color: #e6c68c;
+  font-size: 0.8rem;
+}
+
+/* Friends. */
+.friends {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.friend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 0;
+  border-top: 1px solid #ffffff0d;
+}
+.friend:first-child {
+  border-top: none;
+}
+.friendLink {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.friendLink > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.friendLink strong {
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+.friendLink small {
+  color: #a5b0a3;
+  font-size: 0.7rem;
+}
+.friendLink:hover strong {
+  color: #e6c68c;
+}
+
+/* Privacy settings. */
+.choices {
+  border: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+}
+.choices legend {
+  color: #c9d0c6;
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+  padding: 0;
+}
+.choices label,
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #ebece6;
+  font-size: 0.82rem;
+  min-height: 34px;
+}
+.choices input,
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: #d5b77c;
+}
+.check {
+  margin: 12px 0;
+  max-width: 40rem;
+}
+.check small {
+  display: block;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  margin-top: 3px;
+}
+.blocks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.blocks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 28rem;
+  padding: 6px 0;
+  border-top: 1px solid #ffffff0d;
+  font-size: 0.84rem;
+}
+.blocks a {
+  color: #e8d3a6;
+}
+
+@media (max-width: 600px) {
+  .profile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .toasts {
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+  }
+}

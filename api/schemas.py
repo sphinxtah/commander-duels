@@ -132,6 +132,7 @@ Permission = Literal[
     "economy.manage",
     "shop.manage",
     "reports.manage",
+    "players.presence",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]

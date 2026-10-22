@@ -165,6 +165,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `progress.manage` (v0.3.1: set any account's wins) |  |  |  |  | ✓ |
 | `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  |  | ✓ |
 | `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  |  | ✓ | ✓ |
+| `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  |  | ✓ | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).

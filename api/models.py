@@ -61,6 +61,9 @@ class User(Base):
             "onboarding IN ('handle', 'starters', 'complete')", name="ck_users_onboarding"
         ),
         CheckConstraint("privilege_version >= 0", name="ck_users_privilege_version"),
+        CheckConstraint(
+            "presence_visibility IN ('friends', 'everyone')", name="ck_users_presence_visibility"
+        ),
         Index(
             "uq_users_one_sysop",
             "kind",
@@ -94,6 +97,15 @@ class User(Base):
     starter_decks: Mapped[list[str] | None] = mapped_column(JsonType)
     # When the account was deleted (v0.4.1); its status is then deleted for good.
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Presence (v0.4.3, api/social.py): the app's latest check-in from any tab, and the latest
+    # from a tab its player was using.
+    presence_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    active_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Privacy settings (v0.4.3): who sees the presence (friends or everyone), appearing offline,
+    # and being found by an email address typed in full.
+    presence_visibility: Mapped[str] = mapped_column(String(16), default="friends")
+    appear_offline: Mapped[bool] = mapped_column(default=False)
+    email_searchable: Mapped[bool] = mapped_column(default=True)
 
 
 class ExternalIdentity(Base):
@@ -1125,3 +1137,70 @@ class ProblemReport(Base):
     screenshot: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
     screenshot_width: Mapped[int | None]
     screenshot_height: Mapped[int | None]
+
+
+class Friendship(Base):
+    """Two players who are friends, or one's request to the other (v0.4.3, api/social.py). A pair
+    has one row whichever asked: user_low is the lower of the two IDs. Friendship is mutual, so a
+    request waits (pending) until the other player accepts it or asks back."""
+
+    __tablename__ = "friendships"
+    __table_args__ = (
+        UniqueConstraint("user_low", "user_high"),
+        CheckConstraint("status IN ('pending', 'accepted')", name="ck_friendships_status"),
+        CheckConstraint("user_low <> user_high", name="ck_friendships_pair"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_low: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    user_high: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    # Who asked first.
+    requested_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    accepted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class PlayerBlock(Base):
+    """A player one account has blocked (v0.4.3): no friendship or request between the two, and
+    the blocked player neither sees the blocker's presence nor finds them in the search."""
+
+    __tablename__ = "player_blocks"
+    __table_args__ = (UniqueConstraint("blocker_id", "blocked_id"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    blocker_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    blocked_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class Notification(Base):
+    """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
+    come online. The actor is the other player. Kept NOTIFICATION_DAYS, at most a few hundred per
+    account (api/social.py)."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('friend_request', 'friend_accepted', 'friend_online')",
+            name="ck_notifications_kind",
+        ),
+        # The bell's list, newest first, and its unread count.
+        Index("ix_notifications_user_id_created_at", "user_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(32))
+    actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class WeeklySale(Base):
+    """Leng's weekly sale (v0.4.3, api/sales.py): the products a week's sale took, drawn once by
+    the first request that needed them, so every player sees the same ones all week."""
+
+    __tablename__ = "shop_weekly_sales"
+    # The Sunday the week starts on, in the sale's time zone.
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    product_ids: Mapped[list[str]] = mapped_column(JsonType)
+    percent: Mapped[int] = mapped_column(SmallInteger)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())

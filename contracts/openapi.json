@@ -720,6 +720,25 @@
         "title": "AuthConfig",
         "type": "object"
       },
+      "BlockedPlayer": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked_at": {
+            "format": "date-time",
+            "title": "Blocked At",
+            "type": "string"
+          },
+          "player": {
+            "$ref": "#/components/schemas/PlayerRef"
+          }
+        },
+        "required": [
+          "player",
+          "blocked_at"
+        ],
+        "title": "BlockedPlayer",
+        "type": "object"
+      },
       "BoosterRun": {
         "additionalProperties": false,
         "properties": {
@@ -1813,6 +1832,69 @@
           "cards"
         ],
         "title": "CatalogStatus",
+        "type": "object"
+      },
+      "CheckIn": {
+        "additionalProperties": false,
+        "properties": {
+          "idle": {
+            "default": false,
+            "description": "Whether this tab's player has left it: hidden, or untouched for minutes.",
+            "title": "Idle",
+            "type": "boolean"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The newest notification the page knows of; newer unread ones come back as fresh.",
+            "title": "Since"
+          }
+        },
+        "title": "CheckIn",
+        "type": "object"
+      },
+      "CheckedIn": {
+        "additionalProperties": false,
+        "properties": {
+          "fresh": {
+            "description": "Unread notifications newer than the check-in's since, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/NotificationItem"
+            },
+            "title": "Fresh",
+            "type": "array"
+          },
+          "newest": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The newest notification's time, if any.",
+            "title": "Newest"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread",
+          "newest",
+          "fresh"
+        ],
+        "title": "CheckedIn",
         "type": "object"
       },
       "Coverage": {
@@ -3243,6 +3325,41 @@
         "title": "Format",
         "type": "object"
       },
+      "FriendList": {
+        "additionalProperties": false,
+        "properties": {
+          "friends": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerSummary"
+            },
+            "title": "Friends",
+            "type": "array"
+          },
+          "incoming": {
+            "description": "Requests waiting for your answer.",
+            "items": {
+              "$ref": "#/components/schemas/PlayerSummary"
+            },
+            "title": "Incoming",
+            "type": "array"
+          },
+          "outgoing": {
+            "description": "Your requests, waiting for theirs.",
+            "items": {
+              "$ref": "#/components/schemas/PlayerSummary"
+            },
+            "title": "Outgoing",
+            "type": "array"
+          }
+        },
+        "required": [
+          "friends",
+          "incoming",
+          "outgoing"
+        ],
+        "title": "FriendList",
+        "type": "object"
+      },
       "GameResult": {
         "additionalProperties": false,
         "properties": {
@@ -4156,7 +4273,8 @@
                 "custom_cards.manage",
                 "economy.manage",
                 "shop.manage",
-                "reports.manage"
+                "reports.manage",
+                "players.presence"
               ],
               "type": "string"
             },
@@ -4210,6 +4328,114 @@
           "csrf_token"
         ],
         "title": "Me",
+        "type": "object"
+      },
+      "NotificationItem": {
+        "additionalProperties": false,
+        "properties": {
+          "actor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlayerRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "friend_request",
+              "friend_accepted",
+              "friend_online"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "read": {
+            "title": "Read",
+            "type": "boolean"
+          },
+          "request_pending": {
+            "default": false,
+            "description": "For a friend request: whether it still waits for your answer.",
+            "title": "Request Pending",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "created_at",
+          "read",
+          "actor"
+        ],
+        "title": "NotificationItem",
+        "type": "object"
+      },
+      "NotificationPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor of the next, older page.",
+            "title": "Next"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "unread",
+          "next"
+        ],
+        "title": "NotificationPage",
+        "type": "object"
+      },
+      "NotificationsRead": {
+        "additionalProperties": false,
+        "properties": {
+          "up_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Marks unread notifications up to this time read; all if null.",
+            "title": "Up To"
+          }
+        },
+        "title": "NotificationsRead",
         "type": "object"
       },
       "Opening": {
@@ -4449,6 +4675,253 @@
         "title": "PlaneswalkerInfo",
         "type": "object"
       },
+      "PlayerProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The allied Planeswalker; its portrait is theirs.",
+            "title": "Alliance"
+          },
+          "avatar": {
+            "enum": [
+              "sigil",
+              "sun",
+              "moon",
+              "flame",
+              "wave",
+              "leaf",
+              "crown",
+              "tower"
+            ],
+            "title": "Avatar",
+            "type": "string"
+          },
+          "blocked": {
+            "description": "Whether you have blocked this player.",
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "friendship": {
+            "description": "none, friends, requested (you asked) or requested_you (they asked).",
+            "enum": [
+              "none",
+              "friends",
+              "requested",
+              "requested_you"
+            ],
+            "title": "Friendship",
+            "type": "string"
+          },
+          "handle": {
+            "title": "Handle",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "member_since": {
+            "format": "date-time",
+            "title": "Member Since",
+            "type": "string"
+          },
+          "presence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Presence"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the player does not share their presence with you."
+          },
+          "tier": {
+            "$ref": "#/components/schemas/TierInfo"
+          },
+          "wins": {
+            "title": "Wins",
+            "type": "integer"
+          },
+          "you": {
+            "description": "Whether this is your own profile.",
+            "title": "You",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "handle",
+          "avatar",
+          "alliance",
+          "tier",
+          "presence",
+          "friendship",
+          "wins",
+          "member_since",
+          "blocked",
+          "you"
+        ],
+        "title": "PlayerProfile",
+        "type": "object"
+      },
+      "PlayerRef": {
+        "additionalProperties": false,
+        "description": "Who a player is to everyone: never an email.",
+        "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The allied Planeswalker; its portrait is theirs.",
+            "title": "Alliance"
+          },
+          "avatar": {
+            "enum": [
+              "sigil",
+              "sun",
+              "moon",
+              "flame",
+              "wave",
+              "leaf",
+              "crown",
+              "tower"
+            ],
+            "title": "Avatar",
+            "type": "string"
+          },
+          "handle": {
+            "title": "Handle",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "handle",
+          "avatar",
+          "alliance"
+        ],
+        "title": "PlayerRef",
+        "type": "object"
+      },
+      "PlayerSearch": {
+        "additionalProperties": false,
+        "properties": {
+          "by_email": {
+            "description": "Whether the text was taken as an email address.",
+            "title": "By Email",
+            "type": "boolean"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerSummary"
+            },
+            "title": "Players",
+            "type": "array"
+          }
+        },
+        "required": [
+          "players",
+          "by_email"
+        ],
+        "title": "PlayerSearch",
+        "type": "object"
+      },
+      "PlayerSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The allied Planeswalker; its portrait is theirs.",
+            "title": "Alliance"
+          },
+          "avatar": {
+            "enum": [
+              "sigil",
+              "sun",
+              "moon",
+              "flame",
+              "wave",
+              "leaf",
+              "crown",
+              "tower"
+            ],
+            "title": "Avatar",
+            "type": "string"
+          },
+          "friendship": {
+            "description": "none, friends, requested (you asked) or requested_you (they asked).",
+            "enum": [
+              "none",
+              "friends",
+              "requested",
+              "requested_you"
+            ],
+            "title": "Friendship",
+            "type": "string"
+          },
+          "handle": {
+            "title": "Handle",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "presence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Presence"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null when the player does not share their presence with you."
+          },
+          "tier": {
+            "$ref": "#/components/schemas/TierInfo"
+          }
+        },
+        "required": [
+          "id",
+          "handle",
+          "avatar",
+          "alliance",
+          "tier",
+          "presence",
+          "friendship"
+        ],
+        "title": "PlayerSummary",
+        "type": "object"
+      },
       "PracticeFormat": {
         "additionalProperties": false,
         "properties": {
@@ -4641,6 +5114,63 @@
         "title": "Preferences",
         "type": "object"
       },
+      "Presence": {
+        "additionalProperties": false,
+        "properties": {
+          "appears_offline": {
+            "default": false,
+            "description": "Shown only to the player and to administrators and SysOp: everyone else sees this player offline.",
+            "title": "Appears Offline",
+            "type": "boolean"
+          },
+          "game_format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy",
+                  "commander"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Format"
+          },
+          "game_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "practice",
+                  "table"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In a game: a practice game against bots, or a human table.",
+            "title": "Game Kind"
+          },
+          "state": {
+            "enum": [
+              "in_game",
+              "online",
+              "idle",
+              "offline"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "Presence",
+        "type": "object"
+      },
       "PriceChange": {
         "additionalProperties": false,
         "properties": {
@@ -4775,6 +5305,81 @@
           "removed"
         ],
         "title": "PrintingSummary",
+        "type": "object"
+      },
+      "PrivacySettings": {
+        "additionalProperties": false,
+        "properties": {
+          "appear_offline": {
+            "description": "Everyone sees you offline, except administrators and SysOp.",
+            "title": "Appear Offline",
+            "type": "boolean"
+          },
+          "email_searchable": {
+            "description": "Whether a player who types your email address in full finds you.",
+            "title": "Email Searchable",
+            "type": "boolean"
+          },
+          "presence_visibility": {
+            "description": "Who sees whether you are online, idle or in a game.",
+            "enum": [
+              "friends",
+              "everyone"
+            ],
+            "title": "Presence Visibility",
+            "type": "string"
+          }
+        },
+        "required": [
+          "presence_visibility",
+          "appear_offline",
+          "email_searchable"
+        ],
+        "title": "PrivacySettings",
+        "type": "object"
+      },
+      "PrivacyUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "appear_offline": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Appear Offline"
+          },
+          "email_searchable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Searchable"
+          },
+          "presence_visibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "friends",
+                  "everyone"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Presence Visibility"
+          }
+        },
+        "title": "PrivacyUpdate",
         "type": "object"
       },
       "Problem": {
@@ -7510,6 +8115,20 @@
           "entries"
         ],
         "title": "Tokens",
+        "type": "object"
+      },
+      "Unread": {
+        "additionalProperties": false,
+        "properties": {
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread"
+        ],
+        "title": "Unread",
         "type": "object"
       },
       "UnresolvedCard": {
@@ -11733,6 +12352,226 @@
         "summary": "Logout All"
       }
     },
+    "/api/v1/blocks/{player_id}": {
+      "delete": {
+        "description": "Unblocks a player. A request they sent while blocked is dropped, so nothing old surfaces.",
+        "operationId": "unblock_player_api_v1_blocks__player_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Unblock Player"
+      },
+      "put": {
+        "description": "Blocks a player: any friendship or request between the two ends.",
+        "operationId": "block_player_api_v1_blocks__player_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Block Player"
+      }
+    },
     "/api/v1/bootstrap": {
       "get": {
         "operationId": "bootstrap_api_v1_bootstrap_get",
@@ -15231,6 +16070,324 @@
         "summary": "Formats"
       }
     },
+    "/api/v1/friends": {
+      "get": {
+        "operationId": "friend_list_api_v1_friends_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Friend List"
+      }
+    },
+    "/api/v1/friends/{player_id}": {
+      "delete": {
+        "description": "Withdraws a request, declines one, or ends a friendship. A request's notification stays,\nno longer waiting, so asking again within a day tells no one twice.",
+        "operationId": "remove_friend_api_v1_friends__player_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove Friend"
+      },
+      "put": {
+        "description": "Add friend: a request, or the answer to theirs, which makes the two friends.",
+        "operationId": "add_friend_api_v1_friends__player_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Add Friend"
+      }
+    },
     "/api/v1/games": {
       "get": {
         "description": "Your recent games, newest first; SysOp may list everyone's (scope=all).",
@@ -16310,6 +17467,312 @@
         "summary": "My Alliance Cards"
       }
     },
+    "/api/v1/me/blocks": {
+      "get": {
+        "operationId": "my_blocks_api_v1_me_blocks_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BlockedPlayer"
+                  },
+                  "title": "Response My Blocks Api V1 Me Blocks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Blocks"
+      }
+    },
+    "/api/v1/me/privacy": {
+      "get": {
+        "operationId": "my_privacy_api_v1_me_privacy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacySettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Privacy"
+      },
+      "patch": {
+        "operationId": "change_privacy_api_v1_me_privacy_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivacyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacySettings"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Privacy"
+      }
+    },
     "/api/v1/me/progress": {
       "get": {
         "operationId": "my_progress_api_v1_me_progress_get",
@@ -16810,6 +18273,245 @@
         "summary": "My Tokens"
       }
     },
+    "/api/v1/notifications": {
+      "get": {
+        "description": "The account's notifications, newest first; the bell shows the first few.",
+        "operationId": "notifications_api_v1_notifications_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Notifications"
+      }
+    },
+    "/api/v1/notifications/read": {
+      "post": {
+        "description": "Marks the account's unread notifications read, up to a time or all of them.",
+        "operationId": "read_notifications_api_v1_notifications_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationsRead"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unread"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Notifications"
+      }
+    },
     "/api/v1/planeswalkers": {
       "get": {
         "description": "The roster, with what the account's tier has opened.",
@@ -16911,6 +18613,230 @@
           }
         },
         "summary": "Planeswalkers"
+      }
+    },
+    "/api/v1/players": {
+      "get": {
+        "description": "Players by handle (in part) or by email address (in full); never anyone's email.",
+        "operationId": "search_players_api_v1_players_get",
+        "parameters": [
+          {
+            "description": "A handle, or part of one; or an email address.",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "A handle, or part of one; or an email address.",
+              "maxLength": 320,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerSearch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Search Players"
+      }
+    },
+    "/api/v1/players/{player_id}": {
+      "get": {
+        "operationId": "player_profile_api_v1_players__player_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerProfile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Player Profile"
       }
     },
     "/api/v1/practice-games": {
@@ -17119,6 +19045,115 @@
           }
         },
         "summary": "Practice Options"
+      }
+    },
+    "/api/v1/presence": {
+      "post": {
+        "description": "The app's check-in, from each open tab every CHECK_IN_SECONDS. It is not activity: it never\nholds off the session's idle limit (identity.BACKGROUND_PATHS).",
+        "operationId": "check_in_api_v1_presence_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckedIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Check In"
       }
     },
     "/api/v1/ready": {

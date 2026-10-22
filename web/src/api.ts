@@ -36,8 +36,9 @@ const METHODS = new Set<string>([
   "PATCH",
   "DELETE",
 ]);
-// Asked by the page on its own every minute: they would push out what the person did.
-const UNRECORDED = new Set(["/api/v1/admin/counts"]);
+// Asked by the page on its own (Administration's counts, the presence check-in): they would
+// push out what the person did.
+const UNRECORDED = new Set(["/api/v1/admin/counts", "/api/v1/presence"]);
 const REQUEST_ID = /^[A-Za-z0-9-]{1,64}$/;
 
 /**

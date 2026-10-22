@@ -25,6 +25,12 @@ import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { SiteLinks } from "./app/SiteLinks";
 import { UpdateNotice } from "./app/UpdateNotice";
+import { FriendsPage } from "./social/FriendsPage";
+import { NotificationBell, NotificationsPage } from "./social/Notifications";
+import { PlayerPage } from "./social/PlayerPage";
+import { PlayerSearch } from "./social/PlayerSearch";
+import { useSocial } from "./social/presence";
+import { PLAYER_ROUTE } from "./social/social";
 import {
   answerTimeout,
   client,
@@ -56,6 +62,7 @@ import styles from "./App.module.css";
 const pages = [
   "Play",
   "Tables",
+  "Friends",
   "Campaign",
   "Learn",
   "Decks",
@@ -66,14 +73,17 @@ const pages = [
   "Settings",
   "Admin",
 ] as const;
-// SysOp's entrance has no navigation entry; it opens only from the SysOp networks.
-type Page = (typeof pages)[number] | "SysOp";
-const glyphs = ["◇", "⚔", "▱", "✧", "▤", "▦", "⬡", "◈", "○", "⚙", "⚖"];
+// SysOp's entrance has no navigation entry; it opens only from the SysOp networks. The
+// notifications' history (v0.4.3) opens from the bell.
+type Page = (typeof pages)[number] | "SysOp" | "Notifications";
+const glyphs = ["◇", "⚔", "◎", "▱", "✧", "▤", "▦", "⬡", "◈", "○", "⚙", "⚖"];
 const details: Record<
   Exclude<
     Page,
     | "Play"
     | "Tables"
+    | "Friends"
+    | "Notifications"
     | "Settings"
     | "Profile"
     | "Admin"
@@ -145,9 +155,15 @@ function currentDeck(): { deck?: string; shared?: string } {
 function currentTable(): string | undefined {
   return TABLE_ROUTE.exec(window.location.hash)?.[1];
 }
+/** #player/<id> opens a player's profile (v0.4.3), under Friends. */
+function currentPlayer(): string | undefined {
+  return PLAYER_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
+}
 function currentPage(): Page {
   const path = window.location.hash.slice(1).toLowerCase().split("?")[0] ?? "";
   if (path === "sysop") return "SysOp";
+  if (path === "notifications") return "Notifications";
+  if (path.startsWith("player/")) return "Friends";
   if (path.startsWith("tables/")) return "Tables";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
   return pages.find((page) => page.toLowerCase() === path) ?? "Play";
@@ -158,6 +174,7 @@ export function App() {
   const [game, setGame] = useState(currentGame);
   const [deckRoute, setDeckRoute] = useState(currentDeck);
   const [tableRoute, setTableRoute] = useState(currentTable);
+  const [playerRoute, setPlayerRoute] = useState(currentPlayer);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [formats, setFormats] = useState<Format[]>([]);
   const [connection, setConnection] = useState<
@@ -223,7 +240,10 @@ export function App() {
   // Administration's tabs and in the tab's title, asked again every minute.
   const { counts, refresh: refreshCounts } = useAdminCounts(me);
   const waiting = countsTotal(counts);
-  useCountTitle(waiting);
+  // The app's check-in, on every screen of an active account, the table's too (v0.4.3): presence
+  // for friends, and the bell's count. Unread notifications join the tab title's count.
+  const social = useSocial(me);
+  useCountTitle(waiting + social.unread);
 
   useEffect(() => {
     const change = (event: HashChangeEvent) => {
@@ -242,6 +262,7 @@ export function App() {
       setGame(currentGame());
       setDeckRoute(currentDeck());
       setTableRoute(currentTable());
+      setPlayerRoute(currentPlayer());
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -536,12 +557,17 @@ export function App() {
         <InstallBanner me={me} onGame={false} />
         <header className={styles.topbar}>
           <span>THE GATHERING STARTS HERE</span>
-          <div>
+          <PlayerSearch className={styles.topbarSearch} />
+          <div className={styles.topbarEnd}>
             <span
               className={styles.statusDot}
               data-connected={connection === "connected" && online}
             />
-            <span role="status" aria-label="Connection status">
+            <span
+              role="status"
+              aria-label="Connection status"
+              className={styles.statusText}
+            >
               {!online
                 ? "Offline"
                 : connection === "loading"
@@ -554,6 +580,7 @@ export function App() {
             {/* On every page of the app (v0.4.1); the table has its own, in the Game menu. */}
             <ReportButton className={styles.report} />
             <span className={styles.version}>v{__APP_VERSION__}</span>
+            <NotificationBell social={social} />
           </div>
         </header>
         <main id="main" className={styles.main} tabIndex={-1}>
@@ -613,6 +640,16 @@ export function App() {
               heading={heading}
               onSetup={() => setSetup("current")}
             />
+          ) : page === "Friends" && playerRoute ? (
+            <PlayerPage
+              key={playerRoute}
+              playerId={playerRoute}
+              heading={heading}
+            />
+          ) : page === "Friends" ? (
+            <FriendsPage heading={heading} />
+          ) : page === "Notifications" ? (
+            <NotificationsPage social={social} heading={heading} />
           ) : page === "Tables" ? (
             <TablesPage
               key={tableRoute ?? "lobby"}

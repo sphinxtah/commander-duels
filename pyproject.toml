@@ -19,6 +19,8 @@ version = {file = "VERSION"}
 include = ["api*", "catalog*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A test stuck this long prints every thread's stack (two CI runs hung in v0.4.2).
+faulthandler_timeout = 300
 [tool.ruff]
 target-version = "py312"
 line-length = 100

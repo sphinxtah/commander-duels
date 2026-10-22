@@ -33,6 +33,7 @@ import { useStanding } from "./alliance/useStanding";
 import { TierBadge } from "./alliance/TierBadge";
 import { loadGoogle } from "./google";
 import styles from "./Account.module.css";
+import { PrivacySettings } from "./social/PrivacySettings";
 import shell from "./App.module.css";
 
 export const avatars: Record<Avatar, string> = {
@@ -1012,6 +1013,8 @@ export function Account({
           <SysopPassword onChange={onChange} />
         </section>
       )}
+      {/* Who sees your presence, appearing offline, being found by email, blocks (v0.4.3). */}
+      <PrivacySettings />
       <Sessions me={me} onChange={onChange} onSignedOut={onSignedOut} />
     </>
   );

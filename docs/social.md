@@ -1,0 +1,62 @@
+# Finding players, friends and notifications (v0.4.3)
+
+Since v0.4.3 players find each other with a search in the top bar, open each other's profiles, become friends, see what their friends are doing, and hear of it through a notification bell. The owner's decisions are in [the v0.4.3 plan](plans/0.4.3.md#decisions-at-the-start-of-v043). The API is `api/social.py`; the web app's part is `web/src/social/`. Chat between friends and at the table comes next, in v0.4.4 ([its plan](plans/0.4.4.md)).
+
+## The player search
+
+- **Where.** A search field in the middle of the top bar, on every page of the app (`PlayerSearch.tsx`). On a phone it takes its own row under the status line.
+- **By handle.** A handle matches in part, case aside, as it is typed: two letters at least, a moment (300 ms) after the last key. The closest come first: the whole handle, then handles that start with the text, then the rest, alphabetically; 20 at most. `_` and `%` are only themselves, never wildcards.
+- **By email.** Text with an `@` is an email address. It matches only typed in full, case aside, and it is sent only on Enter, so an address typed letter by letter spends no searches. A player may turn this off in their privacy settings (it is on by default, as the owner asked for search by email). No answer ever holds an email address: a result shows the handle, the portrait or avatar, the tier, whether the two are friends, and the presence the searcher may see.
+- **Who is found.** Active players who have chosen a handle. Never SysOp, a pending, denied or deleted account, the one searching, or a player who has blocked the one searching.
+- **Who may search.** Every active account. An account searches at most 60 times a minute, and by email at most 30 times a day (`429 search_limited`); SysOp has no limit. The counts live in the API process's memory (it runs as one process), so a restart forgets them.
+- **A result** opens the player's profile.
+
+`GET /api/v1/players?q=<text>` answers `{players, by_email}`.
+
+## Profiles
+
+`#player/<id>` shows any active account with a handle, SysOp's included (the search never lists SysOp, but its notifications link to it): the handle, the portrait or avatar, the tier, the wins, the month the account began, the presence when shared, and what is between the two accounts. On a player's own profile it says so, with a link to Profile. Any other account is not found (`404`, as for a missing one). `GET /api/v1/players/{id}`.
+
+## Friends
+
+- **Mutual** (the owner's decision). **Add friend** sends a request; the asker sees **Pending** until the other player accepts it, from the bell, the history, Friends or the asker's profile, or adds the asker back, which is the same thing. Either may withdraw or decline a request, or end a friendship (after a confirmation). `PUT /api/v1/friends/{id}` asks or accepts; `DELETE /api/v1/friends/{id}` withdraws, declines or ends.
+- **A request's notification** goes to the other player once a day at most, however often the request is withdrawn and sent again. A request withdrawn stays in their notifications, no longer waiting; a request declined is marked read.
+- **Limits.** An account may have 50 requests waiting for others' answers (`429 too_many_requests`); answering a request is never limited. An account needs its handle before it can ask (`409 handle_required`).
+- **The Friends page** (`#friends`, in the navigation) lists the requests waiting for your answer, your friends by what they are doing (in a game, online, idle, offline, then those who share nothing), and your requests waiting for theirs. It asks again every 30 seconds while shown. `GET /api/v1/friends`.
+
+## Blocking
+
+A block (from the player's profile, after a confirmation) ends any friendship or request between the two, and removes the notifications the blocked player caused. Afterwards the blocked player no longer finds the blocker in the search and never sees their presence; their friend requests wait unseen, with no notification, and are dropped when the block ends. The blocker cannot ask them either until unblocking. Blocked players are listed in the privacy settings on Profile, each with Unblock. `PUT` and `DELETE /api/v1/blocks/{id}`, `GET /api/v1/me/blocks`.
+
+## Presence
+
+- **The states.** In a game (a practice game against bots, or a human table, with its format), online, idle, or offline.
+- **Where it comes from.** Every open tab of the app checks in every 30 seconds (`POST /api/v1/presence`, `presence.ts`), on every screen, the table's too. The check-in says only one thing, about its own player: whether they have left that tab (it is hidden, or untouched for 5 minutes). The server works out the rest: offline after 90 seconds with no check-in from any tab; idle when no tab in use has checked in for 90 seconds; in a game while the account holds a seat in a running game. Nothing the browser says about anyone else is used.
+- **Not activity.** Check-ins never keep a session from its idle limit (`identity.BACKGROUND_PATHS`), and they are not among the requests a problem report attaches.
+- **Who sees it** (the owner's decisions): friends, by default; every player, when the player chooses "Every player" in their privacy settings. A blocked player never does.
+- **Appearing offline** shows the player offline to everyone, friends included, and their friends are not told when they come online. Administrators and SysOp (permission `players.presence`) still see the real state, passively and silently, with a note that the player appears offline; nothing records or tells the player that they looked. The player sees their own real state with the same note.
+- **Two tabs at once** count once: the account's row is locked during a check-in, so coming online is announced once.
+
+## Notifications and the bell
+
+- **The bell** sits in the top bar's right-hand corner, on every page of the app, with the count of unread notifications (also in the browser tab's title, with Administration's counts). It opens a bubble with the newest six and, at its bottom, **See all notifications**, the full history (`#notifications`), a page of 20 at a time with "Show older notifications". Opening either marks what it shows read. Escape, a click elsewhere or another page closes the bubble.
+- **What it tells** (`NotificationItem.kind`): a friend request (with Accept and Decline while it waits), a request accepted, and a friend coming online. The last goes only to friends online at that moment, and at most once in 30 minutes for the same friend.
+- **Pop-ups.** A notification that arrives while the app is open pops up beside the bell for 8 seconds, from the check-in's answer (`fresh`: unread notifications newer than the newest the page knew of). Nothing from before the page opened pops up.
+- **Kept** 90 days, and at most the newest 200 per account; older ones go when a new one arrives. The bell alone: no email, no browser notifications.
+- `GET /api/v1/notifications?limit=&cursor=`, `POST /api/v1/notifications/read {up_to}`.
+
+## Privacy settings
+
+On Profile, under "Privacy" (`PrivacySettings.tsx`): who sees whether you are online, idle or in a game (your friends, or every player); appear offline; let players find you by your email address; and the players you blocked. Each change saves at once. `GET` and `PATCH /api/v1/me/privacy`. The [privacy policy](../web/public/pages/privacy.html) says all of this to players.
+
+## Deleting an account
+
+Deleting an account ([accounts](../api/accounts.py), `CLEANUPS`) removes its friendships and requests, its blocks either way, and the notifications it received or caused.
+
+## The data
+
+Migration `0015_friends`: `friendships` (one row a pair, whichever asked: `user_low` is the lower ID; `pending` or `accepted`), `player_blocks`, `notifications`, and on `users` the presence (`presence_at`, `active_at`) and the privacy settings (`presence_visibility`, `appear_offline`, `email_searchable`).
+
+## Tests
+
+`tests/test_social.py` (SQLite, and PostgreSQL when `CD_TEST_POSTGRES_URL` is set), `web/src/social/social.test.tsx`, and the browser journey `web/e2e/social.spec.ts`, which CI's engine job runs with SysOp and the test player of the human table's journey: a search, a request, the bell, accepting, presence both ways, and appearing offline seen by SysOp.

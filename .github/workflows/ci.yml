@@ -3,6 +3,8 @@ on: [push, pull_request]
 jobs:
   verify:
     runs-on: ubuntu-24.04
+    # It takes about 8 minutes; a hang fails here instead of holding a runner for six hours.
+    timeout-minutes: 30
     env:
       CD_TEST_POSTGRES_URL: postgresql+psycopg://commander:commander@localhost:5432/commander
     services:
@@ -56,6 +58,8 @@ jobs:
       - run: docker compose config --quiet && docker compose build migrate api worker web
   engine:
     runs-on: ubuntu-24.04
+    # About 15 minutes warm and 25 cold.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -133,7 +137,7 @@ jobs:
           printf '%s\n' "$password" | docker compose exec -T api python -m api.cli sysop-password --stdin
           docker compose run --rm --no-deps -v "$PWD/tests/fixtures:/fixtures:ro" -v "$PWD/scripts:/scripts:ro" \
             api python /scripts/load_fixture_catalog.py /fixtures
-          # The second player of the human table's journey, and its session (v0.4.0).
+          # The second player of the human table's and the friends' journeys, and its session (v0.4.0).
           player="$(docker compose run --rm --no-deps -v "$PWD/scripts:/scripts:ro" api \
             python /scripts/e2e_player.py rival | tail -n 1)"
           echo "::add-mask::$player"
@@ -143,7 +147,7 @@ jobs:
             -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -e CD_E2E_PLAYER_SESSION="$player" \
             -v "$PWD:/w" -w /w mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
               && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
-              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
+              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/social.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
                 --reporter=line"
           docker compose down
       # As in verify; a failed game's error also lists the test player's last answers.

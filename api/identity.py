@@ -32,9 +32,10 @@ TOUCH_INTERVAL = timedelta(minutes=1)
 # How long a rotated session's old token still signs requests in, for those the browser sent
 # before it read the new cookie.
 ROTATION_GRACE = timedelta(seconds=60)
-# Asked by the page on its own every minute (Administration's counts, v0.4.1): they are not
-# activity, so a tab left open does not keep its session from reaching its idle limit.
-BACKGROUND_PATHS = frozenset({"/api/v1/admin/counts"})
+# Asked by the page on its own (Administration's counts every minute, v0.4.1; the presence
+# check-in, v0.4.3): they are not activity, so a tab left open does not keep its session from
+# reaching its idle limit.
+BACKGROUND_PATHS = frozenset({"/api/v1/admin/counts", "/api/v1/presence"})
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -56,6 +57,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "shop.manage",
             # Reading the players' problem reports and setting their status (v0.4.1).
             "reports.manage",
+            # Every player's real presence, appearing offline or not (v0.4.3).
+            "players.presence",
         }
     ),
 }

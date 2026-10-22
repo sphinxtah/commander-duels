@@ -582,6 +582,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/blocks/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Block Player
+         * @description Blocks a player: any friendship or request between the two ends.
+         */
+        put: operations["block_player_api_v1_blocks__player_id__put"];
+        post?: never;
+        /**
+         * Unblock Player
+         * @description Unblocks a player. A request they sent while blocked is dropped, so nothing old surfaces.
+         */
+        delete: operations["unblock_player_api_v1_blocks__player_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bootstrap": {
         parameters: {
             query?: never;
@@ -1101,6 +1125,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Friend List */
+        get: operations["friend_list_api_v1_friends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Friend
+         * @description Add friend: a request, or the answer to theirs, which makes the two friends.
+         */
+        put: operations["add_friend_api_v1_friends__player_id__put"];
+        post?: never;
+        /**
+         * Remove Friend
+         * @description Withdraws a request, declines one, or ends a friendship. A request's notification stays,
+         *     no longer waiting, so asking again within a day tells no one twice.
+         */
+        delete: operations["remove_friend_api_v1_friends__player_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games": {
         parameters: {
             query?: never;
@@ -1284,6 +1350,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Blocks */
+        get: operations["my_blocks_api_v1_me_blocks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/privacy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Privacy */
+        get: operations["my_privacy_api_v1_me_privacy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change Privacy */
+        patch: operations["change_privacy_api_v1_me_privacy_patch"];
+        trace?: never;
+    };
     "/api/v1/me/progress": {
         parameters: {
             query?: never;
@@ -1373,6 +1474,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notifications
+         * @description The account's notifications, newest first; the bell shows the first few.
+         */
+        get: operations["notifications_api_v1_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Notifications
+         * @description Marks the account's unread notifications read, up to a time or all of them.
+         */
+        post: operations["read_notifications_api_v1_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/planeswalkers": {
         parameters: {
             query?: never;
@@ -1385,6 +1526,43 @@ export interface paths {
          * @description The roster, with what the account's tier has opened.
          */
         get: operations["planeswalkers_api_v1_planeswalkers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Players
+         * @description Players by handle (in part) or by email address (in full); never anyone's email.
+         */
+        get: operations["search_players_api_v1_players_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Player Profile */
+        get: operations["player_profile_api_v1_players__player_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1429,6 +1607,27 @@ export interface paths {
         get: operations["practice_options_api_v1_practice_games_options_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/presence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check In
+         * @description The app's check-in, from each open tab every CHECK_IN_SECONDS. It is not activity: it never
+         *     holds off the session's idle limit (identity.BACKGROUND_PATHS).
+         */
+        post: operations["check_in_api_v1_presence_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2038,6 +2237,15 @@ export interface components {
              */
             signup_policy: "open" | "approval";
         };
+        /** BlockedPlayer */
+        BlockedPlayer: {
+            /**
+             * Blocked At
+             * Format: date-time
+             */
+            blocked_at: string;
+            player: components["schemas"]["PlayerRef"];
+        };
         /** BoosterRun */
         BoosterRun: {
             /** Error Code */
@@ -2385,6 +2593,35 @@ export interface components {
             revision: components["schemas"]["RevisionInfo"] | null;
             /** Stale */
             stale: boolean;
+        };
+        /** CheckIn */
+        CheckIn: {
+            /**
+             * Idle
+             * @description Whether this tab's player has left it: hidden, or untouched for minutes.
+             * @default false
+             */
+            idle: boolean;
+            /**
+             * Since
+             * @description The newest notification the page knows of; newer unread ones come back as fresh.
+             */
+            since?: string | null;
+        };
+        /** CheckedIn */
+        CheckedIn: {
+            /**
+             * Fresh
+             * @description Unread notifications newer than the check-in's since, newest first.
+             */
+            fresh: components["schemas"]["NotificationItem"][];
+            /**
+             * Newest
+             * @description The newest notification's time, if any.
+             */
+            newest: string | null;
+            /** Unread */
+            unread: number;
         };
         /**
          * Coverage
@@ -2909,6 +3146,21 @@ export interface components {
             /** Seats */
             seats: number[];
         };
+        /** FriendList */
+        FriendList: {
+            /** Friends */
+            friends: components["schemas"]["PlayerSummary"][];
+            /**
+             * Incoming
+             * @description Requests waiting for your answer.
+             */
+            incoming: components["schemas"]["PlayerSummary"][];
+            /**
+             * Outgoing
+             * @description Your requests, waiting for theirs.
+             */
+            outgoing: components["schemas"]["PlayerSummary"][];
+        };
         /** GameResult */
         GameResult: {
             /** Conceded Seats */
@@ -3257,7 +3509,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -3267,6 +3519,53 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "denied";
+        };
+        /** NotificationItem */
+        NotificationItem: {
+            actor: components["schemas"]["PlayerRef"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "friend_request" | "friend_accepted" | "friend_online";
+            /** Read */
+            read: boolean;
+            /**
+             * Request Pending
+             * @description For a friend request: whether it still waits for your answer.
+             * @default false
+             */
+            request_pending: boolean;
+        };
+        /** NotificationPage */
+        NotificationPage: {
+            /** Items */
+            items: components["schemas"]["NotificationItem"][];
+            /**
+             * Next
+             * @description The cursor of the next, older page.
+             */
+            next: string | null;
+            /** Unread */
+            unread: number;
+        };
+        /** NotificationsRead */
+        NotificationsRead: {
+            /**
+             * Up To
+             * @description Marks unread notifications up to this time read; all if null.
+             */
+            up_to?: string | null;
         };
         /** Opening */
         Opening: {
@@ -3380,6 +3679,114 @@ export interface components {
              */
             wins: number;
         };
+        /** PlayerProfile */
+        PlayerProfile: {
+            /**
+             * Alliance
+             * @description The allied Planeswalker; its portrait is theirs.
+             */
+            alliance: string | null;
+            /**
+             * Avatar
+             * @enum {string}
+             */
+            avatar: "sigil" | "sun" | "moon" | "flame" | "wave" | "leaf" | "crown" | "tower";
+            /**
+             * Blocked
+             * @description Whether you have blocked this player.
+             */
+            blocked: boolean;
+            /**
+             * Friendship
+             * @description none, friends, requested (you asked) or requested_you (they asked).
+             * @enum {string}
+             */
+            friendship: "none" | "friends" | "requested" | "requested_you";
+            /** Handle */
+            handle: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Member Since
+             * Format: date-time
+             */
+            member_since: string;
+            /** @description Null when the player does not share their presence with you. */
+            presence: components["schemas"]["Presence"] | null;
+            tier: components["schemas"]["TierInfo"];
+            /** Wins */
+            wins: number;
+            /**
+             * You
+             * @description Whether this is your own profile.
+             */
+            you: boolean;
+        };
+        /**
+         * PlayerRef
+         * @description Who a player is to everyone: never an email.
+         */
+        PlayerRef: {
+            /**
+             * Alliance
+             * @description The allied Planeswalker; its portrait is theirs.
+             */
+            alliance: string | null;
+            /**
+             * Avatar
+             * @enum {string}
+             */
+            avatar: "sigil" | "sun" | "moon" | "flame" | "wave" | "leaf" | "crown" | "tower";
+            /** Handle */
+            handle: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** PlayerSearch */
+        PlayerSearch: {
+            /**
+             * By Email
+             * @description Whether the text was taken as an email address.
+             */
+            by_email: boolean;
+            /** Players */
+            players: components["schemas"]["PlayerSummary"][];
+        };
+        /** PlayerSummary */
+        PlayerSummary: {
+            /**
+             * Alliance
+             * @description The allied Planeswalker; its portrait is theirs.
+             */
+            alliance: string | null;
+            /**
+             * Avatar
+             * @enum {string}
+             */
+            avatar: "sigil" | "sun" | "moon" | "flame" | "wave" | "leaf" | "crown" | "tower";
+            /**
+             * Friendship
+             * @description none, friends, requested (you asked) or requested_you (they asked).
+             * @enum {string}
+             */
+            friendship: "none" | "friends" | "requested" | "requested_you";
+            /** Handle */
+            handle: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** @description Null when the player does not share their presence with you. */
+            presence: components["schemas"]["Presence"] | null;
+            tier: components["schemas"]["TierInfo"];
+        };
         /** PracticeFormat */
         PracticeFormat: {
             /** Bots */
@@ -3464,6 +3871,27 @@ export interface components {
              */
             reduced_motion: boolean;
         };
+        /** Presence */
+        Presence: {
+            /**
+             * Appears Offline
+             * @description Shown only to the player and to administrators and SysOp: everyone else sees this player offline.
+             * @default false
+             */
+            appears_offline: boolean;
+            /** Game Format */
+            game_format?: ("legacy" | "commander") | null;
+            /**
+             * Game Kind
+             * @description In a game: a practice game against bots, or a human table.
+             */
+            game_kind?: ("practice" | "table") | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "in_game" | "online" | "idle" | "offline";
+        };
         /** PriceChange */
         PriceChange: {
             /** Reason */
@@ -3507,6 +3935,34 @@ export interface components {
             set_code: string;
             /** Set Name */
             set_name: string;
+        };
+        /** PrivacySettings */
+        PrivacySettings: {
+            /**
+             * Appear Offline
+             * @description Everyone sees you offline, except administrators and SysOp.
+             */
+            appear_offline: boolean;
+            /**
+             * Email Searchable
+             * @description Whether a player who types your email address in full finds you.
+             */
+            email_searchable: boolean;
+            /**
+             * Presence Visibility
+             * @description Who sees whether you are online, idle or in a game.
+             * @enum {string}
+             */
+            presence_visibility: "friends" | "everyone";
+        };
+        /** PrivacyUpdate */
+        PrivacyUpdate: {
+            /** Appear Offline */
+            appear_offline?: boolean | null;
+            /** Email Searchable */
+            email_searchable?: boolean | null;
+            /** Presence Visibility */
+            presence_visibility?: ("friends" | "everyone") | null;
         };
         /** Problem */
         Problem: {
@@ -4597,6 +5053,11 @@ export interface components {
              * @description On packs, as a positive number.
              */
             spent: number;
+        };
+        /** Unread */
+        Unread: {
+            /** Unread */
+            unread: number;
         };
         /** UnresolvedCard */
         UnresolvedCard: {
@@ -7973,6 +8434,194 @@ export interface operations {
             };
         };
     };
+    block_player_api_v1_blocks__player_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    unblock_player_api_v1_blocks__player_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     bootstrap_api_v1_bootstrap_get: {
         parameters: {
             query?: never;
@@ -10643,6 +11292,286 @@ export interface operations {
             };
         };
     };
+    friend_list_api_v1_friends_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    add_friend_api_v1_friends__player_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    remove_friend_api_v1_friends__player_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     list_games_api_v1_games_get: {
         parameters: {
             query?: {
@@ -11601,6 +12530,286 @@ export interface operations {
             };
         };
     };
+    my_blocks_api_v1_me_blocks_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockedPlayer"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_privacy_api_v1_me_privacy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacySettings"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_privacy_api_v1_me_privacy_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacySettings"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     my_progress_api_v1_me_progress_get: {
         parameters: {
             query?: never;
@@ -12056,6 +13265,197 @@ export interface operations {
             };
         };
     };
+    notifications_api_v1_notifications_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_notifications_api_v1_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationsRead"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Unread"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     planeswalkers_api_v1_planeswalkers_get: {
         parameters: {
             query?: never;
@@ -12072,6 +13472,195 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlaneswalkerInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    search_players_api_v1_players_get: {
+        parameters: {
+            query: {
+                /** @description A handle, or part of one; or an email address. */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerSearch"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    player_profile_api_v1_players__player_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerProfile"];
                 };
             };
             /** @description Bad Request */
@@ -12260,6 +13849,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PracticeOptions"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    check_in_api_v1_presence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckedIn"];
                 };
             };
             /** @description Bad Request */

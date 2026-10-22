@@ -72,12 +72,18 @@ describe("the public pages", () => {
     expect(about).toContain("Commander Duels is a free, unofficial beta");
     expect(page("about")).toContain('<a href="/privacy">privacy policy</a>');
     expect(about).toContain('Press "Sign in with Google" on the home page');
-    // The policy and the terms carry their effective date, and the policy its version.
-    for (const name of ["privacy", "terms"])
-      expect(text(page(name))).toContain(
-        "Effective 21 October 2026 (2026-10-21)",
-      );
-    expect(text(page("privacy"))).toContain("Commander Duels version 0.4.1");
+    // The policy and the terms carry their effective date, and the policy its version: v0.4.3
+    // added the player search, friends, presence and notifications to the policy.
+    expect(text(page("terms"))).toContain(
+      "Effective 21 October 2026 (2026-10-21)",
+    );
+    expect(text(page("privacy"))).toContain(
+      "Effective 22 October 2026 (2026-10-22)",
+    );
+    expect(text(page("privacy"))).toContain("Commander Duels version 0.4.3");
+    expect(text(page("privacy"))).toContain(
+      "Your friends see whether you are online, idle or in a game.",
+    );
     // Only the basic sign-in scopes, which need no verification by Google.
     expect(page("privacy")).toMatch(
       /<code>openid<\/code>,\s*<code>email<\/code> and <code>profile<\/code> scopes/,

@@ -242,6 +242,18 @@ beforeEach(() => {
   // Profile's progress and the roster (v0.3.1).
   on("GET /api/v1/me/progress", () => reply(200, progress()));
   on("GET /api/v1/planeswalkers", () => reply(200, roster));
+  // The app's check-in and Profile's privacy settings (v0.4.3).
+  on("POST /api/v1/presence", () =>
+    reply(200, { unread: 0, newest: null, fresh: [] }),
+  );
+  on("GET /api/v1/me/privacy", () =>
+    reply(200, {
+      presence_visibility: "friends",
+      appear_offline: false,
+      email_searchable: true,
+    }),
+  );
+  on("GET /api/v1/me/blocks", () => reply(200, []));
 });
 afterEach(() => {
   vi.restoreAllMocks();

@@ -24,6 +24,7 @@ from api import (
     progression,
     reports,
     shop,
+    social,
     tables,
 )
 from api.config import Settings
@@ -330,4 +331,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(economy.router)
     app.include_router(shop.router)
     app.include_router(reports.router)
+    app.include_router(social.router)
     return app

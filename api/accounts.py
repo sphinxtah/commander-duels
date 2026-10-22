@@ -74,7 +74,16 @@ def remove_reports(db: Session, user_id: UUID) -> int:
     return delete_reports_of(db, user_id)
 
 
-CLEANUPS: tuple[Callable[[Session, UUID], object], ...] = (remove_reports,)
+def remove_social(db: Session, user_id: UUID) -> int:
+    """The account's friendships and requests, blocks either way, and the notifications it
+    received or caused (api/social.py)."""
+    # Imported here, as above: api.social imports api.progression, which imports far.
+    from api.social import delete_social_of
+
+    return delete_social_of(db, user_id)
+
+
+CLEANUPS: tuple[Callable[[Session, UUID], object], ...] = (remove_reports, remove_social)
 
 
 @dataclass

@@ -141,19 +141,27 @@
 .workspace {
   margin-left: 238px;
 }
+/* The motto, the player search in the middle (v0.4.3), and the status, report button, version
+   and notification bell on the right. */
 .topbar {
   min-height: 76px;
   border-bottom: 1px solid #ffffff0b;
-  display: flex;
+  display: grid;
+  /* The right-hand side never wraps: the motto gives way first. */
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 400px) auto;
   align-items: center;
-  justify-content: space-between;
+  gap: 18px;
   padding: 0 44px;
   color: #82918a;
   font-size: 0.63rem;
   letter-spacing: 1.8px;
 }
+.topbarSearch {
+  justify-self: center;
+}
 /* Wraps rather than overflowing when an update notice joins the connection status. */
-.topbar > div {
+.topbarEnd {
+  justify-self: end;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -640,7 +648,7 @@ h1 {
     display: none;
   }
   .topbar {
-    justify-content: flex-end;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   .hero {
     min-height: 0;
@@ -686,6 +694,23 @@ h1 {
   }
   .topbar {
     min-height: 50px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px 16px 12px;
+  }
+  .topbarSearch {
+    order: 2;
+    justify-self: stretch;
+    width: 100%;
+  }
+  /* The dot says it; the words stay for screen readers, so the bell fits on the row. */
+  .statusText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .main {
     padding: 22px 18px 0;
