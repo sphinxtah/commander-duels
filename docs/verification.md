@@ -16,6 +16,8 @@ Validated locally on Windows on October 21, 2026, on the work of v0.4.2 (the liv
 | The wizard on screen | Looked at in Chromium at 1280 x 800 and 390 x 844 with a stand-in account: the welcome with its four screenshots in a column on a phone and two across on a desktop, no sideways scroll, and the handle step |
 | The welcome screenshots | Captured by Playwright at 1280 x 800 from a throwaway local stack built from the tree, with a copy of the development catalog and a made-up test player: a Commander practice game against a bot on turn 16, the deck builder's card details, a pack opening at Leng's counter, the alliance picker; 492 KB for the eight files |
 
+**Hosted CI.** Run #83 on 010f7b4 passed in 16 m 48 s, with 220 pytest (the git-clone tests included), 880 Vitest tests and 44 + 16 browser journeys ([release notes](releases/0.4.2.md#verification)).
+
 ## v0.4.1
 
 Validated locally on Windows on October 21, 2026, on the work as merged for v0.4.1 (the public pages, problem reports and the counts, account deletion, 64 games at once, and The Sphinx's portrait). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository, with Pillow 12.3.0; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine's tests ran in its image's Maven build.
