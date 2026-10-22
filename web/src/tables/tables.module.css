@@ -1,8 +1,5 @@
 /* Human tables (v0.4.0): the lobby and a table's seats, in the practice table's colours. */
 .page h1 {
-  font:
-    2.2rem Georgia,
-    serif;
   margin: 0 0 10px;
 }
 .lead {
@@ -192,9 +189,6 @@
   font-size: 0.85rem;
 }
 @media (max-width: 600px) {
-  .page h1 {
-    font-size: 1.7rem;
-  }
   .seats {
     grid-template-columns: minmax(0, 1fr);
   }

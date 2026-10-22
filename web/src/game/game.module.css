@@ -1081,3 +1081,57 @@ button.life[data-selected] {
   gap: 8px;
   margin-top: 16px;
 }
+
+/* The facelift (v0.4.5): away from the game, on the Play and Tables pages, the practice table's
+   panel, choices and buttons take the menus' look. The table's own screen keeps its own. */
+.table {
+  background: var(--cd-panel-bg);
+  border-color: var(--cd-gold-line);
+  border-radius: 10px;
+  box-shadow: var(--cd-frame);
+}
+.table h2 {
+  font: 600 1.6rem var(--cd-display);
+  color: var(--cd-gold-hi);
+}
+.eyebrow {
+  font-family: var(--cd-display);
+  font-weight: 600;
+}
+.choice {
+  background: linear-gradient(180deg, #172522, #0e1716);
+  border-color: #d5b77c2e;
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
+}
+.choice:hover {
+  border-color: #d5b77c80;
+}
+.choice:has(input:checked) {
+  border-color: #f4dca6b3;
+  background: linear-gradient(180deg, #2a3a2f, #151f1c);
+  box-shadow:
+    0 0 18px #e9b96033,
+    inset 0 1px 0 #ffffff14;
+}
+:global(html[data-route="shell"]) .primaryButton {
+  background: var(--cd-gold-fill);
+  border-color: #f7e2ae;
+  color: #1d1408;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+:global(html[data-route="shell"]) .primaryButton:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+:global(html[data-route="shell"]) .secondaryButton {
+  background: linear-gradient(180deg, #1f302cd9, #111b1ad9);
+  border-color: var(--cd-gold-line);
+  color: var(--cd-gold-hi);
+  font-family: var(--cd-display);
+  letter-spacing: 0.6px;
+  box-shadow: inset 0 1px 0 #ffffff12;
+}

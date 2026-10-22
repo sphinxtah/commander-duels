@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0020_account_reset"
-down_revision = "0017_chat"
+down_revision = "0019_table_rules"
 branch_labels = None
 depends_on = None
 

@@ -892,13 +892,22 @@
 }
 
 /* ---------- smaller windows ---------- */
-@media (max-width: 1360px) {
+/* The top bar gives way a step at a time, so it never runs wider than the window: the pages'
+   icons first, then the wordmark, the account's words, and the search to a row of its own. */
+@media (max-width: 1580px) {
+  .nav a {
+    padding: 0 11px;
+  }
+  .nav a svg {
+    display: none;
+  }
+}
+@media (max-width: 1440px) {
   .wordmark {
     display: none;
   }
-  .nav a {
-    padding: 0 10px;
-  }
+}
+@media (max-width: 1300px) {
   .accountWords {
     display: none;
   }
@@ -906,14 +915,30 @@
     padding: 3px;
   }
 }
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .topbar {
-    gap: 14px;
-    padding: 0 18px;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px 14px;
+    padding: 8px 18px 10px;
   }
-  .nav a svg {
-    display: none;
+  .nav {
+    justify-content: center;
   }
+  .search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+  }
+}
+@media (max-width: 960px) {
+  .nav a {
+    padding: 0 7px;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+  }
+}
+@media (max-width: 1100px) {
   .hub {
     grid-template-columns: 1fr;
   }
