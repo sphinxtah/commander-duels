@@ -487,7 +487,7 @@ def card_problems(report: Report, card: Card, rules: Rules, today: date) -> None
             "card.not_implemented",
             f"{card.name} cannot be played yet: "
             + (card.status_detail or "the game engine does not support it."),
-            "Keep it in the maybeboard until it is supported, or replace it.",
+            "Take it out of the deck, or replace it.",
             kind="not_implemented",
             card_ids=[card.id],
         )

@@ -209,6 +209,44 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     expect(screen.getByLabelText("4 copies")).toBeInTheDocument();
   });
 
+  it("names the cards that left the deck because the game cannot play them, until dismissed (v0.4.5)", async () => {
+    const api = mockApi();
+    api.on(DECK, () =>
+      reply(200, {
+        ...deck(3),
+        removed_cards: [
+          {
+            name: "Temple of Khonshu",
+            quantity: 2,
+            reason: "The game engine has no implementation of this card yet.",
+            removed_at: "2026-10-22T10:00:00Z",
+          },
+        ],
+      }),
+    );
+    api.on("DELETE /api/v1/decks/{deck_id}/removed-cards", () =>
+      reply(200, { ...deck(3), removed_cards: [] }),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    const note = await screen.findByRole("region", {
+      name: "Cards that left this deck",
+    });
+    expect(note).toHaveTextContent(
+      "2 Temple of Khonshu: The game engine has no implementation of this card yet.",
+    );
+    fireEvent.click(within(note).getByRole("button", { name: "Dismiss" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "Cards that left this deck" }),
+      ).toBeNull(),
+    );
+    // The finder asks for cards legal in the format; every card it finds is in the game.
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    expect(searches(api)[0]).toMatchObject({ legal: "legacy" });
+    expect(searches(api)[0]).not.toHaveProperty("playable");
+  });
+
   it("starts the finder on the player's library, with copies, and switches to all cards", async () => {
     const api = mockApi();
     api.on(DECK, () =>

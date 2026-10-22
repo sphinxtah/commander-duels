@@ -43,6 +43,7 @@ from api.models import (
     BoosterCollation,
     BoosterSyncRun,
     CardConcept,
+    CardPrinting,
     LibraryGrant,
     Pack,
     PackCard,
@@ -357,6 +358,37 @@ def test_duplicates_foils_fixed_and_balanced_sheets():
     assert again == balanced and again.digest() == balanced.digest()
     with pytest.raises(ValueError):
         collations.from_json([{"contents": {"missing": 1}, "weight": 1}], sheets)
+
+
+def test_a_card_the_game_cannot_play_gives_way_to_another_from_its_sheet():
+    """v0.4.5: a pack keeps its size and each slot its sheet, so its rarity odds; the card drawn
+    first is named beside the one given. A sheet holding nothing the game can play (a token's)
+    gives nothing."""
+    commons, (rare, gone_rare), token = ids(3), ids(2), uuid4()
+    gone = commons[0]
+    collation = Collation(
+        layouts=(Layout((("common", 2), ("rare", 1), ("token", 1)), 1),),
+        sheets={
+            "common": sheet_of(*((card, 1) for card in commons)),
+            "rare": sheet_of((rare, 1), (gone_rare, 3)),
+            "token": sheet_of((token, 1)),
+        },
+    )
+    removed = frozenset({gone, gone_rare, token})
+    rng = random.Random(20261022)
+    replaced: Counter[UUID] = Counter()
+    for _ in range(2_000):
+        _, pulled = collations.draw(collation, rng, removed)
+        assert [card.sheet for card in pulled] == ["common", "common", "rare"]
+        assert not removed & {card.printing_id for card in pulled}
+        assert len({card.printing_id for card in pulled[:2]}) == 2
+        assert pulled[2].printing_id == rare
+        replaced.update(card.replaced for card in pulled if card.replaced is not None)
+    assert set(replaced) == {gone, gone_rare}
+    # The removed rare was drawn first three times in four, and gave way each time.
+    assert replaced[gone_rare] / 2_000 == pytest.approx(0.75, abs=0.03)
+    # With nothing removed, the draw is as before: no card gives way.
+    assert all(card.replaced is None for card in collations.draw(collation, rng)[1])
 
 
 def test_finishes_follow_the_sheet_and_the_printing():
@@ -826,6 +858,24 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
     cards = opening["cards"]
     assert len(cards) == 15 and opening["collation_revision"] == 1
     assert [card["position"] for card in cards] == list(range(15))
+    # Only cards the game can play (v0.4.5): the test set's Temple of Khonshu, which the engine
+    # lacks, gives way to another card of its sheet whenever it is drawn, and the record names it.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        rows = db.execute(
+            select(PackCard.replaced_printing_id, CardConcept.status)
+            .join(CardConcept, CardConcept.id == PackCard.concept_id)
+            .where(PackCard.opening_id == UUID(opening["id"]))
+        ).all()
+        assert {status for _, status in rows} == {"certified"}
+        replaced = [printing for printing, _ in rows if printing is not None]
+        assert len(replaced) == sum(1 for card in cards if card["replaced"])
+        for printing in replaced:
+            gone = db.scalar(
+                select(CardConcept.name)
+                .join(CardPrinting, CardPrinting.concept_id == CardConcept.id)
+                .where(CardPrinting.id == printing)
+            )
+            assert gone == "Temple of Khonshu"
     # Revealed commons first, the rarest last, any foil after them.
     order = {"common": 0, "uncommon": 1, "rare": 2, "mythic": 3}
     plain = [order[card["rarity"]] for card in cards if card["finish"] == "nonfoil"]

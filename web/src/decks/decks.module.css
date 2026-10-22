@@ -520,6 +520,24 @@ a.deckTitle:hover {
   margin-top: 0.25em;
 }
 
+/* Cards that left the draft because the game cannot play them (v0.4.5), until dismissed: the
+   amber of cards the engine cannot play. */
+.removed {
+  padding: 10px 14px;
+  border: 1px solid #c59b6566;
+  border-radius: 6px;
+  color: #e7cf9b;
+  line-height: 1.5;
+}
+.removed h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.removed p,
+.removed ul {
+  margin: 0 0 8px;
+}
+
 /* The editor. */
 .editorHead {
   display: flex;

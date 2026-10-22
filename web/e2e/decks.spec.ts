@@ -190,11 +190,11 @@ test.describe("decks and the card catalog", () => {
     page,
   }) => {
     await page.goto("/#cards");
-    await expect(page.getByRole("main")).toContainText("playable here");
+    await expect(page.getByRole("main")).toContainText(
+      / cards · catalog revision /,
+    );
     await page.getByLabel("Search cards").fill("t:instant o:damage");
-    const bolt = page.getByRole("button", {
-      name: "Lightning Bolt, Instant, Playable",
-    });
+    const bolt = page.getByRole("button", { name: "Lightning Bolt, Instant" });
     await expect(bolt).toBeVisible();
     await expect(
       page.getByRole("button", { name: /^Counterspell,/ }),
@@ -206,23 +206,16 @@ test.describe("decks and the card catalog", () => {
     );
     await page.keyboard.press("Escape");
 
-    // Cards that cannot be played here yet are hidden until asked for, then shown with their
-    // badge (T18 keeps them searchable and labeled).
-    const hidden = await page.evaluate(async () => {
-      const response = await fetch("/api/v1/cards?playable=false&page_size=1");
-      return ((await response.json()) as { items: { name: string }[] }).items[0]
-        ?.name;
-    });
-    expect(hidden).toBeTruthy();
-    await page.getByLabel("Search cards").fill(`!"${hidden}"`);
-    await expect(page.getByText("0 playable cards")).toBeVisible();
-    await page
-      .getByRole("button", { name: "Show cards not playable yet" })
-      .click();
-    await expect(page.getByText("1 card", { exact: true })).toBeVisible();
+    // A card the game engine cannot play is not in the game (v0.4.5): no search finds it, and
+    // no term or filter names playability any more. Temple of Khonshu is in the test slice, and
+    // the engine has no implementation of it.
+    await page.getByLabel("Search cards").fill('!"Temple of Khonshu"');
+    await expect(page.getByText("0 cards", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("list", { name: "Cards" }).getByRole("listitem"),
-    ).toContainText("Not playable");
+      page.getByRole("button", { name: /not playable yet/ }),
+    ).toHaveCount(0);
+    await page.getByLabel("Search cards").fill("is:unsupported");
+    await expect(page.getByRole("alert")).toBeVisible();
 
     // A query the parser refuses says why.
     await page.getByLabel("Search cards").fill("mv>=");

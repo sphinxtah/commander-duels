@@ -29,7 +29,7 @@ The roster is `content/planeswalkers.json`: each Planeswalker's stable ID, name,
 - **Its cards.** While the alliance lasts, the library holds a playset (4) of each of the Planeswalker's own Planeswalker cards: every deck card in the catalog with a face whose types include Planeswalker and whose subtypes include the roster's subtype (Tibalt's cards include the back face of Valki, God of Lies). The Wanderer, whose card has no subtype, is matched by name. Cards that only name a Planeswalker ("Chandra's Outrage") are not included. Since v0.4.2 every Planeswalker in the roster has at least one card a game can play (above).
 - **Leaving** takes the cards out at once, except copies owned from another source. Every deck of the player is revalidated then, so a deck that needed the alliance's cards is shown as collection-locked straight away.
 - **The portrait is the alliance's.** The allied Planeswalker's portrait is the player's picture on the profile, in the sidebar and at the table. With no alliance, the generated sigil stays.
-- **The Cards page's alliance tab** (v0.4.2). Named for the allied Planeswalker ("Teferi's cards"), it shows only that Planeswalker's cards, for every account, SysOp's too, and follows the alliance when it changes (`GET /api/v1/me/alliance/cards`). For The Sphinx it shows the custom cards. It replaced the "Godlike cards" tab, which had shown every custom card to any Godlike account whatever its alliance (the owner's report at the start of v0.4.2).
+- **The Cards page's alliance tab** (v0.4.2). Named for the allied Planeswalker ("Teferi's cards"), it shows only that Planeswalker's cards, for every account, SysOp's too, and follows the alliance when it changes (`GET /api/v1/me/alliance/cards`). Since v0.4.5 it shows only those a game can play. For The Sphinx it shows the custom cards. It replaced the "Godlike cards" tab, which had shown every custom card to any Godlike account whatever its alliance (the owner's report at the start of v0.4.2).
 
 ## The library
 
@@ -48,6 +48,7 @@ A player's library is what they may build from (PROG01's earned policy, DECK08):
 - **Collection-locked decks.** Validation reports a deck holding more copies than the library as `collection.locked` (kind `collection_locked`), with what the library holds. Such a deck is legal and stays saved, but it cannot start a game until it is fixed. The deck's stored flags are refreshed whenever the library changes.
 - **Administrators and SysOp** hold `library.unlimited`: they build from the whole catalog, and only the format's rules apply. SysOp keeps its any-card deck lists.
 - **Where it shows.** Every card in search results and card details says how many copies the player's library holds (`owned`; null when not limited). The deck builder's finder starts on the library, and the Cards page browses the whole catalog with an "In my library" filter and a library view.
+- **Cards out of the game** (v0.4.5). Copies of a card the game cannot play ([catalog](catalog.md#only-playable-cards-are-in-the-game-v045)) stay recorded, as every grant does, but are hidden: the library's list and the alliance tab leave the card out, and no deck's draft holds it. If the engine learns the card, the copies are there again, as many as before.
 
 ## The starter decks
 
@@ -56,7 +57,7 @@ A player's library is what they may build from (PROG01's earned policy, DECK08):
 - **The setup wizard** (v0.4.2, `web/src/app/SetupWizard.tsx`). A new account sets up its game in one dialog: a welcome with four screenshots of the game, its handle (the name other players see, at the table, in the lobby and later in a game's chat), the two free starter decks, each shown with its commander's card, and an alliance, which may wait. It opens by itself each time the site opens on an account that has not chosen its handle and its starter decks, a new sign-in or a reload, until both are done; "Finish later" closes it, and the notice on every page and Profile's "Continue setup" open it again at the account's step. The server decides every step, as before.
 - **The other eight in Leng's shop** (v0.4.2). Once the two free ones are chosen, the shop sells each of the others once, priced by the market value of its cards ([shop](shop.md#starter-decks-v042)).
 - **The six old starter decks** (the engine's fixture decks) are no longer offered to players. They remain the engine's test decks: SysOp sees them at the practice table, and the browser journeys and the engine's smoke games play them.
-- **The bots** at the practice table play the ten in Commander, a different one each, when no deck is chosen for them; Legacy bots keep the two Legacy fixture decks. `CD_BOT_DECKS=fixtures` keeps Commander bots on the fixture decks too, as CI's browser game journeys need: their leak checks tell concealed cards apart by name, and the starter decks share cards. A starter deck whose cards the catalog cannot all map to the engine falls back to a fixture deck.
+- **The bots** at the practice table play the ten in Commander, a different one each, when no deck is chosen for them; Legacy bots keep the two Legacy fixture decks. `CD_BOT_DECKS=fixtures` keeps Commander bots on the fixture decks too, as CI's browser game journeys need: their leak checks tell concealed cards apart by name, and the starter decks share cards. A starter deck whose cards the catalog cannot all map to the engine (since v0.4.5, whose cards are not all in the game) falls back to a fixture deck. On 2026-10-22 every card of the ten starter decks and of the six fixture decks was in the game.
 
 ## The Godlike tier's custom cards
 
@@ -86,8 +87,8 @@ Since v0.4.0 the custom cards are playable in every game, practice games and hum
 | `PUT /api/v1/me/alliance`, `DELETE /api/v1/me/alliance` | any active account | join (403 `alliance_locked` above the tier), leave |
 | `GET /api/v1/decks/starters` | `decks.edit` | the ten starter decks, with the two chosen |
 | `POST /api/v1/me/starters` | `decks.edit` | choose two (409 `starters_chosen`, `handle_first`; 422 `same_starter`) |
-| `GET /api/v1/library` | any active account | the library's cards, copies and sources |
-| `GET /api/v1/me/alliance/cards` | any active account | the allied Planeswalker's own catalog cards, with the library's copies (v0.4.2) |
+| `GET /api/v1/library` | any active account | the library's cards, copies and sources (since v0.4.5 the cards in the game) |
+| `GET /api/v1/me/alliance/cards` | any active account | the allied Planeswalker's own catalog cards in the game, with the library's copies (v0.4.2) |
 | `GET /api/v1/cards?owned=true` | any active account | search within the library |
 | `POST /api/v1/admin/users/{id}/wins` | SysOp (`progress.manage`) | set an account's wins, with a reason |
 | `GET`, `POST /api/v1/admin/custom-cards`, `DELETE /api/v1/admin/custom-cards/{id}` | SysOp (`custom_cards.manage`) | the custom cards |

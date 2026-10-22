@@ -12,7 +12,9 @@ the Magic Duels style, their cards the player's for good.
   opening (the collation revision, each card's printing, finish and sheet), grants the cards to the
   library for good (library_grants, source pack, key pack:<opening id>), and revalidates the
   account's decks. A pack opens once: asking again returns the same cards. The account's row is
-  locked, so two requests at once open it once.
+  locked, so two requests at once open it once. Since v0.4.5 a card the game cannot play gives
+  way to another from its sheet (api/collation.py), and the opening records the card it replaced;
+  the history shows only cards the game can play.
 - **SysOp gives packs** to any account, its own included, with a reason, audited
   (shop.packs_granted). Administrators and SysOp change prices and sale (shop.manage), each
   change audited, and see the booster data job's runs.
@@ -39,7 +41,7 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field
-from sqlalchemy import func, select
+from sqlalchemy import func, not_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -106,6 +108,7 @@ from api.roster import roster_of
 from api.sales import Sale, SaleInfo, weekly_sale
 from api.schemas import Contract, StoredText
 from catalog import boosters
+from catalog.statuses import playable
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
@@ -266,6 +269,11 @@ class PulledCard(Contract):
     sheet: str
     new: bool = Field(description="No copy of it was in the library for good before.")
     faces: int = Field(description="Faces with images of their own; 0 for one image.")
+    replaced: bool = Field(
+        default=False,
+        description="Drawn from its sheet in place of a card the game cannot play (v0.4.5); the "
+        "opening's record names that card.",
+    )
 
 
 class Opening(Contract):
@@ -677,13 +685,15 @@ def reveal_order(rarity: str, finish: str) -> tuple[int, int]:
 
 
 def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
+    """An opened pack's cards; one the game cannot play now (a pack opened before v0.4.5, or a
+    card removed since) stays recorded but is not shown."""
     product = db.get_one(ShopProduct, opening.product_id)
     collation = db.get_one(BoosterCollation, opening.collation_id)
     rows = db.execute(
         select(PackCard, CardPrinting, CardConcept)
         .join(CardPrinting, CardPrinting.id == PackCard.printing_id)
         .join(CardConcept, CardConcept.id == PackCard.concept_id)
-        .where(PackCard.opening_id == opening.id)
+        .where(PackCard.opening_id == opening.id, playable())
         .order_by(PackCard.position)
     ).all()
     cards = []
@@ -704,6 +714,7 @@ def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
                 sheet=card.sheet,
                 new=card.new,
                 faces=image.faces if image else 0,
+                replaced=card.replaced_printing_id is not None,
             )
         )
     return Opening(
@@ -740,7 +751,15 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
             409, "pack_unavailable", f"{product.name} cannot be opened until its data is read."
         )
     collation = load(db, product.collation_id)
-    layout, pulled = draw(collation, secrets.SystemRandom())
+    # A card the game cannot play gives way to another from its sheet (v0.4.5).
+    removed = frozenset(
+        db.scalars(
+            select(CardPrinting.id)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardPrinting.id.in_(collation.printings()), not_(playable()))
+        )
+    )
+    layout, pulled = draw(collation, secrets.SystemRandom(), removed)
     printings = {
         printing.id: printing
         for printing in db.scalars(
@@ -775,8 +794,8 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
     quantities: dict[UUID, int] = defaultdict(int)
     for position, card in enumerate(ordered):
         concept = concepts[printings[card.printing_id].concept_id]
-        # Basic lands are in every library already, and tokens or art cards are no deck's.
-        kept = concept.deck_card and not concept.type_line.startswith("Basic ")
+        # Basic lands are in every library already.
+        kept = not concept.type_line.startswith("Basic ")
         new = kept and concept.construction_key not in owned
         if kept:
             quantities[concept.id] += 1
@@ -790,6 +809,7 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
                 finish=card.finish,
                 sheet=card.sheet[:64],
                 new=new,
+                replaced_printing_id=card.replaced,
             )
         )
     for concept_id, quantity in quantities.items():
@@ -854,7 +874,8 @@ def openings(
     for opening_id, rarity, finish, new in db.execute(
         select(PackCard.opening_id, CardPrinting.rarity, PackCard.finish, PackCard.new)
         .join(CardPrinting, CardPrinting.id == PackCard.printing_id)
-        .where(PackCard.opening_id.in_([row.id for row in found]))
+        .join(CardConcept, CardConcept.id == PackCard.concept_id)
+        .where(PackCard.opening_id.in_([row.id for row in found]), playable())
     ):
         cards[opening_id].append((rarity, finish, new))
     art = art_of(request)

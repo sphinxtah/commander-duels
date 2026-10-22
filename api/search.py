@@ -14,18 +14,20 @@ operator and a value. Keys and operators:
     s: set: e: edition:      printed in that set                  s:lea
     f: format: legal:        legal in a format                    f:commander
     banned:                  banned in a format                   banned:legacy
-    is:                      commander, companion, partner, background, playable, unsupported,
-                             reserved, gamechanger, permanent, and layouts (split, flip,
-                             transform, mdfc, meld, adventure, saga, class, case, leveler,
-                             prototype, mutate, battle)
+    is:                      commander, companion, partner, background, reserved, gamechanger,
+                             permanent, and layouts (split, flip, transform, mdfc, meld,
+                             adventure, prepare, saga, class, case, leveler, prototype, mutate,
+                             battle)
     k: keyword:              has a keyword ability                k:flying
     otag: function:          tagged by Scryfall Tagger            otag:ramp  function:removal
     year:                    first printed in that year            year>=2020
-    status:                  catalog status                       status:implemented
 
 Values are matched as written: no value becomes SQL, and %, _ and \\ are literal. An unknown key
 or operator, or a value a key does not take, is refused with an explanation naming what is
 supported. Nothing here promises compatibility with Scryfall's other operators.
+
+Since v0.4.5 every card a search can find is one a game can play (api/cards.py), so no term names
+playability any more: is:playable, is:unsupported and status: are refused as unknown.
 """
 
 import re
@@ -50,7 +52,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import SQLCoreOperations
 
-from api.models import CARD_STATUSES, CardConcept, CardPrinting, CardTag, CardTagLink
+from api.models import CardConcept, CardPrinting, CardTag, CardTagLink
 from catalog.text import COLOR_BITS, normalize
 
 # A column or mapped attribute.
@@ -104,6 +106,7 @@ LAYOUT_WORDS = {
     "modal_dfc": "modal_dfc",
     "meld": "meld",
     "adventure": "adventure",
+    "prepare": "prepare",
     "saga": "saga",
     "class": "class",
     "case": "case",
@@ -444,9 +447,6 @@ class Compiler:
             "companion": CardConcept.companion.is_(True),
             "partner": and_(CardConcept.partner.is_not(None), CardConcept.partner != "background"),
             "background": CardConcept.partner == "background",
-            "playable": CardConcept.status == "certified",
-            "supported": CardConcept.status == "certified",
-            "unsupported": CardConcept.status != "certified",
             "reserved": CardConcept.reserved.is_(True),
             "gamechanger": CardConcept.game_changer.is_(True),
             "permanent": or_(*(CardConcept.type_search.contains(kind) for kind in PERMANENT_TYPES)),
@@ -518,12 +518,6 @@ class Compiler:
             ">=": column >= start,
         }[leaf.op]
 
-    def status(self, leaf: Leaf) -> ColumnElement[bool]:
-        word = leaf.value.casefold()
-        if word not in CARD_STATUSES or leaf.op not in (":", "="):
-            raise SearchError("“status:” takes " + ", ".join(CARD_STATUSES) + ".")
-        return CardConcept.status == word
-
 
 def legality(fmt: str) -> ColumnElement[str]:
     """A card's Scryfall legality in a format, as text."""
@@ -569,7 +563,6 @@ KEYS: dict[str, Handler] = {
     "function": Compiler.tag,
     "oracletag": Compiler.tag,
     "year": Compiler.year,
-    "status": Compiler.status,
 }
 SUPPORTED = sorted(
     {
@@ -587,7 +580,6 @@ SUPPORTED = sorted(
         "k",
         "otag",
         "year",
-        "status",
     }
 )
 

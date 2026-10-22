@@ -152,12 +152,15 @@ def test_bans_releases_and_engine_support_are_told_apart(session):
     future = check(session, "legacy", entry(session, "Temple of Khonshu"), lands(session, 59))
     kinds = {problem.code: problem.kind for problem in future.errors}
     assert kinds == {"card.not_released": "not_released", "card.not_implemented": "not_implemented"}
-    quarantined = check(
-        session, "legacy", entry(session, "Adventurous Eater // Have a Bite"), lands(session, 59)
-    )
+    # A card the engine's checks held back (left uncommitted: the next test sees it certified).
+    held = card(session, "Grizzly Bears")
+    held.status, held.status_reason = "implemented", "characteristics_differ"
+    held.status_detail = "The engine's card differs from the Oracle card: power 3 against 2."
+    session.flush()
+    quarantined = check(session, "legacy", entry(session, "Grizzly Bears"), lands(session, 59))
     assert codes(quarantined) == ["card.not_implemented"]
     assert (quarantined.legal, quarantined.playable) == (True, False)
-    assert "layout is new" in quarantined.errors[0].message
+    assert "differs from the Oracle card" in quarantined.errors[0].message
     # The maybeboard holds anything without blocking.
     maybe = check(
         session,

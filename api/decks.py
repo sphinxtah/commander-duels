@@ -18,11 +18,17 @@ changes (refresh_decks). The starter decks are the ten in content/starter-decks.
 Since v0.4.0 a Godlike account's decks may hold the Godlike tier's custom cards
 (api/custom_play.py): its owner sees, imports and exports them; shared decks, their exports and
 copies leave them out.
+
+Since v0.4.5 a draft holds only cards the game can play. A card the engine cannot play leaves
+every draft when it becomes unplayable (a catalog sync, a staff suspension; withdraw_unplayable)
+and whenever a save names it, and the deck notes what left and why until its owner dismisses the
+note. Revisions keep their cards: games played them.
 """
 
 import hashlib
 import json
 import secrets
+from collections import defaultdict
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal, cast
 from uuid import UUID
@@ -31,7 +37,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi import Path as PathParam
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import Field
-from sqlalchemy import func, select
+from sqlalchemy import func, not_, select
 from sqlalchemy.orm import Session
 
 from api import deckio, guided
@@ -44,7 +50,9 @@ from api.identity import (
     Db,
     Principal,
     not_found,
+    permissions_for,
     require_permission,
+    roles_of,
     settings_of,
 )
 from api.library import (
@@ -53,6 +61,7 @@ from api.library import (
     Starter,
     at_godlike,
     commander_printing,
+    library_of,
     starter_entries,
     starters_in,
 )
@@ -66,6 +75,7 @@ from api.models import (
     DeckRevision,
     User,
 )
+from api.roster import Planeswalker
 from api.schemas import Contract, Error, StoredText
 from api.validation import (
     MAX_ENTRIES,
@@ -77,6 +87,7 @@ from api.validation import (
     symbol_colors,
     validate_deck,
 )
+from catalog.statuses import playable, unplayable_reason
 from catalog.text import colors_of, normalize
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -85,6 +96,15 @@ MAX_DECKS = 250
 MAX_NOTES = 10_000
 Title = Annotated[StoredText, Field(min_length=1, max_length=80)]
 ShareCode = Annotated[str, PathParam(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
+class RemovedCard(Contract):
+    """A card that left the deck's draft because the game cannot play it (v0.4.5)."""
+
+    name: str
+    quantity: int = Field(description="The copies the draft held, every location together.")
+    reason: str = Field(description="Why the game cannot play it, in a sentence.")
+    removed_at: datetime
 
 
 class DeckSummary(Contract):
@@ -106,6 +126,10 @@ class DeckSummary(Contract):
     archived: bool
     deleted_at: datetime | None
     updated_at: datetime
+    removed_cards: list[RemovedCard] = Field(
+        description="Cards that left the draft because the game cannot play them (v0.4.5), "
+        "until the owner dismisses the note."
+    )
 
 
 class RevisionSummary(Contract):
@@ -208,6 +232,9 @@ class ImportPreview(Contract):
     entries: list[DeckEntry]
     unresolved: int
     ambiguous: int
+    unavailable: int = Field(
+        default=0, description="Lines naming a card the game cannot play (v0.4.5)."
+    )
     validation: Validation
     cards: dict[UUID, CardSummary]
 
@@ -310,10 +337,54 @@ def locked(validation: Validation) -> bool:
     return any(problem.kind == "collection_locked" for problem in validation.errors)
 
 
+def without_unplayable(db: Session, deck: Deck, entries: list[DeckEntry]) -> list[DeckEntry]:
+    """The entries the game can play. A catalog card it cannot leaves the draft, every location
+    together, and the deck's note names it and why (the newest removal of each card). Custom
+    cards are not the catalog's, and stay."""
+    ids = {entry.card_id for entry in entries}
+    gone = (
+        {
+            row.id: row
+            for row in db.execute(
+                select(
+                    CardConcept.id,
+                    CardConcept.name,
+                    CardConcept.status,
+                    CardConcept.status_detail,
+                    CardConcept.removed_revision,
+                ).where(CardConcept.id.in_(ids), not_(playable()))
+            )
+        }
+        if ids
+        else {}
+    )
+    if not gone:
+        return entries
+    copies: dict[UUID, int] = defaultdict(int)
+    for entry in entries:
+        if entry.card_id in gone:
+            copies[entry.card_id] += entry.quantity
+    note = {str(item.get("card_id")): item for item in deck.removed_cards or []}
+    stamp = now().isoformat()
+    for card_id, quantity in copies.items():
+        row = gone[card_id]
+        note[str(card_id)] = {
+            "card_id": str(card_id),
+            "name": row.name,
+            "quantity": quantity,
+            "reason": unplayable_reason(
+                row.status, row.status_detail, row.removed_revision is not None
+            ),
+            "removed_at": stamp,
+        }
+    deck.removed_cards = list(note.values())
+    return [entry for entry in entries if entry.card_id not in gone]
+
+
 def store_draft(
     db: Session, deck: Deck, entries: list[DeckEntry], library: Library | None
 ) -> Validation:
-    clean = normalized(entries)
+    clean = without_unplayable(db, deck, normalized(entries))
     validation = validate_deck(
         db,
         DeckContent(format=deck.format, entries=clean),  # type: ignore[arg-type]
@@ -358,6 +429,10 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
         archived=deck.archived_at is not None,
         deleted_at=deck.deleted_at,
         updated_at=deck.updated_at,
+        removed_cards=[
+            RemovedCard.model_validate({key: item.get(key) for key in RemovedCard.model_fields})
+            for item in deck.removed_cards or []
+        ],
     )
 
 
@@ -453,6 +528,37 @@ def refresh_decks(db: Session, user_id: UUID, library: Library) -> None:
         )
         deck.legal, deck.playable = validation.legal, validation.playable
         deck.collection_locked = locked(validation)
+
+
+def withdraw_unplayable(db: Session, roster: dict[str, Planeswalker]) -> int:
+    """Takes every card the game cannot play out of the decks' drafts, the archived and trashed
+    ones too (v0.4.5): after a catalog sync, a staff suspension, and once each time the worker
+    starts, which is each deploy. A deck that loses one notes it, gets a new draft version, so an
+    editor open elsewhere shows the change rather than saving over it, and has its flags refreshed
+    against its owner's library. Revisions keep their cards. Returns how many decks changed."""
+    # Drafts store card IDs as text.
+    unplayable = {str(card) for card in db.scalars(select(CardConcept.id).where(not_(playable())))}
+    holding = [
+        deck_id
+        for deck_id, draft in db.execute(select(Deck.id, Deck.draft))
+        if any(
+            str(entry.get("card_id")) in unplayable
+            for entry in cast(list[dict[str, object]], (draft or {}).get("entries") or [])
+        )
+    ]
+    libraries: dict[UUID, Library] = {}
+    for deck_id in holding:
+        deck = db.scalar(select(Deck).where(Deck.id == deck_id).with_for_update())
+        if deck is None:
+            continue
+        if deck.owner_id not in libraries:
+            owner = db.get_one(User, deck.owner_id)
+            permissions = permissions_for(owner, roles_of(db, owner))
+            libraries[deck.owner_id] = library_of(db, owner, permissions, roster)
+        store_draft(db, deck, entries_of(deck), libraries[deck.owner_id])
+        deck.draft_version += 1
+    db.flush()
+    return len(holding)
 
 
 def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
@@ -739,6 +845,15 @@ def restore(deck_id: UUID, principal: Builder, db: Db) -> DeckSummary:
     return deck_summary(db, deck)
 
 
+@router.delete("/decks/{deck_id}/removed-cards", response_model=DeckSummary)
+def dismiss_removed(deck_id: UUID, principal: Builder, db: Db) -> DeckSummary:
+    """Dismisses the deck's note of the cards that left its draft (v0.4.5)."""
+    deck = owned(db, principal, deck_id)
+    deck.removed_cards = []
+    db.commit()
+    return deck_summary(db, deck)
+
+
 @router.post("/decks/validate", response_model=Validation)
 def validate_entries(
     body: ValidateRequest, principal: Builder, library: CurrentLibrary, db: Db
@@ -798,6 +913,7 @@ def import_preview(
         entries=entries,
         unresolved=sum(1 for line in lines if line.status == "unresolved"),
         ambiguous=sum(1 for line in lines if line.status == "ambiguous"),
+        unavailable=sum(1 for line in lines if line.status == "unavailable"),
         validation=validation,
         cards=cards,
     )

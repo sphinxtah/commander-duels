@@ -28,7 +28,7 @@ const runNames: Record<string, string> = {
 
 const statusNames: Record<string, string> = {
   certified: "Playable",
-  implemented: "In the engine, held back",
+  implemented: "Held back by the checks",
   mapped: "Mapped to the engine",
   catalog_only: "Catalog only",
   suspended: "Suspended",
@@ -63,8 +63,10 @@ type Change = {
   after?: { oracle_text?: string | null };
 };
 
-/** The catalog's state for administrators: the sync, the engine's coverage, and the cards whose
- * Oracle text changed since they were certified (CAT02, CAT07, CAT08). */
+/** The catalog's state for administrators: the sync, the engine's coverage, and the cards to
+ * review: those whose Oracle text changed since they were certified (CAT02, CAT07, CAT08), and
+ * since v0.4.5 those the engine's automatic checks held back, the only cards outside the game the
+ * site lists, since accepting one is how it comes into the game. */
 export function CatalogAdmin() {
   const [status, setStatus] = useState<CatalogStatus>();
   const [runs, setRuns] = useState<SyncRun[]>([]);
@@ -117,8 +119,11 @@ export function CatalogAdmin() {
     if (!data) return setMessage(describe(error));
     setMessage(
       {
-        accept: `${card.name}: the engine's version is accepted for today's text.`,
-        suspend: `${card.name} is suspended. No new game can start with it.`,
+        accept:
+          card.status === "implemented"
+            ? `${card.name} is accepted: it is in the game from now on, as the engine plays it.`
+            : `${card.name}: the engine's version is accepted for today's text.`,
+        suspend: `${card.name} is suspended: it has left the game, and every deck's draft.`,
         restore: `${card.name} is restored.`,
       }[action],
     );
@@ -230,10 +235,15 @@ export function CatalogAdmin() {
         <p className={styles.fine}>
           A playable card whose Oracle text changed stays playable until
           reviewed. Accept it when the engine still plays it as written, or
-          suspend it until the engine catches up.
+          suspend it until the engine catches up. A card the engine's automatic
+          checks held back is not in the game: accept it when the engine plays
+          it right, and it stays in the game through later syncs. A suspended
+          card leaves the game, and every deck's draft, until it is restored.
         </p>
         <label className={styles.field}>
-          <span>Reason for a suspension (shown on the card)</span>
+          <span>
+            Reason for a suspension (shown to the players whose decks it leaves)
+          </span>
           <input
             value={reason}
             maxLength={500}
@@ -259,6 +269,9 @@ export function CatalogAdmin() {
                           {latest.after?.oracle_text ?? ""}”
                         </small>
                       )}
+                      {card.status === "implemented" && card.status_detail && (
+                        <small>{card.status_detail}</small>
+                      )}
                     </div>
                     <span className={shell.tag}>
                       {(statusNames[card.status] ?? card.status).toUpperCase()}
@@ -271,6 +284,13 @@ export function CatalogAdmin() {
                         onClick={() => void review(card, "restore")}
                       >
                         Restore {card.name}
+                      </button>
+                    ) : card.status === "implemented" ? (
+                      <button
+                        className={shell.primary}
+                        onClick={() => void review(card, "accept")}
+                      >
+                        Accept {card.name}
                       </button>
                     ) : (
                       <>

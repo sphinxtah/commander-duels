@@ -23,6 +23,7 @@ from api.models import (
 )
 from catalog.importer import Fence, Fenced
 from catalog.scryfall import Limits, Reader, SyncError
+from catalog.statuses import unplayable_reason
 from catalog.text import normalize, type_parts
 
 
@@ -48,7 +49,7 @@ def test_initial_import_decides_every_status_with_its_reason(tmp_path):
     with Session(engine) as session:
         revision = session.get(CatalogRevision, applied.revision_id)
         assert revision.counts["oracle_cards"] == len(records("oracle_cards"))
-        assert revision.counts["unknown_layouts"] == {"front_card": 1, "prepare": 1}
+        assert revision.counts["unknown_layouts"] == {"front_card": 1}
         assert revision.engine_build == "test-build-1"
         bolt = concept(session, "Lightning Bolt")
         assert (bolt.status, bolt.status_reason, bolt.engine_name) == (
@@ -67,9 +68,10 @@ def test_initial_import_decides_every_status_with_its_reason(tmp_path):
         assert concept(session, "Fire // Ice").status == "certified"
         valki = concept(session, "Valki, God of Lies // Tibalt, Cosmic Impostor")
         assert (valki.status, valki.engine_name) == ("certified", "Valki, God of Lies")
-        # Quarantined: a layout this version does not know, though the engine has the name.
+        # Prepare cards (v0.4.5) play as the engine's adventures do, under their front face.
         eater = concept(session, "Adventurous Eater // Have a Bite")
-        assert (eater.status, eater.status_reason) == ("unsupported", "unknown_layout")
+        assert (eater.status, eater.engine_name) == ("certified", "Adventurous Eater")
+        assert not eater.text_differs
         assert concept(session, "Goblin").status_reason == "not_a_deck_card"
         assert not concept(session, "Goblin").deck_card
         brisela = concept(session, "Brisela, Voice of Nightmares")
@@ -100,6 +102,90 @@ def test_initial_import_decides_every_status_with_its_reason(tmp_path):
         commander = session.scalar(select(FormatVersion).where(FormatVersion.format == "commander"))
         assert "dockside extortionist" in commander.banned
         assert "companion:lutri, the spellchaser" in commander.banned
+
+
+def test_prepare_cards_play_as_the_engines_adventures(tmp_path):
+    """v0.4.5 learned Scryfall's prepare layout (Secrets of Strixhaven): XMage implements such a
+    card as an adventure, under its front face's name, with the spell as its second face. One the
+    engine lacks stays out, and a layout no version knows yet stays quarantined."""
+    oracle = records("oracle_cards")
+    future = json.loads(json.dumps(by_name(oracle, "Grizzly Bears")))
+    future.update(
+        id="00000000-0000-4000-8000-000000000011",
+        oracle_id="00000000-0000-4000-8000-000000000012",
+        name="Commander Duels Future Card",
+        layout="omen",
+    )
+    oracle.append(future)
+    engine = database(tmp_path)
+    import_bulk(engine, tmp_path / "files", bulk(oracle_cards=oracle), engine_list())
+    with Session(engine) as session:
+        abigale = concept(session, "Abigale, Poet Laureate // Heroic Stanza")
+        assert (abigale.status, abigale.engine_name) == ("certified", "Abigale, Poet Laureate")
+        # The engine prints the spell and its cost among the card's rules, as an adventure's.
+        assert not abigale.text_differs
+        # The front face leads: a legendary creature, so it may be a commander.
+        assert abigale.commander and abigale.identity_mask == 5
+        faces = session.scalars(
+            select(CardFace.name)
+            .where(CardFace.concept_id == abigale.id)
+            .order_by(CardFace.position)
+        )
+        assert list(faces) == ["Abigale, Poet Laureate", "Heroic Stanza"]
+        # A deck list may name it by either face.
+        for name in ("abigale, poet laureate", "heroic stanza"):
+            alias = session.scalar(select(CardAlias).where(CardAlias.alias == name))
+            assert alias is not None and alias.concept_id == abigale.id
+        unknown = concept(session, "Commander Duels Future Card")
+        assert (unknown.status, unknown.status_reason) == ("unsupported", "unknown_layout")
+    # A prepare card the engine does not implement (six of them in XMage 1.4.62) stays out.
+    export = engine_list()
+    export["cards"] = [card for card in export["cards"] if card["name"] != "Abigale, Poet Laureate"]
+    (tmp_path / "other").mkdir()
+    other = database(tmp_path / "other")
+    import_bulk(other, tmp_path / "other" / "files", bulk(), export)
+    with Session(other) as session:
+        missing = concept(session, "Abigale, Poet Laureate // Heroic Stanza")
+        assert (missing.status, missing.status_reason) == ("unsupported", "not_implemented")
+
+
+def test_an_accepted_or_suspended_card_keeps_the_staffs_decision_across_syncs(tmp_path):
+    """An administrator who accepts a card the automatic checks held back makes it playable for
+    good (v0.4.5); a suspension and what it set aside also outlive a sync."""
+    export = engine_list()
+    for card in export["cards"]:
+        if card["name"] == "Hill Giant":
+            card["power"] = "4"
+    engine = database(tmp_path)
+    import_bulk(engine, tmp_path / "a", bulk(), export)
+    with Session(engine) as session, session.begin():
+        giant = concept(session, "Hill Giant")
+        assert (giant.status, giant.status_reason) == ("implemented", "characteristics_differ")
+        giant.status, giant.status_reason, giant.status_detail = "certified", None, None
+        giant.certified_hash = giant.gameplay_hash
+        giant.capabilities = {
+            "multiplayer": True,
+            "ai": "untested",
+            "accepted": {"reason": "characteristics_differ"},
+        }
+        bolt = concept(session, "Lightning Bolt")
+        bolt.capabilities = {
+            **bolt.capabilities,
+            "multiplayer": False,
+            "ai": False,
+            "suspended_from": {"status": "certified", "reason": None, "detail": None},
+        }
+        bolt.status, bolt.status_reason = "suspended", "suspended_by_staff"
+        bolt.status_detail = "Rules bug"
+    import_bulk(engine, tmp_path / "b", bulk(), export, NOW + timedelta(days=1))
+    with Session(engine) as session:
+        giant = concept(session, "Hill Giant")
+        assert (giant.status, giant.review) == ("certified", "none")
+        assert giant.capabilities["accepted"] == {"reason": "characteristics_differ"}
+        assert giant.capabilities["multiplayer"] is True
+        bolt = concept(session, "Lightning Bolt")
+        assert (bolt.status, bolt.status_detail) == ("suspended", "Rules bug")
+        assert bolt.capabilities["suspended_from"]["status"] == "certified"
 
 
 def test_engine_unavailable_leaves_new_cards_catalog_only_and_keeps_decisions(tmp_path):
@@ -308,6 +394,20 @@ def test_reader_bounds_and_formats(tmp_path):
     unclosed.write_text('[{"a": 1}, {"b": 2}', encoding="utf-8")
     with pytest.raises(SyncError, match="not closed|invalid JSON"):
         list(Reader(unclosed, "json", Limits(), "test"))
+
+
+def test_why_a_card_is_out_of_the_game():
+    """The sentence an import's line and a deck's note give for a card the game cannot play."""
+    token = "Tokens are made by other cards; no deck holds them."
+    assert unplayable_reason("unsupported", token, False) == token
+    assert unplayable_reason("certified", None, True) == "Scryfall's catalog no longer lists it."
+    assert (
+        unplayable_reason("suspended", "Rules bug", False)
+        == "Suspended by the site's staff: Rules bug"
+    )
+    staff = "Suspended by the site's staff."
+    assert unplayable_reason("suspended", staff, False) == staff
+    assert unplayable_reason("mapped", None, False) == "The game engine cannot play it."
 
 
 def test_text_normalization_and_type_lines():

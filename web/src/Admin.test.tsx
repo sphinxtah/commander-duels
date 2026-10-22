@@ -351,6 +351,14 @@ describe("the card catalog", () => {
     status_reason: "suspended_by_staff",
     playable: false,
   });
+  // v0.4.5: a card the engine implements that its automatic checks held back.
+  const heldBack = card("Stand-in Oddity", {
+    status: "implemented",
+    status_reason: "characteristics_differ",
+    status_detail:
+      "The engine's card differs from the Oracle card: mana cost {1} against {2}.",
+    playable: false,
+  });
 
   function serveCatalog() {
     on("GET /api/v1/catalog", () => reply(200, status));
@@ -381,6 +389,7 @@ describe("the card catalog", () => {
           ],
         },
         { card: suspended, changed: [] },
+        { card: heldBack, changed: [] },
       ]),
     );
     on("GET /api/v1/cards", () =>
@@ -397,7 +406,7 @@ describe("the card catalog", () => {
       "true",
     );
     expect(
-      await screen.findByText(/32,089 playable here · catalog revision 3/),
+      await screen.findByText(/32,089 cards · catalog revision 3/),
     ).toBeInTheDocument();
     const runs = screen.getByRole("table", { name: "Recent catalog runs" });
     expect(within(runs).getByText("New revision")).toBeInTheDocument();
@@ -413,6 +422,39 @@ describe("the card catalog", () => {
     expect(
       screen.getByRole("button", { name: "Restore Held Card" }),
     ).toBeInTheDocument();
+    // A card the checks held back says why, and may only be accepted: it is out of the game.
+    const oddity = screen.getByRole("listitem", { name: "Stand-in Oddity" });
+    expect(oddity).toHaveTextContent("mana cost {1} against {2}");
+    expect(oddity).toHaveTextContent("HELD BACK BY THE CHECKS");
+    expect(
+      within(oddity).getByRole("button", { name: "Accept Stand-in Oddity" }),
+    ).toBeInTheDocument();
+    expect(
+      within(oddity).queryByRole("button", { name: /^Suspend/ }),
+    ).toBeNull();
+  });
+
+  it("accepts a card the automatic checks held back, so it plays (v0.4.5)", async () => {
+    serveCatalog();
+    on("POST /api/v1/admin/catalog/cards/{card_id}/review", () =>
+      reply(200, { ...heldBack, status: "certified", playable: true }),
+    );
+    render(<Admin me={catalogAdministrator} heading={createRef()} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Accept Stand-in Oddity" }),
+    );
+    expect(
+      await screen.findByText(
+        "Stand-in Oddity is accepted: it is in the game from now on, as the engine plays it.",
+      ),
+    ).toBeInTheDocument();
+    expect(client.POST).toHaveBeenCalledWith(
+      "/api/v1/admin/catalog/cards/{card_id}/review",
+      {
+        params: { path: { card_id: heldBack.id } },
+        body: { action: "accept", reason: "" },
+      },
+    );
   });
 
   it("queues a run and accepts a review", async () => {

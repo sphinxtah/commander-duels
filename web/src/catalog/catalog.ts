@@ -21,7 +21,6 @@ export type Search = {
   rarity: string;
   set: string;
   legal: string;
-  playable: "" | "true" | "false";
   /** Only the cards in the player's library (basic lands included). The server sets it aside
    * for an account that builds from the whole catalog. */
   owned: boolean;
@@ -40,51 +39,13 @@ export const emptySearch: Search = {
   rarity: "",
   set: "",
   legal: "",
-  playable: "",
   owned: false,
   sort: "name",
   descending: false,
 };
 
-/** The Cards page opens on the cards that play here; the "Playable here" filter, its button in
- * the result line, or a search that names playability shows the others. */
-export const catalogSearch: Search = { ...emptySearch, playable: "true" };
-
-// The search syntax's own tokens, as api/search.py's TOKEN reads them: a group, a negation, a
-// key with its operator and value, or a word (a quoted phrase, or !Exact Name). Reading the query
-// the same way means only a real term counts, never text inside a quoted phrase.
-const TOKEN =
-  /\s*(?:(\()|(\))|(-)(?=[^\s)])|([A-Za-z]+)(:|<=|>=|!=|=|<|>)("[^"]*"?|[^\s()]*)|(!)?("[^"]*"?|[^\s()]+))/y;
-const PLAYABILITY = new Set(["playable", "supported", "unsupported"]);
-
-function unquote(value: string): string {
-  const inner = value.startsWith('"')
-    ? value.endsWith('"') && value.length > 1
-      ? value.slice(1, -1)
-      : value.slice(1)
-    : value;
-  return inner.trim();
-}
-
-/** Whether a query sets playability itself (is:playable, is:unsupported, status:…, negated,
- * quoted or grouped), so the page's "only playable" filter steps aside for it instead of
- * contradicting it. */
-export function namesPlayability(q: string): boolean {
-  const token = new RegExp(TOKEN.source, "y");
-  while (q.slice(token.lastIndex).trim()) {
-    const at = token.lastIndex;
-    const match = token.exec(q);
-    // The server refuses what it cannot read, and says why; no filter decision hangs on it.
-    if (!match || token.lastIndex === at) return false;
-    const key = match[4]?.toLowerCase();
-    if (key === "status") return true;
-    if (key === "is" && PLAYABILITY.has(unquote(match[6] ?? "").toLowerCase()))
-      return true;
-  }
-  return false;
-}
-
-/** The query string the card search takes; unset filters are left out. */
+/** The query string the card search takes; unset filters are left out. Every card it finds is
+ * one the game can play (v0.4.5): the others are not in the game. */
 export function searchQuery(
   search: Search,
   page: number,
@@ -108,7 +69,6 @@ export function searchQuery(
   if (search.rarity) query.rarity = search.rarity;
   if (search.set.trim()) query.set = search.set.trim().toLowerCase();
   if (search.legal) query.legal = search.legal;
-  if (search.playable) query.playable = search.playable === "true";
   if (search.owned) query.owned = true;
   return query;
 }

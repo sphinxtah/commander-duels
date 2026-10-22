@@ -87,7 +87,6 @@ export function AllianceCardsView({
         <p className={styles.lead}>No cards of theirs are here yet.</p>
       </section>
     );
-  const playable = cards.cards.filter((card) => card.playable).length;
   return (
     <section className={styles.library} aria-labelledby="alliance-cards-title">
       <h2 id="alliance-cards-title">{allianceTabName(cards)}</h2>
@@ -97,7 +96,7 @@ export function AllianceCardsView({
         <a href="#profile">your profile</a>.
       </p>
       <p role="status" className={styles.resultLine}>
-        {`${cards.cards.length.toLocaleString()} ${cards.cards.length === 1 ? "card" : "cards"}, ${playable.toLocaleString()} playable here`}
+        {`${cards.cards.length.toLocaleString()} ${cards.cards.length === 1 ? "card" : "cards"}`}
       </p>
       <ul className={styles.grid} aria-label={allianceTabName(cards)}>
         {cards.cards.map((card) => (

@@ -262,6 +262,9 @@ export function PackOpening({
                   {rarityLabels[card.rarity] ?? card.rarity}
                   {card.finish === "foil" && " · Foil"}
                   {card.finish === "etched" && " · Etched foil"}
+                  {/* v0.4.5: drawn from its sheet in place of a card not in the game. */}
+                  {card.replaced &&
+                    " · In place of a card the game cannot play"}
                 </span>
                 {card.new && <span className={styles.newMark}>New</span>}
                 <button

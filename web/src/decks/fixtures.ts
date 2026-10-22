@@ -157,6 +157,7 @@ export function deckDetail(fields: Partial<DeckDetail> = {}): DeckDetail {
     archived: false,
     deleted_at: null,
     updated_at: "2026-10-20T10:00:00Z",
+    removed_cards: [],
     notes: "",
     share_code: null,
     draft: { version: 1, entries: [] },

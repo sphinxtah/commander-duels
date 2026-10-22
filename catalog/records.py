@@ -33,6 +33,9 @@ KNOWN_LAYOUTS = frozenset(
         "case",
         "saga",
         "adventure",
+        # Since v0.4.5: a creature with a spell it may cast a copy of while prepared (Secrets of
+        # Strixhaven). XMage models it as an adventure, under its front face's name.
+        "prepare",
         "mutate",
         "prototype",
         "battle",
@@ -55,6 +58,9 @@ NON_DECK_LAYOUTS = frozenset(
 # Layouts whose faces have one name together ("Fire // Ice"); on the others the front face names
 # the card in a game.
 JOINED_NAME_LAYOUTS = frozenset({"split"})
+# Layouts whose second face is a spell cast from the card: the engine prints the spell, with its
+# cost, among the card's rules.
+SPELL_FACE_LAYOUTS = frozenset({"adventure", "prepare"})
 
 # Changes daily, or only points elsewhere on Scryfall.
 VOLATILE = frozenset(

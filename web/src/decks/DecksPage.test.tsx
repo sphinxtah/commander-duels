@@ -292,4 +292,26 @@ describe("the decks page", () => {
       api.calls.filter((call) => call.route === "GET /api/v1/decks/{deck_id}"),
     ).toEqual([]);
   });
+
+  it("says when cards left a deck because the game cannot play them (v0.4.5)", async () => {
+    const api = mockApi();
+    const left = {
+      ...summary,
+      removed_cards: [
+        {
+          name: "Temple of Khonshu",
+          quantity: 1,
+          reason: "The game engine has no implementation of this card yet.",
+          removed_at: "2026-10-22T10:00:00Z",
+        },
+      ],
+    };
+    api.on("GET /api/v1/decks", () => reply(200, [left]));
+    api.on("GET /api/v1/decks/starters", () => reply(200, []));
+    render(<DecksPage me={player} heading={createRef()} />);
+    const row = (
+      await screen.findByRole("link", { name: "Mono-Red Burn" })
+    ).closest("li")!;
+    expect(row).toHaveTextContent("1 card left the game");
+  });
 });

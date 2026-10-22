@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { client, type Me } from "../api";
 import { CardDetails, CardTile } from "./CardViews";
 import {
@@ -9,8 +9,7 @@ import {
 import { useCustomCards } from "./CustomCards";
 import { MyLibrary } from "./MyLibrary";
 import {
-  catalogSearch,
-  namesPlayability,
+  emptySearch,
   type CatalogStatus,
   type CardSummary,
   type Search,
@@ -21,9 +20,9 @@ import styles from "./catalog.module.css";
 
 const PAGE_SIZE = 60;
 
-/** The whole catalog (CAT: every card stays searchable), the player's own library, and the
- * allied Planeswalker's cards (v0.4.2), which at the Godlike tier's Planeswalker are its custom
- * cards. */
+/** Every card in the game (since v0.4.5 only the cards the engine can play), the player's own
+ * library, and the allied Planeswalker's cards (v0.4.2), which at the Godlike tier's Planeswalker
+ * are its custom cards. */
 type View = "catalog" | "library" | "alliance";
 const VIEWS: View[] = ["catalog", "library", "alliance"];
 
@@ -31,20 +30,12 @@ export function catalogLine(status: CatalogStatus | undefined): string {
   if (!status) return "";
   if (!status.revision) return "The card catalog has not been imported yet.";
   const when = new Date(status.revision.created_at).toLocaleDateString();
-  return `${status.cards.toLocaleString()} cards from Scryfall, ${status.playable.toLocaleString()} playable here · catalog revision ${status.revision.id}, ${when}${status.stale ? " · not updated for two days" : ""}`;
+  return `${status.playable.toLocaleString()} cards · catalog revision ${status.revision.id}, ${when}${status.stale ? " · not updated for two days" : ""}`;
 }
 
 /** The result count, saying which cards it counts. */
-export function resultWords(
-  total: number,
-  playable: Search["playable"],
-  owned = false,
-): string {
-  const count = total.toLocaleString();
-  const cards = `${total === 1 ? "card" : "cards"}${owned ? " in your library" : ""}`;
-  if (playable === "true") return `${count} playable ${cards}`;
-  if (playable === "false") return `${count} ${cards} not playable yet`;
-  return `${count} ${cards}`;
+export function resultWords(total: number, owned = false): string {
+  return `${total.toLocaleString()} ${total === 1 ? "card" : "cards"}${owned ? " in your library" : ""}`;
 }
 
 export function useCatalogStatus(): CatalogStatus | undefined {
@@ -100,31 +91,20 @@ function Browser({
   library: boolean;
 }) {
   const [view, setView] = useState<View>("catalog");
-  // Cards that cannot be played here yet are hidden until the player asks for them.
-  const [search, setSearch] = useState<Search>({ ...catalogSearch });
+  const [search, setSearch] = useState<Search>({ ...emptySearch });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<CardSummary>();
   const dialog = useRef<HTMLDialogElement>(null);
   const status = useCatalogStatus();
   const custom = useCustomCards();
   const alliance = useAllianceCards();
-  // A search that names playability itself (status:unsupported, is:playable) decides it, and the
-  // "Playable here" filter steps aside rather than contradict it.
-  const typed = namesPlayability(search.q);
-  const setAside = typed && search.playable !== "";
-  const effective = useMemo<Search>(
-    () => (setAside ? { ...search, playable: "" } : search),
-    [search, setAside],
-  );
   const { results, answered, error, loading } = useCardSearch(
-    effective,
+    search,
     page,
     PAGE_SIZE,
   );
   // The result line describes the results on screen, so it follows the search they answer.
-  const shown = answered ?? effective;
-  const shownSetAside =
-    setAside && shown.playable === "" && namesPlayability(shown.q);
+  const shown = answered ?? search;
   useEffect(() => setPage(1), [search]);
   useEffect(() => {
     if (open) dialog.current?.showModal();
@@ -170,37 +150,18 @@ function Browser({
           <SearchControls
             search={search}
             onChange={setSearch}
-            defaults={catalogSearch}
             library={library}
           />
           <div className={styles.resultRow}>
-            {/* The count names the cards the shown results hold (the search they answer, not
-                one still on its way), and says when a typed term has set the filter aside, so
-                screen readers hear both. */}
+            {/* The count names the cards the shown results hold: the search they answer, not
+                one still on its way. */}
             <p role="status" className={styles.resultLine}>
               {error
                 ? ""
                 : results
-                  ? `${resultWords(results.total, shown.playable, shown.owned)}${shownSetAside ? " · your search names playability, so the “Playable here” filter is set aside" : ""}${loading ? " · searching…" : ""}`
+                  ? `${resultWords(results.total, shown.owned)}${loading ? " · searching…" : ""}`
                   : "Searching…"}
             </p>
-            {/* One button whose words change, so focus stays on it after a click. */}
-            {!typed && search.playable !== "false" && (
-              <button
-                type="button"
-                className={styles.textButton}
-                onClick={() =>
-                  setSearch({
-                    ...search,
-                    playable: search.playable === "true" ? "" : "true",
-                  })
-                }
-              >
-                {search.playable === "true"
-                  ? "Show cards not playable yet"
-                  : "Hide cards not playable yet"}
-              </button>
-            )}
           </div>
           {error && (
             <p role="alert" className={styles.refusal}>

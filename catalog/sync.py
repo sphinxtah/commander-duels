@@ -7,6 +7,10 @@ run ends as unchanged. Otherwise every file is validated, and the revision is ap
 fenced transaction. Transient failures (Scryfall or the file host unreachable, slow or limiting)
 are retried with capped exponential backoff; other failures stop until the next scheduled run.
 Either way the last good catalog stays in use.
+
+A version that learns a layout the last revision quarantined (v0.4.5 learned prepare) imports
+again as soon as its worker starts, from the files at hand, so those cards are decided at once
+rather than at the next day's run (ensure_relearned).
 """
 
 import logging
@@ -27,6 +31,7 @@ from api.config import Settings
 from api.models import CatalogRevision, CatalogSyncRun, ScheduledJob, SourceSnapshot
 from catalog import engine_export
 from catalog.importer import Apply, Fence, Fenced, Source, validate
+from catalog.records import KNOWN_LAYOUTS
 from catalog.scryfall import (
     DATASETS,
     BulkFile,
@@ -103,6 +108,47 @@ def ensure_scheduled(engine: Engine, settings: Settings, now: datetime) -> None:
                 session.commit()
             except IntegrityError:
                 session.rollback()
+
+
+def learned(counts: dict[str, object] | None) -> bool:
+    """Whether a revision quarantined a layout this version knows: its cards are decided again."""
+    layouts = (counts or {}).get("unknown_layouts")
+    return isinstance(layouts, dict) and bool(KNOWN_LAYOUTS & set(layouts))
+
+
+def ensure_relearned(engine: Engine, settings: Settings, now: datetime) -> bool:
+    """Queues a run due at once when the last revision quarantined a layout this version knows,
+    once per revision. True while that run waits or works."""
+    if not settings.catalog_dir:
+        return False
+    with Session(engine) as session:
+        last = session.execute(
+            select(CatalogRevision.id, CatalogRevision.counts)
+            .order_by(CatalogRevision.id.desc())
+            .limit(1)
+        ).first()
+        if last is None or not learned(last.counts):
+            return False
+        key = f"{KIND}:relearn:{last.id}"
+        status = session.scalar(
+            select(ScheduledJob.status).where(ScheduledJob.deduplication_key == key)
+        )
+        if status is not None:
+            return status in ("pending", "running")
+        session.add(
+            ScheduledJob(
+                kind=KIND,
+                deduplication_key=key,
+                payload={"trigger": "schedule"},
+                status="pending",
+                due_at=now,
+            )
+        )
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+        return True
 
 
 def request_now(session: Session, user_id: UUID, now: datetime) -> ScheduledJob | None:
@@ -310,7 +356,7 @@ class Run:
                 self.settings.engine_service_token.get_secret_value(),
             )
             last = session.execute(
-                select(CatalogRevision.id, CatalogRevision.engine_build)
+                select(CatalogRevision.id, CatalogRevision.engine_build, CatalogRevision.counts)
                 .order_by(CatalogRevision.id.desc())
                 .limit(1)
             ).first()
@@ -320,8 +366,10 @@ class Run:
         self.stats["engine"] = cards.build if cards else missing
         # A catalog never checked against the engine waits for it: a deploy starts the worker with
         # the engine, which takes a minute to load, and an import without it would leave every card
-        # unchecked until the next day's run. Later runs go ahead and keep the cards' statuses.
-        if cards is None and checked is None and missing != "engine_service_off":
+        # unchecked until the next day's run. So does a run deciding a newly known layout's cards,
+        # which imports even when nothing changed. Later runs go ahead and keep the cards' statuses.
+        relearn = last is not None and learned(last.counts)
+        if cards is None and (checked is None or relearn) and missing != "engine_service_off":
             raise SyncError(
                 str(missing),
                 "The engine's implementation list is not available yet; the import waits for it.",
@@ -330,7 +378,7 @@ class Run:
         files = discover(self.client, str(self.settings.scryfall_url))
         sources, changed = self.sources(files)
         engine_new = cards is not None and (last is None or last.engine_build != cards.build)
-        if last is not None and not changed and not engine_new:
+        if last is not None and not changed and not engine_new and not relearn:
             self.finish("unchanged", None, None, revision_id=last.id)
             return Outcome("completed", "unchanged", run_id=self.run_id, revision_id=last.id)
         with Session(self.engine) as session:

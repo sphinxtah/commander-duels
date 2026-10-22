@@ -155,6 +155,7 @@ export function card(
     sheet: "common",
     new: false,
     faces: 0,
+    replaced: false,
     ...fields,
   };
 }

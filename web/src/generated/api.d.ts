@@ -32,8 +32,9 @@ export interface paths {
         put?: never;
         /**
          * Review Card
-         * @description accept: the engine's behaviour is right for today's text. suspend: no new game may start
-         *     with the card. restore: undo a suspension.
+         * @description accept: the engine's behaviour is right for today's text, or (v0.4.5) a card the automatic
+         *     checks held back plays as the engine has it, certified from now on, syncs included. suspend:
+         *     the card leaves the game, and every deck's draft. restore: undo a suspension.
          */
         post: operations["review_card_api_v1_admin_catalog_cards__card_id__review_post"];
         delete?: never;
@@ -51,7 +52,9 @@ export interface paths {
         };
         /**
          * Reviews
-         * @description Cards whose Oracle text changed since they were certified, and suspended cards.
+         * @description Cards whose Oracle text changed since they were certified, cards the engine implements
+         *     that its automatic checks held back (v0.4.5), and suspended cards: the only place the site
+         *     lists cards a game cannot play.
          */
         get: operations["reviews_api_v1_admin_catalog_reviews_get"];
         put?: never;
@@ -757,9 +760,9 @@ export interface paths {
         };
         /**
          * Search Cards
-         * @description Cards by structured filters and the search syntax together; all must match. `owned` keeps
-         *     to the cards in the player's library (basic lands included); every card says how many copies
-         *     the library holds.
+         * @description Cards by structured filters and the search syntax together; all must match, and only cards
+         *     a game can play are found. `owned` keeps to the cards in the player's library (basic lands
+         *     included); every card says how many copies the library holds.
          */
         get: operations["search_cards_api_v1_cards_get"];
         put?: never;
@@ -781,6 +784,7 @@ export interface paths {
          * Card Detail
          * @description A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)
          *     is listed among them even when it is older, so the screen can show it and credit its artist.
+         *     A card the game cannot play is not found.
          */
         get: operations["card_detail_api_v1_cards__card_id__get"];
         put?: never;
@@ -1144,6 +1148,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/removed-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Dismiss Removed
+         * @description Dismisses the deck's note of the cards that left its draft (v0.4.5).
+         */
+        delete: operations["dismiss_removed_api_v1_decks__deck_id__removed_cards_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/restore": {
         parameters: {
             query?: never;
@@ -1221,7 +1245,8 @@ export interface paths {
         };
         /**
          * Card Names
-         * @description Names of cards the engine implements, for SysOp's deck lists (cards.any).
+         * @description Names of cards the engine implements, for SysOp's deck lists (cards.any): since v0.4.5
+         *     only those of cards in the game.
          */
         get: operations["card_names_api_v1_engine_cards_get"];
         put?: never;
@@ -1419,7 +1444,8 @@ export interface paths {
         /**
          * My Library
          * @description The cards in the account's library, with their copies and where they came from. An
-         *     account that builds from the whole catalog has no list here.
+         *     account that builds from the whole catalog has no list here. Copies of a card the game cannot
+         *     play stay recorded but are not shown (v0.4.5): they come back if the engine learns it.
          */
         get: operations["my_library_api_v1_library_get"];
         put?: never;
@@ -1480,7 +1506,8 @@ export interface paths {
          * My Alliance Cards
          * @description The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
          *     every account, those that build from the whole catalog included: each says how many copies
-         *     the library holds (a playset while the alliance lasts, or more from elsewhere).
+         *     the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a
+         *     game can play (v0.4.5).
          */
         get: operations["my_alliance_cards_api_v1_me_alliance_cards_get"];
         put?: never;
@@ -1819,7 +1846,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Sets */
+        /**
+         * Sets
+         * @description Sets with a card a game can play, each with the number of such cards.
+         */
         get: operations["sets_api_v1_sets_get"];
         put?: never;
         post?: never;
@@ -2324,7 +2354,7 @@ export interface components {
             alliance: string | null;
             /**
              * Cards
-             * @description Its own Planeswalker cards in the catalog, playable or not, one per card.
+             * @description Its own Planeswalker cards a game can play, one per card (since v0.4.5, the only ones shown).
              */
             cards: components["schemas"]["CardSummary"][];
             /**
@@ -3095,6 +3125,11 @@ export interface components {
             notes: string;
             /** Playable */
             playable: boolean;
+            /**
+             * Removed Cards
+             * @description Cards that left the draft because the game cannot play them (v0.4.5), until the owner dismisses the note.
+             */
+            removed_cards: components["schemas"]["RemovedCard"][];
             /** Revisions */
             revisions: components["schemas"]["RevisionSummary"][];
             /** Share Code */
@@ -3243,6 +3278,11 @@ export interface components {
             legal: boolean;
             /** Playable */
             playable: boolean;
+            /**
+             * Removed Cards
+             * @description Cards that left the draft because the game cannot play them (v0.4.5), until the owner dismisses the note.
+             */
+            removed_cards: components["schemas"]["RemovedCard"][];
             /** Source */
             source: string;
             /** Title */
@@ -3362,7 +3402,7 @@ export interface components {
             message: string;
             /**
              * Names
-             * @description For unknown_cards: the names the engine does not know.
+             * @description For unknown_cards: the names the engine does not know; for cards_not_playable (v0.4.5): the names of no card in the game.
              */
             names?: string[] | null;
             /** Request Id */
@@ -3637,10 +3677,15 @@ export interface components {
             /** Quantity */
             quantity: number;
             /**
+             * Reason
+             * @description An unavailable line's card is one the game cannot play (v0.4.5): why.
+             */
+            reason?: string | null;
+            /**
              * Status
              * @enum {string}
              */
-            status: "resolved" | "ambiguous" | "unresolved";
+            status: "resolved" | "ambiguous" | "unresolved" | "unavailable";
             /** Text */
             text: string;
         };
@@ -3663,6 +3708,12 @@ export interface components {
             lines: components["schemas"]["ImportLine"][];
             /** Title */
             title: string | null;
+            /**
+             * Unavailable
+             * @description Lines naming a card the game cannot play (v0.4.5).
+             * @default 0
+             */
+            unavailable: number;
             /** Unresolved */
             unresolved: number;
             validation: components["schemas"]["Validation"];
@@ -4162,7 +4213,7 @@ export interface components {
             deck_id?: string | null;
             /**
              * Deck List
-             * @description SysOp only (cards.any): one card per line, any card the engine implements.
+             * @description SysOp only (cards.any): one card per line, any card in the game.
              */
             deck_list?: string | null;
             /**
@@ -4488,6 +4539,12 @@ export interface components {
             printing_id: string;
             /** Rarity */
             rarity: string;
+            /**
+             * Replaced
+             * @description Drawn from its sheet in place of a card the game cannot play (v0.4.5); the opening's record names that card.
+             * @default false
+             */
+            replaced: boolean;
             /** Set Code */
             set_code: string;
             /** Sheet */
@@ -4632,6 +4689,29 @@ export interface components {
             name: string;
             /** Type Line */
             type_line: string | null;
+        };
+        /**
+         * RemovedCard
+         * @description A card that left the deck's draft because the game cannot play it (v0.4.5).
+         */
+        RemovedCard: {
+            /** Name */
+            name: string;
+            /**
+             * Quantity
+             * @description The copies the draft held, every location together.
+             */
+            quantity: number;
+            /**
+             * Reason
+             * @description Why the game cannot play it, in a sentence.
+             */
+            reason: string;
+            /**
+             * Removed At
+             * Format: date-time
+             */
+            removed_at: string;
         };
         /**
          * ReportContext
@@ -5013,7 +5093,7 @@ export interface components {
             deck_id?: string | null;
             /**
              * Deck List
-             * @description SysOp only (cards.any): one card per line, any card the engine implements.
+             * @description SysOp only (cards.any): one card per line, any card in the game.
              */
             deck_list?: string | null;
         };
@@ -9723,8 +9803,6 @@ export interface operations {
                 rarity?: string | null;
                 set?: string | null;
                 legal?: string | null;
-                playable?: boolean | null;
-                extras?: boolean;
                 owned?: boolean;
                 sort?: "name" | "mana_value" | "released" | "popularity" | "color";
                 descending?: boolean;
@@ -11837,6 +11915,100 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    dismiss_removed_api_v1_decks__deck_id__removed_cards_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"];
+                };
             };
             /** @description Bad Request */
             400: {

@@ -142,4 +142,38 @@ describe("a card's details", () => {
       screen.queryByRole("button", { name: /^Show the newest/ }),
     ).not.toBeInTheDocument();
   });
+
+  it("says a card is not in the game, as a version a game played may still name one (v0.4.5)", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/cards/{card_id}", () =>
+      reply(404, { code: "not_found", message: "Not found." }),
+    );
+    render(<CardDetails cardId="card-temple-of-khonshu" />);
+    expect(
+      await screen.findByText(
+        "This card is not in the game: the game engine cannot play it.",
+      ),
+    ).toHaveAttribute("role", "status");
+  });
+
+  it("shows no status for a card the game can play, unless the engine's wording differs", async () => {
+    const api = mockApi();
+    api.on(
+      "GET /api/v1/cards/{card_id}",
+      () => reply(200, detail([printing("p1", "Artist")], 1)),
+      () =>
+        reply(200, {
+          ...detail([printing("p1", "Artist")], 1),
+          text_differs: true,
+        }),
+    );
+    const { unmount } = render(<CardDetails cardId="card-lightning-bolt" />);
+    await screen.findByText(/^Illustrated by /);
+    expect(screen.queryByText("Status")).toBeNull();
+    expect(document.body).not.toHaveTextContent(/playable/i);
+    unmount();
+    render(<CardDetails cardId="card-lightning-bolt" />);
+    expect(await screen.findByText("Status")).toBeInTheDocument();
+    expect(screen.getByText(/wording of this card may differ/)).toBeVisible();
+  });
 });

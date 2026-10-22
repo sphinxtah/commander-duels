@@ -53,7 +53,21 @@ Each card concept has one status, with a reason when it cannot be played:
 | `unsupported` | Not a card a deck holds: tokens, emblems, art cards, schemes, memorabilia | `not_a_deck_card` |
 | `suspended` | Held back by an administrator; no new game may start with it | `suspended_by_staff` |
 
-Unsupported and uncertified cards stay searchable and labeled, and are blocked from play (T18). Since v0.3.0 the Cards page hides them by default, at the owner's request: it opens on playable cards, and "Show cards not playable yet" beside the result count, the "Playable here" filter, or a search that names playability (`is:unsupported`, `status:catalog_only`) shows them, each with its “Not playable” badge (the reason is in the card's details, and screen readers hear it with the badge). "Clear filters" goes back to playable cards. The deck editor's finder shows only playable cards while “Only cards this deck can use” is ticked, as it is by default. SysOp's own practice decks may still use any card the engine implements.
+### Only playable cards are in the game (v0.4.5)
+
+At the owner's decision of 2026-10-21 ("If the engine can't play a card, and we can't make the engine play it, then we can remove it from the game entirely, for everyone"), a card that is not certified, or that Scryfall no longer lists, is out of the game for every account, players, administrators and SysOp alike. Search, card pages and their printings, the deck builder's finder, guided creation, deck imports, libraries, the alliance lists, Leng's packs and SysOp's deck lists know nothing of it; tokens, emblems and the other objects no deck holds leave search too. Only Administration's catalog review still lists such cards, because accepting or restoring one is how it comes back.
+
+- **The catalog keeps every card**, with its status and reason, so a card comes back by itself when a release of the engine implements it (the next sync certifies it), or when an administrator accepts or restores it.
+- **What went.** Until v0.4.5 such cards stayed searchable and labeled (T18), and since v0.3.0 the Cards page hid them until asked. "Show cards not playable yet", the "Playable here" filter, the "Not playable" badges and the search terms that named playability (`is:playable`, `is:unsupported`, `status:`) are gone; `GET /api/v1/cards` lost its `playable` and `extras` parameters, and `GET /api/v1/cards/{id}` answers 404 for a card out of the game, as for one that does not exist.
+- **What follows.** Deck drafts lose such cards, with a note ([decks](decks.md#cards-that-leave-the-game-v045)); a pack that would pull one draws another from the same sheet ([shop](shop.md#buying-and-opening)); library copies of one stay recorded but hidden ([progression](progression.md#the-library)).
+- **The game is untouched.** The table still names and pictures any card the engine puts on it, tokens included: the image cache looks every name up in the whole catalog ([the game screen](game-screen.md#cards)). Games, and the deck versions they played, keep their cards.
+- **On 2026-10-22** about 2,600 deck cards were out (351 of them legal in Commander, mostly Un-cards and Attractions; the rest digital-only and playtest cards), with the 4,161 objects no deck holds. No starter deck and no engine fixture deck holds one.
+
+### Prepare cards (v0.4.5)
+
+Scryfall's `prepare` layout (Secrets of Strixhaven, Reality Fracture and their Alchemy cards; 72 cards on 2026-10-22) is a creature with a spell on its second face, which it may cast a copy of while it is prepared. Until v0.4.5 the catalog quarantined them (`unknown_layout`). It now reads them as it reads an adventure, which is how XMage implements them (its kind `adventure`): the front face names the card in a game and decides whether it may be a commander, both faces' names resolve in imports, and the wording check counts the spell's cost, which the engine prints among the card's rules. XMage 1.4.62 implements 66 of the 72. The six it lacks are not implemented: Whiplash Wordsmith // Vicious Verse (Reality Fracture), and five digital-only Alchemy cards, Crescendo Conductor // Boltwave, Galathul Galecaller // Corvid Squall and Ursine Guide // Ranger's Merit (Alchemy: Secrets of Strixhaven), Rootha, Ardent Artisan // Next Iteration and Zimone the Calculating // Simple Subtraction (Alchemy: Reality Fracture).
+
+A version that learns a layout the last revision quarantined imports again as soon as its worker starts, from the files at hand, waiting for the engine as a first import does, so those cards are decided at once rather than at the next day's run (`catalog/sync.py`, `ensure_relearned`).
 
 ### The engine's implementation list
 
@@ -61,12 +75,14 @@ The engine image builds the list when it is built: every card XMage implements, 
 - **Characteristics.** Mana cost, card types and, for creatures, power and toughness must match (`*` and X values are skipped). A difference holds the card at `implemented`.
 - **Wording.** The engine's rules text may still use older wording than today's Oracle text. A heuristic compares the symbols, numbers and words that matter after removing reminder text and names; a card that differs keeps its status and is marked `text_differs`, which the card details show. On the real data 92 cards are marked.
 - **Oracle changes after certification (CAT08).** A certified card whose Oracle text changes stays playable and goes on the review list. An administrator accepts it (the engine still plays it as written) or suspends it.
+- **Cards the checks held back (v0.4.5).** A card the engine implements whose gates failed, or whose characteristics differ from the Oracle card (`implemented`; 12 on 2026-10-22, mostly Un-cards and playtest cards), is out of the game and goes on the review list with what held it back. An administrator who finds that the engine plays it right accepts it: it is certified from then on, audited (`catalog.card_accept`), and the acceptance rides in the card's capabilities (`accepted`), which every sync keeps, as it keeps a suspension and the status it set aside. Like any certified card's, a later Oracle change puts it back on the review list.
+- **Suspensions** take a card out of the game, and out of every deck's draft (v0.4.5), until an administrator restores it.
 
-Coverage on 2026-10-20, engine build `1.4.62-eb69d05b-7909ff1a7bd0`: the engine lists 32,486 cards, all passing the gates; 32,089 card concepts are playable. Of the deck cards legal in Legacy, 31,711 are playable, 351 are not implemented and 67 use a layout this version does not know yet (`prepare`). `GET /api/v1/catalog/coverage` gives the counts by format.
+Coverage on 2026-10-20, engine build `1.4.62-eb69d05b-7909ff1a7bd0`: the engine lists 32,486 cards, all passing the gates; 32,089 card concepts are playable. Of the deck cards legal in Legacy, 31,711 are playable, 351 are not implemented and 67 used a layout that version did not know yet (`prepare`, read since v0.4.5: above). `GET /api/v1/catalog/coverage` gives the counts by format.
 
 ## Search (DECK03, DECK04)
 
-`GET /api/v1/cards` takes filters (name, text, type, colors with exact/including/within, identity, mana value range, rarity, set, format, playable) and a query in Scryfall's syntax. Words are ANDed, `or` and parentheses group, and `-` negates. At most 500 characters, 40 terms and 8 levels of parentheses.
+`GET /api/v1/cards` takes filters (name, text, type, colors with exact/including/within, identity, mana value range, rarity, set, format) and a query in Scryfall's syntax, and finds only cards in the game (v0.4.5). Words are ANDed, `or` and parentheses group, and `-` negates. At most 500 characters, 40 terms and 8 levels of parentheses.
 
 | Key | Example |
 | --- | --- |
@@ -79,11 +95,12 @@ Coverage on 2026-10-20, engine build `1.4.62-eb69d05b-7909ff1a7bd0`: the engine 
 | `r:` `rarity:` | `r>=rare` |
 | `s:` `set:` `e:` | `s:dmu` |
 | `f:` `format:` `legal:`, `banned:` | `f:commander`, `banned:legacy` |
-| `is:` | `commander`, `companion`, `partner`, `background`, `playable`, `unsupported`, `reserved`, `gamechanger`, `permanent`, and layouts (`split`, `mdfc`, `adventure`, ...) |
+| `is:` | `commander`, `companion`, `partner`, `background`, `reserved`, `gamechanger`, `permanent`, and layouts (`split`, `mdfc`, `adventure`, `prepare`, ...) |
 | `k:` `keyword:` | `k:flying` |
 | `otag:` `function:` | `otag:removal` (includes the tag's children) |
 | `year:` | `year>=2020` |
-| `status:` | `status:implemented` |
+
+`is:playable`, `is:unsupported` and `status:` went in v0.4.5: every card found is one a game can play.
 
 An unknown key or a malformed term is refused with a message that says what was wrong. Results sort by name, mana value, release date, popularity (EDHREC rank) or color, 60 a page by default (at most 100). Warm searches on the real catalog took 39–71 ms (median per query) and at most 120 ms; the first `otag:` query after a start takes about 450 ms while the tag tree loads.
 
@@ -92,25 +109,25 @@ An unknown key or a malformed term is refused with a message that says what was 
 | Route | Who | |
 | --- | --- | --- |
 | `GET /api/v1/cards` | signed-in players | Search. Since v0.3.1 each card carries `owned`, the copies in the player's library (null when not limited), and `owned=true` keeps to the library ([the Planeswalker Alliance](progression.md#the-library)) |
-| `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags, status and newest 60 printings; `?printing=<id>` also lists that printing of the card when it is older (since v0.3.0, for a deck entry's chosen printing) |
-| `GET /api/v1/cards/{id}/printings` | signed-in players | Its English printings, newest first |
-| `GET /api/v1/sets` | signed-in players | Sets, for the set filter |
+| `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags, status and newest 60 printings; `?printing=<id>` also lists that printing of the card when it is older (since v0.3.0, for a deck entry's chosen printing). Since v0.4.5 a card out of the game answers 404 |
+| `GET /api/v1/cards/{id}/printings` | signed-in players | Its English printings, newest first (404 for a card out of the game) |
+| `GET /api/v1/sets` | signed-in players | Sets holding a card in the game, for the set filter |
 | `GET /api/v1/catalog` | signed-in players | The current revision, the last run, the next scheduled run, whether it is stale (no successful run for 48 hours), format versions and counts |
 | `GET /api/v1/catalog/coverage` | signed-in players | Counts per format, status and reason |
 | `GET /api/v1/admin/catalog/runs` | `catalog.manage` | Recent runs |
 | `POST /api/v1/admin/catalog/sync` | `catalog.manage` | Queue a run now (audited) |
-| `GET /api/v1/admin/catalog/reviews` | `catalog.manage` | Cards to review, and suspended cards |
-| `POST /api/v1/admin/catalog/cards/{id}/review` | `catalog.manage` | Accept, suspend or restore a card (audited) |
+| `GET /api/v1/admin/catalog/reviews` | `catalog.manage` | Cards to review: Oracle changes, since v0.4.5 the cards the checks held back, and suspended cards |
+| `POST /api/v1/admin/catalog/cards/{id}/review` | `catalog.manage` | Accept (an Oracle change, or a card the checks held back), suspend (the card leaves every deck's draft) or restore a card (audited) |
 
 `catalog.manage` belongs to administrators and SysOp. The Godlike tier's custom cards (v0.3.1) are not part of the catalog: they live in a table of their own, which no route above reads ([the custom cards](progression.md#the-godlike-tiers-custom-cards)). Card images for catalog printings come through the API's image cache at `GET /api/v1/card-images/printings/{id}`, so the browser still makes no request to Scryfall ([the game screen](game-screen.md#cards)).
 
 ## On screen
 
-- **Cards** (the navigation's Cards page): playable cards by default, with search, the syntax help, filters, sorting and pages; each card opens its details: images of every printing, Oracle text, legality, rulings, tags, why it is or is not playable here, and the illustrator of the image on show.
+- **Cards** (the navigation's Cards page): every card in the game, with search, the syntax help, filters, sorting and pages; each card opens its details: images of every printing, Oracle text, legality, rulings, tags, the engine's wording when it may differ, and the illustrator of the image on show.
 - **Its three tabs:** All cards; My library ([progression](progression.md#the-library)); and since v0.4.2 the allied Planeswalker's cards, named for them ("Teferi's cards"), which follow the alliance ([progression](progression.md#alliances)).
-- **Images as Scryfall serves them.** A card image is never dimmed, recoloured, blurred, cropped or covered over its artist or copyright line (Scryfall's image rules); a card that is not playable says so in its caption and badge instead.
-- **Administration → Card catalog:** the sync's state and recent runs, "Run the catalog sync now", the engine's coverage per format, and the cards to review, with accept, suspend and restore, and a search to suspend any other card.
+- **Images as Scryfall serves them.** A card image is never dimmed, recoloured, blurred, cropped or covered over its artist or copyright line (Scryfall's image rules).
+- **Administration → Card catalog:** the sync's state and recent runs, "Run the catalog sync now", the engine's coverage per format, and the cards to review, with accept, suspend and restore (since v0.4.5 the cards the checks held back too, each with what held it back and Accept), and a search to suspend any other card.
 
 ## Testing without Scryfall
 
-`tests/fixtures/scryfall` holds a 70-card slice of the four files, taken on 2026-10-20, and `tests/fixtures/engine_implementations.json` the engine's list for the same cards. The tests import them into a fresh database. `python scripts/load_fixture_catalog.py` imports the same slice into `CD_DATABASE_URL` for the browser journeys, which CI runs that way; it leaves a database that holds a catalog alone.
+`tests/fixtures/scryfall` holds a 71-card slice of the four files, taken on 2026-10-20, and `tests/fixtures/engine_implementations.json` the engine's list for the same cards. Since v0.4.5 it holds a second prepare card, Abigale, Poet Laureate // Heroic Stanza (a legendary one), as Scryfall's API gave it on 2026-10-22, with XMage 1.4.62's implementation of it. The tests import them into a fresh database. `python scripts/load_fixture_catalog.py` imports the same slice into `CD_DATABASE_URL` for the browser journeys, which CI runs that way; it leaves a database that holds a catalog alone.

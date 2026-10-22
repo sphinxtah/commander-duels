@@ -12,7 +12,11 @@ product, every card resolved to a catalog printing. Drawing a pack:
 - **duplicates**: a pack never holds the same printing twice in the same finish, unless the sheet
   allows duplicates (or nothing else is left on it);
 - a card's **finish** is the sheet's: foil sheets give foils (etched foils where the sheet or the
-  printing says so).
+  printing says so);
+- a card the game **cannot play** (v0.4.5) gives way to another from the same sheet, drawn by
+  weight from the sheet's cards the game can play, so the pack keeps its size and each slot its
+  rarity; the card drawn first is recorded beside the one given. A sheet holding no card the game
+  can play (a token or art card slot) gives nothing.
 The randomness is the caller's: the shop draws with the operating system's secure generator, tests
 with a seeded one. Nothing the client sends reaches it.
 """
@@ -163,6 +167,8 @@ class Pulled:
     printing_id: UUID
     finish: str
     sheet: str
+    # The printing drawn first, which the game cannot play.
+    replaced: UUID | None = None
 
 
 def weighted(rng: random.Random, cards: Sequence[SheetCard]) -> SheetCard:
@@ -227,9 +233,12 @@ def draw_sheet(
     return picked
 
 
-def draw(collation: Collation, rng: random.Random) -> tuple[int, list[Pulled]]:
+def draw(
+    collation: Collation, rng: random.Random, removed: frozenset[UUID] = frozenset()
+) -> tuple[int, list[Pulled]]:
     """A pack: the layout drawn, and its cards, slot by slot in the layout's order. Fixed sheets
-    are drawn first, so the random slots avoid duplicating them."""
+    are drawn first, so the random slots avoid duplicating them. removed: printings of cards the
+    game cannot play, each replaced from its own sheet."""
     index = choose_layout(rng, collation.layouts)
     layout = collation.layouts[index]
     taken: set[tuple[UUID, str]] = set()
@@ -237,9 +246,17 @@ def draw(collation: Collation, rng: random.Random) -> tuple[int, list[Pulled]]:
     order = sorted(layout.contents, key=lambda slot: not collation.sheets[slot[0]].fixed)
     for name, count in order:
         drawn[name] = draw_sheet(rng, collation.sheets[name], count, taken)
-    pulled = [
-        Pulled(card.printing_id, card.finish, name)
-        for name, _ in layout.contents
-        for card in drawn[name]
-    ]
+    pulled: list[Pulled] = []
+    for name, _ in layout.contents:
+        sheet = collation.sheets[name]
+        for card in drawn[name]:
+            if card.printing_id not in removed:
+                pulled.append(Pulled(card.printing_id, card.finish, name))
+                continue
+            others = [other for other in sheet.cards if other.printing_id not in removed]
+            if not others:
+                continue
+            given = pick(rng, sheet, taken, others)
+            taken.add(key(given))
+            pulled.append(Pulled(given.printing_id, given.finish, name, card.printing_id))
     return index, pulled

@@ -91,8 +91,12 @@ function TextFrame({ card, face }: { card: CardSummary; face?: number }) {
   );
 }
 
-/** A small badge for a card's playability, with its reason in words for screen readers. */
+/** A small badge for a Godlike card's playability (whether the running engine has loaded it),
+ * or for a catalog card that cannot be played, with its reason in words for screen readers. Since
+ * v0.4.5 the catalog shows only cards the game can play, so a catalog card has one only in a
+ * version of a deck that games played. */
 export function StatusBadge({ card }: { card: CardSummary }) {
+  if (card.playable && !card.custom) return null;
   return (
     <span
       className={styles.status}
@@ -118,8 +122,8 @@ export function OwnedNote({ card }: { card: CardSummary }) {
   );
 }
 
-/** A card in a grid of results: its image, name, cost and status, and for a player who builds
- * from a library, the copies it holds. */
+/** A card in a grid of results: its image and name, and for a player who builds from a library,
+ * the copies it holds. */
 export function CardTile({
   card,
   onOpen,
@@ -136,7 +140,7 @@ export function CardTile({
         type="button"
         className={styles.tileButton}
         onClick={() => onOpen(card)}
-        aria-label={`${card.name}, ${card.type_line}, ${statusLabel(card)}${owned ? `, ${owned.toLowerCase()}` : ""}`}
+        aria-label={`${card.name}, ${card.type_line}${card.playable ? "" : `, ${statusLabel(card)}`}${owned ? `, ${owned.toLowerCase()}` : ""}`}
       >
         <CardImage card={card} />
       </button>
@@ -165,12 +169,16 @@ export function CardDetails({
   actions?: ReactNode;
 }) {
   const [card, setCard] = useState<CardDetail>();
+  // A card the game cannot play is not in the game (v0.4.5): a version of a deck that games
+  // played may still name one.
+  const [gone, setGone] = useState(false);
   const [face, setFace] = useState(0);
   const [preview, setPreview] = useState<string | null>(chosenPrinting ?? null);
   const [allPrintings, setAllPrintings] = useState<PrintingSummary[]>();
   useEffect(() => {
     let active = true;
     setCard(undefined);
+    setGone(false);
     setAllPrintings(undefined);
     // A deck entry's chosen printing is asked for by name, so the details list it (and its
     // artist) even when it is older than the printings the card lists first. Choosing another
@@ -183,13 +191,24 @@ export function CardDetails({
           query: printing ? { printing } : undefined,
         },
       })
-      .then(({ data }) => active && data && setCard(data));
+      .then(({ data, response }) => {
+        if (!active) return;
+        if (data) setCard(data);
+        else setGone(response.status === 404);
+      });
     return () => {
       active = false;
     };
   }, [cardId]);
   useEffect(() => setPreview(chosenPrinting ?? null), [chosenPrinting]);
-  if (!card) return <p role="status">Loading the card…</p>;
+  if (!card)
+    return (
+      <p role="status">
+        {gone
+          ? "This card is not in the game: the game engine cannot play it."
+          : "Loading the card…"}
+      </p>
+    );
   // "Show all" loads the newest 500; the first list's printings stay too, so a chosen printing
   // older than those (asked for by name) is never dropped from the list.
   const loaded = new Set(allPrintings?.map((printing) => printing.id));
@@ -252,21 +271,23 @@ export function CardDetails({
           </div>
         ))}
         <dl className={styles.facts}>
-          <div>
-            <dt>Status</dt>
-            <dd>
-              <StatusBadge card={card} />{" "}
-              {!card.playable && (
-                <span>{card.status_detail ?? statusLabel(card)}</span>
-              )}
-              {card.text_differs && (
-                <span className={styles.warning}>
-                  The game engine's wording of this card may differ from today's
-                  Oracle text. It plays as the engine has it.
-                </span>
-              )}
-            </dd>
-          </div>
+          {(!card.playable || card.text_differs) && (
+            <div>
+              <dt>Status</dt>
+              <dd>
+                <StatusBadge card={card} />{" "}
+                {!card.playable && (
+                  <span>{card.status_detail ?? statusLabel(card)}</span>
+                )}
+                {card.text_differs && (
+                  <span className={styles.warning}>
+                    The game engine's wording of this card may differ from
+                    today's Oracle text. It plays as the engine has it.
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
           {ownedWords(card) && (
             <div>
               <dt>Your library</dt>
