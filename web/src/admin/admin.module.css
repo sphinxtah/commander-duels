@@ -88,9 +88,7 @@
 }
 .customHeading {
   margin: 28px 0 8px;
-  font:
-    1.15rem Georgia,
-    serif;
+  font: 600 1.15rem var(--cd-display);
 }
 .customList {
   list-style: none;
@@ -152,10 +150,14 @@
   margin-left: 8px;
   padding: 0 6px;
   border-radius: 10px;
-  background: #d5b77c;
+  background: var(--cd-gold-fill);
   color: #192220;
   font-size: 0.68rem;
   font-weight: 700;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
 }
 .shortcut {
   display: flex;
