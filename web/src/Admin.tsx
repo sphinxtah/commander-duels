@@ -16,6 +16,7 @@ import {
   type Me,
   type Planeswalker,
 } from "./api";
+import { Chats } from "./admin/Chats";
 import { pendingWords, unreadWords } from "./admin/counts";
 import { CustomCards } from "./admin/CustomCards";
 import { DeleteAccount } from "./admin/DeleteAccount";
@@ -608,12 +609,20 @@ export function canAdminister(me: Me | null | undefined) {
       me.permissions.includes("catalog.manage") ||
       me.permissions.includes("custom_cards.manage") ||
       me.permissions.includes("shop.manage") ||
-      me.permissions.includes("reports.manage")),
+      me.permissions.includes("reports.manage") ||
+      me.permissions.includes("chat.read_all")),
   );
 }
 
 type Tab =
-  "users" | "reports" | "economy" | "audit" | "catalog" | "shop" | "custom";
+  | "users"
+  | "reports"
+  | "chats"
+  | "economy"
+  | "audit"
+  | "catalog"
+  | "shop"
+  | "custom";
 
 /** A tab's count, with words for screen readers ("Accounts, 2 accounts waiting…"). */
 function TabCount({ count, words }: { count: number; words: string }) {
@@ -676,11 +685,14 @@ export function Admin({
   const shop = me!.permissions.includes("shop.manage");
   // The players' problem reports, for SysOp and administrators (v0.4.1).
   const reports = me!.permissions.includes("reports.manage");
+  // SysOp's reader of every chat, each opening audited (v0.4.4).
+  const chats = me!.permissions.includes("chat.read_all");
   const pending = counts?.pending_accounts ?? 0;
   const unread = counts?.unread_reports ?? 0;
   const available = [
     users && "users",
     reports && "reports",
+    chats && "chats",
     users && "economy",
     audit && "audit",
     catalog && "catalog",
@@ -721,6 +733,15 @@ export function Admin({
           >
             Reports
             <TabCount count={unread} words={unreadWords(unread)} />
+          </button>
+        )}
+        {chats && (
+          <button
+            role="tab"
+            aria-selected={shown === "chats"}
+            onClick={() => setTab("chats")}
+          >
+            Chats
           </button>
         )}
         {users && (
@@ -778,6 +799,8 @@ export function Admin({
           />
         ) : shown === "reports" ? (
           <Reports onCounts={onCounts} />
+        ) : shown === "chats" ? (
+          <Chats />
         ) : shown === "economy" ? (
           <EconomySettings
             canChange={me!.permissions.includes("economy.manage")}

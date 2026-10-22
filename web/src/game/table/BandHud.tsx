@@ -16,8 +16,9 @@ import gameStyles from "../game.module.css";
 import styles from "./screen.module.css";
 
 // The band's HUD (design §8.2, §9.1): the diamond buttons at its left (the Game menu, the log,
-// the priority controls, full screen and SysOp's inspection), the turn and step line, and the
-// connection's status chip. The scene draws the band itself, its step icons and phase pips.
+// the priority controls, full screen, SysOp's inspection and, at a human table, the chat), the
+// turn and step line, and the connection's status chip. The scene draws the band itself, its
+// step icons and phase pips.
 
 /** The step's caption on the band; the live turn line says the step in the site's own words. */
 const CAPTIONS: Record<string, string> = {
@@ -83,6 +84,7 @@ export function BandHud({
   turnLine,
   statusText,
   statusPhase,
+  chat = null,
 }: {
   layout: TableLayout | null;
   sysop: boolean;
@@ -94,9 +96,25 @@ export function BandHud({
   turnLine: TurnLine | null;
   statusText: string;
   statusPhase: GameState["phase"];
+  /** At a human table (v0.4.4): the chat's diamond, with the lines not read yet. */
+  chat?: { unread: number } | null;
 }) {
   const band = layout?.band ?? null;
   const hud = band?.hud ?? HUD;
+  // The chat takes the inspection's slot, which only SysOp uses; beside SysOp's inspection it
+  // takes the next one, and the turn line moves over by one.
+  const step = BAND.hud.inspection - BAND.hud.fullscreen;
+  const chatAt =
+    chat &&
+    diamond(BAND.hud.inspection + (sysop ? step : 0), BAND.y, BAND.hud.side);
+  const turnText =
+    band && chat && sysop
+      ? {
+          ...band.turnText,
+          x: band.turnText.x + step,
+          w: band.turnText.w - step,
+        }
+      : band?.turnText;
   const toggle = (id: DrawerId) => ({
     "aria-expanded": drawer === id,
     "aria-controls": `drawer-${id}`,
@@ -142,9 +160,25 @@ export function BandHud({
           {...toggle("inspection")}
         />
       )}
-      {turnLine && band && (
+      {chat && chatAt && (
+        <HudButton
+          at={chatAt}
+          icon="chat"
+          label={
+            chat.unread > 0 ? `Table chat, ${chat.unread} unread` : "Table chat"
+          }
+          {...toggle("chat")}
+        >
+          {chat.unread > 0 && (
+            <span className={styles.hudCount} aria-hidden="true">
+              {chat.unread > 99 ? "99+" : chat.unread}
+            </span>
+          )}
+        </HudButton>
+      )}
+      {turnLine && band && turnText && (
         <p className={styles.turnLine} aria-live="polite">
-          <span className={styles.turnText} style={boxStyle(band.turnText)}>
+          <span className={styles.turnText} style={boxStyle(turnText)}>
             {turnLine.turn}
           </span>
           {turnLine.step && (

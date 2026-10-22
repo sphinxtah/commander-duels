@@ -369,6 +369,10 @@ class LiveGame:
     recorded: asyncio.Event = field(default_factory=asyncio.Event)
     inspecting: bool = False
     inspect_again: bool = False
+    # At a table (v0.4.4, api/table_chat.py): the alliances, each a pair of seats, and the offers
+    # waiting for an answer, each (from, to).
+    alliances: set[frozenset[int]] = field(default_factory=set)
+    offers: set[tuple[int, int]] = field(default_factory=set)
 
     @property
     def path(self) -> str:
@@ -668,6 +672,11 @@ class GameHub:
             return
         seat.left = reason
         seat.votes.clear()
+        # Imported here: api.table_chat imports api.chat, which imports api.admin, which imports
+        # this module.
+        from api import table_chat
+
+        table_chat.seat_out(self, game, seat)
         self.spawn(
             self.recorded_left(
                 partial(record_left, self.database, game.id, seat.seat, reason),
@@ -1776,6 +1785,10 @@ async def converse(
         claim(hub, game, connection)
     await resync(hub, game, connection, hello.since)
     hub.arrived(game, connection)
+    if game.kind == "table":
+        from api import table_chat  # Imported here: see GameHub.seat_left.
+
+        await table_chat.welcome(hub, game, connection)
     if hello.inspect:
         hub.inspect_soon(game)
     await receive_loop(hub, game, connection, websocket)
@@ -1822,10 +1835,10 @@ async def receive_loop(
         except (ValueError, TypeError, KeyError):
             connection.send({"type": "error", "code": "invalid_message"})
             continue
-        if kind in ("command", "vote"):
-            # Every command and vote checks that the session still stands, and counts as
-            # activity. One stopped here goes nowhere; after a session refresh the client resends
-            # a command.
+        if kind in ("command", "vote", "chat", "emote", "alliance"):
+            # Every command, vote and chat message checks that the session still stands, and
+            # counts as activity. One stopped here goes nowhere; after a session refresh the
+            # client resends a command.
             ended = await run_in_threadpool(
                 partial(session_ended, active=True),
                 hub.database,
@@ -1837,6 +1850,11 @@ async def receive_loop(
                 return
             if kind == "command":
                 await hub.command(game, connection, message.get("command"))
+                continue
+            if kind != "vote":
+                from api import table_chat  # Imported here: see GameHub.seat_left.
+
+                await table_chat.receive(hub, game, connection, websocket, message)
                 continue
             seat, remove = message.get("seat"), message.get("remove", True)
             if not isinstance(seat, int) or isinstance(seat, bool) or not isinstance(remove, bool):

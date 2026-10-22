@@ -19,6 +19,8 @@ const EPOCH = "1970-01-01T00:00:00Z";
 export type Social = {
   /** Unread notifications, for the bell. */
   unread: number;
+  /** Unread messages from friends (v0.4.4), as the last check-in said; null before the first. */
+  messagesUnread: number | null;
   setUnread: (count: number) => void;
   /** Notifications that came since the last check-in, newest first, until dismissed. */
   toasts: NotificationItem[];
@@ -30,10 +32,12 @@ export type Social = {
 export function useSocial(me: Me | null | undefined): Social {
   const account = me?.status === "active" ? me.id : null;
   const [unread, setUnread] = useState(0);
+  const [messagesUnread, setMessagesUnread] = useState<number | null>(null);
   const [toasts, setToasts] = useState<NotificationItem[]>([]);
   const ask = useRef<() => void>(() => undefined);
   useEffect(() => {
     setUnread(0);
+    setMessagesUnread(null);
     setToasts([]);
     if (!account) return;
     let active = true;
@@ -59,11 +63,14 @@ export function useSocial(me: Me | null | undefined): Social {
         });
         if (active && data) {
           setUnread(data.unread);
-          if (since !== undefined && data.fresh.length > 0)
+          setMessagesUnread(data.messages_unread ?? 0);
+          // New messages pop up from the chat's own connection, at once (chat/chat.ts).
+          const fresh = data.fresh.filter((item) => item.kind !== "message");
+          if (since !== undefined && fresh.length > 0)
             setToasts((shown) => [
-              ...data.fresh,
+              ...fresh,
               ...shown.filter(
-                (old) => !data.fresh.some((item) => item.id === old.id),
+                (old) => !fresh.some((item) => item.id === old.id),
               ),
             ]);
           // With none yet, every later one is new.
@@ -108,6 +115,7 @@ export function useSocial(me: Me | null | undefined): Social {
   const checkIn = useCallback(() => ask.current(), []);
   return {
     unread: account ? unread : 0,
+    messagesUnread: account ? messagesUnread : null,
     setUnread,
     toasts: account ? toasts : [],
     dismiss,

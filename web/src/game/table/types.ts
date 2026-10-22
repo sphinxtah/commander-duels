@@ -157,6 +157,7 @@ export interface SummarySeat {
   handle: string | null;
   deck: string | null;
   portrait?: string | null; // a human's allied Planeswalker, by roster ID (v0.3.1)
+  left?: "conceded" | "removed" | "eliminated" | null; // out of a table's game (v0.4.0)
 }
 export interface BuildInput {
   gameId: string;
@@ -357,7 +358,8 @@ export interface StageFit {
 }
 
 /* ---------- interface state (external store; no React re-render on pointer moves) ---------- */
-export type DrawerId = "log" | "priority" | "inspection" | "options" | "zone";
+export type DrawerId =
+  "log" | "priority" | "inspection" | "options" | "zone" | "chat";
 export type TimerPhase =
   "idle" | "arming" | "running" | "paused" | "stopped" | "expired";
 export interface TimerView {

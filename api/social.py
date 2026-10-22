@@ -21,7 +21,8 @@ describes them for players and staff.
   offline to everyone but administrators and SysOp (players.presence), who see the real state and
   that the player appears offline; nothing tells the player.
 - **Notifications:** a friend request, a request accepted, and a friend come online, the last only
-  to friends online at that moment and at most once in ONLINE_NOTICE_GAP for the same friend.
+  to friends online at that moment and at most once in ONLINE_NOTICE_GAP for the same friend; since
+  v0.4.4 new messages from a friend too (api/chat.py), one while unread.
   Kept NOTIFICATION_DAYS days, at most NOTIFICATION_LIMIT per account. The bell alone shows them:
   no email, no browser notifications.
 """
@@ -79,7 +80,7 @@ PENDING_LIMIT = 50
 
 FriendState = Literal["none", "friends", "requested", "requested_you"]
 PresenceState = Literal["in_game", "online", "idle", "offline"]
-NotificationKind = Literal["friend_request", "friend_accepted", "friend_online"]
+NotificationKind = Literal["friend_request", "friend_accepted", "friend_online", "message"]
 SearchText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=320),
@@ -184,10 +185,17 @@ class NotificationItem(Contract):
         default=False,
         description="For a friend request: whether it still waits for your answer.",
     )
+    messages: int = Field(
+        default=0,
+        description="For new messages (v0.4.4): how many from this friend are still unread.",
+    )
 
 
 class CheckedIn(Contract):
     unread: int
+    messages_unread: int = Field(
+        default=0, description="Unread messages from friends (v0.4.4), in every conversation."
+    )
     newest: datetime | None = Field(description="The newest notification's time, if any.")
     fresh: list[NotificationItem] = Field(
         description="Unread notifications newer than the check-in's since, newest first."
@@ -522,6 +530,10 @@ def unread_of(db: Session, user_id: UUID) -> int:
 
 
 def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[NotificationItem]:
+    # Imported here: api.chat imports this module.
+    from api.chat import unread_by_player
+
+    unread = unread_by_player(db, viewer.id) if any(r.kind == "message" for r in rows) else {}
     actors = {
         user.id: user
         for user in db.scalars(
@@ -541,6 +553,9 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                 request_pending=row.kind == "friend_request"
                 and actor is not None
                 and viewer.state_with(actor.id) == "requested_you",
+                messages=unread.get(row.actor_id, 0)
+                if row.kind == "message" and row.actor_id
+                else 0,
             )
         )
     return items
@@ -869,7 +884,15 @@ def check_in(body: CheckIn, principal: Active, db: Db) -> CheckedIn:
             )
         )
         fresh = items_of(db, viewer_of(db, principal), rows) if rows else []
-    return CheckedIn(unread=unread_of(db, user.id), newest=newest, fresh=fresh)
+    # Imported here: api.chat imports this module.
+    from api.chat import unread_total
+
+    return CheckedIn(
+        unread=unread_of(db, user.id),
+        messages_unread=unread_total(db, user.id),
+        newest=newest,
+        fresh=fresh,
+    )
 
 
 @router.get("/notifications", response_model=NotificationPage)

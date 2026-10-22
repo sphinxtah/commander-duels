@@ -1137,6 +1137,11 @@ class ProblemReport(Base):
     screenshot: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
     screenshot_width: Mapped[int | None]
     screenshot_height: Mapped[int | None]
+    # A reported chat message (v0.4.4): who sent it, and a copy of it with the messages before it
+    # that the reporter saw (api/chat.py, ReportedChat). No foreign key: the copy stands as it was
+    # reported, whatever becomes of the account or the messages.
+    reported_user_id: Mapped[UUID | None]
+    chat: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class Friendship(Base):
@@ -1174,13 +1179,14 @@ class PlayerBlock(Base):
 
 class Notification(Base):
     """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
-    come online. The actor is the other player. Kept NOTIFICATION_DAYS, at most a few hundred per
+    come online, and since v0.4.4 new messages from a friend (one while unread, renewed by each
+    message). The actor is the other player. Kept NOTIFICATION_DAYS, at most a few hundred per
     account (api/social.py)."""
 
     __tablename__ = "notifications"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('friend_request', 'friend_accepted', 'friend_online')",
+            "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1192,6 +1198,64 @@ class Notification(Base):
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class Conversation(Base):
+    """Two friends' messages to each other (v0.4.4, api/chat.py). One row a pair, user_low the
+    lower of the two IDs, with each side's read mark: their messages up to it are read."""
+
+    __tablename__ = "conversations"
+    __table_args__ = (
+        UniqueConstraint("user_low", "user_high"),
+        CheckConstraint("user_low <> user_high", name="ck_conversations_pair"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_low: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    user_high: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    last_message_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    low_read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    high_read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class DirectMessage(Base):
+    """One message between friends (v0.4.4). The sender's client_id makes a resend land once."""
+
+    __tablename__ = "direct_messages"
+    __table_args__ = (
+        UniqueConstraint("sender_id", "client_id"),
+        Index("ix_direct_messages_conversation_id_created_at", "conversation_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id"))
+    sender_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    client_id: Mapped[UUID]
+    body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), index=True)
+
+
+class TableMessage(Base):
+    """One line of a table's chat (v0.4.4, api/table_chat.py): a player's text or preset emote to
+    the whole table, a text to their allies only (seats: who it went to besides the sender), or an
+    alliance's event (seats: the two allies; the sender, if any, is who ended it). seat is None
+    for SysOp watching."""
+
+    __tablename__ = "table_messages"
+    __table_args__ = (
+        CheckConstraint("channel IN ('table', 'allies')", name="ck_table_messages_channel"),
+        CheckConstraint("kind IN ('text', 'emote', 'event')", name="ck_table_messages_kind"),
+        Index("ix_table_messages_game_id_created_at", "game_id", "created_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"))
+    sender_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    seat: Mapped[int | None]
+    channel: Mapped[str] = mapped_column(String(16))
+    kind: Mapped[str] = mapped_column(String(16))
+    body: Mapped[str] = mapped_column(Text)
+    seats: Mapped[list[int] | None] = mapped_column(JsonType)
+    client_id: Mapped[UUID | None]
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), index=True)
 
 
 class WeeklySale(Base):

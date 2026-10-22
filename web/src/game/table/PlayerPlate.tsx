@@ -3,6 +3,7 @@ import { boxStyle, OptionMenu, useGameContext, useOptionMenu } from "../Board";
 import { CardFace } from "../Card";
 import { playerName, words } from "../model";
 import type { ManaPool, Seat } from "../types";
+import { AllianceControl, AlliancePills } from "./Alliance";
 import { MENU, diamondBox } from "./geometry";
 import { noteBlur, noteFocus } from "./pointer";
 import {
@@ -34,7 +35,8 @@ import styles from "./table.module.css";
 // life (a button when the prompt offers the player), the counts, the zone tiles, the status row
 // and the board's Expand or Show button. Names, life and status are DOM text at every scale; the
 // scene draws the diamonds, the portrait or sigil and the counts' numerals unless the dom painter
-// does. A Planeswalker portrait (v0.3.1) is named in both painters.
+// does. A Planeswalker portrait (v0.3.1) is named in both painters. At a human table (v0.4.4) the
+// pills say the player's alliances, and another player's plate has its Alliance button.
 
 const poolColours: [keyof ManaPool, string][] = [
   ["white", "W"],
@@ -565,7 +567,9 @@ export function PlayerPlate({
             Winner
           </span>
         )}
+        <AlliancePills seat={player.seat} />
       </span>
+      <AllianceControl seat={player.seat} node={node} />
       <Portrait key={player.portrait ?? ""} player={player} node={node} />
       <PlayerTarget player={player} node={node} />
       <span

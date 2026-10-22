@@ -60,6 +60,12 @@ export function notificationWords(item: NotificationItem): string {
       return `${who} accepted your friend request.`;
     case "friend_online":
       return `${who} is online.`;
+    case "message":
+      return item.messages > 1
+        ? `${who} sent you ${item.messages} messages.`
+        : item.messages === 1
+          ? `${who} sent you a message.`
+          : `${who} sent you messages.`;
   }
 }
 

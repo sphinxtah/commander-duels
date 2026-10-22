@@ -6,7 +6,8 @@ import gameStyles from "../game.module.css";
 import styles from "./screen.module.css";
 
 // The drawers at the table's right (design §6.1, §9.1): the priority controls, SysOp's
-// inspection, the game log, the table options and the zone browser, one open at a time. A drawer
+// inspection, the game log, the table options, the zone browser and a human table's chat
+// (v0.4.4), one open at a time. A drawer
 // is part of the page, never a dialog: the table stays live beside it. A closed drawer is
 // hidden, except the log, which is only visually hidden so that its role=log keeps announcing.
 //
@@ -17,6 +18,7 @@ export function Drawer({
   id,
   name,
   titled = false,
+  fill = false,
   open,
   closed,
   onClose,
@@ -26,6 +28,9 @@ export function Drawer({
   /** What the drawer holds: the close button's name, and the title of a titled drawer. */
   name: string;
   titled?: boolean;
+  /** The contents fill the drawer and scroll within themselves (the chat), instead of the
+   * drawer scrolling them. */
+  fill?: boolean;
   open: boolean;
   closed: "hidden" | "visually-hidden";
   onClose(): void;
@@ -59,9 +64,15 @@ export function Drawer({
     "data-open": open || undefined,
     hidden: !open && closed === "hidden",
   };
+  const scroll = {
+    ref: box,
+    className: styles.drawerScroll,
+    tabIndex: -1,
+    "data-fill": fill || undefined,
+  };
   return titled ? (
     <section {...shared} aria-labelledby={titleId}>
-      <div ref={box} className={styles.drawerScroll} tabIndex={-1}>
+      <div {...scroll}>
         <div className={styles.drawerHead}>
           <h2 id={titleId}>{name}</h2>
           {close}
@@ -71,7 +82,7 @@ export function Drawer({
     </section>
   ) : (
     <div {...shared}>
-      <div ref={box} className={styles.drawerScroll} tabIndex={-1}>
+      <div {...scroll}>
         {close && <div className={styles.drawerHead}>{close}</div>}
         {children}
       </div>

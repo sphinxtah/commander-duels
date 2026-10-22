@@ -6,6 +6,7 @@ import {
   type RefObject,
 } from "react";
 import { client, describe } from "../api";
+import { useChatContext } from "../chat/chat";
 import { tierNames } from "../alliance/alliance";
 import { PlayerPicture, PresenceLine } from "./PlayerBits";
 import {
@@ -53,6 +54,8 @@ export function FriendsPage({
   const [error, setError] = useState("");
   const [said, setSaid] = useState("");
   const [busy, setBusy] = useState<string>();
+  // Friends write to each other (v0.4.4): Message opens a docked window.
+  const chat = useChatContext();
 
   const load = useCallback(async () => {
     const { data, error } = await client.GET("/api/v1/friends");
@@ -152,7 +155,18 @@ export function FriendsPage({
           ) : (
             <ul className={styles.friends}>
               {friends.map((player) => (
-                <PlayerRow key={player.id} player={player} />
+                <PlayerRow key={player.id} player={player}>
+                  {chat && (
+                    <button
+                      type="button"
+                      className={styles.small}
+                      onClick={() => chat.open(player.id)}
+                      aria-label={`Message ${player.handle}`}
+                    >
+                      Message
+                    </button>
+                  )}
+                </PlayerRow>
               ))}
             </ul>
           )}

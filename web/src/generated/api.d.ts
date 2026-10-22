@@ -99,6 +99,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/chats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reader Chats
+         * @description The latest conversations and table chats, or one player's; listing reads no message.
+         */
+        get: operations["reader_chats_api_v1_admin_chats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chats/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reader Conversation
+         * @description A conversation's messages, for SysOp; audited as chat.conversation_read.
+         */
+        get: operations["reader_conversation_api_v1_admin_chats_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/chats/games/{game_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reader Table
+         * @description A table's chat, allies-only messages included, for SysOp; audited as chat.table_read.
+         */
+        get: operations["reader_table_api_v1_admin_chats_games__game_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/counts": {
         parameters: {
             query?: never;
@@ -776,6 +836,87 @@ export interface paths {
         get: operations["coverage_api_v1_catalog_coverage_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversations
+         * @description The account's conversations, the latest first, with what is unread in each.
+         */
+        get: operations["conversations_api_v1_conversations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversation
+         * @description The messages between the account and a player, the newest page first; each page oldest
+         *     first. A player never written to has an empty one.
+         */
+        get: operations["conversation_api_v1_conversations__player_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{player_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Message
+         * @description Writes to a friend. A resend with the same client_id answers the message already sent.
+         */
+        post: operations["send_message_api_v1_conversations__player_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{player_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Conversation
+         * @description Marks a player's messages read, up to a time or all of them, with their notification.
+         */
+        post: operations["read_conversation_api_v1_conversations__player_id__read_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2312,7 +2453,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.4.3
+             * @default 0.4.4
              */
             version: string;
         };
@@ -2606,6 +2747,87 @@ export interface components {
             /** Stale */
             stale: boolean;
         };
+        /**
+         * ChatLine
+         * @description One message of a reported chat, as the reporter saw it.
+         */
+        ChatLine: {
+            /**
+             * Body
+             * @description The text; an emote's or an event's name.
+             */
+            body: string;
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "direct" | "table" | "allies";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "emote" | "event";
+            /**
+             * Reported
+             * @default false
+             */
+            reported: boolean;
+            /**
+             * Seats
+             * @description At a table: the sender's seat first, then the seats an allies-only message went to, or an event's two allies.
+             */
+            seats?: number[];
+            /** @description Null for an alliance's event. */
+            sender: components["schemas"]["ChatPerson"] | null;
+        };
+        /** ChatMessage */
+        ChatMessage: {
+            /** Body */
+            body: string;
+            /**
+             * Client Id
+             * Format: uuid
+             * @description The sender's own ID for it, so a resend lands once.
+             */
+            client_id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Sender Id
+             * Format: uuid
+             */
+            sender_id: string;
+        };
+        /** ChatPerson */
+        ChatPerson: {
+            /** Handle */
+            handle: string | null;
+            /** Id */
+            id: string | null;
+        };
+        /** ChatUnread */
+        ChatUnread: {
+            /** Unread */
+            unread: number;
+        };
         /** CheckIn */
         CheckIn: {
             /**
@@ -2628,11 +2850,39 @@ export interface components {
              */
             fresh: components["schemas"]["NotificationItem"][];
             /**
+             * Messages Unread
+             * @description Unread messages from friends (v0.4.4), in every conversation.
+             * @default 0
+             */
+            messages_unread: number;
+            /**
              * Newest
              * @description The newest notification's time, if any.
              */
             newest: string | null;
             /** Unread */
+            unread: number;
+        };
+        /** ConversationItem */
+        ConversationItem: {
+            /**
+             * Friends
+             * @description Whether you may still write: you are friends.
+             */
+            friends: boolean;
+            last_message: components["schemas"]["ChatMessage"] | null;
+            player: components["schemas"]["PlayerSummary"];
+            /** Unread */
+            unread: number;
+        };
+        /** ConversationList */
+        ConversationList: {
+            /** Conversations */
+            conversations: components["schemas"]["ConversationItem"][];
+            /**
+             * Unread
+             * @description Unread messages in all of them.
+             */
             unread: number;
         };
         /**
@@ -3351,7 +3601,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.4.3
+             * @default 0.4.4
              */
             version: string;
         };
@@ -3521,7 +3771,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -3531,6 +3781,45 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "denied";
+        };
+        /** MessageCreate */
+        MessageCreate: {
+            /**
+             * Client Id
+             * Format: uuid
+             */
+            client_id: string;
+            /** Text */
+            text: string;
+        };
+        /** MessagePage */
+        MessagePage: {
+            /** Friends */
+            friends: boolean;
+            /**
+             * Messages
+             * @description Oldest first.
+             */
+            messages: components["schemas"]["ChatMessage"][];
+            /**
+             * Next
+             * @description The cursor of the older page, if any.
+             */
+            next: string | null;
+            player: components["schemas"]["PlayerSummary"];
+            /**
+             * Unread
+             * @description Unread messages from this player.
+             */
+            unread: number;
+        };
+        /** MessagesRead */
+        MessagesRead: {
+            /**
+             * Up To
+             * @description Marks their messages up to this time read; all if null.
+             */
+            up_to?: string | null;
         };
         /** NotificationItem */
         NotificationItem: {
@@ -3549,7 +3838,13 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message";
+            /**
+             * Messages
+             * @description For new messages (v0.4.4): how many from this friend are still unread.
+             * @default 0
+             */
+            messages: number;
             /** Read */
             read: boolean;
             /**
@@ -4234,6 +4529,57 @@ export interface components {
              */
             product: string;
         };
+        /**
+         * ReaderChat
+         * @description A chat SysOp's reader lists: a conversation or a table's game.
+         */
+        ReaderChat: {
+            /**
+             * Id
+             * Format: uuid
+             * @description The conversation's ID, or the game's.
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "table";
+            /**
+             * Last Message At
+             * Format: date-time
+             */
+            last_message_at: string;
+            /** Messages */
+            messages: number;
+            /** Players */
+            players: components["schemas"]["PlayerRef"][];
+        };
+        /** ReaderList */
+        ReaderList: {
+            /** Chats */
+            chats: components["schemas"]["ReaderChat"][];
+        };
+        /** ReaderTranscript */
+        ReaderTranscript: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "table";
+            /**
+             * Lines
+             * @description Oldest first; the newest READER_LIMIT at most.
+             */
+            lines: components["schemas"]["ChatLine"][];
+            /** Players */
+            players: components["schemas"]["PlayerRef"][];
+        };
         /** Readiness */
         Readiness: {
             /**
@@ -4324,6 +4670,8 @@ export interface components {
             context: components["schemas"]["ReportContext"];
             /** Description */
             description: string;
+            /** @description The chat message the report is about (v0.4.4). */
+            message?: components["schemas"]["ReportedMessageRef"] | null;
             /**
              * Screenshot
              * @description An image, base64: PNG, JPEG or WebP, at most 5 MB decoded.
@@ -4341,6 +4689,8 @@ export interface components {
             api_version: string;
             /** App Version */
             app_version: string;
+            /** @description The reported message and the messages before it the reporter saw. */
+            chat?: components["schemas"]["ReportedChat"] | null;
             /**
              * Created At
              * Format: date-time
@@ -4361,6 +4711,8 @@ export interface components {
             page: string;
             /** Pixel Ratio */
             pixel_ratio: number;
+            /** @description Who sent the reported chat message, if the report is of one. */
+            reported_user?: components["schemas"]["ChatPerson"] | null;
             reporter: components["schemas"]["Reporter"];
             /** Requests */
             requests: components["schemas"]["RecentRequest"][];
@@ -4441,6 +4793,8 @@ export interface components {
             id: string;
             /** Page */
             page: string;
+            /** @description Who sent the reported chat message, if the report is of one. */
+            reported_user?: components["schemas"]["ChatPerson"] | null;
             reporter: components["schemas"]["Reporter"];
             /** Screenshot */
             screenshot: boolean;
@@ -4452,6 +4806,38 @@ export interface components {
             status: "new" | "seen" | "fixed" | "closed";
             /** Summary */
             summary: string;
+        };
+        /**
+         * ReportedChat
+         * @description A copy of a reported message and the messages before it that the reporter saw.
+         */
+        ReportedChat: {
+            /** Game Id */
+            game_id?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "table";
+            /** Lines */
+            lines: components["schemas"]["ChatLine"][];
+            reported_user: components["schemas"]["ChatPerson"];
+        };
+        /**
+         * ReportedMessageRef
+         * @description The message a report is about: a friend's (direct) or a table chat's.
+         */
+        ReportedMessageRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "direct" | "table";
         };
         /** Reporter */
         Reporter: {
@@ -5638,6 +6024,289 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyncQueued"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reader_chats_api_v1_admin_chats_get: {
+        parameters: {
+            query?: {
+                /** @description Only this player's chats. */
+                player_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaderList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reader_conversation_api_v1_admin_chats_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaderTranscript"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reader_table_api_v1_admin_chats_games__game_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaderTranscript"];
                 };
             };
             /** @description Bad Request */
@@ -9452,6 +10121,391 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Coverage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    conversations_api_v1_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    conversation_api_v1_conversations__player_id__get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagePage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    send_message_api_v1_conversations__player_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatMessage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    read_conversation_api_v1_conversations__player_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessagesRead"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatUnread"];
                 };
             };
             /** @description Bad Request */

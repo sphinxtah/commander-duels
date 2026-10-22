@@ -216,6 +216,41 @@
 .pill[data-tone="lost"] {
   color: #e0485a;
 }
+/* Alliances at a human table (v0.4.4): allies in teal, an offer waiting in violet. */
+.pill[data-tone="ally"] {
+  color: #74c7b5;
+}
+.pill[data-tone="offer"] {
+  color: #c8a8ff;
+}
+/* Another player's Alliance button, under their pills: DOM in both painters. */
+.alliance {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  border: 1px solid #e6c68c66;
+  border-radius: 4px;
+  background: #050707d9;
+  color: #f1e3c4;
+  font-size: 1rem;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.alliance:hover {
+  border-color: #efcc8d;
+}
+.alliance[data-standing="offering"] {
+  border-color: #b07cff;
+  box-shadow: 0 0 10px #a86bffaa;
+}
+.alliance:focus-visible {
+  outline: calc(3px / var(--stage-k, 1)) solid #efcc8d;
+  outline-offset: calc(2px / var(--stage-k, 1));
+}
 .chip {
   padding: 0 6px;
   border-radius: 3px;
@@ -394,5 +429,11 @@
   }
   .hit[data-actionable] {
     border: 2px solid Highlight;
+  }
+  .alliance {
+    border-color: ButtonText;
+  }
+  .alliance:focus-visible {
+    outline-color: Highlight;
   }
 }

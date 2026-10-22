@@ -1,14 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  RETRIES,
-  backoff,
-  cardImageUrl,
-  knownMissing,
-  rememberMissing,
-  whyFailed,
-} from "./images";
+import { cardImageUrl } from "./images";
 import type { Located } from "./model";
 import { manaSymbols, manaWords } from "./model";
+import { useImageRetry } from "./RetryingImage";
 import type { CardImageSize } from "./table/types";
 import type { CardView, PermanentView } from "./types";
 import styles from "./game.module.css";
@@ -17,7 +11,8 @@ import styles from "./game.module.css";
 // over a text frame built from the engine's view. The frame is always underneath, so a missing
 // or slow image never hides the rules text or blocks a choice (UI03). Images are never cropped,
 // covered or altered; the current state sits in a strip below the card. Which images exist, and
-// how a failure is retried, live in images.ts, which the table's textures share.
+// how a failure is retried, live in images.ts, which the table's textures share, and in
+// RetryingImage.tsx, which every card picture shares.
 
 export { cardImageUrl };
 
@@ -95,57 +90,22 @@ function Face({
   name: string;
   size: CardImageSize;
 }) {
-  const [state, setState] = useState<"loading" | "loaded" | "failed">(() =>
-    knownMissing(name) ? "failed" : "loading",
-  );
-  // Each retry is a new <img>, so the browser asks again; failures are never cached.
-  const [attempt, setAttempt] = useState(0);
-  const retry = useRef<number | undefined>(undefined);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      window.clearTimeout(retry.current);
-    };
-  }, []);
-
-  function failed() {
-    setState("failed");
-    void whyFailed(cardImageUrl(name, size)).then((why) => {
-      if (why === "missing") rememberMissing(name);
-      else if (mounted.current && attempt < RETRIES)
-        retry.current = window.setTimeout(
-          () => {
-            setAttempt(attempt + 1);
-            setState("loading");
-          },
-          why === "ready" ? 0 : backoff(attempt, why),
-        );
-    });
-  }
-
+  const src = cardImageUrl(name, size);
+  // Remembered by name: the server's answer for a name holds in every size.
+  const image = useImageRetry(src, name);
   return (
-    <div className={styles.face} data-image={state}>
+    <div className={styles.face} data-image={image.state}>
       <TextFrame card={card} />
-      {state !== "failed" && (
+      {image.state !== "failed" && (
         <img
-          key={attempt}
-          src={cardImageUrl(name, size)}
+          key={image.attempt}
+          src={src}
           alt=""
           decoding="async"
           draggable={false}
-          ref={(image) => {
-            // An image already in the browser's cache may be complete before React listens.
-            if (
-              image?.complete &&
-              image.naturalWidth > 0 &&
-              state === "loading"
-            )
-              setState("loaded");
-          }}
-          onLoad={() => setState("loaded")}
-          onError={failed}
+          ref={image.ref}
+          onLoad={image.onLoad}
+          onError={image.onError}
         />
       )}
     </div>

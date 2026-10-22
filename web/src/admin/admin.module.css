@@ -233,3 +233,68 @@
   border: 1px solid #ffffff1f;
   border-radius: 6px;
 }
+
+/* v0.4.4: chat lines, in a reported message's excerpt and in SysOp's reader of chats. Each line's
+   class sits under the list's, so the account list's own rule for its items does not reach it. */
+.reportedFrom {
+  margin: 0;
+  color: #dec38b;
+  font-size: 0.78rem;
+}
+.chatLines {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 0;
+}
+.chatLines > .chatLine {
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-top-color: #ffffff0d;
+}
+.chatLines > .chatLine[data-reported] {
+  border: 1px solid #d5b77c88;
+  border-left-width: 4px;
+  border-radius: 4px;
+  background: #d5b77c14;
+}
+.chatMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  color: #8d9b95;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+.chatMeta strong {
+  color: #c9d0c6;
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+.chatReported {
+  padding: 1px 6px;
+  border: 1px solid #d5b77c88;
+  border-radius: 3px;
+  color: #dec38b;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+.chatBody {
+  margin: 3px 0 0;
+  color: #dfe3db;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chatBody[data-kind="emote"] {
+  color: #dec38b;
+}
+.chatBody[data-kind="event"] {
+  color: #a5b0a3;
+  font-style: italic;
+}

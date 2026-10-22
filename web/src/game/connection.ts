@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { currentCsrfToken, loadMe } from "../api";
 import type {
+  AllianceAction,
+  Alliances,
+  ChatLine,
   CommandEnvelope,
+  EmoteName,
   Inspection,
   LogLine,
   Presence,
@@ -44,6 +48,28 @@ export interface GameState {
   presence: (Presence & { received: number }) | null;
   /** Why the server refused this tab's vote, in words. */
   voteRefusal: string | null;
+  /** At a human table (v0.4.4): the chat lines this connection may see, oldest first. Null until
+   * the history arrives, and in a practice game, which has no chat. */
+  chat: ChatLine[] | null;
+  /** The messages and emotes this tab sent that have not come back from the server yet, or that
+   * it refused. */
+  outbox: OutgoingChat[];
+  /** At a human table: every alliance, and the offers this seat made or received. */
+  alliances: Alliances | null;
+  /** Why the server refused this tab's last alliance request, in words. */
+  allianceRefusal: string | null;
+}
+
+/** A message or emote this tab sent, until the server sends it back with the same client_id. */
+export interface OutgoingChat {
+  client_id: string;
+  kind: "text" | "emote";
+  channel: "table" | "allies";
+  /** The text, or the emote's name. */
+  body: string;
+  status: "pending" | "failed";
+  /** Why it failed, in words. */
+  error: string | null;
 }
 
 export type EndReason =
@@ -72,6 +98,10 @@ const initial: GameState = {
   priority: null,
   presence: null,
   voteRefusal: null,
+  chat: null,
+  outbox: [],
+  alliances: null,
+  allianceRefusal: null,
 };
 /** The server's refusals of a vote: their message says why. */
 const VOTE_REFUSALS = new Set([
@@ -81,7 +111,44 @@ const VOTE_REFUSALS = new Set([
   "not_removable",
   "removal_failed",
 ]);
+/** The refusals only an alliance request gets. not_a_player and not_in_game answer a vote too, so
+ * those go to whichever of the two this tab asked for last. */
+const ALLIANCE_REFUSALS = new Set([
+  "invalid_alliance",
+  "already_allied",
+  "no_offer",
+  "not_allied",
+]);
 const LOG_KEPT = 400;
+/** The chat lines a tab keeps: a reconnect's history holds the latest 200. */
+const CHAT_KEPT = 500;
+const UNSENT = "This message may not have reached the table. Try again.";
+
+function chatRefusal(message: {
+  code: string;
+  message?: string;
+  retry_after?: number;
+}): string {
+  if (message.code === "chat_limited") {
+    const seconds = Math.max(1, Math.ceil(message.retry_after ?? 1));
+    return `You are sending messages very fast. Wait ${seconds} ${
+      seconds === 1 ? "second" : "seconds"
+    }, then try again.`;
+  }
+  return message.message ?? "That message was not sent.";
+}
+
+/** Lines added to the chat by their IDs, in the order they were written. A line sent again (a
+ * reconnect's history repeats what the tab has) replaces itself. */
+function mergeChat(chat: ChatLine[], lines: ChatLine[]): ChatLine[] {
+  if (lines.length === 0) return chat;
+  const byId = new Map(chat.map((line) => [line.id, line]));
+  for (const line of lines) byId.set(line.id, line);
+  // A stable sort: lines written in the same millisecond keep the order they arrived in.
+  return [...byId.values()]
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+    .slice(-CHAT_KEPT);
+}
 
 /** crypto.randomUUID needs a secure context; plain-HTTP test hosts get the same from bytes. */
 export function newActionId(): string {
@@ -124,6 +191,12 @@ export class GameConnection {
   private yielded = false;
   // A session refresh since the last welcome: another one waits out the backoff.
   private refreshed = false;
+  // The sockets opened so far, and which one each waiting chat message went out on: a reconnect's
+  // history settles only the messages sent before it.
+  private sockets = 0;
+  private readonly sentOn = new Map<string, number>();
+  // A vote and an alliance request share two refusals; they answer the one asked for last.
+  private asked: "vote" | "alliance" | null = null;
 
   constructor(
     private readonly gameId: string,
@@ -196,8 +269,99 @@ export class GameConnection {
 
   /** At a human table: votes on removing an away player's seat (true), or to wait (false). */
   vote(seat: Seat, remove: boolean): void {
+    this.asked = "vote";
     this.update({ voteRefusal: null });
     this.send({ type: "vote", seat, remove });
+  }
+
+  /** At a human table (v0.4.4): a message to the whole table, or to this seat's allies alone. It
+   * waits in the outbox until the server sends it back. */
+  chat(channel: OutgoingChat["channel"], text: string): void {
+    this.post({ client_id: newActionId(), kind: "text", channel, body: text });
+  }
+
+  /** At a human table: an emote, to the whole table. */
+  emote(emote: EmoteName): void {
+    this.post({
+      client_id: newActionId(),
+      kind: "emote",
+      channel: "table",
+      body: emote,
+    });
+  }
+
+  /** Sends a failed message again under its own client_id, so that it lands once. */
+  retryChat(clientId: string): void {
+    const entry = this.state.outbox.find(
+      (each) => each.client_id === clientId && each.status === "failed",
+    );
+    if (entry) this.post(entry);
+  }
+
+  /** Forgets a failed message. */
+  discardChat(clientId: string): void {
+    this.sentOn.delete(clientId);
+    this.update({
+      outbox: this.state.outbox.filter((each) => each.client_id !== clientId),
+    });
+  }
+
+  /** At a human table: offers, accepts, declines, withdraws or ends an alliance with a seat. */
+  alliance(action: AllianceAction, seat: Seat): void {
+    this.asked = "alliance";
+    this.update({ allianceRefusal: null });
+    this.send({ type: "alliance", action, seat });
+  }
+
+  private post(
+    message: Pick<OutgoingChat, "client_id" | "kind" | "channel" | "body">,
+  ): void {
+    const open = this.socket?.readyState === WebSocket.OPEN;
+    const entry: OutgoingChat = {
+      ...message,
+      status: open ? "pending" : "failed",
+      error: open ? null : "Not connected. Try again once the table is back.",
+    };
+    const known = this.state.outbox.some(
+      (each) => each.client_id === entry.client_id,
+    );
+    this.update({
+      outbox: known
+        ? this.state.outbox.map((each) =>
+            each.client_id === entry.client_id ? entry : each,
+          )
+        : [...this.state.outbox, entry],
+    });
+    if (!open) return;
+    this.sentOn.set(entry.client_id, this.sockets);
+    this.send(
+      entry.kind === "emote"
+        ? { type: "emote", emote: entry.body, client_id: entry.client_id }
+        : {
+            type: "chat",
+            channel: entry.channel,
+            text: entry.body,
+            client_id: entry.client_id,
+          },
+    );
+  }
+
+  /** The outbox without the messages these lines bring back. After a reconnect's history, a
+   * message sent on an earlier socket that is not among them never reached the table. */
+  private settle(lines: ChatLine[], history: boolean): OutgoingChat[] {
+    const outbox = this.state.outbox;
+    if (outbox.length === 0) return outbox;
+    const arrived = new Set(lines.map((line) => line.client_id));
+    const left = outbox.filter((each) => !arrived.has(each.client_id));
+    for (const each of outbox)
+      if (arrived.has(each.client_id)) this.sentOn.delete(each.client_id);
+    if (!history) return left.length === outbox.length ? outbox : left;
+    return left.map((each) =>
+      each.status === "pending" &&
+      (this.sentOn.get(each.client_id) ?? 0) < this.sockets
+        ? { ...each, status: "failed", error: UNSENT }
+        : each,
+    );
   }
 
   /** "Play here": moves the lease to this tab. */
@@ -243,6 +407,7 @@ export class GameConnection {
       `${scheme}//${window.location.host}/api/v1/games/${this.gameId}/events`,
     );
     this.socket = socket;
+    this.sockets += 1;
     this.lastError = null;
     // A replaced socket says nothing more: its welcome or lease would overwrite this one's.
     socket.onopen = () => {
@@ -378,13 +543,54 @@ export class GameConnection {
           },
         });
         break;
-      case "error":
-        this.lastError = message.code;
-        if (VOTE_REFUSALS.has(message.code))
+      case "chat_history":
+        this.update({
+          chat: mergeChat(this.state.chat ?? [], message.messages),
+          outbox: this.settle(message.messages, true),
+        });
+        break;
+      case "chat":
+        this.update({
+          chat: mergeChat(this.state.chat ?? [], [message.message]),
+          outbox: this.settle([message.message], false),
+        });
+        break;
+      case "alliances":
+        this.update({
+          alliances: { alliances: message.alliances, offers: message.offers },
+        });
+        break;
+      case "error": {
+        // A refusal names the chat message or the seat it answers. It ends nothing: only the
+        // errors before a close say why the connection stops.
+        if (message.client_id !== undefined) {
+          const failed = message.client_id;
+          if (failed)
+            this.update({
+              outbox: this.state.outbox.map((each) =>
+                each.client_id === failed
+                  ? { ...each, status: "failed", error: chatRefusal(message) }
+                  : each,
+              ),
+            });
+          break;
+        }
+        const code = message.code;
+        if (message.seat === undefined) this.lastError = code;
+        if (
+          ALLIANCE_REFUSALS.has(code) ||
+          (this.asked === "alliance" &&
+            (code === "not_a_player" || code === "not_in_game"))
+        )
+          this.update({
+            allianceRefusal: message.message ?? "That was refused.",
+          });
+        else if (VOTE_REFUSALS.has(code))
           this.update({
             voteRefusal: message.message ?? "That vote was refused.",
           });
         break;
+      }
       case "pong":
         break;
     }
@@ -393,8 +599,18 @@ export class GameConnection {
   private async closed(code: number): Promise<void> {
     this.socket = null;
     if (this.stopped) return;
+    // A message still waiting will not come back now.
     const end = (reason: EndReason) =>
-      this.update({ phase: "ended", ended: reason, role: "observer" });
+      this.update({
+        phase: "ended",
+        ended: reason,
+        role: "observer",
+        outbox: this.state.outbox.map((each) =>
+          each.status === "pending"
+            ? { ...each, status: "failed", error: UNSENT }
+            : each,
+        ),
+      });
     if (code === 4401 && this.lastError === "session_refresh") {
       // The account's roles changed: any request rotates the cookie, then reconnect, at once the
       // first time since a welcome. A cookie rotated a moment ago stands for its successor for a

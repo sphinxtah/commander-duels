@@ -684,3 +684,136 @@ describe("Report a problem at the table (v0.4.1)", () => {
     });
   });
 });
+
+describe("a human table's chat and alliances (v0.4.4)", () => {
+  it("is only at a human table's game", () => {
+    render(<GameScreen gameId="g1" me={null} />);
+    const socket = FakeSocket.made[0];
+    act(() => {
+      socket.accept();
+      socket.deliver(welcome(0, false));
+      socket.deliver({ type: "snapshot", snapshot: snapshot(5, null) });
+    });
+    expect(screen.queryByRole("button", { name: /Table chat/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Alliance/ })).toBeNull();
+  });
+
+  it("counts what arrives while folded, sends from its box, and offers alliances on the plates", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const human = (seat: number, handle: string) => ({
+      seat,
+      player: "human",
+      handle,
+      portrait: null,
+      deck: null,
+      left: null,
+    });
+    get.mockImplementation((async () => ({
+      data: {
+        game: {
+          id: "g1",
+          kind: "table",
+          format: "legacy",
+          status: "active",
+          seats: [human(0, "alice"), human(1, "bob")],
+          your_seat: 0,
+          bot_skill: 4,
+          turn_cap: 60,
+          created_at: "2026-10-22T10:00:00Z",
+          finished_at: null,
+          result: null,
+          tokens: null,
+        },
+        snapshot: null,
+      },
+    })) as never);
+    const line = (id: string, body: string) => ({
+      id,
+      channel: "table",
+      kind: "text",
+      seat: 1,
+      sender: { id: "u-bob", handle: "bob" },
+      body,
+      seats: [],
+      client_id: null,
+      created_at: "2026-10-22T10:00:00+00:00",
+    });
+    try {
+      render(<GameScreen gameId="g1" me={null} />);
+      const socket = FakeSocket.made[0];
+      act(() => {
+        socket.accept();
+        socket.deliver(welcome(0, false));
+        socket.deliver({
+          type: "lease",
+          role: "controller",
+          controlled: true,
+          reason: "granted",
+        });
+        socket.deliver({ type: "snapshot", snapshot: snapshot(5, null) });
+        socket.deliver({
+          type: "chat_history",
+          messages: [line("1", "Good luck")],
+        });
+        socket.deliver({ type: "alliances", alliances: [], offers: [] });
+      });
+      const toggle = await screen.findByRole("button", { name: "Table chat" });
+      act(() =>
+        socket.deliver({ type: "chat", message: line("2", "Your move") }),
+      );
+      expect(toggle).toHaveAccessibleName("Table chat, 1 unread");
+      expect(document.querySelector("[data-announcer]")).toHaveTextContent(
+        "bob: Your move",
+      );
+
+      fireEvent.click(toggle);
+      expect(document.querySelector('[data-drawer="chat"]')).toHaveAttribute(
+        "data-open",
+      );
+      expect(toggle).toHaveAccessibleName("Table chat");
+      const box = screen.getByRole("textbox", { name: "Message to the table" });
+      expect(box).toHaveFocus();
+      fireEvent.change(box, { target: { value: "Thinking" } });
+      fireEvent.keyDown(box, { key: "Enter" });
+      expect(socket.sent.at(-1)).toEqual({
+        type: "chat",
+        channel: "table",
+        text: "Thinking",
+        client_id: expect.any(String),
+      });
+      expect(
+        screen.getByRole("list", { name: "Messages to the table" }),
+      ).toHaveTextContent("You: ThinkingSending…");
+      // P typed in the box is a letter, not a pass.
+      fireEvent.keyDown(box, { key: "p" });
+      expect(socket.commands()).toEqual([]);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Alliance with bob" }),
+      );
+      fireEvent.click(
+        screen.getByRole("menuitem", { name: "Offer an alliance" }),
+      );
+      expect(socket.sent.at(-1)).toEqual({
+        type: "alliance",
+        action: "offer",
+        seat: 1,
+      });
+      act(() =>
+        socket.deliver({
+          type: "alliances",
+          alliances: [],
+          offers: [{ from: 0, to: 1 }],
+        }),
+      );
+      expect(screen.getByText("Offer sent")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Withdraw the offer to bob" }),
+      ).toBeInTheDocument();
+    } finally {
+      get.mockImplementation(original);
+    }
+  });
+});

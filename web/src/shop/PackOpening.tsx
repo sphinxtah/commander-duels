@@ -9,6 +9,7 @@ import { useMotionLevel } from "../app/motion";
 import { readTableSettings } from "../app/tableSettings";
 import { CardDetails } from "../catalog/CardViews";
 import { printingImage } from "../catalog/catalog";
+import { useImageRetry } from "../game/RetryingImage";
 import { getSoundEngine } from "../game/sound/engine";
 import type { Cue } from "../game/sound/recipes";
 import shell from "../App.module.css";
@@ -51,27 +52,33 @@ function flipSounds(card: PulledCard, delayMs = 0) {
 }
 
 export function CardFace({ card }: { card: PulledCard }) {
-  const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const src = printingImage(
+    card.printing_id,
+    "normal",
+    card.faces > 0 ? 0 : undefined,
+  );
+  // A pack's new cards all load at once: one the server cannot send yet is tried again (v0.4.4).
+  const image = useImageRetry(src);
   return (
-    <span className={styles.face} data-loaded={loaded || undefined}>
+    <span
+      className={styles.face}
+      data-loaded={image.state === "loaded" || undefined}
+    >
       <span className={styles.frame} aria-hidden="true">
         <strong>{card.name}</strong>
         {card.mana_cost && <small>{card.mana_cost}</small>}
         <span>{card.type_line}</span>
         <small>{rarityLabels[card.rarity] ?? card.rarity}</small>
       </span>
-      {!failed && (
+      {image.state !== "failed" && (
         <img
-          src={printingImage(
-            card.printing_id,
-            "normal",
-            card.faces > 0 ? 0 : undefined,
-          )}
+          key={image.attempt}
+          src={src}
           alt=""
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          ref={image.ref}
+          onLoad={image.onLoad}
+          onError={image.onError}
         />
       )}
       {card.finish !== "nonfoil" && (

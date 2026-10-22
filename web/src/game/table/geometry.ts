@@ -407,6 +407,10 @@ export const REGIONS: Regions = {
 /** Option menus: 320 su wide, 44 su per item, below the hit when there is room. */
 export const MENU = { width: 320, item: 44, margin: 8 } as const;
 
+/** The Alliance button on another player's plate at a human table (v0.4.4): left of their
+ * portrait, under their pills and status row, clear of their back row in every arrangement. */
+export const ALLIANCE_BUTTON = { w: 150, h: 32, gap: 8, drop: 6 } as const;
+
 /* ---------- drops (§8.9) ---------- */
 export const DROPS = {
   yours: rect(480, 588, 1560, 932),

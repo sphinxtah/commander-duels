@@ -898,7 +898,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.4.3",
+            "default": "0.4.4",
             "title": "Version",
             "type": "string"
           }
@@ -1871,6 +1871,166 @@
         "title": "CatalogStatus",
         "type": "object"
       },
+      "ChatLine": {
+        "additionalProperties": false,
+        "description": "One message of a reported chat, as the reporter saw it.",
+        "properties": {
+          "body": {
+            "description": "The text; an emote's or an event's name.",
+            "title": "Body",
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "direct",
+              "table",
+              "allies"
+            ],
+            "title": "Channel",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "emote",
+              "event"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reported": {
+            "default": false,
+            "title": "Reported",
+            "type": "boolean"
+          },
+          "seats": {
+            "description": "At a table: the sender's seat first, then the seats an allies-only message went to, or an event's two allies.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Seats",
+            "type": "array"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatPerson"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for an alliance's event."
+          }
+        },
+        "required": [
+          "id",
+          "sender",
+          "channel",
+          "kind",
+          "body",
+          "created_at"
+        ],
+        "title": "ChatLine",
+        "type": "object"
+      },
+      "ChatMessage": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "client_id": {
+            "description": "The sender's own ID for it, so a resend lands once.",
+            "format": "uuid",
+            "title": "Client Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sender_id": {
+            "format": "uuid",
+            "title": "Sender Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sender_id",
+          "body",
+          "created_at",
+          "client_id"
+        ],
+        "title": "ChatMessage",
+        "type": "object"
+      },
+      "ChatPerson": {
+        "additionalProperties": false,
+        "properties": {
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          }
+        },
+        "required": [
+          "id",
+          "handle"
+        ],
+        "title": "ChatPerson",
+        "type": "object"
+      },
+      "ChatUnread": {
+        "additionalProperties": false,
+        "properties": {
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "unread"
+        ],
+        "title": "ChatUnread",
+        "type": "object"
+      },
       "CheckIn": {
         "additionalProperties": false,
         "properties": {
@@ -1908,6 +2068,12 @@
             "title": "Fresh",
             "type": "array"
           },
+          "messages_unread": {
+            "default": 0,
+            "description": "Unread messages from friends (v0.4.4), in every conversation.",
+            "title": "Messages Unread",
+            "type": "integer"
+          },
           "newest": {
             "anyOf": [
               {
@@ -1932,6 +2098,64 @@
           "fresh"
         ],
         "title": "CheckedIn",
+        "type": "object"
+      },
+      "ConversationItem": {
+        "additionalProperties": false,
+        "properties": {
+          "friends": {
+            "description": "Whether you may still write: you are friends.",
+            "title": "Friends",
+            "type": "boolean"
+          },
+          "last_message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatMessage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "player": {
+            "$ref": "#/components/schemas/PlayerSummary"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "player",
+          "friends",
+          "last_message",
+          "unread"
+        ],
+        "title": "ConversationItem",
+        "type": "object"
+      },
+      "ConversationList": {
+        "additionalProperties": false,
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationItem"
+            },
+            "title": "Conversations",
+            "type": "array"
+          },
+          "unread": {
+            "description": "Unread messages in all of them.",
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "conversations",
+          "unread"
+        ],
+        "title": "ConversationList",
         "type": "object"
       },
       "Coverage": {
@@ -3879,7 +4103,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.4.3",
+            "default": "0.4.4",
             "title": "Version",
             "type": "string"
           }
@@ -4311,7 +4535,8 @@
                 "economy.manage",
                 "shop.manage",
                 "reports.manage",
-                "players.presence"
+                "players.presence",
+                "chat.read_all"
               ],
               "type": "string"
             },
@@ -4367,6 +4592,94 @@
         "title": "Me",
         "type": "object"
       },
+      "MessageCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "client_id": {
+            "format": "uuid",
+            "title": "Client Id",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "client_id"
+        ],
+        "title": "MessageCreate",
+        "type": "object"
+      },
+      "MessagePage": {
+        "additionalProperties": false,
+        "properties": {
+          "friends": {
+            "title": "Friends",
+            "type": "boolean"
+          },
+          "messages": {
+            "description": "Oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The cursor of the older page, if any.",
+            "title": "Next"
+          },
+          "player": {
+            "$ref": "#/components/schemas/PlayerSummary"
+          },
+          "unread": {
+            "description": "Unread messages from this player.",
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "player",
+          "friends",
+          "messages",
+          "next",
+          "unread"
+        ],
+        "title": "MessagePage",
+        "type": "object"
+      },
+      "MessagesRead": {
+        "additionalProperties": false,
+        "properties": {
+          "up_to": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Marks their messages up to this time read; all if null.",
+            "title": "Up To"
+          }
+        },
+        "title": "MessagesRead",
+        "type": "object"
+      },
       "NotificationItem": {
         "additionalProperties": false,
         "properties": {
@@ -4394,10 +4707,17 @@
             "enum": [
               "friend_request",
               "friend_accepted",
-              "friend_online"
+              "friend_online",
+              "message"
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "messages": {
+            "default": 0,
+            "description": "For new messages (v0.4.4): how many from this friend are still unread.",
+            "title": "Messages",
+            "type": "integer"
           },
           "read": {
             "title": "Read",
@@ -6101,6 +6421,109 @@
         "title": "PurchaseRequest",
         "type": "object"
       },
+      "ReaderChat": {
+        "additionalProperties": false,
+        "description": "A chat SysOp's reader lists: a conversation or a table's game.",
+        "properties": {
+          "id": {
+            "description": "The conversation's ID, or the game's.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_message_at": {
+            "format": "date-time",
+            "title": "Last Message At",
+            "type": "string"
+          },
+          "messages": {
+            "title": "Messages",
+            "type": "integer"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerRef"
+            },
+            "title": "Players",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "players",
+          "messages",
+          "last_message_at"
+        ],
+        "title": "ReaderChat",
+        "type": "object"
+      },
+      "ReaderList": {
+        "additionalProperties": false,
+        "properties": {
+          "chats": {
+            "items": {
+              "$ref": "#/components/schemas/ReaderChat"
+            },
+            "title": "Chats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "chats"
+        ],
+        "title": "ReaderList",
+        "type": "object"
+      },
+      "ReaderTranscript": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Oldest first; the newest READER_LIMIT at most.",
+            "items": {
+              "$ref": "#/components/schemas/ChatLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerRef"
+            },
+            "title": "Players",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "players",
+          "lines"
+        ],
+        "title": "ReaderTranscript",
+        "type": "object"
+      },
       "Readiness": {
         "additionalProperties": false,
         "properties": {
@@ -6314,6 +6737,17 @@
             "title": "Description",
             "type": "string"
           },
+          "message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedMessageRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The chat message the report is about (v0.4.4)."
+          },
           "screenshot": {
             "anyOf": [
               {
@@ -6354,6 +6788,17 @@
           "app_version": {
             "title": "App Version",
             "type": "string"
+          },
+          "chat": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedChat"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reported message and the messages before it the reporter saw."
           },
           "created_at": {
             "format": "date-time",
@@ -6399,6 +6844,17 @@
           "pixel_ratio": {
             "title": "Pixel Ratio",
             "type": "number"
+          },
+          "reported_user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatPerson"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who sent the reported chat message, if the report is of one."
           },
           "reporter": {
             "$ref": "#/components/schemas/Reporter"
@@ -6639,6 +7095,17 @@
             "title": "Page",
             "type": "string"
           },
+          "reported_user": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChatPerson"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who sent the reported chat message, if the report is of one."
+          },
           "reporter": {
             "$ref": "#/components/schemas/Reporter"
           },
@@ -6675,6 +7142,74 @@
           "screenshot"
         ],
         "title": "ReportSummary",
+        "type": "object"
+      },
+      "ReportedChat": {
+        "additionalProperties": false,
+        "description": "A copy of a reported message and the messages before it that the reporter saw.",
+        "properties": {
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ChatLine"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "reported_user": {
+            "$ref": "#/components/schemas/ChatPerson"
+          }
+        },
+        "required": [
+          "kind",
+          "reported_user",
+          "lines"
+        ],
+        "title": "ReportedChat",
+        "type": "object"
+      },
+      "ReportedMessageRef": {
+        "additionalProperties": false,
+        "description": "The message a report is about: a friend's (direct) or a table chat's.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "direct",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "ReportedMessageRef",
         "type": "object"
       },
       "Reporter": {
@@ -8617,7 +9152,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.4.3"
+    "version": "0.4.4"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -9203,6 +9738,348 @@
           }
         },
         "summary": "Request Sync"
+      }
+    },
+    "/api/v1/admin/chats": {
+      "get": {
+        "description": "The latest conversations and table chats, or one player's; listing reads no message.",
+        "operationId": "reader_chats_api_v1_admin_chats_get",
+        "parameters": [
+          {
+            "description": "Only this player's chats.",
+            "in": "query",
+            "name": "player_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this player's chats.",
+              "title": "Player Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReaderList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reader Chats"
+      }
+    },
+    "/api/v1/admin/chats/conversations/{conversation_id}": {
+      "get": {
+        "description": "A conversation's messages, for SysOp; audited as chat.conversation_read.",
+        "operationId": "reader_conversation_api_v1_admin_chats_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReaderTranscript"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reader Conversation"
+      }
+    },
+    "/api/v1/admin/chats/games/{game_id}": {
+      "get": {
+        "description": "A table's chat, allies-only messages included, for SysOp; audited as chat.table_read.",
+        "operationId": "reader_table_api_v1_admin_chats_games__game_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReaderTranscript"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reader Table"
       }
     },
     "/api/v1/admin/counts": {
@@ -14107,6 +14984,487 @@
           }
         },
         "summary": "Coverage"
+      }
+    },
+    "/api/v1/conversations": {
+      "get": {
+        "description": "The account's conversations, the latest first, with what is unread in each.",
+        "operationId": "conversations_api_v1_conversations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Conversations"
+      }
+    },
+    "/api/v1/conversations/{player_id}": {
+      "get": {
+        "description": "The messages between the account and a player, the newest page first; each page oldest\nfirst. A player never written to has an empty one.",
+        "operationId": "conversation_api_v1_conversations__player_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Conversation"
+      }
+    },
+    "/api/v1/conversations/{player_id}/messages": {
+      "post": {
+        "description": "Writes to a friend. A resend with the same client_id answers the message already sent.",
+        "operationId": "send_message_api_v1_conversations__player_id__messages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Send Message"
+      }
+    },
+    "/api/v1/conversations/{player_id}/read": {
+      "post": {
+        "description": "Marks a player's messages read, up to a time or all of them, with their notification.",
+        "operationId": "read_conversation_api_v1_conversations__player_id__read_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessagesRead"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatUnread"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Read Conversation"
       }
     },
     "/api/v1/custom-cards": {

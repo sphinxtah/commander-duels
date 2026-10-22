@@ -39,6 +39,10 @@ export interface FakeTable {
   }[];
   /** Sends the tab a new snapshot (a fixture's, changed by the test). */
   send(snapshot: TableFixture["snapshot"]): void;
+  /** At a human table (v0.4.4): every chat, emote and alliance message the tab sent, in order. */
+  chat: Record<string, unknown>[];
+  /** At a human table: a line of the table's chat from another seat's player. */
+  say(seat: number, body: string): void;
   /** Problems the page reported: errors, console errors and CSP violations. */
   problems(): Promise<string[]>;
 }
@@ -56,13 +60,16 @@ export const ALICE_PORTRAIT = "rowan";
 
 /** Opens the game screen on a fixture, signed in as an active SysOp. `portraits` sets the
  * summary's portrait of each seat it names (a human's allied Planeswalker, or null for none);
- * Alice has Rowan's unless it says otherwise. */
+ * Alice has Rowan's unless it says otherwise. `humans` makes the game a human table's (v0.4.4),
+ * with the seats it names played by people with those handles: the socket then has the table's
+ * chat, sending back each message as the server does and keeping the alliances. */
 export async function openTable(
   page: Page,
   options: {
     fixture: FixtureName | TableFixture;
     settings?: Partial<TableSettings>;
     portraits?: Record<number, string | null>;
+    humans?: Record<number, string>;
   },
 ): Promise<FakeTable> {
   const fixture =
@@ -75,11 +82,18 @@ export async function openTable(
     0: ALICE_PORTRAIT,
     ...options.portraits,
   };
-  const seats = fixture.summarySeats.map((seat) =>
-    seat.player === "human" && seat.seat in portraits
-      ? { ...seat, portrait: portraits[seat.seat] }
-      : seat,
-  );
+  const humans = options.humans;
+  const seats = fixture.summarySeats
+    .map((seat) =>
+      humans && seat.seat in humans
+        ? { ...seat, player: "human" as const, handle: humans[seat.seat] }
+        : seat,
+    )
+    .map((seat) =>
+      seat.player === "human" && seat.seat in portraits
+        ? { ...seat, portrait: portraits[seat.seat] }
+        : seat,
+    );
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(`page error: ${error.message}`));
   page.on("console", (message) => {
@@ -179,6 +193,7 @@ export async function openTable(
       json: {
         game: {
           id,
+          ...(humans ? { kind: "table" } : {}),
           format: fixture.snapshot.settings.format,
           status: fixture.snapshot.result ? "finished" : "active",
           bot_skill: 3,
@@ -193,6 +208,22 @@ export async function openTable(
       },
     }),
   );
+  // The app's check-in (v0.4.3) and the friends' chat socket (v0.4.4) run on every screen, the
+  // table's too: both are answered as for an account with nothing new.
+  await page.route("**/api/v1/presence", (route) =>
+    route.fulfill({
+      json: { unread: 0, messages_unread: 0, newest: null, fresh: [] },
+    }),
+  );
+  await page.routeWebSocket(/\/api\/v1\/chat\/events$/, (ws) => {
+    ws.onMessage((raw) => {
+      const parsed = JSON.parse(String(raw)) as { type?: string };
+      if (parsed.type === "hello")
+        ws.send(JSON.stringify({ type: "welcome", unread: 0 }));
+      else if (parsed.type === "ping")
+        ws.send(JSON.stringify({ type: "pong" }));
+    });
+  });
   await page.route("**/api/v1/card-images**", (route) => {
     const name = new URL(route.request().url()).searchParams.get("name") ?? "";
     // Tokens have no picture of their own, as on the live site.
@@ -211,6 +242,73 @@ export async function openTable(
   let socket: WebSocketRoute | null = null;
   let latest = fixture.snapshot;
   const message = (value: object) => socket?.send(JSON.stringify(value));
+
+  // A human table's chat, as api/table_chat.py keeps it for the tab's own seat.
+  const chat: FakeTable["chat"] = [];
+  let lines = 0;
+  const alliances: [number, number][] = [];
+  let offers: { from: number; to: number }[] = [];
+  const line = (fields: object) => {
+    lines += 1;
+    return {
+      id: `00000000-0000-4000-9000-${String(lines).padStart(12, "0")}`,
+      channel: "table",
+      kind: "text",
+      seat: fixture.seat,
+      sender: {
+        id: "00000000-0000-4000-8000-00000000a11c",
+        handle: fixture.selfHandle ?? "alice",
+      },
+      body: "",
+      seats: [],
+      client_id: null,
+      created_at: new Date().toISOString(),
+      ...fields,
+    };
+  };
+  const sendAlliances = () =>
+    message({ type: "alliances", alliances, offers: [...offers] });
+  const talk = (parsed: Record<string, unknown>) => {
+    chat.push(parsed);
+    const me = fixture.seat!;
+    if (parsed.type === "chat" || parsed.type === "emote") {
+      const allies = alliances.flatMap(([a, b]) =>
+        a === me ? [b] : b === me ? [a] : [],
+      );
+      message({
+        type: "chat",
+        message: line({
+          channel: parsed.type === "chat" ? parsed.channel : "table",
+          kind: parsed.type === "chat" ? "text" : "emote",
+          body: parsed.type === "chat" ? parsed.text : parsed.emote,
+          seats: parsed.channel === "allies" ? allies : [],
+          client_id: parsed.client_id,
+        }),
+      });
+      return;
+    }
+    const other = Number(parsed.seat);
+    const theirs = offers.some((o) => o.from === other && o.to === me);
+    if (parsed.action === "offer" && !theirs)
+      offers.push({ from: me, to: other });
+    else if (parsed.action === "offer" || parsed.action === "accept") {
+      offers = offers.filter((o) => !(o.from === other && o.to === me));
+      alliances.push([Math.min(me, other), Math.max(me, other)]);
+    } else if (parsed.action === "decline" || parsed.action === "withdraw")
+      offers = offers.filter(
+        (o) =>
+          !(o.from === other && o.to === me) &&
+          !(o.from === me && o.to === other),
+      );
+    else {
+      const at = alliances.findIndex(
+        ([a, b]) => (a === me && b === other) || (a === other && b === me),
+      );
+      if (at >= 0) alliances.splice(at, 1);
+    }
+    sendAlliances();
+  };
+
   await page.routeWebSocket(/\/api\/v1\/games\/[^/]+\/events$/, (ws) => {
     socket = ws;
     ws.onMessage((raw) => {
@@ -229,7 +327,18 @@ export async function openTable(
         });
         if (fixture.role !== "controller")
           message({ type: "snapshot", snapshot: latest });
-      } else if (parsed.type === "take_control") {
+        if (humans) {
+          message({ type: "chat_history", messages: [] });
+          sendAlliances();
+        }
+      } else if (
+        humans &&
+        (parsed.type === "chat" ||
+          parsed.type === "emote" ||
+          parsed.type === "alliance")
+      )
+        talk(parsed as unknown as Record<string, unknown>);
+      else if (parsed.type === "take_control") {
         message({
           type: "lease",
           role: "controller",
@@ -259,6 +368,20 @@ export async function openTable(
     send(snapshot) {
       latest = snapshot;
       message({ type: "snapshot", snapshot });
+    },
+    chat,
+    say(seat, body) {
+      message({
+        type: "chat",
+        message: line({
+          seat,
+          sender: {
+            id: `00000000-0000-4000-8000-${String(seat).padStart(12, "0")}`,
+            handle: humans?.[seat] ?? null,
+          },
+          body,
+        }),
+      });
     },
     async problems() {
       const csp = await page

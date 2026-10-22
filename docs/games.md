@@ -116,6 +116,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `{"type": "release_control"}` | Gives the lease up |
 | `{"type": "resync", "since": n}` | Sends the current snapshot if it is newer than `n`. New connections, resyncs and `GET /api/v1/games/{id}` share one engine view per revision, so they cost the engine nothing more |
 | `{"type": "vote", "seat": n, "remove": true}` | Since v0.4.0, at a table: a player's vote on removing the away player in seat `n` (`false` votes to keep waiting). Any tab of a player still in the game may vote; the session is checked as for a command. Refusals come as `error` with the `seat` and a `message`: `not_a_player`, `invalid_vote`, `not_in_game`, `not_removable` (not away for 2 minutes), `removal_failed` |
+| `{"type": "chat"}`, `{"type": "emote"}`, `{"type": "alliance"}` | Since v0.4.4, at a table: the table's chat and its alliances ([chat](chat.md#on-the-games-websocket)). The session is checked as for a command |
 | `{"type": "ping"}` | Answered with `pong` |
 
 **Messages from the server.**
@@ -127,6 +128,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 | `lease` | `role` (`controller` or `observer`), `controlled` (whether any tab holds the lease) and `reason`: `granted`, `taken_over`, `released` or `disconnected` |
 | `inspection` | SysOp's inspection view, after each new revision, only to connections that asked to inspect |
 | `presence` | Since v0.4.0, at a table only: `away_after` (120 seconds) and, for each player's seat, `connected`, `away_seconds` (since no tab of theirs has been connected), `left`, `removable`, the seats that voted `yes` and `no`, and the yes votes `needed`. Sent to every connection when it changes, when a seat has been away long enough to be voted on, and after the welcome |
+| `chat_history`, `chat`, `alliances` | Since v0.4.4, at a table only: the table's chat and its alliances, each line only to the connections that may see it ([chat](chat.md#on-the-games-websocket)) |
 | `interrupted` | The engine lost the game |
 | `welcome`, `pong`, `error` | As above |
 

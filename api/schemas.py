@@ -133,6 +133,7 @@ Permission = Literal[
     "shop.manage",
     "reports.manage",
     "players.presence",
+    "chat.read_all",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]
@@ -390,3 +391,47 @@ class GameState(Contract):
 
 class CardNames(Contract):
     names: list[str]
+
+
+# Chat (v0.4.4, api/chat.py and api/table_chat.py): what a problem report keeps of a message it
+# reports. Here, beside the other shared contracts, since both the chat and the reports need them.
+
+ChatKind = Literal["direct", "table"]
+
+
+class ReportedMessageRef(Contract):
+    """The message a report is about: a friend's (direct) or a table chat's."""
+
+    kind: ChatKind
+    id: UUID
+
+
+class ChatPerson(Contract):
+    id: UUID | None
+    handle: str | None
+
+
+class ChatLine(Contract):
+    """One message of a reported chat, as the reporter saw it."""
+
+    id: UUID
+    sender: ChatPerson | None = Field(description="Null for an alliance's event.")
+    channel: Literal["direct", "table", "allies"]
+    kind: Literal["text", "emote", "event"]
+    body: str = Field(description="The text; an emote's or an event's name.")
+    seats: list[int] = Field(
+        default_factory=list,
+        description="At a table: the sender's seat first, then the seats an allies-only message "
+        "went to, or an event's two allies.",
+    )
+    created_at: datetime
+    reported: bool = False
+
+
+class ReportedChat(Contract):
+    """A copy of a reported message and the messages before it that the reporter saw."""
+
+    kind: ChatKind
+    game_id: UUID | None = None
+    reported_user: ChatPerson
+    lines: list[ChatLine]

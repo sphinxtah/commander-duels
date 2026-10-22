@@ -27,7 +27,8 @@ class Frames {
     private readonly concealed: Set<string>,
   ) {
     page.on("websocket", (socket) => {
-      if (!socket.url().includes("/events")) return;
+      // The game's socket; the chat's (v0.4.4) carries no game.
+      if (!/\/games\/[^/]+\/events$/.test(socket.url())) return;
       socket.on("framereceived", ({ payload }) =>
         this.receive(String(payload)),
       );
@@ -267,6 +268,47 @@ test.describe("a human table in two browsers", () => {
         type: "jpeg",
         quality: 80,
       });
+
+      // The table's chat (v0.4.4): SysOp greets the table; the two make an alliance from the
+      // plates; the player writes to their ally alone. Every frame stays under the leak check.
+      const greeting = `Good luck! ${stamp}`;
+      await host.getByRole("button", { name: /^Table chat/ }).click();
+      const hostBox = host.getByRole("textbox", {
+        name: "Message to the table",
+      });
+      await hostBox.fill(greeting);
+      await hostBox.press("Enter");
+      await expect(
+        host.getByRole("list", { name: "Messages to the table" }),
+      ).toContainText(greeting);
+      await host.keyboard.press("Escape");
+      await expect(
+        guest.getByRole("button", { name: /^Table chat, 1 unread/ }),
+      ).toBeVisible({ timeout: 15_000 });
+      await host.getByRole("button", { name: "Alliance with rival" }).click();
+      await host.getByRole("menuitem", { name: "Offer an alliance" }).click();
+      await guest.getByRole("button", { name: "Alliance with sysop" }).click();
+      await guest.getByRole("menuitem", { name: "Accept the alliance" }).click();
+      await guest.getByRole("button", { name: /^Table chat/ }).click();
+      const guestTable = guest.getByRole("list", {
+        name: "Messages to the table",
+      });
+      await expect(guestTable).toContainText(greeting);
+      await expect(guestTable).toContainText(/now allies/);
+      const secret = `Just between us ${stamp}`;
+      await guest.getByRole("tab", { name: /Allies/ }).click();
+      const allyBox = guest.getByRole("textbox", {
+        name: "Message to your allies",
+      });
+      await allyBox.fill(secret);
+      await allyBox.press("Enter");
+      await host.getByRole("button", { name: /^Table chat/ }).click();
+      await host.getByRole("tab", { name: /Allies/ }).click();
+      await expect(
+        host.getByRole("list", { name: "Messages to allies" }),
+      ).toContainText(secret, { timeout: 15_000 });
+      await host.keyboard.press("Escape");
+      await guest.keyboard.press("Escape");
 
       // The player concedes; both see the result at once (the engine does not wait for the
       // winner's next answer), and the winner what the win paid.

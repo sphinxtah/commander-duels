@@ -9,10 +9,15 @@ import {
 import styles from "../Account.module.css";
 import shell from "../App.module.css";
 import admin from "./admin.module.css";
+import { ChatLines } from "./ChatLines";
 
 // Administration's Reports tab (v0.4.1): the players' problem reports, newest first, for SysOp
 // and administrators (reports.manage). Opening a new report marks it seen; a status says what
-// became of it. The screenshot is the API's own image, sent with the session's cookie.
+// became of it. The screenshot is the API's own image, sent with the session's cookie. Since
+// v0.4.4 a report may be of a chat message: it carries a copy of the message and of the ones
+// before it that the reporter saw.
+
+type ReportedChat = NonNullable<ReportDetail["chat"]>;
 
 type Filter = "open" | ReportStatus | "all";
 const filters: Record<Filter, ReportStatus[] | undefined> = {
@@ -79,6 +84,43 @@ function reporterName(report: ReportSummary) {
   return handle ? `${handle} (${display_name})` : display_name;
 }
 
+/** The reported message, marked, after the ones the reporter saw before it, and who sent it. */
+function ReportedMessage({ chat }: { chat: ReportedChat }) {
+  const sender = chat.reported_user;
+  return (
+    <>
+      <h3 className={admin.reportHeading}>Reported message</h3>
+      <dl className={admin.reportFacts}>
+        <div>
+          <dt>Sent by</dt>
+          <dd>
+            {sender.handle ?? "Unknown account"}
+            {sender.id && <small>{sender.id}</small>}
+          </dd>
+        </div>
+        <div>
+          <dt>Where</dt>
+          <dd>
+            {chat.kind === "direct" ? "A friend's message" : "A table's chat"}
+          </dd>
+        </div>
+        {chat.game_id && (
+          <div>
+            <dt>Game</dt>
+            <dd>
+              <code>{chat.game_id}</code>
+            </dd>
+          </div>
+        )}
+      </dl>
+      <ChatLines
+        lines={chat.lines}
+        label="The reported message and the messages before it"
+      />
+    </>
+  );
+}
+
 function Detail({
   detail,
   onStatus,
@@ -140,6 +182,7 @@ function Detail({
           </div>
         )}
       </dl>
+      {detail.chat && <ReportedMessage chat={detail.chat} />}
       <h3 className={admin.reportHeading}>Latest requests</h3>
       {detail.requests.length === 0 ? (
         <p className={styles.fine}>None recorded.</p>
@@ -328,6 +371,12 @@ export function Reports({ onCounts }: { onCounts?: () => void }) {
                   <div>
                     <strong>{report.summary}</strong>
                     <span>{reporterName(report)}</span>
+                    {report.reported_user && (
+                      <p className={admin.reportedFrom}>
+                        Message from{" "}
+                        {report.reported_user.handle ?? "an unknown account"}
+                      </p>
+                    )}
                     <small>{facts(report)}</small>
                   </div>
                   <span className={shell.tag} data-report={report.status}>

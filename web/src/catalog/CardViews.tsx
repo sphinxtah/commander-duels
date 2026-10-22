@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { client } from "../api";
 import { ManaCost } from "../game/Card";
+import { useImageRetry } from "../game/RetryingImage";
 import {
   colorWords,
   formatLabels,
@@ -28,32 +29,32 @@ export function CardImage({
 }) {
   const chosen = printingId ?? card.image?.printing_id;
   const faces = card.image?.faces ?? 0;
-  const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    setFailed(false);
-    setLoaded(false);
-  }, [chosen, face, size]);
   // A Godlike card (v0.4.0) has its own image, from the custom card route.
-  const src = failed
-    ? null
-    : (card.custom_image ??
-      (chosen
-        ? printingImage(chosen, size, faces > 0 ? (face ?? 0) : undefined)
-        : null));
+  const src =
+    card.custom_image ??
+    (chosen
+      ? printingImage(chosen, size, faces > 0 ? (face ?? 0) : undefined)
+      : null);
+  // A failure is tried again (v0.4.4): a page of new cards may find the server busy at first.
+  const image = useImageRetry(src);
   // Once the image has drawn, the frame beneath it is hidden, so a printing of another shape
   // shows the card's background around it rather than fragments of the text.
   return (
-    <div className={styles.cardImage} data-loaded={loaded || undefined}>
+    <div
+      className={styles.cardImage}
+      data-loaded={image.state === "loaded" || undefined}
+    >
       <TextFrame card={card} face={face} />
-      {src && (
+      {src && image.state !== "failed" && (
         <img
+          key={image.attempt}
           src={src}
           alt=""
           loading="lazy"
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          ref={image.ref}
+          onLoad={image.onLoad}
+          onError={image.onError}
         />
       )}
     </div>

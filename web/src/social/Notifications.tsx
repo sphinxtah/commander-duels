@@ -1,5 +1,11 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { client, describe } from "../api";
+import {
+  messagesLink,
+  TOAST_MS as MESSAGE_TOAST_MS,
+  useChatContext,
+} from "../chat/chat";
+import chatStyles from "../chat/chat.module.css";
 import { PlayerPicture } from "./PlayerBits";
 import type { Social } from "./presence";
 import {
@@ -14,7 +20,9 @@ import styles from "./social.module.css";
 // its count of unread notifications, and a bubble with the latest ones and a link to them all
 // (#notifications, the full history). Opening the bubble or the history marks what it shows
 // read. A friend request answers from either. New notifications pop up beside the bell for a
-// moment, from the app's check-in (presence.ts).
+// moment, from the app's check-in (presence.ts). Since v0.4.4 new messages from a friend are one
+// notification while unread, which opens the conversation; a message itself pops up beside the
+// bell the moment it arrives, from the chat's connection (chat/chat.ts).
 
 export const BUBBLE_ITEMS = 6;
 export const TOAST_MS = 8000;
@@ -87,16 +95,26 @@ export function NotificationRow({
 }) {
   const [shown, setShown] = useState(item);
   const [said, setSaid] = useState("");
+  const chat = useChatContext();
   useEffect(() => setShown(item), [item]);
+  const actor = shown.actor;
+  // New messages open the conversation: its docked window, or the Messages page.
+  const message = shown.kind === "message" && actor;
   return (
     <li className={styles.note} data-unread={wasUnread || undefined}>
-      {shown.actor ? (
+      {actor ? (
         <a
-          href={playerLink(shown.actor.id)}
+          href={message ? messagesLink(actor.id) : playerLink(actor.id)}
           className={styles.noteLink}
-          onClick={onFollow}
+          onClick={(event) => {
+            if (message && chat) {
+              event.preventDefault();
+              chat.open(actor.id);
+            }
+            onFollow?.();
+          }}
         >
-          <PlayerPicture player={shown.actor} size={34} />
+          <PlayerPicture player={actor} size={34} />
           <span className={styles.noteText}>
             {notificationWords(shown)}
             <small>
@@ -181,6 +199,8 @@ export function NotificationBell({
   const bubble = useRef<HTMLDivElement>(null);
   const id = useId();
   const { unread, setUnread, toasts, dismiss } = social;
+  const chat = useChatContext();
+  const messages = chat?.toasts ?? [];
   const close = useRef(() => setOpen(false)).current;
   useOutside(open, box, close);
   // Another page closes it.
@@ -223,6 +243,13 @@ export function NotificationBell({
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [toasts, dismiss]);
+  useEffect(() => {
+    if (!chat || messages.length === 0) return;
+    const timers = messages.map((each) =>
+      window.setTimeout(() => chat.dismiss(each.message.id), MESSAGE_TOAST_MS),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [messages, chat]);
 
   const label =
     unread === 0 ? "Notifications" : `Notifications, ${unread} unread`;
@@ -277,8 +304,8 @@ export function NotificationBell({
           {items === null && !error && <p className={styles.quiet}>Loading…</p>}
           {items?.length === 0 && (
             <p className={styles.quiet}>
-              Nothing yet. Friend requests, and friends coming online, show
-              here.
+              Nothing yet. Friend requests, friends coming online and new
+              messages show here.
             </p>
           )}
           {items && items.length > 0 && (
@@ -299,6 +326,33 @@ export function NotificationBell({
         </div>
       )}
       <div className={styles.toasts} role="status" aria-live="polite">
+        {chat &&
+          messages.map((each) => (
+            <div
+              key={each.message.id}
+              className={[styles.toast, chatStyles.toast].join(" ")}
+            >
+              <button
+                type="button"
+                className={chatStyles.toastOpen}
+                onClick={() => chat.open(each.player.id)}
+              >
+                <PlayerPicture player={each.player} size={30} />
+                <span>
+                  <strong>{each.player.handle}</strong>
+                  <small>{each.message.body}</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={styles.toastClose}
+                aria-label="Dismiss"
+                onClick={() => chat.dismiss(each.message.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
         {toasts.map((item) => (
           <div key={item.id} className={styles.toast}>
             {item.actor ? (
@@ -376,8 +430,8 @@ export function NotificationsPage({
         Notifications
       </h1>
       <p className={styles.lead}>
-        Friend requests, answers to yours, and friends coming online, kept for
-        90 days.
+        Friend requests, answers to yours, friends coming online and new
+        messages, kept for 90 days.
       </p>
       {state === "error" && (
         <p className={styles.rowError} role="alert">

@@ -14,6 +14,7 @@ import {
   type StarterDeck,
 } from "../api";
 import { printingImage } from "../catalog/catalog";
+import { RetryingImage } from "../game/RetryingImage";
 import styles from "./alliance.module.css";
 import account from "../Account.module.css";
 import shell from "../App.module.css";
@@ -43,8 +44,6 @@ export function StarterPicker({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  // Commanders whose picture did not arrive show their name in a frame instead.
-  const [missing, setMissing] = useState<Set<string>>(new Set());
   const prefix = `starter${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   useEffect(() => {
     let active = true;
@@ -142,6 +141,12 @@ export function StarterPicker({
             {decks.map((deck) => {
               const on = chosen.includes(deck.name);
               const id = `${prefix}-${deck.name}`;
+              // A commander whose picture does not arrive shows its name in a frame instead.
+              const frame = (
+                <span className={styles.starterFrame} aria-hidden="true">
+                  {deck.commanders.join(" & ")}
+                </span>
+              );
               return (
                 <li key={deck.name} data-chosen={on || undefined}>
                   <label className={styles.starter}>
@@ -155,27 +160,15 @@ export function StarterPicker({
                       aria-describedby={`${id}-about`}
                     />
                     <span className={styles.starterArt}>
-                      {deck.commander_printing_id && !missing.has(deck.name) ? (
-                        <img
+                      {deck.commander_printing_id ? (
+                        <RetryingImage
                           src={printingImage(deck.commander_printing_id)}
-                          alt=""
                           width={244}
                           height={340}
-                          loading="lazy"
-                          decoding="async"
-                          onError={() =>
-                            setMissing((current) =>
-                              new Set(current).add(deck.name),
-                            )
-                          }
+                          fallback={frame}
                         />
                       ) : (
-                        <span
-                          className={styles.starterFrame}
-                          aria-hidden="true"
-                        >
-                          {deck.commanders.join(" & ")}
-                        </span>
+                        frame
                       )}
                     </span>
                     <span className={styles.starterText}>

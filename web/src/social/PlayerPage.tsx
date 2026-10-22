@@ -2,6 +2,7 @@ import { useEffect, useState, type RefObject } from "react";
 import { client, describe } from "../api";
 import { tierNames } from "../alliance/alliance";
 import { TierBadge } from "../alliance/TierBadge";
+import { useChatContext } from "../chat/chat";
 import { PlayerPicture, PresenceLine } from "./PlayerBits";
 import type { PlayerProfile } from "./social";
 import styles from "./social.module.css";
@@ -37,6 +38,8 @@ export function PlayerPage({
   const [said, setSaid] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<"remove" | "block" | null>(null);
+  // Friends write to each other (v0.4.4): Message opens a docked window.
+  const chat = useChatContext();
 
   useEffect(() => {
     let active = true;
@@ -227,14 +230,25 @@ export function PlayerPage({
                     </button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    className={styles.secondary}
-                    disabled={busy}
-                    onClick={() => setConfirming("remove")}
-                  >
-                    Remove friend
-                  </button>
+                  <>
+                    {chat && (
+                      <button
+                        type="button"
+                        className={styles.primary}
+                        onClick={() => chat.open(profile.id)}
+                      >
+                        Message
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={busy}
+                      onClick={() => setConfirming("remove")}
+                    >
+                      Remove friend
+                    </button>
+                  </>
                 ))}
               {confirming === "block" ? (
                 <div className={styles.confirm}>

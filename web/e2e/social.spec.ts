@@ -3,7 +3,8 @@ import { test, expect } from "@playwright/test";
 // Friends in two browsers (v0.4.3): SysOp finds the test player with the top bar's search, opens
 // their profile and adds them; the player's bell counts the request, and they accept it from the
 // bubble; each then sees the other on Friends, online. The player appears offline, and SysOp, an
-// administrator of everything, still sees the real state. It needs SysOp and a second account,
+// administrator of everything, still sees the real state. Since v0.4.4 the two also write to each
+// other, and the player reports a message. It needs SysOp and a second account,
 // which cannot sign in with Google: scripts/e2e_player.py makes one and prints its session token,
 // as for the human table's journey.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
@@ -110,9 +111,55 @@ test.describe("friends in two browsers", () => {
       await sysop.reload();
       await expect(sysop.getByText(/\(appears offline\)$/)).toBeVisible();
 
-      // Back as it was, for a later run.
       await player.getByRole("checkbox", { name: /Appear offline/ }).uncheck();
       await expect(player.getByText("Privacy settings saved.")).toBeVisible();
+
+      // Chat (v0.4.4): SysOp writes from the profile in a docked window; the message pops up
+      // beside the player's bell at once, and waits on their Messages page; the answer reaches
+      // SysOp's window without a reload. Then the player reports SysOp's message.
+      const hello = `Hello, rival! ${Date.now()}`;
+      await sysop.getByRole("button", { name: "Message", exact: true }).click();
+      const window = sysop.getByRole("region", { name: "Chat with rival" });
+      await window.getByLabel("Write to rival").fill(hello);
+      await window.getByLabel("Write to rival").press("Enter");
+      await expect(
+        window.getByRole("list", { name: "Messages with rival" }),
+      ).toContainText(hello);
+      const popup = player.getByRole("button", { name: new RegExp(hello) });
+      await expect(popup).toBeVisible({ timeout: 15_000 });
+      await player.goto("/#messages");
+      await player
+        .getByRole("list", { name: "Conversations" })
+        .getByRole("link", { name: /sysop/ })
+        .click();
+      const thread = player.getByRole("list", { name: "Messages with sysop" });
+      await expect(thread).toContainText(hello);
+      const answer = `Hello, SysOp. ${Date.now()}`;
+      await player.getByLabel("Write to sysop").fill(answer);
+      await player.getByLabel("Write to sysop").press("Enter");
+      await expect(thread).toContainText(answer);
+      await expect(
+        window.getByRole("list", { name: "Messages with rival" }),
+      ).toContainText(answer, { timeout: 15_000 });
+      await thread
+        .getByRole("listitem")
+        .filter({ hasText: hello })
+        .getByRole("button", { name: /More about the message/ })
+        .click();
+      await player.getByRole("button", { name: "Report", exact: true }).click();
+      const report = player.getByRole("dialog", { name: "Report a message" });
+      await report.getByRole("button", { name: "Report the message" }).click();
+      // Sent, the dialog is named by its thanks.
+      const thanks = player.getByRole("dialog", {
+        name: "Thank you. The message was reported.",
+      });
+      await expect(thanks).toBeVisible();
+      await thanks.getByRole("button", { name: "Done" }).click();
+      await window
+        .getByRole("button", { name: "Close the chat with rival" })
+        .click();
+
+      // Back as it was, for a later run.
       await sysop.getByRole("button", { name: "Remove friend" }).click();
       await sysop.getByRole("button", { name: "Remove friend" }).click();
       await expect(

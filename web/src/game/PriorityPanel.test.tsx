@@ -46,6 +46,10 @@ function state(
     priority: controls,
     presence: null,
     voteRefusal: null,
+    chat: null,
+    outbox: [],
+    alliances: null,
+    allianceRefusal: null,
     ...fields,
   };
 }

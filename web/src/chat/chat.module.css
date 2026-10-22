@@ -1,0 +1,482 @@
+/* Chat between friends (v0.4.4): the docked windows, the Messages page and the conversation they
+   share, in the app's colours: dark green panels, the gold of its buttons, quiet grey-green text.
+   A friend's messages sit on the left, yours on the right in gold. */
+
+.eyebrow {
+  color: #bdab80;
+  font-size: 0.6rem;
+  letter-spacing: 2.1px;
+  font-weight: 600;
+}
+.lead {
+  color: #aeb8ac;
+  font-size: 0.86rem;
+  line-height: 1.8;
+  max-width: 46rem;
+}
+.quiet {
+  color: #a5b0a3;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  margin: 8px 0;
+  list-style: none;
+}
+.quiet a {
+  color: #e8d3a6;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.error {
+  color: #f0b4a0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 6px 0;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.unread {
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #d9714f;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 19px;
+  text-align: center;
+}
+
+/* The conversation. */
+.conversation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 12px 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.messages:focus-visible {
+  outline: 2px solid #e6c68c88;
+  outline-offset: -2px;
+}
+.olderRow {
+  text-align: center;
+}
+.older {
+  background: transparent;
+  border: 1px solid #ffffff2a;
+  border-radius: 4px;
+  color: #c9d0c6;
+  font-size: 0.72rem;
+  padding: 6px 12px;
+  min-height: 32px;
+}
+.older:hover {
+  border-color: #d5b77c88;
+  color: #e6c68c;
+}
+.message {
+  position: relative;
+  align-self: flex-start;
+  max-width: 82%;
+  background: #22302c;
+  border: 1px solid #ffffff12;
+  border-radius: 10px 10px 10px 3px;
+  padding: 7px 10px 5px;
+  color: #ebece6;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.message[data-mine] {
+  align-self: flex-end;
+  background: #3b3424;
+  border-color: #d5b77c44;
+  border-radius: 10px 10px 3px 10px;
+}
+.message[data-pending] {
+  opacity: 0.6;
+}
+.message[data-failed] {
+  border-color: #d98f78aa;
+}
+/* Text as typed: line breaks kept, long words wrapped; never HTML. */
+.body {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message time,
+.sending {
+  display: block;
+  margin-top: 2px;
+  color: #a5b0a3;
+  font-size: 0.66rem;
+}
+.failed {
+  display: block;
+  margin-top: 4px;
+  color: #f0b4a0;
+  font-size: 0.72rem;
+}
+.retry {
+  background: transparent;
+  border: none;
+  color: #e6c68c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 0.72rem;
+  padding: 2px;
+}
+.menu {
+  position: absolute;
+  top: 2px;
+  right: -30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  z-index: 2;
+}
+.menuButton {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #a5b0a3;
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.5;
+}
+.message:hover .menuButton,
+.menuButton:focus-visible,
+.menuButton[aria-expanded="true"] {
+  opacity: 1;
+}
+.menuItem {
+  background: #18221f;
+  border: 1px solid #ffffff2a;
+  border-radius: 4px;
+  color: #f0c2b3;
+  font-size: 0.72rem;
+  padding: 6px 12px;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px #0008;
+}
+.composer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 6px;
+  padding: 8px 4px 4px;
+  border-top: 1px solid #ffffff14;
+}
+.composer textarea {
+  width: 100%;
+  min-width: 0;
+  resize: none;
+  background: #0c1314;
+  border: 1px solid #ffffff26;
+  border-radius: 5px;
+  padding: 8px 10px;
+  color: #ebece6;
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  max-height: 9rem;
+}
+.composer textarea:focus-visible {
+  outline: 2px solid #e6c68c88;
+  outline-offset: 1px;
+}
+.send {
+  background: #d5b77c;
+  border: 1px solid #e0c58f;
+  border-radius: 4px;
+  color: #192220;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-height: 38px;
+  padding: 8px 14px;
+}
+.send:hover:not(:disabled) {
+  background: #e6cc99;
+}
+.send:disabled {
+  opacity: 0.55;
+}
+.count {
+  grid-column: 1 / -1;
+  color: #a5b0a3;
+  font-size: 0.68rem;
+}
+.closed {
+  margin: 0;
+  padding: 10px 6px 6px;
+  border-top: 1px solid #ffffff14;
+  color: #a5b0a3;
+  font-size: 0.76rem;
+}
+
+/* The docked windows: fixed at the bottom right, side by side; on a phone, the newest alone. */
+.dock {
+  position: fixed;
+  z-index: 40;
+  right: 18px;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+.window {
+  pointer-events: auto;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  background: #18221f;
+  border: 1px solid #ffffff22;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -8px 30px #0009;
+}
+.window:not([data-folded]) {
+  height: min(440px, calc(100vh - 120px));
+}
+.windowBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 4px 4px;
+  border-bottom: 1px solid #ffffff14;
+}
+.window[data-folded] .windowBar {
+  border-bottom: none;
+}
+.windowTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: #ebece6;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 4px;
+  min-height: 40px;
+}
+.windowTitle > span:not(.unread) {
+  min-width: 0;
+  display: grid;
+}
+.windowTitle small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #a5b0a3;
+  font-size: 0.66rem;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.windowAction {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #a5b0a3;
+  font-size: 1.05rem;
+  text-decoration: none;
+}
+.windowAction:hover {
+  background: #ffffff10;
+  color: #e6c68c;
+}
+.windowBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+}
+.windowBody[hidden] {
+  display: none;
+}
+.profileLink {
+  align-self: flex-end;
+  color: #a5b0a3;
+  font-size: 0.68rem;
+  padding: 4px 2px 0;
+}
+@media (max-width: 760px) {
+  .dock {
+    left: 8px;
+    right: 8px;
+  }
+  .window {
+    width: 100%;
+  }
+  .window:not(:last-child) {
+    display: none;
+  }
+}
+
+/* The Messages page: the list beside the conversation; on a phone, one or the other. */
+.page {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 22px;
+  align-items: start;
+}
+.page:not([data-open]) {
+  grid-template-columns: minmax(260px, 560px);
+}
+.list {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 1px solid #ffffff16;
+  border-radius: 6px;
+  background: #18221f;
+}
+.list li + li {
+  border-top: 1px solid #ffffff10;
+}
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  color: #ebece6;
+  text-decoration: none;
+}
+.listItem:hover,
+.listItem[aria-current="page"] {
+  background: #d5b77c14;
+}
+.listText {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.listText strong {
+  font-size: 0.86rem;
+}
+.listText small {
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.listEnd {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  color: #a5b0a3;
+  font-size: 0.66rem;
+}
+.pageConversation {
+  position: sticky;
+  top: 12px;
+  height: min(640px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ffffff16;
+  border-radius: 6px;
+  background: #18221f;
+  padding: 0 12px 10px;
+}
+.pageBar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #ffffff14;
+}
+.pageWho {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #ebece6;
+  text-decoration: none;
+}
+.pageWho span {
+  display: grid;
+  font-size: 0.86rem;
+}
+.back {
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  display: none;
+}
+@media (max-width: 860px) {
+  .page,
+  .page:not([data-open]) {
+    grid-template-columns: 1fr;
+  }
+  .page[data-open] .listSide {
+    display: none;
+  }
+  .back {
+    display: inline;
+  }
+  .pageConversation {
+    position: static;
+    height: calc(100vh - 170px);
+  }
+}
+
+/* A message that pops up beside the bell. */
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.toastOpen {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  padding: 0;
+}
+.toastOpen span {
+  min-width: 0;
+  display: grid;
+}
+.toastOpen small {
+  color: #c9d0c6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

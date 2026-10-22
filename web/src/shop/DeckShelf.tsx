@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { client, describe } from "../api";
 import shell from "../App.module.css";
 import { printingImage } from "../catalog/catalog";
+import { RetryingImage } from "../game/RetryingImage";
 import { tokens, type DeckOffer } from "./shop";
 import styles from "./shop.module.css";
 
@@ -28,8 +29,6 @@ export function DeckShelf({
   const [buying, setBuying] = useState<DeckOffer | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Commanders whose picture did not arrive show their name in a frame instead.
-  const [missing, setMissing] = useState<Set<string>>(new Set());
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (buying) dialog.current?.showModal?.();
@@ -81,25 +80,24 @@ export function DeckShelf({
       <ul className={styles.decks} aria-label="Starter decks">
         {decks.map((deck) => {
           const short = deck.price !== null ? deck.price - balance : 0;
+          // A commander whose picture does not arrive shows its name in a frame instead.
+          const frame = (
+            <span className={styles.deckFrame} aria-hidden="true">
+              {deck.commander}
+            </span>
+          );
           return (
             <li key={deck.id} className={styles.deck} aria-label={deck.title}>
               <span className={styles.deckArt}>
-                {deck.commander_printing_id && !missing.has(deck.id) ? (
-                  <img
+                {deck.commander_printing_id ? (
+                  <RetryingImage
                     src={printingImage(deck.commander_printing_id)}
-                    alt=""
                     width={244}
                     height={340}
-                    loading="lazy"
-                    decoding="async"
-                    onError={() =>
-                      setMissing((current) => new Set(current).add(deck.id))
-                    }
+                    fallback={frame}
                   />
                 ) : (
-                  <span className={styles.deckFrame} aria-hidden="true">
-                    {deck.commander}
-                  </span>
+                  frame
                 )}
               </span>
               <div className={styles.deckText}>

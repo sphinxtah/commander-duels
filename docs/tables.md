@@ -1,6 +1,6 @@
 # Human tables (v0.4.0)
 
-Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Friends, blocks, presence lists and queues come later.
+Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Queues come later.
 
 ## The lobby
 

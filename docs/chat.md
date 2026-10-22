@@ -1,0 +1,121 @@
+# Chat between friends and at the table (v0.4.4)
+
+Since v0.4.4 friends write to each other while the app is open, and the players at a human table talk to the whole table or, once they have made an alliance, to their allies alone. The owner's decisions are in [the v0.4.4 plan](plans/0.4.4.md#decisions-at-the-start-of-v044). The API is `api/chat.py` (friends) and `api/table_chat.py` (tables); the web app's parts are `web/src/chat/` and the table's chat panel in `web/src/game/`.
+
+## Decisions
+
+Agreed with the owner on 2026-10-22, at the start of v0.4.4:
+- **Allies are agreed during the game.** A player offers an alliance from another player's portrait; it starts when they accept, and either may end it at any time. Everyone sees who is allied with whom; only the allies read their messages.
+- **Friends' chat lives on a Messages page and in small windows** docked at the bottom right that stay open from page to page. New messages count on the bell and pop up beside it.
+- **Administrators read a message only when a player reports it**, with the 20 messages before it in that chat that the reporter saw.
+- **Quick emotes at the table.** No mute, word filter, or typing and seen marks in this version.
+
+Defaults stated at the start, which the owner did not change:
+- Chat is between friends only; a block, or a friendship that ends, stops new messages.
+- Messages reach open tabs at once, over a connection the app keeps open.
+- SysOp reads every chat, allies-only messages at the tables it watches included, as its standing full access says ([SysOp](identity.md#sysop-the-local-root-account)). Every reading through its reader is audited.
+- Bots never read or send chat. Practice games, which seat one player against bots, have none.
+- A player out of the game (conceded, removed or eliminated) still reads and writes the table's chat, as the scope asks (NET13).
+- Friends' messages are kept a year; a table's chat 30 days.
+
+## Friends' messages
+
+- **Who.** Two players write to each other while they are friends ([friends](social.md#friends)). Once the friendship ends, or either blocks the other, neither may write (`409 not_friends`); what was written stays readable to both, and the conversation says why the box is closed.
+- **Where.**
+  - **Messages** (`#messages`, in the navigation, with the count of unread messages) lists the conversations, the latest first, each with the friend's portrait, presence, last message and unread count. `#messages/<player id>` opens one beside the list (on a phone, alone), with its history a page of 50 at a time ("Show older messages").
+  - **Chat windows.** **Message** on a friend's profile, on the Friends page, or on a message's pop-up opens a small window docked at the bottom right of every page. Up to three stay open side by side (on a phone, the newest alone); each can be folded to its title bar or closed, and they stay open as the player moves between pages and when the page reloads (the browser remembers which, never what was written). The table's screen shows none; they are there again on leaving it, and its unread messages count meanwhile.
+- **Sending.** Enter sends, Shift+Enter starts a new line. A message is at most 500 characters and 13 lines. A message waits greyed until the server has it; one that fails says so, with **Try again**, which sends it under the same `client_id`, so it lands once.
+- **Read.** A conversation shown in a window that is open or on the Messages page, in a tab in use, is read: the page tells the server up to the newest message it shows. Every tab of the account then shows it read.
+- **The bell.** New messages from a friend are one notification while unread, "Ada sent you 3 messages", renewed by each new message so it comes first; it opens the conversation's window. Reading the conversation marks it read. A message that arrives while the app is open pops up beside the bell for 8 seconds unless its conversation is open and shown.
+- **Reporting.** Each message from the other player has a **Report** in its menu (⋯), which opens a short form: why (optional), and what is sent with it.
+
+### Routes
+
+| Route | What |
+| --- | --- |
+| `GET /api/v1/conversations` | The account's conversations (100 at most), the latest first: the friend (as a search result: handle, portrait, tier, presence), whether you may still write, the last message and the unread count; and `unread`, in all |
+| `GET /api/v1/conversations/{player_id}?limit=&cursor=` | The messages between you and a player, the newest page (50 by default, at most 100), oldest first, with `next` for the older page; `friends` and `unread`. A player never written to has an empty one; another account that is not active, or has no handle, is not found (404) |
+| `POST /api/v1/conversations/{player_id}/messages` | `{text, client_id}`: writes to a friend (201, the message). The same `client_id` again answers the message already sent |
+| `POST /api/v1/conversations/{player_id}/read` | `{up_to}`: marks their messages up to that time read (all when null), with the bell's notification; answers `{unread}` |
+
+Refusals: 401 signed out, 403 not active or without the CSRF token, `409 handle_required`, `409 own_account`, `409 not_friends`, `422` for text that breaks the rules below, `429 chat_limited` with `Retry-After`.
+
+### The chat's WebSocket
+
+`/api/v1/chat/events` tells each open tab of the app, at once, of new messages and read marks. Like a game's socket ([games](games.md#the-websocket)) it is signed in by the session cookie and refused from another site's origin; its first message must be `{"type": "hello", "csrf_token": "..."}` within 10 seconds. An account holds at most 8 at once (a tab each). The page only listens; it may send `{"type": "ping"}` (answered `pong`) to keep proxies from closing the connection.
+
+| Message | When |
+| --- | --- |
+| `{"type": "welcome", "unread": 3}` | After the hello: unread messages in all conversations |
+| `{"type": "message", "player_id": "...", "player": {...}, "message": {...}, "unread": 4}` | A message stored, to the recipient's tabs and the sender's: `player_id` and `player` (handle, avatar, alliance) are the other player of the conversation, as the tab's account sees it, and `unread` that account's new total |
+| `{"type": "read", "player_id": "...", "unread": 0}` | The account read a conversation, in any of its tabs |
+| `{"type": "error", "code": "..."}` | Before a close: as for a game's socket (`authentication_required`, `session_refresh`, `csrf_failed`, `origin_refused`, `too_many_connections`, `hello_required`) |
+
+The connection closes when the session ends, is revoked or expires, as a game's does. The page reconnects with backoff and, each time it connects, reloads the conversations it shows, since nothing is resent. The presence check-in also carries `messages_unread` ([presence](social.md#presence)), so the count stays right while the socket is down.
+
+## The table's chat
+
+At a human table's game ([human tables](tables.md)) the band has a chat diamond, **Table chat**, with the count of lines not read yet; it opens the chat as a drawer at the right of the table, like the log, and Escape folds it again (`web/src/game/table/TableChat.tsx`). The drawer has two tabs, **Table** and **Allies**, each with its messages and its own unread count; under the Table tab, a row of the emotes; and the alliances, with a button for each thing the player may do. New lines from others are spoken through the table's polite announcer, folded or not. A practice game has no diamond, drawer or alliance controls.
+
+- **The table.** Every player of the game writes to all of them, in text or with an emote: Hello!, Good luck, have fun!, Your turn., Thinking…, Nice play!, Thanks!, Oops!, Sorry!, Good game!. SysOp watching the game writes there too, shown as watching.
+- **Alliances.** Each other player's plate has an **Alliance** menu (named "Alliance with <handle>"), as the drawer's list does: **Offer an alliance** sends an offer only the two see ("Offer sent", "Offers alliance" on the plates); the other player accepts or declines it, or offers one back, which is accepting. Either may then **End the alliance** at any time. The table's chat says when an alliance starts or ends, and each plate shows its player's allies ("Ally", "Allied with …"). A player out of the game makes no alliance, and leaving the game ends theirs. Bots, SysOp watching, and a finished game make none.
+- **Allies only.** A player with allies may write to them alone, on the Allies tab: the message goes to the sender's allies at that moment and to no other player's connection, like a hand. Each such line shows whom it went to ("bob to you and cara").
+- **Writing.** Enter sends, Shift+Enter starts a new line; each tab keeps its own draft. A line waits greyed until the server sends it back; one refused says why, with **Try again** (the same `client_id`) and **Discard**. A line sent just before the connection dropped, and missing from the history the reconnected tab is sent, is marked as not sent.
+- **History.** A tab that connects (or reconnects) is sent the latest 200 lines it may see, then each new one.
+- **Reporting.** As for friends' messages, from a line's menu; the report keeps the 20 lines before it that the reporter saw.
+
+### On the game's WebSocket
+
+Sent by the page:
+
+| Message | Meaning |
+| --- | --- |
+| `{"type": "chat", "channel": "table" or "allies", "text": "...", "client_id": "..."}` | A message to the table, or to the sender's allies |
+| `{"type": "emote", "emote": "good_game", "client_id": "..."}` | An emote, to the table: `hello`, `good_luck`, `your_turn`, `thinking`, `nice_play`, `thanks`, `oops`, `sorry`, `good_game` |
+| `{"type": "alliance", "action": "offer", "seat": 2}` | `offer`, `accept` (their offer), `decline` (their offer), `withdraw` (your offer) or `end`, with the other player's seat |
+
+Sent by the API, to a table's connections only:
+
+| Message | Meaning |
+| --- | --- |
+| `{"type": "chat_history", "messages": [line, ...]}` | On connecting: the latest lines the connection may see, oldest first |
+| `{"type": "chat", "message": line}` | A new line the connection may see |
+| `{"type": "alliances", "alliances": [[0, 1]], "offers": [{"from": 0, "to": 2}]}` | On connecting and after every change: every alliance (pairs of seats), and the offers its own seat made or received |
+| `{"type": "error", "code": "...", "message": "...", "client_id": "...", "seat": 2}` | A refusal: `no_chat` (a practice game), `invalid_message` (text that breaks the rules, an unknown emote), `chat_limited` (with `retry_after` in seconds), `no_allies`; for alliances `not_a_player`, `not_in_game`, `invalid_alliance` (no such player, yourself, or a bot), `already_allied`, `no_offer`, `not_allied` |
+
+A line: `{"id", "channel": "table" or "allies", "kind": "text", "emote" or "event", "seat" (the sender's; null for SysOp watching), "sender": {"id", "handle"} or null, "body", "seats", "client_id", "created_at"}`. For a text, `body` is the text; for an emote, its name; for an event, `allied` or `alliance_ended`, with `seats` the two allies and `sender` and `seat` whoever ended it (null when leaving the game ended it). An allies-only line's `seats` are those it went to besides the sender.
+
+Who receives a line: every connection of the game for the table's; for an allies-only one, the sender's seat's and its recipients' connections, and SysOp's (watching, or inspecting from its own seat). The API tests read every frame each player's connections receive and check that no allies-only line reaches another player's.
+
+## Rules for the text
+
+- At most 500 characters and 13 lines, trimmed; never empty.
+- No control characters except line breaks and tabs (`422`); NUL is refused everywhere.
+- Unicode's direction overrides and isolates (U+202A–U+202E, U+2066–U+2069) are dropped, so a message cannot draw itself backwards to pass for someone else's words. Emoji, accents and joiners stay.
+- The page shows every message as text, never as HTML or a link (SEC01's chat injection).
+- **How fast.** An account sends at most 5 messages in 5 seconds and 30 a minute, friends' messages, table lines and emotes together (`429 chat_limited`, or the socket's error, with the seconds to wait). The counts live in the API process's memory. SysOp has no limit.
+
+## Reports of a message
+
+`POST /api/v1/reports` takes `message: {"kind": "direct" or "table", "id": "..."}` beside the usual fields ([reports](reports.md)). The API copies the reported message, and the 20 messages before it in that chat that the reporter saw, into the report (`chat`), with who sent it (`reported_user`). Only a message the reporter received or saw may be reported (another's is not found, `404`), never one's own (`409 own_message`) or an alliance's event (`409 not_reportable`). Reports count against the 20 a day as any report.
+
+Administrators and SysOp read the copy in Administration → Reports, the reported message marked. The copy stays with the report, whatever later becomes of the messages or the account; deleting the reporter's account deletes their reports, as before.
+
+## SysOp's reader
+
+`chat.read_all`, SysOp's alone. Administration → **Chats** lists the latest conversations and table chats, or one player's, with their players and how many messages they hold; listing reads no message. Opening one shows its messages (the newest 1,000), allies-only lines included, and records `chat.conversation_read` or `chat.table_read` in the audit trail, with the conversation's players or the game. `GET /api/v1/admin/chats?player_id=`, `GET /api/v1/admin/chats/conversations/{id}`, `GET /api/v1/admin/chats/games/{game_id}`.
+
+## Kept, and removed
+
+- Friends' messages 365 days, and their conversation once it has none left; a table's lines 30 days (a game lasts hours). The worker's daily job removes them, with the requests never approved ([accounts](identity.md)).
+- Deleting an account removes its conversations, with both sides' messages, and its own lines in tables' chats ([deleting an account](social.md#deleting-an-account)).
+- Alliances live only with the running game, in the API's memory.
+- The [privacy policy](../web/public/pages/privacy.html) says all of this to players, and the [terms](../web/public/pages/terms.html) say what may not be written.
+
+## The data
+
+Migration `0017_chat`: `conversations` (one row a pair, `user_low` the lower ID, with each side's read mark), `direct_messages` (with the sender's `client_id`, unique per sender), `table_messages` (game, sender, seat, channel, kind, body, seats), the notification kind `message`, and on `problem_reports` the reported message's copy (`chat`) and sender (`reported_user_id`). It only adds, so the previous version runs on it.
+
+## Tests
+
+`tests/test_chat.py` (friends' messages, the socket, reports, SysOp's reader, deletion and the daily job; SQLite, and PostgreSQL when `CD_TEST_POSTGRES_URL` is set), `tests/test_table_chat.py` (the table's chat, alliances and the allies-only leak check on the fake engine of the table tests), the web app's tests in `web/src/chat/` and `web/src/game/`, and the browser journeys `web/e2e/social.spec.ts` (two friends write to each other) and `web/e2e/tables.spec.ts` (the table's chat).

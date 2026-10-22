@@ -16,7 +16,10 @@ class FakeSocket {
   static readonly CLOSED = 3;
   static made: FakeSocket[] = [];
   readyState = FakeSocket.CONNECTING;
-  sent: { type: string; command?: Record<string, unknown> }[] = [];
+  sent: ({ type: string; command?: Record<string, unknown> } & Record<
+    string,
+    unknown
+  >)[] = [];
   closedWith: number | null = null;
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
@@ -415,5 +418,178 @@ describe("away players at a human table (v0.4.0)", () => {
     expect(state.voteRefusal).toBeNull();
     socket.deliver({ type: "error", code: "invalid_message" });
     expect(state.voteRefusal).toBeNull();
+  });
+});
+
+describe("the table's chat and alliances (v0.4.4)", () => {
+  const line = (id: string, fields: Record<string, unknown> = {}) => ({
+    id,
+    channel: "table",
+    kind: "text",
+    seat: 1,
+    sender: { id: "u-bob", handle: "bob" },
+    body: `line ${id}`,
+    seats: [],
+    client_id: null,
+    created_at: `2026-10-22T10:00:0${id}+00:00`,
+    ...fields,
+  });
+  const echo = (id: string, sent: Record<string, unknown>) =>
+    line(id, {
+      seat: 0,
+      sender: { id: "u-ada", handle: "ada" },
+      body: sent.text,
+      client_id: sent.client_id,
+    });
+
+  it("keeps the history and each new line, once each, in the order written", () => {
+    const socket = playing();
+    expect(state.chat).toBeNull();
+    socket.deliver({ type: "chat_history", messages: [line("1"), line("2")] });
+    socket.deliver({ type: "chat", message: line("3") });
+    // A reconnect's history repeats what the tab has.
+    socket.deliver({ type: "chat_history", messages: [line("2"), line("3")] });
+    expect(state.chat?.map((each) => each.id)).toEqual(["1", "2", "3"]);
+    socket.deliver({
+      type: "alliances",
+      alliances: [[0, 1]],
+      offers: [{ from: 2, to: 0 }],
+    });
+    expect(state.alliances).toEqual({
+      alliances: [[0, 1]],
+      offers: [{ from: 2, to: 0 }],
+    });
+  });
+
+  it("sends a message with a fresh client_id, which waits until the server sends it back", () => {
+    const socket = playing();
+    socket.deliver({ type: "chat_history", messages: [] });
+    connection.chat("allies", "Attack Cara next");
+    const sent = socket.sent.at(-1)!;
+    expect(sent).toEqual({
+      type: "chat",
+      channel: "allies",
+      text: "Attack Cara next",
+      client_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    });
+    expect(state.outbox).toEqual([
+      expect.objectContaining({
+        client_id: sent.client_id,
+        status: "pending",
+        body: "Attack Cara next",
+      }),
+    ]);
+    connection.emote("good_game");
+    expect(socket.sent.at(-1)).toEqual({
+      type: "emote",
+      emote: "good_game",
+      client_id: expect.any(String),
+    });
+    expect(socket.sent.at(-1)!.client_id).not.toBe(sent.client_id);
+
+    socket.deliver({ type: "chat", message: echo("1", sent) });
+    expect(state.outbox.map((each) => each.body)).toEqual(["good_game"]);
+    expect(state.chat?.map((each) => each.client_id)).toEqual([sent.client_id]);
+  });
+
+  it("marks a refused message failed without ending anything, and tries it again under its client_id", () => {
+    const socket = playing();
+    connection.chat("table", "Hello");
+    const sent = socket.sent.at(-1)!;
+    socket.deliver({
+      type: "error",
+      code: "chat_limited",
+      message: "You are sending messages very fast. Wait a moment.",
+      client_id: sent.client_id,
+      retry_after: 3,
+    });
+    expect(state.outbox[0]).toMatchObject({
+      status: "failed",
+      error:
+        "You are sending messages very fast. Wait 3 seconds, then try again.",
+    });
+    expect(state.phase).toBe("open");
+
+    connection.retryChat(String(sent.client_id));
+    expect(socket.sent.at(-1)).toEqual(sent);
+    expect(state.outbox).toEqual([
+      expect.objectContaining({ status: "pending", error: null }),
+    ]);
+    socket.deliver({
+      type: "error",
+      code: "no_allies",
+      message: "You have no allies at this table.",
+      client_id: sent.client_id,
+    });
+    expect(state.outbox[0].error).toBe("You have no allies at this table.");
+    connection.discardChat(String(sent.client_id));
+    expect(state.outbox).toEqual([]);
+
+    // A chat refusal just before a close is not why the connection closed.
+    socket.deliver({ type: "error", code: "session_refresh" });
+    socket.deliver({
+      type: "error",
+      code: "invalid_message",
+      client_id: null,
+    });
+    api.loadMe.mockResolvedValue(null);
+    socket.drop(4401);
+    expect(state.phase).not.toBe("ended");
+  });
+
+  it("after a reconnect, fails a message the history does not hold, but not one sent since", () => {
+    const first = playing();
+    first.deliver({ type: "chat_history", messages: [] });
+    connection.chat("table", "Lost in the drop");
+    const lost = first.sent.at(-1)!;
+    first.drop(1006);
+    vi.advanceTimersByTime(1000);
+    const second = FakeSocket.made[1];
+    second.accept();
+    second.deliver(welcome(0, true));
+    connection.chat("table", "Sent after the welcome");
+    const fresh = second.sent.at(-1)!;
+    second.deliver({ type: "chat_history", messages: [] });
+    expect(state.outbox.map((each) => [each.client_id, each.status])).toEqual([
+      [lost.client_id, "failed"],
+      [fresh.client_id, "pending"],
+    ]);
+  });
+
+  it("sends alliance requests, and says why one was refused apart from votes", () => {
+    const socket = playing();
+    connection.alliance("offer", 2);
+    expect(socket.sent.at(-1)).toEqual({
+      type: "alliance",
+      action: "offer",
+      seat: 2,
+    });
+    socket.deliver({
+      type: "error",
+      code: "not_in_game",
+      message: "That player is out of the game.",
+      seat: 2,
+    });
+    expect(state.allianceRefusal).toBe("That player is out of the game.");
+    expect(state.voteRefusal).toBeNull();
+
+    // The same code after a vote is the vote's.
+    connection.vote(1, true);
+    socket.deliver({
+      type: "error",
+      code: "not_in_game",
+      message: "You are out of this game.",
+      seat: 1,
+    });
+    expect(state.voteRefusal).toBe("You are out of this game.");
+    connection.alliance("end", 1);
+    expect(state.allianceRefusal).toBeNull();
+    socket.deliver({
+      type: "error",
+      code: "not_allied",
+      message: "You are not allies.",
+      seat: 1,
+    });
+    expect(state.allianceRefusal).toBe("You are not allies.");
   });
 });

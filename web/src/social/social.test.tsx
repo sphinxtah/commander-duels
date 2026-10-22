@@ -80,6 +80,7 @@ function note(overrides: Partial<NotificationItem> = {}): NotificationItem {
   return {
     id: "n1",
     kind: "friend_request",
+    messages: 0,
     created_at: new Date(Date.now() - 5 * 60_000).toISOString(),
     read: false,
     actor: { id: BOB, handle: "bob", avatar: "moon", alliance: null },
@@ -307,6 +308,7 @@ describe("the notification bell (v0.4.3)", () => {
   function social(overrides: Partial<Social> = {}): Social {
     return {
       unread: 2,
+      messagesUnread: 0,
       setUnread: vi.fn(),
       toasts: [],
       dismiss: vi.fn(),

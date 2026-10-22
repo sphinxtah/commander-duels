@@ -63,11 +63,13 @@ Scryfall's terms are kept:
 - **No paywall.** Nothing is sold, so no Scryfall data sits behind a payment.
 - **Notices.** The zoom credits the artist and Scryfall, and the site's footer carries Wizards of the Coast's Fan Content notice.
 
-**The queue.** Each new name waits its turn for Scryfall, so one account may have 8 new names waiting and everyone together 24. Beyond that, a request is answered at once with 429 `card_images_busy` (the account is over its share) or 503 `card_images_unavailable` (the total is reached), and the card keeps its text frame. Cached names and names recorded as missing are never refused; SysOp is never refused.
+**The queue.** Each new name waits its turn for Scryfall, so one account may have 8 new names waiting and everyone together 24. Beyond that, a request is answered at once with 429 `card_images_busy` (the account is over its share) or 503 `card_images_unavailable` (the total is reached), and the page asks again after the `Retry-After`. Cached names and names recorded as missing are never refused; SysOp is never refused.
+
+**Downloads** (v0.4.4). A catalog printing's image, or a name the catalog already knows, needs no search, only a download from Scryfall's image host, which is not rate limited. Downloads wait their turn instead of being refused: 4 at once for one account and 16 in all, with up to 128 of an account's waiting; only beyond that is one refused (429 `card_images_busy`). Until v0.4.4 they took the search's share of 8, so a pack of new cards, or a page of the Cards list, drew its first 8 pictures and kept text frames for the rest (the owner's report).
 
 **What a name lookup could reveal.** The table asks only for names in the seat's current view: nothing prefetches deck lists, so probing the cache cannot reveal another seat's deck. Tokens and names Scryfall does not know show their text frame, and are asked about again after a week.
 
-**Failed images on the page.** The page remembers a name the server has no image for (404 `card_image_missing`) for an hour. Any other failed image is asked for again up to five times, with backoff at least as long as the server's `Retry-After`.
+**Failed images on the page.** The page remembers a name the server has no image for (404 `card_image_missing`) for an hour. Any other failed image is asked for again up to five times, with backoff at least as long as the server's `Retry-After`. Since v0.4.4 every card picture does the same (`web/src/game/RetryingImage.tsx`): the Cards page and card details, the pack opening, and the starter decks' commanders, which until then gave up at the first failure.
 
 ## The magnifier
 
@@ -152,6 +154,8 @@ Since v0.3.1 the bots plan only with what their seat may see ([fair bots](engine
 ## Human tables (v0.4.0)
 
 A table's game ([human tables](tables.md)) uses the same screen. The other players go by their handles, on the board, in the turn line, the result and the log. Above the prompt, a Players panel says who is away and for how long, and once they may be voted out offers "Vote to remove" and "Keep waiting" with the votes so far. It also says who conceded or was removed, and tells a removed player so when they come back. Conceding says the other players play on; the result and its dialog lead back to the lobby. Every finished game's result, practice or table, shows the tokens it paid you.
+
+Since v0.4.4 a table's game has its chat: a diamond on the band opens it as a drawer at the right, with the Table and Allies tabs, the emotes and the alliances, and each other player's plate has an Alliance menu ([chat](chat.md#the-tables-chat)).
 
 ## Accessibility
 

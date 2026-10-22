@@ -22,7 +22,13 @@ Scryfall allows its named-card search 2 requests a second, so this process space
 550 ms apart, and after a 429 asks nothing more for as long as Scryfall says (30 s at least);
 downloads from its image host are not limited. Concurrent requests for one name fetch it once.
 Each name waiting its turn delays every name behind it, so the names waiting are capped, per
-account and in all; more are refused at once, and those cards keep their text frame.
+account and in all; more are refused at once, and the page asks again after the Retry-After.
+
+A catalog printing's image needs no search, only a download, and a pack of 15 new cards or a page
+of the Cards list asks for many at once. Downloads therefore wait their turn rather than being
+refused (v0.4.4: until then they shared the search's cap of 8 an account, so the 9th card of a
+pack kept its text frame): a few at a time for each account and a few more in all, so one
+account's page never holds up another's, with a generous number allowed to wait.
 """
 
 import asyncio
@@ -97,6 +103,11 @@ MAX_RATE_LIMIT_PAUSE = 3600.0
 # names hold up everyone else's first look by up to LOOKUPS_PER_ACCOUNT * API_SPACING.
 LOOKUPS_PER_ACCOUNT = 8
 LOOKUPS_WAITING = 24
+# Downloads from the image host at once, for one account and in all; more wait for a slot. An
+# account may have DOWNLOADS_QUEUED downloads started or waiting, and more are refused (429).
+DOWNLOADS_PER_ACCOUNT = 4
+DOWNLOADS_AT_ONCE = 16
+DOWNLOADS_QUEUED = 128
 MISSING_RETRY = timedelta(days=7)
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 MAX_PNG_BYTES = 8 * 1024 * 1024
@@ -388,6 +399,11 @@ class CardImageCache:
         self.paused_until = -math.inf
         # Lookups waiting on Scryfall's API, by account; None is SysOp's, which are never refused.
         self.lookups: Counter[UUID | None] = Counter()
+        # Downloads from the image host, started or waiting, by account (None: SysOp's), and the
+        # slots they wait for: each account's own, which live while it has any, and everyone's.
+        self.downloads: Counter[UUID | None] = Counter()
+        self.account_slots: dict[UUID | None, asyncio.Semaphore] = {}
+        self.download_slots = asyncio.Semaphore(DOWNLOADS_AT_ONCE)
         # Replaced in tests, to measure the spacing without waiting for it.
         self.clock: Callable[[], float] = time.monotonic
         self.sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
@@ -428,8 +444,9 @@ class CardImageCache:
         self, directory: Path, chosen: Chosen, size: ImageSize, account: UUID | None
     ) -> bytes:
         """A catalog image from disk, or downloaded once from Scryfall's image host. Downloads
-        need no API request, but still count against the account's share of the queue. A png
-        the printing lacks is served as its large image, then its normal one."""
+        need no API request: they wait for a download slot (see downloading) rather than taking
+        a share of the lookups' queue. A png the printing lacks is served as its large image,
+        then its normal one."""
         for each in SIZES_TO_TRY[size]:
             path = directory / file_name(chosen.scryfall_id, chosen.face, each)
             image = await run_in_threadpool(read_image, path)
@@ -442,7 +459,7 @@ class CardImageCache:
                 image = await run_in_threadpool(read_image, path)
                 if image is not None:
                     return image
-                with self.counted(account):
+                async with self.downloading(account):
                     image = await self.download(url, each)
                 try:
                     await run_in_threadpool(write_atomically, path, image)
@@ -527,6 +544,24 @@ class CardImageCache:
             self.lookups[account] -= 1
             if not self.lookups[account]:
                 del self.lookups[account]
+
+    @asynccontextmanager
+    async def downloading(self, account: UUID | None) -> AsyncIterator[None]:
+        """Waits for a download slot: one of the account's DOWNLOADS_PER_ACCOUNT, then one of
+        everyone's DOWNLOADS_AT_ONCE. An account with DOWNLOADS_QUEUED started or waiting is
+        refused at once; SysOp (None) never is."""
+        if account is not None and self.downloads[account] >= DOWNLOADS_QUEUED:
+            raise busy(self.downloads[account] / DOWNLOADS_PER_ACCOUNT)
+        self.downloads[account] += 1
+        own = self.account_slots.setdefault(account, asyncio.Semaphore(DOWNLOADS_PER_ACCOUNT))
+        try:
+            async with own, self.download_slots:
+                yield
+        finally:
+            self.downloads[account] -= 1
+            if not self.downloads[account]:
+                # No one holds or waits for the account's slots any more.
+                del self.downloads[account], self.account_slots[account]
 
     def stored(self, directory: Path, name: str, size: ImageSize) -> bytes | None:
         """The cached image when the name's printing is known and this size is on disk. A name

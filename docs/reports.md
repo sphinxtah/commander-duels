@@ -13,6 +13,10 @@ v0.4.1 adds "Report a problem" for the beta testers, and a Reports tab in Admini
 - **After sending** the dialog says "Thank you. Your report was sent." and that there is no reply in the app. Closing it after a report was sent leaves an empty form for the next one; a report that was not sent keeps its draft.
 - **Accessibility.** The dialog is modal (`<dialog>`: focus stays inside and Escape closes it), and its fields have labels. What happens to the screenshot and to the sending is said in a status line; refusals are alerts. After sending, focus moves to the thank-you heading.
 
+## Reporting a chat message (v0.4.4)
+
+Each message from another player, between friends or in a table's chat, has **Report** in its menu. A short dialog shows the message and asks why (optional); it sends a report whose summary names the sender, with `message: {"kind": "direct" or "table", "id": "..."}`. The API copies the message and the 20 messages before it that the reporter saw into the report (`chat`), with who sent it (`reported_user`). Administration's list marks such a report "Message from …", and its detail shows the copy with the reported message marked. Administrators read chat messages only so ([chat](chat.md#reports-of-a-message)). The 20 reports a day count these too.
+
 ## What is attached
 
 The dialog says so in plain words: "We'll also send: this page, the version, the game and turn, your browser and screen size, and the IDs of your last requests to the site." The game and turn appear only at a table. In detail:

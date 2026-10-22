@@ -166,6 +166,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  |  | ✓ |
 | `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  |  | ✓ | ✓ |
 | `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  |  | ✓ | ✓ |
+| `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  |  | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
@@ -184,6 +185,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 - The last two took effect in v0.0.6 ([games through the API](games.md#sysops-powers)):
   - **Inspection.** SysOp's view of every hand and library, in any running game, audited at every opening.
   - **Any card.** Deck lists naming any card in the engine's card database, on SysOp's practice games.
+- Since v0.4.4 `chat.read_all` is SysOp's alone too: it reads any conversation between friends and any table's chat, allies-only messages included, and every reading is audited ([chat](chat.md#sysops-reader)). Administrators read a chat message only when a player reports it.
 - Administrators and moderators keep SEC05's and NET14's restrictions: there is no "view all live hands" for them.
 
 **Errors** follow the scope's rules:

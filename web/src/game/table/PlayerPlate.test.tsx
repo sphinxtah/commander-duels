@@ -1,13 +1,15 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { GameContext, type GameContextValue } from "../Board";
-import type { Seat } from "../types";
+import type { Alliances, Seat } from "../types";
+import { AllianceContext, allianceBox, type TableAlliances } from "./Alliance";
 import {
   fixtureInput,
   tableFixture,
   type FixtureName,
   type TableFixture,
 } from "./fixtures";
+import { overlaps } from "./geometry";
 import { layoutTable } from "./layout";
 import { PlayerPlate } from "./PlayerPlate";
 import { buildTableModel } from "./tableModel";
@@ -23,6 +25,8 @@ function plate(
     painter?: Painter;
     expandedSeat?: Seat | null;
     canAnswer?: boolean;
+    /** At a human table (v0.4.4): the alliances the plates show. */
+    alliances?: TableAlliances;
   } = {},
 ) {
   const input = fixtureInput(typeof f === "string" ? tableFixture(f) : f, {
@@ -51,13 +55,15 @@ function plate(
       <TableContext.Provider
         value={{ painter, ui, layout, model, fit: null, drag: null }}
       >
-        <PlayerPlate
-          player={player}
-          node={layout.players.get(seat)!}
-          tiles={layout.zones.filter((tile) => tile.seat === seat)}
-          onBrowse={onBrowse}
-          onExpand={onExpand}
-        />
+        <AllianceContext.Provider value={options.alliances ?? null}>
+          <PlayerPlate
+            player={player}
+            node={layout.players.get(seat)!}
+            tiles={layout.zones.filter((tile) => tile.seat === seat)}
+            onBrowse={onBrowse}
+            onExpand={onExpand}
+          />
+        </AllianceContext.Provider>
       </TableContext.Provider>
     </GameContext.Provider>,
   );
@@ -367,5 +373,117 @@ describe("a player's Planeswalker portrait (v0.3.1)", () => {
     ).toBeInTheDocument();
     expect(document.querySelector('img[src^="/portraits/"]')).toBeNull();
     expect(document.querySelector("svg[data-sigil]")).toBeNull();
+  });
+});
+
+describe("alliances on the plates (v0.4.4)", () => {
+  const names = ["alice", "bob", "cara", "dan"];
+  function table(
+    alliances: Alliances,
+    fields: Partial<TableAlliances> = {},
+  ): TableAlliances {
+    return {
+      mine: 0,
+      alliances,
+      open: new Set([1, 2, 3]),
+      handle: (seat) => names[seat],
+      act: vi.fn(),
+      ...fields,
+    };
+  }
+  const none: Alliances = { alliances: [], offers: [] };
+
+  it("offers an alliance from another player's Alliance menu", () => {
+    const alliances = table(none);
+    const { ui } = plate("duel", 1, { alliances });
+    const button = screen.getByRole("button", { name: "Alliance with bob" });
+    expect(button).toHaveAttribute("aria-haspopup", "menu");
+    fireEvent.click(button);
+    expect(ui.get().menu).toBe("alliance:1");
+    const menu = screen.getByRole("menu", { name: "Alliance with bob" });
+    const offer = within(menu).getByRole("menuitem", {
+      name: "Offer an alliance",
+    });
+    expect(offer).toHaveFocus();
+    fireEvent.click(offer);
+    expect(alliances.act).toHaveBeenCalledWith("offer", 1);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(button).toHaveFocus();
+  });
+
+  it("marks an ally and an offer, with the actions each allows", () => {
+    const { unmount } = plate("duel", 1, {
+      alliances: table({ alliances: [[0, 1]], offers: [] }),
+    });
+    expect(screen.getByText("Ally")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Alliance with bob" }));
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["End the alliance"]);
+    unmount();
+
+    const alliances = table({ alliances: [], offers: [{ from: 1, to: 0 }] });
+    plate("duel", 1, { alliances });
+    expect(screen.getByText("Offers alliance")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: "Alliance with bob" });
+    expect(button).toHaveAttribute("data-standing", "offering");
+    fireEvent.click(button);
+    expect(
+      screen.getAllByRole("menuitem").map((item) => item.textContent),
+    ).toEqual(["Accept the alliance", "Decline"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Decline" }));
+    expect(alliances.act).toHaveBeenCalledWith("decline", 1);
+  });
+
+  it("shows whom a player is allied with, on your plate and theirs", () => {
+    const alliances = table({
+      alliances: [
+        [0, 1],
+        [2, 3],
+      ],
+      offers: [],
+    });
+    const { unmount } = plate("four", 0, { alliances });
+    expect(screen.getByText("Allied with bob")).toBeInTheDocument();
+    // Your own plate has no Alliance button.
+    expect(screen.queryByRole("button", { name: /^Alliance/ })).toBeNull();
+    unmount();
+    plate("four", 2, { alliances });
+    expect(screen.getByText("Allied with dan")).toBeInTheDocument();
+  });
+
+  it("gives no actions for a player it may not ally with, nor outside a human table", () => {
+    const { unmount } = plate("duel", 1, {
+      alliances: table(none, { open: new Set() }),
+    });
+    expect(screen.queryByRole("button", { name: /^Alliance/ })).toBeNull();
+    unmount();
+    plate("duel", 1);
+    expect(screen.queryByRole("button", { name: /^Alliance/ })).toBeNull();
+    expect(screen.queryByText("Ally")).toBeNull();
+  });
+
+  it("sits clear of the plate's other controls in every arrangement", () => {
+    for (const name of ["duel", "three", "four"] as const) {
+      const f = tableFixture(name);
+      const model = buildTableModel(fixtureInput(f));
+      const layout = layoutTable(model, { expandedSeat: null, textScale: 1 });
+      for (const player of model.opponents) {
+        const node = layout.players.get(player.seat)!;
+        if (node.chip) continue;
+        const box = allianceBox(node);
+        const hits = [
+          node.target,
+          ...layout.zones.flatMap((tile) => (tile.hit ? [tile.hit] : [])),
+          ...[...layout.nodes.values()].flatMap((n) => (n.hit ? [n.hit] : [])),
+        ];
+        for (const hit of hits)
+          expect(
+            overlaps(box, hit),
+            `${name}: seat ${player.seat}'s Alliance button`,
+          ).toBe(false);
+        expect(box.x).toBeGreaterThanOrEqual(0);
+      }
+    }
   });
 });

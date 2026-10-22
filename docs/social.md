@@ -1,6 +1,6 @@
 # Finding players, friends and notifications (v0.4.3)
 
-Since v0.4.3 players find each other with a search in the top bar, open each other's profiles, become friends, see what their friends are doing, and hear of it through a notification bell. The owner's decisions are in [the v0.4.3 plan](plans/0.4.3.md#decisions-at-the-start-of-v043). The API is `api/social.py`; the web app's part is `web/src/social/`. Chat between friends and at the table comes next, in v0.4.4 ([its plan](plans/0.4.4.md)).
+Since v0.4.3 players find each other with a search in the top bar, open each other's profiles, become friends, see what their friends are doing, and hear of it through a notification bell. The owner's decisions are in [the v0.4.3 plan](plans/0.4.3.md#decisions-at-the-start-of-v043). The API is `api/social.py`; the web app's part is `web/src/social/`. Since v0.4.4 friends write to each other, and new messages come to the bell too ([chat](chat.md)).
 
 ## The player search
 
@@ -40,8 +40,8 @@ A block (from the player's profile, after a confirmation) ends any friendship or
 ## Notifications and the bell
 
 - **The bell** sits in the top bar's right-hand corner, on every page of the app, with the count of unread notifications (also in the browser tab's title, with Administration's counts). It opens a bubble with the newest six and, at its bottom, **See all notifications**, the full history (`#notifications`), a page of 20 at a time with "Show older notifications". Opening either marks what it shows read. Escape, a click elsewhere or another page closes the bubble.
-- **What it tells** (`NotificationItem.kind`): a friend request (with Accept and Decline while it waits), a request accepted, and a friend coming online. The last goes only to friends online at that moment, and at most once in 30 minutes for the same friend.
-- **Pop-ups.** A notification that arrives while the app is open pops up beside the bell for 8 seconds, from the check-in's answer (`fresh`: unread notifications newer than the newest the page knew of). Nothing from before the page opened pops up.
+- **What it tells** (`NotificationItem.kind`): a friend request (with Accept and Decline while it waits), a request accepted, and a friend coming online. The last goes only to friends online at that moment, and at most once in 30 minutes for the same friend. Since v0.4.4, `message`: new messages from a friend, one notification while unread with their count (`messages`), renewed by each message and read with the conversation; it opens the conversation ([chat](chat.md#friends-messages)).
+- **Pop-ups.** A notification that arrives while the app is open pops up beside the bell for 8 seconds, from the check-in's answer (`fresh`: unread notifications newer than the newest the page knew of). Nothing from before the page opened pops up. A message from a friend pops up the moment it arrives, from the chat's own connection, so its notification does not pop up again.
 - **Kept** 90 days, and at most the newest 200 per account; older ones go when a new one arrives. The bell alone: no email, no browser notifications.
 - `GET /api/v1/notifications?limit=&cursor=`, `POST /api/v1/notifications/read {up_to}`.
 
@@ -51,7 +51,7 @@ On Profile, under "Privacy" (`PrivacySettings.tsx`): who sees whether you are on
 
 ## Deleting an account
 
-Deleting an account ([accounts](../api/accounts.py), `CLEANUPS`) removes its friendships and requests, its blocks either way, and the notifications it received or caused.
+Deleting an account ([accounts](../api/accounts.py), `CLEANUPS`) removes its friendships and requests, its blocks either way, and the notifications it received or caused; since v0.4.4 also its conversations and its lines in tables' chats ([chat](chat.md#kept-and-removed)).
 
 ## The data
 

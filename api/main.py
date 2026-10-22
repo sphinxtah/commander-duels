@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from uuid import uuid4
@@ -16,6 +17,7 @@ from api import (
     auth,
     card_images,
     cards,
+    chat,
     custom_cards,
     decks,
     economy,
@@ -118,6 +120,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.database = build_engine(config.database_url)
+        # Friends' messages reach open tabs from the routes' threads through this loop (v0.4.4).
+        app.state.chat = chat.ChatHub(asyncio.get_running_loop())
         token = config.engine_service_token.get_secret_value()
         with httpx.Client(timeout=5.0) as google:
             if config.google_client_id:
@@ -332,4 +336,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(shop.router)
     app.include_router(reports.router)
     app.include_router(social.router)
+    app.include_router(chat.router)
     return app

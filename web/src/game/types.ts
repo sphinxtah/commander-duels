@@ -364,8 +364,49 @@ export interface Presence {
   seats: PresenceSeat[];
 }
 
+/** A line of a human table's chat (v0.4.4, docs/chat.md): a player's text or emote, or an
+ * alliance's start or end. */
+export interface ChatLine {
+  id: string;
+  channel: "table" | "allies";
+  kind: "text" | "emote" | "event";
+  /** The sender's seat: null for SysOp watching, and for an event nobody caused. */
+  seat: Seat | null;
+  sender: { id: string; handle: string | null } | null;
+  /** A text's words, an emote's name, or an event's: "allied" or "alliance_ended". */
+  body: string;
+  /** An allies-only line's recipients besides the sender; an event's two players. */
+  seats: Seat[];
+  client_id: string | null;
+  created_at: string;
+}
+
+/** Every alliance at the table, and the offers this connection's seat made or received (all of
+ * them for SysOp). */
+export interface Alliances {
+  alliances: [Seat, Seat][];
+  offers: { from: Seat; to: Seat }[];
+}
+
+export type AllianceAction =
+  "offer" | "accept" | "decline" | "withdraw" | "end";
+
+export type EmoteName =
+  | "hello"
+  | "good_luck"
+  | "your_turn"
+  | "thinking"
+  | "nice_play"
+  | "thanks"
+  | "oops"
+  | "sorry"
+  | "good_game";
+
 export type ServerMessage =
   | ({ type: "presence" } & Presence)
+  | { type: "chat_history"; messages: ChatLine[] }
+  | { type: "chat"; message: ChatLine }
+  | ({ type: "alliances" } & Alliances)
   | {
       type: "welcome";
       game_id: string;
@@ -385,4 +426,14 @@ export type ServerMessage =
   | { type: "inspection"; inspection: Inspection }
   | { type: "interrupted"; game_id: string }
   | { type: "pong" }
-  | { type: "error"; code: string; message?: string; seat?: Seat };
+  | {
+      type: "error";
+      code: string;
+      message?: string;
+      /** The vote's or the alliance's other seat. */
+      seat?: Seat;
+      /** The chat message or emote refused. */
+      client_id?: string | null;
+      /** chat_limited: the seconds to wait. */
+      retry_after?: number;
+    };

@@ -7,6 +7,10 @@ import {
   useState,
 } from "react";
 import { client, type Me } from "../api";
+import {
+  ReportMessageDialog,
+  type ReportedMessage,
+} from "../chat/ReportMessage";
 import { useFullscreen } from "../app/fullscreen";
 import {
   holdLiveGame,
@@ -29,6 +33,7 @@ import {
   optionsByObject,
   optionsBySeat,
   playerName,
+  players,
   primaryOption,
   resultText,
   words,
@@ -37,7 +42,9 @@ import {
 import { PriorityPanel } from "./PriorityPanel";
 import { PromptPanel } from "./PromptPanel";
 import { useTableSound } from "./sound/useTableSound";
+import { AllianceContext, type TableAlliances } from "./table/Alliance";
 import { BandHud, type TurnLine } from "./table/BandHud";
+import { allianceSeats, type Channel, type ChatPeople } from "./table/chat";
 import { DomLayer } from "./table/DomLayer";
 import { Drawer } from "./table/Drawers";
 import { useDragController } from "./table/dnd";
@@ -48,6 +55,7 @@ import { Magnifier } from "./table/Magnifier";
 import { PassingNotice } from "./table/PassingNotice";
 import { probeWebGL, SceneHost } from "./table/SceneHost";
 import { Stage, useStageFit } from "./table/Stage";
+import { TableChat, useChatReading } from "./table/TableChat";
 import { TableContext, useTableContext } from "./table/TableContext";
 import {
   ARM_CAP_MS,
@@ -134,6 +142,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   // "Report a problem" from the Game menu (v0.4.1): the report names this game and its turn.
   const [reporting, setReporting] = useState(false);
+  // At a human table (v0.4.4): the chat's tab, and a line being reported.
+  const [chatTab, setChatTab] = useState<Channel>("table");
+  const [reportedLine, setReportedLine] = useState<ReportedMessage | null>(
+    null,
+  );
   const [expandedSeat, setExpandedSeat] = useState<Seat | null>(null);
   const [sceneStatus, setSceneStatus] = useState<SceneStatus | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -493,6 +506,71 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       const entry = summary?.seats.find((s) => s.seat === Number(number) - 1);
       return entry?.player === "human" && entry.handle ? entry.handle : words;
     });
+
+  // A human table's chat and alliances (v0.4.4, docs/chat.md): the chat in its drawer behind the
+  // band's diamond, and the alliances on the plates. The history the server sends a table's
+  // connection says it is one before the summary does; a practice game has neither.
+  const chatting = atTable || state.chat !== null;
+  const people = useMemo<ChatPeople>(
+    () => ({
+      seat: state.seat,
+      userId: me?.id ?? null,
+      handle: (seat) =>
+        summary?.seats.find((entry) => entry.seat === seat)?.handle ??
+        playerName(view, seat, true),
+    }),
+    [state.seat, me?.id, summary, view],
+  );
+  const unread = useChatReading({
+    chat: state.chat,
+    outbox: state.outbox,
+    refusal: state.allianceRefusal,
+    people,
+    reading: chatting && drawer === "chat" ? chatTab : null,
+    say,
+  });
+  const lost = useMemo(
+    () =>
+      new Set(
+        view
+          ? players(view)
+              .filter((player) => player.lost)
+              .map((player) => player.seat)
+          : [],
+      ),
+    [view],
+  );
+  const over = Boolean(snapshot?.result) || state.ended !== null;
+  const alliances = useMemo<TableAlliances | null>(
+    () =>
+      chatting
+        ? {
+            mine: state.seat,
+            alliances: state.alliances,
+            open: allianceSeats({
+              mine: state.seat,
+              seats: summary?.seats ?? null,
+              presence: state.presence?.seats ?? null,
+              lost,
+              finished: over,
+            }),
+            handle: people.handle,
+            act: (action, seat) => connection?.alliance(action, seat),
+          }
+        : null,
+    [
+      chatting,
+      state.seat,
+      state.alliances,
+      state.presence,
+      summary,
+      lost,
+      over,
+      people,
+      connection,
+    ],
+  );
+
   const result = snapshot?.result ?? null;
   const outcome = result
     ? resultText(view, state.seat, result, seatName)
@@ -554,354 +632,398 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   return (
     <GameContext.Provider value={context}>
       <TableContext.Provider value={table}>
-        <div className={styles.screen}>
-          <Stage
-            fit={fit}
-            painter={painter}
-            status={sceneStatus}
-            revision={model?.revision ?? null}
-            arrangement={model?.arrangement ?? null}
-            opponents={view?.opponents.length ?? 0}
-            keyboardLock={fullscreen.escapeLocked}
-            canvas={canvas}
-          >
-            <h1 ref={heading} tabIndex={-1} className={styles.visuallyHidden}>
-              {format === "commander" ? "Commander" : "Legacy"}
-              <span>{atTable ? " · Table game" : " · Practice game"}</span>
-            </h1>
-
-            <BandHud
-              layout={layout}
-              sysop={sysop}
-              drawer={drawer}
-              onDrawer={openDrawer}
-              menuOpen={menuOpen}
-              onMenu={(open) => (open ? setMenuOpen(true) : closeMenu(false))}
-              fullscreen={fullscreen}
-              turnLine={turnLine}
-              statusText={connectionText}
-              statusPhase={state.phase}
-            />
-            <div className={screen.notes} aria-label="Table notices">
-              <UpdateNotice inGame className={screen.chip} />
-              {liveNotice && (
-                <span role="status" className={screen.chip}>
-                  {liveNotice}
-                </span>
-              )}
-              {sceneStatus?.renderer === "lost" && sceneWanted && (
-                <span role="status" className={screen.chip}>
-                  Redrawing the table…
-                </span>
-              )}
-              {fullscreenHint && (
-                <span className={screen.chip} aria-hidden="true">
-                  Full screen: F
-                </span>
-              )}
-            </div>
-            <GameMenu
-              open={menuOpen}
-              onClose={closeMenu}
-              fullscreen={fullscreen}
-              muted={settings.muted}
-              onMute={(muted) => updateSettings({ muted })}
-              onOptions={() => openDrawer("options")}
-              onReport={() => {
-                closeMenu(false);
-                setReporting(true);
-              }}
-              onConcede={() => {
-                closeMenu(false);
-                concedeDialog.current?.showModal();
-              }}
-              concedeDisabled={concedeDisabled}
-              onLeave={leave}
-            />
-
-            {(state.ended || state.crowded || state.interrupted || !view) && (
-              <div className={screen.alerts} style={boxStyle(REGIONS.alerts)}>
-                {state.ended && (
-                  <div className={screen.alert} role="alert">
-                    <p>{ended[state.ended] ?? "This game has ended."}</p>
-                    {recordedOutcome && (
-                      <p>
-                        {recordedOutcome.title}: {recordedOutcome.detail}
-                        {tokensLine ? ` ${tokensLine}` : ""}
-                      </p>
-                    )}
-                    <a
-                      href={back.href}
-                      className={styles.secondaryButton}
-                      onClick={leave}
-                    >
-                      {back.text}
-                    </a>
-                  </div>
-                )}
-                {state.crowded && (
-                  <div className={screen.alert} role="alert">
-                    <p>
-                      This game is open in too many tabs. Close one, and this
-                      tab connects by itself.
-                    </p>
-                  </div>
-                )}
-                {state.interrupted && (
-                  <div className={screen.alert} role="alert">
-                    <p>
-                      The rules engine lost this game (a restart), so it cannot
-                      continue. Recovery arrives in a later version.
-                    </p>
-                  </div>
-                )}
-                {!view && !state.ended && (
-                  <p role="status" className={screen.setup}>
-                    Setting up the table…
-                  </p>
-                )}
-              </div>
-            )}
-
-            {model && layout && (
-              <DomLayer
-                model={model}
-                layout={layout}
-                painter={painter}
-                onBrowse={browse}
-                onExpand={setExpandedSeat}
-              />
-            )}
-
-            <aside aria-label="Prompt and game log" className={screen.aside}>
-              <div
-                className={screen.column}
-                style={boxStyle(REGIONS.column)}
-                data-column
-              >
-                {fit.small && (
-                  <p role="status" className={screen.small}>
-                    The table is designed for a window of at least 1280 × 720.
-                  </p>
-                )}
-                {state.seat !== null && (
-                  <PassingNotice
-                    passing={controls?.passing ?? null}
-                    disabled={
-                      state.role !== "controller" ||
-                      state.pending !== null ||
-                      result !== null
-                    }
-                    onStop={() =>
-                      connection?.setPriority({ cancel_passes: true })
-                    }
-                  />
-                )}
-                <AwayPlayers
-                  state={state}
-                  name={seatName}
-                  onVote={(seat, remove) => connection?.vote(seat, remove)}
-                />
-                <PromptPanel
-                  state={shown}
-                  onAnswer={answer}
-                  onTakeControl={() => connection?.takeControl()}
-                  onConcede={() => concedeDialog.current?.showModal()}
-                  timer={timer.view}
-                  onStopTimer={timer.stop}
-                />
-                {result && outcome && (
-                  <section
-                    className={styles.result}
-                    aria-labelledby="result-side-title"
-                  >
-                    <h2 id="result-side-title">{outcome.title}</h2>
-                    <p>{outcome.detail}</p>
-                    {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
-                    <a
-                      href={back.href}
-                      className={styles.secondaryButton}
-                      onClick={leave}
-                    >
-                      {back.text}
-                    </a>
-                  </section>
-                )}
-              </div>
-
-              <Drawer
-                id="priority"
-                name="Priority controls"
-                open={drawer === "priority"}
-                closed="hidden"
-                onClose={closeDrawer}
-              >
-                <PriorityPanel
-                  state={shown}
-                  onSet={(priority) => connection?.setPriority(priority)}
-                  showPassing={false}
-                />
-                {state.seat === null && (
-                  <p className={styles.hint}>
-                    Only the seat’s own player sets its priority.
-                  </p>
-                )}
-              </Drawer>
-              {sysop && (
-                <Drawer
-                  id="inspection"
-                  name="Inspection"
-                  open={drawer === "inspection"}
-                  closed="hidden"
-                  onClose={closeDrawer}
-                >
-                  <label className={styles.switch}>
-                    <input
-                      type="checkbox"
-                      checked={inspect}
-                      onChange={(event) => toggleInspect(event.target.checked)}
-                    />
-                    <span>Inspect</span>
-                  </label>
-                  {inspect && <InspectionPanel inspection={state.inspection} />}
-                </Drawer>
-              )}
-              <Drawer
-                id="log"
-                name="Game log"
-                open={drawer === "log"}
-                closed="visually-hidden"
-                onClose={closeDrawer}
-              >
-                <section className={styles.log} aria-labelledby="log-title">
-                  <h2 id="log-title">Game log</h2>
-                  <GameLog
-                    lines={state.log}
-                    focusable={drawer === "log"}
-                    rename={atTable ? handlesInLog : undefined}
-                  />
-                </section>
-              </Drawer>
-              {drawer === "options" && (
-                <Drawer
-                  id="options"
-                  name="Table options"
-                  titled
-                  open
-                  closed="hidden"
-                  onClose={closeDrawer}
-                >
-                  <TableSettingsForm compact />
-                </Drawer>
-              )}
-              {drawer === "zone" && zone && model && (
-                <Drawer
-                  id="zone"
-                  name={zoneTitle(zone, model)}
-                  titled
-                  open
-                  closed="hidden"
-                  onClose={closeDrawer}
-                >
-                  <ZoneContents target={zone} model={model} />
-                </Drawer>
-              )}
-            </aside>
-
-            <p
-              className={styles.visuallyHidden}
-              aria-live="polite"
-              data-announcer
+        <AllianceContext.Provider value={alliances}>
+          <div className={styles.screen}>
+            <Stage
+              fit={fit}
+              painter={painter}
+              status={sceneStatus}
+              revision={model?.revision ?? null}
+              arrangement={model?.arrangement ?? null}
+              opponents={view?.opponents.length ?? 0}
+              keyboardLock={fullscreen.escapeLocked}
+              canvas={canvas}
             >
-              {announcement}
-            </p>
-            <TimerStatus />
+              <h1 ref={heading} tabIndex={-1} className={styles.visuallyHidden}>
+                {format === "commander" ? "Commander" : "Legacy"}
+                <span>{atTable ? " · Table game" : " · Practice game"}</span>
+              </h1>
 
-            {model && layout && (
-              <Magnifier
-                model={model}
+              <BandHud
                 layout={layout}
-                fit={fit}
-                view={view}
-                observing={observing}
-                painter={painter}
+                sysop={sysop}
+                drawer={drawer}
+                onDrawer={openDrawer}
+                menuOpen={menuOpen}
+                onMenu={(open) => (open ? setMenuOpen(true) : closeMenu(false))}
+                fullscreen={fullscreen}
+                turnLine={turnLine}
+                statusText={connectionText}
+                statusPhase={state.phase}
+                chat={
+                  chatting ? { unread: unread.table + unread.allies } : null
+                }
+              />
+              <div className={screen.notes} aria-label="Table notices">
+                <UpdateNotice inGame className={screen.chip} />
+                {liveNotice && (
+                  <span role="status" className={screen.chip}>
+                    {liveNotice}
+                  </span>
+                )}
+                {sceneStatus?.renderer === "lost" && sceneWanted && (
+                  <span role="status" className={screen.chip}>
+                    Redrawing the table…
+                  </span>
+                )}
+                {fullscreenHint && (
+                  <span className={screen.chip} aria-hidden="true">
+                    Full screen: F
+                  </span>
+                )}
+              </div>
+              <GameMenu
+                open={menuOpen}
+                onClose={closeMenu}
+                fullscreen={fullscreen}
+                muted={settings.muted}
+                onMute={(muted) => updateSettings({ muted })}
+                onOptions={() => openDrawer("options")}
+                onReport={() => {
+                  closeMenu(false);
+                  setReporting(true);
+                }}
+                onConcede={() => {
+                  closeMenu(false);
+                  concedeDialog.current?.showModal();
+                }}
+                concedeDisabled={concedeDisabled}
+                onLeave={leave}
+              />
+
+              {(state.ended || state.crowded || state.interrupted || !view) && (
+                <div className={screen.alerts} style={boxStyle(REGIONS.alerts)}>
+                  {state.ended && (
+                    <div className={screen.alert} role="alert">
+                      <p>{ended[state.ended] ?? "This game has ended."}</p>
+                      {recordedOutcome && (
+                        <p>
+                          {recordedOutcome.title}: {recordedOutcome.detail}
+                          {tokensLine ? ` ${tokensLine}` : ""}
+                        </p>
+                      )}
+                      <a
+                        href={back.href}
+                        className={styles.secondaryButton}
+                        onClick={leave}
+                      >
+                        {back.text}
+                      </a>
+                    </div>
+                  )}
+                  {state.crowded && (
+                    <div className={screen.alert} role="alert">
+                      <p>
+                        This game is open in too many tabs. Close one, and this
+                        tab connects by itself.
+                      </p>
+                    </div>
+                  )}
+                  {state.interrupted && (
+                    <div className={screen.alert} role="alert">
+                      <p>
+                        The rules engine lost this game (a restart), so it
+                        cannot continue. Recovery arrives in a later version.
+                      </p>
+                    </div>
+                  )}
+                  {!view && !state.ended && (
+                    <p role="status" className={screen.setup}>
+                      Setting up the table…
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {model && layout && (
+                <DomLayer
+                  model={model}
+                  layout={layout}
+                  painter={painter}
+                  onBrowse={browse}
+                  onExpand={setExpandedSeat}
+                />
+              )}
+
+              <aside aria-label="Prompt and game log" className={screen.aside}>
+                <div
+                  className={screen.column}
+                  style={boxStyle(REGIONS.column)}
+                  data-column
+                >
+                  {fit.small && (
+                    <p role="status" className={screen.small}>
+                      The table is designed for a window of at least 1280 × 720.
+                    </p>
+                  )}
+                  {state.seat !== null && (
+                    <PassingNotice
+                      passing={controls?.passing ?? null}
+                      disabled={
+                        state.role !== "controller" ||
+                        state.pending !== null ||
+                        result !== null
+                      }
+                      onStop={() =>
+                        connection?.setPriority({ cancel_passes: true })
+                      }
+                    />
+                  )}
+                  <AwayPlayers
+                    state={state}
+                    name={seatName}
+                    onVote={(seat, remove) => connection?.vote(seat, remove)}
+                  />
+                  <PromptPanel
+                    state={shown}
+                    onAnswer={answer}
+                    onTakeControl={() => connection?.takeControl()}
+                    onConcede={() => concedeDialog.current?.showModal()}
+                    timer={timer.view}
+                    onStopTimer={timer.stop}
+                  />
+                  {result && outcome && (
+                    <section
+                      className={styles.result}
+                      aria-labelledby="result-side-title"
+                    >
+                      <h2 id="result-side-title">{outcome.title}</h2>
+                      <p>{outcome.detail}</p>
+                      {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+                      <a
+                        href={back.href}
+                        className={styles.secondaryButton}
+                        onClick={leave}
+                      >
+                        {back.text}
+                      </a>
+                    </section>
+                  )}
+                </div>
+
+                <Drawer
+                  id="priority"
+                  name="Priority controls"
+                  open={drawer === "priority"}
+                  closed="hidden"
+                  onClose={closeDrawer}
+                >
+                  <PriorityPanel
+                    state={shown}
+                    onSet={(priority) => connection?.setPriority(priority)}
+                    showPassing={false}
+                  />
+                  {state.seat === null && (
+                    <p className={styles.hint}>
+                      Only the seat’s own player sets its priority.
+                    </p>
+                  )}
+                </Drawer>
+                {sysop && (
+                  <Drawer
+                    id="inspection"
+                    name="Inspection"
+                    open={drawer === "inspection"}
+                    closed="hidden"
+                    onClose={closeDrawer}
+                  >
+                    <label className={styles.switch}>
+                      <input
+                        type="checkbox"
+                        checked={inspect}
+                        onChange={(event) =>
+                          toggleInspect(event.target.checked)
+                        }
+                      />
+                      <span>Inspect</span>
+                    </label>
+                    {inspect && (
+                      <InspectionPanel inspection={state.inspection} />
+                    )}
+                  </Drawer>
+                )}
+                <Drawer
+                  id="log"
+                  name="Game log"
+                  open={drawer === "log"}
+                  closed="visually-hidden"
+                  onClose={closeDrawer}
+                >
+                  <section className={styles.log} aria-labelledby="log-title">
+                    <h2 id="log-title">Game log</h2>
+                    <GameLog
+                      lines={state.log}
+                      focusable={drawer === "log"}
+                      rename={atTable ? handlesInLog : undefined}
+                    />
+                  </section>
+                </Drawer>
+                {chatting && (
+                  <Drawer
+                    id="chat"
+                    name="Table chat"
+                    titled
+                    fill
+                    open={drawer === "chat"}
+                    closed="hidden"
+                    onClose={closeDrawer}
+                  >
+                    <TableChat
+                      state={state}
+                      people={people}
+                      tab={chatTab}
+                      onTab={setChatTab}
+                      unread={unread}
+                      open={drawer === "chat"}
+                      connected={state.phase === "open"}
+                      onSend={(channel, text) =>
+                        connection?.chat(channel, text)
+                      }
+                      onEmote={(emote) => connection?.emote(emote)}
+                      onRetry={(id) => connection?.retryChat(id)}
+                      onDiscard={(id) => connection?.discardChat(id)}
+                      onReport={setReportedLine}
+                    />
+                  </Drawer>
+                )}
+                {drawer === "options" && (
+                  <Drawer
+                    id="options"
+                    name="Table options"
+                    titled
+                    open
+                    closed="hidden"
+                    onClose={closeDrawer}
+                  >
+                    <TableSettingsForm compact />
+                  </Drawer>
+                )}
+                {drawer === "zone" && zone && model && (
+                  <Drawer
+                    id="zone"
+                    name={zoneTitle(zone, model)}
+                    titled
+                    open
+                    closed="hidden"
+                    onClose={closeDrawer}
+                  >
+                    <ZoneContents target={zone} model={model} />
+                  </Drawer>
+                )}
+              </aside>
+
+              <p
+                className={styles.visuallyHidden}
+                aria-live="polite"
+                data-announcer
+              >
+                {announcement}
+              </p>
+              <TimerStatus />
+
+              {model && layout && (
+                <Magnifier
+                  model={model}
+                  layout={layout}
+                  fit={fit}
+                  view={view}
+                  observing={observing}
+                  painter={painter}
+                />
+              )}
+            </Stage>
+
+            <CardZoom
+              card={zoomed?.card ?? null}
+              located={zoomed?.located}
+              onClose={() => setZoomed(null)}
+            />
+            <dialog
+              ref={concedeDialog}
+              className={styles.confirm}
+              aria-labelledby="concede-title"
+            >
+              <h2 id="concede-title">Concede this game?</h2>
+              <p>
+                You lose this game at once.{" "}
+                {atTable
+                  ? "The other players play on without you."
+                  : "The bots play on without you."}
+              </p>
+              <form method="dialog" className={styles.confirmButtons}>
+                <button
+                  type="submit"
+                  className={styles.secondaryButton}
+                  autoFocus
+                >
+                  Keep playing
+                </button>
+                <button
+                  type="submit"
+                  className={styles.dangerButton}
+                  onClick={() => connection?.concede()}
+                >
+                  Concede
+                </button>
+              </form>
+            </dialog>
+            <ReportDialog
+              open={reporting}
+              game={{ id: gameId, turn: view?.turn ?? null }}
+              onClose={() => {
+                setReporting(false);
+                // The Game menu closed as the dialog opened: focus goes back to its diamond.
+                const active = document.activeElement;
+                if (
+                  !active ||
+                  active === document.body ||
+                  active.closest("[hidden]")
+                )
+                  document
+                    .querySelector<HTMLElement>("[data-menu-toggle]")
+                    ?.focus({ preventScroll: true });
+              }}
+            />
+            <dialog
+              ref={resultDialog}
+              className={styles.confirm}
+              aria-labelledby="result-title"
+            >
+              <h2 id="result-title">{outcome?.title}</h2>
+              <p>{outcome?.detail}</p>
+              {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+              <form method="dialog" className={styles.confirmButtons}>
+                <button type="submit" className={styles.secondaryButton}>
+                  Review the board
+                </button>
+                <a
+                  href={back.href}
+                  className={styles.primaryButton}
+                  onClick={leave}
+                >
+                  {back.text}
+                </a>
+              </form>
+            </dialog>
+            {chatting && (
+              <ReportMessageDialog
+                message={reportedLine}
+                game={{ id: gameId, turn: view?.turn ?? null }}
+                onClose={() => setReportedLine(null)}
               />
             )}
-          </Stage>
-
-          <CardZoom
-            card={zoomed?.card ?? null}
-            located={zoomed?.located}
-            onClose={() => setZoomed(null)}
-          />
-          <dialog
-            ref={concedeDialog}
-            className={styles.confirm}
-            aria-labelledby="concede-title"
-          >
-            <h2 id="concede-title">Concede this game?</h2>
-            <p>
-              You lose this game at once.{" "}
-              {atTable
-                ? "The other players play on without you."
-                : "The bots play on without you."}
-            </p>
-            <form method="dialog" className={styles.confirmButtons}>
-              <button
-                type="submit"
-                className={styles.secondaryButton}
-                autoFocus
-              >
-                Keep playing
-              </button>
-              <button
-                type="submit"
-                className={styles.dangerButton}
-                onClick={() => connection?.concede()}
-              >
-                Concede
-              </button>
-            </form>
-          </dialog>
-          <ReportDialog
-            open={reporting}
-            game={{ id: gameId, turn: view?.turn ?? null }}
-            onClose={() => {
-              setReporting(false);
-              // The Game menu closed as the dialog opened: focus goes back to its diamond.
-              const active = document.activeElement;
-              if (
-                !active ||
-                active === document.body ||
-                active.closest("[hidden]")
-              )
-                document
-                  .querySelector<HTMLElement>("[data-menu-toggle]")
-                  ?.focus({ preventScroll: true });
-            }}
-          />
-          <dialog
-            ref={resultDialog}
-            className={styles.confirm}
-            aria-labelledby="result-title"
-          >
-            <h2 id="result-title">{outcome?.title}</h2>
-            <p>{outcome?.detail}</p>
-            {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
-            <form method="dialog" className={styles.confirmButtons}>
-              <button type="submit" className={styles.secondaryButton}>
-                Review the board
-              </button>
-              <a
-                href={back.href}
-                className={styles.primaryButton}
-                onClick={leave}
-              >
-                {back.text}
-              </a>
-            </form>
-          </dialog>
-        </div>
+          </div>
+        </AllianceContext.Provider>
       </TableContext.Provider>
     </GameContext.Provider>
   );

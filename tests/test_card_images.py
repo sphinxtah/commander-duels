@@ -11,7 +11,7 @@ from datetime import timedelta
 from email.utils import format_datetime
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -26,10 +26,14 @@ from sqlalchemy.pool import QueuePool
 from api import card_images
 from api.card_images import (
     API_SPACING,
+    DOWNLOADS_AT_ONCE,
+    DOWNLOADS_PER_ACCOUNT,
+    DOWNLOADS_QUEUED,
     IMAGE_CACHE_CONTROL,
     LOOKUPS_PER_ACCOUNT,
     LOOKUPS_WAITING,
     CardImageCache,
+    Chosen,
 )
 from api.config import Settings
 from api.database import build_engine
@@ -117,6 +121,10 @@ class FakeScryfall:
         self.clock: Callable[[], float] | None = None
         # While set and closed, API requests wait for it: lookups stay in flight.
         self.gate: asyncio.Event | None = None
+        # The same for downloads from the image host, and how many were in flight at once.
+        self.image_gate: asyncio.Event | None = None
+        self.in_flight = 0
+        self.most_in_flight = 0
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         if request.url.host == "api.scryfall.com":
@@ -140,6 +148,14 @@ class FakeScryfall:
             return httpx.Response(200, json=card)
         assert request.url.host == "cards.scryfall.io", request.url
         self.downloads.append(str(request.url))
+        if self.image_gate is not None:
+            self.in_flight += 1
+            self.most_in_flight = max(self.most_in_flight, self.in_flight)
+            try:
+                await self.image_gate.wait()
+                await asyncio.sleep(0.01)  # concurrent downloads overlap here
+            finally:
+                self.in_flight -= 1
         if self.image_failure is not None:
             return self.image_failure
         # Each image is its format's signature and its own path, so a test can tell which it got.
@@ -815,6 +831,81 @@ def test_lookups_waiting_on_scryfall_are_capped_per_account_and_in_all(
             assert "Junk extra" not in scryfall.api_calls and entry(app, "Junk extra") is None
             assert entry(app, "Delver of Secrets") is not None
             assert entries(app) == 2 + LOOKUPS_WAITING + 1
+
+    asyncio.run(scenario())
+
+
+def test_catalog_downloads_wait_their_turn_rather_than_being_refused(
+    database: str, scryfall: FakeScryfall, directory: Path
+) -> None:
+    """A pack of new cards, or a page of the Cards list, asks for many printings at once. Until
+    v0.4.4 their downloads took the lookups' share of 8 an account, so the 9th onwards was
+    refused and the card kept its text frame (the owner's report: 8 of a pack's 14 drew)."""
+
+    def printing(stem: str) -> Chosen:
+        return Chosen(
+            scryfall_id=uuid4(),
+            face=None,
+            source={"image_uris": image_uris(stem)},
+            artist=None,
+            set_code="dft",
+            collector_number="1",
+        )
+
+    async def scenario() -> None:
+        engine = build_engine(database)
+        try:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(scryfall)) as client:
+                settings = Settings(database_url=database, card_image_dir=str(directory))
+                cache = CardImageCache(settings, engine, client)
+
+                def fetch(stems: list[str], account: UUID | None) -> asyncio.Future[list[bytes]]:
+                    return asyncio.gather(
+                        *(
+                            cache.catalog_image(directory, printing(stem), "normal", account)
+                            for stem in stems
+                        )
+                    )
+
+                scryfall.image_gate = asyncio.Event()
+                pack = [f"pack-{index}" for index in range(20)]
+                mine = fetch(pack, ACCOUNT)
+                # A few download at once; the rest wait their turn, none refused.
+                await eventually(lambda: cache.downloads[ACCOUNT] == len(pack))
+                assert scryfall.in_flight == DOWNLOADS_PER_ACCOUNT and not cache.lookups
+                # Another account's cards are not held up behind them, nor SysOp's.
+                theirs = fetch(["theirs-0", "theirs-1"], uuid4())
+                root = fetch(["root-0"], None)
+                await eventually(lambda: scryfall.in_flight == DOWNLOADS_PER_ACCOUNT + 3)
+                scryfall.image_gate.set()
+                assert await mine == [served(stem) for stem in pack]
+                assert await theirs == [served("theirs-0"), served("theirs-1")]
+                assert await root == [served("root-0")]
+                assert scryfall.most_in_flight == DOWNLOADS_PER_ACCOUNT + 3
+                assert not cache.downloads and not cache.account_slots
+
+                # Everyone's downloads at once are capped too.
+                scryfall.image_gate = asyncio.Event()
+                each = DOWNLOADS_PER_ACCOUNT
+                crowd = [
+                    fetch([f"crowd-{number}-{index}" for index in range(each)], uuid4())
+                    for number in range(DOWNLOADS_AT_ONCE // each + 2)
+                ]
+                await eventually(lambda: scryfall.in_flight == DOWNLOADS_AT_ONCE)
+                scryfall.image_gate.set()
+                await asyncio.gather(*crowd)
+                assert scryfall.most_in_flight == DOWNLOADS_AT_ONCE
+                assert not cache.downloads and not cache.account_slots
+
+                # An account with very many waiting is refused, with a Retry-After.
+                cache.downloads[ACCOUNT] = DOWNLOADS_QUEUED
+                with pytest.raises(ApiError) as refused:
+                    await cache.catalog_image(directory, printing("late"), "normal", ACCOUNT)
+                assert (refused.value.status, refused.value.code) == (429, "card_images_busy")
+                assert refused.value.headers is not None
+                assert int(refused.value.headers["Retry-After"]) >= 1
+        finally:
+            engine.dispose()
 
     asyncio.run(scenario())
 

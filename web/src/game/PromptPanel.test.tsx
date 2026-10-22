@@ -108,6 +108,10 @@ function state(snap: Snapshot, pending = false): GameState {
     priority: null,
     presence: null,
     voteRefusal: null,
+    chat: null,
+    outbox: [],
+    alliances: null,
+    allianceRefusal: null,
   };
 }
 

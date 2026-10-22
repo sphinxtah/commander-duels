@@ -93,6 +93,22 @@
   width: 52%;
   height: 52%;
 }
+/* The chat's unread count on its diamond (v0.4.4). */
+.hudCount {
+  position: absolute;
+  top: -8px;
+  right: -10px;
+  min-width: 22px;
+  box-sizing: border-box;
+  padding: 0 5px;
+  border-radius: 11px;
+  background: #b07cff;
+  color: #120b1c;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 22px;
+  text-align: center;
+}
 .turnLine {
   margin: 0;
   pointer-events: none;
@@ -457,6 +473,13 @@
   outline: none;
   scrollbar-width: thin;
 }
+/* A drawer whose contents fill it and scroll within themselves: the chat keeps its box for
+   writing in view below its messages. */
+.drawerScroll[data-fill] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .drawerHead {
   display: flex;
   align-items: center;
@@ -498,6 +521,9 @@
   .hudIcon,
   .leadDiamond > svg {
     color: ButtonText;
+  }
+  .hudCount {
+    border: 1px solid ButtonText;
   }
   .ring polygon {
     stroke: Highlight;

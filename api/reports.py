@@ -17,6 +17,11 @@ database, so the nightly backups hold it with its report.
 SysOp and administrators (reports.manage) read the reports newest first, see the screenshots and
 set a status: new (unread), seen, fixed or closed. Each change is audited. An account sends at most
 20 reports a day; SysOp has no limit.
+
+Since v0.4.4 a report may be about a chat message (message): a friend's message the account
+received, or a line of a table's chat it saw. The report keeps a copy of it and of the messages
+before it that the reporter saw (api/chat.py, api/table_chat.py), and who sent it. Administrators
+read chat messages only so, when a player reports them.
 """
 
 import base64
@@ -48,7 +53,15 @@ from api.identity import (
     utcnow,
 )
 from api.models import ProblemReport, User
-from api.schemas import AuditActor, Contract, StoredText, without_nul
+from api.schemas import (
+    AuditActor,
+    ChatPerson,
+    Contract,
+    ReportedChat,
+    ReportedMessageRef,
+    StoredText,
+    without_nul,
+)
 from api.version import APP_VERSION
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -138,6 +151,9 @@ class ReportCreate(Contract):
         max_length=4 * math.ceil(MAX_SCREENSHOT_BYTES / 3),
         description="An image, base64: PNG, JPEG or WebP, at most 5 MB decoded.",
     )
+    message: ReportedMessageRef | None = Field(
+        default=None, description="The chat message the report is about (v0.4.4)."
+    )
 
 
 class ReportReceipt(Contract):
@@ -163,6 +179,9 @@ class ReportSummary(Contract):
     game_id: UUID | None
     game_turn: int | None
     screenshot: bool
+    reported_user: ChatPerson | None = Field(
+        default=None, description="Who sent the reported chat message, if the report is of one."
+    )
 
 
 class ReportDetail(ReportSummary):
@@ -177,6 +196,10 @@ class ReportDetail(ReportSummary):
     screenshot_height: int | None
     status_changed_at: datetime | None
     status_changed_by: AuditActor | None
+    chat: ReportedChat | None = Field(
+        default=None,
+        description="The reported message and the messages before it the reporter saw.",
+    )
 
 
 class ReportPage(Contract):
@@ -286,6 +309,14 @@ def send_report(body: ReportCreate, request: Request, principal: Active, db: Db)
     now = utcnow()
     if principal.user.kind != "sysop":
         limit_reports(db, principal.user.id, now)
+    reported: tuple[UUID, ReportedChat] | None = None
+    if body.message is not None:
+        # Imported here: the chat modules import far.
+        from api.chat import reported_direct
+        from api.table_chat import reported_table
+
+        found = reported_direct if body.message.kind == "direct" else reported_table
+        reported = found(db, principal, body.message.id)
     shot = screenshot_of(body.screenshot) if body.screenshot else None
     context = body.context
     report = ProblemReport(
@@ -307,6 +338,8 @@ def send_report(body: ReportCreate, request: Request, principal: Active, db: Db)
         screenshot=shot[0] if shot else None,
         screenshot_width=shot[1] if shot else None,
         screenshot_height=shot[2] if shot else None,
+        reported_user_id=reported[0] if reported else None,
+        chat=reported[1].model_dump(mode="json") if reported else None,
     )
     db.add(report)
     db.commit()
@@ -342,6 +375,9 @@ def summary_of(report: ProblemReport, users: dict[UUID, User], viewer: Principal
         game_turn=report.game_turn,
         # The width says whether there is one, without loading the image itself.
         screenshot=report.screenshot_width is not None,
+        reported_user=(
+            ReportedChat.model_validate(report.chat).reported_user if report.chat else None
+        ),
     )
 
 
@@ -361,6 +397,7 @@ def detail_of(db: Session, report: ProblemReport, viewer: Principal) -> ReportDe
         screenshot_height=report.screenshot_height,
         status_changed_at=report.status_changed_at,
         status_changed_by=actor_label(changer, viewer),
+        chat=ReportedChat.model_validate(report.chat) if report.chat else None,
     )
 
 

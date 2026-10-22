@@ -19,7 +19,8 @@ data, and other players' records count them. While the account is seated in a ru
 deleting it is refused; it can be deleted once the game ends or the seat concedes.
 
 The worker's daily job (KIND) deletes accounts still pending or denied UNAPPROVED_DAYS after they
-were created, in one transaction, with one audit entry that counts them.
+were created, in one transaction, with one audit entry that counts them; since v0.4.4 it also
+deletes chat messages past their time (api/chat.py).
 """
 
 import logging
@@ -83,7 +84,20 @@ def remove_social(db: Session, user_id: UUID) -> int:
     return delete_social_of(db, user_id)
 
 
-CLEANUPS: tuple[Callable[[Session, UUID], object], ...] = (remove_reports, remove_social)
+def remove_chat(db: Session, user_id: UUID) -> int:
+    """The account's conversations with their messages, and its lines in tables' chats
+    (api/chat.py)."""
+    # Imported here, as above: api.chat imports api.social.
+    from api.chat import delete_chat_of
+
+    return delete_chat_of(db, user_id)
+
+
+CLEANUPS: tuple[Callable[[Session, UUID], object], ...] = (
+    remove_reports,
+    remove_social,
+    remove_chat,
+)
 
 
 @dataclass
@@ -296,14 +310,27 @@ def remove_unapproved(engine: Engine, now: datetime) -> int:
     return len(stale)
 
 
+def prune_messages(engine: Engine, now: datetime) -> int:
+    """Chat messages past their time (api/chat.py prune_chat), since v0.4.4 in the same run."""
+    from api.chat import prune_chat
+
+    with Session(engine) as db:
+        removed = prune_chat(db, now)
+        db.commit()
+    return removed
+
+
 def handle(engine: Engine, now: datetime) -> Outcome:
     """One run of the job, as the outcome catalog.sync.settle records on it."""
     try:
         count = remove_unapproved(engine, now)
+        messages = prune_messages(engine, now)
     except Exception:
-        # Tomorrow's run tries again; the accounts wait one more day.
-        log.exception("Deleting unapproved accounts failed")
+        # Tomorrow's run tries again; the accounts and messages wait one more day.
+        log.exception("The daily account cleanup failed")
         return Outcome("failed", "internal_error")
     if count:
         log.info("Deleted %s accounts never approved in %s days", count, UNAPPROVED_DAYS)
-    return Outcome("completed", "deleted" if count else "nothing_due")
+    if messages:
+        log.info("Deleted %s chat messages past their time", messages)
+    return Outcome("completed", "deleted" if count or messages else "nothing_due")

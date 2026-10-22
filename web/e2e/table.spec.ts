@@ -1,4 +1,10 @@
-import { test, expect, type Browser, type Page } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import {
   tableFixture,
   type FixtureName,
@@ -406,6 +412,102 @@ test.describe("Planeswalker portraits", () => {
       path: testInfo.outputPath("table-portraits-dom.jpg"),
       quality: 80,
     });
+    expect(await occluded(page)).toEqual([]);
+    expect(await table.problems()).toEqual([]);
+  });
+});
+
+test.describe("a human table's chat (v0.4.4)", () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
+
+  /** Whether the element at a control's centre is that control. */
+  const reachable = (control: Locator) =>
+    control.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2,
+      );
+      return hit === element || element.contains(hit);
+    });
+
+  test("folds behind the band's diamond, counts what arrives, sends, and offers alliances on the plates", async ({
+    page,
+  }, testInfo) => {
+    const table = await openTable(page, {
+      fixture: "three",
+      humans: { 1: "bob", 2: "cara" },
+    });
+    await sizeChecks(page, { width: 1920, height: 1080, dpr: 1 });
+    const toggle = page.getByRole("button", { name: /^Table chat/ });
+    await expect(toggle).toHaveAccessibleName("Table chat");
+    expect(await reachable(toggle)).toBe(true);
+
+    // Each other player's Alliance button sits on their plate, clear of everything drawn there.
+    for (const name of ["bob", "cara"]) {
+      const button = page.getByRole("button", {
+        name: `Alliance with ${name}`,
+      });
+      await expect(button).toBeVisible();
+      expect(await reachable(button)).toBe(true);
+    }
+    await page.getByRole("button", { name: "Alliance with bob" }).click();
+    await page.getByRole("menuitem", { name: "Offer an alliance" }).click();
+    await expect.poll(() => table.chat.length).toBe(1);
+    expect(table.chat[0]).toEqual({
+      type: "alliance",
+      action: "offer",
+      seat: 1,
+    });
+    await expect(page.getByText("Offer sent")).toBeVisible();
+
+    table.say(2, "Good luck, both of you");
+    await expect(toggle).toHaveAccessibleName("Table chat, 1 unread");
+    await expect(page.locator("[data-announcer]")).toHaveText(
+      "cara: Good luck, both of you",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("table-chat-folded.jpg"),
+      quality: 80,
+    });
+
+    await toggle.click();
+    await expect(page.locator('[data-drawer="chat"]')).toHaveAttribute(
+      "data-open",
+      "true",
+    );
+    await expect(toggle).toHaveAccessibleName("Table chat");
+    const box = page.getByRole("textbox", { name: "Message to the table" });
+    await expect(box).toBeFocused();
+    // P and F typed in the box are letters, not a pass or full screen.
+    await box.pressSequentially("Pass the salt, Frank");
+    await box.press("Enter");
+    await expect.poll(() => table.chat.length).toBe(2);
+    expect(table.chat[1]).toMatchObject({
+      type: "chat",
+      channel: "table",
+      text: "Pass the salt, Frank",
+    });
+    const list = page.getByRole("list", { name: "Messages to the table" });
+    await expect(list).toContainText("You: Pass the salt, Frank");
+    await expect(list.locator('[data-status="pending"]')).toHaveCount(0);
+    await page.getByRole("button", { name: "Good game!" }).click();
+    await expect(list).toContainText("You: Good game!");
+    await expect(page.getByRole("region", { name: "Alliances" })).toContainText(
+      "You offered bob an alliance.",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("table-chat-open.jpg"),
+      quality: 80,
+    });
+
+    // Escape folds it again, back to its diamond.
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[data-drawer="chat"]')).not.toHaveAttribute(
+      "data-open",
+    );
+    await expect(toggle).toBeFocused();
+    expect(table.commands).toEqual([]);
     expect(await occluded(page)).toEqual([]);
     expect(await table.problems()).toEqual([]);
   });

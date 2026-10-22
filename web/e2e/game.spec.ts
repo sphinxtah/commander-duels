@@ -59,7 +59,8 @@ class Table {
     private readonly concealed: Set<string>,
   ) {
     page?.on("websocket", (socket) => {
-      if (!socket.url().includes("/events")) return;
+      // The game's socket; the chat's (v0.4.4) carries no game.
+      if (!/\/games\/[^/]+\/events$/.test(socket.url())) return;
       socket.on("framereceived", ({ payload }) =>
         this.receive(String(payload)),
       );
@@ -796,7 +797,7 @@ test.describe("practice games in the browser", () => {
     const lost: { action_id: string; body: unknown }[] = [];
     const resent: string[] = [];
     let loseNextReply = false;
-    await second.routeWebSocket(/\/events$/, (client) => {
+    await second.routeWebSocket(/\/games\/[^/]+\/events$/, (client) => {
       const server = client.connectToServer();
       client.onMessage((message) => {
         const parsed = JSON.parse(String(message)) as {
