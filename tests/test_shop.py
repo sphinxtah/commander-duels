@@ -95,7 +95,41 @@ def content(tmp_path_factory) -> Path:
         json.dumps({"decks": [{"id": ident, "usd": usd} for ident, usd in prices]}),
         encoding="utf-8",
     )
+    # Pack artwork (v0.4.3): the draft booster has a picture; the collector booster's entry names
+    # a file elsewhere, so it is drawn in the browser like the set booster, which has none.
+    (folder / "pack-art.json").write_text(json.dumps(ART), encoding="utf-8")
     return folder
+
+
+def picture(name: str, width: int, height: int) -> dict[str, Any]:
+    return {"src": f"/packs/{name}.webp", "width": width, "height": height}
+
+
+ZNR_ART = {
+    "small": picture("znr-draft-160", 92, 160),
+    "large": picture("znr-draft-480", 276, 480),
+    "origin": "tcgplayer",
+}
+ART = {
+    "as_of": "2026-10-22",
+    "products": [
+        {
+            "set": "ZNR",
+            "booster": "draft",
+            **ZNR_ART,
+            "page": "https://www.tcgplayer.com/product/1",
+        },
+        {
+            "set": "ZNR",
+            "booster": "collector",
+            "small": {"src": "https://elsewhere.example/znr.webp", "width": 92, "height": 160},
+            "large": picture("znr-collector-480", 276, 480),
+            "origin": "tcgplayer",
+        },
+    ],
+    "generated": [{"set": "ZNR", "booster": "set", "reason": "None found."}],
+    "symbols": {"ZNR": "/sets/znr.svg", "KHM": "javascript:alert(1)"},
+}
 
 
 @pytest.fixture(scope="module")
@@ -596,6 +630,8 @@ def test_the_shop_lists_what_is_on_sale(client):
         "released": "2020-09-25",
         "booster": "draft",
         "era": "collector",
+        "art": ZNR_ART,
+        "symbol": "/sets/znr.svg",
         "price": 380,
         "price_basis": "market",
         "pack_size": 15,
@@ -776,6 +812,93 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
     for card in more:
         if card["card_id"] in before:
             assert not card["new"]
+
+
+def test_every_answer_naming_a_product_carries_its_pack_art(client):
+    """v0.4.3: the shelf, the packs held, a purchase, an opening, the history and Administration
+    all carry the product's picture and its set's symbol; a product without one carries null."""
+    ada = funded(client, "ada", 1_000)
+    bought = buy(ada, fixture_product(client).id).json()
+    assert (bought["product"]["art"], bought["product"]["symbol"]) == (ZNR_ART, "/sets/znr.svg")
+    assert bought["product"]["era"] == "collector" and bought["product"]["booster"] == "draft"
+    [held] = ada.get("/api/v1/shop").json()["inventory"]
+    assert held["product"]["art"] == ZNR_ART
+    opening = ada.send("POST", f"/api/v1/shop/packs/{bought['pack']}/open").json()
+    assert opening["product"]["art"] == ZNR_ART
+    assert ada.get(f"/api/v1/shop/openings/{opening['id']}").json()["product"]["art"] == ZNR_ART
+    [summary] = ada.get("/api/v1/shop/openings").json()
+    assert (summary["product"]["art"], summary["product"]["symbol"]) == (ZNR_ART, "/sets/znr.svg")
+    admin = Account(client, "admin", admin=True)
+    everything = admin.get("/api/v1/admin/shop").json()["products"]
+    listed = {item["booster"]: item for item in everything if item["set_code"] == "ZNR"}
+    assert listed["draft"]["art"] == ZNR_ART
+    # No picture, or one that is not a file of this site: the browser draws the pack.
+    assert listed["set"]["art"] is None and listed["collector"]["art"] is None
+    assert listed["set"]["symbol"] == "/sets/znr.svg"
+    khm = [item["symbol"] for item in everything if item["set_code"] == "KHM"]
+    assert khm and set(khm) == {None}
+
+
+def test_the_pack_art_manifest_is_read_with_care(tmp_path):
+    assert products.pack_art(str(tmp_path)) == products.ArtIndex()
+    (tmp_path / "pack-art.json").write_text("{not json", encoding="utf-8")
+    assert products.pack_art(str(tmp_path)).pictures == {}
+    entries = [
+        {"set": "ZNR", "booster": "draft", **ZNR_ART},
+        {"set": "ZNR", "booster": "set", **ZNR_ART, "origin": "elsewhere"},
+        {"set": "ZNR", "booster": "play", **ZNR_ART, "large": picture("../../x", 1, 1)},
+        {"set": "ZNR", "booster": "six", **ZNR_ART, "small": picture("znr-six", 0, 160)},
+        "not an entry",
+    ]
+    symbols = {"ZNR": "/sets/znr.svg", "CON": "/sets/con_.svg", "KHM": "/sets/../khm.svg"}
+    path = tmp_path / "pack-art.json"
+    path.write_text(json.dumps({"products": entries, "symbols": symbols}), encoding="utf-8")
+    os.utime(path, (1, 2))
+    art = products.pack_art(str(tmp_path))
+    assert list(art.pictures) == [("ZNR", "draft")]
+    found = art.picture("ZNR", "draft")
+    assert found is not None and found.small.src == "/packs/znr-draft-160.webp"
+    assert (found.large.width, found.large.height, found.origin) == (276, 480, "tcgplayer")
+    assert art.picture("ZNR", "set") is None
+    assert art.symbols == {"ZNR": "/sets/znr.svg", "CON": "/sets/con_.svg"}
+    assert art.symbol("KHM") is None
+
+
+def test_the_pack_art_covers_every_product_with_its_files():
+    """content/pack-art.json (scripts/pack_art.py) names a picture, or the reason for none, for
+    every product on the price list, and every file it names is in web/public."""
+    public = CONTENT.parent / "web" / "public"
+    manifest = json.loads((CONTENT / "pack-art.json").read_text(encoding="utf-8"))
+    listing = json.loads((CONTENT / "pack-prices.json").read_text(encoding="utf-8"))
+    wanted = Counter((item["set"], item["booster"]) for item in listing["products"])
+    pictured = Counter((item["set"], item["booster"]) for item in manifest["products"])
+    drawn = Counter((item["set"], item["booster"]) for item in manifest["generated"])
+    assert pictured + drawn == wanted
+    assert all(item["reason"] for item in manifest["generated"])
+    total = 0
+    for item in manifest["products"]:
+        assert item["origin"] in ("tcgplayer", "wizards")
+        assert item["page"].startswith("https://") and item["image"].startswith("https://")
+        assert item["product_name"]
+        assert item["small"]["height"] == 160 and 160 <= item["large"]["height"] <= 480
+        for size in ("small", "large"):
+            assert products.ART_FILE.match(item[size]["src"])
+            file = public / item[size]["src"].lstrip("/")
+            assert file.is_file(), file
+            total += file.stat().st_size
+    # About 20 MB at most for both sizes of every picture.
+    assert total < 20_000_000
+    named = {
+        public / item[size]["src"].lstrip("/")
+        for item in manifest["products"]
+        for size in ("small", "large")
+    }
+    assert set((public / "packs").glob("*.webp")) == named
+    for code, path in manifest["symbols"].items():
+        assert code in {item["set"] for item in listing["products"]}
+        assert products.SYMBOL_FILE.match(path)
+        svg = (public / path.lstrip("/")).read_text(encoding="utf-8")
+        assert svg.startswith("<svg") and "<script" not in svg and "href" not in svg
 
 
 def test_sysop_gives_packs(client):

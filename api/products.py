@@ -15,12 +15,17 @@
   the catalog) and it has been released.
 - **Starter decks** (v0.4.2) are priced from the market value of the cards they grant, basic lands
   aside (content/starter-deck-prices.json), at the current pack's rate, rounded the same way.
+- **Pack artwork** (v0.4.3): content/pack-art.json, made by scripts/pack_art.py, names the
+  picture of each product's sealed pack (two WebP sizes under web/public/packs/) and each set's
+  symbol (web/public/sets/). A product it does not picture, and every set the booster data job
+  adds later, is drawn in the browser from its set instead.
 """
 
 import hashlib
 import json
 import math
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -36,6 +41,12 @@ from api.models import ShopProduct
 
 PRICE_LIST = "pack-prices.json"
 DECK_PRICES = "starter-deck-prices.json"
+PACK_ART = "pack-art.json"
+# Only files the site serves itself: a manifest naming anything else is ignored there.
+ART_FILE = re.compile(r"^/packs/[a-z0-9][a-z0-9_-]*\.webp$")
+SYMBOL_FILE = re.compile(r"^/sets/[a-z0-9][a-z0-9_-]*\.svg$")
+ArtOrigin = Literal["tcgplayer", "wizards"]
+ART_ORIGINS: frozenset[str] = frozenset({"tcgplayer", "wizards"})
 ANCHOR_USD = 6.07
 ANCHOR_TOKENS = 500
 TOP_USD = 343.28
@@ -220,6 +231,83 @@ def price_list(content_dir: str) -> PriceList | None:
     if not path.is_file():
         return None
     return price_list_at(str(path), path.stat().st_mtime)
+
+
+# Pack artwork (v0.4.3).
+
+
+@dataclass(frozen=True)
+class ArtImage:
+    src: str
+    width: int
+    height: int
+
+
+@dataclass(frozen=True)
+class ArtEntry:
+    small: ArtImage
+    large: ArtImage
+    origin: ArtOrigin
+
+
+@dataclass(frozen=True)
+class ArtIndex:
+    """Each product's picture by (set code, booster), and each set's symbol by set code."""
+
+    pictures: dict[tuple[str, str], ArtEntry] = field(default_factory=dict)
+    symbols: dict[str, str] = field(default_factory=dict)
+
+    def picture(self, set_code: str, booster: str) -> ArtEntry | None:
+        return self.pictures.get((set_code, booster))
+
+    def symbol(self, set_code: str) -> str | None:
+        return self.symbols.get(set_code)
+
+
+def art_image(value: object) -> ArtImage | None:
+    if not isinstance(value, dict):
+        return None
+    src, width, height = value.get("src"), value.get("width"), value.get("height")
+    if not (isinstance(src, str) and ART_FILE.match(src)):
+        return None
+    if not (isinstance(width, int) and isinstance(height, int) and width > 0 and height > 0):
+        return None
+    return ArtImage(src=src, width=width, height=height)
+
+
+@lru_cache(maxsize=4)
+def pack_art_at(path: str, modified: float) -> ArtIndex:
+    try:
+        content = json.loads(Path(path).read_bytes())
+    except (OSError, ValueError):
+        return ArtIndex()
+    if not isinstance(content, dict):
+        return ArtIndex()
+    pictures = {}
+    for item in content.get("products") or []:
+        if not isinstance(item, dict):
+            continue
+        small, large = art_image(item.get("small")), art_image(item.get("large"))
+        origin = item.get("origin")
+        if small is None or large is None or origin not in ART_ORIGINS:
+            continue
+        key = (str(item.get("set")), str(item.get("booster")))
+        pictures[key] = ArtEntry(small=small, large=large, origin=origin)
+    symbols = {
+        str(code): path
+        for code, path in (content.get("symbols") or {}).items()
+        if isinstance(path, str) and SYMBOL_FILE.match(path)
+    }
+    return ArtIndex(pictures=pictures, symbols=symbols)
+
+
+def pack_art(content_dir: str) -> ArtIndex:
+    """The pictures of the packs and the set symbols, from content/pack-art.json; none when the
+    file is missing or unreadable, so every product is drawn in the browser."""
+    path = Path(content_dir) / PACK_ART
+    if not path.is_file():
+        return ArtIndex()
+    return pack_art_at(str(path), path.stat().st_mtime)
 
 
 # The price list each database was last brought up to, so most requests skip the comparison.

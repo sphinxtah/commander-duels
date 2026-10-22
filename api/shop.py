@@ -22,6 +22,10 @@ the Magic Duels style, their cards the player's for good.
   its cards), makes it a deck of the player's own and grants every copy of its cards for good, as
   choosing it would have (library_grants, source starter, key starter:<deck>). The ledger entry's
   key is deck:<account>:<deck>, so a retried request buys it once.
+- **Pack artwork** (v0.4.3). Every answer that names a product (the shelves, the packs held,
+  purchases, openings and their history, Administration) carries its pack's picture when
+  content/pack-art.json names one, and its set's symbol; with no picture the browser draws the
+  pack from the set's name, symbol, era and booster type.
 """
 
 import secrets
@@ -79,6 +83,9 @@ from api.models import (
 from api.products import (
     ERAS,
     NEVER_SOLD,
+    ArtImage,
+    ArtIndex,
+    ArtOrigin,
     BoosterKind,
     EraId,
     PriceBasis,
@@ -87,6 +94,7 @@ from api.products import (
     ensure_products,
     era_of,
     kind_of,
+    pack_art,
     price_list,
     price_of,
     selling,
@@ -115,6 +123,22 @@ class EraInfo(Contract):
     since: date
 
 
+class PackImage(Contract):
+    src: str = Field(description="A WebP file on this site, under /packs/.")
+    width: int
+    height: int
+
+
+class PackArt(Contract):
+    """The picture of a sealed pack (v0.4.3), copied once and served from this site."""
+
+    small: PackImage = Field(description="160 pixels tall.")
+    large: PackImage = Field(
+        description="480 pixels tall, or the picture's own height when it is smaller."
+    )
+    origin: ArtOrigin = Field(description="Where the picture came from (content/pack-art.json).")
+
+
 class ProductRef(Contract):
     id: UUID
     set_code: str
@@ -122,11 +146,18 @@ class ProductRef(Contract):
     name: str
     kind: BoosterKind
     released: date | None
+    booster: str = Field(description="MTGJSON's booster name.")
+    era: EraId
+    art: PackArt | None = Field(
+        description="The picture of its sealed pack; null: the browser draws one from its set "
+        "(v0.4.3)."
+    )
+    symbol: str | None = Field(
+        description="The set's symbol, an SVG file on this site under /sets/; null: none."
+    )
 
 
 class ProductInfo(ProductRef):
-    booster: str = Field(description="MTGJSON's booster name.")
-    era: EraId
     price: int = Field(description="In tokens.")
     price_basis: PriceBasis = Field(
         description="market: from the pack's market price; set: set by the site's staff; "
@@ -314,7 +345,17 @@ class PacksGranted(Contract):
     inventory: list[InventoryItem]
 
 
-def ref_of(product: ShopProduct) -> ProductRef:
+def art_of(request: Request) -> ArtIndex:
+    """The pictures of the packs and the set symbols (api/products.py)."""
+    return pack_art(settings_of(request).content_dir)
+
+
+def image_of_pack(image: ArtImage) -> PackImage:
+    return PackImage(src=image.src, width=image.width, height=image.height)
+
+
+def ref_of(product: ShopProduct, art: ArtIndex) -> ProductRef:
+    picture = art.picture(product.set_code, product.booster)
     return ProductRef(
         id=product.id,
         set_code=product.set_code,
@@ -322,15 +363,23 @@ def ref_of(product: ShopProduct) -> ProductRef:
         name=product.name,
         kind=kind_of(product.booster),
         released=product.released,
+        booster=product.booster,
+        era=era_of(product.released),
+        art=PackArt(
+            small=image_of_pack(picture.small),
+            large=image_of_pack(picture.large),
+            origin=picture.origin,
+        )
+        if picture
+        else None,
+        symbol=art.symbol(product.set_code),
     )
 
 
-def info_of(product: ShopProduct) -> ProductInfo:
+def info_of(product: ShopProduct, art: ArtIndex) -> ProductInfo:
     price, basis = price_of(product)
     return ProductInfo(
-        **ref_of(product).model_dump(),
-        booster=product.booster,
-        era=era_of(product.released),
+        **ref_of(product, art).model_dump(),
         price=price,
         price_basis=basis,
         pack_size=product.pack_size,
@@ -351,7 +400,7 @@ def products_of(request: Request, db: Session) -> list[ShopProduct]:
     return list(db.scalars(select(ShopProduct)))
 
 
-def inventory_of(db: Session, user_id: UUID) -> list[InventoryItem]:
+def inventory_of(db: Session, user_id: UUID, art: ArtIndex) -> list[InventoryItem]:
     unopened = db.execute(
         select(Pack.id, Pack.product_id)
         .outerjoin(PackOpening, PackOpening.pack_id == Pack.id)
@@ -369,7 +418,7 @@ def inventory_of(db: Session, user_id: UUID) -> list[InventoryItem]:
     }
     items = [
         InventoryItem(
-            product=ref_of(products[product_id]),
+            product=ref_of(products[product_id], art),
             count=count,
             next_pack=first[product_id],
             openable=products[product_id].collation_id is not None,
@@ -415,11 +464,12 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
     listing = price_list(settings_of(request).content_dir)
     version, checked = latest_version(db)
     free = free_decks(principal.user)
+    art = art_of(request)
     return ShopView(
         balance=balance_of(db, principal.user.id),
-        products=[info_of(product) for product in on_sale],
+        products=[info_of(product, art) for product in on_sale],
         eras=[EraInfo(id=era.id, name=era.name, since=era.since) for era in ERAS],
-        inventory=inventory_of(db, principal.user.id),
+        inventory=inventory_of(db, principal.user.id, art),
         data=ShopData(
             mtgjson_version=version,
             prices_as_of=listing.as_of if listing else None,
@@ -543,11 +593,11 @@ def buy_deck(
     return deck_bought(db, user, starter, entry, deck.id)
 
 
-def purchase_of(db: Session, pack: Pack, repeated: bool) -> Purchase:
+def purchase_of(db: Session, pack: Pack, repeated: bool, art: ArtIndex) -> Purchase:
     product = db.get_one(ShopProduct, pack.product_id)
     return Purchase(
         pack=pack.id,
-        product=ref_of(product),
+        product=ref_of(product, art),
         tokens=pack.tokens,
         balance=balance_of(db, pack.user_id),
         repeated=repeated,
@@ -563,13 +613,14 @@ def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> P
     """Buys one pack: its price leaves the balance and the pack joins the inventory, together."""
     user_id = principal.user.id
     ensured(request)
+    art = art_of(request)
     # The account's row is locked first, so a retry waits for the request it repeats.
     lock_account(db, user_id)
     earlier = bought(db, user_id, body.key)
     if earlier is not None:
         if earlier.product_id != body.product:
             raise ApiError(409, "key_reused", "That purchase key bought another product.")
-        return purchase_of(db, earlier, True)
+        return purchase_of(db, earlier, True, art)
     product = db.get(ShopProduct, body.product)
     if product is None:
         raise not_found()
@@ -595,15 +646,15 @@ def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> P
         earlier = bought(db, user_id, body.key)
         if earlier is None:
             raise
-        return purchase_of(db, earlier, True)
-    return purchase_of(db, pack, False)
+        return purchase_of(db, earlier, True, art)
+    return purchase_of(db, pack, False, art)
 
 
 def reveal_order(rarity: str, finish: str) -> tuple[int, int]:
     return (finish != "nonfoil", RARITY_ORDER.get(rarity, 4))
 
 
-def opening_of(db: Session, opening: PackOpening) -> Opening:
+def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
     product = db.get_one(ShopProduct, opening.product_id)
     collation = db.get_one(BoosterCollation, opening.collation_id)
     rows = db.execute(
@@ -636,7 +687,7 @@ def opening_of(db: Session, opening: PackOpening) -> Opening:
     return Opening(
         id=opening.id,
         pack=opening.pack_id,
-        product=ref_of(product),
+        product=ref_of(product, art),
         collation_revision=collation.revision,
         mtgjson_version=collation.mtgjson_version,
         opened_at=opening.created_at,
@@ -753,11 +804,12 @@ def open_one(pack_id: UUID, request: Request, principal: Active, db: Db) -> Open
             opened = db.scalar(select(PackOpening).where(PackOpening.pack_id == pack.id))
             if opened is None:
                 raise
-    return opening_of(db, opened)
+    return opening_of(db, opened, art_of(request))
 
 
 @router.get("/shop/openings", response_model=list[OpeningSummary])
 def openings(
+    request: Request,
     principal: Active,
     db: Db,
     limit: Annotated[int, Query(ge=1, le=200)] = HISTORY_SHOWN,
@@ -783,10 +835,11 @@ def openings(
         .where(PackCard.opening_id.in_([row.id for row in found]))
     ):
         cards[opening_id].append((rarity, finish, new))
+    art = art_of(request)
     return [
         OpeningSummary(
             id=row.id,
-            product=ref_of(products[row.product_id]),
+            product=ref_of(products[row.product_id], art),
             opened_at=row.created_at,
             cards=len(cards[row.id]),
             new_cards=sum(1 for _, _, new in cards[row.id] if new),
@@ -802,11 +855,11 @@ def openings(
 
 
 @router.get("/shop/openings/{opening_id}", response_model=Opening)
-def opening(opening_id: UUID, principal: Active, db: Db) -> Opening:
+def opening(opening_id: UUID, request: Request, principal: Active, db: Db) -> Opening:
     found = db.get(PackOpening, opening_id)
     if found is None or found.user_id != principal.user.id:
         raise not_found()
-    return opening_of(db, found)
+    return opening_of(db, found, art_of(request))
 
 
 # SysOp's grants.
@@ -858,18 +911,20 @@ def give_packs(
         },
     )
     db.commit()
-    return PacksGranted(granted=body.count, inventory=inventory_of(db, user.id))
+    return PacksGranted(granted=body.count, inventory=inventory_of(db, user.id, art_of(request)))
 
 
 @router.get("/admin/users/{user_id}/packs", response_model=list[InventoryItem])
-def account_packs(user_id: UUID, principal: EconomyManager, db: Db) -> list[InventoryItem]:
-    return inventory_of(db, target(db, user_id, principal).id)
+def account_packs(
+    user_id: UUID, request: Request, principal: EconomyManager, db: Db
+) -> list[InventoryItem]:
+    return inventory_of(db, target(db, user_id, principal).id, art_of(request))
 
 
 # Administration (shop.manage: administrators and SysOp).
 
 
-def admin_products(db: Session, products: list[ShopProduct]) -> list[AdminProduct]:
+def admin_products(db: Session, products: list[ShopProduct], art: ArtIndex) -> list[AdminProduct]:
     today = utcnow().date()
     revisions = {
         row.id: (row.revision, row.mtgjson_version)
@@ -888,7 +943,7 @@ def admin_products(db: Session, products: list[ShopProduct]) -> list[AdminProduc
         revision, version = revisions.get(product.collation_id or uuid4(), (None, None))
         found.append(
             AdminProduct(
-                **info_of(product).model_dump(),
+                **info_of(product, art).model_dump(),
                 usd=product.usd,
                 usd_method=product.usd_method,
                 usd_source=product.usd_source,
@@ -940,7 +995,7 @@ def shop_admin(request: Request, principal: ShopManager, db: Db) -> ShopAdminVie
     listing = price_list(settings_of(request).content_dir)
     return ShopAdminView(
         enabled=bool(settings_of(request).catalog_dir),
-        products=admin_products(db, products),
+        products=admin_products(db, products, art_of(request)),
         last_run=run_of(last) if last else None,
         next_run_at=upcoming,
         prices_as_of=listing.as_of if listing else None,
@@ -1015,7 +1070,7 @@ def change_price(
         },
     )
     db.commit()
-    return admin_products(db, [product])[0]
+    return admin_products(db, [product], art_of(request))[0]
 
 
 @router.put("/admin/shop/products/{product_id}/sale", response_model=AdminProduct)
@@ -1043,4 +1098,4 @@ def change_sale(
         },
     )
     db.commit()
-    return admin_products(db, [product])[0]
+    return admin_products(db, [product], art_of(request))[0]
