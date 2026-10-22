@@ -15,6 +15,11 @@
 .wizard::backdrop {
   background: #050d0bed;
 }
+/* Each step's heading takes focus so screen readers say where the wizard went, as the page's h1
+   does; like it, it draws no ring. */
+.wizard h2[tabindex="-1"]:focus {
+  outline: none;
+}
 .top {
   position: sticky;
   top: 0;

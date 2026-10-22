@@ -13,6 +13,8 @@ Validated locally on Windows on October 21, 2026, on the work of v0.4.2 (the liv
 | Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated |
 | Web unit tests and build | 880 Vitest tests in 72 files passed; `tsc -b`, the service worker's `tsc -p sw` and the production build passed. New: the setup wizard from the welcome to the last step, closing for later and opening again from the notice and Profile; the Cards page's alliance tab; the shop's Starter decks tab, free and then for sale; the terms line; the upload preview as a `data:` URL |
 | Browser journeys (CI's verify job) | 44 passed, 13 skipped that need the engine or the built image, on a throwaway API from the source with the test catalog and Vite's dev server. Changed: `identity.spec.ts` (an approval opens the wizard, which leads to the handle) and `pages.spec.ts` (the terms line's two links) |
+| The wizard on screen | Looked at in Chromium at 1280 x 800 and 390 x 844 with a stand-in account: the welcome with its four screenshots in a column on a phone and two across on a desktop, no sideways scroll, and the handle step |
+| The welcome screenshots | Captured by Playwright at 1280 x 800 from a throwaway local stack built from the tree, with a copy of the development catalog and a made-up test player: a Commander practice game against a bot on turn 16, the deck builder's card details, a pack opening at Leng's counter, the alliance picker; 492 KB for the eight files |
 
 ## v0.4.1
 

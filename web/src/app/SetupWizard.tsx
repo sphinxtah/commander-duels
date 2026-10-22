@@ -47,28 +47,28 @@ const SHOTS = [
     title: "The table",
     caption:
       "Commander and Legacy at a Magic Duels-style table, against bots or other players.",
-    alt: "A Commander game at the table: both players' battlefields with their creatures and lands, the hand along the bottom.",
+    alt: "A Commander game at the table on turn 16: a green deck's creatures against a bot's red and blue army, three cards in hand along the bottom.",
   },
   {
     name: "decks",
     title: "The deck builder",
     caption:
       "Build decks from your own library; each format's rules are checked as you go.",
-    alt: "The deck builder: a Commander deck's cards beside the card finder.",
+    alt: "The deck builder: a starter deck open, with its commander's card, rules, legality and printings.",
   },
   {
     name: "shop",
     title: "Leng's card shop",
     caption:
       "Wins earn tokens: spend them on packs from Revised to today, and on more decks.",
-    alt: "Leng's card shop: Leng at the counter, and booster packs on the shelves with their prices in tokens.",
+    alt: "Leng's card shop: a booster pack opened at the counter, its cards turning over one by one.",
   },
   {
     name: "alliance",
     title: "The Planeswalker Alliance",
     caption:
       "Ally with a Planeswalker for their cards and portrait; more open as you win.",
-    alt: "The Planeswalker Alliance: Planeswalker portraits to ally with, by tier.",
+    alt: "The Planeswalker Alliance on Profile: allied with Domri, with the Bronze tier's Planeswalker portraits to choose from.",
   },
 ] as const;
 
