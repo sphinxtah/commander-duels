@@ -13,39 +13,16 @@
     grid-template-columns: 1fr;
   }
 }
+/* Leng at his counter: the owner's painting (v0.4.3), 4:3. */
 .leng {
   display: block;
   width: 100%;
   height: auto;
+  aspect-ratio: 1448 / 1086;
+  object-fit: cover;
   border-radius: 8px;
   border: 1px solid #c3bd8c23;
-}
-.lantern {
-  animation: lantern 4s ease-in-out infinite;
-  transform-origin: 262px 0;
-}
-.flame {
-  animation: flame 1.3s ease-in-out infinite alternate;
-  transform-origin: 233px 161px;
-}
-@keyframes lantern {
-  0%,
-  100% {
-    transform: rotate(-1.5deg);
-  }
-  50% {
-    transform: rotate(1.5deg);
-  }
-}
-@keyframes flame {
-  from {
-    transform: scale(1, 1);
-    opacity: 0.9;
-  }
-  to {
-    transform: scale(0.85, 1.12);
-    opacity: 1;
-  }
+  background: #1a140e;
 }
 .welcome {
   display: flex;
@@ -260,6 +237,18 @@
   color: #a5b0a3;
   font-size: 0.76rem;
 }
+/* A held or opened pack's picture beside its name (v0.4.3). */
+.inventory li,
+.history li {
+  justify-content: flex-start;
+}
+.itemArt {
+  flex: 0 0 auto;
+}
+.itemText {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
 .about {
   border-left: 2px solid #c3a46a;
   padding: 4px 0 4px 14px;
@@ -307,14 +296,39 @@
   line-height: 1.6;
 }
 
-/* Opening a pack. */
+/* Opening a pack, at Leng's counter: his painting behind it, blurred and dimmed so the pack and
+   the cards read clearly (v0.4.3). Nothing in it moves. */
 .opening {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border: 1px solid #c3bd8c2e;
   border-radius: 10px;
-  background:
-    radial-gradient(ellipse at top, #3a2c1a66, transparent 70%), #121a19;
+  background: #121a19;
   padding: 24px;
   margin: 25px 0;
+}
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 30%;
+  filter: blur(8px) brightness(0.5) saturate(0.9);
+  transform: scale(1.08);
+  pointer-events: none;
+}
+.opening::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at top, #3a2c1a55, transparent 70%),
+    linear-gradient(#121a1966, #121a19b3 55%, #121a19e0);
+  pointer-events: none;
 }
 @media (max-width: 600px) {
   .opening {
@@ -334,64 +348,82 @@
   gap: 14px;
   padding: 18px 0;
 }
+/* The sealed pack is the product's own picture, twice: its top strip and the rest, cut along a
+   torn edge, so the tear pulls the strip off the same pack (v0.4.3). */
 .pack {
   position: relative;
-  width: 13rem;
-  height: 20rem;
+  display: inline-grid;
+  max-width: 100%;
   border: 0;
   padding: 0;
   background: none;
+  border-radius: 6px;
+}
+.pack:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 8px;
 }
 .packTop,
 .packBody {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #7a2f2a, #3b1715 55%, #8a5a2a);
-  box-shadow: 0 12px 30px #00000088;
+  grid-area: 1 / 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
 }
 .packTop {
-  top: 0;
-  height: 2.2rem;
-  border-radius: 6px 6px 2px 2px;
-  background:
-    repeating-linear-gradient(90deg, #00000033 0 4px, transparent 4px 8px),
-    linear-gradient(135deg, #8a3a32, #4b1d1a);
+  clip-path: polygon(
+    -10% -10%,
+    110% -10%,
+    110% 15%,
+    96% 17.2%,
+    88% 15.4%,
+    80% 17.6%,
+    72% 15.2%,
+    64% 17.4%,
+    56% 15.6%,
+    48% 17.8%,
+    40% 15.3%,
+    32% 17.3%,
+    24% 15.5%,
+    16% 17.7%,
+    8% 15.4%,
+    -10% 16.8%
+  );
+  transform-origin: 85% 10%;
   transition:
     transform 0.6s cubic-bezier(0.3, 0.7, 0.4, 1),
     opacity 0.6s;
 }
 .packBody {
-  top: 2.3rem;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px;
-  color: #f5e6c8;
-  text-align: center;
+  clip-path: polygon(
+    -10% 16.8%,
+    8% 15.4%,
+    16% 17.7%,
+    24% 15.5%,
+    32% 17.3%,
+    40% 15.3%,
+    48% 17.8%,
+    56% 15.6%,
+    64% 17.4%,
+    72% 15.2%,
+    80% 17.6%,
+    88% 15.4%,
+    96% 17.2%,
+    110% 15%,
+    110% 110%,
+    -10% 110%
+  );
   transition:
     transform 0.6s ease-in,
     opacity 0.6s ease-in;
 }
-.packBody small {
-  letter-spacing: 3px;
-  font-size: 0.7rem;
-  color: #f0d58a;
+.pack .packArt {
+  filter: drop-shadow(0 0.75rem 1.2rem #000000aa);
 }
-.packBody strong {
-  font:
-    1.3rem Georgia,
-    serif;
-}
-.pack:hover .packBody,
-.pack:focus-visible .packBody {
-  box-shadow:
-    0 0 0 2px #efcc8d,
-    0 12px 30px #00000088;
+.pack:hover .packArt,
+.pack:focus-visible .packArt {
+  filter: drop-shadow(0 0 0.45rem #efcc8dcc)
+    drop-shadow(0 0.75rem 1.2rem #000000aa);
 }
 .pack[data-torn] .packTop {
   transform: translate(4rem, -3rem) rotate(24deg);
@@ -641,6 +673,37 @@
   font-size: 0.74rem;
   color: #c9d0c6;
   line-height: 1.6;
+}
+
+/* The packs' pictures (v0.4.3): the real pack's, or one drawn from its set (PackArt). Its height
+   is set where it is used (--pack-h, in rem); its width follows the picture. */
+.packArt {
+  display: block;
+  height: var(--pack-h, 9rem);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.3rem 0.5rem #000000b0);
+  user-select: none;
+}
+svg.packArt {
+  aspect-ratio: 3 / 5;
+}
+.productArt {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin: -4px -4px 4px;
+  padding: 12px 6px 8px;
+  border-radius: 4px;
+  background: radial-gradient(
+    ellipse 60% 80% at 50% 100%,
+    #efcc8d1f,
+    transparent 75%
+  );
+}
+.productArt + header {
+  min-height: 2.5rem;
 }
 
 /* The shop's two shelves (v0.4.2): packs, and the starter decks. */

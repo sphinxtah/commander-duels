@@ -10,6 +10,7 @@ import { client, describe, type Me } from "../api";
 import shell from "../App.module.css";
 import { DeckShelf } from "./DeckShelf";
 import { Leng } from "./Leng";
+import { PackArt } from "./PackArt";
 import { PackOpening } from "./PackOpening";
 import {
   byEra,
@@ -34,7 +35,9 @@ import styles from "./shop.module.css";
 // Leng's card shop (v0.4.0): booster packs from Revised to the current set, bought with the tokens
 // wins earn, and opened at Leng's counter. The server prices, sells and draws every pack; the page
 // shows what it says and keeps one client key per purchase, so a retried request buys once. Since
-// v0.4.2 a second tab sells the starter decks (DeckShelf).
+// v0.4.2 a second tab sells the starter decks (DeckShelf). Since v0.4.3 every pack shows its
+// picture (PackArt) on the shelves, among the packs held and in the history, and Leng's counter
+// is the owner's painting.
 
 type Shelf = "packs" | "decks";
 
@@ -266,7 +269,12 @@ export function ShopPage({
               <ul className={styles.inventory} aria-label="Unopened packs">
                 {view?.inventory.map((item) => (
                   <li key={item.product.id} aria-label={item.product.name}>
-                    <div>
+                    <PackArt
+                      product={item.product}
+                      height={4.5}
+                      className={styles.itemArt}
+                    />
+                    <div className={styles.itemText}>
                       <strong>{item.product.name}</strong>{" "}
                       <span>
                         × {item.count} · {kindLabels[item.product.kind]}
@@ -374,6 +382,9 @@ export function ShopPage({
                         className={styles.product}
                         aria-label={product.name}
                       >
+                        <div className={styles.productArt}>
+                          <PackArt product={product} height={9} />
+                        </div>
                         <header>
                           <strong>{product.name}</strong>
                           <span className={styles.code}>
@@ -430,7 +441,12 @@ export function ShopPage({
               <ul className={styles.history} aria-label="Packs you opened">
                 {history.map((item) => (
                   <li key={item.id}>
-                    <div>
+                    <PackArt
+                      product={item.product}
+                      height={3.75}
+                      className={styles.itemArt}
+                    />
+                    <div className={styles.itemText}>
                       <strong>{item.product.name}</strong>{" "}
                       <span>
                         {new Date(item.opened_at).toLocaleString("en-US", {

@@ -6,11 +6,19 @@ import type {
   Opening,
   OpeningSummary,
   Product,
+  ProductRef,
   PulledCard,
   ShopView,
 } from "./shop";
 
 // Made-up shop data for the tests.
+
+/** A pack's picture (v0.4.3), as content/pack-art.json names it. */
+export const znrArt: NonNullable<Product["art"]> = {
+  small: { src: "/packs/znr-draft-160.webp", width: 92, height: 160 },
+  large: { src: "/packs/znr-draft-480.webp", width: 276, height: 480 },
+  origin: "tcgplayer",
+};
 
 export const eras: EraInfo[] = [
   { id: "play", name: "Play Boosters", since: "2024-02-09" },
@@ -32,12 +40,28 @@ export function product(fields: Partial<Product> = {}): Product {
     released: "2020-09-25",
     booster: "draft",
     era: "collector",
+    art: znrArt,
+    symbol: "/sets/znr.svg",
     price: 380,
     price_basis: "market",
     pack_size: 15,
     ...fields,
   };
 }
+
+/** The Zendikar Rising draft booster as a held or opened pack names it. */
+export const znrRef: ProductRef = {
+  id: "product-znr-draft",
+  set_code: "ZNR",
+  set_name: "Zendikar Rising",
+  name: "Zendikar Rising Draft Booster",
+  kind: "draft",
+  released: "2020-09-25",
+  booster: "draft",
+  era: "collector",
+  art: znrArt,
+  symbol: "/sets/znr.svg",
+};
 
 export const products: Product[] = [
   product({
@@ -51,6 +75,9 @@ export const products: Product[] = [
     era: "play",
     price: 500,
     pack_size: 14,
+    // A set after the price list: no picture yet, so its pack is drawn.
+    art: null,
+    symbol: null,
   }),
   product(),
   product({
@@ -63,6 +90,8 @@ export const products: Product[] = [
     released: "1994-04-11",
     era: "first",
     price: 150_000,
+    art: null,
+    symbol: "/sets/3ed.svg",
   }),
 ];
 
@@ -72,14 +101,7 @@ export const shopView: ShopView = {
   eras,
   inventory: [
     {
-      product: {
-        id: "product-znr-draft",
-        set_code: "ZNR",
-        set_name: "Zendikar Rising",
-        name: "Zendikar Rising Draft Booster",
-        kind: "draft",
-        released: "2020-09-25",
-      },
+      product: znrRef,
       count: 2,
       next_pack: "pack-1",
       openable: true,

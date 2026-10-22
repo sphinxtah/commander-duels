@@ -107,6 +107,38 @@ describe("Leng's card shop", () => {
     expect(document.body.textContent).not.toMatch(/\$|USD|dollar/);
   });
 
+  it("shows each pack's picture on the shelves, among the packs held and in the history", async () => {
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
+    await screen.findByText("1,000");
+    // Leng's counter is the owner's painting, in three sizes.
+    const leng = screen.getByRole("img", { name: /Leng, an old shopkeeper/ });
+    expect(leng.tagName).toBe("IMG");
+    expect(leng.getAttribute("srcset")).toContain("/shop/leng-1448.webp 1448w");
+    // The real pack beside its name is decorative: the item is named already.
+    const picture = (item: HTMLElement) =>
+      item.querySelector("[data-pack-art]");
+    expect(picture(shelf("Zendikar Rising Draft Booster"))).toHaveAttribute(
+      "src",
+      "/packs/znr-draft-160.webp",
+    );
+    expect(picture(shelf("Zendikar Rising Draft Booster"))).toHaveAttribute(
+      "alt",
+      "",
+    );
+    // A product with no picture (a set after the price list) is drawn from its set.
+    const drawn = picture(shelf("Reality Fracture Play Booster"));
+    expect(drawn).toHaveAttribute("data-pack-art", "drawn");
+    expect(drawn).toHaveTextContent("PLAY BOOSTER");
+    const held = within(
+      screen.getByRole("list", { name: "Unopened packs" }),
+    ).getByRole("listitem", { name: "Zendikar Rising Draft Booster" });
+    expect(picture(held)).toHaveAttribute("src", "/packs/znr-draft-160.webp");
+    const opened = within(
+      screen.getByRole("list", { name: "Packs you opened" }),
+    ).getAllByRole("listitem")[0];
+    expect(picture(opened)).toHaveAttribute("data-pack-art", "picture");
+  });
+
   it("filters and sorts the shelves", async () => {
     render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
     await screen.findByText("1,000");
