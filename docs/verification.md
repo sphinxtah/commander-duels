@@ -31,6 +31,8 @@ On the development machine (24 CPUs, 33.6 GB for Docker), with the engine image 
 
 An earlier run of 8 games checked the harness: all finished, and the engine started with "at most 8 games at once, 16 bot search threads".
 
+**Hosted CI.** Run #76 on 2f411c1 passed in 20 m 0 s, with 217 pytest (the git-clone tests included), 876 Vitest tests, 44 + 16 browser journeys and 100 JUnit tests ([release notes](releases/0.4.1.md#verification)).
+
 ## v0.4.0
 
 Validated locally on Windows on October 21, 2026, on the work as merged for v0.4.0 (tokens, human tables, Leng's card shop, the custom cards in play, and the long-choices fix). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine's tests ran in its image's Maven build.
