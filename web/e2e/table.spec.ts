@@ -263,11 +263,12 @@ test.describe("playing on the table", () => {
 
 // The Planeswalker portraits (v0.3.1), the real files from web/public/portraits. The three-player
 // table with both opponents human: Alice allied with Rowan (in colour, hers), Bob with Ugin
-// (grey, an opponent's) and Carol with The Sphinx, which has no picture yet and keeps the sigil.
+// (grey, an opponent's) and Carol with "ezra", an ID shaped like the roster's with no picture, who
+// keeps the sigil.
 test.describe("Planeswalker portraits", () => {
   test.use({ viewport: { width: 1920, height: 1080 } });
 
-  const PORTRAITS = { 0: "rowan", 1: "ugin", 2: "the-sphinx" };
+  const PORTRAITS = { 0: "rowan", 1: "ugin", 2: "ezra" };
 
   function allied(): TableFixture {
     const f = tableFixture("three");
@@ -326,7 +327,7 @@ test.describe("Planeswalker portraits", () => {
       expect(response.headers()["content-type"]).toBe("image/webp");
     }
     // Each is named for screen readers apart from the player and their life.
-    for (const name of ["Rowan", "Ugin", "The Sphinx"])
+    for (const name of ["Rowan", "Ugin", "Ezra"])
       await expect(
         page.getByRole("img", { name: `${name} portrait` }),
       ).toHaveCount(1);
@@ -349,7 +350,7 @@ test.describe("Planeswalker portraits", () => {
       .toBe(true);
     const stone = await colourAt(page, 1877, 34);
     expect(stone.luminance).toBeLessThan(115);
-    // The Sphinx has no picture: Carol's diamond shows her sigil, bright at its core.
+    // Ezra has no picture: Carol's diamond shows her sigil, bright at its core.
     await expect
       .poll(async () => (await colourAt(page, 1840, 86)).luminance)
       .toBeGreaterThan(100);
@@ -398,9 +399,9 @@ test.describe("Planeswalker portraits", () => {
         getComputedStyle(image.parentElement!).clipPath,
       ]),
     ).toEqual(["contain", "none"]);
-    const sphinx = page.getByRole("img", { name: "The Sphinx portrait" });
-    await expect(sphinx.locator("img")).toHaveCount(0);
-    await expect(sphinx.locator('svg[data-sigil="grey"]')).toHaveCount(1);
+    const ezra = page.getByRole("img", { name: "Ezra portrait" });
+    await expect(ezra.locator("img")).toHaveCount(0);
+    await expect(ezra.locator('svg[data-sigil="grey"]')).toHaveCount(1);
     await page.screenshot({
       path: testInfo.outputPath("table-portraits-dom.jpg"),
       quality: 80,
