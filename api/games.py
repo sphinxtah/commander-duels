@@ -95,9 +95,10 @@ from api.schemas import (
     PracticeGameRequest,
     PracticeOptions,
     SeatChoice,
+    TableRules,
 )
 from api.schemas import GameSeat as SeatSummary
-from api.validation import DeckContent, validate_deck
+from api.validation import DeckContent, Problem, not_allowed, validate_deck
 
 log = logging.getLogger("api.games")
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -1070,6 +1071,43 @@ def practice_options(principal: Player) -> PracticeOptions:
     )
 
 
+def listed(names: list[str]) -> str:
+    """Names as a sentence lists them: "A", "A and B", "A, B and C", at most five and a count."""
+    shown = names[:5] + ([f"{len(names) - 5} more"] if len(names) > 5 else [])
+    return shown[0] if len(shown) == 1 else ", ".join(shown[:-1]) + " and " + shown[-1]
+
+
+def refusal(db: Session, refused: list[Problem], fmt: str) -> str:
+    """Why the table's rules refuse a deck (v0.4.5): the cards it holds that they do not allow."""
+    name = FORMAT_NAMES[fmt]
+    ids = {card_id for problem in refused for card_id in problem.card_ids}
+    names = dict(
+        db.execute(select(CardConcept.id, CardConcept.name).where(CardConcept.id.in_(ids))).all()
+    )
+    kinds: list[str] = []
+    clauses: list[str] = []
+    for option, kind, said in (
+        ("banned", "banned cards", "banned"),
+        ("not_legal", f"cards not legal in {name}", "not legal"),
+    ):
+        held = list(
+            dict.fromkeys(
+                names[card_id]
+                for problem in refused
+                if problem.kind == option
+                for card_id in problem.card_ids
+                if card_id in names
+            )
+        )
+        if held:
+            kinds.append(kind)
+            clauses.append(f"{listed(held)} {'is' if len(held) == 1 else 'are'} {said} in {name}")
+    return (
+        f"This table does not allow {' or '.join(kinds)}: {'; '.join(clauses)}. Choose another "
+        f"deck, or take {'it' if len(ids) == 1 else 'them'} out of this one."
+    )
+
+
 def own_deck(
     db: Session,
     owner: User,
@@ -1077,11 +1115,14 @@ def own_deck(
     deck_id: UUID,
     fmt: str,
     library: Library,
+    rules: TableRules,
 ) -> tuple[dict[str, object], UUID, str]:
     """One of the account's decks as the engine's deck list, bound to an immutable revision of
     it (DECK01). The revision must be playable: legal, every card certified, and every copy in the
-    player's library now (v0.3.1). SysOp's decks need only cards the engine implements, as its
-    deck lists do. A table's host starts the game with every player's deck (api/tables.py)."""
+    player's library now (v0.3.1). Since v0.4.5 the table's rules must also allow its cards'
+    legality: banned cards, and cards not legal in the format. SysOp's decks need only cards the
+    engine implements, as its deck lists do. A table's host starts the game with every player's
+    deck (api/tables.py)."""
     deck = db.get(Deck, deck_id)
     if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
@@ -1134,6 +1175,9 @@ def own_deck(
                 f"{deck.title} cannot start a game until its problems are fixed: open it in the "
                 "deck builder to see them.",
             )
+    refused = not_allowed(validation, rules)
+    if refused and "cards.any" not in permissions:
+        raise ApiError(422, "deck_not_allowed", refusal(db, refused, fmt))
     counts: dict[str, int] = defaultdict(int)
     commanders: list[str] = []
     for entry in entries:
@@ -1249,7 +1293,7 @@ def plan_seats(
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
             seat, revision, title = own_deck(
-                db, principal.user, principal.permissions, deck_id, fmt, library
+                db, principal.user, principal.permissions, deck_id, fmt, library, body.rules
             )
             plans.append(SeatPlan({"player": player, **seat}, revision, title))
             continue

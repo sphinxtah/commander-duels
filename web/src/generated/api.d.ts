@@ -3148,6 +3148,11 @@ export interface components {
             latest_revision: number | null;
             /** Legal */
             legal: boolean;
+            /**
+             * Needs
+             * @description The table options its cards need (v0.4.5): only tables that allow them take it.
+             */
+            needs: ("banned" | "not_legal")[];
             /** Notes */
             notes: string;
             /** Playable */
@@ -3298,6 +3303,11 @@ export interface components {
             latest_revision: number | null;
             /** Legal */
             legal: boolean;
+            /**
+             * Needs
+             * @description The table options its cards need (v0.4.5): only tables that allow them take it.
+             */
+            needs: ("banned" | "not_legal")[];
             /** Playable */
             playable: boolean;
             /** Source */
@@ -4228,6 +4238,8 @@ export interface components {
              * @enum {string}
              */
             format: "legacy" | "commander";
+            /** @description Which cards the game's own decks may hold by their legality; casual unless told otherwise. */
+            rules?: components["schemas"]["TableRules"];
             /**
              * Turn Cap
              * @default 60
@@ -4366,7 +4378,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "format_illegal" | "not_released" | "not_implemented" | "collection_locked" | "structure";
+            kind: "format_illegal" | "not_released" | "not_implemented" | "collection_locked" | "structure" | "banned" | "not_legal";
             /** Location */
             location?: ("main" | "sideboard" | "commander" | "companion" | "maybeboard") | null;
             /** Message */
@@ -5442,6 +5454,8 @@ export interface components {
              * @enum {string}
              */
             format: "legacy" | "commander";
+            /** @description Which cards its decks may hold by their legality; casual unless told otherwise. */
+            rules?: components["schemas"]["TableRules"];
             /**
              * Seats
              * @description Every seat, bots included: 2 in Legacy, 2-4 in Commander.
@@ -5460,6 +5474,23 @@ export interface components {
              * @enum {string}
              */
             visibility: "public" | "private";
+        };
+        /**
+         * TableRules
+         * @description Which cards a table's decks may hold by their legality in its format (v0.4.5); the format's
+         *     deck rules apply whatever these say. Casual rules allow both; tournament rules neither.
+         */
+        TableRules: {
+            /**
+             * Banned
+             * @description Cards banned in the format.
+             */
+            banned: boolean;
+            /**
+             * Not Legal
+             * @description Cards not legal in the format: Un-cards, playtest and digital-only cards.
+             */
+            not_legal: boolean;
         };
         /** TableView */
         TableView: {
@@ -5502,6 +5533,7 @@ export interface components {
              * @description Every seat in turn order, bots last.
              */
             players: components["schemas"]["TablePlayer"][];
+            rules: components["schemas"]["TableRules"];
             /** Seats */
             seats: number;
             /**
@@ -5640,6 +5672,11 @@ export interface components {
             format_version: number | null;
             /** Legal */
             legal: boolean;
+            /**
+             * Needs
+             * @description The table options the deck needs (v0.4.5): banned for a card banned in the format, not_legal for a card not legal in it. Empty: any table takes it. Its warnings of the same kinds name the cards.
+             */
+            needs: ("banned" | "not_legal")[];
             /** Playable */
             playable: boolean;
             /** Warnings */

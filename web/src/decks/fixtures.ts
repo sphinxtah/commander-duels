@@ -127,6 +127,7 @@ export function validation(fields: Partial<Validation> = {}): Validation {
     format_version: 1,
     legal: true,
     playable: true,
+    needs: [],
     errors: [],
     warnings: [],
     counts: {
@@ -150,6 +151,7 @@ export function deckDetail(fields: Partial<DeckDetail> = {}): DeckDetail {
     legal: true,
     playable: true,
     collection_locked: false,
+    needs: [],
     identity: "R",
     commanders: [],
     latest_revision: null,

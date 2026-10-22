@@ -11,7 +11,7 @@ import { client, describe, type Me } from "../api";
 import { formatLabels } from "../catalog/catalog";
 import { GuidedDialog } from "./GuidedDialog";
 import { ImportDialog } from "./ImportDialog";
-import { LockIcon } from "./ProblemList";
+import { LockIcon, NeedsTags } from "./ProblemList";
 import {
   type DeckEntry,
   type DeckFormat,
@@ -299,6 +299,7 @@ function Decks({
                   {deck.commanders.length > 0 &&
                     ` · ${deck.commanders.join(" & ")}`}
                 </span>
+                <NeedsTags needs={deck.needs} format={deck.format} />
               </div>
               <StateBadge
                 state={

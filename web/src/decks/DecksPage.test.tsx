@@ -259,6 +259,27 @@ describe("the decks page", () => {
     expect(screen.getByText(/from your card library/)).toBeInTheDocument();
   });
 
+  it("tags a deck that only tables allowing its cards take (v0.4.5)", async () => {
+    const api = mockApi();
+    const lotus = {
+      ...summary,
+      id: "deck-lotus",
+      title: "Lotus Storm",
+      format: "commander" as const,
+      needs: ["banned" as const, "not_legal" as const],
+    };
+    api.on("GET /api/v1/decks", () => reply(200, [lotus]));
+    api.on("GET /api/v1/decks/starters", () => reply(200, []));
+    render(<DecksPage me={player} heading={createRef()} />);
+    const row = (
+      await screen.findByRole("link", { name: "Lotus Storm" })
+    ).closest("li")!;
+    expect(row).toHaveTextContent("Ready to play");
+    expect(row).toHaveTextContent("Casual tables only:");
+    expect(within(row).getByText("Banned cards")).toBeInTheDocument();
+    expect(within(row).getByText("Not legal in Commander")).toBeInTheDocument();
+  });
+
   it("tells a deck the library holds back from one the engine cannot play yet", async () => {
     const api = mockApi();
     const locked = {
@@ -287,6 +308,7 @@ describe("the decks page", () => {
     );
     expect(row("Odd Wizards")).toHaveTextContent("Legal, not playable yet");
     expect(row("Mono-Red Burn")).toHaveTextContent("Ready to play");
+    expect(row("Mono-Red Burn")).not.toHaveTextContent("Casual tables only");
     // The list says so itself (collection_locked): no deck is asked for.
     expect(
       api.calls.filter((call) => call.route === "GET /api/v1/decks/{deck_id}"),

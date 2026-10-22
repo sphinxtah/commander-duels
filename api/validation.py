@@ -3,17 +3,23 @@
 The browser validates as you edit, but only this decides: on save, before a revision is made,
 and when a game starts. Every problem carries a rule code, what it concerns (cards, quantity,
 location), an explanation and a remedy, and its kind:
-- format_illegal: the format's rules forbid it (deck size, copies, bans, identity, pairs);
+- format_illegal: the format's deck rules forbid it (deck size, copies, identity, pairs);
 - not_released: the card is not out yet;
 - not_implemented: the game engine cannot play the card (its catalog status says why);
 - collection_locked: the deck holds more copies of a card than the player owns (v0.3.1: players
   build from their own library; administrators and SysOp from the whole catalog);
-- structure: the deck itself is malformed (a printing of another card, a sideboard in Commander).
+- structure: the deck itself is malformed (a printing of another card, a sideboard in Commander);
+- banned, not_legal: notes, not errors (v0.4.5): a card banned in the format, or not legal in it.
 
 Copies are counted by construction key, the card's English name, so another printing or another
 Oracle version of a card is still that card (T03). Legality comes from the format version: its
 banned list and Scryfall's legality of each card (CAT05). Application limits that are not Magic
 rules (at most 250 cards in a main deck) say so.
+
+Since v0.4.5 a card's legality no longer makes a deck illegal: each table's host chooses whether
+its decks may hold banned cards, and cards not legal in the format (TableRules). A deck holding
+either is legal by the format's deck rules and lists the table options it needs; a game checks
+them against its table's rules. Restricted cards still count as one allowed copy.
 
 Since v0.4.0 a deck may also hold the Godlike tier's custom cards (api/custom_cards.py), from a
 table of their own, while its owner is at the Godlike tier. Each counts as legal in Legacy and
@@ -36,7 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.models import CardConcept, CardPrinting, CustomCard, FormatVersion
-from api.schemas import Contract
+from api.schemas import Contract, TableOption, TableRules
 from catalog.formats import RULES, TECHNICAL_MAX_MAIN
 from catalog.roles import roles
 from catalog.text import ALL_COLORS, COLOR_BITS, colors_of, front, normalize, type_parts
@@ -44,10 +50,18 @@ from catalog.text import ALL_COLORS, COLOR_BITS, colors_of, front, normalize, ty
 GameFormatName = Literal["legacy", "commander"]
 Location = Literal["main", "sideboard", "commander", "companion", "maybeboard"]
 Kind = Literal[
-    "format_illegal", "not_released", "not_implemented", "collection_locked", "structure"
+    "format_illegal",
+    "not_released",
+    "not_implemented",
+    "collection_locked",
+    "structure",
+    "banned",
+    "not_legal",
 ]
 # Problems that keep a legal deck from starting a game.
 BLOCKING = frozenset({"not_implemented", "collection_locked"})
+# The table options a deck may need, in the order it lists them.
+TABLE_OPTIONS: tuple[TableOption, ...] = ("banned", "not_legal")
 MAX_ENTRIES = 400
 MAX_QUANTITY = 250
 PERMANENTS = frozenset({"Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"})
@@ -93,9 +107,15 @@ class DeckCounts(Contract):
 class Validation(Contract):
     format: GameFormatName
     format_version: int | None
+    # By the format's deck rules, whatever its cards' legality (v0.4.5).
     legal: bool
     # Legal, and every card in it can be played by the engine: the deck may start a game.
     playable: bool
+    needs: list[TableOption] = Field(
+        description="The table options the deck needs (v0.4.5): banned for a card banned in the "
+        "format, not_legal for a card not legal in it. Empty: any table takes it. Its warnings of "
+        "the same kinds name the cards."
+    )
     errors: list[Problem]
     warnings: list[Problem]
     counts: DeckCounts
@@ -197,13 +217,14 @@ class Report:
         message: str,
         remedy: str,
         *,
+        kind: Kind = "format_illegal",
         card_ids: list[UUID] | None = None,
         location: Location | None = None,
     ) -> None:
         self.warnings.append(
             Problem(
                 code=code,
-                kind="format_illegal",
+                kind=kind,
                 message=message,
                 remedy=remedy,
                 card_ids=card_ids or [],
@@ -420,18 +441,26 @@ def validate(
         )
         commander(report, playing, cards, rules, counts, hidden_leaders)
     # Legal by the format's rules; playable also needs every card supported by the engine and
-    # owned in the copies the deck holds.
+    # owned in the copies the deck holds. Which tables take it is its cards' legality.
     legal = all(problem.kind in BLOCKING for problem in report.errors)
     blocked = any(problem.kind in BLOCKING for problem in report.errors)
+    noted = {problem.kind for problem in report.warnings}
     return Validation(
         format=content.format,
         format_version=rules.version,
         legal=legal,
         playable=legal and not blocked,
+        needs=[option for option in TABLE_OPTIONS if option in noted],
         errors=report.errors,
         warnings=report.warnings,
         counts=counts,
     )
+
+
+def not_allowed(validation: Validation, rules: TableRules) -> list[Problem]:
+    """The notes behind each table option the deck needs and the rules do not allow."""
+    refused = {option for option in validation.needs if not getattr(rules, option)}
+    return [problem for problem in validation.warnings if problem.kind in refused]
 
 
 def card_problems(report: Report, card: Card, rules: Rules, today: date) -> None:
@@ -453,10 +482,12 @@ def card_problems(report: Report, card: Card, rules: Rules, today: date) -> None
         )
     legality = card.legalities.get(rules.format, "not_legal")
     if card.construction_key in rules.banned or legality == "banned":
-        report.error(
+        report.warning(
             "card.banned",
-            f"{card.name} is banned in {name}.",
-            "Remove it from the deck.",
+            f"{card.name} is banned in {name}: the deck plays only at tables that allow banned "
+            "cards.",
+            "Remove it to play at any table.",
+            kind="banned",
             card_ids=[card.id],
         )
     elif legality == "restricted":
@@ -476,10 +507,12 @@ def card_problems(report: Report, card: Card, rules: Rules, today: date) -> None
                 card_ids=[card.id],
             )
         else:
-            report.error(
+            report.warning(
                 "card.not_legal",
-                f"{card.name} is not legal in {name}.",
-                "Remove it from the deck.",
+                f"{card.name} is not legal in {name}: the deck plays only at tables that allow "
+                f"cards not legal in {name}.",
+                "Remove it to play at any table.",
+                kind="not_legal",
                 card_ids=[card.id],
             )
     if card.status != "certified":
@@ -790,10 +823,12 @@ def companions(
             )
             continue
         if f"companion:{card.construction_key}" in rules.banned:
-            report.error(
+            report.warning(
                 "companion.banned",
-                f"{card.name} is banned as a companion in {rules.format.title()}.",
-                "Play it in the deck instead, or choose another companion.",
+                f"{card.name} is banned as a companion in {rules.format.title()}: the deck plays "
+                "only at tables that allow banned cards.",
+                "Play it in the deck instead, or choose another companion, to play at any table.",
+                kind="banned",
                 card_ids=[card.id],
                 location="companion",
             )

@@ -329,6 +329,50 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
+  it("says which tables take a deck holding a banned card", async () => {
+    const api = mockApi();
+    api.on(DECK, () =>
+      reply(
+        200,
+        deckDetail({
+          draft: { version: 1, entries: [entry(bolt, 4)] },
+          cards: { [bolt.id]: bolt },
+          needs: ["banned"],
+          validation: validation({
+            needs: ["banned"],
+            warnings: [
+              problem({
+                code: "card.banned",
+                kind: "banned",
+                message:
+                  "Lightning Bolt is banned in Legacy: the deck plays only at tables that allow banned cards.",
+                remedy: "Remove it to play at any table.",
+                card_ids: [bolt.id],
+                quantity: null,
+              }),
+            ],
+          }),
+        }),
+      ),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    expect(
+      await screen.findByText(
+        "Ready to play at tables that allow banned cards.",
+      ),
+    ).toHaveAttribute("data-state", "playable");
+    expect(
+      screen.getByText(/^Lightning Bolt is banned in Legacy/).closest("li"),
+    ).toHaveTextContent(
+      "Casual tables only: Lightning Bolt is banned in Legacy: the deck plays only at tables that allow banned cards. Remove it to play at any table.",
+    );
+    // The practice table is casual unless told otherwise: the deck may go there.
+    expect(
+      screen.getByRole("link", { name: "Play it at the practice table" }),
+    ).toBeInTheDocument();
+  });
+
   it("says when the deck is not there", async () => {
     const api = mockApi();
     api.on(DECK, () => reply(404, { code: "not_found", message: "No." }));

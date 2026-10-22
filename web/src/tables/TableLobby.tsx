@@ -10,9 +10,11 @@ import { exitTableFullscreen } from "../app/fullscreen";
 import { tableFullscreen } from "../game/PracticeTable";
 import { getSoundEngine } from "../game/sound/engine";
 import game from "../game/game.module.css";
-import { DeckChoices, Face } from "./TableParts";
+import { DeckChoices, Face, TableTags } from "./TableParts";
 import {
   formatNames,
+  rulesSentence,
+  unfit,
   useOwnDecks,
   usePolled,
   type TablePlayer,
@@ -90,7 +92,8 @@ export function TableLobby({
   const mine = table.players.find((player) => player.you);
   const host = mine?.host ?? false;
   const here = (decks ?? []).filter((deck) => deck.format === table.format);
-  const chosen = choice || here.find((deck) => deck.playable)?.id || "";
+  const chosen =
+    choice || here.find((deck) => unfit(deck, table.rules) === null)?.id || "";
   const free = table.players.some(
     (player) => player.player === "human" && !player.taken,
   );
@@ -153,8 +156,10 @@ export function TableLobby({
       <h1 ref={heading} tabIndex={-1}>
         {formatNames[table.format]} table
       </h1>
+      <TableTags table={table} />
       <p className={styles.lead}>
         Hosted by {table.host ?? "a player"}.{" "}
+        {rulesSentence(table.rules, table.format)}{" "}
         {table.bots > 0
           ? `${table.bots} ${table.bots === 1 ? "bot" : "bots"} at skill ${table.bot_skill} fill the last seats. `
           : ""}
@@ -221,7 +226,7 @@ export function TableLobby({
                     );
                 }}
               >
-                <DeckChoices decks={here} />
+                <DeckChoices decks={here} rules={table.rules} />
               </select>
             </label>
           )}

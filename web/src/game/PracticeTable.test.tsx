@@ -55,6 +55,7 @@ function summary(fields: Partial<DeckSummary>): DeckSummary {
     legal: true,
     playable: true,
     collection_locked: false,
+    needs: [],
     identity: "R",
     commanders: [],
     latest_revision: null,
@@ -257,6 +258,42 @@ describe("the practice table for a player (v0.3.1)", () => {
       body: { format: "commander", deck_id: "deck-a", bots: [{}, {}, {}] },
     });
     expect(screen.getByRole("alert")).toHaveTextContent(/busy/);
+  });
+
+  it("plays by casual rules unless the player chooses others (v0.4.5)", async () => {
+    const api = await sitDown([
+      summary({
+        id: "deck-l",
+        title: "Lotus Storm",
+        format: "commander",
+        needs: ["banned"],
+      }),
+      ...starters,
+    ]);
+    const deck = screen.getByLabelText("Your deck");
+    expect(deck).toHaveValue("own:deck-l");
+    await act(async () =>
+      screen.getByRole("checkbox", { name: /^Banned cards/ }).click(),
+    );
+    expect(
+      within(deck).getByRole("option", {
+        name: "Lotus Storm (holds banned cards)",
+      }),
+    ).toBeDisabled();
+    expect(deck).toHaveValue("own:deck-a");
+    expect(
+      screen.getByRole("checkbox", { name: /^Tournament rules/ }),
+    ).not.toBeChecked();
+    await act(async () =>
+      screen.getByRole("button", { name: "Start the game" }).click(),
+    );
+    await settle();
+    const started = api.calls.find(
+      (c) => c.route === "POST /api/v1/practice-games",
+    )!;
+    expect(started.options).toMatchObject({
+      body: { deck_id: "deck-a", rules: { banned: false, not_legal: true } },
+    });
   });
 
   it("says which decks need cards the library does not hold", async () => {

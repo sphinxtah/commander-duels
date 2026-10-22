@@ -51,13 +51,16 @@ POST /api/v1/practice-games
 | `bots` | One entry per bot, in turn order, each with an optional `deck`, `deck_id` (one of your decks) or (SysOp) `deck_list` |
 | `bot_skill` | XMage's AI skill, 1–6 (default 4) |
 | `turn_cap` | 1–200 turns (default 60) |
+| `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)). Both true, casual, by default. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
 
 The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
+
+The engine checks no deck's legality in its format. Players' own decks and the bots' starter decks reach it as deck lists, which it loads without XMage's deck validator; only its own fixture decks, named by `deck`, pass XMage's Legacy or Commander validator as they load. So the table's rules (v0.4.5) are the API's alone, and a casual deck plays as any other.
 
 Refusals:
 - 401 signed out; 403 without `games.play`, or a deck list without `cards.any`; 403 `csrf_failed` without the token.
 - 409 `game_limit` while the account already runs `CD_GAMES_PER_ACCOUNT` games (default 1). SysOp has no per-account limit.
-- 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`). For an own deck: `invalid_deck` when it is not one of yours or not of the format, and `deck_not_playable` until it is legal and every card is playable. SysOp's decks need only cards the engine implements. Since v0.4.0, a deck holding Godlike custom cards the running engine has not loaded gets `custom_not_loaded` (their names in `names`), and a bot seat holding one gets `custom_cards_for_bots` ([progression](progression.md#playing-them-v040)).
+- 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`). For an own deck: `invalid_deck` when it is not one of yours or not of the format, `deck_not_playable` until it is legal and every card is playable, and since v0.4.5 `deck_not_allowed` when it holds cards the game's `rules` do not allow, named in the message. SysOp's decks need only cards the engine implements. Since v0.4.0, a deck holding Godlike custom cards the running engine has not loaded gets `custom_not_loaded` (their names in `names`), and a bot seat holding one gets `custom_cards_for_bots` ([progression](progression.md#playing-them-v040)).
 - 429 `games_busy` with `Retry-After: 30` when the API runs `CD_GAMES_MAX` games (default 2) or the engine is full (`CD_ENGINE_MAX_GAMES`). Games still being created count toward `CD_GAMES_MAX`, so requests at the same moment cannot all pass the check.
 - 503 `games_unavailable` without a service token; 503 `engine_unavailable` when the engine does not answer.
 

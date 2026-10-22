@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api.models import CardConcept, CardPrinting
-from api.validation import DeckContent, DeckEntry, Validation, validate_deck
+from api.schemas import TableRules
+from api.validation import DeckContent, DeckEntry, Validation, not_allowed, validate_deck
 
 TODAY = date(2026, 10, 20)
 
@@ -146,9 +147,17 @@ def test_t03_other_printings_count_as_the_same_card(session):
     assert wrong.errors[0].kind == "structure"
 
 
+def notes(result: Validation) -> list[tuple[str, str]]:
+    return [(problem.code, problem.kind) for problem in result.warnings]
+
+
 def test_bans_releases_and_engine_support_are_told_apart(session):
+    # A banned card no longer makes a deck illegal (v0.4.5): it needs a table that allows it.
     banned = check(session, "legacy", entry(session, "Black Lotus"), lands(session, 59))
-    assert codes(banned) == ["card.banned"] and banned.errors[0].kind == "format_illegal"
+    assert (banned.legal, banned.playable, codes(banned)) == (True, True, [])
+    assert banned.needs == ["banned"] and notes(banned) == [("card.banned", "banned")]
+    assert banned.warnings[0].card_ids == [card(session, "Black Lotus").id]
+    assert "tables that allow banned cards" in banned.warnings[0].message
     future = check(session, "legacy", entry(session, "Temple of Khonshu"), lands(session, 59))
     kinds = {problem.code: problem.kind for problem in future.errors}
     assert kinds == {"card.not_released": "not_released", "card.not_implemented": "not_implemented"}
@@ -166,7 +175,41 @@ def test_bans_releases_and_engine_support_are_told_apart(session):
         entry(session, "Black Lotus", 1, "maybeboard"),
         entry(session, "Temple of Khonshu", 1, "maybeboard"),
     )
-    assert maybe.playable
+    assert maybe.playable and maybe.needs == []
+
+
+def test_a_cards_legality_says_which_tables_take_the_deck(session):
+    """Banned cards and cards not legal in the format are the table's choice (v0.4.5); the
+    format's deck rules still apply to them, and restricted cards keep their one copy."""
+    unglued = next(
+        concept
+        for concept in session.scalars(
+            select(CardConcept).where(CardConcept.name == "Everythingamajig")
+        )
+        if concept.status == "certified"
+    )
+    both = check(
+        session,
+        "legacy",
+        entry(session, "Black Lotus"),
+        DeckEntry(card_id=unglued.id, quantity=1),
+        lands(session, 58),
+    )
+    assert (both.legal, both.playable, both.needs) == (True, True, ["banned", "not_legal"])
+    assert notes(both) == [("card.banned", "banned"), ("card.not_legal", "not_legal")]
+    assert "not legal in Legacy" in both.warnings[1].message
+    casual = TableRules(banned=True, not_legal=True)
+    assert not_allowed(both, casual) == []
+    only_bans = not_allowed(both, TableRules(banned=False, not_legal=True))
+    assert [problem.code for problem in only_bans] == ["card.banned"]
+    tournament = not_allowed(both, TableRules(banned=False, not_legal=False))
+    assert [problem.kind for problem in tournament] == ["banned", "not_legal"]
+    # The deck rules still count them: a fifth Black Lotus is one too many.
+    five = check(session, "legacy", entry(session, "Black Lotus", 5), lands(session, 55))
+    assert codes(five) == ["deck.copy_limit"] and five.needs == ["banned"]
+    # A legal deck needs nothing.
+    plain = check(session, "legacy", entry(session, "Lightning Bolt", 4), lands(session, 56))
+    assert plain.needs == [] and not_allowed(plain, TableRules(banned=False, not_legal=False)) == []
 
 
 def test_legacy_companions(session):
@@ -189,14 +232,15 @@ def test_legacy_companions(session):
     )
     assert codes(broken) == ["companion.condition"]
     assert card(session, "Counterspell").id in broken.errors[0].card_ids
-    # Lurrus is banned in Legacy, as a companion too.
+    # Lurrus is banned in Legacy, as a companion too: only tables that allow banned cards.
     lurrus = check(
         session,
         "legacy",
         lands(session, 60),
         entry(session, "Lurrus of the Dream-Den", 1, "companion"),
     )
-    assert codes(lurrus) == ["card.banned"]
+    assert codes(lurrus) == [] and lurrus.needs == ["banned"]
+    assert notes(lurrus) == [("card.banned", "banned")]
     yorion = check(
         session, "legacy", lands(session, 60), entry(session, "Yorion, Sky Nomad", 1, "companion")
     )
@@ -283,7 +327,8 @@ def test_commander_size_identity_and_singleton(session):
             session, "Kenrith, the Returned King", rest=[entry(session, "Dockside Extortionist")]
         ),
     )
-    assert codes(banned) == ["card.banned"]
+    assert codes(banned) == [] and banned.legal and banned.needs == ["banned"]
+    assert notes(banned) == [("card.banned", "banned")]
     side = commander_deck(session, "Kenrith, the Returned King")
     side.append(entry(session, "Sol Ring", 1, "sideboard"))
     assert codes(check(session, "commander", *side)) == ["commander.sideboard"]
@@ -322,9 +367,12 @@ def test_who_may_lead(session):
 
 
 def test_commander_companions(session):
+    # Lutri is banned as a Commander companion: a ban, so the table's choice.
     lutri = commander_deck(session, "Kenrith, the Returned King")
     lutri.append(entry(session, "Lutri, the Spellchaser", 1, "companion"))
-    assert codes(check(session, "commander", *lutri)) == ["companion.banned"]
+    companion = check(session, "commander", *lutri)
+    assert codes(companion) == [] and companion.needs == ["banned"]
+    assert notes(companion) == [("companion.banned", "banned")]
     kaheera = commander_deck(
         session, "Kenrith, the Returned King", rest=[entry(session, "Llanowar Elves")]
     )

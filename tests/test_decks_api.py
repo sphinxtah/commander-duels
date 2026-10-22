@@ -24,7 +24,7 @@ from api.cards import artist_of, image_of
 from api.config import Settings
 from api.identity import hash_token, utcnow
 from api.main import create_app
-from api.models import CardConcept, CardPrinting, RoleGrant, User, UserSession
+from api.models import CardConcept, CardPrinting, Deck, RoleGrant, User, UserSession
 
 # Tables a test empties after itself, children first; the catalog stays.
 ACCOUNT_TABLES = (
@@ -356,6 +356,47 @@ def test_deck_lifecycle_drafts_and_revisions(client):
     assert [d["title"] for d in ada.get("/api/v1/decks", view="trash").json()] == ["Red Deck Wins"]
     assert ada.send("POST", f"{path}/restore").json()["deleted_at"] is None
     assert len(ada.get("/api/v1/decks").json()) == 2
+
+
+def test_decks_keep_the_table_options_they_need(client):
+    """A banned card, or one not legal in the format, makes a deck legal for casual tables only
+    (v0.4.5). Each deck keeps the options it needs; one validated before is validated again when
+    its owner's list is read."""
+    ada = Account(client, "ada", admin=True)
+    lotus = ada.send(
+        "POST",
+        "/api/v1/decks",
+        {
+            "title": "Lotus",
+            "format": "legacy",
+            "entries": [entry(client, "Black Lotus"), entry(client, "Mountain", 59)],
+        },
+    ).json()
+    assert (lotus["legal"], lotus["playable"], lotus["needs"]) == (True, True, ["banned"])
+    assert lotus["validation"]["needs"] == ["banned"]
+    assert [p["code"] for p in lotus["validation"]["warnings"]] == ["card.banned"]
+    path = f"/api/v1/decks/{lotus['id']}"
+    saved = ada.send("PUT", f"{path}/draft", {"version": 1, "entries": burn(client)}).json()
+    assert saved["validation"]["needs"] == []
+    assert ada.get("/api/v1/decks").json()[0]["needs"] == []
+    # As 0019_table_rules leaves a deck validated by v0.4.4, which called the lotus illegal.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.execute(
+            text(
+                "UPDATE decks SET draft = :draft, needs = NULL, legal = :no, playable = :no "
+                "WHERE id = :id"
+            ),
+            {
+                "draft": json.dumps({"entries": lotus["draft"]["entries"]}),
+                "no": False,
+                "id": UUID(lotus["id"]).hex,
+            },
+        )
+        db.commit()
+    listed = ada.get("/api/v1/decks").json()
+    assert [(d["legal"], d["playable"], d["needs"]) for d in listed] == [(True, True, ["banned"])]
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        assert db.scalar(select(Deck.needs)) == ["banned"]
 
 
 def test_revisions_cannot_be_changed_in_postgresql_or_by_the_api(client):
@@ -760,6 +801,47 @@ def test_practice_games_bind_your_own_deck_revisions(url, starters):
             "POST", "/api/v1/practice-games", {"format": "commander", "deck_id": deck["id"]}
         )
         assert wrong.json()["code"] == "invalid_deck"
+        # The game's rules choose which cards its decks may hold (v0.4.5): casual unless told.
+        lotus = ada.send(
+            "POST",
+            "/api/v1/decks",
+            {
+                "title": "Lotus",
+                "format": "legacy",
+                "entries": [entry(client, "Black Lotus"), entry(client, "Mountain", 59)],
+            },
+        ).json()
+        assert (lotus["playable"], lotus["needs"]) == (True, ["banned"])
+        tournament = ada.send(
+            "POST",
+            "/api/v1/practice-games",
+            {
+                "format": "legacy",
+                "deck_id": lotus["id"],
+                "rules": {"banned": False, "not_legal": False},
+            },
+        )
+        assert (tournament.status_code, tournament.json()["code"]) == (422, "deck_not_allowed")
+        assert tournament.json()["message"] == (
+            "This table does not allow banned cards: Black Lotus is banned in Legacy. Choose "
+            "another deck, or take it out of this one."
+        )
+        for_bot = ada.send(
+            "POST",
+            "/api/v1/practice-games",
+            {
+                "format": "legacy",
+                "deck_id": deck["id"],
+                "bots": [{"deck_id": lotus["id"]}],
+                "rules": {"banned": False, "not_legal": True},
+            },
+        )
+        assert for_bot.json()["code"] == "deck_not_allowed"
+        casual = ada.send(
+            "POST", "/api/v1/practice-games", {"format": "legacy", "deck_id": lotus["id"]}
+        )
+        assert casual.status_code == 201, casual.json()
+        ada.send("POST", f"/api/v1/games/{casual.json()['id']}/close", {})
         kenrith = ada.send(
             "POST",
             "/api/v1/decks",
