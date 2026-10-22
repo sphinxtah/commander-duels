@@ -290,7 +290,8 @@ def successor_of(db: Session, rotated: UserSession) -> UserSession | None:
 
 def live_session(conn: HTTPConnection, db: Session) -> tuple[UserSession, User] | None:
     """The connection's session and account, or None. Expired, revoked and off-network SysOp
-    sessions count as signed out, as do sessions of disabled accounts. A token rotated moments
+    sessions count as signed out, as do sessions of disabled and deleted accounts (a deletion
+    removes them all; one in flight meanwhile still counts for nothing). A token rotated moments
     ago stands for its successor (see successor_of), and marks the connection via_grace."""
     token = conn.cookies.get(SESSION_COOKIE)
     if not token:
@@ -311,7 +312,7 @@ def live_session(conn: HTTPConnection, db: Session) -> tuple[UserSession, User] 
         or session.revoked_at is not None
         or session.idle_expires_at <= now
         or session.absolute_expires_at <= now
-        or user.status == "disabled"
+        or user.status in ("disabled", "deleted")
         or (session.kind == "sysop" and not from_sysop_network(conn))
     ):
         conn.state.stale_session = True
@@ -405,6 +406,12 @@ def require_permission(permission: Permission) -> Callable[[Principal], Principa
         return principal
 
     return check
+
+
+def refuse_deleted(user: User) -> None:
+    """A deleted account (v0.4.1) stays as its deletion left it: nothing changes it afterwards."""
+    if user.status == "deleted":
+        raise ApiError(409, "account_deleted", "This account was deleted; it cannot be changed.")
 
 
 def require_recent_sign_in(request: Request, principal: Principal) -> None:

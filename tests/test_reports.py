@@ -27,6 +27,7 @@ from test_games import SYSOP_ADDRESS
 from test_progression import Account
 
 from api import reports
+from api.accounts import delete_account
 from api.config import Settings
 from api.identity import utcnow
 from api.main import create_app
@@ -557,6 +558,20 @@ def test_removing_an_accounts_reports(client):
     kept = report(bob).json()["id"]
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
         assert delete_reports_of(db, ada.id) == 2
+        db.commit()
+        assert [str(found) for found in db.scalars(select(ProblemReport.id))] == [kept]
+
+
+def test_deleting_an_account_removes_its_reports(client):
+    # Account deletion (v0.4.1) runs delete_reports_of among its cleanups.
+    ada = account(client, "ada")
+    bob = account(client, "bob")
+    report(ada, picture("PNG"))
+    kept = report(bob).json()["id"]
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        user = db.get(User, ada.id)
+        assert user is not None
+        delete_account(db, user, utcnow())
         db.commit()
         assert [str(found) for found in db.scalars(select(ProblemReport.id))] == [kept]
 
