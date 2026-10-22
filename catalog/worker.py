@@ -8,7 +8,7 @@ import httpx
 from sqlalchemy import Engine, and_, or_, select, update
 from sqlalchemy.orm import Session
 
-from api import accounts
+from api import accounts, decks, roster
 from api.config import Settings
 from api.database import build_engine
 from api.models import ScheduledJob
@@ -62,6 +62,22 @@ def finish(engine: Engine, job_id: UUID, generation: int, kind: str, now: dateti
         return result.rowcount == 1
 
 
+def withdraw_unplayable(engine: Engine, config: Settings) -> None:
+    """Takes the cards a game cannot play out of the decks' drafts (v0.4.5, api/decks.py)."""
+    with Session(engine) as session, session.begin():
+        changed = decks.withdraw_unplayable(session, roster.load(config.content_dir))
+    if changed:
+        logger.info("Cards the game cannot play left the drafts of %s decks", changed)
+
+
+def start(engine: Engine, config: Settings) -> None:
+    """Once each time the worker starts, which is each deploy: a version that learned a layout
+    imports its cards again at once, and the decks' drafts lose what the game cannot play when
+    that import ends; otherwise they lose it now."""
+    if not sync.ensure_relearned(engine, config, datetime.now(UTC)):
+        withdraw_unplayable(engine, config)
+
+
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
     """One iteration: keep the catalog's, the booster data's and the account cleanup's schedules
     queued, then run one due job."""
@@ -86,6 +102,9 @@ def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
         outcome = sync.handle(engine, config, client, claimed)
     if not sync.settle(engine, claimed, outcome, datetime.now(UTC)):
         logger.warning("Job %s (%s) was taken over before it settled", job_id, kind)
+    if kind == sync.KIND and outcome.code == "imported":
+        # A new revision may take cards' playability away.
+        withdraw_unplayable(engine, config)
 
 
 def main() -> None:
@@ -97,10 +116,14 @@ def main() -> None:
     stopped = Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stopped.set())
+    started = False
     try:
         with httpx.Client(timeout=30.0, trust_env=False, follow_redirects=False) as client:
             while not stopped.is_set():
                 try:
+                    if not started:
+                        start(engine, config)
+                        started = True
                     work(engine, config, client)
                 except Exception:
                     logger.exception(

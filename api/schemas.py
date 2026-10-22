@@ -28,7 +28,9 @@ class Error(Contract):
     message: str
     request_id: str
     names: list[str] | None = Field(
-        default=None, description="For unknown_cards: the names the engine does not know."
+        default=None,
+        description="For unknown_cards: the names the engine does not know; for "
+        "cards_not_playable (v0.4.5): the names of no card in the game.",
     )
 
 
@@ -297,7 +299,7 @@ DECK_LIST = Field(
     default=None,
     min_length=1,
     max_length=60_000,
-    description="SysOp only (cards.any): one card per line, any card the engine implements.",
+    description="SysOp only (cards.any): one card per line, any card in the game.",
 )
 # The table options a deck may need by its cards' legality in the format (v0.4.5).
 TableOption = Literal["banned", "not_legal"]

@@ -42,6 +42,7 @@ function deck(fields: Partial<OwnDeck> = {}): OwnDeck {
     archived: false,
     deleted_at: null,
     updated_at: "2026-10-21T10:00:00Z",
+    removed_cards: [],
     ...fields,
   } as OwnDeck;
 }

@@ -4,7 +4,7 @@
 
 The engine loads XMage's card database and plays complete games: Legacy between two seats, and Commander at two, three or four seats, with any mix of human seats and XMage computer players. Human seats run through XMage's own human player: every choice becomes a typed prompt, stale answers are refused, and each seat sees only its own authorized view, including commander tax and commander damage. Players sign in with Google; the account keeps a handle, an avatar and its accessibility preferences. Administrators approve accounts, assign roles and read an append-only audit log. SysOp, the local root account, signs in with a password only from the operator's network.
 
-A signed-in, approved player starts a practice game against bots on the Play page and plays it to the end in the browser, by mouse or by keyboard: Legacy against one bot, or Commander at a table of up to four ([the game screen](docs/game-screen.md)). Cards show their printed images, which the API fetches from Scryfall once and serves itself. The API holds the engine's seat tokens, one tab at a time controls the seat, and resent commands run once. SysOp also inspects every hand and library, observes any game and plays deck lists of any card the engine implements. The site runs live at https://duels.thesphinx.co ([the live site](docs/deployment.md)).
+A signed-in, approved player starts a practice game against bots on the Play page and plays it to the end in the browser, by mouse or by keyboard: Legacy against one bot, or Commander at a table of up to four ([the game screen](docs/game-screen.md)). Cards show their printed images, which the API fetches from Scryfall once and serves itself. The API holds the engine's seat tokens, one tab at a time controls the seat, and resent commands run once. SysOp also inspects every hand and library, observes any game and plays deck lists of any card in the game. The site runs live at https://duels.thesphinx.co ([the live site](docs/deployment.md)).
 
 Since v0.2.0 the worker imports Scryfall's card catalog every day and maps it to the cards the engine implements; a card plays only when the engine's implementation passed automatic checks ([the card catalog](docs/catalog.md)). Players search it on the Cards page, and build Legacy and Commander decks that the server validates, versions and shares by link, with guided creation, statistics and import and export; their playable decks go to the practice table ([decks](docs/decks.md)). The game screen adds the priority controls: passes until a chosen point, stops and full control ([release notes](docs/releases/0.2.0.md)). The application shows unavailable features and their milestones. The source scope remains the full product backlog.
 
@@ -121,7 +121,7 @@ Both development endpoints exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which
 python scripts/api_practice_game.py --url http://localhost:8080 --origin http://localhost:8080 --schemas contracts
 ```
 
-Add `--format commander --bots 3` for a four-seat Commander game, `--deck-list FILE` for a SysOp deck list (one card per line, any card the engine implements), and `--quiet` for the summary only. The protocol and the routes are in [games through the API](docs/games.md).
+Add `--format commander --bots 3` for a four-seat Commander game, `--deck-list FILE` for a SysOp deck list (one card per line, any card in the game), and `--quiet` for the summary only. The protocol and the routes are in [games through the API](docs/games.md).
 
 ### Deploying
 

@@ -206,6 +206,18 @@ export function DeckEditor({
     else setMessage(describe(error));
   }
 
+  async function dismissRemoved() {
+    const { data, error } = await client.DELETE(
+      "/api/v1/decks/{deck_id}/removed-cards",
+      { params: { path: { deck_id: deckId } } },
+    );
+    if (data)
+      setDeck((current) =>
+        current ? { ...current, removed_cards: data.removed_cards } : current,
+      );
+    else setMessage(describe(error));
+  }
+
   async function saveVersion() {
     if (saveState === "dirty" || saveState === "saving") await save();
     const { data, error } = await client.POST(
@@ -242,6 +254,10 @@ export function DeckEditor({
           ? conflict.draft.entries
           : combine(entries, conflict.draft.entries);
     setCards((current) => ({ ...current, ...conflict.cards }));
+    // The saved deck may say cards left it because the game cannot play them (v0.4.5).
+    setDeck((current) =>
+      current ? { ...current, removed_cards: conflict.removed_cards } : current,
+    );
     setConflict(undefined);
     conflictDialog.current?.close();
     if (choice === "theirs") {
@@ -330,6 +346,7 @@ export function DeckEditor({
           onOpen={(card) => setOpened({ card })}
         />
         <div className={styles.deckColumn}>
+          <RemovedCards deck={deck} onDismiss={() => void dismissRemoved()} />
           <ProblemList
             validation={validation}
             cards={cards}
@@ -512,6 +529,40 @@ function SaveStatus({
   );
 }
 
+/** The cards that left the deck's draft because the game cannot play them (v0.4.5), and why,
+ * until the owner dismisses the note. */
+function RemovedCards({
+  deck,
+  onDismiss,
+}: {
+  deck: DeckDetail;
+  onDismiss: () => void;
+}) {
+  if (deck.removed_cards.length === 0) return null;
+  return (
+    <section className={styles.removed} aria-labelledby="removed-title">
+      <h2 id="removed-title">Cards that left this deck</h2>
+      <p>
+        The game cannot play these cards, so they are no longer in the game.
+        Versions of the deck that games played keep them.
+      </p>
+      <ul>
+        {deck.removed_cards.map((card) => (
+          <li key={card.name}>
+            <strong>
+              {card.quantity} {card.name}
+            </strong>
+            : {card.reason}
+          </li>
+        ))}
+      </ul>
+      <button type="button" className={styles.secondary} onClick={onDismiss}>
+        Dismiss
+      </button>
+    </section>
+  );
+}
+
 /** The finder's starting search: the player's own library first (v0.3.1), the most played cards
  * first. "Clear filters" comes back to it. */
 const finderSearch: Search = {
@@ -539,7 +590,7 @@ function CardFinder({
   const [page, setPage] = useState(1);
   const fixed = useMemo(() => {
     if (!fits) return undefined;
-    const found: Record<string, string> = { legal: format, playable: "true" };
+    const found: Record<string, string> = { legal: format };
     if (identity) found.identity = identity === "c" ? "" : identity;
     if (identity === "c") found.q = "id:c";
     return found;

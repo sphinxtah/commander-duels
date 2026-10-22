@@ -298,6 +298,9 @@ function Decks({
                   cards
                   {deck.commanders.length > 0 &&
                     ` · ${deck.commanders.join(" & ")}`}
+                  {/* v0.4.5: the editor's note says which, and why. */}
+                  {deck.removed_cards.length > 0 &&
+                    ` · ${deck.removed_cards.length} ${deck.removed_cards.length === 1 ? "card" : "cards"} left the game`}
                 </span>
                 <NeedsTags needs={deck.needs} format={deck.format} />
               </div>

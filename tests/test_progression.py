@@ -401,6 +401,40 @@ def test_the_alliance_tab_lists_the_allied_planeswalkers_cards(client):
     assert (sphinx["custom"], sphinx["cards"]) == (True, [])
 
 
+def test_copies_of_a_card_the_game_cannot_play_are_kept_but_hidden(client):
+    """v0.4.5: a card the engine cannot play leaves the library's list and the alliance tab. Its
+    copies stay recorded, so they come back if the engine learns the card."""
+    ada = Account(client, "ada", onboarding="starters")
+    ada.send("POST", "/api/v1/me/starters", {"decks": ["starter_red_test", "starter_blue_test"]})
+    ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "tibalt"})
+    names = ("Lightning Bolt", "Valki, God of Lies // Tibalt, Cosmic Impostor")
+
+    def mark(status: str, reason: str | None) -> None:
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            for concept in db.scalars(select(CardConcept).where(CardConcept.name.in_(names))):
+                concept.status, concept.status_reason = status, reason
+            db.commit()
+
+    mark("unsupported", "not_implemented")
+    try:
+        library = {item["card"]["name"] for item in ada.get("/api/v1/library").json()["cards"]}
+        assert "Sol Ring" in library and not library & set(names)
+        assert ada.get("/api/v1/me/alliance/cards").json()["cards"] == []
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            granted = db.scalars(
+                select(LibraryGrant.quantity)
+                .join(CardConcept, CardConcept.id == LibraryGrant.concept_id)
+                .where(LibraryGrant.user_id == ada.id, CardConcept.name == "Lightning Bolt")
+            ).all()
+            assert granted == [1]
+    finally:
+        mark("certified", None)
+    library = {
+        item["card"]["name"]: item["copies"] for item in ada.get("/api/v1/library").json()["cards"]
+    }
+    assert (library["Lightning Bolt"], library[names[1]]) == (1, 4)
+
+
 def test_wins_count_once_and_raise_levels(client):
     ada = Account(client, "ada")
     progress = ada.get("/api/v1/me/progress").json()

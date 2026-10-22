@@ -1805,6 +1805,53 @@
    "passed": true,
    "power": "3",
    "toughness": "3"
+  },
+  {
+   "name": "Abigale, Poet Laureate",
+   "class": "mage.cards.a.AbigalePoetLaureate",
+   "kind": "adventure",
+   "set": "SOS",
+   "number": "170",
+   "mana_cost": "{1}{W}{B}",
+   "types": [
+    "Creature"
+   ],
+   "subtypes": [
+    "Bird",
+    "Bard"
+   ],
+   "supertypes": [
+    "Legendary"
+   ],
+   "rules": [
+    "Sorcery &mdash; Heroic Stanza {1}{W/B} &mdash; Put a +1/+1 counter on target creature.",
+    "Flying",
+    "Whenever you cast a creature spell, {this} becomes prepared. <i>(While it's prepared, you may cast a copy of its spell. Doing so unprepares it.)</i>"
+   ],
+   "faces": [
+    {
+     "mana_cost": "{1}{W/B}",
+     "types": [
+      "Sorcery"
+     ],
+     "subtypes": [],
+     "supertypes": [],
+     "rules": [
+      "Sorcery &mdash; Heroic Stanza {1}{W/B} &mdash; Put a +1/+1 counter on target creature."
+     ],
+     "name": "Heroic Stanza"
+    }
+   ],
+   "gates": {
+    "resolves": true,
+    "creates": true,
+    "describes": true,
+    "faces": true,
+    "copies": true
+   },
+   "passed": true,
+   "power": "2",
+   "toughness": "3"
   }
  ]
 }

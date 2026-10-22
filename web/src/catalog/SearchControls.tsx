@@ -228,19 +228,6 @@ export function SearchControls({
             </select>
           </label>
           <label className={styles.field}>
-            <span>Playable here</span>
-            <select
-              value={search.playable}
-              onChange={(event) =>
-                set("playable", event.target.value as Search["playable"])
-              }
-            >
-              <option value="">Every card</option>
-              <option value="true">Only playable cards</option>
-              <option value="false">Only cards not yet playable</option>
-            </select>
-          </label>
-          <label className={styles.field}>
             <span>Sort by</span>
             <select
               value={search.sort}
@@ -322,11 +309,8 @@ export function SearchControls({
           </dt>
           <dd>Deck-building roles</dd>
           <dt>
-            <code>is:playable</code> <code>status:unsupported</code>
-          </dt>
-          <dd>Whether the engine can play it</dd>
-          <dt>
-            <code>is:mdfc</code> <code>is:split</code> <code>is:adventure</code>
+            <code>is:mdfc</code> <code>is:split</code> <code>is:adventure</code>{" "}
+            <code>is:prepare</code>
           </dt>
           <dd>Card layouts</dd>
           <dt>

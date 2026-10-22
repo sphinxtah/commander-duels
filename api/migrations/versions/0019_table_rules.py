@@ -15,7 +15,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0019_table_rules"
-down_revision = "0017_chat"
+down_revision = "0018_card_removal"
 branch_labels = None
 depends_on = None
 

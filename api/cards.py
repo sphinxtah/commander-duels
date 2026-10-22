@@ -3,8 +3,13 @@ administration (CAT07, DECK03, DECK04).
 
 Every search runs against the local catalog; no request reaches Scryfall. Results are card
 concepts, one per card whatever its printings, with the printing shown by default; a card's
-printings are listed with it. Every card shows its status, and a card the engine cannot play
-says why (CAT07). Search takes structured filters, the search syntax (api/search.py), or both.
+printings are listed with it. Search takes structured filters, the search syntax (api/search.py),
+or both.
+
+Since v0.4.5 only cards a game can play are in the game: search, card pages and their printings
+find nothing else, for every account (catalog.statuses.playable). Administration's review keeps
+listing the cards the automatic checks held back and the suspended ones, because accepting or
+restoring one is how it comes back.
 """
 
 import time
@@ -35,9 +40,11 @@ from api.models import (
     FormatVersion,
     ScheduledJob,
 )
+from api.roster import roster_of
 from api.schemas import Contract
 from api.search import Compiler, Leaf, SearchError, condition
 from catalog import sync
+from catalog.statuses import SUSPENDED_DETAIL, playable
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Manager = Annotated[Principal, Depends(require_permission("catalog.manage"))]
@@ -387,8 +394,6 @@ def filters(
     rarity: str | None,
     set_code: str | None,
     legal: str | None,
-    playable: bool | None,
-    extras: bool,
     library: Library | None = None,
 ) -> list[ColumnElement[bool]]:
     compiler = Compiler(db)
@@ -416,12 +421,9 @@ def filters(
         leaves.append(Leaf("s", ":", set_code))
     if legal:
         leaves.append(Leaf("f", ":", legal))
-    if playable is not None:
-        leaves.append(Leaf("is", ":", "playable" if playable else "unsupported"))
     conditions.extend(compiler.compile(leaf) for leaf in leaves)
-    conditions.append(CardConcept.removed_revision.is_(None))
-    if not extras:
-        conditions.append(CardConcept.deck_card.is_(True))
+    # Only cards a game can play, which are all deck cards: no token, emblem or art card.
+    conditions.append(playable())
     if library is not None and not library.unlimited:
         owned = [key for key, copies in library.copies.items() if copies > 0]
         conditions.append(
@@ -463,17 +465,15 @@ def search_cards(
     rarity: Annotated[str | None, Query(max_length=20)] = None,
     set: Annotated[str | None, Query(max_length=16)] = None,
     legal: Annotated[str | None, Query(max_length=20)] = None,
-    playable: bool | None = None,
-    extras: bool = False,
     owned: bool = False,
     sort: Sort = "name",
     descending: bool = False,
     page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = PAGE_SIZE,
 ) -> CardPage:
-    """Cards by structured filters and the search syntax together; all must match. `owned` keeps
-    to the cards in the player's library (basic lands included); every card says how many copies
-    the library holds."""
+    """Cards by structured filters and the search syntax together; all must match, and only cards
+    a game can play are found. `owned` keeps to the cards in the player's library (basic lands
+    included); every card says how many copies the library holds."""
     started = time.monotonic()
     try:
         conditions = filters(
@@ -490,8 +490,6 @@ def search_cards(
             rarity=rarity,
             set_code=set,
             legal=legal,
-            playable=playable,
-            extras=extras,
             library=library if owned else None,
         )
     except SearchError as error:
@@ -537,6 +535,14 @@ def printing_summary(printing: CardPrinting) -> PrintingSummary:
     )
 
 
+def in_game(db: Session, card_id: UUID) -> CardConcept:
+    """A card a game can play; any other is not found, as a card that does not exist."""
+    concept = db.scalar(select(CardConcept).where(CardConcept.id == card_id, playable()))
+    if concept is None:
+        raise not_found()
+    return concept
+
+
 def printings_query(card_id: UUID) -> Select[CardPrinting]:
     return (
         select(CardPrinting)
@@ -556,10 +562,9 @@ def card_detail(
     printing: Annotated[UUID | None, Query()] = None,
 ) -> CardDetail:
     """A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)
-    is listed among them even when it is older, so the screen can show it and credit its artist."""
-    concept = db.get(CardConcept, card_id)
-    if concept is None:
-        raise not_found()
+    is listed among them even when it is older, so the screen can show it and credit its artist.
+    A card the game cannot play is not found."""
+    concept = in_game(db, card_id)
     base = summaries(db, [concept])[0]
     mark_owned(db, [base], library)
     printings = list(db.scalars(printings_query(card_id).limit(MAX_PRINTINGS)))
@@ -613,14 +618,14 @@ def card_printings(
     offset: Annotated[int, Query(ge=0, le=100_000)] = 0,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> list[PrintingSummary]:
-    if db.get(CardConcept, card_id) is None:
-        raise not_found()
+    in_game(db, card_id)
     printings = db.scalars(printings_query(card_id).offset(offset).limit(limit))
     return [printing_summary(printing) for printing in printings]
 
 
 @router.get("/sets", response_model=list[SetSummary])
 def sets(principal: Active, db: Db) -> list[SetSummary]:
+    """Sets with a card a game can play, each with the number of such cards."""
     rows = db.execute(
         select(
             CardPrinting.set_code,
@@ -629,7 +634,8 @@ def sets(principal: Active, db: Db) -> list[SetSummary]:
             func.min(CardPrinting.released_at),
             func.count(func.distinct(CardPrinting.concept_id)),
         )
-        .where(CardPrinting.removed_revision.is_(None))
+        .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+        .where(CardPrinting.removed_revision.is_(None), playable())
         .group_by(CardPrinting.set_code)
         .order_by(func.min(CardPrinting.released_at).desc(), CardPrinting.set_code)
     )
@@ -690,11 +696,7 @@ def catalog_status(principal: Active, db: Db) -> CatalogStatus:
         .select_from(CardConcept)
         .where(CardConcept.deck_card.is_(True), CardConcept.removed_revision.is_(None))
     )
-    playable = db.scalar(
-        select(func.count())
-        .select_from(CardConcept)
-        .where(CardConcept.status == "certified", CardConcept.removed_revision.is_(None))
-    )
+    in_play = db.scalar(select(func.count()).select_from(CardConcept).where(playable()))
     return CatalogStatus(
         revision=RevisionInfo(
             id=revision.id,
@@ -709,7 +711,7 @@ def catalog_status(principal: Active, db: Db) -> CatalogStatus:
         next_run_at=upcoming,
         stale=not fresh,
         format_versions=versions,
-        playable=playable or 0,
+        playable=in_play or 0,
         cards=counted or 0,
     )
 
@@ -775,11 +777,17 @@ def request_sync(request: Request, principal: Manager, db: Db) -> SyncQueued:
 
 @router.get("/admin/catalog/reviews", response_model=list[ReviewCard])
 def reviews(principal: Manager, db: Db) -> list[ReviewCard]:
-    """Cards whose Oracle text changed since they were certified, and suspended cards."""
+    """Cards whose Oracle text changed since they were certified, cards the engine implements
+    that its automatic checks held back (v0.4.5), and suspended cards: the only place the site
+    lists cards a game cannot play."""
     concepts = list(
         db.scalars(
             select(CardConcept)
-            .where((CardConcept.review == "pending") | (CardConcept.status == "suspended"))
+            .where(
+                (CardConcept.review == "pending")
+                | (CardConcept.status == "suspended")
+                | ((CardConcept.status == "implemented") & CardConcept.removed_revision.is_(None))
+            )
             .order_by(CardConcept.normalized_name)
             .limit(500)
         )
@@ -807,16 +815,35 @@ def reviews(principal: Manager, db: Db) -> list[ReviewCard]:
 def review_card(
     card_id: UUID, body: ReviewAction, request: Request, principal: Manager, db: Db
 ) -> CardSummary:
-    """accept: the engine's behaviour is right for today's text. suspend: no new game may start
-    with the card. restore: undo a suspension."""
+    """accept: the engine's behaviour is right for today's text, or (v0.4.5) a card the automatic
+    checks held back plays as the engine has it, certified from now on, syncs included. suspend:
+    the card leaves the game, and every deck's draft. restore: undo a suspension."""
     concept = db.get(CardConcept, card_id)
     if concept is None:
         raise not_found()
     before = concept.status
     capabilities = dict(concept.capabilities or {})
-    if body.action == "accept":
+    if body.action == "accept" and concept.status == "implemented":
+        # Kept across syncs (catalog/statuses.py); who accepted it is the audit trail's to say.
+        capabilities["accepted"] = {
+            "at": datetime.now(UTC).isoformat(),
+            "reason": concept.status_reason,
+            "detail": concept.status_detail,
+            "engine_build": concept.engine_build,
+        }
+        concept.status, concept.status_reason, concept.status_detail = "certified", None, None
+        concept.certified_hash = concept.gameplay_hash
+        concept.review = "none"
+        capabilities["multiplayer"] = True
+        capabilities["ai"] = "untested"
+    elif body.action == "accept":
         if concept.status != "certified":
-            raise ApiError(409, "not_certified", "Only a certified card's review can be accepted.")
+            raise ApiError(
+                409,
+                "not_certified",
+                "Only a certified card's review, or a card the automatic checks held back, can "
+                "be accepted.",
+            )
         concept.certified_hash = concept.gameplay_hash
         concept.review = "none"
     elif body.action == "suspend":
@@ -829,7 +856,7 @@ def review_card(
         }
         concept.status = "suspended"
         concept.status_reason = "suspended_by_staff"
-        concept.status_detail = body.reason or "Suspended by the site's staff."
+        concept.status_detail = body.reason or SUSPENDED_DETAIL
         capabilities["multiplayer"] = False
         capabilities["ai"] = False
     else:
@@ -840,11 +867,17 @@ def review_card(
         reason, detail = previous.get("reason"), previous.get("detail")
         concept.status_reason = str(reason) if reason else None
         concept.status_detail = str(detail) if detail else None
-        playable = concept.status == "certified"
-        capabilities["multiplayer"] = playable
-        capabilities["ai"] = "untested" if playable else False
+        certified = concept.status == "certified"
+        capabilities["multiplayer"] = certified
+        capabilities["ai"] = "untested" if certified else False
     concept.capabilities = capabilities
     concept.updated_at = datetime.now(UTC)
+    if body.action == "suspend":
+        # Imported here: api.decks imports this module.
+        from api.decks import withdraw_unplayable
+
+        db.flush()
+        withdraw_unplayable(db, roster_of(request))
     audit(
         db,
         request,

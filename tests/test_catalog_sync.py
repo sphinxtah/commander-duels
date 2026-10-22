@@ -208,6 +208,48 @@ def test_the_first_import_waits_for_the_engine_and_later_ones_do_not(tmp_path):
         )
 
 
+def test_a_version_that_learns_a_layout_imports_again_at_once(tmp_path):
+    """v0.4.5 learned the prepare layout: when the worker starts, the revision that quarantined
+    such cards queues a run due at once, which waits for the engine and imports though no file
+    changed, so they are decided straight away rather than at the next day's run."""
+    engine = database(tmp_path)
+    config = settings(tmp_path)
+    fake = Scryfall()
+    first = run(engine, config, fake)
+    now = datetime.now(UTC)
+    # The test slice's only quarantined layout is one no version knows yet.
+    assert not sync.ensure_relearned(engine, config, now)
+    # As a version before v0.4.5 recorded its revision.
+    with Session(engine) as session, session.begin():
+        revision = session.get(CatalogRevision, first.revision_id)
+        revision.counts = {**revision.counts, "unknown_layouts": {"front_card": 1, "prepare": 72}}
+    assert sync.ensure_relearned(engine, config, now)
+    assert sync.ensure_relearned(engine, config, now)
+    with Session(engine) as session:
+        queued = session.scalars(
+            select(ScheduledJob).where(
+                ScheduledJob.deduplication_key == f"catalog_sync:relearn:{first.revision_id}"
+            )
+        ).all()
+        assert [(job.status, job.due_at.replace(tzinfo=UTC)) for job in queued] == [
+            ("pending", now)
+        ]
+    fake.engine_up = False
+    waiting = run(engine, config, fake)
+    assert (waiting.status, waiting.code) == ("pending", "engine_unavailable")
+    fake.engine_up = True
+    again = run(engine, config, fake)
+    assert (again.code, again.revision_id) == ("imported", first.revision_id + 1)
+    with Session(engine) as session:
+        abigale = select(CardConcept.status).where(
+            CardConcept.name == "Abigale, Poet Laureate // Heroic Stanza"
+        )
+        assert session.scalar(abigale) == "certified"
+    assert not sync.ensure_relearned(engine, config, now)
+    # With the catalog sync off, nothing is queued.
+    assert not sync.ensure_relearned(engine, Settings(database_url=config.database_url), now)
+
+
 def test_rate_limits_retry_and_settle_reschedules_the_job(tmp_path):
     engine = database(tmp_path)
     config = settings(tmp_path)

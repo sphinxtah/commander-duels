@@ -167,7 +167,7 @@ export function MyLibrary({ onOpen }: { onOpen: (card: CardSummary) => void }) {
             </thead>
             <tbody>
               {shown.map((item) => (
-                <tr key={item.card.id} data-playable={item.card.playable}>
+                <tr key={item.card.id}>
                   <th scope="row">
                     <button
                       type="button"
@@ -177,9 +177,6 @@ export function MyLibrary({ onOpen }: { onOpen: (card: CardSummary) => void }) {
                       {item.card.name}
                     </button>{" "}
                     <ManaCost cost={item.card.mana_cost} />
-                    {!item.card.playable && (
-                      <span className={styles.note}>Not playable here yet</span>
-                    )}
                   </th>
                   <td>{item.card.type_line}</td>
                   <td>{item.copies ?? "Any number"}</td>

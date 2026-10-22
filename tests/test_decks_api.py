@@ -24,7 +24,7 @@ from api.cards import artist_of, image_of
 from api.config import Settings
 from api.identity import hash_token, utcnow
 from api.main import create_app
-from api.models import CardConcept, CardPrinting, Deck, RoleGrant, User, UserSession
+from api.models import AuditEvent, CardConcept, CardPrinting, Deck, RoleGrant, User, UserSession
 
 # Tables a test empties after itself, children first; the catalog stays.
 ACCOUNT_TABLES = (
@@ -217,10 +217,25 @@ def test_card_search_and_details(client):
         if item["name"].startswith("Delver of Secrets")
     )
     assert delver["image"]["faces"] == 2 and delver["image"]["artist"]
-    unsupported = ada.get("/api/v1/cards", q="status:unsupported", extras="true").json()
-    assert {"Goblin", "Temple of Khonshu"} <= {item["name"] for item in unsupported["items"]}
-    # Tokens and other objects no deck holds are left out unless asked for.
+    # Only cards a game can play are in the game (v0.4.5): no card the engine lacks, no token or
+    # other object no deck holds, and no term or filter that names playability.
+    assert ada.get("/api/v1/cards", q="temple of khonshu").json()["total"] == 0
     assert "Goblin" not in {i["name"] for i in ada.get("/api/v1/cards", q="goblin").json()["items"]}
+    for term in ("status:unsupported", "is:unsupported", "is:playable"):
+        assert ada.get("/api/v1/cards", q=term).json()["code"] == "invalid_search"
+    temple = card_id(client, "Temple of Khonshu")
+    assert ada.get(f"/api/v1/cards/{temple}").status_code == 404
+    assert ada.get(f"/api/v1/cards/{temple}/printings").status_code == 404
+    # Prepare cards are, by their layout or either face's name.
+    prepared = ada.get("/api/v1/cards", q="is:prepare").json()["items"]
+    assert {item["name"] for item in prepared} == {
+        "Abigale, Poet Laureate // Heroic Stanza",
+        "Adventurous Eater // Have a Bite",
+    }
+    stanza = ada.get("/api/v1/cards", q="heroic stanza").json()["items"]
+    assert [(item["name"], item["commander"]) for item in stanza] == [
+        ("Abigale, Poet Laureate // Heroic Stanza", True)
+    ]
     filtered = ada.get("/api/v1/cards", colors="u", colors_mode="exact", mv_max=2).json()
     assert {item["name"] for item in filtered["items"]} >= {"Counterspell", "Brainstorm"}
     assert ada.get("/api/v1/cards", q="mv:even c:u").json()["total"] >= 1
@@ -399,6 +414,148 @@ def test_decks_keep_the_table_options_they_need(client):
         assert db.scalar(select(Deck.needs)) == ["banned"]
 
 
+def test_cards_the_game_cannot_play_leave_drafts_but_not_revisions(client):
+    """v0.4.5: a draft holds only cards the game can play. A save naming another keeps it out; a
+    card that becomes unplayable (here a staff suspension) leaves every draft, archived and
+    trashed ones too, at once. Each deck notes what left and why until its owner dismisses it, its
+    flags follow, and the versions games played keep their cards."""
+    ada = Account(client, "ada", admin=True)
+    temple = card_id(client, "Temple of Khonshu")
+    created = ada.send(
+        "POST",
+        "/api/v1/decks",
+        {
+            "title": "Odd burn",
+            "format": "legacy",
+            "entries": [*burn(client), entry(client, "Temple of Khonshu", 2, "maybeboard")],
+        },
+    ).json()
+    assert temple not in json.dumps(created["draft"]) and created["playable"] is True
+    assert [(c["name"], c["quantity"], c["reason"]) for c in created["removed_cards"]] == [
+        ("Temple of Khonshu", 2, "The game engine has no implementation of this card yet.")
+    ]
+    path = f"/api/v1/decks/{created['id']}"
+    assert ada.send("DELETE", f"{path}/removed-cards").json()["removed_cards"] == []
+    assert ada.get(path).json()["removed_cards"] == []
+    assert ada.send("POST", f"{path}/revisions").json()["number"] == 1
+    old = ada.send(
+        "POST", "/api/v1/decks", {"title": "Old burn", "format": "legacy", "entries": burn(client)}
+    ).json()
+    ada.send("DELETE", f"/api/v1/decks/{old['id']}")
+    bolt = card_id(client, "Lightning Bolt")
+    review = f"/api/v1/admin/catalog/cards/{bolt}/review"
+    try:
+        suspended = ada.send("POST", review, {"action": "suspend", "reason": "Rules bug"}).json()
+        assert suspended["status"] == "suspended"
+        deck = ada.get(path).json()
+        assert bolt not in json.dumps(deck["draft"]) and deck["draft"]["version"] == 2
+        assert (deck["card_count"], deck["legal"], deck["playable"]) == (56, False, False)
+        assert [(c["name"], c["quantity"], c["reason"]) for c in deck["removed_cards"]] == [
+            ("Lightning Bolt", 4, "Suspended by the site's staff: Rules bug")
+        ]
+        listed = {item["title"]: item for item in ada.get("/api/v1/decks").json()}
+        assert listed["Odd burn"]["removed_cards"][0]["name"] == "Lightning Bolt"
+        # The trashed deck lost it too.
+        back = ada.send("POST", f"/api/v1/decks/{old['id']}/restore").json()
+        assert [c["name"] for c in back["removed_cards"]] == ["Lightning Bolt"]
+        # The version a game could have played keeps its four.
+        kept = ada.get(f"{path}/revisions/1").json()["entries"]
+        assert {"card_id": bolt, "printing_id": None, "quantity": 4, "location": "main"} in kept
+        # Out of the game for everyone: search, its page, and a save naming it.
+        assert ada.get("/api/v1/cards", q='!"lightning bolt"').json()["total"] == 0
+        assert ada.get(f"/api/v1/cards/{bolt}").status_code == 404
+        saved = ada.send("PUT", f"{path}/draft", {"version": 2, "entries": burn(client)}).json()
+        assert saved["validation"]["counts"]["main"] == 56
+        # Administration's review still lists it, to restore it.
+        assert bolt in [
+            item["card"]["id"] for item in ada.get("/api/v1/admin/catalog/reviews").json()
+        ]
+    finally:
+        restored = ada.send("POST", review, {"action": "restore"})
+    assert restored.json()["status"] == "certified"
+    assert ada.get("/api/v1/cards", q='!"lightning bolt"').json()["total"] == 1
+    # The drafts keep it out until their owners add it again.
+    assert bolt not in json.dumps(ada.get(path).json()["draft"])
+
+
+def test_the_worker_takes_unplayable_cards_out_of_drafts_when_it_starts(client, url, starters):
+    """Each deploy starts the worker, which empties the drafts of cards the game cannot play
+    (v0.4.5): a deck saved before then may hold one."""
+    from api.models import Deck
+    from catalog import worker
+
+    ada = Account(client, "ada")
+    temple = card_id(client, "Temple of Khonshu")
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        now = utcnow()
+        deck = Deck(
+            owner_id=ada.id,
+            title="From before",
+            format="legacy",
+            draft={"entries": [*burn(client), {"card_id": temple, "quantity": 1}]},
+            draft_hash="",
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(deck)
+        db.commit()
+        deck_id = deck.id
+    database = create_engine(url)
+    worker.start(database, Settings(database_url=url, content_dir=str(starters)))
+    database.dispose()
+    found = ada.get(f"/api/v1/decks/{deck_id}").json()
+    assert temple not in json.dumps(found["draft"]) and found["card_count"] == 60
+    assert [card["name"] for card in found["removed_cards"]] == ["Temple of Khonshu"]
+
+
+def test_an_administrator_accepts_a_card_the_checks_held_back(client):
+    """A card the engine implements that its automatic checks held back is out of the game, and
+    listed for review; accepting it puts it in, audited, and the acceptance outlives syncs
+    (test_catalog.py)."""
+    ada, bob = Account(client, "ada", admin=True), Account(client, "bob")
+    giant = card_id(client, "Hill Giant")
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        concept = db.get(CardConcept, UUID(giant))
+        assert concept is not None
+        before = dict(concept.capabilities)
+        concept.status, concept.status_reason = "implemented", "characteristics_differ"
+        concept.status_detail = "The engine's card differs from the Oracle card: power 4 against 3."
+        concept.capabilities = {**before, "multiplayer": False, "ai": False}
+        db.commit()
+    try:
+        assert ada.get(f"/api/v1/cards/{giant}").status_code == 404
+        listed = {
+            item["card"]["id"]: item for item in ada.get("/api/v1/admin/catalog/reviews").json()
+        }
+        assert listed[giant]["card"]["status_reason"] == "characteristics_differ"
+        assert bob.get("/api/v1/admin/catalog/reviews").status_code == 403
+        accepted = ada.send(
+            "POST", f"/api/v1/admin/catalog/cards/{giant}/review", {"action": "accept"}
+        ).json()
+        assert (accepted["status"], accepted["playable"]) == ("certified", True)
+        detail = bob.get(f"/api/v1/cards/{giant}").json()
+        assert detail["capabilities"]["accepted"]["reason"] == "characteristics_differ"
+        assert detail["capabilities"]["multiplayer"] is True
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            event = db.scalar(select(AuditEvent).where(AuditEvent.action == "catalog.card_accept"))
+            assert event is not None and event.actor_id == ada.id
+            assert (event.details["from"], event.details["to"]) == ("implemented", "certified")
+        # Only a certified card's review, or a held-back card, can be accepted.
+        refused = ada.send(
+            "POST",
+            f"/api/v1/admin/catalog/cards/{card_id(client, 'Temple of Khonshu')}/review",
+            {"action": "accept"},
+        )
+        assert (refused.status_code, refused.json()["code"]) == (409, "not_certified")
+    finally:
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            concept = db.get(CardConcept, UUID(giant))
+            assert concept is not None
+            concept.status, concept.status_reason, concept.status_detail = "certified", None, None
+            concept.capabilities = before
+            db.commit()
+
+
 def test_revisions_cannot_be_changed_in_postgresql_or_by_the_api(client):
     ada = Account(client, "ada")
     deck = ada.send(
@@ -480,6 +637,7 @@ def test_import_preview_resolves_names_and_round_trips(client):
             "1 LIM-DUL'S VAULT",
             "1 Everythingamajig",
             "1 Lightnin Bolt",
+            "1 Temple of Khonshu",
             "48 Island",
             "",
             "Sideboard",
@@ -499,8 +657,17 @@ def test_import_preview_resolves_names_and_round_trips(client):
     assert statuses["1 Lightnin Bolt"] == "unresolved"
     unresolved = next(line for line in preview["lines"] if line["status"] == "unresolved")
     assert "Lightning Bolt" in [card["name"] for card in unresolved["candidates"]]
-    assert (preview["ambiguous"], preview["unresolved"]) == (1, 1)
+    assert (preview["ambiguous"], preview["unresolved"], preview["unavailable"]) == (1, 1, 1)
     assert "Goblin" not in json.dumps(preview["lines"])
+    # A card the game cannot play is named, and left out with the reason (v0.4.5).
+    temple = next(line for line in preview["lines"] if line["status"] == "unavailable")
+    assert (temple["name"], temple["card_id"], temple["candidates"]) == (
+        "Temple of Khonshu",
+        None,
+        [],
+    )
+    assert temple["reason"] == "The game engine has no implementation of this card yet."
+    assert card_id(client, "Temple of Khonshu") not in json.dumps(preview["entries"])
     sideboard = next(line for line in preview["lines"] if "Brainstorm" in line["text"])
     assert sideboard["location"] == "sideboard"
     bolt = next(line for line in preview["lines"] if "Lightning Bolt (M10)" in line["text"])

@@ -46,13 +46,18 @@
   cursor: pointer;
 }
 .primary {
-  background: #d5b77c;
+  background: var(--cd-gold-fill);
   border: 1px solid #e0c58f;
   color: #192220;
   font-weight: 600;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
 }
 .primary:hover:not(:disabled) {
-  background: #e6cc99;
+  background: var(--cd-gold-fill);
+  filter: brightness(1.08);
 }
 .secondary {
   background: #ffffff08;
@@ -157,9 +162,7 @@
   gap: 4px;
 }
 .deckTitle {
-  font:
-    1.08rem Georgia,
-    serif;
+  font: 600 1.08rem var(--cd-display);
   color: #ecefe7;
 }
 a.deckTitle:hover {
@@ -234,9 +237,7 @@ a.deckTitle:hover {
 .section h2,
 .meta h2,
 .finder h2 {
-  font:
-    1.2rem Georgia,
-    serif;
+  font: 600 1.2rem var(--cd-display);
 }
 .pips {
   display: inline-flex;
@@ -289,9 +290,7 @@ a.deckTitle:hover {
   background: #050909cc;
 }
 .dialog h2 {
-  font:
-    1.4rem Georgia,
-    serif;
+  font: 600 1.4rem var(--cd-display);
 }
 .close {
   position: absolute;
@@ -535,6 +534,24 @@ a.deckTitle:hover {
   margin-top: 0.25em;
 }
 
+/* Cards that left the draft because the game cannot play them (v0.4.5), until dismissed: the
+   amber of cards the engine cannot play. */
+.removed {
+  padding: 10px 14px;
+  border: 1px solid #c59b6566;
+  border-radius: 6px;
+  color: #e7cf9b;
+  line-height: 1.5;
+}
+.removed h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.removed p,
+.removed ul {
+  margin: 0 0 8px;
+}
+
 /* The editor. */
 .editorHead {
   display: flex;
@@ -554,9 +571,7 @@ a.deckTitle:hover {
   flex: 1 1 320px;
 }
 .titleField input {
-  font:
-    1.6rem Georgia,
-    serif;
+  font: 600 1.6rem var(--cd-display);
   padding: 6px 10px;
 }
 .save {
@@ -830,9 +845,7 @@ a.deckTitle:hover {
   background: #ffffff03;
 }
 .stats summary {
-  font:
-    1.2rem Georgia,
-    serif;
+  font: 600 1.2rem var(--cd-display);
   cursor: pointer;
 }
 .stats h3 {
@@ -916,4 +929,42 @@ a.deckTitle:hover {
   padding-left: 18px;
   font-size: 0.84rem;
   line-height: 1.6;
+}
+
+/* The facelift (v0.4.5): Magic Duels' tabs, and rows and panels in the menus' gold frame. */
+.tabs button {
+  font: 600 0.82rem/1 var(--cd-display);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.tabs button[aria-selected="true"] {
+  color: var(--cd-gold-hi);
+  border-bottom-color: var(--cd-gold-hi);
+  text-shadow: 0 0 12px #e9b96080;
+}
+.secondary {
+  background: linear-gradient(180deg, #1f302cd9, #111b1ad9);
+  border-color: var(--cd-gold-line);
+  color: var(--cd-gold-hi);
+  font-family: var(--cd-display);
+  letter-spacing: 0.6px;
+  box-shadow: inset 0 1px 0 #ffffff12;
+}
+.deckList li,
+.starters li {
+  background: var(--cd-panel-bg);
+  border-color: var(--cd-gold-line);
+  border-radius: 8px;
+  box-shadow: var(--cd-frame);
+  transition: border-color 160ms;
+}
+.deckList li:hover,
+.starters li:hover {
+  border-color: #d5b77c80;
+}
+.verdict,
+.finder,
+.stats,
+.meta {
+  border-color: var(--cd-gold-line);
 }

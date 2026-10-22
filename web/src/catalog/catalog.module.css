@@ -29,13 +29,18 @@
   font-size: 0.86rem;
 }
 .primary {
-  background: #d5b77c;
+  background: var(--cd-gold-fill);
   border: 1px solid #e0c58f;
   color: #192220;
   font-weight: 600;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
 }
 .primary:hover {
-  background: #e6cc99;
+  background: var(--cd-gold-fill);
+  filter: brightness(1.08);
 }
 .secondary {
   background: #ffffff08;
@@ -545,9 +550,7 @@
 /* The player's library (v0.3.1). */
 .library h2,
 .custom h2 {
-  font:
-    1.3rem Georgia,
-    serif;
+  font: 600 1.3rem var(--cd-display);
   margin: 18px 0 6px;
 }
 .sources {
@@ -659,4 +662,29 @@
 .customState {
   font-size: 0.86rem;
   color: #aeb8ac;
+}
+
+/* The facelift (v0.4.5): Magic Duels' tabs, and rows and panels in the menus' gold frame. */
+.tabs button {
+  font: 600 0.82rem/1 var(--cd-display);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.tabs button[aria-selected="true"] {
+  color: var(--cd-gold-hi);
+  border-bottom-color: var(--cd-gold-hi);
+  text-shadow: 0 0 12px #e9b96080;
+}
+.secondary {
+  background: linear-gradient(180deg, #1f302cd9, #111b1ad9);
+  border-color: var(--cd-gold-line);
+  color: var(--cd-gold-hi);
+  font-family: var(--cd-display);
+  letter-spacing: 0.6px;
+  box-shadow: inset 0 1px 0 #ffffff12;
+}
+.filters {
+  background: var(--cd-panel-bg);
+  border-color: var(--cd-gold-line);
+  box-shadow: var(--cd-frame);
 }

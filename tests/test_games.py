@@ -25,6 +25,7 @@ import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
+from catalog_fixtures import bulk, engine_list, import_bulk
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -658,13 +659,16 @@ def test_results_are_recorded_and_restarts_interrupt(
 
 
 def test_sysop_inspects_observes_and_plays_any_card(
-    client: TestClient, app: FastAPI, engine: FakeEngine
+    client: TestClient, app: FastAPI, engine: FakeEngine, tmp_path: Path
 ) -> None:
+    # SysOp's deck lists name cards in the game (v0.4.5): the test catalog's.
+    import_bulk(app.state.database, tmp_path / "catalog", bulk(), engine_list())
     ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
     listed = ada.post("/api/v1/practice-games", {"deck_list": "4 Lightning Bolt"})
     assert listed.status_code == 403
     assert ada.get("/api/v1/engine/cards", q="bolt").status_code == 403
-    assert root.get("/api/v1/engine/cards", q="bolt").json()["names"][0] == ("Lightning Bolt")
+    # The engine knows Lightning Helix too; the test catalog does not, so it is not offered.
+    assert root.get("/api/v1/engine/cards", q="bolt").json()["names"] == ["Lightning Bolt"]
     assert root.get("/api/v1/practice-games/options").json()["deck_lists"] is True
 
     unknown = root.post(
@@ -673,21 +677,34 @@ def test_sysop_inspects_observes_and_plays_any_card(
     )
     assert unknown.status_code == 422, unknown.text
     assert unknown.json()["names"] == ["Unknown Card", "Unknown Other"]
-    deck = "Commander\n1 Krenko, Mob Boss\n\nDeck\n4x Goblin Guide (ZEN) 126\n36 Mountain\n"
+    # A card the game cannot play is refused as one no card is, a token too.
+    unplayable = root.post(
+        "/api/v1/practice-games",
+        {"deck_list": "20 Mountain\n1 Temple of Khonshu\n1 Goblin"},
+    )
+    assert (unplayable.status_code, unplayable.json()["code"]) == (422, "cards_not_playable")
+    assert unplayable.json()["names"] == ["Temple of Khonshu", "Goblin"]
+    deck = (
+        "Commander\n1 Kenrith, the Returned King\n\nDeck\n4x Lightning Bolt (M10) 146\n"
+        "36 Mountain\n"
+    )
     created = root.post(
         "/api/v1/practice-games",
         {
             "format": "commander",
             "deck_list": deck,
-            "bots": [{"deck_list": "Commander: Isamaru, Hound of Konda\n40 Plains"}],
+            # A double-faced card by its front face, as the engine names it.
+            "bots": [
+                {"deck_list": "Commander: Karlach, Fury of Avernus\n1 Delver of Secrets\n40 Plains"}
+            ],
         },
     )
     assert created.status_code == 201, created.text
     own = created.json()
     assert own["seats"][0]["deck"] == "custom" and own["seats"][1]["deck"] == "custom"
     assert engine.created[-1]["seats"][0]["deck_list"] == {
-        "cards": [{"name": "Goblin Guide", "count": 4}, {"name": "Mountain", "count": 36}],
-        "commanders": ["Krenko, Mob Boss"],
+        "cards": [{"name": "Lightning Bolt", "count": 4}, {"name": "Mountain", "count": 36}],
+        "commanders": ["Kenrith, the Returned King"],
     }
     # SysOp has no per-account limit.
     second = root.post("/api/v1/practice-games", {})

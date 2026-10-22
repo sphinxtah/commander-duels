@@ -3,12 +3,7 @@ import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
 import { card, mockApi, reply } from "../decks/fixtures";
-import {
-  buildsFromLibrary,
-  namesPlayability,
-  ownedWords,
-  type CustomCard,
-} from "./catalog";
+import { buildsFromLibrary, ownedWords, type CustomCard } from "./catalog";
 import { CardsPage, resultWords } from "./CardsPage";
 
 const player = {
@@ -26,11 +21,6 @@ const administrator = {
 } as unknown as Me;
 
 const bolt = card("Lightning Bolt");
-const unsupported = card("Temple of Khonshu", {
-  status: "catalog_only",
-  status_reason: "not_implemented",
-  playable: false,
-});
 // As a player who builds from a library sees them: each card says its copies.
 const ownedBolt = card("Lightning Bolt", { owned: 2 });
 const golem = card("Stand-in Golem", { owned: 0 });
@@ -96,35 +86,21 @@ function searches(api: ReturnType<typeof mockApi>) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("the Cards page", () => {
-  it("opens on playable cards only, and shows the others when asked", async () => {
+  it("lists the cards in the game, with no word of playability (v0.4.5)", async () => {
     const api = pageApi();
-    api.on(
-      "GET /api/v1/cards",
-      () => reply(200, page([bolt])),
-      () => reply(200, page([bolt, unsupported])),
-    );
+    api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
     render(<CardsPage me={player} heading={createRef()} />);
-    expect(await screen.findByText("1 playable card")).toBeInTheDocument();
-    expect(searches(api)[0]).toMatchObject({ playable: true });
-    expect(
-      screen.queryByRole("button", { name: /^Temple of Khonshu/ }),
-    ).not.toBeInTheDocument();
-
-    const toggle = screen.getByRole("button", {
-      name: "Show cards not playable yet",
-    });
-    toggle.focus();
-    fireEvent.click(toggle);
-    expect(await screen.findByText("2 cards")).toBeInTheDocument();
-    expect(searches(api).at(-1)).not.toHaveProperty("playable");
-    // Shown with its badge, which says it cannot be played yet.
-    const temple = screen
-      .getByRole("button", { name: /^Temple of Khonshu, / })
+    expect(await screen.findByText("1 card")).toHaveAttribute("role", "status");
+    expect(searches(api)[0]).not.toHaveProperty("playable");
+    const tile = screen
+      .getByRole("button", { name: "Lightning Bolt, Artifact" })
       .closest("li")!;
-    expect(temple).toHaveTextContent("Not playable");
-    // The same button, still focused, now hides them again.
-    expect(document.activeElement).toBe(toggle);
-    expect(toggle).toHaveAccessibleName("Hide cards not playable yet");
+    expect(tile).not.toHaveTextContent(/playable/i);
+    expect(
+      screen.queryByRole("button", { name: /not playable yet/ }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    expect(screen.queryByLabelText("Playable here")).toBeNull();
   });
 
   it("names the cards the shown results hold while the next search runs", async () => {
@@ -136,76 +112,33 @@ describe("the Cards page", () => {
       () => new Promise((resolve) => (answer = resolve)),
     );
     render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 playable card");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Show cards not playable yet" }),
-    );
-    // The old results are playable cards, and the line says so until the new ones arrive.
-    expect(
-      await screen.findByText("1 playable card · searching…"),
-    ).toBeInTheDocument();
+    await screen.findByText("1 card");
+    fireEvent.change(screen.getByLabelText("Search cards"), {
+      target: { value: "t:artifact" },
+    });
+    // The old results stay, and the line counts them until the new ones arrive.
+    expect(await screen.findByText("1 card · searching…")).toBeInTheDocument();
     await vi.waitFor(() => expect(searches(api)).toHaveLength(2));
-    answer(reply(200, page([bolt, unsupported])));
+    answer(reply(200, page([bolt, golem])));
     expect(await screen.findByText("2 cards")).toBeInTheDocument();
   });
 
-  it("says the filter is set aside only once results answer that search", async () => {
-    const api = pageApi();
-    let answer: (value: unknown) => void = () => {};
-    api.on(
-      "GET /api/v1/cards",
-      () => reply(200, page([bolt])),
-      () => new Promise((resolve) => (answer = resolve)),
-    );
-    render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 playable card");
-    fireEvent.change(screen.getByLabelText("Search cards"), {
-      target: { value: "status:catalog_only" },
-    });
-    expect(
-      await screen.findByText("1 playable card · searching…"),
-    ).toBeInTheDocument();
-    await vi.waitFor(() => expect(searches(api)).toHaveLength(2));
-    answer(reply(200, page([unsupported])));
-    expect(
-      await screen.findByText(/^1 card · your search names playability/),
-    ).toBeInTheDocument();
-  });
-
-  it("lets a search that names playability decide it", async () => {
-    const api = pageApi();
-    api.on("GET /api/v1/cards", () => reply(200, page([unsupported])));
-    render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 playable card");
-    fireEvent.change(screen.getByLabelText("Search cards"), {
-      target: { value: "status:catalog_only" },
-    });
-    // Said in the live result line, so screen readers hear why the others appear.
-    expect(
-      await screen.findByText(
-        "1 card · your search names playability, so the “Playable here” filter is set aside",
-      ),
-    ).toHaveAttribute("role", "status");
-    expect(searches(api).at(-1)).toMatchObject({ q: "status:catalog_only" });
-    expect(searches(api).at(-1)).not.toHaveProperty("playable");
-    expect(
-      screen.queryByRole("button", { name: /cards not playable yet/ }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("clears its filters back to playable cards only", async () => {
+  it("clears its filters back to where it started", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
     render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 playable card");
+    await screen.findByText("1 card");
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    fireEvent.change(screen.getByLabelText("Playable here"), {
-      target: { value: "" },
+    fireEvent.change(screen.getByLabelText("Rarity"), {
+      target: { value: "rare" },
     });
-    expect(await screen.findByText("1 card")).toBeInTheDocument();
+    await vi.waitFor(() =>
+      expect(searches(api).at(-1)).toMatchObject({ rarity: "rare" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(await screen.findByText("1 playable card")).toBeInTheDocument();
-    expect(searches(api).at(-1)).toMatchObject({ playable: true });
+    await vi.waitFor(() =>
+      expect(searches(api).at(-1)).not.toHaveProperty("rarity"),
+    );
   });
 
   it("marks a player's copies, and keeps to their library when asked", async () => {
@@ -216,13 +149,13 @@ describe("the Cards page", () => {
       () => reply(200, page([ownedBolt])),
     );
     render(<CardsPage me={player} heading={createRef()} />);
-    // The page browses the whole catalog (CAT), the player's cards marked in it.
-    expect(await screen.findByText("2 playable cards")).toBeInTheDocument();
+    // The page browses every card in the game, the player's cards marked in it.
+    expect(await screen.findByText("2 cards")).toBeInTheDocument();
     expect(searches(api)[0]).not.toHaveProperty("owned");
     expect(
       screen
         .getByRole("button", {
-          name: "Lightning Bolt, Artifact, Playable, in your library: 2",
+          name: "Lightning Bolt, Artifact, in your library: 2",
         })
         .closest("li"),
     ).toHaveTextContent("In your library: 2");
@@ -232,9 +165,9 @@ describe("the Cards page", () => {
 
     fireEvent.click(screen.getByRole("checkbox", { name: "In my library" }));
     expect(
-      await screen.findByText("1 playable card in your library"),
+      await screen.findByText("1 card in your library"),
     ).toBeInTheDocument();
-    expect(searches(api).at(-1)).toMatchObject({ owned: true, playable: true });
+    expect(searches(api).at(-1)).toMatchObject({ owned: true });
   });
 
   it("says nothing of a library to an account that builds from the whole catalog", async () => {
@@ -244,14 +177,12 @@ describe("the Cards page", () => {
       reply(200, { unlimited: true, alliance: null, cards: [] }),
     );
     render(<CardsPage me={administrator} heading={createRef()} />);
-    await screen.findByText("1 playable card");
+    await screen.findByText("1 card");
     expect(
       screen.queryByRole("checkbox", { name: "In my library" }),
     ).toBeNull();
     expect(
-      screen.getByRole("button", {
-        name: "Lightning Bolt, Artifact, Playable",
-      }),
+      screen.getByRole("button", { name: "Lightning Bolt, Artifact" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "My library" }));
     expect(
@@ -286,7 +217,7 @@ describe("the Cards page", () => {
       }),
     );
     render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 playable card");
+    await screen.findByText("1 card");
     const tab = screen.getByRole("tab", { name: "My library" });
     fireEvent.click(tab);
     expect(tab).toHaveAttribute("aria-selected", "true");
@@ -334,7 +265,7 @@ describe("the Cards page", () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
     render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 playable card");
+    await screen.findByText("1 card");
     expect(
       api.calls.filter((call) => call.route === "GET /api/v1/custom-cards"),
     ).toHaveLength(1);
@@ -357,9 +288,8 @@ describe("the Cards page", () => {
       type_line: "Legendary Planeswalker — Teferi",
       owned: 4,
     });
-    const unplayable = card("Teferi, Who Slows the Sunset", {
+    const other = card("Teferi, Who Slows the Sunset", {
       type_line: "Legendary Planeswalker — Teferi",
-      playable: false,
       owned: 4,
     });
     api.on("GET /api/v1/me/alliance/cards", () =>
@@ -367,13 +297,14 @@ describe("the Cards page", () => {
         alliance: "teferi",
         name: "Teferi",
         custom: false,
-        cards: [teferi, unplayable],
+        cards: [teferi, other],
       }),
     );
     render(<CardsPage me={player} heading={createRef()} />);
     fireEvent.click(await screen.findByRole("tab", { name: "Teferi's cards" }));
     const section = screen.getByRole("region", { name: "Teferi's cards" });
-    expect(section).toHaveTextContent("2 cards, 1 playable here");
+    expect(section).toHaveTextContent("2 cards");
+    expect(section).not.toHaveTextContent(/playable/i);
     expect(
       within(section)
         .getAllByRole("listitem")
@@ -425,16 +356,12 @@ describe("the Cards page", () => {
   });
 });
 
-describe("the result line and playability terms", () => {
+describe("the result line and a library's copies", () => {
   it("says which cards it counts", () => {
-    expect(resultWords(1, "true")).toBe("1 playable card");
-    expect(resultWords(20123, "true")).toBe("20,123 playable cards");
-    expect(resultWords(2, "")).toBe("2 cards");
-    expect(resultWords(1, "false")).toBe("1 card not playable yet");
-    expect(resultWords(2, "true", true)).toBe(
-      "2 playable cards in your library",
-    );
-    expect(resultWords(1, "", true)).toBe("1 card in your library");
+    expect(resultWords(1)).toBe("1 card");
+    expect(resultWords(20123)).toBe("20,123 cards");
+    expect(resultWords(2, true)).toBe("2 cards in your library");
+    expect(resultWords(1, true)).toBe("1 card in your library");
   });
 
   it("reads a player's copies, and whether the account has a library", () => {
@@ -447,31 +374,5 @@ describe("the result line and playability terms", () => {
     expect(buildsFromLibrary([basic, card("A", { owned: 0 })])).toBe(true);
     expect(buildsFromLibrary([basic, card("A")])).toBe(false);
     expect(buildsFromLibrary([])).toBeUndefined();
-  });
-
-  it("knows a query that sets playability itself", () => {
-    for (const q of [
-      "is:playable",
-      "-is:unsupported t:elf",
-      "t:elf (is:supported or c:g)",
-      "STATUS:implemented",
-      "status=suspended",
-      'is:"unsupported"',
-      "(t:elf)is:unsupported",
-      "--is:unsupported",
-    ])
-      expect(namesPlayability(q), q).toBe(true);
-    // Words, quoted phrases and exact names are not terms, as the server reads them.
-    for (const q of [
-      "",
-      "playable",
-      "o:status",
-      "t:elf",
-      "this:playable",
-      'o:"draw status:x"',
-      '"is:playable"',
-      "!status:x",
-    ])
-      expect(namesPlayability(q), q).toBe(false);
   });
 });

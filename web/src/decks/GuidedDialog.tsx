@@ -76,7 +76,6 @@ export function GuidedDialog({ onClose }: { onClose: () => void }) {
     8,
     {
       q: leader ? "is:partner" : "is:commander",
-      playable: "true",
       legal: "commander",
     },
   );

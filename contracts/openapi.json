@@ -578,7 +578,7 @@
             "title": "Alliance"
           },
           "cards": {
-            "description": "Its own Planeswalker cards in the catalog, playable or not, one per card.",
+            "description": "Its own Planeswalker cards a game can play, one per card (since v0.4.5, the only ones shown).",
             "items": {
               "$ref": "#/components/schemas/CardSummary"
             },
@@ -2784,6 +2784,14 @@
             "title": "Playable",
             "type": "boolean"
           },
+          "removed_cards": {
+            "description": "Cards that left the draft because the game cannot play them (v0.4.5), until the owner dismisses the note.",
+            "items": {
+              "$ref": "#/components/schemas/RemovedCard"
+            },
+            "title": "Removed Cards",
+            "type": "array"
+          },
           "revisions": {
             "items": {
               "$ref": "#/components/schemas/RevisionSummary"
@@ -2844,6 +2852,7 @@
           "archived",
           "deleted_at",
           "updated_at",
+          "removed_cards",
           "notes",
           "share_code",
           "draft",
@@ -3178,6 +3187,14 @@
             "title": "Playable",
             "type": "boolean"
           },
+          "removed_cards": {
+            "description": "Cards that left the draft because the game cannot play them (v0.4.5), until the owner dismisses the note.",
+            "items": {
+              "$ref": "#/components/schemas/RemovedCard"
+            },
+            "title": "Removed Cards",
+            "type": "array"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -3216,7 +3233,8 @@
           "source",
           "archived",
           "deleted_at",
-          "updated_at"
+          "updated_at",
+          "removed_cards"
         ],
         "title": "DeckSummary",
         "type": "object"
@@ -3502,7 +3520,7 @@
                 "type": "null"
               }
             ],
-            "description": "For unknown_cards: the names the engine does not know.",
+            "description": "For unknown_cards: the names the engine does not know; for cards_not_playable (v0.4.5): the names of no card in the game.",
             "title": "Names"
           },
           "request_id": {
@@ -4263,11 +4281,24 @@
             "title": "Quantity",
             "type": "integer"
           },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An unavailable line's card is one the game cannot play (v0.4.5): why.",
+            "title": "Reason"
+          },
           "status": {
             "enum": [
               "resolved",
               "ambiguous",
-              "unresolved"
+              "unresolved",
+              "unavailable"
             ],
             "title": "Status",
             "type": "string"
@@ -4337,6 +4368,12 @@
               }
             ],
             "title": "Title"
+          },
+          "unavailable": {
+            "default": 0,
+            "description": "Lines naming a card the game cannot play (v0.4.5).",
+            "title": "Unavailable",
+            "type": "integer"
           },
           "unresolved": {
             "title": "Unresolved",
@@ -5528,7 +5565,7 @@
                 "type": "null"
               }
             ],
-            "description": "SysOp only (cards.any): one card per line, any card the engine implements.",
+            "description": "SysOp only (cards.any): one card per line, any card in the game.",
             "title": "Deck List"
           },
           "format": {
@@ -6407,6 +6444,12 @@
             "title": "Rarity",
             "type": "string"
           },
+          "replaced": {
+            "default": false,
+            "description": "Drawn from its sheet in place of a card the game cannot play (v0.4.5); the opening's record names that card.",
+            "title": "Replaced",
+            "type": "boolean"
+          },
           "set_code": {
             "title": "Set Code",
             "type": "string"
@@ -6719,6 +6762,39 @@
           "type_line"
         ],
         "title": "Related",
+        "type": "object"
+      },
+      "RemovedCard": {
+        "additionalProperties": false,
+        "description": "A card that left the deck's draft because the game cannot play it (v0.4.5).",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "The copies the draft held, every location together.",
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Why the game cannot play it, in a sentence.",
+            "title": "Reason",
+            "type": "string"
+          },
+          "removed_at": {
+            "format": "date-time",
+            "title": "Removed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "quantity",
+          "reason",
+          "removed_at"
+        ],
+        "title": "RemovedCard",
         "type": "object"
       },
       "ReportContext": {
@@ -7738,7 +7814,7 @@
                 "type": "null"
               }
             ],
-            "description": "SysOp only (cards.any): one card per line, any card the engine implements.",
+            "description": "SysOp only (cards.any): one card per line, any card in the game.",
             "title": "Deck List"
           }
         },
@@ -9423,7 +9499,7 @@
     },
     "/api/v1/admin/catalog/cards/{card_id}/review": {
       "post": {
-        "description": "accept: the engine's behaviour is right for today's text. suspend: no new game may start\nwith the card. restore: undo a suspension.",
+        "description": "accept: the engine's behaviour is right for today's text, or (v0.4.5) a card the automatic\nchecks held back plays as the engine has it, certified from now on, syncs included. suspend:\nthe card leaves the game, and every deck's draft. restore: undo a suspension.",
         "operationId": "review_card_api_v1_admin_catalog_cards__card_id__review_post",
         "parameters": [
           {
@@ -9544,7 +9620,7 @@
     },
     "/api/v1/admin/catalog/reviews": {
       "get": {
-        "description": "Cards whose Oracle text changed since they were certified, and suspended cards.",
+        "description": "Cards whose Oracle text changed since they were certified, cards the engine implements\nthat its automatic checks held back (v0.4.5), and suspended cards: the only place the site\nlists cards a game cannot play.",
         "operationId": "reviews_api_v1_admin_catalog_reviews_get",
         "responses": {
           "200": {
@@ -14371,7 +14447,7 @@
     },
     "/api/v1/cards": {
       "get": {
-        "description": "Cards by structured filters and the search syntax together; all must match. `owned` keeps\nto the cards in the player's library (basic lands included); every card says how many copies\nthe library holds.",
+        "description": "Cards by structured filters and the search syntax together; all must match, and only cards\na game can play are found. `owned` keeps to the cards in the player's library (basic lands\nincluded); every card says how many copies the library holds.",
         "operationId": "search_cards_api_v1_cards_get",
         "parameters": [
           {
@@ -14574,32 +14650,6 @@
           },
           {
             "in": "query",
-            "name": "playable",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Playable"
-            }
-          },
-          {
-            "in": "query",
-            "name": "extras",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Extras",
-              "type": "boolean"
-            }
-          },
-          {
-            "in": "query",
             "name": "owned",
             "required": false,
             "schema": {
@@ -14757,7 +14807,7 @@
     },
     "/api/v1/cards/{card_id}": {
       "get": {
-        "description": "A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)\nis listed among them even when it is older, so the screen can show it and credit its artist.",
+        "description": "A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)\nis listed among them even when it is older, so the screen can show it and credit its artist.\nA card the game cannot play is not found.",
         "operationId": "card_detail_api_v1_cards__card_id__get",
         "parameters": [
           {
@@ -17250,6 +17300,117 @@
         "summary": "Export Deck"
       }
     },
+    "/api/v1/decks/{deck_id}/removed-cards": {
+      "delete": {
+        "description": "Dismisses the deck's note of the cards that left its draft (v0.4.5).",
+        "operationId": "dismiss_removed_api_v1_decks__deck_id__removed_cards_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Dismiss Removed"
+      }
+    },
     "/api/v1/decks/{deck_id}/restore": {
       "post": {
         "operationId": "restore_api_v1_decks__deck_id__restore_post",
@@ -17701,7 +17862,7 @@
     },
     "/api/v1/engine/cards": {
       "get": {
-        "description": "Names of cards the engine implements, for SysOp's deck lists (cards.any).",
+        "description": "Names of cards the engine implements, for SysOp's deck lists (cards.any): since v0.4.5\nonly those of cards in the game.",
         "operationId": "card_names_api_v1_engine_cards_get",
         "parameters": [
           {
@@ -18685,7 +18846,7 @@
     },
     "/api/v1/library": {
       "get": {
-        "description": "The cards in the account's library, with their copies and where they came from. An\naccount that builds from the whole catalog has no list here.",
+        "description": "The cards in the account's library, with their copies and where they came from. An\naccount that builds from the whole catalog has no list here. Copies of a card the game cannot\nplay stay recorded but are not shown (v0.4.5): they come back if the engine learns it.",
         "operationId": "my_library_api_v1_library_get",
         "responses": {
           "200": {
@@ -19183,7 +19344,7 @@
     },
     "/api/v1/me/alliance/cards": {
       "get": {
-        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere).",
+        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a\ngame can play (v0.4.5).",
         "operationId": "my_alliance_cards_api_v1_me_alliance_cards_get",
         "responses": {
           "200": {
@@ -21108,6 +21269,7 @@
     },
     "/api/v1/sets": {
       "get": {
+        "description": "Sets with a card a game can play, each with the number of such cards.",
         "operationId": "sets_api_v1_sets_get",
         "responses": {
           "200": {

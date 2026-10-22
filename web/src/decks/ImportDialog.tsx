@@ -95,7 +95,12 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   }
 
   const open =
-    preview?.lines.filter((line) => line.status !== "resolved") ?? [];
+    preview?.lines.filter(
+      (line) => line.status === "ambiguous" || line.status === "unresolved",
+    ) ?? [];
+  // Lines naming a card the game cannot play (v0.4.5): left out, with the reason.
+  const unavailable =
+    preview?.lines.filter((line) => line.status === "unavailable") ?? [];
   return (
     <dialog
       ref={dialog}
@@ -175,7 +180,21 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           <h3 id="preview-title">
             {preview.lines.length} lines · {preview.unresolved} not found ·{" "}
             {preview.ambiguous} with several matches
+            {preview.unavailable > 0 &&
+              ` · ${preview.unavailable} not in the game`}
           </h3>
+          {unavailable.length > 0 && (
+            <ul className={styles.resolutions} aria-label="Not in the game">
+              {unavailable.map((line: ImportLine) => (
+                <li key={line.line}>
+                  <span>
+                    Line {line.line}: <code>{line.text}</code> names {line.name}
+                    , which is not in the game and is left out. {line.reason}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
           {open.length > 0 && (
             <ul className={styles.resolutions}>
               {open.map((line: ImportLine) => (
@@ -200,7 +219,6 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                     {(line.candidates ?? []).map((card) => (
                       <option key={card.id} value={card.id}>
                         {card.name} — {card.type_line}
-                        {card.playable ? "" : " (not playable yet)"}
                       </option>
                     ))}
                   </select>

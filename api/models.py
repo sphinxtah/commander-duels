@@ -515,7 +515,9 @@ class CardConcept(Base):
     # The engine's wording differs from today's Oracle text (shown with the card; CAT08).
     text_differs: Mapped[bool] = mapped_column(default=False)
     review: Mapped[str] = mapped_column(String(16), default="none")
-    # Separate capabilities: multiplayer, AI, campaign and offline (CAT07).
+    # Separate capabilities: multiplayer, AI, campaign and offline (CAT07). Staff's decisions ride
+    # along: suspended_from, the status a suspension set aside, and since v0.4.5 accepted, an
+    # administrator's acceptance of a card the automatic checks held back, which syncs keep.
     capabilities: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)
     # The printing shown when a deck names none.
     default_printing_id: Mapped[UUID | None]
@@ -733,6 +735,9 @@ class Deck(Base):
     latest_revision: Mapped[int | None]
     # How it began: empty, imported, duplicated, starter or guided.
     source: Mapped[str] = mapped_column(String(16), default="empty")
+    # Cards that left the draft because the game cannot play them (v0.4.5), until the owner
+    # dismisses the note: [{card_id, name, quantity, reason, removed_at}].
+    removed_cards: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
@@ -1058,7 +1063,8 @@ class PackOpening(Base):
 
 class PackCard(Base):
     """A card in an opened pack, in the order it is revealed: its printing, finish and sheet, and
-    whether it was new to the library then. Append-only."""
+    whether it was new to the library then; since v0.4.5, the printing first drawn in its place
+    when the game cannot play that card. Append-only."""
 
     __tablename__ = "pack_cards"
     __table_args__ = (
@@ -1073,6 +1079,8 @@ class PackCard(Base):
     finish: Mapped[str] = mapped_column(String(8))
     sheet: Mapped[str] = mapped_column(String(64))
     new: Mapped[bool]
+    # No foreign key: the catalog never deletes a printing, and the record only names it.
+    replaced_printing_id: Mapped[UUID | None]
 
 
 class CustomCard(Base):

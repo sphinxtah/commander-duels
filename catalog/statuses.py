@@ -9,7 +9,13 @@ and on creatures the same power and toughness. A card that passes everything is 
 only certified cards start games. Downloading Oracle text never makes a card playable.
 
 When the Oracle text of a certified card changes, the card keeps playing as the engine has it,
-shows that the engine's wording may differ, and waits in the review list (CAT08).
+shows that the engine's wording may differ, and waits in the review list (CAT08). A card the gates
+held back (implemented) also waits there, and an administrator who accepts it certifies it for
+good: the acceptance is kept across syncs (v0.4.5).
+
+Since v0.4.5 only playable cards are in the game at all: search, card pages, decks, libraries and
+packs show nothing else (playable()). The catalog keeps every card, so one comes back when the
+engine learns it.
 """
 
 import html
@@ -17,11 +23,11 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, and_, func, select
 from sqlalchemy.orm import Session
 
 from api.models import CardConcept, EngineCard
-from catalog.records import Concept
+from catalog.records import SPELL_FACE_LAYOUTS, Concept
 from catalog.text import normalize, type_parts
 
 NOT_A_DECK_CARD = {
@@ -38,6 +44,9 @@ SINGLE_FACED = frozenset(
     {"normal", "leveler", "class", "case", "saga", "mutate", "prototype", "augment", "host"}
 )
 SUSPENDED_BY_STAFF = "suspended_by_staff"
+SUSPENDED_DETAIL = "Suspended by the site's staff."
+# The staff's decisions a card's capabilities carry across syncs (api/cards.py).
+STAFF_KEYS = ("suspended_from", "accepted")
 SYMBOL = re.compile(r"\{[^}]+\}")
 # Mana, tap and other game symbols; not XMage's {this}, which stands for the card's name.
 GAME_SYMBOL = re.compile(r"\{(?:[0-9]+|[WUBRGCXYZTQSEPH½∞]|[WUBRGC2]/[WUBRGP](?:/P)?)\}", re.I)
@@ -122,6 +131,13 @@ def blocked(status: str, reason: str, detail: str, build: str | None = None) -> 
     return Decision(status, reason, detail, None, build, None, False, "none", capabilities(status))
 
 
+def kept(current: Any, status: str) -> dict[str, object]:
+    """A status's capabilities, with the staff's decisions carried over from the card's: the
+    status a suspension set aside, and since v0.4.5 an acceptance (STAFF_KEYS)."""
+    found = current.capabilities or {}
+    return {**capabilities(status), **{key: found[key] for key in STAFF_KEYS if key in found}}
+
+
 def decide(card: Concept, current: Any, engine: EngineCards | None) -> Decision:
     """current is the concept's row as it stands (status, certified_hash, review, ...)."""
     if current.status == "suspended" and current.status_reason == SUSPENDED_BY_STAFF:
@@ -134,7 +150,7 @@ def decide(card: Concept, current: Any, engine: EngineCards | None) -> Decision:
             current.certified_hash,
             current.text_differs,
             current.review,
-            capabilities("suspended"),
+            kept(current, "suspended"),
         )
     if card.meld_result:
         return blocked(
@@ -179,6 +195,7 @@ def decide(card: Concept, current: Any, engine: EngineCards | None) -> Decision:
             "The game engine has no implementation of this card yet.",
             engine.build,
         )
+    held: tuple[str, str] | None = None
     if not found.passed:
         failed = [gate for gate, result in found.gates.items() if result is not True]
         message = found.gates.get("error") or ", ".join(failed)
@@ -194,23 +211,20 @@ def decide(card: Concept, current: Any, engine: EngineCards | None) -> Decision:
                 "none",
                 capabilities("mapped"),
             )
+        held = ("engine_gate_failed", f"The engine's card failed an automatic check: {message}")
+    else:
+        mismatch = characteristics_differ(card, found)
+        if mismatch:
+            held = (
+                "characteristics_differ",
+                f"The engine's card differs from the Oracle card: {mismatch}.",
+            )
+    # An administrator's acceptance of a held-back card stands across syncs (api/cards.py).
+    if held is not None and not (current.capabilities or {}).get("accepted"):
         return Decision(
             "implemented",
-            "engine_gate_failed",
-            f"The engine's card failed an automatic check: {message}",
-            found.name,
-            engine.build,
-            None,
-            False,
-            "none",
-            capabilities("implemented"),
-        )
-    mismatch = characteristics_differ(card, found)
-    if mismatch:
-        return Decision(
-            "implemented",
-            "characteristics_differ",
-            f"The engine's card differs from the Oracle card: {mismatch}.",
+            held[0],
+            held[1],
             found.name,
             engine.build,
             None,
@@ -230,7 +244,7 @@ def decide(card: Concept, current: Any, engine: EngineCards | None) -> Decision:
         certified_hash,
         wording_differs(card, found),
         review,
-        capabilities("certified"),
+        kept(current, "certified"),
     )
 
 
@@ -301,7 +315,12 @@ def wording_differs(card: Concept, found: Implementation) -> bool:
     engine_text = "\n".join(str(line) for line in rules)
     oracle = card.oracle_text
     faces = found.data.get("faces")
-    if card.faces and card.layout not in ("split", "adventure") and not faces:
+    if (
+        card.faces
+        and card.layout != "split"
+        and card.layout not in SPELL_FACE_LAYOUTS
+        and not faces
+    ):
         # The engine listed only the front face's rules; an adventure's include its spell.
         oracle = card.faces[0].oracle_text or ""
     elif isinstance(faces, list):
@@ -311,19 +330,29 @@ def wording_differs(card: Concept, found: Implementation) -> bool:
             if isinstance(face, dict)
             for line in face.get("rules") or []
         )
-    if card.layout == "adventure":
-        # The engine prints the adventure's cost in its rules ("Adventure Sorcery - Stomp {1}{R}").
+    if card.layout in SPELL_FACE_LAYOUTS:
+        # The engine prints the spell's cost in its rules ("Adventure Sorcery - Stomp {1}{R}", and
+        # for a prepare card "Sorcery - Heroic Stanza {1}{W/B}").
         oracle += "\n" + " ".join(face.mana_cost or "" for face in card.faces[1:])
     names = (card.name, *(face.name for face in card.faces))
     return significant(engine_text, names) != significant(oracle, names)
 
 
+def playable() -> ColumnElement[bool]:
+    """The cards a game can be played with, and since v0.4.5 the only cards the site shows:
+    certified, and still in Scryfall's catalog."""
+    return and_(CardConcept.status == "certified", CardConcept.removed_revision.is_(None))
+
+
+def unplayable_reason(status: str, detail: str | None, removed: bool) -> str:
+    """Why a card is out of the game, in a sentence: for an import's line, or the note a deck
+    shows when the card leaves its draft."""
+    if removed:
+        return "Scryfall's catalog no longer lists it."
+    if status == "suspended" and detail and detail != SUSPENDED_DETAIL:
+        return f"Suspended by the site's staff: {detail}"
+    return detail or "The game engine cannot play it."
+
+
 def playable_count(session: Session) -> int:
-    return (
-        session.scalar(
-            select(func.count())
-            .select_from(CardConcept)
-            .where(CardConcept.status == "certified", CardConcept.removed_revision.is_(None))
-        )
-        or 0
-    )
+    return session.scalar(select(func.count()).select_from(CardConcept).where(playable())) or 0

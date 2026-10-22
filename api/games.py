@@ -49,7 +49,7 @@ from starlette.concurrency import run_in_threadpool
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
-from api.decklists import parse_deck_list
+from api.decklists import in_game, parse_deck_list, refuse_unplayable
 from api.decks import publish, revision_entries, starters_of
 from api.economy import pay_game, tokens_from
 from api.engine_cards import engine_cards_of
@@ -99,6 +99,8 @@ from api.schemas import (
 )
 from api.schemas import GameSeat as SeatSummary
 from api.validation import DeckContent, Problem, not_allowed, validate_deck
+from catalog.statuses import playable
+from catalog.text import normalize
 
 log = logging.getLogger("api.games")
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -1120,9 +1122,9 @@ def own_deck(
     """One of the account's decks as the engine's deck list, bound to an immutable revision of
     it (DECK01). The revision must be playable: legal, every card certified, and every copy in the
     player's library now (v0.3.1). Since v0.4.5 the table's rules must also allow its cards'
-    legality: banned cards, and cards not legal in the format. SysOp's decks need only cards the
-    engine implements, as its deck lists do. A table's host starts the game with every player's
-    deck (api/tables.py)."""
+    legality: banned cards, and cards not legal in the format. SysOp's decks need only cards in
+    the game (since v0.4.5 no longer any card the engine implements), as its deck lists do. A
+    table's host starts the game with every player's deck (api/tables.py)."""
     deck = db.get(Deck, deck_id)
     if deck is None or deck.owner_id != owner.id or deck.deleted_at is not None:
         raise ApiError(422, "invalid_deck", "That is not one of your decks.")
@@ -1145,7 +1147,7 @@ def own_deck(
     names = dict(
         db.execute(
             select(CardConcept.id, CardConcept.engine_name).where(
-                CardConcept.id.in_({entry.card_id for entry in entries})
+                CardConcept.id.in_({entry.card_id for entry in entries}), playable()
             )
         ).all()
     )
@@ -1227,15 +1229,16 @@ class SeatPlan:
 
 
 def starter_seat(db: Session, starter: Starter) -> SeatPlan | None:
-    """A bot seat playing a starter deck, as the engine's deck list; None when a card of it has no
-    engine implementation in this catalog, and the engine's own fixture deck plays instead."""
+    """A bot seat playing a starter deck, as the engine's deck list; None when a card of it is not
+    in the game (v0.4.5; before, one with no engine implementation in this catalog), and the
+    engine's own fixture deck plays instead."""
     entries, missing = starter_entries(db, starter)
     if missing:
         return None
     names = dict(
         db.execute(
             select(CardConcept.id, CardConcept.engine_name).where(
-                CardConcept.id.in_({entry.card_id for entry in entries})
+                CardConcept.id.in_({entry.card_id for entry in entries}), playable()
             )
         ).all()
     )
@@ -1303,7 +1306,11 @@ def plan_seats(
             if planned is not None:
                 plans.append(planned)
                 continue
-        plans.append(SeatPlan(engine_seat(player, deck, deck_list, fmt, principal)))
+        seat = engine_seat(player, deck, deck_list, fmt, principal)
+        if isinstance(seat.get("deck_list"), dict):
+            # SysOp's lists hold only cards in the game, as every deck does (v0.4.5).
+            refuse_unplayable(db, cast(dict[str, object], seat["deck_list"]))
+        plans.append(SeatPlan(seat))
     # Bots never play the Godlike tier's custom cards (v0.4.0). The other seats holding them are
     # checked against the running engine before the game starts (require_loaded).
     for index, held in custom_in_seats(db, [plan.engine for plan in plans]).items():
@@ -1620,10 +1627,12 @@ async def inspect_game(
 async def card_names(
     request: Request,
     principal: AnyCard,
+    db: Db,
     q: Annotated[str, Query(min_length=1, max_length=200)],
     limit: Annotated[int, Query(ge=1, le=50)] = 20,
 ) -> CardNames:
-    """Names of cards the engine implements, for SysOp's deck lists (cards.any)."""
+    """Names of cards the engine implements, for SysOp's deck lists (cards.any): since v0.4.5
+    only those of cards in the game."""
     try:
         status, found = (
             await hub_of(request)
@@ -1634,7 +1643,9 @@ async def card_names(
         raise unavailable() from error
     if status != 200:
         raise unavailable()
-    return CardNames.model_validate(found)
+    names = CardNames.model_validate(found).names
+    playing = await run_in_threadpool(in_game, db, names)
+    return CardNames(names=[name for name in names if normalize(name) in playing])
 
 
 # The game's WebSocket.
