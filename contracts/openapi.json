@@ -56,6 +56,17 @@
       "AdminProduct": {
         "additionalProperties": false,
         "properties": {
+          "art": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackArt"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The picture of its sealed pack; null: the browser draws one from its set (v0.4.3)."
+          },
           "booster": {
             "description": "MTGJSON's booster name.",
             "title": "Booster",
@@ -265,6 +276,18 @@
             "title": "Set Name",
             "type": "string"
           },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The set's symbol, an SVG file on this site under /sets/; null: none.",
+            "title": "Symbol"
+          },
           "unresolved": {
             "items": {
               "$ref": "#/components/schemas/UnresolvedCard"
@@ -319,6 +342,8 @@
           "released",
           "booster",
           "era",
+          "art",
+          "symbol",
           "price",
           "price_basis",
           "pack_size",
@@ -4533,6 +4558,36 @@
         "title": "OpeningSummary",
         "type": "object"
       },
+      "PackArt": {
+        "additionalProperties": false,
+        "description": "The picture of a sealed pack (v0.4.3), copied once and served from this site.",
+        "properties": {
+          "large": {
+            "$ref": "#/components/schemas/PackImage",
+            "description": "480 pixels tall, or the picture's own height when it is smaller."
+          },
+          "origin": {
+            "description": "Where the picture came from (content/pack-art.json).",
+            "enum": [
+              "tcgplayer",
+              "wizards"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "small": {
+            "$ref": "#/components/schemas/PackImage",
+            "description": "160 pixels tall."
+          }
+        },
+        "required": [
+          "small",
+          "large",
+          "origin"
+        ],
+        "title": "PackArt",
+        "type": "object"
+      },
       "PackGrant": {
         "additionalProperties": false,
         "properties": {
@@ -4560,6 +4615,31 @@
           "reason"
         ],
         "title": "PackGrant",
+        "type": "object"
+      },
+      "PackImage": {
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "title": "Height",
+            "type": "integer"
+          },
+          "src": {
+            "description": "A WebP file on this site, under /packs/.",
+            "title": "Src",
+            "type": "string"
+          },
+          "width": {
+            "title": "Width",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "src",
+          "width",
+          "height"
+        ],
+        "title": "PackImage",
         "type": "object"
       },
       "PacksGranted": {
@@ -5458,6 +5538,17 @@
       "ProductInfo": {
         "additionalProperties": false,
         "properties": {
+          "art": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackArt"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The picture of its sealed pack; null: the browser draws one from its set (v0.4.3)."
+          },
           "booster": {
             "description": "MTGJSON's booster name.",
             "title": "Booster",
@@ -5548,6 +5639,18 @@
           "set_name": {
             "title": "Set Name",
             "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The set's symbol, an SVG file on this site under /sets/; null: none.",
+            "title": "Symbol"
           }
         },
         "required": [
@@ -5559,6 +5662,8 @@
           "released",
           "booster",
           "era",
+          "art",
+          "symbol",
           "price",
           "price_basis",
           "pack_size"
@@ -5569,6 +5674,35 @@
       "ProductRef": {
         "additionalProperties": false,
         "properties": {
+          "art": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PackArt"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The picture of its sealed pack; null: the browser draws one from its set (v0.4.3)."
+          },
+          "booster": {
+            "description": "MTGJSON's booster name.",
+            "title": "Booster",
+            "type": "string"
+          },
+          "era": {
+            "enum": [
+              "play",
+              "collector",
+              "frame15",
+              "mythic",
+              "modern",
+              "oldborder",
+              "first"
+            ],
+            "title": "Era",
+            "type": "string"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -5614,6 +5748,18 @@
           "set_name": {
             "title": "Set Name",
             "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The set's symbol, an SVG file on this site under /sets/; null: none.",
+            "title": "Symbol"
           }
         },
         "required": [
@@ -5622,7 +5768,11 @@
           "set_name",
           "name",
           "kind",
-          "released"
+          "released",
+          "booster",
+          "era",
+          "art",
+          "symbol"
         ],
         "title": "ProductRef",
         "type": "object"

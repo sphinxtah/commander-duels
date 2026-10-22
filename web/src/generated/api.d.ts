@@ -2019,6 +2019,8 @@ export interface components {
         };
         /** AdminProduct */
         AdminProduct: {
+            /** @description The picture of its sealed pack; null: the browser draws one from its set (v0.4.3). */
+            art: components["schemas"]["PackArt"] | null;
             /**
              * Booster
              * @description MTGJSON's booster name.
@@ -2099,6 +2101,11 @@ export interface components {
             set_code: string;
             /** Set Name */
             set_name: string;
+            /**
+             * Symbol
+             * @description The set's symbol, an SVG file on this site under /sets/; null: none.
+             */
+            symbol: string | null;
             /** Unresolved */
             unresolved: components["schemas"]["UnresolvedCard"][];
             /** Unresolved Count */
@@ -3617,6 +3624,22 @@ export interface components {
             opened_at: string;
             product: components["schemas"]["ProductRef"];
         };
+        /**
+         * PackArt
+         * @description The picture of a sealed pack (v0.4.3), copied once and served from this site.
+         */
+        PackArt: {
+            /** @description 480 pixels tall, or the picture's own height when it is smaller. */
+            large: components["schemas"]["PackImage"];
+            /**
+             * Origin
+             * @description Where the picture came from (content/pack-art.json).
+             * @enum {string}
+             */
+            origin: "tcgplayer" | "wizards";
+            /** @description 160 pixels tall. */
+            small: components["schemas"]["PackImage"];
+        };
         /** PackGrant */
         PackGrant: {
             /** Count */
@@ -3628,6 +3651,18 @@ export interface components {
             product: string;
             /** Reason */
             reason: string;
+        };
+        /** PackImage */
+        PackImage: {
+            /** Height */
+            height: number;
+            /**
+             * Src
+             * @description A WebP file on this site, under /packs/.
+             */
+            src: string;
+            /** Width */
+            width: number;
         };
         /** PacksGranted */
         PacksGranted: {
@@ -3986,6 +4021,8 @@ export interface components {
         };
         /** ProductInfo */
         ProductInfo: {
+            /** @description The picture of its sealed pack; null: the browser draws one from its set (v0.4.3). */
+            art: components["schemas"]["PackArt"] | null;
             /**
              * Booster
              * @description MTGJSON's booster name.
@@ -4030,9 +4067,26 @@ export interface components {
             set_code: string;
             /** Set Name */
             set_name: string;
+            /**
+             * Symbol
+             * @description The set's symbol, an SVG file on this site under /sets/; null: none.
+             */
+            symbol: string | null;
         };
         /** ProductRef */
         ProductRef: {
+            /** @description The picture of its sealed pack; null: the browser draws one from its set (v0.4.3). */
+            art: components["schemas"]["PackArt"] | null;
+            /**
+             * Booster
+             * @description MTGJSON's booster name.
+             */
+            booster: string;
+            /**
+             * Era
+             * @enum {string}
+             */
+            era: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
             /**
              * Id
              * Format: uuid
@@ -4051,6 +4105,11 @@ export interface components {
             set_code: string;
             /** Set Name */
             set_name: string;
+            /**
+             * Symbol
+             * @description The set's symbol, an SVG file on this site under /sets/; null: none.
+             */
+            symbol: string | null;
         };
         /** ProfileUpdate */
         ProfileUpdate: {

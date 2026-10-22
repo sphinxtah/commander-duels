@@ -2,7 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 // Leng's card shop (v0.4.0) as SysOp: a pack bought with tokens, opened at the counter (torn
 // open, a card turned over with Space, the rest revealed), its summary and a card's details, the
-// history, and the Card shop tab in Administration. It needs the test catalog and the test
+// history, and the Card shop tab in Administration; since v0.4.3 the pack's own picture on the
+// shelf and at the counter. It needs the test catalog and the test
 // collation, which scripts/load_fixture_catalog.py loads: a Zendikar Rising draft booster drawn
 // from the test catalog's cards. MTGJSON is never fetched.
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
@@ -64,6 +65,18 @@ test.describe("Leng's card shop", () => {
     await shelves.getByLabel("Search by set name or code").fill("znr");
     const product = shelves.getByRole("listitem", { name: PRODUCT });
     await expect(product).toContainText("380 tokens");
+    // Its pack's picture (v0.4.3), from this site's own copy, loaded and shown.
+    const picture = product.locator('[data-pack-art="picture"]');
+    await expect(picture).toBeVisible();
+    await expect(picture).toHaveAttribute(
+      "src",
+      /^\/packs\/znr-draft-160\.webp$/,
+    );
+    await expect
+      .poll(() =>
+        picture.evaluate((image) => (image as HTMLImageElement).naturalWidth),
+      )
+      .toBeGreaterThan(0);
     await expect(
       shelves.getByRole("region", { name: "Set and Collector Boosters" }),
     ).toBeVisible();
@@ -85,9 +98,14 @@ test.describe("Leng's card shop", () => {
     await page
       .getByRole("button", { name: `Open a pack of ${PRODUCT}` })
       .click();
-    await page
-      .getByRole("button", { name: `Tear open the ${PRODUCT}` })
-      .click();
+    const sealed = page.getByRole("button", {
+      name: `Tear open the ${PRODUCT}`,
+    });
+    // The pack at the counter is the product's own picture: the strip that tears off, and the
+    // rest of it.
+    await expect(sealed.locator("[data-pack-art]")).toHaveCount(2);
+    await page.screenshot({ path: testInfo.outputPath("shop-sealed.png") });
+    await sealed.click();
     const board = page.getByRole("group", { name: "The pack's cards" });
     await expect(board.getByRole("button", { name: /face down/ })).toHaveCount(
       15,

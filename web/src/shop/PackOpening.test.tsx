@@ -60,6 +60,30 @@ function tearAndDeal() {
 }
 
 describe("opening a pack", () => {
+  it("is the product's own pack, its top strip and the rest, before Leng's counter", () => {
+    const { container } = render(
+      <PackOpening opening={opening} onDone={vi.fn()} />,
+    );
+    const pack = screen.getByRole("button", {
+      name: "Tear open the Zendikar Rising Draft Booster",
+    });
+    // The same large picture twice, hidden from assistive technology: the button names it.
+    const halves = pack.querySelectorAll('[data-pack-art="picture"]');
+    expect(halves).toHaveLength(2);
+    for (const half of halves) {
+      expect(half).toHaveAttribute("src", "/packs/znr-draft-480.webp");
+      expect(half.closest('[aria-hidden="true"]')).not.toBeNull();
+    }
+    expect(container.querySelector('[data-backdrop="leng"]')).toHaveAttribute(
+      "alt",
+      "",
+    );
+    // A product with no picture tears its drawn pack in two the same way.
+    fireEvent.error(halves[0]);
+    fireEvent.error(halves[1]);
+    expect(pack.querySelectorAll('[data-pack-art="drawn"]')).toHaveLength(2);
+  });
+
   it("tears, deals face down, and turns cards over by click and by Space", () => {
     vi.useFakeTimers();
     render(<PackOpening opening={opening} onDone={vi.fn()} />);

@@ -1,0 +1,6895 @@
+{
+ "as_of": "2026-10-22",
+ "note": "Pictures of the packs on Leng's shelves, made by scripts/pack_art.py: copied once from TCGplayer's product pages (or Wizards of the Coast's), the white background made transparent, served from this site. Products under 'generated' are drawn in the browser from their set. Set symbols are Scryfall's set icons.",
+ "products": [
+  {
+   "set": "2ED",
+   "booster": "default",
+   "small": {
+    "src": "/packs/2ed-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/2ed-default-480.webp",
+    "width": 198,
+    "height": 378
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27375",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27375_in_1000x1000.jpg",
+   "product_name": "Unlimited Edition - Booster Pack"
+  },
+  {
+   "set": "2ED",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/2ed-starter-160.webp",
+    "width": 109,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/2ed-starter-480.webp",
+    "width": 328,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/162897",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/162897_in_1000x1000.jpg",
+   "product_name": "Unlimited Edition Starter Deck"
+  },
+  {
+   "set": "ARN",
+   "booster": "default",
+   "small": {
+    "src": "/packs/arn-default-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/arn-default-480.webp",
+    "width": 198,
+    "height": 353
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27327",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27327_in_1000x1000.jpg",
+   "product_name": "Arabian Nights - Booster Pack"
+  },
+  {
+   "set": "ATQ",
+   "booster": "default",
+   "small": {
+    "src": "/packs/atq-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/atq-default-480.webp",
+    "width": 198,
+    "height": 378
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27325",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27325_in_1000x1000.jpg",
+   "product_name": "Antiquities - Booster Pack"
+  },
+  {
+   "set": "3ED",
+   "booster": "default",
+   "small": {
+    "src": "/packs/3ed-default-160.webp",
+    "width": 80,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/3ed-default-480.webp",
+    "width": 198,
+    "height": 398
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27365",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27365_in_1000x1000.jpg",
+   "product_name": "Revised Edition - Booster Pack"
+  },
+  {
+   "set": "3ED",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/3ed-starter-160.webp",
+    "width": 112,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/3ed-starter-480.webp",
+    "width": 198,
+    "height": 283
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/57941",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/57941_in_1000x1000.jpg",
+   "product_name": "Revised Edition - Starter Deck"
+  },
+  {
+   "set": "LEG",
+   "booster": "default",
+   "small": {
+    "src": "/packs/leg-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/leg-default-480.webp",
+    "width": 198,
+    "height": 378
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27348",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27348_in_1000x1000.jpg",
+   "product_name": "Legends - Booster Pack"
+  },
+  {
+   "set": "DRK",
+   "booster": "default",
+   "small": {
+    "src": "/packs/drk-default-160.webp",
+    "width": 83,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/drk-default-480.webp",
+    "width": 198,
+    "height": 382
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27371",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27371_in_1000x1000.jpg",
+   "product_name": "The Dark - Booster Pack"
+  },
+  {
+   "set": "FEM",
+   "booster": "default",
+   "small": {
+    "src": "/packs/fem-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fem-default-480.webp",
+    "width": 184,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27338",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27338_in_1000x1000.jpg",
+   "product_name": "Fallen Empires - Booster Pack"
+  },
+  {
+   "set": "4ED",
+   "booster": "default",
+   "small": {
+    "src": "/packs/4ed-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/4ed-default-480.webp",
+    "width": 198,
+    "height": 375
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27341",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27341_in_1000x1000.jpg",
+   "product_name": "Fourth Edition - Booster Pack"
+  },
+  {
+   "set": "4ED",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/4ed-starter-160.webp",
+    "width": 116,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/4ed-starter-480.webp",
+    "width": 349,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194420",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194420_in_1000x1000.jpg",
+   "product_name": "Fourth Edition - Starter Deck"
+  },
+  {
+   "set": "ICE",
+   "booster": "default",
+   "small": {
+    "src": "/packs/ice-default-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ice-default-480.webp",
+    "width": 111,
+    "height": 196
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27345",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27345_in_1000x1000.jpg",
+   "product_name": "Ice Age - Booster Pack"
+  },
+  {
+   "set": "ICE",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/ice-starter-160.webp",
+    "width": 114,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ice-starter-480.webp",
+    "width": 341,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/96286",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/96286_in_1000x1000.jpg",
+   "product_name": "Ice Age - Starter Deck"
+  },
+  {
+   "set": "CHR",
+   "booster": "default",
+   "small": {
+    "src": "/packs/chr-default-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/chr-default-480.webp",
+    "width": 197,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27331",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27331_in_1000x1000.jpg",
+   "product_name": "Chronicles - Booster Pack"
+  },
+  {
+   "set": "HML",
+   "booster": "default",
+   "small": {
+    "src": "/packs/hml-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/hml-default-480.webp",
+    "width": 198,
+    "height": 378
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27344",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27344_in_1000x1000.jpg",
+   "product_name": "Homelands - Booster Pack"
+  },
+  {
+   "set": "ALL",
+   "booster": "default",
+   "small": {
+    "src": "/packs/all-default-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/all-default-480.webp",
+    "width": 190,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27323",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27323_in_1000x1000.jpg",
+   "product_name": "Alliances - Booster Pack"
+  },
+  {
+   "set": "MIR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mir-draft-160.webp",
+    "width": 101,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mir-draft-480.webp",
+    "width": 121,
+    "height": 191
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27352",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27352_in_1000x1000.jpg",
+   "product_name": "Mirage - Booster Pack"
+  },
+  {
+   "set": "MIR",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/mir-starter-160.webp",
+    "width": 114,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mir-starter-480.webp",
+    "width": 343,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/121397",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/121397_in_1000x1000.jpg",
+   "product_name": "Mirage - Starter Deck"
+  },
+  {
+   "set": "VIS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/vis-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vis-draft-480.webp",
+    "width": 117,
+    "height": 195
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27379",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27379_in_1000x1000.jpg",
+   "product_name": "Visions - Booster Pack"
+  },
+  {
+   "set": "5ED",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/5ed-draft-160.webp",
+    "width": 103,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/5ed-draft-480.webp",
+    "width": 118,
+    "height": 184
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27340",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27340_in_1000x1000.jpg",
+   "product_name": "Fifth Edition - Booster Pack"
+  },
+  {
+   "set": "5ED",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/5ed-starter-160.webp",
+    "width": 117,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/5ed-starter-480.webp",
+    "width": 352,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/139148",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/139148_in_1000x1000.jpg",
+   "product_name": "Fifth Edition - Starter Deck"
+  },
+  {
+   "set": "POR",
+   "booster": "default",
+   "small": {
+    "src": "/packs/por-default-160.webp",
+    "width": 102,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/por-default-480.webp",
+    "width": 119,
+    "height": 187
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27360",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27360_in_1000x1000.jpg",
+   "product_name": "Portal - Booster Pack"
+  },
+  {
+   "set": "WTH",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/wth-draft-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/wth-draft-480.webp",
+    "width": 109,
+    "height": 184
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27380",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27380_in_1000x1000.jpg",
+   "product_name": "Weatherlight - Booster Pack"
+  },
+  {
+   "set": "TMP",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/tmp-draft-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tmp-draft-480.webp",
+    "width": 111,
+    "height": 190
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27370",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27370_in_1000x1000.jpg",
+   "product_name": "Tempest - Booster Pack"
+  },
+  {
+   "set": "TMP",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/tmp-starter-160.webp",
+    "width": 112,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tmp-starter-480.webp",
+    "width": 295,
+    "height": 421
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/127433",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/127433_in_1000x1000.jpg",
+   "product_name": "Tempest Tournament Pack"
+  },
+  {
+   "set": "STH",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/sth-draft-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/sth-draft-480.webp",
+    "width": 113,
+    "height": 191
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27369",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27369_in_1000x1000.jpg",
+   "product_name": "Stronghold - Booster Pack"
+  },
+  {
+   "set": "EXO",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/exo-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/exo-draft-480.webp",
+    "width": 112,
+    "height": 187
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27337",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27337_in_1000x1000.jpg",
+   "product_name": "Exodus - Booster Pack"
+  },
+  {
+   "set": "P02",
+   "booster": "default",
+   "small": {
+    "src": "/packs/p02-default-160.webp",
+    "width": 97,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/p02-default-480.webp",
+    "width": 136,
+    "height": 224
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27361",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27361_in_1000x1000.jpg",
+   "product_name": "Portal Second Age - Booster Pack"
+  },
+  {
+   "set": "UGL",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ugl-draft-160.webp",
+    "width": 97,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ugl-draft-480.webp",
+    "width": 115,
+    "height": 190
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27374",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27374_in_1000x1000.jpg",
+   "product_name": "Unglued - Booster Pack"
+  },
+  {
+   "set": "USG",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/usg-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/usg-draft-480.webp",
+    "width": 180,
+    "height": 300
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27378",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27378_in_1000x1000.jpg",
+   "product_name": "Urza's Saga - Booster Pack"
+  },
+  {
+   "set": "USG",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/usg-tournament-160.webp",
+    "width": 115,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/usg-tournament-480.webp",
+    "width": 344,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/127432",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/127432_in_1000x1000.jpg",
+   "product_name": "Urza's Saga Tournament Pack"
+  },
+  {
+   "set": "ULG",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ulg-draft-160.webp",
+    "width": 97,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ulg-draft-480.webp",
+    "width": 118,
+    "height": 195
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27377",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27377_in_1000x1000.jpg",
+   "product_name": "Urza's Legacy - Booster Pack"
+  },
+  {
+   "set": "6ED",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/6ed-draft-160.webp",
+    "width": 107,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/6ed-draft-480.webp",
+    "width": 136,
+    "height": 203
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27332",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27332_in_1000x1000.jpg",
+   "product_name": "Classic Sixth Edition - Booster Pack"
+  },
+  {
+   "set": "6ED",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/6ed-tournament-160.webp",
+    "width": 111,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/6ed-tournament-480.webp",
+    "width": 218,
+    "height": 315
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118880",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118880_in_1000x1000.jpg",
+   "product_name": "Classic Sixth Edition Tournament Pack"
+  },
+  {
+   "set": "PTK",
+   "booster": "default",
+   "small": {
+    "src": "/packs/ptk-default-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ptk-default-480.webp",
+    "width": 198,
+    "height": 357
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27362",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27362_in_1000x1000.jpg",
+   "product_name": "Portal Three Kingdoms - Booster Pack"
+  },
+  {
+   "set": "UDS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/uds-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/uds-draft-480.webp",
+    "width": 198,
+    "height": 348
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27376",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27376_in_1000x1000.jpg",
+   "product_name": "Urza's Destiny - Booster Pack"
+  },
+  {
+   "set": "S99",
+   "booster": "default",
+   "small": {
+    "src": "/packs/s99-default-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/s99-default-480.webp",
+    "width": 286,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/168359",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/168359_in_1000x1000.jpg",
+   "product_name": "Starter 1999 - Booster Pack"
+  },
+  {
+   "set": "MMQ",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mmq-draft-160.webp",
+    "width": 97,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mmq-draft-480.webp",
+    "width": 118,
+    "height": 194
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27351",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27351_in_1000x1000.jpg",
+   "product_name": "Mercadian Masques - Booster Pack"
+  },
+  {
+   "set": "MMQ",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/mmq-tournament-160.webp",
+    "width": 114,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mmq-tournament-480.webp",
+    "width": 319,
+    "height": 448
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/125561",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/125561_in_1000x1000.jpg",
+   "product_name": "Mercadian Masques - Tournament Pack"
+  },
+  {
+   "set": "NEM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/nem-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/nem-draft-480.webp",
+    "width": 198,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27355",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27355_in_1000x1000.jpg",
+   "product_name": "Nemesis - Booster Pack"
+  },
+  {
+   "set": "PCY",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/pcy-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/pcy-draft-480.webp",
+    "width": 197,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27363",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27363_in_1000x1000.jpg",
+   "product_name": "Prophecy - Booster Pack"
+  },
+  {
+   "set": "INV",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/inv-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/inv-draft-480.webp",
+    "width": 198,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27346",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27346_in_1000x1000.jpg",
+   "product_name": "Invasion - Booster Pack"
+  },
+  {
+   "set": "INV",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/inv-tournament-160.webp",
+    "width": 112,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/inv-tournament-480.webp",
+    "width": 198,
+    "height": 284
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/93344",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/93344_in_1000x1000.jpg",
+   "product_name": "Invasion - Tournament Pack"
+  },
+  {
+   "set": "PLS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/pls-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/pls-draft-480.webp",
+    "width": 198,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27359",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27359_in_1000x1000.jpg",
+   "product_name": "Planeshift - Booster Pack"
+  },
+  {
+   "set": "7ED",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/7ed-draft-160.webp",
+    "width": 88,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/7ed-draft-480.webp",
+    "width": 192,
+    "height": 350
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27320",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27320_in_1000x1000.jpg",
+   "product_name": "7th Edition - Booster Pack"
+  },
+  {
+   "set": "APC",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/apc-draft-160.webp",
+    "width": 88,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/apc-draft-480.webp",
+    "width": 198,
+    "height": 358
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27326",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27326_in_1000x1000.jpg",
+   "product_name": "Apocalypse - Booster Pack"
+  },
+  {
+   "set": "ODY",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ody-draft-160.webp",
+    "width": 88,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ody-draft-480.webp",
+    "width": 198,
+    "height": 359
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27356",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27356_in_1000x1000.jpg",
+   "product_name": "Odyssey - Booster Pack"
+  },
+  {
+   "set": "ODY",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/ody-tournament-160.webp",
+    "width": 117,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ody-tournament-480.webp",
+    "width": 344,
+    "height": 469
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/139151",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/139151_in_1000x1000.jpg",
+   "product_name": "Odyssey Tournament Pack"
+  },
+  {
+   "set": "TOR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/tor-draft-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tor-draft-480.webp",
+    "width": 198,
+    "height": 355
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27373",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27373_in_1000x1000.jpg",
+   "product_name": "Torment - Booster Pack"
+  },
+  {
+   "set": "JUD",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/jud-draft-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/jud-draft-480.webp",
+    "width": 164,
+    "height": 277
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27347",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27347_in_1000x1000.jpg",
+   "product_name": "Judgment - Booster Pack"
+  },
+  {
+   "set": "ONS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ons-draft-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ons-draft-480.webp",
+    "width": 197,
+    "height": 331
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27357",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27357_in_1000x1000.jpg",
+   "product_name": "Onslaught - Booster Pack"
+  },
+  {
+   "set": "ONS",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/ons-tournament-160.webp",
+    "width": 114,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ons-tournament-480.webp",
+    "width": 342,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/167795",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/167795_in_1000x1000.jpg",
+   "product_name": "Onslaught Tournament Pack"
+  },
+  {
+   "set": "LGN",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/lgn-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lgn-draft-480.webp",
+    "width": 198,
+    "height": 373
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27349",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27349_in_1000x1000.jpg",
+   "product_name": "Legions - Booster Pack"
+  },
+  {
+   "set": "SCG",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/scg-draft-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/scg-draft-480.webp",
+    "width": 198,
+    "height": 346
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27367",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27367_in_1000x1000.jpg",
+   "product_name": "Scourge - Booster Pack"
+  },
+  {
+   "set": "8ED",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/8ed-draft-160.webp",
+    "width": 97,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/8ed-draft-480.webp",
+    "width": 193,
+    "height": 318
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27321",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27321_in_1000x1000.jpg",
+   "product_name": "8th Edition - Booster Pack"
+  },
+  {
+   "set": "MRD",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mrd-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mrd-draft-480.webp",
+    "width": 198,
+    "height": 370
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27353",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27353_in_1000x1000.jpg",
+   "product_name": "Mirrodin - Booster Pack"
+  },
+  {
+   "set": "MRD",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/mrd-tournament-160.webp",
+    "width": 117,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mrd-tournament-480.webp",
+    "width": 179,
+    "height": 245
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/127431",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/127431_in_1000x1000.jpg",
+   "product_name": "Mirrodin Tournament Pack"
+  },
+  {
+   "set": "DST",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dst-draft-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dst-draft-480.webp",
+    "width": 198,
+    "height": 366
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27334",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27334_in_1000x1000.jpg",
+   "product_name": "Darksteel - Booster Pack"
+  },
+  {
+   "set": "5DN",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/5dn-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/5dn-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27339",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27339_in_1000x1000.jpg",
+   "product_name": "Fifth Dawn - Booster Pack"
+  },
+  {
+   "set": "CHK",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/chk-draft-160.webp",
+    "width": 88,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/chk-draft-480.webp",
+    "width": 198,
+    "height": 360
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27330",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27330_in_1000x1000.jpg",
+   "product_name": "Champions of Kamigawa - Booster Pack"
+  },
+  {
+   "set": "CHK",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/chk-tournament-160.webp",
+    "width": 117,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/chk-tournament-480.webp",
+    "width": 173,
+    "height": 236
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118879",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118879_in_1000x1000.jpg",
+   "product_name": "Champions of Kamigawa Tournament Pack"
+  },
+  {
+   "set": "UNH",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/unh-draft-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/unh-draft-480.webp",
+    "width": 188,
+    "height": 323
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/79291",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/79291_in_1000x1000.jpg",
+   "product_name": "Unhinged - Booster Pack"
+  },
+  {
+   "set": "BOK",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/bok-draft-160.webp",
+    "width": 109,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bok-draft-480.webp",
+    "width": 196,
+    "height": 289
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27329",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27329_in_1000x1000.jpg",
+   "product_name": "Betrayers of Kamigawa - Booster Pack"
+  },
+  {
+   "set": "SOK",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/sok-draft-160.webp",
+    "width": 102,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/sok-draft-480.webp",
+    "width": 198,
+    "height": 310
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27366",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27366_in_1000x1000.jpg",
+   "product_name": "Saviors of Kamigawa - Booster Pack"
+  },
+  {
+   "set": "9ED",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/9ed-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/9ed-draft-480.webp",
+    "width": 198,
+    "height": 351
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27322",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27322_in_1000x1000.jpg",
+   "product_name": "9th Edition - Booster Pack"
+  },
+  {
+   "set": "RAV",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/rav-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rav-draft-480.webp",
+    "width": 198,
+    "height": 330
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27364",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27364_in_1000x1000.jpg",
+   "product_name": "Ravnica - Booster Pack"
+  },
+  {
+   "set": "RAV",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/rav-tournament-160.webp",
+    "width": 114,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rav-tournament-480.webp",
+    "width": 218,
+    "height": 306
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118876",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118876_in_1000x1000.jpg",
+   "product_name": "Ravnica Tournament Pack"
+  },
+  {
+   "set": "GPT",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/gpt-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/gpt-draft-480.webp",
+    "width": 198,
+    "height": 375
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27343",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27343_in_1000x1000.jpg",
+   "product_name": "Guildpact - Booster Pack"
+  },
+  {
+   "set": "DIS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dis-draft-160.webp",
+    "width": 97,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dis-draft-480.webp",
+    "width": 198,
+    "height": 327
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27335",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27335_in_1000x1000.jpg",
+   "product_name": "Dissension - Booster Pack"
+  },
+  {
+   "set": "TSP",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/tsp-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tsp-draft-480.webp",
+    "width": 198,
+    "height": 330
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27372",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27372_in_1000x1000.jpg",
+   "product_name": "Time Spiral - Booster Pack"
+  },
+  {
+   "set": "TSP",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/tsp-tournament-160.webp",
+    "width": 119,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tsp-tournament-480.webp",
+    "width": 218,
+    "height": 293
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118877",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118877_in_1000x1000.jpg",
+   "product_name": "Time Spiral Tournament Pack"
+  },
+  {
+   "set": "PLC",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/plc-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/plc-draft-480.webp",
+    "width": 198,
+    "height": 330
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27358",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27358_in_1000x1000.jpg",
+   "product_name": "Planar Chaos - Booster Pack"
+  },
+  {
+   "set": "FUT",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/fut-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fut-draft-480.webp",
+    "width": 198,
+    "height": 347
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27342",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27342_in_1000x1000.jpg",
+   "product_name": "Future Sight - Booster Pack"
+  },
+  {
+   "set": "10E",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/10e-draft-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/10e-draft-480.webp",
+    "width": 198,
+    "height": 346
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27319",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27319_in_1000x1000.jpg",
+   "product_name": "10th Edition - Booster Pack"
+  },
+  {
+   "set": "LRW",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/lrw-draft-160.webp",
+    "width": 96,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lrw-draft-480.webp",
+    "width": 198,
+    "height": 329
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27350",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27350_in_1000x1000.jpg",
+   "product_name": "Lorwyn - Booster Pack"
+  },
+  {
+   "set": "LRW",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/lrw-tournament-160.webp",
+    "width": 113,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lrw-tournament-480.webp",
+    "width": 338,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118878",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118878_in_1000x1000.jpg",
+   "product_name": "Lorwyn - Tournament Pack"
+  },
+  {
+   "set": "MOR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mor-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mor-draft-480.webp",
+    "width": 198,
+    "height": 369
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27354",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27354_in_1000x1000.jpg",
+   "product_name": "Morningtide - Booster Pack"
+  },
+  {
+   "set": "SHM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/shm-draft-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/shm-draft-480.webp",
+    "width": 198,
+    "height": 365
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27368",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27368_in_1000x1000.jpg",
+   "product_name": "Shadowmoor - Booster Pack"
+  },
+  {
+   "set": "SHM",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/shm-tournament-160.webp",
+    "width": 116,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/shm-tournament-480.webp",
+    "width": 288,
+    "height": 398
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/185147",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/185147_in_1000x1000.jpg",
+   "product_name": "Shadowmoor Tournament Pack"
+  },
+  {
+   "set": "EVE",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/eve-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eve-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27336",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27336_in_1000x1000.jpg",
+   "product_name": "Eventide - Booster Pack"
+  },
+  {
+   "set": "ALA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ala-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ala-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/28639",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/28639_in_1000x1000.jpg",
+   "product_name": "Shards of Alara - Booster Pack"
+  },
+  {
+   "set": "ALA",
+   "booster": "premium",
+   "small": {
+    "src": "/packs/ala-premium-160.webp",
+    "width": 174,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ala-premium-480.webp",
+    "width": 352,
+    "height": 324
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/137061",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/137061_in_1000x1000.jpg",
+   "product_name": "Shards of Alara - Premium Foil Booster Pack"
+  },
+  {
+   "set": "ALA",
+   "booster": "tournament",
+   "small": {
+    "src": "/packs/ala-tournament-160.webp",
+    "width": 118,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ala-tournament-480.webp",
+    "width": 205,
+    "height": 279
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118881",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118881_in_1000x1000.jpg",
+   "product_name": "Shards of Alara Tournament Pack"
+  },
+  {
+   "set": "CON",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/con-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/con-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/108337",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/108337_in_1000x1000.jpg",
+   "product_name": "Conflux - Booster Pack"
+  },
+  {
+   "set": "M10",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m10-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m10-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/32530",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/32530_in_1000x1000.jpg",
+   "product_name": "Magic 2010 (M10) - Booster Pack"
+  },
+  {
+   "set": "ZEN",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/zen-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/zen-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/32791",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/32791_in_1000x1000.jpg",
+   "product_name": "Zendikar - Booster Pack"
+  },
+  {
+   "set": "ROE",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/roe-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/roe-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/34680",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/34680_in_1000x1000.jpg",
+   "product_name": "Rise of the Eldrazi - Booster Pack"
+  },
+  {
+   "set": "M11",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m11-draft-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m11-draft-480.webp",
+    "width": 198,
+    "height": 368
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/35374",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/35374_in_1000x1000.jpg",
+   "product_name": "Magic 2011 (M11) - Booster Pack"
+  },
+  {
+   "set": "MBS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mbs-draft-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mbs-draft-480.webp",
+    "width": 198,
+    "height": 354
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/39108",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/39108_in_1000x1000.jpg",
+   "product_name": "Mirrodin Besieged - Booster Pack"
+  },
+  {
+   "set": "MBS",
+   "booster": "mirran",
+   "small": {
+    "src": "/packs/mbs-mirran-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mbs-mirran-480.webp",
+    "width": 175,
+    "height": 298
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/72025",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/72025_in_1000x1000.jpg",
+   "product_name": "Mirrodin Besieged - Mirran Faction Booster Pack"
+  },
+  {
+   "set": "MBS",
+   "booster": "phyrexian",
+   "small": {
+    "src": "/packs/mbs-phyrexian-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mbs-phyrexian-480.webp",
+    "width": 174,
+    "height": 298
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/72026",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/72026_in_1000x1000.jpg",
+   "product_name": "Mirrodin Besieged - Phyrexian Faction Booster Pack"
+  },
+  {
+   "set": "NPH",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/nph-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/nph-draft-480.webp",
+    "width": 198,
+    "height": 349
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/39409",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/39409_in_1000x1000.jpg",
+   "product_name": "New Phyrexia - Booster Pack"
+  },
+  {
+   "set": "M12",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m12-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m12-draft-480.webp",
+    "width": 198,
+    "height": 353
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/46956",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/46956_in_1000x1000.jpg",
+   "product_name": "Magic 2012 (M12) - Booster Pack"
+  },
+  {
+   "set": "ISD",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/isd-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/isd-draft-480.webp",
+    "width": 198,
+    "height": 353
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/47787",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/47787_in_1000x1000.jpg",
+   "product_name": "Innistrad - Booster Pack"
+  },
+  {
+   "set": "DKA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dka-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dka-draft-480.webp",
+    "width": 198,
+    "height": 353
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/57583",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/57583_in_1000x1000.jpg",
+   "product_name": "Dark Ascension - Booster Pack"
+  },
+  {
+   "set": "AVR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/avr-draft-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/avr-draft-480.webp",
+    "width": 198,
+    "height": 345
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/58056",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/58056_in_1000x1000.jpg",
+   "product_name": "Avacyn Restored - Booster Pack"
+  },
+  {
+   "set": "M13",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m13-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m13-draft-480.webp",
+    "width": 198,
+    "height": 353
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/59123",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/59123_in_1000x1000.jpg",
+   "product_name": "Magic 2013 (M13) - Booster Pack"
+  },
+  {
+   "set": "RTR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/rtr-draft-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rtr-draft-480.webp",
+    "width": 198,
+    "height": 355
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/60121",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/60121_in_1000x1000.jpg",
+   "product_name": "Return to Ravnica - Booster Pack"
+  },
+  {
+   "set": "GTC",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/gtc-draft-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/gtc-draft-480.webp",
+    "width": 198,
+    "height": 355
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/67313",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/67313_in_1000x1000.jpg",
+   "product_name": "Gatecrash - Booster Pack"
+  },
+  {
+   "set": "DGM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dgm-draft-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dgm-draft-480.webp",
+    "width": 187,
+    "height": 345
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/67752",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/67752_in_1000x1000.jpg",
+   "product_name": "Dragon's Maze - Booster Pack"
+  },
+  {
+   "set": "MMA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mma-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mma-draft-480.webp",
+    "width": 194,
+    "height": 341
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/68105",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/68105_in_1000x1000.jpg",
+   "product_name": "Modern Masters - Booster Pack"
+  },
+  {
+   "set": "M14",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m14-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m14-draft-480.webp",
+    "width": 198,
+    "height": 352
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/69245",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/69245_in_1000x1000.jpg",
+   "product_name": "Magic 2014 (M14) - Booster Pack"
+  },
+  {
+   "set": "THS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ths-draft-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ths-draft-480.webp",
+    "width": 152,
+    "height": 274
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/70961",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/70961_in_1000x1000.jpg",
+   "product_name": "Theros - Booster Pack"
+  },
+  {
+   "set": "BNG",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/bng-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bng-draft-480.webp",
+    "width": 176,
+    "height": 309
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/77982",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/77982_in_1000x1000.jpg",
+   "product_name": "Born of the Gods - Booster Pack"
+  },
+  {
+   "set": "JOU",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/jou-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/jou-draft-480.webp",
+    "width": 91,
+    "height": 160
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/80839",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/80839_in_1000x1000.jpg",
+   "product_name": "Journey Into Nyx - Booster Pack"
+  },
+  {
+   "set": "CNS",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/cns-draft-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cns-draft-480.webp",
+    "width": 115,
+    "height": 198
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/82199",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/82199_in_1000x1000.jpg",
+   "product_name": "Conspiracy - Booster Pack"
+  },
+  {
+   "set": "M15",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m15-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m15-draft-480.webp",
+    "width": 156,
+    "height": 273
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/90785",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/90785_in_1000x1000.jpg",
+   "product_name": "Magic 2015 (M15) - Booster Pack"
+  },
+  {
+   "set": "KTK",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ktk-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ktk-draft-480.webp",
+    "width": 178,
+    "height": 312
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/91653",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/91653_in_1000x1000.jpg",
+   "product_name": "Khans of Tarkir - Booster Pack"
+  },
+  {
+   "set": "FRF",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/frf-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/frf-draft-480.webp",
+    "width": 174,
+    "height": 309
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/95031",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/95031_in_1000x1000.jpg",
+   "product_name": "Fate Reforged - Booster Pack"
+  },
+  {
+   "set": "DTK",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dtk-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dtk-draft-480.webp",
+    "width": 176,
+    "height": 311
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/96139",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/96139_in_1000x1000.jpg",
+   "product_name": "Dragons of Tarkir - Booster Pack"
+  },
+  {
+   "set": "MM2",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mm2-draft-160.webp",
+    "width": 114,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mm2-draft-480.webp",
+    "width": 177,
+    "height": 249
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/95053",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/95053_in_1000x1000.jpg",
+   "product_name": "Modern Masters 2015 - Booster Pack"
+  },
+  {
+   "set": "ORI",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ori-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ori-draft-480.webp",
+    "width": 174,
+    "height": 309
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/96148",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/96148_in_1000x1000.jpg",
+   "product_name": "Magic Origins - Booster Pack"
+  },
+  {
+   "set": "BFZ",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/bfz-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bfz-draft-480.webp",
+    "width": 195,
+    "height": 344
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/102716",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/102716_in_1000x1000.jpg",
+   "product_name": "Battle for Zendikar - Booster Pack"
+  },
+  {
+   "set": "OGW",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ogw-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ogw-draft-480.webp",
+    "width": 270,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/110420",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/110420_in_1000x1000.jpg",
+   "product_name": "Oath of the Gatewatch - Booster Pack"
+  },
+  {
+   "set": "SOI",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/soi-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/soi-draft-480.webp",
+    "width": 174,
+    "height": 309
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/112708",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/112708_in_1000x1000.jpg",
+   "product_name": "Shadows over Innistrad - Booster Pack"
+  },
+  {
+   "set": "EMA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ema-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ema-draft-480.webp",
+    "width": 193,
+    "height": 340
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/114833",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/114833_in_1000x1000.jpg",
+   "product_name": "Eternal Masters - Booster Pack"
+  },
+  {
+   "set": "EMN",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/emn-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/emn-draft-480.webp",
+    "width": 130,
+    "height": 228
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/118394",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/118394_in_1000x1000.jpg",
+   "product_name": "Eldritch Moon - Booster Pack"
+  },
+  {
+   "set": "CN2",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/cn2-draft-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cn2-draft-480.webp",
+    "width": 143,
+    "height": 256
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/120967",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/120967_in_1000x1000.jpg",
+   "product_name": "Conspiracy: Take the Crown - Booster Pack"
+  },
+  {
+   "set": "KLD",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/kld-draft-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/kld-draft-480.webp",
+    "width": 170,
+    "height": 297
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/121529",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/121529_in_1000x1000.jpg",
+   "product_name": "Kaladesh - Booster Pack"
+  },
+  {
+   "set": "AER",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/aer-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/aer-draft-480.webp",
+    "width": 272,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/125793",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/125793_in_1000x1000.jpg",
+   "product_name": "Aether Revolt - Booster Pack"
+  },
+  {
+   "set": "MM3",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mm3-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mm3-draft-480.webp",
+    "width": 218,
+    "height": 383
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/127068",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/127068_in_1000x1000.jpg",
+   "product_name": "Modern Masters 2017 - Booster Pack"
+  },
+  {
+   "set": "AKH",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/akh-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/akh-draft-480.webp",
+    "width": 211,
+    "height": 374
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/127173",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/127173_in_1000x1000.jpg",
+   "product_name": "Amonkhet - Booster Pack"
+  },
+  {
+   "set": "HOU",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/hou-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/hou-draft-480.webp",
+    "width": 270,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/131457",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/131457_in_1000x1000.jpg",
+   "product_name": "Hour of Devastation - Booster Pack"
+  },
+  {
+   "set": "XLN",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/xln-draft-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/xln-draft-480.webp",
+    "width": 225,
+    "height": 387
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/141991",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/141991_in_1000x1000.jpg",
+   "product_name": "Ixalan - Booster Pack"
+  },
+  {
+   "set": "IMA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ima-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ima-draft-480.webp",
+    "width": 270,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/145236",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/145236_in_1000x1000.jpg",
+   "product_name": "Iconic Masters - Booster Pack"
+  },
+  {
+   "set": "UST",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ust-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ust-draft-480.webp",
+    "width": 271,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/149403",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/149403_in_1000x1000.jpg",
+   "product_name": "Unstable - Booster Pack"
+  },
+  {
+   "set": "RIX",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/rix-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rix-draft-480.webp",
+    "width": 271,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/149405",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/149405_in_1000x1000.jpg",
+   "product_name": "Rivals of Ixalan - Booster Pack"
+  },
+  {
+   "set": "A25",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/a25-draft-160.webp",
+    "width": 90,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/a25-draft-480.webp",
+    "width": 269,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/157861",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/157861_in_1000x1000.jpg",
+   "product_name": "Masters 25 - Booster Pack"
+  },
+  {
+   "set": "DOM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dom-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dom-draft-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/158425",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/158425_in_1000x1000.jpg",
+   "product_name": "Dominaria - Booster Pack"
+  },
+  {
+   "set": "DOM",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/dom-theme-b-160.webp",
+    "width": 100,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dom-theme-b-480.webp",
+    "width": 300,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166671",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166671_in_1000x1000.jpg",
+   "product_name": "Dominaria - Theme Booster [Black]"
+  },
+  {
+   "set": "DOM",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/dom-theme-g-160.webp",
+    "width": 109,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dom-theme-g-480.webp",
+    "width": 327,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166673",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166673_in_1000x1000.jpg",
+   "product_name": "Dominaria - Theme Booster [Green]"
+  },
+  {
+   "set": "DOM",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/dom-theme-r-160.webp",
+    "width": 109,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dom-theme-r-480.webp",
+    "width": 327,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166675",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166675_in_1000x1000.jpg",
+   "product_name": "Dominaria - Theme Booster [Red]"
+  },
+  {
+   "set": "DOM",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/dom-theme-u-160.webp",
+    "width": 112,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dom-theme-u-480.webp",
+    "width": 335,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166674",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166674_in_1000x1000.jpg",
+   "product_name": "Dominaria - Theme Booster [Blue]"
+  },
+  {
+   "set": "DOM",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/dom-theme-w-160.webp",
+    "width": 106,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dom-theme-w-480.webp",
+    "width": 274,
+    "height": 412
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166672",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166672_in_1000x1000.jpg",
+   "product_name": "Dominaria - Theme Booster [White]"
+  },
+  {
+   "set": "BBD",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/bbd-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bbd-draft-480.webp",
+    "width": 272,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166538",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166538_in_1000x1000.jpg",
+   "product_name": "Battlebond - Booster Pack"
+  },
+  {
+   "set": "M19",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m19-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m19-draft-480.webp",
+    "width": 231,
+    "height": 437
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/166551",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/166551_in_1000x1000.jpg",
+   "product_name": "Core Set 2019 - Booster Pack"
+  },
+  {
+   "set": "GRN",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/grn-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/grn-draft-480.webp",
+    "width": 234,
+    "height": 439
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/173364",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/173364_in_1000x1000.jpg",
+   "product_name": "Guilds of Ravnica - Booster Pack"
+  },
+  {
+   "set": "GRN",
+   "booster": "theme-boros",
+   "small": {
+    "src": "/packs/grn-theme-boros-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/grn-theme-boros-480.webp",
+    "width": 257,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/176698",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/176698_in_1000x1000.jpg",
+   "product_name": "Guilds of Ravnica - Theme Booster Pack [Boros]"
+  },
+  {
+   "set": "GRN",
+   "booster": "theme-dimir",
+   "small": {
+    "src": "/packs/grn-theme-dimir-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/grn-theme-dimir-480.webp",
+    "width": 257,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/176699",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/176699_in_1000x1000.jpg",
+   "product_name": "Guilds of Ravnica - Theme Booster Pack [Dimir]"
+  },
+  {
+   "set": "GRN",
+   "booster": "theme-golgari",
+   "small": {
+    "src": "/packs/grn-theme-golgari-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/grn-theme-golgari-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/176700",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/176700_in_1000x1000.jpg",
+   "product_name": "Guilds of Ravnica - Theme Booster Pack [Golgari]"
+  },
+  {
+   "set": "GRN",
+   "booster": "theme-izzet",
+   "small": {
+    "src": "/packs/grn-theme-izzet-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/grn-theme-izzet-480.webp",
+    "width": 258,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/176701",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/176701_in_1000x1000.jpg",
+   "product_name": "Guilds of Ravnica - Theme Booster Pack [Izzet]"
+  },
+  {
+   "set": "GRN",
+   "booster": "theme-selesnya",
+   "small": {
+    "src": "/packs/grn-theme-selesnya-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/grn-theme-selesnya-480.webp",
+    "width": 257,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/176702",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/176702_in_1000x1000.jpg",
+   "product_name": "Guilds of Ravnica - Theme Booster Pack [Selesnya]"
+  },
+  {
+   "set": "UMA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/uma-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/uma-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/179445",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/179445_in_1000x1000.jpg",
+   "product_name": "Ultimate Masters - Booster Pack"
+  },
+  {
+   "set": "RNA",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/rna-collector-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-collector-480.webp",
+    "width": 280,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/184538",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/184538_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Collectors Booster Pack"
+  },
+  {
+   "set": "RNA",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/rna-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-draft-480.webp",
+    "width": 223,
+    "height": 420
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/180735",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/180735_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Booster Pack"
+  },
+  {
+   "set": "RNA",
+   "booster": "theme-azorius",
+   "small": {
+    "src": "/packs/rna-theme-azorius-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-theme-azorius-480.webp",
+    "width": 241,
+    "height": 418
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/183318",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/183318_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Theme Booster Pack [Azorius]"
+  },
+  {
+   "set": "RNA",
+   "booster": "theme-gruul",
+   "small": {
+    "src": "/packs/rna-theme-gruul-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-theme-gruul-480.webp",
+    "width": 242,
+    "height": 418
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/183319",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/183319_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Theme Booster Pack [Gruul]"
+  },
+  {
+   "set": "RNA",
+   "booster": "theme-orzhov",
+   "small": {
+    "src": "/packs/rna-theme-orzhov-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-theme-orzhov-480.webp",
+    "width": 241,
+    "height": 418
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/183320",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/183320_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Theme Booster Pack [Orzhov]"
+  },
+  {
+   "set": "RNA",
+   "booster": "theme-rakdos",
+   "small": {
+    "src": "/packs/rna-theme-rakdos-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-theme-rakdos-480.webp",
+    "width": 245,
+    "height": 418
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/183321",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/183321_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Theme Booster Pack [Rakdos]"
+  },
+  {
+   "set": "RNA",
+   "booster": "theme-simic",
+   "small": {
+    "src": "/packs/rna-theme-simic-160.webp",
+    "width": 93,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rna-theme-simic-480.webp",
+    "width": 242,
+    "height": 418
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/183322",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/183322_in_1000x1000.jpg",
+   "product_name": "Ravnica Allegiance - Theme Booster Pack [Simic]"
+  },
+  {
+   "set": "WAR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/war-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/war-draft-480.webp",
+    "width": 221,
+    "height": 417
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/185677",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/185677_in_1000x1000.jpg",
+   "product_name": "War of the Spark - Booster Pack"
+  },
+  {
+   "set": "WAR",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/war-theme-b-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/war-theme-b-480.webp",
+    "width": 201,
+    "height": 373
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/188648",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/188648_in_1000x1000.jpg",
+   "product_name": "War of the Spark - Theme Booster Pack [Black]"
+  },
+  {
+   "set": "WAR",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/war-theme-g-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/war-theme-g-480.webp",
+    "width": 202,
+    "height": 373
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/188650",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/188650_in_1000x1000.jpg",
+   "product_name": "War of the Spark - Theme Booster Pack [Green]"
+  },
+  {
+   "set": "WAR",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/war-theme-r-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/war-theme-r-480.webp",
+    "width": 202,
+    "height": 373
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/188649",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/188649_in_1000x1000.jpg",
+   "product_name": "War of the Spark - Theme Booster Pack [Red]"
+  },
+  {
+   "set": "WAR",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/war-theme-u-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/war-theme-u-480.webp",
+    "width": 201,
+    "height": 373
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/188647",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/188647_in_1000x1000.jpg",
+   "product_name": "War of the Spark - Theme Booster Pack [Blue]"
+  },
+  {
+   "set": "WAR",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/war-theme-w-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/war-theme-w-480.webp",
+    "width": 201,
+    "height": 373
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/188646",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/188646_in_1000x1000.jpg",
+   "product_name": "War of the Spark - Theme Booster Pack [White]"
+  },
+  {
+   "set": "MH1",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mh1-draft-160.webp",
+    "width": 91,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mh1-draft-480.webp",
+    "width": 274,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/185892",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/185892_in_1000x1000.jpg",
+   "product_name": "Modern Horizons - Booster Pack"
+  },
+  {
+   "set": "M20",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m20-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m20-draft-480.webp",
+    "width": 221,
+    "height": 418
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/188211",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/188211_in_1000x1000.jpg",
+   "product_name": "Core Set 2020 - Booster Pack"
+  },
+  {
+   "set": "M20",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/m20-theme-b-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m20-theme-b-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/192762",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/192762_in_1000x1000.jpg",
+   "product_name": "Core Set 2020 Theme Booster [Black]"
+  },
+  {
+   "set": "M20",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/m20-theme-g-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m20-theme-g-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/192764",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/192764_in_1000x1000.jpg",
+   "product_name": "Core Set 2020 Theme Booster [Green]"
+  },
+  {
+   "set": "M20",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/m20-theme-r-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m20-theme-r-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/192763",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/192763_in_1000x1000.jpg",
+   "product_name": "Core Set 2020 Theme Booster [Red]"
+  },
+  {
+   "set": "M20",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/m20-theme-u-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m20-theme-u-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/192761",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/192761_in_1000x1000.jpg",
+   "product_name": "Core Set 2020 Theme Booster [Blue]"
+  },
+  {
+   "set": "M20",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/m20-theme-w-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m20-theme-w-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/192765",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/192765_in_1000x1000.jpg",
+   "product_name": "Core Set 2020 Theme Booster [White]"
+  },
+  {
+   "set": "ELD",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/eld-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194906",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194906_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Collector Booster Pack"
+  },
+  {
+   "set": "ELD",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/eld-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194892",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194892_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Draft Booster Pack"
+  },
+  {
+   "set": "ELD",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/eld-theme-b-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-theme-b-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194900",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194900_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Theme Booster Pack [Black]"
+  },
+  {
+   "set": "ELD",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/eld-theme-g-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-theme-g-480.webp",
+    "width": 276,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194901",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194901_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Theme Booster Pack [Green]"
+  },
+  {
+   "set": "ELD",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/eld-theme-r-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-theme-r-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194902",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194902_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Theme Booster Pack [Red]"
+  },
+  {
+   "set": "ELD",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/eld-theme-u-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-theme-u-480.webp",
+    "width": 275,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194903",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194903_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Theme Booster Pack [Blue]"
+  },
+  {
+   "set": "ELD",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/eld-theme-w-160.webp",
+    "width": 92,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eld-theme-w-480.webp",
+    "width": 276,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/194904",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/194904_in_1000x1000.jpg",
+   "product_name": "Throne of Eldraine - Theme Booster Pack [White]"
+  },
+  {
+   "set": "MB1",
+   "booster": "convention",
+   "small": {
+    "src": "/packs/mb1-convention-160.webp",
+    "width": 304,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mb1-convention-480.webp",
+    "width": 535,
+    "height": 282
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/202644",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/202644_in_1000x1000.jpg",
+   "product_name": "Mystery Booster - Booster Pack [Convention Edition] (2019)"
+  },
+  {
+   "set": "MB1",
+   "booster": "convention-2021",
+   "small": {
+    "src": "/packs/mb1-convention-2021-160.webp",
+    "width": 286,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mb1-convention-2021-480.webp",
+    "width": 857,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/246936",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/246936_in_1000x1000.jpg",
+   "product_name": "Mystery Booster - Booster Pack [Convention Edition] (2021)"
+  },
+  {
+   "set": "MB1",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mb1-draft-160.webp",
+    "width": 304,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mb1-draft-480.webp",
+    "width": 538,
+    "height": 283
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/202647",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/202647_in_1000x1000.jpg",
+   "product_name": "Mystery Booster - Booster Pack [Retail Exclusive]"
+  },
+  {
+   "set": "THB",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/thb-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-collector-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/206254",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/206254_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Collector Booster Pack"
+  },
+  {
+   "set": "THB",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/thb-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-draft-480.webp",
+    "width": 254,
+    "height": 478
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/202299",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/202299_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Booster Pack"
+  },
+  {
+   "set": "THB",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/thb-theme-b-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-theme-b-480.webp",
+    "width": 257,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/206258",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/206258_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Theme Booster Pack [Black]"
+  },
+  {
+   "set": "THB",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/thb-theme-g-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-theme-g-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/206260",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/206260_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Theme Booster Pack [Green]"
+  },
+  {
+   "set": "THB",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/thb-theme-r-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-theme-r-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/206261",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/206261_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Theme Booster Pack [Red]"
+  },
+  {
+   "set": "THB",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/thb-theme-u-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-theme-u-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/206259",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/206259_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Theme Booster Pack [Blue]"
+  },
+  {
+   "set": "THB",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/thb-theme-w-160.webp",
+    "width": 86,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/thb-theme-w-480.webp",
+    "width": 258,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/206262",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/206262_in_1000x1000.jpg",
+   "product_name": "Theros Beyond Death - Theme Booster Pack [White]"
+  },
+  {
+   "set": "IKO",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/iko-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208280",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208280_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Collector Booster Pack"
+  },
+  {
+   "set": "IKO",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/iko-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208277",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208277_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Booster Pack"
+  },
+  {
+   "set": "IKO",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/iko-theme-b-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-theme-b-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208285",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208285_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Theme Booster [Black]"
+  },
+  {
+   "set": "IKO",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/iko-theme-g-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-theme-g-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208288",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208288_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Theme Booster [Green]"
+  },
+  {
+   "set": "IKO",
+   "booster": "theme-monsters",
+   "small": {
+    "src": "/packs/iko-theme-monsters-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-theme-monsters-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/212110",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/212110_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Theme Booster [Monsters]"
+  },
+  {
+   "set": "IKO",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/iko-theme-r-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-theme-r-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208289",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208289_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Theme Booster [Red]"
+  },
+  {
+   "set": "IKO",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/iko-theme-u-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-theme-u-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208287",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208287_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Theme Booster [Blue]"
+  },
+  {
+   "set": "IKO",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/iko-theme-w-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/iko-theme-w-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/208290",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/208290_in_1000x1000.jpg",
+   "product_name": "Ikoria: Lair of Behemoths - Theme Booster [White]"
+  },
+  {
+   "set": "M21",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/m21-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m21-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/215325",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/215325_in_1000x1000.jpg",
+   "product_name": "Core Set 2021 - Collector Booster Pack"
+  },
+  {
+   "set": "M21",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/m21-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/m21-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/214813",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/214813_in_1000x1000.jpg",
+   "product_name": "Core Set 2021 - Booster Pack"
+  },
+  {
+   "set": "JMP",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/jmp-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/jmp-jumpstart-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/214822",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/214822_in_1000x1000.jpg",
+   "product_name": "Jumpstart - Booster Pack"
+  },
+  {
+   "set": "2XM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/2xm-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/2xm-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/214824",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/214824_in_1000x1000.jpg",
+   "product_name": "Double Masters - Booster Pack"
+  },
+  {
+   "set": "2XM",
+   "booster": "vip",
+   "small": {
+    "src": "/packs/2xm-vip-160.webp",
+    "width": 132,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/2xm-vip-480.webp",
+    "width": 396,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/215084",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/215084_in_1000x1000.jpg",
+   "product_name": "Double Masters - VIP Edition Pack"
+  },
+  {
+   "set": "ZNR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/znr-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220422",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220422_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Collector Booster Pack"
+  },
+  {
+   "set": "ZNR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/znr-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220413",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220413_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Draft Booster Pack"
+  },
+  {
+   "set": "ZNR",
+   "booster": "set",
+   "small": {
+    "src": "/packs/znr-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220524",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220524_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Set Booster Pack"
+  },
+  {
+   "set": "ZNR",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/znr-theme-b-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-theme-b-480.webp",
+    "width": 285,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220415",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220415_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Theme Booster [Black]"
+  },
+  {
+   "set": "ZNR",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/znr-theme-g-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-theme-g-480.webp",
+    "width": 285,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220417",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220417_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Theme Booster [Green]"
+  },
+  {
+   "set": "ZNR",
+   "booster": "theme-party",
+   "small": {
+    "src": "/packs/znr-theme-party-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-theme-party-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/221915",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/221915_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Theme Booster [Party]"
+  },
+  {
+   "set": "ZNR",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/znr-theme-r-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-theme-r-480.webp",
+    "width": 285,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220418",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220418_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Theme Booster [Red]"
+  },
+  {
+   "set": "ZNR",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/znr-theme-u-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-theme-u-480.webp",
+    "width": 284,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220416",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220416_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Theme Booster [Blue]"
+  },
+  {
+   "set": "ZNR",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/znr-theme-w-160.webp",
+    "width": 95,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/znr-theme-w-480.webp",
+    "width": 285,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/220419",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/220419_in_1000x1000.jpg",
+   "product_name": "Zendikar Rising - Theme Booster [White]"
+  },
+  {
+   "set": "CMR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/cmr-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cmr-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/221322",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/221322_in_1000x1000.jpg",
+   "product_name": "Commander Legends - Collector Booster Pack"
+  },
+  {
+   "set": "CMR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/cmr-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cmr-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/221318",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/221318_in_1000x1000.jpg",
+   "product_name": "Commander Legends - Draft Booster Pack"
+  },
+  {
+   "set": "KHM",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/khm-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/228250",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/228250_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Collector Booster Pack"
+  },
+  {
+   "set": "KHM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/khm-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/228246",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/228246_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Draft Booster Pack"
+  },
+  {
+   "set": "KHM",
+   "booster": "set",
+   "small": {
+    "src": "/packs/khm-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/228252",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/228252_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Set Booster Pack"
+  },
+  {
+   "set": "KHM",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/khm-theme-b-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-theme-b-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/229196",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/229196_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Theme Booster [Black]"
+  },
+  {
+   "set": "KHM",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/khm-theme-g-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-theme-g-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/229198",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/229198_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Theme Booster [Green]"
+  },
+  {
+   "set": "KHM",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/khm-theme-r-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-theme-r-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/229197",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/229197_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Theme Booster [Red]"
+  },
+  {
+   "set": "KHM",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/khm-theme-u-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-theme-u-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/229195",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/229195_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Theme Booster [Blue]"
+  },
+  {
+   "set": "KHM",
+   "booster": "theme-vikings",
+   "small": {
+    "src": "/packs/khm-theme-vikings-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-theme-vikings-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/229199",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/229199_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Theme Booster [Viking]"
+  },
+  {
+   "set": "KHM",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/khm-theme-w-160.webp",
+    "width": 94,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/khm-theme-w-480.webp",
+    "width": 283,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/229194",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/229194_in_1000x1000.jpg",
+   "product_name": "Kaldheim - Theme Booster [White]"
+  },
+  {
+   "set": "TSR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/tsr-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tsr-draft-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/230383",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/230383_in_1000x1000.jpg",
+   "product_name": "Time Spiral: Remastered - Draft Booster Pack"
+  },
+  {
+   "set": "STX",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/stx-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-collector-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233230",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233230_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Collector Booster Pack"
+  },
+  {
+   "set": "STX",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/stx-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233248",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233248_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Draft Booster Pack"
+  },
+  {
+   "set": "STX",
+   "booster": "set",
+   "small": {
+    "src": "/packs/stx-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233228",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233228_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Set Booster Pack"
+  },
+  {
+   "set": "STX",
+   "booster": "theme-lorehold",
+   "small": {
+    "src": "/packs/stx-theme-lorehold-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-theme-lorehold-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233240",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233240_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Theme Booster Pack [Lorehold]"
+  },
+  {
+   "set": "STX",
+   "booster": "theme-prismari",
+   "small": {
+    "src": "/packs/stx-theme-prismari-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-theme-prismari-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233239",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233239_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Theme Booster Pack [Prismari]"
+  },
+  {
+   "set": "STX",
+   "booster": "theme-quandrix",
+   "small": {
+    "src": "/packs/stx-theme-quandrix-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-theme-quandrix-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233241",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233241_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Theme Booster Pack [Quandrix]"
+  },
+  {
+   "set": "STX",
+   "booster": "theme-silverquill",
+   "small": {
+    "src": "/packs/stx-theme-silverquill-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-theme-silverquill-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233236",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233236_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Theme Booster Pack [Silverquill]"
+  },
+  {
+   "set": "STX",
+   "booster": "theme-witherbloom",
+   "small": {
+    "src": "/packs/stx-theme-witherbloom-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/stx-theme-witherbloom-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/233238",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/233238_in_1000x1000.jpg",
+   "product_name": "Strixhaven: School of Mages - Theme Booster Pack [Witherbloom]"
+  },
+  {
+   "set": "MH2",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/mh2-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mh2-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/236349",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/236349_in_1000x1000.jpg",
+   "product_name": "Modern Horizons 2 - Collector Booster Pack"
+  },
+  {
+   "set": "MH2",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mh2-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mh2-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/236356",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/236356_in_1000x1000.jpg",
+   "product_name": "Modern Horizons 2 - Draft Booster Pack"
+  },
+  {
+   "set": "MH2",
+   "booster": "set",
+   "small": {
+    "src": "/packs/mh2-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mh2-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/236351",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/236351_in_1000x1000.jpg",
+   "product_name": "Modern Horizons 2 - Set Booster Pack"
+  },
+  {
+   "set": "AFR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/afr-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-collector-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238746",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238746_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Collector Booster Pack"
+  },
+  {
+   "set": "AFR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/afr-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-draft-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238731",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238731_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Draft Booster Pack"
+  },
+  {
+   "set": "AFR",
+   "booster": "set",
+   "small": {
+    "src": "/packs/afr-set-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-set-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238741",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238741_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Set Booster Pack"
+  },
+  {
+   "set": "AFR",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/afr-theme-b-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-theme-b-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238825",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238825_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Theme Booster [Black]"
+  },
+  {
+   "set": "AFR",
+   "booster": "theme-dungeons",
+   "small": {
+    "src": "/packs/afr-theme-dungeons-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-theme-dungeons-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238829",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238829_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Theme Booster [Dungeon Theme]"
+  },
+  {
+   "set": "AFR",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/afr-theme-g-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-theme-g-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238827",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238827_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Theme Booster [Green]"
+  },
+  {
+   "set": "AFR",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/afr-theme-r-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-theme-r-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238826",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238826_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Theme Booster [Red]"
+  },
+  {
+   "set": "AFR",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/afr-theme-u-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-theme-u-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238822",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238822_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Theme Booster [Blue]"
+  },
+  {
+   "set": "AFR",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/afr-theme-w-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/afr-theme-w-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/238824",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/238824_in_1000x1000.jpg",
+   "product_name": "Adventures in the Forgotten Realms - Theme Booster [White]"
+  },
+  {
+   "set": "MID",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/mid-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/244383",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/244383_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Collector Booster Pack"
+  },
+  {
+   "set": "MID",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mid-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/244378",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/244378_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Draft Booster Pack"
+  },
+  {
+   "set": "MID",
+   "booster": "set",
+   "small": {
+    "src": "/packs/mid-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/244387",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/244387_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Set Booster Pack"
+  },
+  {
+   "set": "MID",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/mid-theme-b-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-theme-b-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/247375",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/247375_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Theme Booster [Black]"
+  },
+  {
+   "set": "MID",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/mid-theme-g-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-theme-g-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/247380",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/247380_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Theme Booster [Green]"
+  },
+  {
+   "set": "MID",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/mid-theme-r-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-theme-r-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/247378",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/247378_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Theme Booster [Red]"
+  },
+  {
+   "set": "MID",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/mid-theme-u-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-theme-u-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/247377",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/247377_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Theme Booster [Blue]"
+  },
+  {
+   "set": "MID",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/mid-theme-w-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-theme-w-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/247379",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/247379_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Theme Booster [White]"
+  },
+  {
+   "set": "MID",
+   "booster": "theme-werewolves",
+   "small": {
+    "src": "/packs/mid-theme-werewolves-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mid-theme-werewolves-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/247381",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/247381_in_1000x1000.jpg",
+   "product_name": "Innistrad: Midnight Hunt - Theme Booster [Werewolves]"
+  },
+  {
+   "set": "VOW",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/vow-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/246459",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/246459_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Collector Booster Pack"
+  },
+  {
+   "set": "VOW",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/vow-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/246469",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/246469_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Draft Booster Pack"
+  },
+  {
+   "set": "VOW",
+   "booster": "set",
+   "small": {
+    "src": "/packs/vow-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/246472",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/246472_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Set Booster Pack"
+  },
+  {
+   "set": "VOW",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/vow-theme-b-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-theme-b-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/253823",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/253823_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Theme Booster [Black]"
+  },
+  {
+   "set": "VOW",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/vow-theme-g-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-theme-g-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/253825",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/253825_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Theme Booster [Green]"
+  },
+  {
+   "set": "VOW",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/vow-theme-r-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-theme-r-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/253826",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/253826_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Theme Booster [Red]"
+  },
+  {
+   "set": "VOW",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/vow-theme-u-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-theme-u-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/253824",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/253824_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Theme Booster [Blue]"
+  },
+  {
+   "set": "VOW",
+   "booster": "theme-vampires",
+   "small": {
+    "src": "/packs/vow-theme-vampires-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-theme-vampires-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/253828",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/253828_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Theme Booster [Vampires]"
+  },
+  {
+   "set": "VOW",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/vow-theme-w-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/vow-theme-w-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/253827",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/253827_in_1000x1000.jpg",
+   "product_name": "Innistrad: Crimson Vow - Theme Booster [White]"
+  },
+  {
+   "set": "DBL",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dbl-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dbl-draft-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/255912",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/255912_in_1000x1000.jpg",
+   "product_name": "Innistrad: Double Feature - Draft Booster Pack"
+  },
+  {
+   "set": "NEO",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/neo-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257562",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257562_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Collector Booster Pack"
+  },
+  {
+   "set": "NEO",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/neo-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257556",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257556_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Draft Booster Pack"
+  },
+  {
+   "set": "NEO",
+   "booster": "set",
+   "small": {
+    "src": "/packs/neo-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257561",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257561_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Set Booster Pack"
+  },
+  {
+   "set": "NEO",
+   "booster": "theme-b",
+   "small": {
+    "src": "/packs/neo-theme-b-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-theme-b-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257569",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257569_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Theme Booster [Black]"
+  },
+  {
+   "set": "NEO",
+   "booster": "theme-g",
+   "small": {
+    "src": "/packs/neo-theme-g-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-theme-g-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257572",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257572_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Theme Booster [Green]"
+  },
+  {
+   "set": "NEO",
+   "booster": "theme-ninjas",
+   "small": {
+    "src": "/packs/neo-theme-ninjas-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-theme-ninjas-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257574",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257574_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Theme Booster [Ninjas]"
+  },
+  {
+   "set": "NEO",
+   "booster": "theme-r",
+   "small": {
+    "src": "/packs/neo-theme-r-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-theme-r-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257573",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257573_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Theme Booster [Red]"
+  },
+  {
+   "set": "NEO",
+   "booster": "theme-u",
+   "small": {
+    "src": "/packs/neo-theme-u-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-theme-u-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257571",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257571_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Theme Booster [Blue]"
+  },
+  {
+   "set": "NEO",
+   "booster": "theme-w",
+   "small": {
+    "src": "/packs/neo-theme-w-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/neo-theme-w-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/257570",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/257570_in_1000x1000.jpg",
+   "product_name": "Kamigawa: Neon Dynasty - Theme Booster [White]"
+  },
+  {
+   "set": "SNC",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/snc-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/264766",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/264766_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Collector Booster Pack"
+  },
+  {
+   "set": "SNC",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/snc-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/264759",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/264759_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Draft Booster Pack"
+  },
+  {
+   "set": "SNC",
+   "booster": "set",
+   "small": {
+    "src": "/packs/snc-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/264765",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/264765_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Set Booster Pack"
+  },
+  {
+   "set": "SNC",
+   "booster": "theme-brokers",
+   "small": {
+    "src": "/packs/snc-theme-brokers-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-theme-brokers-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/265380",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/265380_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Theme Booster [Brokers]"
+  },
+  {
+   "set": "SNC",
+   "booster": "theme-cabaretti",
+   "small": {
+    "src": "/packs/snc-theme-cabaretti-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-theme-cabaretti-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/265377",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/265377_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Theme Booster [Cabaretti]"
+  },
+  {
+   "set": "SNC",
+   "booster": "theme-maestros",
+   "small": {
+    "src": "/packs/snc-theme-maestros-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-theme-maestros-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/265369",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/265369_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Theme Booster [Maestros]"
+  },
+  {
+   "set": "SNC",
+   "booster": "theme-obscura",
+   "small": {
+    "src": "/packs/snc-theme-obscura-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-theme-obscura-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/265367",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/265367_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Theme Booster [Obscura]"
+  },
+  {
+   "set": "SNC",
+   "booster": "theme-riveteers",
+   "small": {
+    "src": "/packs/snc-theme-riveteers-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/snc-theme-riveteers-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/265375",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/265375_in_1000x1000.jpg",
+   "product_name": "Streets of New Capenna - Theme Booster [Riveteers]"
+  },
+  {
+   "set": "CLB",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/clb-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/clb-collector-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/267024",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/267024_in_1000x1000.jpg",
+   "product_name": "Commander Legends: Battle for Baldur's Gate - Collector Booster Pack"
+  },
+  {
+   "set": "CLB",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/clb-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/clb-draft-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/267020",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/267020_in_1000x1000.jpg",
+   "product_name": "Commander Legends: Battle for Baldur's Gate - Draft Booster Pack"
+  },
+  {
+   "set": "CLB",
+   "booster": "set",
+   "small": {
+    "src": "/packs/clb-set-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/clb-set-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/267021",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/267021_in_1000x1000.jpg",
+   "product_name": "Commander Legends: Battle for Baldur's Gate - Set Booster Pack"
+  },
+  {
+   "set": "2X2",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/2x2-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/2x2-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/271508",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/271508_in_1000x1000.jpg",
+   "product_name": "Double Masters 2022 - Collector Booster Pack"
+  },
+  {
+   "set": "2X2",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/2x2-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/2x2-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/271507",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/271507_in_1000x1000.jpg",
+   "product_name": "Double Masters 2022 - Draft Booster Pack"
+  },
+  {
+   "set": "DMU",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/dmu-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dmu-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/275407",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/275407_in_1000x1000.jpg",
+   "product_name": "Dominaria United - Collector Booster Pack"
+  },
+  {
+   "set": "DMU",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dmu-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dmu-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/275432",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/275432_in_1000x1000.jpg",
+   "product_name": "Dominaria United - Draft Booster Pack"
+  },
+  {
+   "set": "DMU",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/dmu-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dmu-jumpstart-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/275425",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/275425_in_1000x1000.jpg",
+   "product_name": "Dominaria United - Jumpstart Booster Pack"
+  },
+  {
+   "set": "DMU",
+   "booster": "set",
+   "small": {
+    "src": "/packs/dmu-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dmu-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/275405",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/275405_in_1000x1000.jpg",
+   "product_name": "Dominaria United - Set Booster Pack"
+  },
+  {
+   "set": "UNF",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/unf-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/unf-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/275409",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/275409_in_1000x1000.jpg",
+   "product_name": "Unfinity - Collector Booster Pack"
+  },
+  {
+   "set": "UNF",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/unf-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/unf-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/275408",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/275408_in_1000x1000.jpg",
+   "product_name": "Unfinity - Draft Booster Pack"
+  },
+  {
+   "set": "BRO",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/bro-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bro-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/282223",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/282223_in_1000x1000.jpg",
+   "product_name": "The Brothers' War - Collector Booster Pack"
+  },
+  {
+   "set": "BRO",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/bro-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bro-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/282227",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/282227_in_1000x1000.jpg",
+   "product_name": "The Brothers' War - Draft Booster Pack"
+  },
+  {
+   "set": "BRO",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/bro-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bro-jumpstart-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/449720",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/449720_in_1000x1000.jpg",
+   "product_name": "The Brothers' War - Jumpstart Booster Pack"
+  },
+  {
+   "set": "BRO",
+   "booster": "set",
+   "small": {
+    "src": "/packs/bro-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/bro-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/282231",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/282231_in_1000x1000.jpg",
+   "product_name": "The Brothers' War - Set Booster Pack"
+  },
+  {
+   "set": "30A",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/30a-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/30a-draft-480.webp",
+    "width": 185,
+    "height": 348
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/448873",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/448873_in_1000x1000.jpg",
+   "product_name": "30th Anniversary Edition Pack"
+  },
+  {
+   "set": "J22",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/j22-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/j22-jumpstart-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/287814",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/287814_in_1000x1000.jpg",
+   "product_name": "Jumpstart 2022 Booster Pack"
+  },
+  {
+   "set": "DMR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/dmr-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dmr-collector-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/449570",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/449570_in_1000x1000.jpg",
+   "product_name": "Dominaria Remastered - Collector Booster Pack"
+  },
+  {
+   "set": "DMR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/dmr-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dmr-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/449571",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/449571_in_1000x1000.jpg",
+   "product_name": "Dominaria Remastered - Draft Booster Pack"
+  },
+  {
+   "set": "ONE",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/one-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/one-collector-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/451879",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/451879_in_1000x1000.jpg",
+   "product_name": "Phyrexia: All Will Be One - Collector Booster Pack"
+  },
+  {
+   "set": "ONE",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/one-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/one-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/451868",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/451868_in_1000x1000.jpg",
+   "product_name": "Phyrexia: All Will Be One - Draft Booster Pack"
+  },
+  {
+   "set": "ONE",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/one-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/one-jumpstart-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/451875",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/451875_in_1000x1000.jpg",
+   "product_name": "Phyrexia: All Will Be One - Jumpstart Booster Pack"
+  },
+  {
+   "set": "ONE",
+   "booster": "set",
+   "small": {
+    "src": "/packs/one-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/one-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/451871",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/451871_in_1000x1000.jpg",
+   "product_name": "Phyrexia: All Will Be One - Set Booster Pack"
+  },
+  {
+   "set": "MOM",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/mom-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mom-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/475583",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/475583_in_1000x1000.jpg",
+   "product_name": "March of the Machine - Collector Booster Pack"
+  },
+  {
+   "set": "MOM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mom-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mom-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/475577",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/475577_in_1000x1000.jpg",
+   "product_name": "March of the Machine - Draft Booster Pack"
+  },
+  {
+   "set": "MOM",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/mom-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mom-jumpstart-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/475581",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/475581_in_1000x1000.jpg",
+   "product_name": "March of the Machine - Jumpstart Booster Pack"
+  },
+  {
+   "set": "MOM",
+   "booster": "set",
+   "small": {
+    "src": "/packs/mom-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mom-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/475578",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/475578_in_1000x1000.jpg",
+   "product_name": "March of the Machine - Set Booster Pack"
+  },
+  {
+   "set": "MAT",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/mat-collector-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mat-collector-480.webp",
+    "width": 261,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/489204",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/489204_in_1000x1000.jpg",
+   "product_name": "March of the Machine: The Aftermath - Collector Booster Pack"
+  },
+  {
+   "set": "MAT",
+   "booster": "default",
+   "small": {
+    "src": "/packs/mat-default-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mat-default-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/489274",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/489274_in_1000x1000.jpg",
+   "product_name": "March of the Machine: The Aftermath - Epilogue Booster Pack"
+  },
+  {
+   "set": "LTR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/ltr-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ltr-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484911",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484911_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: The Lord of the Rings: Tales of Middle-earth - Collector Booster Pack"
+  },
+  {
+   "set": "LTR",
+   "booster": "collector-special",
+   "small": {
+    "src": "/packs/ltr-collector-special-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ltr-collector-special-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/515905",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/515905_in_1000x1000.jpg",
+   "product_name": "The Lord of the Rings: Tales of Middle-earth - Special Edition Collector Booster Pack"
+  },
+  {
+   "set": "LTR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/ltr-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ltr-draft-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484905",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484905_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: The Lord of the Rings: Tales of Middle-earth - Draft Booster Pack"
+  },
+  {
+   "set": "LTR",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/ltr-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ltr-jumpstart-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484914",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484914_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: The Lord of the Rings: Tales of Middle-earth - Jumpstart Booster Pack"
+  },
+  {
+   "set": "LTR",
+   "booster": "jumpstart-v2",
+   "small": {
+    "src": "/packs/ltr-jumpstart-v2-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ltr-jumpstart-v2-480.webp",
+    "width": 251,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/515920",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/515920_in_1000x1000.jpg",
+   "product_name": "The Lord of the Rings: Tales of Middle-earth - Jumpstart Vol. 2 Booster Pack"
+  },
+  {
+   "set": "LTR",
+   "booster": "set",
+   "small": {
+    "src": "/packs/ltr-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ltr-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484908",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484908_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: The Lord of the Rings: Tales of Middle-earth - Set Booster Pack"
+  },
+  {
+   "set": "CMM",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/cmm-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cmm-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484928",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484928_in_1000x1000.jpg",
+   "product_name": "Commander Masters - Collector Booster Pack"
+  },
+  {
+   "set": "CMM",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/cmm-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cmm-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484923",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484923_in_1000x1000.jpg",
+   "product_name": "Commander Masters - Draft Booster Pack"
+  },
+  {
+   "set": "CMM",
+   "booster": "set",
+   "small": {
+    "src": "/packs/cmm-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/cmm-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/484926",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/484926_in_1000x1000.jpg",
+   "product_name": "Commander Masters - Set Booster Pack"
+  },
+  {
+   "set": "WOE",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/woe-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/woe-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/496040",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/496040_in_1000x1000.jpg",
+   "product_name": "Wilds of Eldraine - Collector Booster Pack"
+  },
+  {
+   "set": "WOE",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/woe-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/woe-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/496034",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/496034_in_1000x1000.jpg",
+   "product_name": "Wilds of Eldraine - Draft Booster Pack"
+  },
+  {
+   "set": "WOE",
+   "booster": "set",
+   "small": {
+    "src": "/packs/woe-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/woe-set-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/496037",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/496037_in_1000x1000.jpg",
+   "product_name": "Wilds of Eldraine - Set Booster Pack"
+  },
+  {
+   "set": "WHO",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/who-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/who-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/496075",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/496075_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: Doctor Who - Collector Booster Pack"
+  },
+  {
+   "set": "LCI",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/lci-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lci-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/516613",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/516613_in_1000x1000.jpg",
+   "product_name": "The Lost Caverns of Ixalan - Collector Booster Pack"
+  },
+  {
+   "set": "LCI",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/lci-draft-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lci-draft-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/516618",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/516618_in_1000x1000.jpg",
+   "product_name": "The Lost Caverns of Ixalan - Draft Booster Pack"
+  },
+  {
+   "set": "LCI",
+   "booster": "set",
+   "small": {
+    "src": "/packs/lci-set-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lci-set-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/516621",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/516621_in_1000x1000.jpg",
+   "product_name": "The Lost Caverns of Ixalan - Set Booster Pack"
+  },
+  {
+   "set": "RVR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/rvr-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rvr-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/517707",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/517707_in_1000x1000.jpg",
+   "product_name": "Ravnica Remastered - Collector Booster Pack"
+  },
+  {
+   "set": "RVR",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/rvr-draft-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/rvr-draft-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/517704",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/517704_in_1000x1000.jpg",
+   "product_name": "Ravnica Remastered - Draft Booster Pack"
+  },
+  {
+   "set": "MKM",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/mkm-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mkm-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/529967",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/529967_in_1000x1000.jpg",
+   "product_name": "Murders at Karlov Manor - Collector Booster Pack"
+  },
+  {
+   "set": "MKM",
+   "booster": "play",
+   "small": {
+    "src": "/packs/mkm-play-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mkm-play-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/529962",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/529962_in_1000x1000.jpg",
+   "product_name": "Murders at Karlov Manor - Play Booster Pack"
+  },
+  {
+   "set": "CLU",
+   "booster": "default",
+   "small": {
+    "src": "/packs/clu-default-160.webp",
+    "width": 285,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/clu-default-480.webp",
+    "width": 855,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/618914",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/618914_in_1000x1000.jpg",
+   "product_name": "Ravnica: Clue Edition - Booster Pack"
+  },
+  {
+   "set": "PIP",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/pip-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/pip-collector-480.webp",
+    "width": 251,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/523180",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/523180_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: Fallout - Collector Booster Pack"
+  },
+  {
+   "set": "OTJ",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/otj-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/otj-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541086",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541086_in_1000x1000.jpg",
+   "product_name": "Outlaws of Thunder Junction - Collector Booster Pack"
+  },
+  {
+   "set": "OTJ",
+   "booster": "play",
+   "small": {
+    "src": "/packs/otj-play-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/otj-play-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541083",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541083_in_1000x1000.jpg",
+   "product_name": "Outlaws of Thunder Junction - Play Booster Pack"
+  },
+  {
+   "set": "MH3",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/mh3-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mh3-collector-480.webp",
+    "width": 251,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541173",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541173_in_1000x1000.jpg",
+   "product_name": "Modern Horizons 3 - Collector Booster Pack"
+  },
+  {
+   "set": "MH3",
+   "booster": "play",
+   "small": {
+    "src": "/packs/mh3-play-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mh3-play-480.webp",
+    "width": 251,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541163",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541163_in_1000x1000.jpg",
+   "product_name": "Modern Horizons 3 - Play Booster Pack"
+  },
+  {
+   "set": "ACR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/acr-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/acr-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541224",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541224_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: Assassin's Creed - Collector Booster Pack"
+  },
+  {
+   "set": "ACR",
+   "booster": "default",
+   "small": {
+    "src": "/packs/acr-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/acr-default-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541218",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541218_in_1000x1000.jpg",
+   "product_name": "Universes Beyond: Assassin's Creed - Beyond Booster Pack"
+  },
+  {
+   "set": "BLB",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/blb-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/blb-collector-480.webp",
+    "width": 251,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541237",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541237_in_1000x1000.jpg",
+   "product_name": "Bloomburrow - Collector Booster Pack"
+  },
+  {
+   "set": "BLB",
+   "booster": "play",
+   "small": {
+    "src": "/packs/blb-play-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/blb-play-480.webp",
+    "width": 251,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/541234",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/541234_in_1000x1000.jpg",
+   "product_name": "Bloomburrow - Play Booster Pack"
+  },
+  {
+   "set": "MB2",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mb2-draft-160.webp",
+    "width": 305,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mb2-draft-480.webp",
+    "width": 914,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/563749",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/563749_in_1000x1000.jpg",
+   "product_name": "Mystery Booster 2 - Booster Pack"
+  },
+  {
+   "set": "DSK",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/dsk-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dsk-collector-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/557243",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/557243_in_1000x1000.jpg",
+   "product_name": "Duskmourn: House of Horror - Collector Booster Pack"
+  },
+  {
+   "set": "DSK",
+   "booster": "play",
+   "small": {
+    "src": "/packs/dsk-play-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dsk-play-480.webp",
+    "width": 253,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/557240",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/557240_in_1000x1000.jpg",
+   "product_name": "Duskmourn: House of Horror - Play Booster Pack"
+  },
+  {
+   "set": "FDN",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/fdn-collector-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fdn-collector-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/562121",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/562121_in_1000x1000.jpg",
+   "product_name": "Magic: The Gathering Foundations - Collector Booster Pack"
+  },
+  {
+   "set": "FDN",
+   "booster": "play",
+   "small": {
+    "src": "/packs/fdn-play-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fdn-play-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/562116",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/562116_in_1000x1000.jpg",
+   "product_name": "Magic: The Gathering Foundations - Play Booster Pack"
+  },
+  {
+   "set": "J25",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/j25-jumpstart-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/j25-jumpstart-480.webp",
+    "width": 252,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/562128",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/562128_in_1000x1000.jpg",
+   "product_name": "Magic: The Gathering Foundations - Jumpstart Booster Pack"
+  },
+  {
+   "set": "INR",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/inr-collector-160.webp",
+    "width": 88,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/inr-collector-480.webp",
+    "width": 265,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/594678",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/594678_in_1000x1000.jpg",
+   "product_name": "Innistrad Remastered - Collector Booster Pack"
+  },
+  {
+   "set": "INR",
+   "booster": "play",
+   "small": {
+    "src": "/packs/inr-play-160.webp",
+    "width": 88,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/inr-play-480.webp",
+    "width": 265,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/594669",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/594669_in_1000x1000.jpg",
+   "product_name": "Innistrad Remastered - Play Booster Pack"
+  },
+  {
+   "set": "DFT",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/dft-collector-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dft-collector-480.webp",
+    "width": 267,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/604252",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/604252_in_1000x1000.jpg",
+   "product_name": "Aetherdrift - Collector Booster Pack"
+  },
+  {
+   "set": "DFT",
+   "booster": "play",
+   "small": {
+    "src": "/packs/dft-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/dft-play-480.webp",
+    "width": 267,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/604249",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/604249_in_1000x1000.jpg",
+   "product_name": "Aetherdrift - Play Booster Pack"
+  },
+  {
+   "set": "TDM",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/tdm-collector-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tdm-collector-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/619648",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/619648_in_1000x1000.jpg",
+   "product_name": "Tarkir: Dragonstorm - Collector Booster Pack"
+  },
+  {
+   "set": "TDM",
+   "booster": "play",
+   "small": {
+    "src": "/packs/tdm-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tdm-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/619644",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/619644_in_1000x1000.jpg",
+   "product_name": "Tarkir: Dragonstorm - Play Booster Pack"
+  },
+  {
+   "set": "FIN",
+   "booster": "chocobo-bundle",
+   "small": {
+    "src": "/packs/fin-chocobo-bundle-160.webp",
+    "width": 261,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fin-chocobo-bundle-480.webp",
+    "width": 782,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/672958",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/672958_in_1000x1000.jpg",
+   "product_name": "FINAL FANTASY - Chocobo Booster Pack"
+  },
+  {
+   "set": "FIN",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/fin-collector-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fin-collector-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/618892",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/618892_in_1000x1000.jpg",
+   "product_name": "FINAL FANTASY - Collector Booster Pack"
+  },
+  {
+   "set": "FIN",
+   "booster": "play",
+   "small": {
+    "src": "/packs/fin-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fin-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/618889",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/618889_in_1000x1000.jpg",
+   "product_name": "FINAL FANTASY - Play Booster Pack"
+  },
+  {
+   "set": "EOE",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/eoe-collector-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eoe-collector-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/619696",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/619696_in_1000x1000.jpg",
+   "product_name": "Edge of Eternities - Collector Booster Pack"
+  },
+  {
+   "set": "EOE",
+   "booster": "play",
+   "small": {
+    "src": "/packs/eoe-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/eoe-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/619697",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/619697_in_1000x1000.jpg",
+   "product_name": "Edge of Eternities - Play Booster Pack"
+  },
+  {
+   "set": "SPM",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/spm-collector-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/spm-collector-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/621109",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/621109_in_1000x1000.jpg",
+   "product_name": "Marvel's Spider-Man - Collector Booster Pack"
+  },
+  {
+   "set": "SPM",
+   "booster": "play",
+   "small": {
+    "src": "/packs/spm-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/spm-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/621106",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/621106_in_1000x1000.jpg",
+   "product_name": "Marvel's Spider-Man - Play Booster Pack"
+  },
+  {
+   "set": "TLA",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/tla-collector-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tla-collector-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/648646",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/648646_in_1000x1000.jpg",
+   "product_name": "Avatar: The Last Airbender - Collector Booster Pack"
+  },
+  {
+   "set": "TLA",
+   "booster": "play",
+   "small": {
+    "src": "/packs/tla-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tla-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/648640",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/648640_in_1000x1000.jpg",
+   "product_name": "Avatar: The Last Airbender - Play Booster Pack"
+  },
+  {
+   "set": "TLE",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/tle-jumpstart-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tle-jumpstart-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/648675",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/648675_in_1000x1000.jpg",
+   "product_name": "Avatar: The Last Airbender - Jumpstart Booster Pack"
+  },
+  {
+   "set": "ECL",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/ecl-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ecl-collector-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/656318",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/656318_in_1000x1000.jpg",
+   "product_name": "Lorwyn Eclipsed - Collector Booster Pack"
+  },
+  {
+   "set": "ECL",
+   "booster": "play",
+   "small": {
+    "src": "/packs/ecl-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/ecl-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/656311",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/656311_in_1000x1000.jpg",
+   "product_name": "Lorwyn Eclipsed - Play Booster Pack"
+  },
+  {
+   "set": "TMT",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/tmt-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tmt-collector-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/657851",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/657851_in_1000x1000.jpg",
+   "product_name": "Teenage Mutant Ninja Turtles - Collector Booster Pack"
+  },
+  {
+   "set": "TMT",
+   "booster": "play",
+   "small": {
+    "src": "/packs/tmt-play-160.webp",
+    "width": 89,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/tmt-play-480.webp",
+    "width": 268,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/657848",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/657848_in_1000x1000.jpg",
+   "product_name": "Teenage Mutant Ninja Turtles - Play Booster Pack"
+  },
+  {
+   "set": "SOS",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/sos-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/sos-collector-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/675557",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/675557_in_1000x1000.jpg",
+   "product_name": "Secrets of Strixhaven - Collector Booster Pack"
+  },
+  {
+   "set": "SOS",
+   "booster": "play",
+   "small": {
+    "src": "/packs/sos-play-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/sos-play-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/675554",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/675554_in_1000x1000.jpg",
+   "product_name": "Secrets of Strixhaven - Play Booster Pack"
+  },
+  {
+   "set": "MSH",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/msh-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/msh-collector-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/675605",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/675605_in_1000x1000.jpg",
+   "product_name": "Marvel Super Heroes - Collector Booster Pack"
+  },
+  {
+   "set": "MSH",
+   "booster": "jumpstart",
+   "small": {
+    "src": "/packs/msh-jumpstart-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/msh-jumpstart-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/675622",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/675622_in_1000x1000.jpg",
+   "product_name": "Marvel Super Heroes - Jumpstart Booster Pack"
+  },
+  {
+   "set": "MSH",
+   "booster": "play",
+   "small": {
+    "src": "/packs/msh-play-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/msh-play-480.webp",
+    "width": 255,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/675602",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/675602_in_1000x1000.jpg",
+   "product_name": "Marvel Super Heroes - Play Booster Pack"
+  },
+  {
+   "set": "HOB",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/hob-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/hob-collector-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/692962",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/692962_in_1000x1000.jpg",
+   "product_name": "The Hobbit - Collector Booster Pack"
+  },
+  {
+   "set": "HOB",
+   "booster": "play",
+   "small": {
+    "src": "/packs/hob-play-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/hob-play-480.webp",
+    "width": 254,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/692959",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/692959_in_1000x1000.jpg",
+   "product_name": "The Hobbit - Play Booster Pack"
+  },
+  {
+   "set": "FRA",
+   "booster": "collector",
+   "small": {
+    "src": "/packs/fra-collector-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fra-collector-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/692982",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/692982_in_1000x1000.jpg",
+   "product_name": "Reality Fracture - Collector Booster"
+  },
+  {
+   "set": "FRA",
+   "booster": "play",
+   "small": {
+    "src": "/packs/fra-play-160.webp",
+    "width": 85,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/fra-play-480.webp",
+    "width": 256,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/692979",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/692979_in_1000x1000.jpg",
+   "product_name": "Reality Fracture - Play Booster"
+  },
+  {
+   "set": "MBC",
+   "booster": "draft",
+   "small": {
+    "src": "/packs/mbc-draft-160.webp",
+    "width": 300,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/mbc-draft-480.webp",
+    "width": 901,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/709720",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/709720_in_1000x1000.jpg",
+   "product_name": "Mystery Booster Commander Edition - Booster Pack"
+  }
+ ],
+ "generated": [
+  {
+   "set": "SUM",
+   "booster": "default",
+   "reason": "TCGplayer lists no pack of this product."
+  },
+  {
+   "set": "CSP",
+   "booster": "draft",
+   "reason": "TCGplayer's picture shows three packs fanned out, 200 pixels wide: too small to cut one from."
+  },
+  {
+   "set": "CON",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "ARB",
+   "booster": "draft",
+   "reason": "TCGplayer's picture of Alara Reborn - Booster Pack is missing."
+  },
+  {
+   "set": "ARB",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "M10",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "ZEN",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "WWK",
+   "booster": "draft",
+   "reason": "TCGplayer's picture of Worldwake - Booster Pack is missing."
+  },
+  {
+   "set": "WWK",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "ROE",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "M11",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "SOM",
+   "booster": "draft",
+   "reason": "TCGplayer's picture of Scars of Mirrodin - Booster Pack is the set's logo, not the pack."
+  },
+  {
+   "set": "SOM",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "MBS",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "NPH",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "M12",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "ISD",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "DKA",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "AVR",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "M13",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "RTR",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "GTC",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "DGM",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "M14",
+   "booster": "six",
+   "reason": "Six-card boosters came only inside other products; TCGplayer sells none alone."
+  },
+  {
+   "set": "ONE",
+   "booster": "compleat",
+   "reason": "TCGplayer's product is not a single pack (Phyrexia: All Will Be One - Compleat Bundle), and no pack was found."
+  },
+  {
+   "set": "BLB",
+   "booster": "value",
+   "reason": "TCGplayer lists no pack of this product."
+  },
+  {
+   "set": "SLZ",
+   "booster": "default",
+   "reason": "TCGplayer's picture of The Zeta Set is a promotional layout (the pack under a fan of cards, on a background), not the pack alone."
+  }
+ ],
+ "symbols": {
+  "10E": "/sets/10e.svg",
+  "2ED": "/sets/2ed.svg",
+  "2X2": "/sets/2x2.svg",
+  "2XM": "/sets/2xm.svg",
+  "30A": "/sets/30a.svg",
+  "3ED": "/sets/3ed.svg",
+  "4ED": "/sets/4ed.svg",
+  "5DN": "/sets/5dn.svg",
+  "5ED": "/sets/5ed.svg",
+  "6ED": "/sets/6ed.svg",
+  "7ED": "/sets/7ed.svg",
+  "8ED": "/sets/8ed.svg",
+  "9ED": "/sets/9ed.svg",
+  "A25": "/sets/a25.svg",
+  "ACR": "/sets/acr.svg",
+  "AER": "/sets/aer.svg",
+  "AFR": "/sets/afr.svg",
+  "AKH": "/sets/akh.svg",
+  "ALA": "/sets/ala.svg",
+  "ALL": "/sets/all.svg",
+  "APC": "/sets/apc.svg",
+  "ARB": "/sets/arb.svg",
+  "ARN": "/sets/arn.svg",
+  "ATQ": "/sets/atq.svg",
+  "AVR": "/sets/avr.svg",
+  "BBD": "/sets/bbd.svg",
+  "BFZ": "/sets/bfz.svg",
+  "BLB": "/sets/blb.svg",
+  "BNG": "/sets/bng.svg",
+  "BOK": "/sets/bok.svg",
+  "BRO": "/sets/bro.svg",
+  "CHK": "/sets/chk.svg",
+  "CHR": "/sets/chr.svg",
+  "CLB": "/sets/clb.svg",
+  "CLU": "/sets/clu.svg",
+  "CMM": "/sets/cmm.svg",
+  "CMR": "/sets/cmr.svg",
+  "CN2": "/sets/cn2.svg",
+  "CNS": "/sets/cns.svg",
+  "CON": "/sets/con_.svg",
+  "CSP": "/sets/csp.svg",
+  "DBL": "/sets/dbl.svg",
+  "DFT": "/sets/dft.svg",
+  "DGM": "/sets/dgm.svg",
+  "DIS": "/sets/dis.svg",
+  "DKA": "/sets/dka.svg",
+  "DMR": "/sets/dmr.svg",
+  "DMU": "/sets/dmu.svg",
+  "DOM": "/sets/dom.svg",
+  "DRK": "/sets/drk.svg",
+  "DSK": "/sets/dsk.svg",
+  "DST": "/sets/dst.svg",
+  "DTK": "/sets/dtk.svg",
+  "ECL": "/sets/ecl.svg",
+  "ELD": "/sets/eld.svg",
+  "EMA": "/sets/ema.svg",
+  "EMN": "/sets/emn.svg",
+  "EOE": "/sets/eoe.svg",
+  "EVE": "/sets/eve.svg",
+  "EXO": "/sets/exo.svg",
+  "FDN": "/sets/fdn.svg",
+  "FEM": "/sets/fem.svg",
+  "FIN": "/sets/fin.svg",
+  "FRA": "/sets/fra.svg",
+  "FRF": "/sets/frf.svg",
+  "FUT": "/sets/fut.svg",
+  "GPT": "/sets/gpt.svg",
+  "GRN": "/sets/grn.svg",
+  "GTC": "/sets/gtc.svg",
+  "HML": "/sets/hml.svg",
+  "HOB": "/sets/hob.svg",
+  "HOU": "/sets/hou.svg",
+  "ICE": "/sets/ice.svg",
+  "IKO": "/sets/iko.svg",
+  "IMA": "/sets/ima.svg",
+  "INR": "/sets/inr.svg",
+  "INV": "/sets/inv.svg",
+  "ISD": "/sets/isd.svg",
+  "J22": "/sets/j22.svg",
+  "J25": "/sets/j25.svg",
+  "JMP": "/sets/jmp.svg",
+  "JOU": "/sets/jou.svg",
+  "JUD": "/sets/jud.svg",
+  "KHM": "/sets/khm.svg",
+  "KLD": "/sets/kld.svg",
+  "KTK": "/sets/ktk.svg",
+  "LCI": "/sets/lci.svg",
+  "LEG": "/sets/leg.svg",
+  "LGN": "/sets/lgn.svg",
+  "LRW": "/sets/lrw.svg",
+  "LTR": "/sets/ltr.svg",
+  "M10": "/sets/m10.svg",
+  "M11": "/sets/m11.svg",
+  "M12": "/sets/m12.svg",
+  "M13": "/sets/m13.svg",
+  "M14": "/sets/m14.svg",
+  "M15": "/sets/m15.svg",
+  "M19": "/sets/m19.svg",
+  "M20": "/sets/m20.svg",
+  "M21": "/sets/m21.svg",
+  "MAT": "/sets/mat.svg",
+  "MB2": "/sets/mb2.svg",
+  "MBS": "/sets/mbs.svg",
+  "MH1": "/sets/mh1.svg",
+  "MH2": "/sets/mh2.svg",
+  "MH3": "/sets/mh3.svg",
+  "MID": "/sets/mid.svg",
+  "MIR": "/sets/mir.svg",
+  "MKM": "/sets/mkm.svg",
+  "MM2": "/sets/mm2.svg",
+  "MM3": "/sets/mm3.svg",
+  "MMA": "/sets/mma.svg",
+  "MMQ": "/sets/mmq.svg",
+  "MOM": "/sets/mom.svg",
+  "MOR": "/sets/mor.svg",
+  "MRD": "/sets/mrd.svg",
+  "MSH": "/sets/msh.svg",
+  "NEM": "/sets/nem.svg",
+  "NEO": "/sets/neo.svg",
+  "NPH": "/sets/nph.svg",
+  "ODY": "/sets/ody.svg",
+  "OGW": "/sets/ogw.svg",
+  "ONE": "/sets/one.svg",
+  "ONS": "/sets/ons.svg",
+  "ORI": "/sets/ori.svg",
+  "OTJ": "/sets/otj.svg",
+  "P02": "/sets/p02.svg",
+  "PCY": "/sets/pcy.svg",
+  "PIP": "/sets/pip.svg",
+  "PLC": "/sets/plc.svg",
+  "PLS": "/sets/pls.svg",
+  "POR": "/sets/por.svg",
+  "PTK": "/sets/ptk.svg",
+  "RAV": "/sets/rav.svg",
+  "RIX": "/sets/rix.svg",
+  "RNA": "/sets/rna.svg",
+  "ROE": "/sets/roe.svg",
+  "RTR": "/sets/rtr.svg",
+  "RVR": "/sets/rvr.svg",
+  "S99": "/sets/s99.svg",
+  "SCG": "/sets/scg.svg",
+  "SHM": "/sets/shm.svg",
+  "SLZ": "/sets/slz.svg",
+  "SNC": "/sets/snc.svg",
+  "SOI": "/sets/soi.svg",
+  "SOK": "/sets/sok.svg",
+  "SOM": "/sets/som.svg",
+  "SOS": "/sets/sos.svg",
+  "SPM": "/sets/spm.svg",
+  "STH": "/sets/sth.svg",
+  "STX": "/sets/stx.svg",
+  "SUM": "/sets/sum.svg",
+  "TDM": "/sets/tdm.svg",
+  "THB": "/sets/thb.svg",
+  "THS": "/sets/ths.svg",
+  "TLA": "/sets/tla.svg",
+  "TLE": "/sets/tle.svg",
+  "TMP": "/sets/tmp.svg",
+  "TMT": "/sets/tmt.svg",
+  "TOR": "/sets/tor.svg",
+  "TSP": "/sets/tsp.svg",
+  "TSR": "/sets/tsr.svg",
+  "UDS": "/sets/uds.svg",
+  "UGL": "/sets/ugl.svg",
+  "ULG": "/sets/ulg.svg",
+  "UMA": "/sets/uma.svg",
+  "UNF": "/sets/unf.svg",
+  "UNH": "/sets/unh.svg",
+  "USG": "/sets/usg.svg",
+  "UST": "/sets/ust.svg",
+  "VIS": "/sets/vis.svg",
+  "VOW": "/sets/vow.svg",
+  "WAR": "/sets/war.svg",
+  "WHO": "/sets/who.svg",
+  "WOE": "/sets/woe.svg",
+  "WTH": "/sets/wth.svg",
+  "WWK": "/sets/wwk.svg",
+  "XLN": "/sets/xln.svg",
+  "ZEN": "/sets/zen.svg",
+  "ZNR": "/sets/znr.svg"
+ }
+}

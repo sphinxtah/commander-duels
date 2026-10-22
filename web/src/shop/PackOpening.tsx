@@ -12,6 +12,8 @@ import { printingImage } from "../catalog/catalog";
 import { getSoundEngine } from "../game/sound/engine";
 import type { Cue } from "../game/sound/recipes";
 import shell from "../App.module.css";
+import { LengBackdrop } from "./Leng";
+import { PackArt } from "./PackArt";
 import {
   describeCard,
   glowOf,
@@ -27,7 +29,8 @@ import styles from "./shop.module.css";
 // rarity's color and foils shimmer, each with its generated sound; "Reveal all" turns the rest.
 // A summary follows, with new cards marked and each card's details a click away. The server drew
 // the pack before any of this: the show only reveals it. With reduced motion every step is
-// immediate and nothing moves.
+// immediate and nothing moves. Since v0.4.3 the pack is the product's own picture (PackArt), whose
+// top strip tears off, and Leng's counter shows dimly behind it all.
 
 /** How long each step takes, in ms, when motion is allowed. */
 export const TIMING = { tear: 650, deal: 70, settle: 300, revealAll: 140 };
@@ -227,6 +230,7 @@ export function PackOpening({
         aria-labelledby="opening-summary-title"
         data-stage="summary"
       >
+        <LengBackdrop />
         <span className={shell.eyebrow}>PACK OPENED</span>
         <h2 id="opening-summary-title" ref={heading} tabIndex={-1}>
           {title}
@@ -309,6 +313,7 @@ export function PackOpening({
       aria-labelledby="opening-title"
       data-stage={stage}
     >
+      <LengBackdrop />
       <span className={shell.eyebrow}>OPENING A PACK</span>
       <h2 id="opening-title">{title}</h2>
       {stage === "sealed" || stage === "tearing" ? (
@@ -320,11 +325,12 @@ export function PackOpening({
             onClick={stage === "sealed" ? tear : undefined}
             aria-label={`Tear open the ${title}`}
           >
-            <span className={styles.packTop} aria-hidden="true" />
+            {/* The same picture twice: the strip that tears off, and the rest of the pack. */}
+            <span className={styles.packTop} aria-hidden="true">
+              <PackArt product={opening.product} size="large" height={20} />
+            </span>
             <span className={styles.packBody} aria-hidden="true">
-              <small>{opening.product.set_code}</small>
-              <strong>{opening.product.set_name}</strong>
-              <span>{kindLabels[opening.product.kind]}</span>
+              <PackArt product={opening.product} size="large" height={20} />
             </span>
           </button>
           <p className={styles.note}>

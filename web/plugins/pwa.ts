@@ -21,8 +21,17 @@ export interface BuiltFile {
 // sizes, about 11 MB) load when a screen shows one, and the HTTP cache keeps them; precaching them
 // would make every install and every update fetch them all. The public pages (v0.4.1: About,
 // Privacy and Terms) are not the app, and the worker never answers for them (src/pwa/swRules.ts).
-// The setup wizard's screenshots (v0.4.2) show once, to a new account.
-const NOT_PRECACHED = ["portraits/", "pages/", "welcome/"];
+// The setup wizard's screenshots (v0.4.2) show once, to a new account. The shop's pack pictures
+// (v0.4.3: 365 packs in two sizes, about 10 MB), its set symbols and Leng's painting load when the
+// shop shows them, as the portraits do.
+const NOT_PRECACHED = [
+  "portraits/",
+  "pages/",
+  "welcome/",
+  "packs/",
+  "sets/",
+  "shop/",
+];
 
 /**
  * "/" and every file by its URL, sorted: every chunk (lazy ones too), asset and public file,
