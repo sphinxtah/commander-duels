@@ -842,7 +842,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.4.2",
+            "default": "0.4.3",
             "title": "Version",
             "type": "string"
           }
@@ -3725,7 +3725,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.4.2",
+            "default": "0.4.3",
             "title": "Version",
             "type": "string"
           }
@@ -7774,7 +7774,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.4.2"
+    "version": "0.4.3"
   },
   "openapi": "3.1.0",
   "paths": {
