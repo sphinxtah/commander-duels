@@ -21,9 +21,7 @@
 }
 .dialog h2 {
   margin: 0 32px 14px 0;
-  font:
-    1.4rem Georgia,
-    serif;
+  font: 600 1.4rem var(--cd-display);
 }
 .close {
   position: absolute;
@@ -147,12 +145,17 @@
   cursor: pointer;
 }
 .primary {
-  background: #d5b77c;
+  background: var(--cd-gold-fill);
   border: 1px solid #e0c58f;
   color: #192220;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
 }
 .primary:hover:not(:disabled) {
-  background: #e6cc99;
+  background: var(--cd-gold-fill);
+  filter: brightness(1.08);
 }
 .secondary,
 .choose {

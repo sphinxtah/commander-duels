@@ -38,6 +38,8 @@ test.describe("Report a problem", () => {
     await page.goto("/#settings");
     const summary = `The journey's report ${Date.now()}`;
 
+    // In the account's menu, on every page (v0.4.5).
+    await page.getByRole("button", { name: /^Your account/ }).click();
     await page.getByRole("button", { name: "Report a problem" }).click();
     // Named by its heading, which becomes the thanks once the report is sent.
     const dialog = page.getByRole("dialog");
@@ -69,14 +71,16 @@ test.describe("Report a problem", () => {
     await dialog.getByRole("button", { name: "Done" }).click();
     await expect(dialog).toBeHidden();
 
-    // Counted on Admin and in the tab's title once the page asks again.
+    // Counted on the account's menu and in the tab's title once the page asks again.
     await page.goto("/#admin");
     await page.reload();
+    await page
+      .getByRole("button", { name: /^Your account: .*unread reports?$/ })
+      .click();
     await expect(
-      page
-        .getByRole("navigation")
-        .getByRole("link", { name: /^Admin, .*unread reports?$/ }),
+      page.getByRole("link", { name: /^Administration, .*unread reports?$/ }),
     ).toBeVisible();
+    await page.keyboard.press("Escape");
     await expect(page).toHaveTitle(/^\(\d+\) Commander Duels$/);
     await page.getByRole("tab", { name: /^Reports/ }).click();
     const item = page.getByRole("listitem", { name: summary });

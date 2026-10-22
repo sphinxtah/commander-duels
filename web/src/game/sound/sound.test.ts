@@ -517,6 +517,9 @@ describe("the sound recipes", () => {
     ["rareReveal", 800, 0.3],
     ["mythicReveal", 1200, 0.32],
     ["foilShimmer", 700, 0.16],
+    ["menuHover", 60, 0.08],
+    ["menuSelect", 420, 0.22],
+    ["menuBack", 360, 0.2],
   ])("%s lasts %s ms at gain %s, every part inside it", (cue, ms, gain) => {
     const recipe = RECIPES[cue];
     expect(recipe).toMatchObject({ ms, gain });
@@ -526,8 +529,8 @@ describe("the sound recipes", () => {
       ).toBeLessThanOrEqual(ms);
   });
 
-  it("has nineteen cues for the table and six for opening packs, and a falling counter", () => {
-    expect(CUES).toHaveLength(25);
+  it("has nineteen cues for the table, six for opening packs and three for the menus, and a falling counter", () => {
+    expect(CUES).toHaveLength(28);
     expect(RECIPES.counter.parts).toMatchObject([{ hz: 1320 }]);
     expect(RECIPES.counter.low).toMatchObject([{ hz: 660 }]);
   });

@@ -254,6 +254,16 @@ beforeEach(() => {
     }),
   );
   on("GET /api/v1/me/blocks", () => reply(200, []));
+  // The top bar's tokens, and what the main menu's tiles count (v0.4.5).
+  on("GET /api/v1/me/tokens", () =>
+    reply(200, { balance: 12450, earned: 0, given: 0, spent: 0, entries: [] }),
+  );
+  on("GET /api/v1/games", () => reply(200, []));
+  on("GET /api/v1/tables", () => reply(200, []));
+  on("GET /api/v1/decks", () => reply(200, []));
+  on("GET /api/v1/friends", () =>
+    reply(200, { friends: [], incoming: [], outgoing: [] }),
+  );
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -404,7 +414,9 @@ describe("the landing page", () => {
       name: "Make yourself at home.",
     });
     expect(window.location.hash).toBe("#settings");
-    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Main navigation" }),
+    ).toBeInTheDocument();
     // Focus lands on the page's heading, as after following a link.
     expect(document.activeElement).toBe(heading);
   });
@@ -489,7 +501,9 @@ describe("the landing page", () => {
       await screen.findByRole("heading", { name: "Keep the table running." }),
     ).toBeInTheDocument();
     expect(window.location.hash).toBe("#admin");
-    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Main navigation" }),
+    ).toBeInTheDocument();
     expect(fetches).toHaveBeenCalledWith(
       "/api/v1/sysop/login",
       expect.objectContaining({ method: "POST" }),
@@ -569,7 +583,9 @@ describe("an account that is not active", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
     await screen.findByRole("heading", { name: "Welcome to the table." });
     expect(window.location.hash).toBe("#profile");
-    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    expect(
+      screen.getByRole("navigation", { name: "Main navigation" }),
+    ).toBeInTheDocument();
     // The setup wizard opens on the approved account (v0.4.2), with focus on its welcome.
     const welcome = await screen.findByRole("heading", {
       name: "Welcome to Commander Duels",
@@ -821,7 +837,9 @@ describe("the account", () => {
       screen.getByRole("heading", { name: "Welcome back, Alice." }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Display name")).toHaveValue("Alice the Bold");
-    expect(screen.getByText("Signed in")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Your account: alice" }),
+    ).toBeInTheDocument();
 
     act(() => void window.dispatchEvent(new Event("online")));
     const signIn = await screen.findByRole("heading", { name: "Sign in" });
@@ -906,10 +924,10 @@ describe("a new account's setup (v0.4.2)", () => {
     expect(screen.getByRole("main")).toHaveTextContent(
       "Your game is not set up yet: choose the name other players see, and claim two free starter decks.",
     );
-    // So does the sidebar, where the handle would be.
+    // So does the account's corner of the top bar, where the handle would be.
     expect(
-      screen.getByRole("link", { name: /Alice\s*Choose your handle/ }),
-    ).toHaveAttribute("href", "#profile");
+      screen.getByRole("button", { name: "Your account: Alice" }),
+    ).toHaveTextContent("Choose your handle");
 
     // The notice opens it at the account's own step.
     fireEvent.click(screen.getByRole("button", { name: /Continue setup/ }));
@@ -941,8 +959,8 @@ describe("a new account's setup (v0.4.2)", () => {
       "Two free starter decks are waiting for you to claim them.",
     );
     expect(
-      screen.getByRole("link", { name: /alice\s*Choose your starter decks/ }),
-    ).toHaveAttribute("href", "#profile");
+      screen.getByRole("button", { name: "Your account: alice" }),
+    ).toHaveTextContent("Choose your starter decks");
 
     window.location.hash = "#profile";
     expect(
@@ -961,7 +979,7 @@ describe("a new account's setup (v0.4.2)", () => {
   });
 });
 
-describe("the sidebar's picture (v0.3.1)", () => {
+describe("the account's picture (v0.3.1)", () => {
   it("is the alliance's portrait, never cropped, and the avatar without one", async () => {
     on(
       "GET /api/v1/me",
@@ -970,8 +988,8 @@ describe("the sidebar's picture (v0.3.1)", () => {
     );
     window.location.hash = "#settings";
     const { unmount } = render(<App />);
-    const allied = await screen.findByRole("link", {
-      name: /^alice\s*Signed in$/,
+    const allied = await screen.findByRole("button", {
+      name: "Your account: alice",
     });
     // A thumbnail: the 128 px file alone, decorative beside the handle.
     const portrait = allied.querySelector("img")!;
@@ -981,16 +999,16 @@ describe("the sidebar's picture (v0.3.1)", () => {
     unmount();
 
     render(<App />);
-    const plain = await screen.findByRole("link", {
-      name: /^alice\s*Signed in$/,
+    const plain = await screen.findByRole("button", {
+      name: "Your account: alice",
     });
     expect(plain.querySelector("img")).toBeNull();
     expect(plain).toHaveTextContent("◇");
   });
 });
 
-describe("release status", () => {
-  it("Settings shows each capability's own availability", async () => {
+describe("what this version offers", () => {
+  it("Settings shows each capability's own availability, with no milestones or test-build words", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
     window.location.hash = "#settings";
     render(<App />);
@@ -998,20 +1016,29 @@ describe("release status", () => {
     expect(google).toHaveTextContent("Available");
     expect(google).not.toHaveTextContent("M1");
     const decks = screen.getByText("Deck builder").closest("li")!;
-    expect(decks).toHaveTextContent("M1");
+    expect(decks).toHaveTextContent("Coming later");
+    expect(decks).not.toHaveTextContent("M1");
     expect(decks).not.toHaveTextContent("Available");
-    expect(screen.getByText(/TESTING PREVIEW/)).toBeInTheDocument();
-    expect(screen.queryByText(/remain unavailable/)).toBeNull();
+    expect(
+      screen.getByRole("heading", {
+        name: `In this version v${__APP_VERSION__}`,
+      }),
+    ).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/testing/i);
     expect(screen.queryByText(/FRAMEWORK/)).toBeNull();
   });
 
-  it("the Play page says practice games are playable; only Two-Headed Giant is planned", async () => {
+  it("the Play page opens Commander and Legacy, and shows Two-Headed Giant as coming soon", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
+    window.location.hash = "#play";
     render(<App />);
     await screen.findByRole("heading", { name: "Commander" });
-    expect(screen.getByText("TESTING PREVIEW")).toBeInTheDocument();
-    expect(screen.queryByText("IN DEVELOPMENT")).toBeNull();
-    expect(screen.queryByText(/gameplay will arrive/)).toBeNull();
+    expect(document.body).not.toHaveTextContent(/testing preview|planned/i);
+    const card = (id: Format["id"]) =>
+      document.querySelector<HTMLElement>(`[data-format="${id}"]`)!;
+    expect(card("commander")).toHaveTextContent("Open to play");
+    expect(card("legacy")).toHaveTextContent("Open to play");
+    expect(card("two_headed_giant")).toHaveTextContent("Coming soon");
 
     // The format's dialog; the page's other one is Report a problem's (v0.4.1).
     const dialog = document.querySelector(
@@ -1023,14 +1050,99 @@ describe("release status", () => {
       ).getByRole("button");
     fireEvent.click(about("commander"));
     await waitFor(() => expect(dialog).toHaveTextContent("Commander"));
-    expect(dialog).toHaveTextContent("OPEN FOR PRACTICE");
-    expect(dialog).not.toHaveTextContent(/planned/i);
+    expect(dialog).toHaveTextContent("OPEN TO PLAY");
     fireEvent.click(about("legacy"));
     await waitFor(() => expect(dialog).toHaveTextContent("Legacy"));
-    expect(dialog).not.toHaveTextContent(/planned/i);
+    expect(dialog).toHaveTextContent("OPEN TO PLAY");
     fireEvent.click(about("two_headed_giant"));
-    await waitFor(() => expect(dialog).toHaveTextContent("PLANNED FORMAT"));
-    expect(dialog).toHaveTextContent("4 seats supported in the planned format");
+    await waitFor(() => expect(dialog).toHaveTextContent("COMING SOON"));
+    expect(dialog).toHaveTextContent("4 seats. Default table: 4 players.");
+    expect(dialog).toHaveTextContent("Two-Headed Giant is coming soon.");
+    expect(dialog).not.toHaveTextContent(/planned/i);
+  });
+});
+
+describe("the main menu (v0.4.5)", () => {
+  it("opens first, greets the account and leads to every part of the game", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    on("GET /api/v1/decks", () =>
+      reply(200, [
+        { archived: false, deleted_at: null },
+        { archived: true, deleted_at: null },
+      ]),
+    );
+    on("GET /api/v1/tables", () =>
+      reply(200, [
+        { status: "open" },
+        { status: "open" },
+        { status: "started" },
+      ]),
+    );
+    on("GET /api/v1/games", () =>
+      reply(200, [{ id: gameId, status: "active" }]),
+    );
+    window.location.hash = "";
+    render(<App />);
+    const heading = await screen.findByRole("heading", {
+      name: "Welcome back, alice",
+    });
+    expect(heading.tagName).toBe("H1");
+    const menu = screen.getByRole("region", { name: "Main menu" });
+    await waitFor(() =>
+      expect(within(menu).getByRole("link", { name: /^Play/ })).toHaveAttribute(
+        "href",
+        `#game/${gameId}`,
+      ),
+    );
+    expect(
+      within(menu).getByRole("link", { name: /^Tables/ }),
+    ).toHaveTextContent("2 open tables");
+    expect(
+      within(menu).getByRole("link", { name: /^Decks/ }),
+    ).toHaveTextContent("1 deck");
+    for (const [name, href] of [
+      ["Leng's Card Shop", "#shop"],
+      ["Cards", "#cards"],
+      ["Friends", "#friends"],
+    ])
+      expect(
+        within(menu).getByRole("link", { name: new RegExp(`^${name}`) }),
+      ).toHaveAttribute("href", href);
+    // The top bar: the six pages and the tokens; no title band on the main menu itself.
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(
+      within(nav)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Home", "Play", "Tables", "Decks", "Cards", "Shop"]);
+    expect(within(nav).getByRole("link", { name: "Home" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      await screen.findByRole("link", { name: "12,450 tokens" }),
+    ).toHaveAttribute("href", "#shop");
+    expect(screen.queryByRole("link", { name: "Main menu" })).toBeNull();
+  });
+
+  it("sends Campaign, Learn and Collection's old addresses to the main menu, and every other page has a way back", async () => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    for (const old of ["#campaign", "#learn", "#collection"]) {
+      window.location.hash = old;
+      const shown = render(<App />);
+      await screen.findByRole("heading", { name: "Welcome back, alice" });
+      expect(document.body).not.toHaveTextContent(
+        /Campaign|Learn\b|Collection|on the horizon|NOT AVAILABLE/,
+      );
+      shown.unmount();
+    }
+    window.location.hash = "#settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    expect(screen.getByRole("link", { name: "Main menu" })).toHaveAttribute(
+      "href",
+      "#home",
+    );
   });
 });
 
@@ -1040,8 +1152,9 @@ describe("the install banner", () => {
     // As main.tsx does: the offer can come before any banner is drawn.
     initInstall();
     on("GET /api/v1/me", () => reply(200, alice));
+    window.location.hash = "#home";
     let shown = render(<App />);
-    await screen.findByText("Signed in");
+    await screen.findByRole("button", { name: "Your account: alice" });
     expect(
       screen.queryByRole("region", { name: "Install the app" }),
     ).toBeNull();
@@ -1072,7 +1185,7 @@ describe("the install banner", () => {
     );
     // The workspace's first child, before the top bar.
     expect(banner.nextElementSibling?.tagName).toBe("HEADER");
-    // The owner's art on the page stays the sidebar mark and the banner image.
+    // The owner's art on the main menu: the top bar's mark, and the mark where an ally stands.
     expect(document.querySelectorAll('img[src^="/brand/"]')).toHaveLength(2);
     // The banner listens to the install offer from an effect, which can run a moment after the
     // banner is drawn: pressed before then, Not now would change an offer nobody listens to yet.
@@ -1104,7 +1217,7 @@ describe("what waits for Administration (v0.4.1)", () => {
     document.title = "";
   });
 
-  it("is counted on Admin in the navigation and in the tab's title", async () => {
+  it("is counted on the account's menu, on Administration in it, and in the tab's title", async () => {
     document.title = "Commander Duels";
     on("GET /api/v1/me", () => reply(200, administrator));
     on(
@@ -1114,18 +1227,25 @@ describe("what waits for Administration (v0.4.1)", () => {
     );
     window.location.hash = "#settings";
     render(<App />);
-    const link = await screen.findByRole("link", {
-      name: "Admin, 2 accounts waiting for approval, 1 unread report",
+    const account = await screen.findByRole("button", {
+      name: "Your account: alice, 2 accounts waiting for approval, 1 unread report",
     });
-    expect(within(link).getByText("3")).toHaveAttribute("aria-hidden", "true");
+    expect(within(account).getByText("3")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+    fireEvent.click(account);
+    expect(
+      screen.getByRole("link", {
+        name: "Administration, 2 accounts waiting for approval, 1 unread report",
+      }),
+    ).toHaveAttribute("href", "#admin");
     expect(document.title).toBe("(3) Commander Duels");
     // Asked again when the window regains focus: nothing waits now.
     act(() => void window.dispatchEvent(new Event("focus")));
     await waitFor(() =>
       expect(
-        within(screen.getByRole("navigation")).getByRole("link", {
-          name: "Admin",
-        }),
+        screen.getByRole("link", { name: "Administration" }),
       ).toBeInTheDocument(),
     );
     expect(document.title).toBe("Commander Duels");
@@ -1136,9 +1256,15 @@ describe("what waits for Administration (v0.4.1)", () => {
     window.location.hash = "#settings";
     render(<App />);
     await screen.findByRole("heading", { name: "Make yourself at home." });
+    // In the account's menu, on every page.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Your account: alice" }),
+    );
+    expect(screen.queryByRole("link", { name: "Administration" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Report a problem" }));
     expect(
-      screen.getByRole("button", { name: "Report a problem" }),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "Your account: alice" }),
+    ).toHaveAttribute("aria-expanded", "false");
     await settle();
     expect(count("GET /api/v1/admin/counts")).toBe(0);
   });

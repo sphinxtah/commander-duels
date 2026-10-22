@@ -51,7 +51,7 @@ CAPABILITIES = [
         name="Card catalog",
         available=True,
         milestone="M1",
-        reason="Scryfall's cards, imported daily; each says whether the game engine can play it.",
+        reason="Scryfall's cards, imported daily: every card the game engine can play.",
     ),
     Capability(
         id="decks",
@@ -84,12 +84,6 @@ CAPABILITIES = [
         milestone="M4",
         reason="Tokens from wins buy booster packs from Revised to the current set, with real "
         "pull ratios; their cards join your library for good (v0.4.0).",
-    ),
-    Capability(
-        id="campaign",
-        name="Campaign and lessons",
-        milestone="M4",
-        reason="Reference audit and authorized scenario content are outstanding.",
     ),
     Capability(
         id="offline",

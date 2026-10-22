@@ -5,33 +5,24 @@ import {
   useRef,
   useState,
 } from "react";
-import { Account, SignIn, Waiting, avatars } from "./Account";
-import { Admin, SysopSignIn, canAdminister } from "./Admin";
-import {
-  countsTotal,
-  countsWords,
-  useAdminCounts,
-  useCountTitle,
-} from "./admin/counts";
-import { Portrait } from "./alliance/Portrait";
+import { Account, SignIn, Waiting } from "./Account";
+import { Admin, SysopSignIn } from "./Admin";
+import { useAdminCounts, useCountTitle, countsTotal } from "./admin/counts";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { InstallBanner } from "./app/InstallBanner";
 import { Landing } from "./app/Landing";
 import { guardLiveGame } from "./app/liveGame";
 import { useOnline } from "./app/online";
-import { ReportButton } from "./app/ReportProblem";
 import { SetupWizard } from "./app/SetupWizard";
 import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { SiteLinks } from "./app/SiteLinks";
-import { UpdateNotice } from "./app/UpdateNotice";
 import { ChatContext, MESSAGES_ROUTE, useChat } from "./chat/chat";
 import { ChatDock } from "./chat/ChatDock";
 import { MessagesPage } from "./chat/MessagesPage";
 import { FriendsPage } from "./social/FriendsPage";
-import { NotificationBell, NotificationsPage } from "./social/Notifications";
+import { NotificationsPage } from "./social/Notifications";
 import { PlayerPage } from "./social/PlayerPage";
-import { PlayerSearch } from "./social/PlayerSearch";
 import { useSocial } from "./social/presence";
 import { PLAYER_ROUTE } from "./social/social";
 import {
@@ -45,7 +36,6 @@ import {
   type Bootstrap,
   type Format,
   type Me,
-  type PracticeFormat,
 } from "./api";
 import { CardsPage } from "./catalog/CardsPage";
 import { DeckEditor } from "./decks/DeckEditor";
@@ -53,8 +43,13 @@ import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
 import { GameScreen } from "./game/GameScreen";
-import { PracticeTable } from "./game/PracticeTable";
 import { TablesPage } from "./tables/TablesPage";
+import { HomeHub } from "./shell/HomeHub";
+import { useHud } from "./shell/hud";
+import { PageBand } from "./shell/PageBand";
+import { pages, type Page } from "./shell/pages";
+import { PlayPage } from "./shell/PlayPage";
+import { PhoneBar, TopBar } from "./shell/TopBar";
 import {
   readPreferences,
   savePreferences,
@@ -62,90 +57,6 @@ import {
 } from "./preferences";
 import styles from "./App.module.css";
 
-const pages = [
-  "Play",
-  "Tables",
-  "Friends",
-  "Messages",
-  "Campaign",
-  "Learn",
-  "Decks",
-  "Cards",
-  "Shop",
-  "Collection",
-  "Profile",
-  "Settings",
-  "Admin",
-] as const;
-// SysOp's entrance has no navigation entry; it opens only from the SysOp networks. The
-// notifications' history (v0.4.3) opens from the bell.
-type Page = (typeof pages)[number] | "SysOp" | "Notifications";
-const glyphs = [
-  "◇",
-  "⚔",
-  "◎",
-  "✉",
-  "▱",
-  "✧",
-  "▤",
-  "▦",
-  "⬡",
-  "◈",
-  "○",
-  "⚙",
-  "⚖",
-];
-const details: Record<
-  Exclude<
-    Page,
-    | "Play"
-    | "Tables"
-    | "Friends"
-    | "Messages"
-    | "Notifications"
-    | "Settings"
-    | "Profile"
-    | "Admin"
-    | "SysOp"
-    | "Decks"
-    | "Cards"
-    | "Shop"
-  >,
-  { title: string; description: string; next: string; milestone: string }
-> = {
-  Campaign: {
-    title: "Every journey starts at the table.",
-    description: "Stories, encounters, and challenges will live here.",
-    next: "The reference campaign audit and scenario authoring come first.",
-    milestone: "M4 · Campaign & progression",
-  },
-  Learn: {
-    title: "Make your next move with confidence.",
-    description:
-      "Guided lessons will introduce resources, combat, priority, and Commander.",
-    next: "Interactive lessons need the rules adapter and validated scenarios.",
-    milestone: "M4 · Tutorials & lessons",
-  },
-  Collection: {
-    title: "Room for every possibility.",
-    description:
-      "The default collection will include every legal, certified card.",
-    next: "Collection browsing follows the catalog. Optional earned progression arrives later.",
-    milestone: "M1 / M4 · Collection policies",
-  },
-};
-// Practice games against the bots cover these; a format that is neither one of them nor marked
-// available by the server is still planned. Keyed by the API's practice formats, so a new one
-// fails the type check until it is listed here.
-const practiceFormats: Record<PracticeFormat["id"], true> = {
-  commander: true,
-  legacy: true,
-};
-function plannedFormat(format: Format | undefined): boolean {
-  return Boolean(
-    format && !format.available && !(format.id in practiceFormats),
-  );
-}
 const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
 const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
 const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
@@ -190,7 +101,10 @@ function currentPage(): Page {
   if (path.startsWith("messages/")) return "Messages";
   if (path.startsWith("tables/")) return "Tables";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
-  return pages.find((page) => page.toLowerCase() === path) ?? "Play";
+  // The Play page's own anchors: its practice table and its formats.
+  if (path === "practice" || path === "formats") return "Play";
+  // Any other address, Campaign, Learn and Collection's old ones included, is the main menu.
+  return pages.find((page) => page.toLowerCase() === path) ?? "Home";
 }
 
 export function App() {
@@ -209,7 +123,6 @@ export function App() {
   const online = useOnline();
   const [preferences, setPreferences] = useState(readPreferences);
   const [saveMessage, setSaveMessage] = useState("");
-  const [selected, setSelected] = useState<Format>();
   // undefined while loading, null when signed out.
   const [me, setMe] = useState<Me | null>();
   // Only an active account sees the app; everyone else, the landing page (v0.3.0).
@@ -218,7 +131,6 @@ export function App() {
   const [notice, setNotice] = useState("");
   // Whether #sysop is SysOp's entrance here: undefined until the server answers.
   const [entrance, setEntrance] = useState<boolean>();
-  const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
   // The setup wizard (v0.4.2) and where it opens. It opens by itself once each time the site opens
@@ -289,7 +201,7 @@ export function App() {
   useEffect(() => {
     const change = (event: HashChangeEvent) => {
       // A live game keeps its address unless an in-game link meant to leave (v0.3.0): the
-      // browser's Back, or the installed app opening #play in this window, changes nothing.
+      // browser's Back, or the installed app opening #home in this window, changes nothing.
       if (guardLiveGame(event.oldURL)) return;
       if (GAME_ROUTE.test(hashOf(event.oldURL)) && !currentGame()) {
         // Leaving the table: its full screen ends, and the update the game screen said was
@@ -337,9 +249,16 @@ export function App() {
     }
   }, [view, game, atTable]);
   useLayoutEffect(() => {
-    // Leaving a game also lands on a page (usually Play, whose state never changed), so focus
-    // follows the game route too; the game screen focuses its own heading.
-    if (navigated.current && !atTable) heading.current?.focus();
+    // Leaving a game also lands on a page (usually the main menu, whose state never changed), so
+    // focus follows the game route too; the game screen focuses its own heading. A new page opens
+    // at its top, under the top bar (v0.4.5), however far down the last one was read.
+    if (!navigated.current || atTable) return;
+    // At once, not with the page's smooth scrolling meant for its own anchors.
+    const root = document.documentElement;
+    root.style.scrollBehavior = "auto";
+    root.scrollTop = 0;
+    root.style.scrollBehavior = "";
+    heading.current?.focus({ preventScroll: true });
   }, [page, atTable]);
   useEffect(() => {
     // Either change is a reason to ask the service again.
@@ -398,9 +317,6 @@ export function App() {
     );
   }, [preferences]);
   useEffect(() => {
-    if (selected) dialog.current?.showModal();
-  }, [selected]);
-  useEffect(() => {
     if (page !== "SysOp") return;
     let active = true;
     // A check that has not answered in time counts as off the network, so #sysop never stays
@@ -416,7 +332,9 @@ export function App() {
     };
   }, [page]);
   // Off the SysOp networks, #sysop is indistinguishable from any unknown address.
-  const shown: Page = page === "SysOp" && !entrance ? "Play" : page;
+  const shown: Page = page === "SysOp" && !entrance ? "Home" : page;
+  // The top bar's tokens and tier (v0.4.5), asked again on every change of page.
+  const hud = useHud(me, atTable ? "table" : shown);
   const changeMe = useCallback((value: Me | null) => {
     setMe(value);
     if (value) setNotice("");
@@ -518,141 +436,49 @@ export function App() {
           className={styles.skip}
           href="#main"
           onClick={(event) => {
-            // The hash is the router: following #main would leave this page for Play.
+            // The hash is the router: following #main would leave this page for the main menu.
             event.preventDefault();
             document.getElementById("main")?.focus();
           }}
         >
           Skip to content
         </a>
-        <aside className={styles.sidebar}>
-          <a
-            href="#play"
-            className={styles.brand}
-            aria-label="Commander Duels home"
-          >
-            <img src="/brand/mark.webp" alt="" width={48} height={48} />
-            <span>
-              COMMANDER<strong>DUELS</strong>
-            </span>
-          </a>
-          <div className={styles.navLabel}>YOUR TABLE</div>
-          <nav aria-label="Main navigation">
-            {pages
-              .filter((item) => item !== "Admin" || canAdminister(me))
-              .map((item) => (
-                <a
-                  key={item}
-                  href={`#${item.toLowerCase()}`}
-                  aria-current={shown === item ? "page" : undefined}
-                  className={shown === item ? styles.active : ""}
-                  aria-label={
-                    item === "Admin" && waiting > 0
-                      ? `Admin, ${countsWords(counts)}`
-                      : item === "Messages" && chat.unread > 0
-                        ? `Messages, ${chat.unread} unread`
-                        : undefined
-                  }
-                >
-                  <span aria-hidden="true">{glyphs[pages.indexOf(item)]}</span>
-                  {item}
-                  {item === "Play" && (
-                    <span className={styles.navArrow} aria-hidden="true">
-                      ↗
-                    </span>
-                  )}
-                  {item === "Admin" && waiting > 0 && (
-                    <span className={styles.navBadge} aria-hidden="true">
-                      {waiting}
-                    </span>
-                  )}
-                  {item === "Messages" && chat.unread > 0 && (
-                    <span className={styles.navBadge} aria-hidden="true">
-                      {chat.unread > 99 ? "99+" : chat.unread}
-                    </span>
-                  )}
-                </a>
-              ))}
-          </nav>
-          <a className={styles.sidebarBottom} href="#profile">
-            {/* The alliance's portrait is the account's picture; with none, its avatar (v0.3.1). */}
-            {me.alliance ? (
-              <Portrait
-                id={me.alliance}
-                size={40}
-                thumbnail
-                decorative
-                className={styles.sidebarPortrait}
-              />
-            ) : (
-              <span className={styles.monogram} aria-hidden="true">
-                {avatars[me.avatar]}
-              </span>
-            )}
-            <div>
-              {me.handle ?? me.display_name}
-              <small>
-                {me.kind === "sysop"
-                  ? "Local administrator"
-                  : me.onboarding === "handle"
-                    ? "Choose your handle"
-                    : me.onboarding === "starters"
-                      ? "Choose your starter decks"
-                      : "Signed in"}
-              </small>
-            </div>
-          </a>
-        </aside>
-        <div className={styles.workspace}>
-          <InstallBanner me={me} onGame={false} />
-          <header className={styles.topbar}>
-            <span>THE GATHERING STARTS HERE</span>
-            <PlayerSearch className={styles.topbarSearch} />
-            <div className={styles.topbarEnd}>
-              <span
-                className={styles.statusDot}
-                data-connected={connection === "connected" && online}
-              />
-              <span
-                role="status"
-                aria-label="Connection status"
-                className={styles.statusText}
+        <InstallBanner me={me} onGame={false} />
+        <TopBar
+          me={me}
+          shown={shown}
+          hud={hud}
+          social={social}
+          messagesUnread={chat.unread}
+          counts={counts}
+          connection={connection}
+          online={online}
+        />
+        <main
+          id="main"
+          className={styles.main}
+          data-page={shown.toLowerCase()}
+          tabIndex={-1}
+        >
+          {shown !== "Home" && <PageBand page={shown} />}
+          {/* Until the account has its handle and its two starter decks (v0.3.1), every page but
+            Profile, which has its own, points to the setup wizard (v0.4.2). */}
+          {onboarding(me) && page !== "Profile" && (
+            <p className={styles.handleNotice}>
+              {me.onboarding === "handle"
+                ? "Your game is not set up yet: choose the name other players see, and claim two free starter decks."
+                : "Two free starter decks are waiting for you to claim them."}{" "}
+              <button
+                type="button"
+                className={styles.noticeButton}
+                onClick={() => setSetup("current")}
               >
-                {!online
-                  ? "Offline"
-                  : connection === "loading"
-                    ? "Connecting"
-                    : connection === "connected"
-                      ? "Service connected"
-                      : "Service unavailable"}
-              </span>
-              <UpdateNotice />
-              {/* On every page of the app (v0.4.1); the table has its own, in the Game menu. */}
-              <ReportButton className={styles.report} />
-              <span className={styles.version}>v{__APP_VERSION__}</span>
-              <NotificationBell social={social} />
-            </div>
-          </header>
-          <main id="main" className={styles.main} tabIndex={-1}>
-            <div className={styles.breadcrumb}>
-              COMMANDER DUELS <span>/</span> {shown.toUpperCase()}
-            </div>
-            {/* Until the account has its handle and its two starter decks (v0.3.1), every page but
-              Profile, which has its own, points to the setup wizard (v0.4.2). */}
-            {onboarding(me) && page !== "Profile" && (
-              <p className={styles.handleNotice}>
-                {me.onboarding === "handle"
-                  ? "Your game is not set up yet: choose the name other players see, and claim two free starter decks."
-                  : "Two free starter decks are waiting for you to claim them."}{" "}
-                <button
-                  type="button"
-                  className={styles.noticeButton}
-                  onClick={() => setSetup("current")}
-                >
-                  Continue setup <span aria-hidden="true">→</span>
-                </button>
-              </p>
-            )}
+                Continue setup <span aria-hidden="true">→</span>
+              </button>
+            </p>
+          )}
+          {/* Each page comes in as Magic Duels' screens did; its own heading takes focus. */}
+          <div key={shown} className={styles.stage}>
             {page === "Profile" ? (
               <Account
                 me={me}
@@ -715,133 +541,14 @@ export function App() {
               />
             ) : page === "SysOp" && entrance ? (
               <SysopSignIn onSignedIn={accountChanged} heading={heading} />
-            ) : page === "Play" || page === "SysOp" ? (
-              <>
-                <section className={styles.hero} aria-labelledby="page-title">
-                  <picture className={styles.heroBanner}>
-                    <source
-                      media="(max-width: 600px)"
-                      srcSet="/brand/banner-logo-640.webp"
-                      width={640}
-                      height={584}
-                    />
-                    <source
-                      media="(max-width: 1100px)"
-                      srcSet="/brand/banner-960.webp"
-                      width={960}
-                      height={411}
-                    />
-                    <img
-                      src="/brand/banner-1600.webp"
-                      alt="Commander Duels: an armoured warrior with an axe on a battlefield, beside the Commander Duels logo"
-                      width={1600}
-                      height={686}
-                    />
-                  </picture>
-                  <div className={styles.heroCopy}>
-                    <div className={styles.eyebrow}>
-                      <span /> A NEW TABLE. ENDLESS POSSIBILITIES.
-                    </div>
-                    <h1 id="page-title" ref={heading} tabIndex={-1}>
-                      Gather your cards.
-                      <br />
-                      <em>Make your mark.</em>
-                    </h1>
-                    <p>
-                      Build something unmistakably yours.
-                      <br />A new home for Commander, Legacy, and playing
-                      together.
-                    </p>
-                    <a className={styles.primary} href="#practice">
-                      Play a practice game <span aria-hidden="true">↓</span>
-                    </a>
-                    <span className={styles.heroNote}>
-                      Testing preview · Practice games against the bots
-                    </span>
-                  </div>
-                </section>
-                <div id="practice" className={styles.practice}>
-                  <PracticeTable me={me} />
-                </div>
-                <section
-                  id="formats"
-                  className={styles.formats}
-                  aria-labelledby="formats-title"
-                >
-                  <div className={styles.sectionHeading}>
-                    <div>
-                      <span className={styles.eyebrow}>
-                        FIND YOUR WAY TO PLAY
-                      </span>
-                      <h2 id="formats-title">
-                        One game. Different possibilities.
-                      </h2>
-                    </div>
-                    <span className={styles.tag}>TESTING PREVIEW</span>
-                  </div>
-                  {connection === "loading" && (
-                    <p role="status">Loading format information…</p>
-                  )}
-                  {connection === "unavailable" && (
-                    <div className={styles.notice}>
-                      <strong>The application service is unavailable.</strong>
-                      <p>
-                        The shell is ready. Format information will appear when
-                        the service reconnects.
-                      </p>
-                      <button onClick={retry}>Retry connection</button>
-                    </div>
-                  )}
-                  {connection === "connected" && (
-                    <div className={styles.formatGrid}>
-                      {formats.map((format, index) => (
-                        <article
-                          key={format.id}
-                          className={styles.formatCard}
-                          data-format={format.id}
-                        >
-                          <div className={styles.formatTop}>
-                            <span
-                              className={styles.formatSymbol}
-                              aria-hidden="true"
-                            >
-                              {["♜", "⚔", "♜♜"][index]}
-                            </span>
-                            <span>
-                              {format.id === "commander"
-                                ? "2–4 PLAYERS"
-                                : format.id === "legacy"
-                                  ? "2 PLAYERS"
-                                  : "2 × 2 PLAYERS"}
-                            </span>
-                          </div>
-                          <h3>{format.name}</h3>
-                          <p>{format.description}</p>
-                          <button onClick={() => setSelected(format)}>
-                            About this format <span aria-hidden="true">↗</span>
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-                </section>
-                <section className={styles.foundation}>
-                  <div>
-                    <span className={styles.eyebrow}>
-                      BUILT ONE MILESTONE AT A TIME
-                    </span>
-                    <h2>The foundation is taking shape.</h2>
-                    <p>
-                      Practice games against the bots are open for testing, with
-                      your own decks from the card catalog. Sit down with other
-                      players at a human table from Tables.
-                    </p>
-                  </div>
-                  <a href="#settings">
-                    View release status <span aria-hidden="true">→</span>
-                  </a>
-                </section>
-              </>
+            ) : page === "Play" ? (
+              <PlayPage
+                me={me}
+                formats={formats}
+                connection={connection}
+                onRetry={retry}
+                heading={heading}
+              />
             ) : page === "Settings" ? (
               <Settings
                 preferences={preferences}
@@ -851,85 +558,29 @@ export function App() {
                 heading={heading}
               />
             ) : (
-              <>
-                <span className={styles.eyebrow}>
-                  {details[page].milestone}
-                </span>
-                <h1 ref={heading} tabIndex={-1}>
-                  {details[page].title}
-                </h1>
-                <p className={styles.lead}>{details[page].description}</p>
-                <section className={styles.empty}>
-                  <span aria-hidden="true">{glyphs[pages.indexOf(page)]}</span>
-                  <h2>{page} is on the horizon.</h2>
-                  <p>{details[page].next}</p>
-                  <span className={styles.tag}>
-                    NOT AVAILABLE IN v{__APP_VERSION__}
-                  </span>
-                  <a className={styles.primary} href="#play">
-                    Return to the table <span aria-hidden="true">→</span>
-                  </a>
-                </section>
-              </>
+              <HomeHub me={me} hud={hud} heading={heading} />
             )}
-            <footer className={styles.footer}>
-              <span>COMMANDER DUELS</span>
-              <span>
-                Testing preview <span aria-hidden="true">·</span> v
-                {__APP_VERSION__}
-              </span>
-              <p className={styles.legal}>
-                Commander Duels is unofficial Fan Content permitted under the
-                Fan Content Policy. Not approved/endorsed by Wizards. Portions
-                of the materials used are property of Wizards of the Coast.
-                ©Wizards of the Coast LLC. Card images from Scryfall.
-              </p>
-              {/* The public pages (v0.4.1), as on the landing page. */}
-              <SiteLinks className={styles.footerLinks} />
-            </footer>
-          </main>
-        </div>
+          </div>
+          <footer className={styles.footer}>
+            <span>COMMANDER DUELS</span>
+            <span>v{__APP_VERSION__}</span>
+            <p className={styles.legal}>
+              Commander Duels is unofficial Fan Content permitted under the Fan
+              Content Policy. Not approved/endorsed by Wizards. Portions of the
+              materials used are property of Wizards of the Coast. ©Wizards of
+              the Coast LLC. Card images from Scryfall.
+            </p>
+            {/* The public pages (v0.4.1), as on the landing page. */}
+            <SiteLinks className={styles.footerLinks} />
+          </footer>
+        </main>
+        <PhoneBar shown={shown} />
         <SetupWizard
           me={me}
           onChange={accountChanged}
           open={setup}
           onClose={() => setSetup(null)}
         />
-        <dialog
-          ref={dialog}
-          className={styles.dialog}
-          onClose={() => setSelected(undefined)}
-          aria-labelledby="format-dialog-title"
-        >
-          <button
-            className={styles.close}
-            aria-label="Close format details"
-            onClick={() => dialog.current?.close()}
-          >
-            ×
-          </button>
-          <span className={styles.eyebrow}>
-            {plannedFormat(selected) ? "PLANNED FORMAT" : "OPEN FOR PRACTICE"}
-          </span>
-          <h2 id="format-dialog-title">{selected?.name}</h2>
-          <p>{selected?.description}</p>
-          <p>
-            {selected?.seats.join(", ")} seats supported
-            {plannedFormat(selected) ? " in the planned format" : ""}. Default
-            table: {selected?.default_seats} players.
-          </p>
-          <p>
-            {plannedFormat(selected)
-              ? `${selected?.name} opens after its engine work is proven.`
-              : "Practice games against the bots are open for testing: start one from the practice table."}
-          </p>
-          <button
-            className={styles.primary}
-            onClick={() => dialog.current?.close()}
-          >
-            Back to the table
-          </button>
-        </dialog>
         <ChatDock chat={chat} />
       </div>
     </ChatContext.Provider>

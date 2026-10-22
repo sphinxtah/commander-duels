@@ -32,7 +32,7 @@ test.describe("the installable app", () => {
     };
     expect(body).toMatchObject({
       id: "/",
-      start_url: "/#play",
+      start_url: "/#home",
       display: "standalone",
       launch_handler: { client_mode: ["navigate-existing", "auto"] },
     });

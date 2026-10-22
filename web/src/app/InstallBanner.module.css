@@ -23,16 +23,21 @@
   flex-shrink: 0;
 }
 .install {
-  background: #d5b77c;
+  background: var(--cd-gold-fill);
   border: 1px solid #e0c58f;
   color: #192220;
   padding: 8px 16px;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 650;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
 }
 .install:hover {
-  background: #e6cc99;
+  background: var(--cd-gold-fill);
+  filter: brightness(1.08);
 }
 .later {
   background: transparent;

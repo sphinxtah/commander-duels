@@ -89,7 +89,7 @@ export async function anyLiveGame(): Promise<boolean> {
  * App's hashchange handler asks this first. When the change left a game that is live in this tab
  * and no in-game link marked it, the game's address is put back (replaceState fires no
  * hashchange), the game screen says why, and this returns true: App then changes nothing. It
- * catches the browser's Back and the installed app's launch (navigate-existing to #play).
+ * catches the browser's Back and the installed app's launch (navigate-existing to #home).
  */
 export function guardLiveGame(oldURL: string): boolean {
   let hash: string;

@@ -28,7 +28,11 @@ export type Cue =
   | "cardFlip"
   | "rareReveal"
   | "mythicReveal"
-  | "foilShimmer";
+  | "foilShimmer"
+  // The menus (v0.4.5): a tile or link under the pointer, a choice made, and back to the menu.
+  | "menuHover"
+  | "menuSelect"
+  | "menuBack";
 
 interface Timing {
   /** When the part starts, from the cue's start (default 0). */
@@ -294,6 +298,48 @@ export const RECIPES: Record<Cue, Recipe> = {
       { kind: "tone", wave: "sine", hz: 2093, ms: 260 },
       { kind: "tone", wave: "sine", hz: 2637, atMs: 140, ms: 280, level: 0.8 },
       { kind: "tone", wave: "sine", hz: 3136, atMs: 300, ms: 400, level: 0.6 },
+    ],
+  },
+  // The menus (v0.4.5). Under the pointer: a soft, high tick.
+  menuHover: {
+    ms: 60,
+    gain: 0.08,
+    parts: [
+      { kind: "tone", wave: "sine", hz: 1760, toHz: 1980, lowpass: 3000 },
+    ],
+  },
+  // A choice made: a whoosh rising into a bell a fifth above.
+  menuSelect: {
+    ms: 420,
+    gain: 0.22,
+    parts: [
+      {
+        kind: "noise",
+        filter: "bandpass",
+        hz: 900,
+        toHz: 3600,
+        q: 0.8,
+        ms: 220,
+        swell: true,
+      },
+      note(E5, 120, 300, 0.7),
+      note(B5, 160, 260, 0.5),
+    ],
+  },
+  // Back to the menu: the whoosh falling, with a low bell.
+  menuBack: {
+    ms: 360,
+    gain: 0.2,
+    parts: [
+      {
+        kind: "noise",
+        filter: "bandpass",
+        hz: 3200,
+        toHz: 800,
+        q: 0.8,
+        ms: 220,
+      },
+      note(A4, 100, 260, 0.6),
     ],
   },
 };

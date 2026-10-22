@@ -1,6 +1,9 @@
-/* The page before the app (v0.3.0): the mark in the middle of the window on the site's own
-   background, and below it only what to do next. */
+/* The page before the app (v0.3.0), a title screen since v0.4.5: the mark in the middle of the
+   window in a halo of light, the owner's banner dimmed far behind it, embers rising, and below it
+   only what to do next. */
 .landing {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -9,19 +12,54 @@
   justify-content: center;
   gap: 36px;
   padding: 48px 16px;
-  background: #101819;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 45% 40% at 50% 38%, #e9b96026, transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 50%, transparent 40%, #000000e6),
+    var(--cd-bg);
 }
-/* No shadow: on the plain background it shows as a faint square around the mark. */
+/* The banner's battlefield, far behind: dark, soft and slowly drifting. */
+.landing::before {
+  content: "";
+  position: absolute;
+  inset: -4%;
+  z-index: -2;
+  background: url("/brand/banner-1600.webp") 18% center / cover no-repeat;
+  filter: blur(6px) saturate(0.7) brightness(0.32);
+  animation: drift 40s ease-in-out infinite alternate;
+}
+@keyframes drift {
+  to {
+    transform: scale(1.08) translateX(2%);
+  }
+}
+/* No shadow box: on the dark backdrop it would show as a square; a glow follows its shape. */
 .mark {
   display: block;
   width: 128px;
   height: 128px;
+  filter: drop-shadow(0 0 22px #e9b96080) drop-shadow(0 0 60px #e9893a40);
+  animation:
+    rise 900ms cubic-bezier(0.2, 0.8, 0.25, 1) both,
+    breathe 5s ease-in-out 900ms infinite;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+}
+@keyframes breathe {
+  50% {
+    filter: drop-shadow(0 0 30px #f0c977a6) drop-shadow(0 0 80px #e9893a59);
+  }
 }
 /* Room for the sign-in button and a line below it, kept while they load, so the mark stays put
    when they arrive. */
 .content {
   width: min(100%, 440px);
   min-height: 7rem;
+  animation: rise 900ms cubic-bezier(0.2, 0.8, 0.25, 1) 250ms both;
 }
 /* SysOp's entrance and the wait for approval: headings sized for the narrow column. */
 .content h1 {

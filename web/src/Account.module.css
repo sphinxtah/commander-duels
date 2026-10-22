@@ -1,14 +1,13 @@
 .panel {
-  border: 1px solid #ffffff16;
-  background: #18221f;
+  border: 1px solid var(--cd-gold-line);
+  background: var(--cd-panel-bg);
   border-radius: 6px;
   padding: 25px;
   margin: 25px 0;
+  box-shadow: var(--cd-frame);
 }
 .panel > h2 {
-  font:
-    1.5rem Georgia,
-    serif;
+  font: 600 1.5rem var(--cd-display);
 }
 .fine {
   color: #a5b0a3;
@@ -115,9 +114,7 @@
   background: #d98f781a;
 }
 .form h2 {
-  font:
-    1.5rem Georgia,
-    serif;
+  font: 600 1.5rem var(--cd-display);
 }
 .form button[type="submit"] {
   margin-top: 6px;
@@ -179,9 +176,7 @@
   filter: drop-shadow(0 6px 12px #00000090);
 }
 .card strong {
-  font:
-    1.35rem Georgia,
-    serif;
+  font: 600 1.35rem var(--cd-display);
 }
 .card span {
   color: #c9d0c6;

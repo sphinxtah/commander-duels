@@ -3,7 +3,7 @@
   "name": "Commander Duels",
   "short_name": "Duels",
   "description": "Commander and Legacy against bots, on a full-screen table.",
-  "start_url": "/#play",
+  "start_url": "/#home",
   "scope": "/",
   "display": "standalone",
   "orientation": "landscape",

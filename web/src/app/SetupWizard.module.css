@@ -62,8 +62,12 @@
 }
 .steps li[aria-current="step"] span {
   border-color: #d5b77c;
-  background: #d5b77c;
+  background: var(--cd-gold-fill);
   color: #192220;
+  box-shadow: var(--cd-gold-shadow);
+  font-family: var(--cd-display);
+  font-weight: 700;
+  letter-spacing: 0.6px;
 }
 .steps li[data-done] span {
   border-color: #d5b77c88;

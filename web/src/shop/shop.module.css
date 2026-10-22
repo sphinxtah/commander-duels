@@ -54,9 +54,7 @@
   text-transform: uppercase;
 }
 .balance strong {
-  font:
-    2rem Georgia,
-    serif;
+  font: 600 2rem var(--cd-display);
   color: #efcc8d;
 }
 .note {
@@ -72,9 +70,7 @@
   margin: 34px 0;
 }
 .section > h2 {
-  font:
-    1.5rem Georgia,
-    serif;
+  font: 600 1.5rem var(--cd-display);
 }
 .filters {
   display: grid;
@@ -120,9 +116,7 @@
   display: flex;
   align-items: baseline;
   gap: 12px;
-  font:
-    1.15rem Georgia,
-    serif;
+  font: 600 1.15rem var(--cd-display);
   color: #e6dcc2;
   border-bottom: 1px solid #ffffff12;
   padding-bottom: 8px;
@@ -146,10 +140,11 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  border: 1px solid #ffffff14;
+  border: 1px solid var(--cd-gold-line);
   border-radius: 6px;
-  background: #18221f;
+  background: var(--cd-panel-bg);
   padding: 14px;
+  box-shadow: var(--cd-frame);
 }
 .product header {
   display: flex;
@@ -227,10 +222,11 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
-  border: 1px solid #ffffff14;
+  border: 1px solid var(--cd-gold-line);
   border-radius: 6px;
-  background: #18221f;
+  background: var(--cd-panel-bg);
   padding: 12px 14px;
+  box-shadow: var(--cd-frame);
 }
 .inventory span,
 .history span {
@@ -336,9 +332,7 @@
   }
 }
 .opening > h2 {
-  font:
-    1.6rem Georgia,
-    serif;
+  font: 600 1.6rem var(--cd-display);
   margin: 8px 0;
 }
 .packStage {
@@ -665,9 +659,7 @@
 }
 .editor h3 {
   margin: 0 0 8px;
-  font:
-    1.1rem Georgia,
-    serif;
+  font: 600 1.1rem var(--cd-display);
 }
 .unresolved {
   font-size: 0.74rem;
@@ -755,10 +747,11 @@ svg.packArt {
 .deck {
   display: flex;
   gap: 14px;
-  border: 1px solid #ffffff14;
+  border: 1px solid var(--cd-gold-line);
   border-radius: 6px;
-  background: #18221f;
+  background: var(--cd-panel-bg);
   padding: 14px;
+  box-shadow: var(--cd-frame);
 }
 .deckArt {
   flex: 0 0 112px;
@@ -790,9 +783,7 @@ svg.packArt {
   flex: 1;
 }
 .deckText strong {
-  font:
-    1.1rem Georgia,
-    serif;
+  font: 600 1.1rem var(--cd-display);
 }
 .deckText p {
   margin: 0;
@@ -816,9 +807,7 @@ svg.packArt {
   align-items: center;
   gap: 10px;
   margin: 0 0 4px;
-  font:
-    1.15rem Georgia,
-    serif;
+  font: 600 1.15rem var(--cd-display);
   color: #ebece6;
 }
 .saleTag {

@@ -211,7 +211,7 @@ function Decks({
 
   return (
     <>
-      <span className={styles.eyebrow}>M1 · DECKS</span>
+      <span className={styles.eyebrow}>YOUR DECKS</span>
       <h1 ref={heading} tabIndex={-1}>
         A strategy to call your own.
       </h1>

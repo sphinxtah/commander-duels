@@ -2,17 +2,16 @@
    shares with the game's Options drawer. */
 .panel,
 .release {
-  border: 1px solid #ffffff16;
-  background: #18221f;
+  border: 1px solid var(--cd-gold-line);
+  background: var(--cd-panel-bg);
   border-radius: 6px;
   padding: 25px;
   margin: 25px 0;
+  box-shadow: var(--cd-frame);
 }
 .panel h2,
 .release h2 {
-  font:
-    1.5rem Georgia,
-    serif;
+  font: 600 1.5rem var(--cd-display);
 }
 .panel label {
   display: flex;
@@ -122,9 +121,7 @@
   margin: 0 0 18px;
 }
 .compact h3 {
-  font:
-    1.1rem Georgia,
-    serif;
+  font: 600 1.1rem var(--cd-display);
   margin: 0 0 4px;
 }
 .compact .panel label {

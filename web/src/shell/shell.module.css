@@ -1,0 +1,1026 @@
+/* The menus (v0.4.5), after Magic Duels' front end: the top bar, the phone's bar of pages, the
+   title band over each page, the main menu's tiles and the Play page. Colours and the frame come
+   from global.css; motion stops under Reduce motion and the system's setting. */
+
+/* ---------- the top bar ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto auto minmax(160px, 1fr) auto;
+  align-items: center;
+  gap: 22px;
+  min-height: 68px;
+  padding: 0 28px;
+  background: linear-gradient(180deg, #1b2a27f2, #0e1817f2 70%, #0b1413f2);
+  border-bottom: 1px solid #d5b77c4d;
+  box-shadow:
+    0 1px 0 #00000099,
+    0 10px 30px #00000080;
+  backdrop-filter: blur(6px);
+}
+/* A hairline of light along the bar's lower edge. */
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #f4dca6cc, transparent);
+  pointer-events: none;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand img {
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 0 10px #e9b96059) drop-shadow(0 3px 6px #000c);
+  transition: transform 300ms;
+}
+.brand:hover img {
+  transform: rotate(-8deg) scale(1.06);
+}
+.wordmark {
+  font: 600 0.58rem/1 var(--cd-display);
+  letter-spacing: 3px;
+  color: #c9cdc2;
+}
+.wordmark strong {
+  display: block;
+  margin-top: 3px;
+  font: 700 1.3rem/1 var(--cd-display);
+  letter-spacing: 4px;
+  color: var(--cd-gold-hi);
+  text-shadow: 0 0 12px #e9b96059;
+}
+.nav {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  gap: 2px;
+}
+.nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  color: #b5bdb4;
+  font: 600 0.78rem/1 var(--cd-display);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  transition: color 160ms;
+}
+.nav a svg {
+  width: 19px;
+  height: 19px;
+  opacity: 0.8;
+}
+/* The page's own: a gold flare under it, as Magic Duels marked the chosen tab. */
+.nav a::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--cd-gold-hi),
+    transparent
+  );
+  box-shadow: 0 0 14px #f0c977;
+  opacity: 0;
+  transform: scaleX(0.4);
+  transition:
+    opacity 200ms,
+    transform 200ms;
+}
+.nav a:hover {
+  color: var(--cd-gold-hi);
+}
+.nav a:hover::after {
+  opacity: 0.5;
+  transform: scaleX(0.8);
+}
+.nav a.active {
+  color: var(--cd-gold-hi);
+  text-shadow: 0 0 14px #e9b96080;
+}
+.nav a.active::after {
+  opacity: 1;
+  transform: none;
+}
+.search {
+  justify-self: end;
+  width: min(100%, 300px);
+}
+.corner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.update {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cd-gold-hi);
+  font-size: 0.7rem;
+}
+.update button {
+  background: transparent;
+  border: 1px solid var(--cd-gold);
+  color: var(--cd-gold-hi);
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 0.68rem;
+}
+/* The account's tokens: a gold coin and the balance, leading to the shop. */
+.tokens {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px 0 6px;
+  border: 1px solid #d5b77c55;
+  border-radius: 17px;
+  background: linear-gradient(180deg, #0f1918, #0a1211);
+  color: var(--cd-gold-hi);
+  font: 700 0.82rem/1 var(--cd-display);
+  letter-spacing: 0.6px;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 1px 6px #000000b3;
+}
+.tokens:hover {
+  border-color: #f4dca6aa;
+}
+.coin {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #fff4d0,
+    #f0c977 35%,
+    #b8853f 70%,
+    #7a5626
+  );
+  box-shadow:
+    inset 0 0 0 2px #00000026,
+    0 0 8px #f0c97766;
+}
+.iconLink {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #ffffff1c;
+  color: #d8dccf;
+  transition:
+    border-color 160ms,
+    color 160ms,
+    box-shadow 160ms;
+}
+.iconLink svg {
+  width: 20px;
+  height: 20px;
+}
+.iconLink:hover,
+.iconLink[aria-current="page"] {
+  border-color: #d5b77c88;
+  color: var(--cd-gold-hi);
+  box-shadow: 0 0 14px #e9b96033;
+}
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f08a5c, #c8573a);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #0e1817;
+}
+.account {
+  position: relative;
+}
+.accountButton {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 12px 3px 3px;
+  border: 1px solid #d5b77c40;
+  border-radius: 26px;
+  background: linear-gradient(180deg, #1d2d29, #111b1a);
+  text-align: left;
+  box-shadow: inset 0 1px 0 #ffffff12;
+  transition:
+    border-color 160ms,
+    box-shadow 160ms;
+}
+.accountButton:hover,
+.accountButton[aria-expanded="true"] {
+  border-color: #f4dca6aa;
+  box-shadow:
+    inset 0 1px 0 #ffffff12,
+    0 0 16px #e9b96040;
+}
+.accountPicture {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #3d5a4c, #12201d 70%);
+  box-shadow: inset 0 0 0 1px #d5b77c66;
+}
+/* The ally's portrait, contain-fit and never cut to a circle (v0.3.1). */
+.accountPortrait {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px #000000b3);
+}
+.monogram {
+  color: #e6dcc3;
+  font:
+    17px Georgia,
+    serif;
+}
+.statusDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #c59b65;
+  box-shadow: 0 0 0 2px #0e1817;
+}
+.statusDot[data-connected="true"] {
+  background: #7fd09a;
+}
+.accountPicture .statusDot {
+  position: absolute;
+  right: -1px;
+  bottom: 1px;
+}
+.accountWords {
+  display: grid;
+  gap: 3px;
+  max-width: 160px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--cd-text);
+}
+.accountWords > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.accountWords small {
+  color: var(--cd-gold);
+  font: 600 0.6rem/1 var(--cd-display);
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.accountButton > .badge {
+  top: -5px;
+  right: -5px;
+}
+.menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 10px);
+  right: 0;
+  display: grid;
+  min-width: 230px;
+  padding: 8px;
+  border: 1px solid #d5b77c66;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #1c2b27, #111b1a);
+  box-shadow:
+    inset 0 1px 0 #ffffff14,
+    0 24px 60px #000000d9;
+  animation: menuIn 180ms ease-out;
+}
+.menu[hidden] {
+  display: none;
+}
+@keyframes menuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.menu a,
+.menu button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--cd-text);
+  font: 600 0.78rem/1.2 var(--cd-display);
+  letter-spacing: 1px;
+  text-align: left;
+}
+.menu a:hover,
+.menu button:hover,
+.menu a[aria-current="page"] {
+  background: #d5b77c1a;
+  color: var(--cd-gold-hi);
+}
+.menu .badge {
+  position: static;
+}
+.menuNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  padding: 10px 14px 4px;
+  border-top: 1px solid #ffffff12;
+  color: var(--cd-faint);
+  font-size: 0.68rem;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.phoneBar {
+  display: none;
+}
+
+/* ---------- the title band over every page but the main menu ---------- */
+.band {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-height: 58px;
+  margin: 0 0 22px;
+  padding: 0 4px;
+  border-bottom: 1px solid #d5b77c26;
+  overflow: hidden;
+}
+.back {
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px 8px 10px;
+  border: 1px solid #d5b77c55;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #1f302cd9, #111b1ad9);
+  color: var(--cd-gold-hi);
+  font: 600 0.72rem/1 var(--cd-display);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  transition:
+    box-shadow 160ms,
+    border-color 160ms;
+}
+.back svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 160ms;
+}
+.back:hover {
+  border-color: #f4dca6aa;
+  box-shadow: 0 0 16px #e9b96040;
+}
+.back:hover svg {
+  transform: translateX(-3px);
+}
+/* The page's name, engraved large across the band behind the way back. */
+.bandTitle {
+  font: 700 clamp(1.5rem, 2.6vw, 2.4rem) / 1 var(--cd-display);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: transparent;
+  background: linear-gradient(180deg, #f4dca659, #d5b77c14);
+  -webkit-background-clip: text;
+  background-clip: text;
+  white-space: nowrap;
+}
+
+/* ---------- the main menu ---------- */
+.hub {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(300px, 4fr) 8fr;
+  gap: 22px;
+  min-height: calc(100vh - 220px);
+}
+.embers {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.embers span {
+  position: absolute;
+  left: var(--x);
+  bottom: -12px;
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  background: #ffcf86;
+  box-shadow:
+    0 0 6px #ffb45c,
+    0 0 14px #e9893a;
+  opacity: 0;
+  animation: ember var(--d) linear var(--w) infinite;
+}
+@keyframes ember {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  10% {
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(40px, -95vh);
+  }
+}
+/* The ally's corner: their portrait standing in a pool of light, as Magic Duels' Planeswalkers
+   stood beside its menu. */
+.welcome {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 520px;
+  padding: 26px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 62%, #e9b96033, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 100%, #2b4a3f80, transparent 70%),
+    linear-gradient(180deg, #13201ecc, #0b1312e6);
+  box-shadow: var(--cd-frame);
+  overflow: hidden;
+  animation: tileIn 520ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+.allyStage {
+  position: absolute;
+  inset: 12px 0 140px;
+  display: grid;
+  place-items: center;
+}
+.ally {
+  width: min(100%, 320px);
+  height: auto;
+  max-height: 100%;
+  filter: drop-shadow(0 0 30px #e9b96040) drop-shadow(0 18px 24px #000000cc);
+  animation: hover 6s ease-in-out infinite;
+}
+.allyMark {
+  width: 192px;
+  height: 192px;
+  filter: drop-shadow(0 0 30px #e9b96059);
+  animation: hover 6s ease-in-out infinite;
+}
+@keyframes hover {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.welcomeWords {
+  position: relative;
+  padding-top: 18px;
+  background: linear-gradient(180deg, transparent, #0b1312f2 30%);
+}
+.welcomeWords h1 {
+  margin: 6px 0 12px;
+  font-size: clamp(1.6rem, 2.2vw, 2.2rem);
+}
+.kicker {
+  color: var(--cd-ember);
+  font: 700 0.64rem/1.3 var(--cd-display);
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+}
+.tier {
+  display: grid;
+  gap: 7px;
+  color: var(--cd-muted);
+  font-size: 0.78rem;
+}
+.tierName {
+  color: var(--cd-gold-hi);
+  font: 700 0.9rem/1 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.tierBar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #00000080;
+  box-shadow: inset 0 0 0 1px #d5b77c33;
+  overflow: hidden;
+}
+.tierBar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #a7773a, #f4dca6);
+  box-shadow: 0 0 10px #f0c977;
+}
+.quiet {
+  color: var(--cd-gold);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: minmax(150px, auto);
+  gap: 18px;
+}
+.tile {
+  --tile-art: none;
+  position: relative;
+  isolation: isolate;
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 160px;
+  padding: 20px 22px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 10px;
+  background:
+    var(--tile-art),
+    radial-gradient(ellipse at 80% 0%, #d5b77c1f, transparent 60%),
+    linear-gradient(160deg, #1b2b28, #0e1716);
+  background-size: cover;
+  background-position: center;
+  box-shadow: var(--cd-frame);
+  overflow: hidden;
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.25, 1),
+    box-shadow 220ms,
+    border-color 220ms;
+  animation: tileIn 520ms cubic-bezier(0.2, 0.8, 0.25, 1) both;
+  animation-delay: calc(80ms + var(--i) * 60ms);
+}
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+}
+/* A sheen that crosses the tile under the pointer. */
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    #fff2d22e 48%,
+    transparent 60%
+  );
+  transform: translateX(-110%);
+  pointer-events: none;
+}
+.tile:hover,
+.tile:focus-visible {
+  transform: translateY(-4px);
+  border-color: #f4dca6b3;
+  box-shadow:
+    var(--cd-frame),
+    0 0 0 1px #f4dca666,
+    0 0 34px #e9b9604d;
+}
+.tile:hover::after,
+.tile:focus-visible::after {
+  transition: transform 800ms ease;
+  transform: translateX(110%);
+}
+.tile:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 3px;
+}
+/* The large tile to play, over the owner's banner (v0.1.0). */
+.playTile {
+  --tile-art:
+    linear-gradient(90deg, #0b1312f2 0%, #0b131299 45%, transparent 75%),
+    url("/brand/banner-1600.webp");
+  grid-column: span 6;
+  min-height: 300px;
+  justify-content: center;
+  padding: 34px 38px;
+  background-position: 70% center;
+}
+.playTile .tileTitle {
+  font-size: 3rem;
+  letter-spacing: 8px;
+}
+.playTile .tileLead {
+  max-width: 300px;
+  font-size: 0.95rem;
+}
+.tablesTile,
+.shopTile {
+  grid-column: span 3;
+  min-height: 190px;
+}
+/* Leng at his counter (v0.4.3), the owner's painting. */
+.shopTile {
+  --tile-art:
+    linear-gradient(90deg, #0b1312f2 0%, #0b1312b3 50%, #0b131233 100%),
+    url("/shop/leng-640.webp");
+  background-position: right 30%;
+}
+.tileIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #d5b77c66;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #2f4840, #0f1918);
+  color: var(--cd-gold-hi);
+  box-shadow:
+    inset 0 1px 0 #ffffff1f,
+    0 0 16px #e9b96026;
+}
+.tileIcon svg {
+  width: 24px;
+  height: 24px;
+}
+.playTile .tileIcon,
+.shopTile .tileIcon,
+.tablesTile .tileIcon {
+  margin-bottom: auto;
+}
+.playTile .tileIcon {
+  display: none;
+}
+.tileWords {
+  display: grid;
+  gap: 6px;
+}
+.tileTitle {
+  color: var(--cd-gold-hi);
+  font: 700 1.3rem/1.05 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px #000000cc;
+}
+.tileLead {
+  color: #c9cec5;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.tileMeta {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 4px 9px;
+  border-radius: 3px;
+  background: #00000066;
+  color: var(--cd-gold);
+  font: 700 0.6rem/1.2 var(--cd-display);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+/* The play tile's call, drawn as the gold button. */
+.tileAction {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 13px 26px;
+  border: 1px solid #f7e2ae;
+  border-radius: 4px;
+  background: linear-gradient(
+    180deg,
+    #f6dda2 0%,
+    #d9b06a 48%,
+    #b8853f 52%,
+    #a7773a 100%
+  );
+  color: #1d1408;
+  font: 700 0.9rem/1 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  box-shadow:
+    inset 0 1px 0 #ffffffaa,
+    0 8px 24px #000000b3;
+  animation: beckon 2.6s ease-in-out infinite;
+}
+@keyframes beckon {
+  50% {
+    box-shadow:
+      inset 0 1px 0 #ffffffaa,
+      0 0 26px #f0c977a6,
+      0 8px 24px #000000b3;
+  }
+}
+
+/* ---------- Play ---------- */
+.playHero {
+  position: relative;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, #13201e, #0b1312);
+  box-shadow: var(--cd-frame);
+}
+/* The owner's banner (v0.1.0), never cropped on larger screens; phones get its logo half. */
+.playBanner {
+  display: block;
+  border-bottom: 1px solid #d5b77c33;
+}
+.playBanner img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.playCopy {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 28px 36px 32px;
+}
+.playCopy h1 {
+  margin: 8px 0 10px;
+}
+.playCopy p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--cd-muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+.playActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.practice {
+  margin-top: 28px;
+  scroll-margin-top: 90px;
+}
+.formats {
+  margin-top: 40px;
+  scroll-margin-top: 90px;
+}
+.sectionHeading {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.sectionHeading h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--cd-gold-hi);
+}
+.formatGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 17px;
+}
+.formatCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 8px;
+  padding: 22px 23px 0;
+  background:
+    radial-gradient(ellipse at 90% 0%, #d5b77c1a, transparent 60%),
+    linear-gradient(150deg, #1d2d29, #101a19);
+  box-shadow: var(--cd-frame);
+  transition:
+    transform 220ms,
+    border-color 220ms;
+}
+.formatCard:hover {
+  transform: translateY(-3px);
+  border-color: #f4dca699;
+}
+.formatCard[data-format="legacy"] {
+  background:
+    radial-gradient(ellipse at 90% 0%, #a7b8e01a, transparent 60%),
+    linear-gradient(150deg, #24242f, #121619);
+}
+.formatTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: #8f9e94;
+  font: 600 0.58rem/1 var(--cd-display);
+  letter-spacing: 1.4px;
+}
+.formatSymbol {
+  font:
+    2.1rem Georgia,
+    serif;
+  color: var(--cd-gold);
+  letter-spacing: -6px;
+  min-height: 40px;
+  text-shadow: 0 0 14px #e9b96059;
+}
+.formatCard h3 {
+  margin: 0 0 10px;
+  font: 700 1.4rem/1.2 var(--cd-display);
+  color: var(--cd-gold-hi);
+}
+.formatCard p {
+  flex: 1;
+  font-size: 0.78rem;
+  line-height: 1.8;
+  color: var(--cd-muted);
+}
+.formatFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #ffffff10;
+}
+.formatFoot button {
+  padding: 17px 0;
+  border: 0;
+  background: transparent;
+  color: #c7cdbb;
+  font-size: 0.7rem;
+}
+.formatFoot button:hover {
+  color: var(--cd-gold-hi);
+}
+
+/* ---------- smaller windows ---------- */
+@media (max-width: 1360px) {
+  .wordmark {
+    display: none;
+  }
+  .nav a {
+    padding: 0 10px;
+  }
+  .accountWords {
+    display: none;
+  }
+  .accountButton {
+    padding: 3px;
+  }
+}
+@media (max-width: 1100px) {
+  .topbar {
+    gap: 14px;
+    padding: 0 18px;
+  }
+  .nav a svg {
+    display: none;
+  }
+  .hub {
+    grid-template-columns: 1fr;
+  }
+  .welcome {
+    min-height: 380px;
+  }
+  .allyStage {
+    inset: 12px 0 130px;
+  }
+  .formatGrid {
+    grid-template-columns: 1fr;
+  }
+  .playCopy {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+/* A phone: the six pages move to a bar along the bottom, and the search to its own row. */
+@media (max-width: 820px) {
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 12px;
+    padding: 8px 14px 10px;
+  }
+  .nav {
+    display: none;
+  }
+  .search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+  }
+  .corner {
+    gap: 8px;
+  }
+  .tokens {
+    padding-right: 10px;
+    font-size: 0.75rem;
+  }
+  .phoneBar {
+    position: fixed;
+    z-index: 20;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, #16231f, #0b1312);
+    border-top: 1px solid #d5b77c55;
+    box-shadow: 0 -10px 30px #00000099;
+  }
+  .phoneBar a {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    padding: 5px 0;
+    color: #a8b1a8;
+    font: 600 0.55rem/1 var(--cd-display);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+  .phoneBar a svg {
+    width: 22px;
+    height: 22px;
+  }
+  .phoneBar a.active {
+    color: var(--cd-gold-hi);
+    text-shadow: 0 0 10px #e9b96080;
+  }
+  .band {
+    min-height: 46px;
+    gap: 14px;
+  }
+  .tiles {
+    grid-template-columns: 1fr;
+  }
+  .tile,
+  .playTile,
+  .tablesTile,
+  .shopTile {
+    grid-column: auto;
+  }
+  /* The words over the warrior's half, darkened from below, clear of the logo. */
+  .playTile {
+    --tile-art:
+      linear-gradient(0deg, #0b1312f2 15%, #0b131280 60%, transparent),
+      url("/brand/banner-960.webp");
+    min-height: 240px;
+    padding: 26px 22px;
+    justify-content: flex-end;
+    background-position: 25% center;
+  }
+  .playTile .tileTitle {
+    font-size: 2.2rem;
+  }
+  .welcome {
+    min-height: 340px;
+    padding: 20px;
+  }
+  .playCopy {
+    padding: 22px 20px 24px;
+  }
+}
+@media (max-width: 420px) {
+  .tokens {
+    display: none;
+  }
+}

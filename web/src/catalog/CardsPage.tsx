@@ -132,7 +132,7 @@ function Browser({
   const pages = results ? Math.max(1, Math.ceil(results.total / PAGE_SIZE)) : 1;
   return (
     <>
-      <span className={styles.eyebrow}>M1 · CARD CATALOG</span>
+      <span className={styles.eyebrow}>CARD CATALOG</span>
       <h1 ref={heading} tabIndex={-1}>
         Discover your next centerpiece.
       </h1>

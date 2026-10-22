@@ -72,13 +72,9 @@ export function Settings({
       </section>
       <section className={styles.release}>
         <h2>
-          Release status{" "}
-          <span className={app.tag}>v{__APP_VERSION__} · TESTING PREVIEW</span>
+          In this version <span className={app.tag}>v{__APP_VERSION__}</span>
         </h2>
-        <p>
-          Practice games against the bots are open for testing. Here is where
-          each part of Commander Duels stands.
-        </p>
+        <p>What Commander Duels offers today, and what comes later.</p>
         {bootstrap ? (
           <ul>
             {bootstrap.capabilities.map((item) => (
@@ -88,13 +84,15 @@ export function Settings({
                   <p>{item.reason}</p>
                 </div>
                 <span data-available={item.available}>
-                  {item.available ? "Available" : item.milestone}
+                  {item.available ? "Available" : "Coming later"}
                 </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p>Connect to the application service to load the feature roadmap.</p>
+          <p>
+            Connect to the application service to load what this version offers.
+          </p>
         )}
       </section>
     </>

@@ -45,10 +45,6 @@ function watchInside(page: Page) {
   return inside;
 }
 
-async function nav(page: Page) {
-  return page.getByRole("navigation").getByRole("link").allTextContents();
-}
-
 function googleButton(page: Page) {
   return page.getByRole("button", { name: "Sign in with Google" });
 }
@@ -311,7 +307,12 @@ test("SysOp signs in at its entrance under the mark, administers and sees its ow
     page.getByRole("heading", { name: "Keep the table running." }),
   ).toBeVisible();
   await expect(page).toHaveURL(/#admin$/);
-  expect((await nav(page)).some((name) => name.includes("Admin"))).toBe(true);
+  // Administration is in the account's menu (v0.4.5).
+  await page.getByRole("button", { name: /^Your account/ }).click();
+  await expect(
+    page.getByRole("link", { name: /^Administration/ }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("tab", { name: "Accounts" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -353,10 +354,8 @@ test("SysOp signs in at its entrance under the mark, administers and sees its ow
   await expect(
     page.getByRole("heading", { name: "Keep the table running." }),
   ).toBeVisible();
-  await page
-    .getByRole("navigation")
-    .getByRole("link", { name: "Profile" })
-    .click();
+  await page.getByRole("button", { name: /^Your account/ }).click();
+  await page.getByRole("link", { name: "Profile" }).click();
   await expect(page.getByText("Local administrator")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "SysOp password" }),
@@ -450,7 +449,9 @@ test("an account waiting for approval sees only its wait, and approval opens the
   await expect(
     page.getByRole("heading", { name: "Make yourself at home." }),
   ).toBeVisible();
-  await expect(page.getByRole("navigation")).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Main navigation" }),
+  ).toBeVisible();
   await expect(page).toHaveURL(/#settings$/);
 });
 
