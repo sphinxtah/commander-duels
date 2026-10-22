@@ -2093,6 +2093,11 @@ export interface components {
             price_reason: string | null;
             /** Released */
             released: string | null;
+            /**
+             * Sale Price
+             * @description In tokens, while the product is in this week's sale; null otherwise.
+             */
+            sale_price?: number | null;
             /** Sale Reason */
             sale_reason: string | null;
             /** Selling */
@@ -4063,6 +4068,11 @@ export interface components {
             price_basis: "market" | "set" | "unpriced";
             /** Released */
             released: string | null;
+            /**
+             * Sale Price
+             * @description In tokens, while the product is in this week's sale; null otherwise.
+             */
+            sale_price?: number | null;
             /** Set Code */
             set_code: string;
             /** Set Name */
@@ -4570,6 +4580,31 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** SaleInfo */
+        SaleInfo: {
+            /**
+             * Ends At
+             * Format: date-time
+             * @description The next Sunday midnight.
+             */
+            ends_at: string;
+            /**
+             * Percent
+             * @description How much less the sale's packs cost.
+             */
+            percent: number;
+            /**
+             * Products
+             * @description This week's products still on the shelf.
+             */
+            products: string[];
+            /**
+             * Starts At
+             * Format: date-time
+             * @description Sunday midnight, Arizona time.
+             */
+            starts_at: string;
+        };
         /** SeatChange */
         SeatChange: {
             /**
@@ -4761,6 +4796,8 @@ export interface components {
              * @description The products on sale, newest first.
              */
             products: components["schemas"]["ProductInfo"][];
+            /** @description This week's sale at Leng's counter (v0.4.3). */
+            sale?: components["schemas"]["SaleInfo"] | null;
         };
         /** StarterChoice */
         StarterChoice: {

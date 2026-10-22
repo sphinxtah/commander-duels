@@ -33,6 +33,16 @@ Since v0.4.0 players spend the tokens their wins earn on booster packs in Leng's
 - **No market price** (a set after the list): 500 tokens until priced.
 - **Staff's prices.** SysOp and administrators (permission `shop.manage`) may set any product's price in tokens, or return it to the curve, and take any product off sale or put it back. Each change needs a reason, is stored in the database apart from the content file, and is audited (`shop.price_changed`, `shop.sale_changed`). A product off sale can still be given, and packs already held still open.
 
+## The weekly sale (v0.4.3)
+
+The owner's request on 2026-10-22: each week five packs, chosen at random, are 20% off, from Sunday midnight to the next Sunday midnight. It took the place of the note on earning tokens at Leng's counter, which the owner said is not the shop's to say.
+
+- **The week** runs from Sunday 00:00 to the next Sunday 00:00, Arizona time (the owner's; UTC−7 all year, as Arizona keeps no daylight saving time): Sunday 07:00 UTC. The page shows the end in the viewer's own time zone.
+- **The draw.** The first request that needs a week's sale (the shop's page or a purchase) chooses five products among those on the shelf with the operating system's secure randomness, and keeps them (`shop_weekly_sales`, migration `0016_weekly_sale`), so every player sees the same five all week and a restart changes nothing. Two requests drawing at once keep one draw. While nothing is on the shelf (a new installation before its first booster data) nothing is kept, and the next request draws again.
+- **The price** is the product's own price, the curve's or the staff's, 20% less, to the nearest token. The counter lists the five with their pictures, the old price struck through and the new one, each with Buy; the shelves mark them "Weekly sale" with both prices; sorting by price uses the price to pay. A purchase pays the sale price while the week lasts, and its ledger entry says so ("<product> (weekly sale, 20% off)").
+- **Leaving the shelf.** A product taken off sale by the staff, or whose booster data can no longer be read, leaves the week's sale too; nothing replaces it until the next week.
+- `api/sales.py`; `GET /api/v1/shop` carries `sale` (the week's start and end, the share off and the products) and each product's `sale_price`.
+
 ## Buying and opening
 
 - **Buying** (PROG02, PROG03, SEC03). The price leaves the balance and an unopened pack joins the inventory in one transaction. The account's row is locked, so two purchases at once cannot spend the same tokens, and a balance never goes below zero. The ledger entry's key is `pack:<pack id>`. The browser sends a key of its own making with each purchase: a retried request finds the pack that key bought and buys nothing more.

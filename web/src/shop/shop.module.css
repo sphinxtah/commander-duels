@@ -804,3 +804,86 @@ svg.packArt {
   color: #dec38b;
   font-size: 0.74rem;
 }
+
+/* The weekly sale at the counter (v0.4.3): five packs, 20% off, Sunday to Sunday. */
+.sale {
+  border-top: 1px solid #ffffff12;
+  padding-top: 14px;
+}
+.sale > h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+  font:
+    1.15rem Georgia,
+    serif;
+  color: #ebece6;
+}
+.saleTag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #d9714f;
+  color: #fff;
+  font:
+    700 0.66rem/1.5 Inter,
+    "Segoe UI",
+    sans-serif;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.saleWhen {
+  margin: 0 0 10px;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+.saleList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.saleList li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid #ffffff0b;
+}
+.saleList li:first-child {
+  border-top: none;
+}
+.saleName {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.saleName strong {
+  color: #ebece6;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.saleName s,
+.salePrice s {
+  color: #8c978f;
+}
+.saleName b,
+.salePrice b {
+  color: #efcc8d;
+}
+.salePrice {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 0.85rem;
+}

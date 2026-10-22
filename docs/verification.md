@@ -1,5 +1,21 @@
 # Verification
 
+## v0.4.3
+
+Validated locally on Windows on October 22, 2026, on the work of v0.4.3 as merged (the player search, profiles, friends, blocks, presence, privacy settings and the notification bell; the pack artwork and Leng's painting, built in a worktree by a subagent and merged; the weekly sale; the CI hang's guards). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine did not change.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 103 files formatted, 69 Python source files type-checked |
+| Python suite | 241 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New: `tests/test_social.py` (the search by handle in part with `_` and `%` taken literally, by email only in full and never shown, its limits; profiles; mutual requests, withdrawing, declining, ending; the pending limit; blocks and their silent requests; presence from check-ins and running games, for friends or everyone, appearing offline seen through by administrators and SysOp; a check-in is not activity; a friend coming online told once in 30 minutes to friends online; the history's pages and marking read; pruning; deletion removing it all; and on PostgreSQL the escaped search, the email join and the check-in's row lock), `tests/test_sales.py` (the week from Sunday midnight Arizona time, the price, the draw kept for the week, a product leaving the shelf, nothing kept with an empty shelf), and in `tests/test_shop.py` the pack art in every answer, the manifest read with care, and the weekly sale on the shelf and at purchase, with four purchases at once on PostgreSQL drawing one week |
+| Migrations | `alembic upgrade head && alembic check` on a fresh PostgreSQL: one head, `0016_weekly_sale`, no drift; down to `0014_roster_playable` and up again |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated on the merged tree |
+| Web unit tests and build | 907 Vitest tests in 74 files passed; `tsc -b`, the service worker's `tsc -p sw` and the production build passed. New: `web/src/social/social.test.tsx` (the words, the search's delay and keys and its email on Enter, the check-in's idle flag and pop-ups, the bell, the history, profiles, friends, privacy), `web/src/shop/PackArt.test.tsx`, and the shop's weekly sale |
+| Browser journeys (CI's verify job) | 45 passed, 13 skipped that need the engine or the built image, on a throwaway API from the source with the test catalog and Vite's dev server, with a second account from `scripts/e2e_player.py`. New: `social.spec.ts`; changed: `shop.spec.ts` (the shelf's picture loaded, the tear holding the pack twice, the weekly sale and its price at purchase) |
+| Browser journeys (CI's engine job) | 17 passed in 2 m 30 s on a throwaway Compose stack built from the tree (the API image with `content/pack-art.json`, the web image with the pictures), through the web container's nginx: `game.spec.ts`, `tables.spec.ts`, the new `social.spec.ts` (a search, a request, the bell, accepting, presence both ways, appearing offline seen by SysOp), `pwa.spec.ts` and `pages.spec.ts` |
+| The new screens | Looked at in Chromium at 1400 x 900 and 375 x 812: the search and its results, the bell's bubble and count, Friends, a profile, the privacy panel, the history; and the shop's counter with Leng's painting and the weekly sale at 1366 x 768 |
+| The pack artwork | 365 of 392 products with their real picture from TCGplayer, checked on contact sheets; 27 drawn; 180 set symbols; 10.7 MB in all, outside the precache |
+
 ## v0.4.2
 
 Validated locally on Windows on October 21, 2026, on the work of v0.4.2 (the live 64-game limit, the alliance tab, the setup wizard, the starter decks in the shop, the roster of 89, the terms line and the upload preview). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine did not change.

@@ -32,10 +32,11 @@ from test_games import SERVICE_TOKEN, SYSOP_ADDRESS
 from test_progression import Account
 
 from api import collation as collations
-from api import products
+from api import products, sales
 from api import shop as shop_api
 from api.collation import Collation, Layout, Sheet, SheetCard
 from api.config import Settings
+from api.identity import utcnow
 from api.main import create_app
 from api.models import (
     AuditEvent,
@@ -49,6 +50,7 @@ from api.models import (
     ScheduledJob,
     ShopProduct,
     TokenEntry,
+    WeeklySale,
 )
 from catalog import boosters, sync
 
@@ -155,8 +157,13 @@ def client(collated: str, content: Path, engine, tmp_path):
     )
     app.state.engine_transport = httpx.MockTransport(engine)
     with TestClient(app, base_url="https://testserver", client=SYSOP_ADDRESS) as client:
+        # The fixture's one product would always be in the weekly sale (v0.4.3): this week's sale
+        # is kept empty, so prices are the shelf's, unless a test draws the week itself.
+        with Session(app.state.database) as db:
+            no_sale(db)
         yield client
         with Session(app.state.database) as db:
+            db.execute(text("DELETE FROM shop_weekly_sales"))
             for table in SHOP_TABLES:
                 db.execute(text(f"DELETE FROM {table}"))
             db.execute(
@@ -172,6 +179,15 @@ def client(collated: str, content: Path, engine, tmp_path):
             for table in ("role_grants", "sessions", "progress_ledger", "users"):
                 db.execute(text(f"DELETE FROM {table}"))
             db.commit()
+
+
+def no_sale(db: Session) -> None:
+    db.add(
+        WeeklySale(
+            week_start=sales.week_of(utcnow())[0], product_ids=[], percent=20, created_at=utcnow()
+        )
+    )
+    db.commit()
 
 
 def fixture_product(client: TestClient, booster: str = "draft") -> ShopProduct:
@@ -635,6 +651,7 @@ def test_the_shop_lists_what_is_on_sale(client):
         "price": 380,
         "price_basis": "market",
         "pack_size": 15,
+        "sale_price": None,
     }
     assert [era["id"] for era in shop["eras"]][:2] == ["play", "collector"]
     assert shop["data"] == {
@@ -680,6 +697,46 @@ def test_buying_spends_once_per_key(client):
     assert [
         (item["product"]["set_code"], item["count"], item["openable"]) for item in inventory
     ] == [("ZNR", 2, True)]
+
+
+def test_the_weekly_sale(client):
+    # v0.4.3: this week's five products (here the fixture's one) cost 20% less, shown at the
+    # counter and on the shelf, and paid at purchase; a product off the shelf leaves the sale.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.execute(text("DELETE FROM shop_weekly_sales"))
+        db.commit()
+    ada = funded(client, "ada", 1_000)
+    product = fixture_product(client)
+    shop = ada.get("/api/v1/shop").json()
+    sale = shop["sale"]
+    assert sale["percent"] == 20 and sale["products"] == [str(product.id)]
+    starts, ends = (datetime.fromisoformat(sale[key]) for key in ("starts_at", "ends_at"))
+    assert ends - starts == timedelta(days=7)
+    # Sunday midnight in Arizona: 07:00 UTC.
+    assert starts.astimezone(UTC).weekday() == 6 and starts.astimezone(UTC).hour == 7
+    [shown] = shop["products"]
+    assert (shown["price"], shown["sale_price"]) == (380, 304)
+    bought = buy(ada, product.id).json()
+    assert (bought["tokens"], bought["balance"]) == (304, 696)
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        entry = db.scalars(
+            select(TokenEntry).where(TokenEntry.user_id == ada.id, TokenEntry.kind == "pack")
+        ).one()
+        assert (entry.amount, entry.reason) == (
+            -304,
+            "Zendikar Rising Draft Booster (weekly sale, 20% off)",
+        )
+        assert db.scalar(select(func.count()).select_from(WeeklySale)) == 1
+    # Taken off sale by the staff, it leaves the shelf and the sale.
+    staff = Account(client, "staff", admin=True)
+    off = staff.send(
+        "PUT",
+        f"/api/v1/admin/shop/products/{product.id}/sale",
+        {"on_sale": False, "reason": "Testing the sale"},
+    )
+    assert off.status_code == 200, off.text
+    after = ada.get("/api/v1/shop").json()
+    assert after["sale"]["products"] == [] and after["products"] == []
 
 
 def buy_deck(account: Account, deck: str) -> httpx.Response:
@@ -1037,11 +1094,15 @@ def test_concurrent_opens_and_purchases_on_postgresql(monkeypatch, tmp_path, con
             with ThreadPoolExecutor(max_workers=4) as workers:
                 bought = list(workers.map(lambda _: buy(ada, product, "same-key").json(), range(4)))
             assert len({item["pack"] for item in bought}) == 1
-            assert {item["balance"] for item in bought} == {620}
-            # Different keys at once never spend below zero: 620 buys one more pack.
+            # The four requests drew the week's sale at once (v0.4.3): one draw stood, and the
+            # fixture's one product is in it, at 304 tokens rather than 380.
+            assert {item["balance"] for item in bought} == {696}
+            with Session(engine) as db:
+                assert db.scalar(select(func.count()).select_from(WeeklySale)) == 1
+            # Different keys at once never spend below zero: 696 buys two more packs.
             with ThreadPoolExecutor(max_workers=4) as workers:
                 codes = sorted(workers.map(lambda _: buy(ada, product).status_code, range(4)))
-            assert codes == [201, 409, 409, 409]
+            assert codes == [201, 201, 409, 409]
             pack = bought[0]["pack"]
             with ThreadPoolExecutor(max_workers=4) as workers:
                 opened = list(

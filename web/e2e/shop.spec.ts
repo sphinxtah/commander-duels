@@ -87,12 +87,23 @@ test.describe("Leng's card shop", () => {
       fullPage: true,
     });
 
+    // The weekly sale (v0.4.3): the test catalog's one product on the shelf is always among the
+    // week's five, at 20% off, at the counter and on the shelf alike.
+    const sale = page.getByRole("region", { name: /This week's sale/ });
+    await expect(sale.getByRole("listitem", { name: PRODUCT })).toContainText(
+      "380 tokens 304 tokens",
+    );
+    await expect(page.getByText(/Wins earn tokens/)).toHaveCount(0);
+    await expect(product).toContainText("Weekly sale");
+
     await product.getByRole("button", { name: `Buy ${PRODUCT}` }).click();
     const dialog = page.getByRole("dialog", { name: `Buy a ${PRODUCT}?` });
-    await expect(dialog).toContainText("It costs 380 tokens.");
-    await dialog.getByRole("button", { name: "Buy for 380 tokens" }).click();
+    await expect(dialog).toContainText(
+      "It costs 304 tokens in this week's sale (380 tokens otherwise).",
+    );
+    await dialog.getByRole("button", { name: "Buy for 304 tokens" }).click();
     await expect(
-      page.getByText(new RegExp(`You bought a ${PRODUCT} for 380 tokens`)),
+      page.getByText(new RegExp(`You bought a ${PRODUCT} for 304 tokens`)),
     ).toBeVisible();
 
     await page

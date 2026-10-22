@@ -13,6 +13,7 @@ export type OpeningSummary = components["schemas"]["OpeningSummary"];
 export type PulledCard = components["schemas"]["PulledCard"];
 export type Purchase = components["schemas"]["Purchase"];
 export type DeckOffer = components["schemas"]["DeckOffer"];
+export type SaleInfo = components["schemas"]["SaleInfo"];
 export type BoosterKind = Product["kind"];
 
 export const kindLabels: Record<BoosterKind, string> = {
@@ -85,6 +86,13 @@ function released(product: Product): string {
   return product.released ?? "9999-12-31";
 }
 
+/** What buying the product costs now: this week's sale price, or its own (v0.4.3). */
+export function priceToPay(
+  product: Pick<Product, "price" | "sale_price">,
+): number {
+  return product.sale_price ?? product.price;
+}
+
 function compare(a: Product, b: Product, sort: Sort): number {
   const byDate = released(a).localeCompare(released(b));
   const byName = a.name.localeCompare(b.name);
@@ -92,9 +100,9 @@ function compare(a: Product, b: Product, sort: Sort): number {
     case "oldest":
       return byDate || byName;
     case "cheapest":
-      return a.price - b.price || -byDate || byName;
+      return priceToPay(a) - priceToPay(b) || -byDate || byName;
     case "dearest":
-      return b.price - a.price || -byDate || byName;
+      return priceToPay(b) - priceToPay(a) || -byDate || byName;
     default:
       return -byDate || byName;
   }

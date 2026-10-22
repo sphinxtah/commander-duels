@@ -253,6 +253,18 @@
             ],
             "title": "Released"
           },
+          "sale_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In tokens, while the product is in this week's sale; null otherwise.",
+            "title": "Sale Price"
+          },
           "sale_reason": {
             "anyOf": [
               {
@@ -5632,6 +5644,18 @@
             ],
             "title": "Released"
           },
+          "sale_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In tokens, while the product is in this week's sale; null otherwise.",
+            "title": "Sale Price"
+          },
           "set_code": {
             "title": "Set Code",
             "type": "string"
@@ -6986,6 +7010,45 @@
         "title": "SaleChange",
         "type": "object"
       },
+      "SaleInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "ends_at": {
+            "description": "The next Sunday midnight.",
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "percent": {
+            "description": "How much less the sale's packs cost.",
+            "title": "Percent",
+            "type": "integer"
+          },
+          "products": {
+            "description": "This week's products still on the shelf.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Products",
+            "type": "array"
+          },
+          "starts_at": {
+            "description": "Sunday midnight, Arizona time.",
+            "format": "date-time",
+            "title": "Starts At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "percent",
+          "starts_at",
+          "ends_at",
+          "products"
+        ],
+        "title": "SaleInfo",
+        "type": "object"
+      },
       "SeatChange": {
         "additionalProperties": false,
         "properties": {
@@ -7457,6 +7520,17 @@
             },
             "title": "Products",
             "type": "array"
+          },
+          "sale": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SaleInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "This week's sale at Leng's counter (v0.4.3)."
           }
         },
         "required": [

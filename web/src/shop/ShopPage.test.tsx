@@ -95,7 +95,7 @@ describe("Leng's card shop", () => {
     expect(
       within(shelf("Reality Fracture Play Booster")).getByText("500 tokens"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/3 of 3 products on sale/)).toBeInTheDocument();
+    expect(screen.getByText(/3 of 3 products for sale/)).toBeInTheDocument();
     expect(screen.getByText(/version 5\.3\.0\+20261021/)).toBeInTheDocument();
     expect(screen.getByText(/read on Oct 21, 2026/)).toBeInTheDocument();
     expect(
@@ -240,6 +240,57 @@ describe("Leng's card shop", () => {
     expect(posted[0].key).toMatch(/^[0-9a-f]{32}$/);
     expect(posted[1]).toEqual(posted[0]);
     expect(posted[0].product).toBe("product-znr-draft");
+  });
+
+  it("shows the weekly sale at the counter, and sells its packs for less (v0.4.3)", async () => {
+    const onSale = shopView.products.map((product) =>
+      product.id === "product-znr-draft"
+        ? { ...product, sale_price: 304 }
+        : product,
+    );
+    on("GET /api/v1/shop", () =>
+      reply(200, {
+        ...shopView,
+        products: onSale,
+        sale: {
+          percent: 20,
+          starts_at: "2026-10-18T07:00:00Z",
+          ends_at: "2026-10-25T07:00:00Z",
+          products: ["product-znr-draft"],
+        },
+      }),
+    );
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
+    const sale = await screen.findByRole("region", {
+      name: "This week's sale 20% off",
+    });
+    // The note on earning tokens is gone from the counter.
+    expect(document.body.textContent).not.toMatch(/Wins earn tokens/);
+    expect(within(sale).getByText(/^Until Sunday, Oct 25/)).toBeInTheDocument();
+    const item = within(sale).getByRole("listitem", {
+      name: "Zendikar Rising Draft Booster",
+    });
+    expect(item).toHaveTextContent("380 tokens 304 tokens");
+    expect(
+      within(shelf("Zendikar Rising Draft Booster")).getByText("Weekly sale"),
+    ).toBeInTheDocument();
+    expect(
+      within(shelf("Reality Fracture Play Booster")).queryByText("Weekly sale"),
+    ).toBeNull();
+    fireEvent.click(
+      within(item).getByRole("button", {
+        name: "Buy Zendikar Rising Draft Booster for 304 tokens",
+      }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "Buy a Zendikar Rising Draft Booster?",
+    });
+    expect(dialog).toHaveTextContent(
+      "It costs 304 tokens in this week's sale (380 tokens otherwise). You have 1,000 tokens, and will have 696 tokens left.",
+    );
+    expect(
+      within(dialog).getByRole("button", { name: "Buy for 304 tokens" }),
+    ).toBeInTheDocument();
   });
 
   it("opens a pack from the inventory, and shows one opened before", async () => {

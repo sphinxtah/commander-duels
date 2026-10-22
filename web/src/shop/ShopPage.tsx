@@ -12,12 +12,14 @@ import { DeckShelf } from "./DeckShelf";
 import { Leng } from "./Leng";
 import { PackArt } from "./PackArt";
 import { PackOpening } from "./PackOpening";
+import { WeeklySale } from "./WeeklySale";
 import {
   byEra,
   filtered,
   kindLabels,
   kindsOf,
   noFilters,
+  priceToPay,
   purchaseKey,
   rarityLabels,
   sortLabels,
@@ -36,8 +38,8 @@ import styles from "./shop.module.css";
 // wins earn, and opened at Leng's counter. The server prices, sells and draws every pack; the page
 // shows what it says and keeps one client key per purchase, so a retried request buys once. Since
 // v0.4.2 a second tab sells the starter decks (DeckShelf). Since v0.4.3 every pack shows its
-// picture (PackArt) on the shelves, among the packs held and in the history, and Leng's counter
-// is the owner's painting.
+// picture (PackArt) on the shelves, among the packs held and in the history, Leng's counter is
+// the owner's painting, and the counter shows the weekly sale (WeeklySale).
 
 type Shelf = "packs" | "decks";
 
@@ -53,7 +55,7 @@ function speech(view: ShopView | undefined): string {
   if (!view) return "Come in, come in. Let me light the lamp…";
   if (!view.products.length)
     return "My shelves are still being stocked. Come back once the booster data has been read.";
-  const cheapest = Math.min(...view.products.map((product) => product.price));
+  const cheapest = Math.min(...view.products.map(priceToPay));
   if (view.balance < cheapest)
     return "Short of tokens? Win a few games, then come back and see what the packs hold.";
   return "Welcome, traveller. Every pack on these shelves holds what the real ones held, rare for rare.";
@@ -216,11 +218,13 @@ export function ShopPage({
             <span>Your tokens</span>
             <strong>{view ? balance.toLocaleString("en-US") : "…"}</strong>
           </div>
-          <p className={styles.note}>
-            {me.kind === "sysop"
-              ? "SysOp gives tokens and packs from Administration."
-              : "Wins earn tokens: 5 to 20 for each bot you beat, 50 to 500 for each player."}
-          </p>
+          {/* The weekly sale (v0.4.3), where a note on earning tokens was. */}
+          <WeeklySale
+            sale={view?.sale}
+            products={products}
+            balance={balance}
+            onBuy={choose}
+          />
         </div>
       </div>
       {error && (
@@ -359,7 +363,7 @@ export function ShopPage({
             </div>
             <p className={styles.note} aria-live="polite">
               {view
-                ? `${shown.length} of ${products.length} ${products.length === 1 ? "product" : "products"} on sale.`
+                ? `${shown.length} of ${products.length} ${products.length === 1 ? "product" : "products"} for sale.`
                 : "Loading the shelves…"}
             </p>
             {groups.map(({ era, products: group }) => (
@@ -375,7 +379,8 @@ export function ShopPage({
                 )}
                 <ul className={styles.products}>
                   {group.map((product) => {
-                    const short = product.price - balance;
+                    const price = priceToPay(product);
+                    const short = price - balance;
                     return (
                       <li
                         key={product.id}
@@ -404,7 +409,19 @@ export function ShopPage({
                             : ""}
                         </p>
                         <div className={styles.price}>
-                          <b>{tokens(product.price)}</b>
+                          {product.sale_price != null ? (
+                            <span className={styles.salePrice}>
+                              <s aria-label={`was ${tokens(product.price)}`}>
+                                {tokens(product.price)}
+                              </s>{" "}
+                              <b>{tokens(price)}</b>{" "}
+                              <span className={styles.saleTag}>
+                                Weekly sale
+                              </span>
+                            </span>
+                          ) : (
+                            <b>{tokens(product.price)}</b>
+                          )}
                           <button
                             type="button"
                             className={styles.secondary}
@@ -514,8 +531,11 @@ export function ShopPage({
           <>
             <h2 id="buy-title">Buy a {buying.name}?</h2>
             <p>
-              It costs {tokens(buying.price)}. You have {tokens(balance)}, and
-              will have {tokens(balance - buying.price)} left.
+              It costs {tokens(priceToPay(buying))}
+              {buying.sale_price != null &&
+                ` in this week's sale (${tokens(buying.price)} otherwise)`}
+              . You have {tokens(balance)}, and will have{" "}
+              {tokens(balance - priceToPay(buying))} left.
             </p>
             {buyError && (
               <p className={styles.error} role="alert">
@@ -529,7 +549,9 @@ export function ShopPage({
                 disabled={busy}
                 onClick={() => void confirm()}
               >
-                {buyError ? "Try again" : `Buy for ${tokens(buying.price)}`}
+                {buyError
+                  ? "Try again"
+                  : `Buy for ${tokens(priceToPay(buying))}`}
               </button>
               <button
                 type="button"

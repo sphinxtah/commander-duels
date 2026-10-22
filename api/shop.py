@@ -26,6 +26,9 @@ the Magic Duels style, their cards the player's for good.
   purchases, openings and their history, Administration) carries its pack's picture when
   content/pack-art.json names one, and its set's symbol; with no picture the browser draws the
   pack from the set's name, symbol, era and booster type.
+- **The weekly sale** (v0.4.3, api/sales.py). Each week five products on the shelf cost 20% less,
+  from Sunday midnight to Sunday midnight, Arizona time: the shelf and Leng's counter show the sale
+  price, and a purchase pays it while the week lasts.
 """
 
 import secrets
@@ -100,6 +103,7 @@ from api.products import (
     selling,
 )
 from api.roster import roster_of
+from api.sales import Sale, SaleInfo, weekly_sale
 from api.schemas import Contract, StoredText
 from catalog import boosters
 
@@ -164,6 +168,10 @@ class ProductInfo(ProductRef):
         "unpriced: not priced yet."
     )
     pack_size: int | None = Field(description="Cards in the usual pack.")
+    sale_price: int | None = Field(
+        default=None,
+        description="In tokens, while the product is in this week's sale; null otherwise.",
+    )
 
 
 class InventoryItem(Contract):
@@ -209,6 +217,9 @@ class ShopView(Contract):
         default=False,
         description="The account's two free starter decks are still to choose; the shop sells "
         "none until they are.",
+    )
+    sale: SaleInfo | None = Field(
+        default=None, description="This week's sale at Leng's counter (v0.4.3)."
     )
 
 
@@ -376,13 +387,14 @@ def ref_of(product: ShopProduct, art: ArtIndex) -> ProductRef:
     )
 
 
-def info_of(product: ShopProduct, art: ArtIndex) -> ProductInfo:
+def info_of(product: ShopProduct, art: ArtIndex, sale: Sale | None = None) -> ProductInfo:
     price, basis = price_of(product)
     return ProductInfo(
         **ref_of(product, art).model_dump(),
         price=price,
         price_basis=basis,
         pack_size=product.pack_size,
+        sale_price=sale.price(product.id, price) if sale else None,
     )
 
 
@@ -455,7 +467,9 @@ def latest_version(db: Session) -> tuple[str | None, datetime | None]:
 def shop(request: Request, principal: Active, db: Db) -> ShopView:
     """What Leng sells, the account's tokens and unopened packs, and where the data comes from."""
     products = products_of(request, db)
-    today = utcnow().date()
+    now = utcnow()
+    today = now.date()
+    sale = weekly_sale(db, products, now)
     on_sale = sorted(
         (product for product in products if selling(product, today)),
         key=newest_first,
@@ -467,7 +481,7 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
     art = art_of(request)
     return ShopView(
         balance=balance_of(db, principal.user.id),
-        products=[info_of(product, art) for product in on_sale],
+        products=[info_of(product, art, sale) for product in on_sale],
         eras=[EraInfo(id=era.id, name=era.name, since=era.since) for era in ERAS],
         inventory=inventory_of(db, principal.user.id, art),
         data=ShopData(
@@ -477,6 +491,7 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
         ),
         decks=deck_offers(request, db, principal.user),
         free_decks=free,
+        sale=sale.info(),
     )
 
 
@@ -612,8 +627,9 @@ def bought(db: Session, user_id: UUID, key: str) -> Pack | None:
 def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> Purchase:
     """Buys one pack: its price leaves the balance and the pack joins the inventory, together."""
     user_id = principal.user.id
-    ensured(request)
     art = art_of(request)
+    # Drawn (and committed) before the purchase's own transaction, if no request has yet.
+    sale = weekly_sale(db, products_of(request, db), utcnow())
     # The account's row is locked first, so a retry waits for the request it repeats.
     lock_account(db, user_id)
     earlier = bought(db, user_id, body.key)
@@ -627,6 +643,9 @@ def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> P
     if not selling(product, utcnow().date()):
         raise ApiError(409, "not_on_sale", f"{product.name} is not on sale.")
     price, _ = price_of(product)
+    discounted = sale.price(product.id, price)
+    if discounted is not None:
+        price = discounted
     pack = Pack(
         id=uuid4(),
         user_id=user_id,
@@ -638,7 +657,10 @@ def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> P
     )
     db.add(pack)
     db.flush()
-    spend(db, user_id, price, f"pack:{pack.id}", product.name)
+    reason = (
+        product.name if discounted is None else f"{product.name} (weekly sale, {sale.percent}% off)"
+    )
+    spend(db, user_id, price, f"pack:{pack.id}", reason)
     try:
         db.commit()
     except IntegrityError:
