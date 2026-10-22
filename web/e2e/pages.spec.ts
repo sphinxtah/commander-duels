@@ -115,19 +115,26 @@ test("the landing page's line of links opens each page, and it fits a phone", as
     await named.click();
     await expectPublicPage(page, index);
   }
-  // Under the button, what signing in accepts (v0.4.2), with the two pages it names.
-  await page.goto("/#play");
-  for (const [name, index] of [
-    ["terms of use", 2],
-    ["privacy policy", 1],
-  ] as const) {
-    await page
-      .getByRole("main")
-      .getByRole("link", { name, exact: true })
-      .click();
-    await expectPublicPage(page, index);
-    await page.goto("/#play");
-  }
+  // Under the button, what signing in accepts (v0.4.2), with the two pages it names. It comes
+  // with the Google button, so only where the server has a Google client: CI's engine job has
+  // none, and its landing page says sign-in is not set up instead.
+  const bootstrap = (await (
+    await page.request.get("/api/v1/bootstrap")
+  ).json()) as {
+    auth?: { google_client_id?: string | null };
+  };
+  if (bootstrap.auth?.google_client_id)
+    for (const [name, index] of [
+      ["terms of use", 2],
+      ["privacy policy", 1],
+    ] as const) {
+      await page.goto("/#play");
+      await page
+        .getByRole("main")
+        .getByRole("link", { name, exact: true })
+        .click();
+      await expectPublicPage(page, index);
+    }
   await page.setViewportSize({ width: 390, height: 844 });
   for (const { path } of pages) {
     await page.goto(path);
