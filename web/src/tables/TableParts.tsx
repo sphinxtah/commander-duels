@@ -1,6 +1,35 @@
 import { Portrait } from "../alliance/Portrait";
-import type { OwnDeck } from "./tables";
+import game from "../game/game.module.css";
+import {
+  casualRules,
+  formatNames,
+  rulesSentence,
+  rulesTag,
+  tournamentRules,
+  unfit,
+  type OwnDeck,
+  type TableFormat,
+  type TableRules,
+  type TableView,
+} from "./tables";
 import styles from "./tables.module.css";
+
+/** A table's seats and rules as tags (v0.4.5), so a player sees before joining which decks it
+ * takes. The rules tag spells them out to a screen reader. */
+export function TableTags({ table }: { table: TableView }) {
+  return (
+    <span className={styles.tags}>
+      <span className={styles.badge}>{table.seats} seats</span>
+      <span className={styles.badge} data-tone="rules">
+        {rulesTag(table.rules, table.format)}
+        <span className={styles.visuallyHidden}>
+          {" "}
+          ({rulesSentence(table.rules, table.format)})
+        </span>
+      </span>
+    </span>
+  );
+}
 
 /** A player's face at a table: their alliance's portrait, or their handle's first letter. */
 export function Face({
@@ -25,20 +54,85 @@ export function Face({
   );
 }
 
-/** The deck choices of one format: playable decks, and the others greyed with the reason. */
-export function DeckChoices({ decks }: { decks: OwnDeck[] }) {
+/** The deck choices of one format: the decks the table's rules take, and the others greyed with
+ * the reason. */
+export function DeckChoices({
+  decks,
+  rules,
+}: {
+  decks: OwnDeck[];
+  rules: TableRules;
+}) {
   return (
     <>
-      {decks.map((deck) => (
-        <option key={deck.id} value={deck.id} disabled={!deck.playable}>
-          {deck.title}
-          {deck.playable
-            ? ""
-            : deck.collection_locked
-              ? " (needs cards you don't own)"
-              : " (not playable yet)"}
-        </option>
-      ))}
+      {decks.map((deck) => {
+        const reason = unfit(deck, rules);
+        return (
+          <option key={deck.id} value={deck.id} disabled={reason !== null}>
+            {deck.title}
+            {reason ? ` (${reason})` : ""}
+          </option>
+        );
+      })}
     </>
+  );
+}
+
+/** The host's choice of which cards the decks may hold by their legality (v0.4.5): two boxes, and
+ * Tournament rules, which clears both. Unticking it goes back to casual. */
+export function RulesFields({
+  rules,
+  format,
+  onChange,
+}: {
+  rules: TableRules;
+  format: TableFormat;
+  onChange: (rules: TableRules) => void;
+}) {
+  const name = formatNames[format];
+  const tournament = !rules.banned && !rules.not_legal;
+  return (
+    <fieldset>
+      <legend>Cards the decks may hold</legend>
+      <label className={game.choice}>
+        <input
+          type="checkbox"
+          checked={rules.banned}
+          onChange={(event) =>
+            onChange({ ...rules, banned: event.target.checked })
+          }
+        />
+        <span>
+          <strong>Banned cards</strong>
+          <small>Cards banned in {name}</small>
+        </span>
+      </label>
+      <label className={game.choice}>
+        <input
+          type="checkbox"
+          checked={rules.not_legal}
+          onChange={(event) =>
+            onChange({ ...rules, not_legal: event.target.checked })
+          }
+        />
+        <span>
+          <strong>Cards not legal in {name}</strong>
+          <small>Un-cards, playtest and digital-only cards</small>
+        </span>
+      </label>
+      <label className={game.choice}>
+        <input
+          type="checkbox"
+          checked={tournament}
+          onChange={(event) =>
+            onChange(event.target.checked ? tournamentRules : casualRules)
+          }
+        />
+        <span>
+          <strong>Tournament rules</strong>
+          <small>Neither: every card legal in {name}</small>
+        </span>
+      </label>
+    </fieldset>
   );
 }

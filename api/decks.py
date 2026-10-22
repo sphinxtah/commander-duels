@@ -18,11 +18,16 @@ changes (refresh_decks). The starter decks are the ten in content/starter-decks.
 Since v0.4.0 a Godlike account's decks may hold the Godlike tier's custom cards
 (api/custom_play.py): its owner sees, imports and exports them; shared decks, their exports and
 copies leave them out.
+
+Since v0.4.5 a deck holding banned cards, or cards not legal in its format, is legal and records
+the table options it needs (needs); only tables that allow them take it. A deck last validated
+before then is validated again when its owner's deck list is read.
 """
 
 import hashlib
 import json
 import secrets
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from typing import Annotated, Literal, cast
 from uuid import UUID
@@ -53,6 +58,7 @@ from api.library import (
     Starter,
     at_godlike,
     commander_printing,
+    library_of,
     starter_entries,
     starters_in,
 )
@@ -66,7 +72,8 @@ from api.models import (
     DeckRevision,
     User,
 )
-from api.schemas import Contract, Error, StoredText
+from api.roster import roster_of
+from api.schemas import Contract, Error, StoredText, TableOption
 from api.validation import (
     MAX_ENTRIES,
     DeckContent,
@@ -97,6 +104,10 @@ class DeckSummary(Contract):
     playable: bool
     collection_locked: bool = Field(
         description="Legal, but the player's library holds too few copies of a card (v0.3.1)."
+    )
+    needs: list[TableOption] = Field(
+        description="The table options its cards need (v0.4.5): only tables that allow them "
+        "take it."
     )
     # The commanders' color identity, or the deck's colors in Legacy, as letters.
     identity: str
@@ -310,6 +321,13 @@ def locked(validation: Validation) -> bool:
     return any(problem.kind == "collection_locked" for problem in validation.errors)
 
 
+def store_flags(deck: Deck, validation: Validation) -> None:
+    """The draft's validation, kept so a deck list needs none."""
+    deck.legal, deck.playable = validation.legal, validation.playable
+    deck.collection_locked = locked(validation)
+    deck.needs = list(validation.needs)
+
+
 def store_draft(
     db: Session, deck: Deck, entries: list[DeckEntry], library: Library | None
 ) -> Validation:
@@ -324,9 +342,7 @@ def store_draft(
     deck.draft_hash = content_hash(deck.format, clean)
     counts = validation.counts
     deck.card_count = counts.main + counts.commander
-    deck.legal = validation.legal
-    deck.playable = validation.playable
-    deck.collection_locked = locked(validation)
+    store_flags(deck, validation)
     deck.identity = identity_of(db, deck.format, clean)
     deck.updated_at = now()
     return validation
@@ -351,6 +367,7 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
         legal=deck.legal,
         playable=deck.playable,
         collection_locked=deck.collection_locked,
+        needs=cast(list[TableOption], deck.needs or []),
         identity=deck.identity,
         commanders=commanders_of(db, entries_of(deck), deck.owner_id),
         latest_revision=deck.latest_revision,
@@ -441,18 +458,26 @@ def create_deck(
     return deck, validation
 
 
-def refresh_decks(db: Session, user_id: UUID, library: Library) -> None:
-    """Revalidates the account's decks after its library changed, so each deck's stored flags
-    say whether it can start a game now."""
-    for deck in db.scalars(select(Deck).where(Deck.owner_id == user_id, Deck.deleted_at.is_(None))):
+def revalidate(db: Session, decks: Iterable[Deck], library: Library) -> None:
+    """Validates the decks again with their owner's library, and keeps the flags."""
+    for deck in decks:
         validation = validate_deck(
             db,
             DeckContent(format=deck.format, entries=entries_of(deck)),  # type: ignore[arg-type]
             today(),
             library.collection(),
         )
-        deck.legal, deck.playable = validation.legal, validation.playable
-        deck.collection_locked = locked(validation)
+        store_flags(deck, validation)
+
+
+def refresh_decks(db: Session, user_id: UUID, library: Library) -> None:
+    """Revalidates the account's decks after its library changed, so each deck's stored flags
+    say whether it can start a game now."""
+    revalidate(
+        db,
+        db.scalars(select(Deck).where(Deck.owner_id == user_id, Deck.deleted_at.is_(None))),
+        library,
+    )
 
 
 def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
@@ -572,6 +597,7 @@ def starters(
 
 @router.get("/decks", response_model=list[DeckSummary])
 def list_decks(
+    request: Request,
     principal: Builder,
     db: Db,
     view: Literal["active", "archived", "trash"] = "active",
@@ -584,8 +610,17 @@ def list_decks(
         query = query.where(
             Deck.archived_at.is_not(None) if view == "archived" else Deck.archived_at.is_(None)
         )
-    decks = db.scalars(query.order_by(Deck.updated_at.desc()))
-    return [deck_summary(db, deck) for deck in decks]
+    decks = list(db.scalars(query.order_by(Deck.updated_at.desc())))
+    # A deck last validated before v0.4.5 is validated again, once: a banned card, or one not
+    # legal in the format, no longer makes it illegal, and the tables ask which options it needs.
+    stale = [deck for deck in decks if deck.needs is None]
+    if stale:
+        roster = roster_of(request)
+        revalidate(db, stale, library_of(db, principal.user, principal.permissions, roster))
+    summaries = [deck_summary(db, deck) for deck in decks]
+    if stale:
+        db.commit()
+    return summaries
 
 
 @router.post("/decks", response_model=DeckDetail, status_code=201)

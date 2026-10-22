@@ -4,14 +4,20 @@
   private, with bots of one skill (1-6) in the seats the players leave. Public tables are listed
   while they wait for players; a private one is reached only by its invite link, whose code is
   unguessable. SysOp sees every table. A table nobody started closes after 3 hours.
+- **Rules** (v0.4.5). The host chooses which cards its decks may hold by their legality in the
+  format: banned cards, and cards not legal in it (Un-cards, playtest and digital-only cards).
+  A new table is casual, allowing both; tournament rules allow neither. The format's deck rules
+  always apply. The lobby shows each table's rules.
 - **Seats.** A player takes a seat with one of their own decks, checked as at the practice table:
-  every copy in their library, and no deck that cannot be played. Otherwise anything legal goes,
-  administrators' whole-catalog decks included. Players may change deck, mark themselves ready and
-  leave. A player sits at one open table at a time, and the host leaving closes the table.
+  every copy in their library, no deck that cannot be played, and no card the table's rules do
+  not allow (the player is told which). Administrators' whole-catalog decks play too. Players may
+  change deck, mark themselves ready and leave. A player sits at one open table at a time, and
+  the host leaving closes the table.
 - **Starting.** The host starts once every player's seat is taken and ready, within every player's
-  limit of running games (CD_GAMES_PER_ACCOUNT; SysOp has none). That makes one engine game, with
-  the players' seats first, then the bots'. The game runs as any other (api/games.py): each
-  player's seat has its own token, lease, views and concession, and away players may be voted out.
+  limit of running games (CD_GAMES_PER_ACCOUNT; SysOp has none), and every deck is checked again.
+  That makes one engine game, with the players' seats first, then the bots'. The game runs as any
+  other (api/games.py): each player's seat has its own token, lease, views and concession, and
+  away players may be voted out.
 - **Privacy.** Others see a seat's handle and portrait (its alliance), never its deck.
 """
 
@@ -69,7 +75,7 @@ from api.models import (
     User,
 )
 from api.roster import roster_of
-from api.schemas import Contract, Error, GameFormatId
+from api.schemas import Contract, Error, GameFormatId, TableRules, casual
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -99,6 +105,11 @@ class TableRequest(Contract):
     visibility: Visibility = Field(
         default="public",
         description="public tables are listed; a private one is reached by its invite link only.",
+    )
+    rules: TableRules = Field(
+        default_factory=casual,
+        description="Which cards its decks may hold by their legality; casual unless told "
+        "otherwise.",
     )
     deck_id: UUID = Field(description="The host's deck.")
 
@@ -134,6 +145,7 @@ class TableView(Contract):
     bots: int
     bot_skill: int
     turn_cap: int
+    rules: TableRules
     host: str | None = Field(description="The host's handle.")
     players: list[TablePlayer] = Field(description="Every seat in turn order, bots last.")
     your_seat: int | None
@@ -151,6 +163,10 @@ def status_of(table: GameTable) -> str:
     if table.status == "open" and table.created_at < cutoff():
         return "closed"
     return table.status
+
+
+def rules_of(table: GameTable) -> TableRules:
+    return TableRules(banned=table.allow_banned, not_legal=table.allow_not_legal)
 
 
 def find(db: Session, code: str, *, lock: bool = False) -> GameTable:
@@ -241,6 +257,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         bots=table.bots,
         bot_skill=table.bot_skill,
         turn_cap=table.turn_cap,
+        rules=rules_of(table),
         host=found.get(table.host_id, (None, None))[0],
         players=players,
         your_seat=mine.seat if mine is not None else None,
@@ -251,14 +268,20 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
 
 
 def check_deck(
-    db: Session, request: Request, user: User, permissions: frozenset[str], deck_id: UUID, fmt: str
+    db: Session,
+    request: Request,
+    user: User,
+    permissions: frozenset[str],
+    deck_id: UUID,
+    fmt: str,
+    rules: TableRules,
 ) -> None:
-    """A deck the player may sit down with: theirs, of the table's format, and playable with their
-    library now (as at the practice table)."""
+    """A deck the player may sit down with: theirs, of the table's format, playable with their
+    library now (as at the practice table), and holding no card the table's rules do not allow."""
     if "decks.edit" not in permissions:
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
-    own_deck(db, user, permissions, deck_id, fmt, library)
+    own_deck(db, user, permissions, deck_id, fmt, library, rules)
 
 
 def may_sit(db: Session, request: Request, principal: Principal) -> None:
@@ -306,7 +329,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         )
     if body.bots > body.seats - 2:
         raise ApiError(422, "invalid_table", "A table needs at least two players' seats.")
-    check_deck(db, request, principal.user, principal.permissions, body.deck_id, fmt)
+    check_deck(db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules)
     may_sit(db, request, principal)
     now = utcnow()
     table = GameTable(
@@ -318,6 +341,8 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         bots=body.bots,
         bot_skill=body.bot_skill,
         turn_cap=body.turn_cap,
+        allow_banned=body.rules.banned,
+        allow_not_legal=body.rules.not_legal,
         status="open",
         created_at=now,
     )
@@ -357,7 +382,15 @@ def join_table(
     free = [seat for seat in range(table.seats - table.bots) if seat not in {r.seat for r in rows}]
     if not free:
         raise ApiError(409, "table_full", "Every player's seat at this table is taken.")
-    check_deck(db, request, principal.user, principal.permissions, body.deck_id, table.format)
+    check_deck(
+        db,
+        request,
+        principal.user,
+        principal.permissions,
+        body.deck_id,
+        table.format,
+        rules_of(table),
+    )
     may_sit(db, request, principal)
     db.add(
         TableSeat(
@@ -398,7 +431,15 @@ def change_seat(
     table = find(db, code)
     row = seat_at(db, table, principal)
     if body.deck_id is not None and body.deck_id != row.deck_id:
-        check_deck(db, request, principal.user, principal.permissions, body.deck_id, table.format)
+        check_deck(
+            db,
+            request,
+            principal.user,
+            principal.permissions,
+            body.deck_id,
+            table.format,
+            rules_of(table),
+        )
         row.deck_id = body.deck_id
         row.ready = False
     if body.ready is not None:
@@ -453,12 +494,13 @@ def plan_table(
         library = library_of(db, user, permissions, roster)
         try:
             seat, revision, title = own_deck(
-                db, user, permissions, row.deck_id, table.format, library
+                db, user, permissions, row.deck_id, table.format, library, rules_of(table)
             )
         except ApiError as refused:
             if user.id == principal.user.id:
                 raise
-            # Another player's deck stays private: the host learns only whose it is.
+            # Another player's deck stays private: the host learns only whose it is, not whether
+            # its cards or the table's rules stop it.
             row.ready = False
             db.commit()
             raise ApiError(

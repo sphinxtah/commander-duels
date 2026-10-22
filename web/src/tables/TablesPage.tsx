@@ -2,12 +2,15 @@ import { useCallback, useState, type FormEvent, type RefObject } from "react";
 import { client, describe, type Me } from "../api";
 import game from "../game/game.module.css";
 import { TableLobby } from "./TableLobby";
-import { DeckChoices, Face } from "./TableParts";
+import { DeckChoices, Face, RulesFields, TableTags } from "./TableParts";
 import {
+  casualRules,
   formatNames,
+  unfit,
   useOwnDecks,
   usePolled,
   type TableFormat as Format,
+  type TableRules,
   type TableView,
 } from "./tables";
 import styles from "./tables.module.css";
@@ -54,12 +57,16 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
   const [bots, setBots] = useState(0);
   const [skill, setSkill] = useState(4);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [rules, setRules] = useState<TableRules>(casualRules);
   const [deck, setDeck] = useState("");
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
 
   const here = (decks ?? []).filter((d) => d.format === format);
-  const chosen = deck || here.find((d) => d.playable)?.id || "";
+  // The deck chosen while the rules take it; else the first deck they take.
+  const fitting = here.filter((d) => unfit(d, rules) === null);
+  const chosen =
+    (fitting.some((d) => d.id === deck) ? deck : fitting[0]?.id) ?? "";
   const yours = tables?.find((table) => table.your_seat !== null);
 
   function chooseFormat(next: Format) {
@@ -81,6 +88,7 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
         bot_skill: skill,
         turn_cap: 60,
         visibility,
+        rules,
         deck_id: chosen,
       },
     });
@@ -100,9 +108,10 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
         Sit down with other players.
       </h1>
       <p className={styles.lead}>
-        Open a table and share its invite link, or join one below. Bring any
-        deck of your own that you can play. Wins over players pay 50 to 500
-        tokens, by how many wins they have.
+        Open a table and share its invite link, or join one below. Bring a deck
+        of your own that the table's rules take: its host chooses whether banned
+        cards, and cards not legal in the format, may play. Wins over players
+        pay 50 to 500 tokens, by how many wins they have.
       </p>
       {yours && (
         <p className={styles.notice} role="status">
@@ -201,12 +210,21 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
               <option value="private">Only players with the invite link</option>
             </select>
           </label>
+          <RulesFields rules={rules} format={format} onChange={setRules} />
           {decks !== null && here.every((d) => !d.playable) ? (
             <div className={game.field} data-no-deck>
               <span>Your deck</span>
               <span>
                 You have no playable {formatNames[format]} deck yet. Build one
                 in <a href="#decks">Decks</a>.
+              </span>
+            </div>
+          ) : decks !== null && fitting.length === 0 ? (
+            <div className={game.field} data-no-deck>
+              <span>Your deck</span>
+              <span>
+                None of your {formatNames[format]} decks fits these rules: each
+                holds cards they do not allow.
               </span>
             </div>
           ) : (
@@ -216,7 +234,7 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
                 value={chosen}
                 onChange={(event) => setDeck(event.target.value)}
               >
-                <DeckChoices decks={here} />
+                <DeckChoices decks={here} rules={rules} />
               </select>
             </label>
           )}
@@ -272,6 +290,7 @@ function ListedTable({ table }: { table: TableView }) {
             <span className={styles.badge}>Private</span>
           )}
         </h3>
+        <TableTags table={table} />
         <small>
           Hosted by {table.host ?? "a player"} · {players.length} of {humans}{" "}
           players

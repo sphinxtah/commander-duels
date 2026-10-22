@@ -196,6 +196,21 @@ a.deckTitle:hover {
   border-color: #d4b47a88;
   color: #e6c68c;
 }
+/* The table options a deck needs (v0.4.5): only tables that allow them take it. */
+.needs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.needs small {
+  color: #93a198;
+  font-size: 0.78rem;
+}
+.badge[data-state="needs"] {
+  border-color: #d4b47a66;
+  color: #e6dcc4;
+}
 .starterAbout {
   margin: 4px 0 0;
   max-width: 72ch;

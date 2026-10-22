@@ -1,5 +1,11 @@
-import type { CardSummary } from "../catalog/catalog";
-import { collectionLocked, type Problem, type Validation } from "./decks";
+import { formatLabels, type CardSummary } from "../catalog/catalog";
+import {
+  collectionLocked,
+  type DeckFormat,
+  type Problem,
+  type TableOption,
+  type Validation,
+} from "./decks";
 import styles from "./decks.module.css";
 
 const kinds: Record<Problem["kind"], string> = {
@@ -8,7 +14,37 @@ const kinds: Record<Problem["kind"], string> = {
   not_implemented: "Not playable here yet",
   collection_locked: "Needs cards you don't own",
   structure: "Needs fixing",
+  banned: "Casual tables only",
+  not_legal: "Casual tables only",
 };
+
+/** What a table must allow for a deck that needs the option (v0.4.5), as a tag names it. */
+export function needWords(need: TableOption, format: DeckFormat): string {
+  return need === "banned"
+    ? "Banned cards"
+    : `Not legal in ${formatLabels[format]}`;
+}
+
+/** The table options a deck needs, as tags: only tables that allow them take it (v0.4.5). */
+export function NeedsTags({
+  needs,
+  format,
+}: {
+  needs: TableOption[];
+  format: DeckFormat;
+}) {
+  if (needs.length === 0) return null;
+  return (
+    <span className={styles.needs}>
+      <small>Casual tables only:</small>
+      {needs.map((need) => (
+        <span key={need} className={styles.badge} data-state="needs">
+          {needWords(need, format)}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 /** A padlock for what the player's library holds back (DECK08). Never announced: the words
  * beside it say so. */
@@ -31,16 +67,26 @@ export function LockIcon() {
   );
 }
 
+/** Which tables take a playable deck, by the options its cards need (v0.4.5). */
+function tablesFor(validation: Validation): string {
+  const format = formatLabels[validation.format];
+  const needs = validation.needs;
+  if (needs.length === 0)
+    return "Ready to play: legal, and every card is playable here.";
+  if (needs.length > 1)
+    return `Ready to play at casual tables, which allow banned cards and cards not legal in ${format}.`;
+  return needs[0] === "banned"
+    ? "Ready to play at tables that allow banned cards."
+    : `Ready to play at tables that allow cards not legal in ${format}.`;
+}
+
 /** The one line that says whether the deck can play, and if not, what kind of problem keeps it. */
 export function verdict(validation: Validation): {
   state: "playable" | "locked" | "legal" | "draft";
   words: string;
 } {
   if (validation.playable)
-    return {
-      state: "playable",
-      words: "Ready to play: legal, and every card is playable here.",
-    };
+    return { state: "playable", words: tablesFor(validation) };
   const count = validation.errors.length;
   if (!validation.legal)
     return {
@@ -83,35 +129,40 @@ export function ProblemList({
       {validation.errors.length + validation.warnings.length > 0 && (
         <ul>
           {[...validation.errors, ...validation.warnings].map(
-            (problem, index) => (
-              <li
-                key={`${problem.code}-${index}`}
-                data-kind={problem.kind}
-                data-warning={index >= validation.errors.length}
-              >
-                {index < validation.errors.length &&
-                  problem.kind === "collection_locked" && <LockIcon />}
-                <strong>
-                  {index >= validation.errors.length
-                    ? "Note"
-                    : kinds[problem.kind]}
-                  :
-                </strong>{" "}
-                {problem.message} <em>{problem.remedy}</em>
-                {onSelect && (problem.card_ids ?? []).length > 0 && (
-                  <button
-                    type="button"
-                    className={styles.link}
-                    onClick={() => onSelect(problem.card_ids ?? [])}
-                  >
-                    Show{" "}
-                    {problem.card_ids?.length === 1
-                      ? (cards[problem.card_ids[0]!]?.name ?? "the card")
-                      : "the cards"}
-                  </button>
-                )}
-              </li>
-            ),
+            (problem, index) => {
+              const note = index >= validation.errors.length;
+              // A card's legality is a note, not a problem (v0.4.5): it says which tables take
+              // the deck.
+              const casual =
+                problem.kind === "banned" || problem.kind === "not_legal";
+              return (
+                <li
+                  key={`${problem.code}-${index}`}
+                  data-kind={problem.kind}
+                  data-warning={note}
+                >
+                  {!note && problem.kind === "collection_locked" && (
+                    <LockIcon />
+                  )}
+                  <strong>
+                    {note && !casual ? "Note" : kinds[problem.kind]}:
+                  </strong>{" "}
+                  {problem.message} <em>{problem.remedy}</em>
+                  {onSelect && (problem.card_ids ?? []).length > 0 && (
+                    <button
+                      type="button"
+                      className={styles.link}
+                      onClick={() => onSelect(problem.card_ids ?? [])}
+                    >
+                      Show{" "}
+                      {problem.card_ids?.length === 1
+                        ? (cards[problem.card_ids[0]!]?.name ?? "the card")
+                        : "the cards"}
+                    </button>
+                  )}
+                </li>
+              );
+            },
           )}
         </ul>
       )}

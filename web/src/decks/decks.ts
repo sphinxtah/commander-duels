@@ -15,6 +15,8 @@ export type SharedDeck = components["schemas"]["SharedDeck"];
 export type RevisionSummary = components["schemas"]["RevisionSummary"];
 export type Location = DeckEntry["location"];
 export type DeckFormat = DeckSummary["format"];
+/** A table option a deck may need by its cards' legality (v0.4.5). */
+export type TableOption = Validation["needs"][number];
 
 export const locationNames: Record<Location, string> = {
   commander: "Commander",

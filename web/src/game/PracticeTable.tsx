@@ -12,6 +12,8 @@ import {
   exitTableFullscreen,
 } from "../app/fullscreen";
 import { readTableSettings } from "../app/tableSettings";
+import { RulesFields } from "../tables/TableParts";
+import { casualRules, unfit, type TableRules } from "../tables/tables";
 import { getSoundEngine } from "./sound/engine";
 import type { components } from "../generated/api";
 import styles from "./game.module.css";
@@ -85,28 +87,34 @@ function outcome(game: GameSummary): string {
 }
 
 /** The account's own decks, then the engine's fixture decks: offered to SysOp only (v0.3.1), so
- * a player's lists are empty and get no group. */
+ * a player's lists are empty and get no group. A deck the game's rules do not take (v0.4.5) is
+ * greyed with the reason, as one that cannot play. */
 function DeckOptions({
   fixtures,
   own,
+  rules,
 }: {
   fixtures: string[];
   own: OwnDeck[];
+  rules: TableRules;
 }) {
   return (
     <>
       {own.length > 0 && (
         <optgroup label="Your decks">
-          {own.map((d) => (
-            <option key={d.id} value={`${OWN}${d.id}`} disabled={!d.playable}>
-              {d.title}
-              {d.playable
-                ? ""
-                : d.collection_locked
-                  ? " (needs cards you don't own)"
-                  : " (not playable yet)"}
-            </option>
-          ))}
+          {own.map((d) => {
+            const reason = unfit(d, rules);
+            return (
+              <option
+                key={d.id}
+                value={`${OWN}${d.id}`}
+                disabled={reason !== null}
+              >
+                {d.title}
+                {reason ? ` (${reason})` : ""}
+              </option>
+            );
+          })}
         </optgroup>
       )}
       {fixtures.length > 0 && (
@@ -202,6 +210,7 @@ function Table({ me }: { me: Me }) {
   const [botDecks, setBotDecks] = useState<string[]>(["", "", ""]);
   const [skill, setSkill] = useState(4);
   const [turnCap, setTurnCap] = useState(60);
+  const [rules, setRules] = useState<TableRules>(casualRules);
   const [useList, setUseList] = useState(false);
   const [deckList, setDeckList] = useState("");
   const [query, setQuery] = useState("");
@@ -300,12 +309,19 @@ function Table({ me }: { me: Me }) {
   const chosenFormat = options?.formats.find((f) => f.id === format);
   const fixtures = chosenFormat?.decks ?? [];
   const ownHere = (ownDecks ?? []).filter((d) => d.format === format);
-  // A player has no fixture decks (v0.3.1): they play a deck of their own, the first playable
-  // one unless they choose another. SysOp may leave it to the engine's free fixture decks.
-  const firstPlayable = ownHere.find((d) => d.playable);
+  /** A seat's choice while the game's rules take it (v0.4.5); else none. */
+  const allowed = (value: string): string =>
+    !value.startsWith(OWN) ||
+    ownHere.some((d) => `${OWN}${d.id}` === value && unfit(d, rules) === null)
+      ? value
+      : "";
+  // A player has no fixture decks (v0.3.1): they play a deck of their own, the first one the
+  // rules take unless they choose another. SysOp may leave it to the engine's free fixture decks.
+  const firstPlayable = ownHere.find((d) => unfit(d, rules) === null);
   const ownOnly = options !== undefined && fixtures.length === 0;
   const chosenDeck =
-    deck || (ownOnly && firstPlayable ? `${OWN}${firstPlayable.id}` : "");
+    allowed(deck) ||
+    (ownOnly && firstPlayable ? `${OWN}${firstPlayable.id}` : "");
   const noDeck = ownOnly && ownDecks !== null && !firstPlayable && !useList;
 
   async function start(event: FormEvent) {
@@ -319,8 +335,9 @@ function Table({ me }: { me: Me }) {
       format,
       bot_skill: skill,
       turn_cap: turnCap,
+      rules,
       bots: Array.from({ length: bots }, (_, i) =>
-        seatChoice(botDecks[i] ?? ""),
+        seatChoice(allowed(botDecks[i] ?? "")),
       ),
       ...(useList && deckList.trim()
         ? { deck_list: deckList }
@@ -396,13 +413,21 @@ function Table({ me }: { me: Me }) {
             </label>
           ))}
         </fieldset>
+        <RulesFields rules={rules} format={format} onChange={setRules} />
         {noDeck ? (
           <div className={styles.field} data-no-deck>
             <span>Your deck</span>
-            <span>
-              You have no playable {chosenFormat?.name ?? ""} deck yet. Build
-              one, or fix one, in <a href="#decks">Decks</a>.
-            </span>
+            {ownHere.some((d) => d.playable) ? (
+              <span>
+                None of your {chosenFormat?.name ?? ""} decks fits these rules:
+                each holds cards they do not allow.
+              </span>
+            ) : (
+              <span>
+                You have no playable {chosenFormat?.name ?? ""} deck yet. Build
+                one, or fix one, in <a href="#decks">Decks</a>.
+              </span>
+            )}
           </div>
         ) : (
           <label className={styles.field}>
@@ -414,7 +439,7 @@ function Table({ me }: { me: Me }) {
               onChange={(event) => setDeck(event.target.value)}
             >
               {!ownOnly && <option value="">Any free fixture deck</option>}
-              <DeckOptions fixtures={fixtures} own={ownHere} />
+              <DeckOptions fixtures={fixtures} own={ownHere} rules={rules} />
             </select>
           </label>
         )}
@@ -439,7 +464,7 @@ function Table({ me }: { me: Me }) {
             <span>{bots === 1 ? "Bot's deck" : `Bot ${i + 1}'s deck`}</span>
             <select
               aria-label={bots === 1 ? "Bot's deck" : `Bot ${i + 1}'s deck`}
-              value={botDecks[i]}
+              value={allowed(botDecks[i] ?? "")}
               onChange={(event) =>
                 setBotDecks((current) =>
                   current.map((value, j) =>
@@ -451,7 +476,7 @@ function Table({ me }: { me: Me }) {
               {/* Left to the server: Commander bots play the starter decks, Legacy bots the
                   engine's fixture decks. */}
               <option value="">Chosen by the table</option>
-              <DeckOptions fixtures={fixtures} own={ownHere} />
+              <DeckOptions fixtures={fixtures} own={ownHere} rules={rules} />
             </select>
           </label>
         ))}

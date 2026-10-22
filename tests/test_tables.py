@@ -20,6 +20,7 @@ import pytest
 import test_progression
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from catalog_fixtures import bulk, engine_list, import_bulk
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select, text
@@ -233,6 +234,23 @@ def deck(account: Account, client: TestClient, fmt: str = "legacy", title: str =
     return str(made["id"])
 
 
+def lotus(client: TestClient) -> list[dict[str, object]]:
+    """A Legacy deck holding a card banned in Legacy."""
+    return [
+        {"card_id": card(client, "Black Lotus"), "quantity": 1, "location": "main"},
+        {"card_id": card(client, "Mountain"), "quantity": 59, "location": "main"},
+    ]
+
+
+def banned_deck(account: Account, client: TestClient) -> str:
+    """A playable Legacy deck that only tables allowing banned cards take."""
+    made = account.send(
+        "POST", "/api/v1/decks", {"title": "Lotus", "format": "legacy", "entries": lotus(client)}
+    ).json()
+    assert (made["playable"], made["needs"]) == (True, ["banned"]), made
+    return str(made["id"])
+
+
 def commander_table(
     client: TestClient,
     host: Account,
@@ -362,6 +380,7 @@ def test_a_table_from_the_lobby_to_the_result(client, engine):
     table = created.json()
     code = table["code"]
     assert len(code) >= 16 and table["status"] == "open" and table["your_seat"] == 0
+    assert table["rules"] == {"banned": True, "not_legal": True}
     assert table["players"][0] == {
         "seat": 0,
         "player": "human",
@@ -587,6 +606,127 @@ def test_seats_limits_and_privacy(client, engine):
         db.commit()
     assert ada.get(f"/api/v1/tables/{stale}").json()["status"] == "closed"
     assert root.get("/api/v1/tables").json() == []
+
+
+def test_the_hosts_rules_choose_which_decks_sit(client, engine):
+    """The host chooses which cards its decks may hold by their legality (v0.4.5): casual by
+    default, tournament rules allowing neither banned cards nor cards not legal in the format.
+    Every deck is checked as it sits down, its player told which cards, and again at the start,
+    where the host learns only whose deck no longer fits."""
+    ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
+    root = Account(client, "sysop", kind="sysop")
+    tournament = {"banned": False, "not_legal": False}
+
+    # The host's own deck is checked too.
+    refused = ada.send(
+        "POST",
+        "/api/v1/tables",
+        {"format": "legacy", "deck_id": banned_deck(ada, client), "rules": tournament},
+    )
+    assert (refused.status_code, refused.json()["code"]) == (422, "deck_not_allowed")
+    assert refused.json()["message"] == (
+        "This table does not allow banned cards: Black Lotus is banned in Legacy. Choose another "
+        "deck, or take it out of this one."
+    )
+    ada_deck = deck(ada, client)
+    made = ada.send(
+        "POST", "/api/v1/tables", {"format": "legacy", "deck_id": ada_deck, "rules": tournament}
+    )
+    assert made.status_code == 201, made.text
+    code = made.json()["code"]
+    assert made.json()["rules"] == tournament
+    assert [found["rules"] for found in bob.get("/api/v1/tables").json()] == [tournament]
+    assert bob.get(f"/api/v1/tables/{code}").json()["rules"] == tournament
+
+    # A player is told which cards keep their deck out: joining, and changing deck.
+    bobs_lotus = banned_deck(bob, client)
+    joined = bob.send("POST", f"/api/v1/tables/{code}/join", {"deck_id": bobs_lotus})
+    assert (joined.status_code, joined.json()["code"]) == (422, "deck_not_allowed")
+    assert "Black Lotus is banned in Legacy" in joined.json()["message"]
+    bob_deck = deck(bob, client)
+    joined = bob.send("POST", f"/api/v1/tables/{code}/join", {"deck_id": bob_deck})
+    assert joined.status_code == 200, joined.text
+    changed = bob.send("PATCH", f"/api/v1/tables/{code}/seat", {"deck_id": bobs_lotus})
+    assert changed.json()["code"] == "deck_not_allowed"
+
+    # A deck changed after it sat down is checked again at the start: the host learns whose.
+    edited = bob.send(
+        "PUT", f"/api/v1/decks/{bob_deck}/draft", {"version": 1, "entries": lotus(client)}
+    )
+    assert edited.json()["validation"]["needs"] == ["banned"]
+    bob.send("PATCH", f"/api/v1/tables/{code}/seat", {"ready": True})
+    stopped = ada.send("POST", f"/api/v1/tables/{code}/start").json()
+    assert stopped["code"] == "deck_not_playable"
+    assert stopped["message"] == "bob's deck cannot be played now; they need to choose another."
+    assert ada.get(f"/api/v1/tables/{code}").json()["players"][1]["ready"] is False
+    # The host's own, edited, is named to the host.
+    bob.send("PATCH", f"/api/v1/tables/{code}/seat", {"deck_id": deck(bob, client)})
+    bob.send("PATCH", f"/api/v1/tables/{code}/seat", {"ready": True})
+    ada.send("PUT", f"/api/v1/decks/{ada_deck}/draft", {"version": 1, "entries": lotus(client)})
+    own = ada.send("POST", f"/api/v1/tables/{code}/start").json()
+    assert own["code"] == "deck_not_allowed" and "Black Lotus" in own["message"]
+    assert engine.created == []
+    ada.send("POST", f"/api/v1/tables/{code}/leave")
+
+    # A table is casual unless its host says otherwise; one rule may stay on alone.
+    casual = bob.send("POST", "/api/v1/tables", {"format": "legacy", "deck_id": bobs_lotus})
+    assert casual.status_code == 201 and casual.json()["rules"] == {
+        "banned": True,
+        "not_legal": True,
+    }
+    bob.send("POST", f"/api/v1/tables/{casual.json()['code']}/leave")
+    no_bans = bob.send(
+        "POST",
+        "/api/v1/tables",
+        {
+            "format": "legacy",
+            "deck_id": bobs_lotus,
+            "rules": {"banned": False, "not_legal": True},
+        },
+    )
+    assert no_bans.json()["code"] == "deck_not_allowed"
+    # SysOp's decks need only cards the engine implements, at any table.
+    sysops = root.send(
+        "POST",
+        "/api/v1/tables",
+        {"format": "legacy", "deck_id": banned_deck(root, client), "rules": tournament},
+    )
+    assert sysops.status_code == 201, sysops.text
+
+
+def test_tables_open_at_the_upgrade_become_casual(tmp_path, monkeypatch):
+    url = f"sqlite:///{tmp_path}/rules.db"
+    monkeypatch.setenv("CD_DATABASE_URL", url)
+    config = Config("alembic.ini")
+    before = ScriptDirectory.from_config(config).get_revision("0019_table_rules").down_revision
+    assert isinstance(before, str)
+    command.upgrade(config, before)
+    engine = create_engine(url)
+    user = uuid.uuid4()
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO users (id, display_name, kind, status, onboarding, avatar, locale, "
+                "preferences, privilege_version, created_at) VALUES (:id, 'Ada', 'player', "
+                "'active', 'complete', 'sigil', 'en', '{}', 0, CURRENT_TIMESTAMP)"
+            ),
+            {"id": user.hex},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO game_tables (id, code, host_id, format, visibility, seats, bots, "
+                "bot_skill, turn_cap, status, created_at) VALUES (:id, 'open-table-code', :user, "
+                "'legacy', 'public', 2, 0, 4, 60, 'open', CURRENT_TIMESTAMP)"
+            ),
+            {"id": uuid.uuid4().hex, "user": user.hex},
+        )
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        found = connection.execute(text("SELECT allow_banned, allow_not_legal FROM game_tables"))
+        assert [tuple(map(bool, row)) for row in found] == [(True, True)]
+    command.downgrade(config, before)
+    command.upgrade(config, "head")
+    engine.dispose()
 
 
 def test_starting_keeps_every_players_limit(url, content, engine):

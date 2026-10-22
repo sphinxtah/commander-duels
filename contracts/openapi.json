@@ -2720,6 +2720,18 @@
             "title": "Legal",
             "type": "boolean"
           },
+          "needs": {
+            "description": "The table options its cards need (v0.4.5): only tables that allow them take it.",
+            "items": {
+              "enum": [
+                "banned",
+                "not_legal"
+              ],
+              "type": "string"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
           "notes": {
             "title": "Notes",
             "type": "string"
@@ -2780,6 +2792,7 @@
           "legal",
           "playable",
           "collection_locked",
+          "needs",
           "identity",
           "commanders",
           "latest_revision",
@@ -3105,6 +3118,18 @@
             "title": "Legal",
             "type": "boolean"
           },
+          "needs": {
+            "description": "The table options its cards need (v0.4.5): only tables that allow them take it.",
+            "items": {
+              "enum": [
+                "banned",
+                "not_legal"
+              ],
+              "type": "string"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
           "playable": {
             "title": "Playable",
             "type": "boolean"
@@ -3140,6 +3165,7 @@
           "legal",
           "playable",
           "collection_locked",
+          "needs",
           "identity",
           "commanders",
           "latest_revision",
@@ -5469,6 +5495,10 @@
             "title": "Format",
             "type": "string"
           },
+          "rules": {
+            "$ref": "#/components/schemas/TableRules",
+            "description": "Which cards the game's own decks may hold by their legality; casual unless told otherwise."
+          },
           "turn_cap": {
             "default": 60,
             "maximum": 200.0,
@@ -5815,7 +5845,9 @@
               "not_released",
               "not_implemented",
               "collection_locked",
-              "structure"
+              "structure",
+              "banned",
+              "not_legal"
             ],
             "title": "Kind",
             "type": "string"
@@ -8552,6 +8584,10 @@
             "title": "Format",
             "type": "string"
           },
+          "rules": {
+            "$ref": "#/components/schemas/TableRules",
+            "description": "Which cards its decks may hold by their legality; casual unless told otherwise."
+          },
           "seats": {
             "default": 2,
             "description": "Every seat, bots included: 2 in Legacy, 2-4 in Commander.",
@@ -8582,6 +8618,28 @@
           "deck_id"
         ],
         "title": "TableRequest",
+        "type": "object"
+      },
+      "TableRules": {
+        "additionalProperties": false,
+        "description": "Which cards a table's decks may hold by their legality in its format (v0.4.5); the format's\ndeck rules apply whatever these say. Casual rules allow both; tournament rules neither.",
+        "properties": {
+          "banned": {
+            "description": "Cards banned in the format.",
+            "title": "Banned",
+            "type": "boolean"
+          },
+          "not_legal": {
+            "description": "Cards not legal in the format: Un-cards, playtest and digital-only cards.",
+            "title": "Not Legal",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "banned",
+          "not_legal"
+        ],
+        "title": "TableRules",
         "type": "object"
       },
       "TableView": {
@@ -8651,6 +8709,9 @@
             "title": "Players",
             "type": "array"
           },
+          "rules": {
+            "$ref": "#/components/schemas/TableRules"
+          },
           "seats": {
             "title": "Seats",
             "type": "integer"
@@ -8697,6 +8758,7 @@
           "bots",
           "bot_skill",
           "turn_cap",
+          "rules",
           "host",
           "players",
           "your_seat",
@@ -9032,6 +9094,18 @@
             "title": "Legal",
             "type": "boolean"
           },
+          "needs": {
+            "description": "The table options the deck needs (v0.4.5): banned for a card banned in the format, not_legal for a card not legal in it. Empty: any table takes it. Its warnings of the same kinds name the cards.",
+            "items": {
+              "enum": [
+                "banned",
+                "not_legal"
+              ],
+              "type": "string"
+            },
+            "title": "Needs",
+            "type": "array"
+          },
           "playable": {
             "title": "Playable",
             "type": "boolean"
@@ -9049,6 +9123,7 @@
           "format_version",
           "legal",
           "playable",
+          "needs",
           "errors",
           "warnings",
           "counts"

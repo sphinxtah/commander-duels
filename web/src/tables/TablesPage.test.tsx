@@ -34,6 +34,7 @@ function deck(fields: Partial<OwnDeck> = {}): OwnDeck {
     legal: true,
     playable: true,
     collection_locked: false,
+    needs: [],
     identity: "R",
     commanders: [],
     latest_revision: null,
@@ -70,6 +71,7 @@ function table(fields: Partial<TableView> = {}): TableView {
     bots: 0,
     bot_skill: 4,
     turn_cap: 60,
+    rules: { banned: true, not_legal: true },
     host: "bob",
     players: [
       seat({ seat: 0, taken: true, handle: "bob", host: true, ready: true }),
@@ -139,6 +141,83 @@ describe("the lobby", () => {
       },
     });
     expect(window.location.hash).toBe(`#tables/${CODE}`);
+  });
+
+  it("shows each table's rules, and lets the host choose them (v0.4.5)", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/tables", () =>
+      reply(200, [
+        table(),
+        table({
+          code: "Tournament-code1",
+          format: "commander",
+          seats: 4,
+          rules: { banned: false, not_legal: false },
+        }),
+        table({
+          code: "Bans-only-code12",
+          rules: { banned: true, not_legal: false },
+        }),
+      ]),
+    );
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [
+        deck({ id: "deck-lotus", title: "Lotus", needs: ["banned"] }),
+        deck(),
+      ]),
+    );
+    api.on("POST /api/v1/tables", () =>
+      reply(201, table({ host: "ada", your_seat: 0 })),
+    );
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    const [casual, tournament, bans] = screen.getAllByRole("listitem");
+    expect(casual).toHaveTextContent("2 seats");
+    expect(within(casual!).getByText("Casual")).toBeInTheDocument();
+    expect(tournament).toHaveTextContent("4 seats");
+    expect(
+      within(tournament!).getByText("Tournament rules"),
+    ).toBeInTheDocument();
+    expect(tournament).toHaveTextContent(
+      "Tournament rules: no banned cards, and no cards not legal in Commander.",
+    );
+    expect(within(bans!).getByText("Banned cards allowed")).toBeInTheDocument();
+
+    // A new table is casual: a deck holding a banned card may open it.
+    expect(
+      screen.getByRole("checkbox", { name: /^Banned cards/ }),
+    ).toBeChecked();
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-lotus");
+    await act(async () =>
+      screen.getByRole("checkbox", { name: /^Tournament rules/ }).click(),
+    );
+    expect(
+      screen.getByRole("checkbox", { name: /^Banned cards/ }),
+    ).not.toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: /^Cards not legal in Legacy/ }),
+    ).not.toBeChecked();
+    expect(
+      within(screen.getByLabelText("Your deck")).getByRole("option", {
+        name: "Lotus (holds banned cards)",
+      }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-1");
+    await act(async () =>
+      screen.getByRole("button", { name: "Open the table" }).click(),
+    );
+    await settle();
+    const opened = api.calls.find((c) => c.route === "POST /api/v1/tables")!;
+    expect(opened.options).toMatchObject({
+      body: { rules: { banned: false, not_legal: false }, deck_id: "deck-1" },
+    });
+    // Unticking Tournament rules goes back to casual.
+    await act(async () =>
+      screen.getByRole("checkbox", { name: /^Tournament rules/ }).click(),
+    );
+    expect(
+      screen.getByRole("checkbox", { name: /^Cards not legal in Legacy/ }),
+    ).toBeChecked();
   });
 
   it("points to the table you sit at, and says why a table could not open", async () => {
@@ -291,6 +370,31 @@ describe("a table", () => {
     );
     await settle();
     expect(window.location.hash).toBe("#game/game-2");
+  });
+
+  it("says the table's rules, and greys the decks they do not take", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/tables/{code}", () =>
+      reply(200, table({ rules: { banned: false, not_legal: false } })),
+    );
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [
+        deck({ id: "deck-odd", title: "Odd", needs: ["banned", "not_legal"] }),
+        deck(),
+      ]),
+    );
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    expect(screen.getByText("Tournament rules")).toBeInTheDocument();
+    expect(screen.getByText(/^Hosted by bob\./)).toHaveTextContent(
+      "Tournament rules: no banned cards, and no cards not legal in Legacy.",
+    );
+    expect(
+      within(screen.getByLabelText("Your deck")).getByRole("option", {
+        name: "Odd (holds banned cards and cards not legal in Legacy)",
+      }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-1");
   });
 
   it("says when a table is gone or closed", async () => {

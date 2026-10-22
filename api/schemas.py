@@ -286,6 +286,23 @@ DECK_LIST = Field(
     max_length=60_000,
     description="SysOp only (cards.any): one card per line, any card the engine implements.",
 )
+# The table options a deck may need by its cards' legality in the format (v0.4.5).
+TableOption = Literal["banned", "not_legal"]
+
+
+class TableRules(Contract):
+    """Which cards a table's decks may hold by their legality in its format (v0.4.5); the format's
+    deck rules apply whatever these say. Casual rules allow both; tournament rules neither."""
+
+    banned: bool = Field(description="Cards banned in the format.")
+    not_legal: bool = Field(
+        description="Cards not legal in the format: Un-cards, playtest and digital-only cards."
+    )
+
+
+def casual() -> TableRules:
+    """A new table's rules, and a new practice game's: every card, whatever its legality."""
+    return TableRules(banned=True, not_legal=True)
 
 
 class SeatChoice(Contract):
@@ -314,6 +331,11 @@ class PracticeGameRequest(Contract):
     )
     bot_skill: int = Field(default=4, ge=1, le=6)
     turn_cap: int = Field(default=60, ge=1, le=200)
+    rules: TableRules = Field(
+        default_factory=casual,
+        description="Which cards the game's own decks may hold by their legality; casual unless "
+        "told otherwise.",
+    )
 
 
 class PracticeFormat(Contract):

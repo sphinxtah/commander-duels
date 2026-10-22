@@ -276,6 +276,10 @@ class GameTable(Base):
     bots: Mapped[int]
     bot_skill: Mapped[int]
     turn_cap: Mapped[int]
+    # The host's rules (v0.4.5): whether its decks may hold cards banned in the format, and cards
+    # not legal in it. Both is casual, neither tournament rules.
+    allow_banned: Mapped[bool] = mapped_column(default=True)
+    allow_not_legal: Mapped[bool] = mapped_column(default=True)
     # open (the lobby), started (its game holds the rest) or closed (the host left).
     status: Mapped[str] = mapped_column(String(16), index=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
@@ -719,6 +723,9 @@ class Deck(Base):
     playable: Mapped[bool] = mapped_column(default=False)
     # Legal, but the owner's library holds too few copies of a card (v0.3.1).
     collection_locked: Mapped[bool] = mapped_column(default=False)
+    # The table options its cards need (v0.4.5): banned, not_legal. None for a deck last
+    # validated before them; the deck list validates it again.
+    needs: Mapped[list[str] | None] = mapped_column(JsonType)
     identity: Mapped[str] = mapped_column(String(8), default="")
     latest_revision: Mapped[int | None]
     # How it began: empty, imported, duplicated, starter or guided.

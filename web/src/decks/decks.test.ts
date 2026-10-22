@@ -182,6 +182,21 @@ describe("the player's library", () => {
       state: "playable",
       words: "Ready to play: legal, and every card is playable here.",
     });
+    // A card's legality says which tables take the deck (v0.4.5).
+    expect(verdict(validation({ needs: ["banned"] }))).toEqual({
+      state: "playable",
+      words: "Ready to play at tables that allow banned cards.",
+    });
+    expect(verdict(validation({ needs: ["not_legal"] })).words).toBe(
+      "Ready to play at tables that allow cards not legal in Legacy.",
+    );
+    expect(
+      verdict(
+        validation({ format: "commander", needs: ["banned", "not_legal"] }),
+      ).words,
+    ).toBe(
+      "Ready to play at casual tables, which allow banned cards and cards not legal in Commander.",
+    );
     expect(
       verdict(validation({ playable: false, errors: [problem()] })),
     ).toEqual({
