@@ -38,6 +38,25 @@
 .google {
   gap: 8px;
 }
+/* Below the sign-in button (v0.4.2): what signing in accepts. Quiet, like the links line. */
+.consent {
+  margin: 12px 0 0;
+  max-width: 22rem;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+.consent a {
+  display: inline-block;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-decoration-color: #a5b0a366;
+  text-underline-offset: 3px;
+}
+.consent a:hover {
+  color: #ebece6;
+  text-decoration-color: currentColor;
+}
 .googleButton {
   min-height: 44px;
 }

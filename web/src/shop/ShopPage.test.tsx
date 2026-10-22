@@ -16,7 +16,7 @@ import {
   vi,
 } from "vitest";
 import { client } from "../api";
-import { history, opening, player, shopView } from "./fixtures";
+import { deckOffer, history, opening, player, shopView } from "./fixtures";
 import { ShopPage } from "./ShopPage";
 
 vi.mock("../game/sound/engine", () => ({
@@ -76,7 +76,7 @@ function shelf(name: string) {
 
 describe("Leng's card shop", () => {
   it("shows the balance, the packs held, the shelves by era and where the data comes from", async () => {
-    render(<ShopPage me={player} heading={createRef()} />);
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
     expect(
       await screen.findByRole("heading", { name: "Leng's card shop" }),
     ).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe("Leng's card shop", () => {
   });
 
   it("filters and sorts the shelves", async () => {
-    render(<ShopPage me={player} heading={createRef()} />);
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
     await screen.findByText("1,000");
     fireEvent.change(screen.getByLabelText("Search by set name or code"), {
       target: { value: "znr" },
@@ -167,7 +167,7 @@ describe("Leng's card shop", () => {
             repeated: false,
           });
     }) as never);
-    render(<ShopPage me={player} heading={createRef()} />);
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
     await screen.findByText("1,000");
     // Revised costs more than the balance: its button says why it waits.
     const revised = shelf("Revised Edition Booster Pack");
@@ -214,7 +214,7 @@ describe("Leng's card shop", () => {
     document.documentElement.dataset.reducedMotion = "true";
     on("POST /api/v1/shop/packs/{pack_id}/open", () => reply(200, opening));
     on("GET /api/v1/shop/openings/{opening_id}", () => reply(200, opening));
-    render(<ShopPage me={player} heading={createRef()} />);
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Open a pack of Zendikar Rising Draft Booster",
@@ -245,5 +245,95 @@ describe("Leng's card shop", () => {
         { params: { path: { opening_id: "opening-0" } } },
       ),
     );
+  });
+});
+
+describe("Leng's starter decks (v0.4.2)", () => {
+  const decks = [
+    deckOffer("one", { owned: true, price: 42_000 }),
+    deckOffer("two", { price: 900 }),
+    deckOffer("three", { price: 94_000 }),
+    deckOffer("four", { price: null }),
+  ];
+
+  it("are free until the two free ones are chosen, which the setup wizard does", async () => {
+    on("GET /api/v1/shop", () =>
+      reply(200, {
+        ...shopView,
+        decks: decks.map((deck) => ({ ...deck, owned: false, price: null })),
+        free_decks: true,
+      }),
+    );
+    const setup = vi.fn();
+    render(<ShopPage me={player} heading={createRef()} onSetup={setup} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Starter decks" }));
+    const shelf = screen.getByRole("list", { name: "Starter decks" });
+    expect(within(shelf).getAllByText("Free")).toHaveLength(4);
+    expect(within(shelf).queryByRole("button", { name: /^Buy/ })).toBeNull();
+    // The commander's card is each deck's picture.
+    expect(
+      within(shelf)
+        .getByRole("listitem", { name: "Stand-in one" })
+        .querySelector("img"),
+    ).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/printing-one?size=normal",
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Claim your two free decks" }),
+    );
+    expect(setup).toHaveBeenCalledOnce();
+  });
+
+  it("then sell each of the others once, at its price in tokens", async () => {
+    on("GET /api/v1/shop", () =>
+      reply(200, { ...shopView, decks, free_decks: false }),
+    );
+    on("POST /api/v1/shop/decks", () =>
+      reply(201, {
+        deck: "deck-9",
+        starter: "two",
+        tokens: 900,
+        balance: 100,
+        repeated: false,
+      }),
+    );
+    render(<ShopPage me={player} heading={createRef()} onSetup={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Starter decks" }));
+    const item = (name: string) =>
+      within(screen.getByRole("list", { name: "Starter decks" })).getByRole(
+        "listitem",
+        { name },
+      );
+    expect(item("Stand-in one")).toHaveTextContent("In your decks");
+    expect(item("Stand-in four")).toHaveTextContent("Not for sale yet");
+    expect(item("Stand-in three")).toHaveTextContent(
+      "You need 93,000 tokens more.",
+    );
+    expect(
+      within(item("Stand-in three")).getByRole("button", {
+        name: "Buy Stand-in three",
+      }),
+    ).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(
+      within(item("Stand-in two")).getByRole("button", {
+        name: "Buy Stand-in two",
+      }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Buy Stand-in two?" });
+    expect(dialog).toHaveTextContent(
+      "It costs 900 tokens. You have 1,000 tokens, and will have 100 tokens left.",
+    );
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Buy for 900 tokens" }),
+    );
+    expect(
+      await screen.findByText(
+        "You bought Stand-in two for 900 tokens. It is in your decks, and its cards in your library.",
+      ),
+    ).toBeInTheDocument();
+    expect(client.POST).toHaveBeenCalledWith("/api/v1/shop/decks", {
+      body: { deck: "two" },
+    });
   });
 });

@@ -6,8 +6,9 @@ live in a table of their own, outside the catalog's, so no search, card page, de
 image route or list of the catalog can reach them. Only an account at the Godlike tier (100,000
 wins; SysOp starts there) can list them or fetch their images, and to everyone else those routes
 answer as routes for things that do not exist. An alliance with the Godlike tier's Planeswalker
-puts them in the library. Since v0.4.0 a Godlike account may play them in its decks, wherever the
-running engine has loaded them (the engine plugin from a private repository): api/custom_play.py.
+puts them in the library, and since v0.4.2 only that alliance lists them, for SysOp too. Since
+v0.4.0 a Godlike account may play them in its decks, wherever the running engine has loaded them
+(the engine plugin from a private repository): api/custom_play.py.
 
 The browser makes each image fit Scryfall's 745 x 1040 card size and at most 750 KB before it
 uploads it, base64 in JSON, so a request stays under the proxies' 1 MB limit; the API checks what
@@ -148,11 +149,19 @@ def require_godlike(db: Session, principal: Principal) -> None:
 
 @router.get("/custom-cards", response_model=list[CustomCardInfo])
 def custom_cards(principal: Active, library: CurrentLibrary, db: Db) -> list[CustomCardInfo]:
-    """The custom cards, for accounts at the Godlike tier only, each with whether the running
-    engine has loaded it."""
+    """The allied Planeswalker's custom cards, for accounts at the Godlike tier only, each with
+    whether the running engine has loaded it. Since v0.4.2 an account allied with another
+    Planeswalker, or with none, gets none, SysOp included: the Cards page and the deck builder
+    show only the alliance's cards."""
     if not library.godlike:
         raise not_found()
-    cards = db.scalars(select(CustomCard).order_by(CustomCard.name))
+    if library.alliance is None:
+        return []
+    cards = db.scalars(
+        select(CustomCard)
+        .where(CustomCard.planeswalker == library.alliance)
+        .order_by(CustomCard.name)
+    )
     return [info(card, library) for card in cards]
 
 

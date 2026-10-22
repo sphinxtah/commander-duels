@@ -16,6 +16,12 @@ the Magic Duels style, their cards the player's for good.
 - **SysOp gives packs** to any account, its own included, with a reason, audited
   (shop.packs_granted). Administrators and SysOp change prices and sale (shop.manage), each
   change audited, and see the booster data job's runs.
+- **Starter decks** (v0.4.2). The ten starter decks are sold too, each once to an account, from
+  when it has chosen its two free ones at onboarding: until then the shop shows them as free and
+  sells none. Buying one, in one transaction, spends its price (api/products.py, from the value of
+  its cards), makes it a deck of the player's own and grants every copy of its cards for good, as
+  choosing it would have (library_grants, source starter, key starter:<deck>). The ledger entry's
+  key is deck:<account>:<deck>, so a retried request buys it once.
 """
 
 import secrets
@@ -33,7 +39,7 @@ from sqlalchemy.orm import Session
 from api.auth import INPUT_ERRORS
 from api.cards import SyncQueued, image_of
 from api.collation import draw, load
-from api.decks import refresh_decks
+from api.decks import create_deck, refresh_decks, starters_of
 from api.economy import balance_of, lock_account, spend, target
 from api.identity import (
     Active,
@@ -47,18 +53,27 @@ from api.identity import (
     settings_of,
     utcnow,
 )
-from api.library import library_of
+from api.library import (
+    Starter,
+    commander_printing,
+    grant_starter,
+    library_of,
+    owned_starters,
+    starter_entries,
+)
 from api.models import (
     BoosterCollation,
     BoosterSyncRun,
     CardConcept,
     CardPrinting,
+    Deck,
     LibraryGrant,
     Pack,
     PackCard,
     PackOpening,
     ScheduledJob,
     ShopProduct,
+    TokenEntry,
     User,
 )
 from api.products import (
@@ -68,6 +83,7 @@ from api.products import (
     EraId,
     PriceBasis,
     curve_price,
+    deck_prices,
     ensure_products,
     era_of,
     kind_of,
@@ -80,6 +96,7 @@ from api.schemas import Contract, StoredText
 from catalog import boosters
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
+Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
 ShopManager = Annotated[Principal, Depends(require_permission("shop.manage"))]
 EconomyManager = Annotated[Principal, Depends(require_permission("economy.manage"))]
 MAX_PRICE = 10_000_000_000
@@ -131,12 +148,51 @@ class ShopData(Contract):
     checked_at: datetime | None = Field(description="When the booster data was last read.")
 
 
+class DeckOffer(Contract):
+    """A starter deck in Leng's shop (v0.4.2)."""
+
+    id: str
+    title: str
+    commander: str
+    colors: str
+    color_names: str
+    guild: str
+    description: str
+    commander_card_id: UUID | None
+    commander_printing_id: UUID | None = Field(description="The commander's picture.")
+    price: int | None = Field(
+        description="In tokens, from the value of its cards; null while the account's two free "
+        "starter decks are still to choose, or when it is not priced."
+    )
+    owned: bool = Field(description="Chosen as a free starter deck, or bought: each sells once.")
+
+
 class ShopView(Contract):
     balance: int
     products: list[ProductInfo] = Field(description="The products on sale, newest first.")
     eras: list[EraInfo]
     inventory: list[InventoryItem]
     data: ShopData
+    decks: list[DeckOffer] = Field(default_factory=list, description="The ten starter decks.")
+    free_decks: bool = Field(
+        default=False,
+        description="The account's two free starter decks are still to choose; the shop sells "
+        "none until they are.",
+    )
+
+
+class DeckPurchaseRequest(Contract):
+    deck: str = Field(min_length=1, max_length=64)
+
+
+class DeckPurchase(Contract):
+    deck: UUID | None = Field(
+        description="The new deck of the player's own; null on a retry once it has been deleted."
+    )
+    starter: str
+    tokens: int = Field(description="The price paid.")
+    balance: int
+    repeated: bool = Field(description="A retry: the deck was bought already.")
 
 
 class PurchaseRequest(Contract):
@@ -358,6 +414,7 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
     )
     listing = price_list(settings_of(request).content_dir)
     version, checked = latest_version(db)
+    free = free_decks(principal.user)
     return ShopView(
         balance=balance_of(db, principal.user.id),
         products=[info_of(product) for product in on_sale],
@@ -368,7 +425,122 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
             prices_as_of=listing.as_of if listing else None,
             checked_at=checked,
         ),
+        decks=deck_offers(request, db, principal.user),
+        free_decks=free,
     )
+
+
+# Starter decks (v0.4.2).
+
+
+def free_decks(user: User) -> bool:
+    """Whether the account's two free starter decks are still to choose (onboarding)."""
+    return user.onboarding != "complete"
+
+
+def deck_offers(request: Request, db: Session, user: User) -> list[DeckOffer]:
+    prices = deck_prices(settings_of(request).content_dir)
+    owned = owned_starters(db, user)
+    free = free_decks(user)
+    offers = []
+    for starter in starters_of(request).values():
+        entries, _ = starter_entries(db, starter)
+        card, printing = commander_printing(db, entries)
+        offers.append(
+            DeckOffer(
+                id=starter.id,
+                title=starter.title,
+                commander=starter.commander,
+                colors=starter.colors,
+                color_names=starter.color_names,
+                guild=starter.guild,
+                description=starter.description,
+                commander_card_id=card,
+                commander_printing_id=printing,
+                price=None if free else prices.get(starter.id),
+                owned=starter.id in owned,
+            )
+        )
+    return offers
+
+
+def deck_bought(
+    db: Session, user: User, starter: Starter, entry: TokenEntry, deck: UUID | None = None
+) -> DeckPurchase:
+    repeated = deck is None
+    if repeated:
+        # A retry: the newest deck of the account's made from it is the one the purchase made.
+        deck = db.scalar(
+            select(Deck.id)
+            .where(Deck.owner_id == user.id, Deck.source == "starter", Deck.title == starter.title)
+            .order_by(Deck.created_at.desc())
+            .limit(1)
+        )
+    return DeckPurchase(
+        deck=deck,
+        starter=starter.id,
+        tokens=-entry.amount,
+        balance=balance_of(db, user.id),
+        repeated=repeated,
+    )
+
+
+@router.post("/shop/decks", response_model=DeckPurchase, status_code=201)
+def buy_deck(
+    body: DeckPurchaseRequest, request: Request, principal: Builder, db: Db
+) -> DeckPurchase:
+    """Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's
+    own, and every copy of its cards joins the library for good, together."""
+    user = principal.user
+    starter = starters_of(request).get(body.deck)
+    if starter is None:
+        raise not_found()
+    # The account's row is locked first, so a retry waits for the request it repeats.
+    lock_account(db, user.id)
+    db.refresh(user)
+    key = f"deck:{user.id}:{starter.id}"
+    earlier = db.scalar(select(TokenEntry).where(TokenEntry.key == key))
+    if earlier is not None:
+        return deck_bought(db, user, starter, earlier)
+    if free_decks(user):
+        raise ApiError(
+            409, "starters_first", "Choose your two free starter decks first: they cost nothing."
+        )
+    if starter.id in owned_starters(db, user):
+        raise ApiError(409, "deck_owned", f"{starter.title} is yours already.")
+    price = deck_prices(settings_of(request).content_dir).get(starter.id)
+    if price is None:
+        raise ApiError(409, "not_on_sale", f"{starter.title} is not on sale.")
+    entries, missing = starter_entries(db, starter)
+    if missing:
+        raise ApiError(
+            503,
+            "starters_unavailable",
+            "The card catalog is not ready for the starter decks yet. Try again later.",
+        )
+    entry = spend(db, user.id, price, key, f"Starter deck: {starter.title}")
+    grant_starter(db, user, starter, entries)
+    db.flush()
+    roster = roster_of(request)
+    deck, _ = create_deck(
+        db,
+        principal,
+        starter.title,
+        "commander",
+        entries,
+        library_of(db, user, principal.permissions, roster),
+        source="starter",
+    )
+    refresh_decks(db, user.id, library_of(db, user, principal.permissions, roster))
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        earlier = db.scalar(select(TokenEntry).where(TokenEntry.key == key))
+        if earlier is None:
+            raise
+        return deck_bought(db, user, starter, earlier)
+    return deck_bought(db, user, starter, entry, deck.id)
 
 
 def purchase_of(db: Session, pack: Pack, repeated: bool) -> Purchase:

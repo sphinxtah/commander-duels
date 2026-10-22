@@ -12,7 +12,8 @@
 - **Grants.** SysOp gives (or takes back) tokens on any account, its own included, with a reason,
   audited, and kept apart from tokens earned. Administrators see balances and ledgers.
 - **Spending.** A purchase locks the account's row, so two purchases at once cannot spend the same
-  tokens; a balance never goes below zero.
+  tokens; a balance never goes below zero. Every purchase in Leng's shop is a "pack" entry, the
+  starter decks sold there since v0.4.2 too (key deck:<account>:<deck>, named by the reason).
 """
 
 import math

@@ -104,15 +104,29 @@ test("the landing page's line of links opens each page, and it fits a phone", as
   for (const [index, { link }] of pages.entries()) {
     await page.goto("/#play");
     const main = page.getByRole("main");
-    await expect(main.getByRole("link", { name: link })).toBeVisible();
+    const named = main.getByRole("link", { name: link, exact: true });
+    await expect(named).toBeVisible();
     // Below the mark, quietly: the landing page keeps no words above its button.
     const mark = await page
       .locator('img[src="/brand/mark.webp"]')
       .boundingBox();
-    const line = await main.getByRole("link", { name: link }).boundingBox();
+    const line = await named.boundingBox();
     expect(line!.y).toBeGreaterThan(mark!.y + mark!.height);
-    await main.getByRole("link", { name: link }).click();
+    await named.click();
     await expectPublicPage(page, index);
+  }
+  // Under the button, what signing in accepts (v0.4.2), with the two pages it names.
+  await page.goto("/#play");
+  for (const [name, index] of [
+    ["terms of use", 2],
+    ["privacy policy", 1],
+  ] as const) {
+    await page
+      .getByRole("main")
+      .getByRole("link", { name, exact: true })
+      .click();
+    await expectPublicPage(page, index);
+    await page.goto("/#play");
   }
   await page.setViewportSize({ width: 390, height: 844 });
   for (const { path } of pages) {

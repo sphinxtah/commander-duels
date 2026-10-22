@@ -1,18 +1,7 @@
 {
   "version": 1,
-  "source": "The owner's tier list of 2026-10-20 (docs/plans/0.3.1-planeswalkers.csv).",
+  "source": "The owner's tier list of 2026-10-20 (docs/plans/0.3.1-planeswalkers.csv); since v0.4.2 without the ten whose cards no game can play.",
   "planeswalkers": [
-    {
-      "id": "abian",
-      "name": "Abian",
-      "tier": "bronze",
-      "subtype": "Abian",
-      "first_card": "Abian, Luvion Usurper",
-      "first_printed": "2019-11-07",
-      "description": "Playtest creature with a tree-like crown, broad monster face, toothy grin, and rib-patterned torso.",
-      "portrait": true,
-      "custom": false
-    },
     {
       "id": "angrath",
       "name": "Angrath",
@@ -32,17 +21,6 @@
       "first_card": "Arlinn Kord",
       "first_printed": "2016-04-08",
       "description": "Human-form portrait of Arlinn Kord, with long reddish hair, grey streaks, and rugged leather and fur.",
-      "portrait": true,
-      "custom": false
-    },
-    {
-      "id": "b-o-b",
-      "name": "B.O.B.",
-      "tier": "bronze",
-      "subtype": "B.O.B.",
-      "first_card": "B.O.B. (Bevy of Beebles)",
-      "first_printed": "2020-02-29",
-      "description": "A clustered group of pink Beebles forming one playful collective avatar.",
       "portrait": true,
       "custom": false
     },
@@ -113,17 +91,6 @@
       "custom": false
     },
     {
-      "id": "deb-thomas",
-      "name": "Deb Thomas",
-      "tier": "bronze",
-      "subtype": "Deb",
-      "first_card": "Deb Thomas",
-      "first_printed": "2024-05-10",
-      "description": "Promotional armored portrait of a smiling blonde woman in red and silver with a red cape.",
-      "portrait": true,
-      "custom": false
-    },
-    {
       "id": "domri",
       "name": "Domri",
       "tier": "bronze",
@@ -146,17 +113,6 @@
       "custom": false
     },
     {
-      "id": "dungeon-master",
-      "name": "Dungeon Master",
-      "tier": "bronze",
-      "subtype": "Dungeon Master",
-      "first_card": "Dungeon Master",
-      "first_printed": "2017-09-20",
-      "description": "Cheerful elderly wizard with white side hair and broad red-and-gold robes.",
-      "portrait": true,
-      "custom": false
-    },
-    {
       "id": "ellywick",
       "name": "Ellywick",
       "tier": "bronze",
@@ -164,17 +120,6 @@
       "first_card": "Ellywick Tumblestrum",
       "first_printed": "2021-07-23",
       "description": "Ellywick Tumblestrum, a smiling gnome bard in green and brown with a small purple frog.",
-      "portrait": true,
-      "custom": false
-    },
-    {
-      "id": "ersta",
-      "name": "Ersta",
-      "tier": "bronze",
-      "subtype": "Ersta",
-      "first_card": "Ersta, Friend to All",
-      "first_printed": "2022-08-01",
-      "description": "White unicorn with a long horn, pastel iridescent mane, and flower garland.",
       "portrait": true,
       "custom": false
     },
@@ -278,28 +223,6 @@
       "custom": false
     },
     {
-      "id": "luxior",
-      "name": "Luxior",
-      "tier": "bronze",
-      "subtype": "Equipment Luxior",
-      "first_card": "Luxior, Ignited",
-      "first_printed": "2024-08-02",
-      "description": "Playtest-inspired magical sword with a silver blade and ornate circular gold guard.",
-      "portrait": true,
-      "custom": false
-    },
-    {
-      "id": "mr-monopoly",
-      "name": "Mr. Monopoly",
-      "tier": "bronze",
-      "subtype": "Monopoly",
-      "first_card": "Mr. Monopoly, On the Go",
-      "first_printed": "2025-08-24",
-      "description": "Cheerful promotional cartoon figure with a white moustache, black top hat, and formal suit.",
-      "portrait": true,
-      "custom": false
-    },
-    {
       "id": "mu-yanling",
       "name": "Mu Yanling",
       "tier": "bronze",
@@ -373,17 +296,6 @@
       "first_card": "Samut, the Tested",
       "first_printed": "2017-07-14",
       "description": "Warrior with thick braids, gold circular earrings, and black-and-gold armor.",
-      "portrait": true,
-      "custom": false
-    },
-    {
-      "id": "svega",
-      "name": "Svega",
-      "tier": "bronze",
-      "subtype": "Svega",
-      "first_card": "Svega, the Unconventional",
-      "first_printed": "2023-08-01",
-      "description": "Promotional ceremonial portrait with a tall feather-like crown and silver-blue clothing.",
       "portrait": true,
       "custom": false
     },
@@ -575,17 +487,6 @@
       "custom": false
     },
     {
-      "id": "sifa",
-      "name": "Sifa",
-      "tier": "silver",
-      "subtype": "Sifa",
-      "first_card": "Sifa Grent",
-      "first_printed": "2026-10-19",
-      "description": "Sifa Grent with a high dark ponytail, purple headpiece, and red armor.",
-      "portrait": true,
-      "custom": false
-    },
-    {
       "id": "sivitri",
       "name": "Sivitri",
       "tier": "silver",
@@ -637,17 +538,6 @@
       "first_card": "The Wanderer",
       "first_printed": "2019-05-03",
       "description": "Mysterious veiled figure with a wide conical hat, pink robes, teal cape, and concealed face.",
-      "portrait": true,
-      "custom": false
-    },
-    {
-      "id": "thomil",
-      "name": "Thomil",
-      "tier": "silver",
-      "subtype": "Thomil",
-      "first_card": "Thomil, the Destroyer",
-      "first_printed": "2026-10-19",
-      "description": "Hooded figure with a pale scarred face, magenta-dark robes, and bone skull shoulder armor.",
       "portrait": true,
       "custom": false
     },

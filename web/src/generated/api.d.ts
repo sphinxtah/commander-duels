@@ -767,8 +767,10 @@ export interface paths {
         };
         /**
          * Custom Cards
-         * @description The custom cards, for accounts at the Godlike tier only, each with whether the running
-         *     engine has loaded it.
+         * @description The allied Planeswalker's custom cards, for accounts at the Godlike tier only, each with
+         *     whether the running engine has loaded it. Since v0.4.2 an account allied with another
+         *     Planeswalker, or with none, gets none, SysOp included: the Cards page and the deck builder
+         *     show only the alliance's cards.
          */
         get: operations["custom_cards_api_v1_custom_cards_get"];
         put?: never;
@@ -1260,6 +1262,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/alliance/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Alliance Cards
+         * @description The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
+         *     every account, those that build from the whole catalog included: each says how many copies
+         *     the library holds (a playset while the alliance lasts, or more from elsewhere).
+         */
+        get: operations["my_alliance_cards_api_v1_me_alliance_cards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/progress": {
         parameters: {
             query?: never;
@@ -1538,6 +1562,27 @@ export interface paths {
         get: operations["shop_api_v1_shop_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/shop/decks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy Deck
+         * @description Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's
+         *     own, and every copy of its cards joins the library for good, together.
+         */
+        post: operations["buy_deck_api_v1_shop_decks_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1918,6 +1963,26 @@ export interface components {
              */
             wins: number;
         };
+        /** AllianceCards */
+        AllianceCards: {
+            /**
+             * Alliance
+             * @description The allied Planeswalker; null with no alliance.
+             */
+            alliance: string | null;
+            /**
+             * Cards
+             * @description Its own Planeswalker cards in the catalog, playable or not, one per card.
+             */
+            cards: components["schemas"]["CardSummary"][];
+            /**
+             * Custom
+             * @description The Godlike tier's Planeswalker, whose cards are its custom cards (GET /api/v1/custom-cards), none from the catalog.
+             */
+            custom: boolean;
+            /** Name */
+            name: string | null;
+        };
         /** AllianceChange */
         AllianceChange: {
             /** Planeswalker */
@@ -2027,7 +2092,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.4.1
+             * @default 0.4.2
              */
             version: string;
         };
@@ -2569,6 +2634,70 @@ export interface components {
             /** Quantity */
             quantity: number;
         };
+        /**
+         * DeckOffer
+         * @description A starter deck in Leng's shop (v0.4.2).
+         */
+        DeckOffer: {
+            /** Color Names */
+            color_names: string;
+            /** Colors */
+            colors: string;
+            /** Commander */
+            commander: string;
+            /** Commander Card Id */
+            commander_card_id: string | null;
+            /**
+             * Commander Printing Id
+             * @description The commander's picture.
+             */
+            commander_printing_id: string | null;
+            /** Description */
+            description: string;
+            /** Guild */
+            guild: string;
+            /** Id */
+            id: string;
+            /**
+             * Owned
+             * @description Chosen as a free starter deck, or bought: each sells once.
+             */
+            owned: boolean;
+            /**
+             * Price
+             * @description In tokens, from the value of its cards; null while the account's two free starter decks are still to choose, or when it is not priced.
+             */
+            price: number | null;
+            /** Title */
+            title: string;
+        };
+        /** DeckPurchase */
+        DeckPurchase: {
+            /** Balance */
+            balance: number;
+            /**
+             * Deck
+             * @description The new deck of the player's own; null on a retry once it has been deleted.
+             */
+            deck: string | null;
+            /**
+             * Repeated
+             * @description A retry: the deck was bought already.
+             */
+            repeated: boolean;
+            /** Starter */
+            starter: string;
+            /**
+             * Tokens
+             * @description The price paid.
+             */
+            tokens: number;
+        };
+        /** DeckPurchaseRequest */
+        DeckPurchaseRequest: {
+            /** Deck */
+            deck: string;
+        };
         /** DeckSource */
         DeckSource: {
             /** Deck Id */
@@ -2958,7 +3087,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.4.1
+             * @default 0.4.2
              */
             version: string;
         };
@@ -4097,8 +4226,19 @@ export interface components {
             /** Balance */
             balance: number;
             data: components["schemas"]["ShopData"];
+            /**
+             * Decks
+             * @description The ten starter decks.
+             */
+            decks?: components["schemas"]["DeckOffer"][];
             /** Eras */
             eras: components["schemas"]["EraInfo"][];
+            /**
+             * Free Decks
+             * @description The account's two free starter decks are still to choose; the shop sells none until they are.
+             * @default false
+             */
+            free_decks: boolean;
             /** Inventory */
             inventory: components["schemas"]["InventoryItem"][];
             /**
@@ -11369,6 +11509,98 @@ export interface operations {
             };
         };
     };
+    my_alliance_cards_api_v1_me_alliance_cards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllianceCards"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     my_progress_api_v1_me_progress_get: {
         parameters: {
             query?: never;
@@ -12619,6 +12851,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShopView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    buy_deck_api_v1_shop_decks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeckPurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckPurchase"];
                 };
             };
             /** @description Bad Request */

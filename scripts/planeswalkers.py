@@ -46,6 +46,22 @@ GODLIKE = {
 }
 # The Godlike portrait's master (v0.4.1); the folder's avatar-roster.json lists only the 98.
 GODLIKE_FILE = "the.sphinx.png"
+# Left out of the roster since v0.4.2, by the owner's decision: none of their cards is one the
+# game engine can play (migration 0014_roster_playable ends any alliance with them).
+REMOVED = frozenset(
+    {
+        "Abian",
+        "B.O.B.",
+        "Deb Thomas",
+        "Dungeon Master",
+        "Ersta",
+        "Luxior",
+        "Mr. Monopoly",
+        "Sifa",
+        "Svega",
+        "Thomil",
+    }
+)
 
 
 def slug(name: str) -> str:
@@ -63,6 +79,8 @@ def roster(folder: Path) -> None:
     planeswalkers = []
     for row in rows:
         name = row["character"]
+        if name in REMOVED:
+            continue
         if files.get(name) != row["image_file"]:
             raise SystemExit(
                 f"{name}: the tier list names {row['image_file']}, the folder {files.get(name)}"
@@ -90,7 +108,8 @@ def roster(folder: Path) -> None:
         raise SystemExit("Two Planeswalkers share an ID")
     content = {
         "version": 1,
-        "source": "The owner's tier list of 2026-10-20 (docs/plans/0.3.1-planeswalkers.csv).",
+        "source": "The owner's tier list of 2026-10-20 (docs/plans/0.3.1-planeswalkers.csv); "
+        "since v0.4.2 without the ten whose cards no game can play.",
         "planeswalkers": planeswalkers,
     }
     # LF on every system, as the repository keeps text.

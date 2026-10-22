@@ -9,7 +9,8 @@
   counted wins.
 - **Levels** are the tiers of api/roster.py, from the account's wins.
 - **An alliance** joins one Planeswalker the account's tier has opened, at any time; its cards are
-  in the library while it lasts (api/library.py). The alliance's portrait is the account's picture.
+  in the library while it lasts (api/library.py), and since v0.4.2 the Cards page lists them on a
+  tab of their own. The alliance's portrait is the account's picture.
 - **Starter decks.** After choosing a handle, every player chooses two of the ten starter decks:
   both become decks of their own, and every copy of their cards joins the library for good.
 """
@@ -119,6 +120,18 @@ class LibraryView(Contract):
     unlimited: bool = Field(description="Builds from the whole catalog (administrators, SysOp).")
     alliance: str | None
     cards: list[LibraryCard]
+
+
+class AllianceCards(Contract):
+    alliance: str | None = Field(description="The allied Planeswalker; null with no alliance.")
+    name: str | None
+    custom: bool = Field(
+        description="The Godlike tier's Planeswalker, whose cards are its custom cards "
+        "(GET /api/v1/custom-cards), none from the catalog."
+    )
+    cards: list[CardSummary] = Field(
+        description="Its own Planeswalker cards in the catalog, playable or not, one per card."
+    )
 
 
 class WinsChange(Contract):
@@ -414,6 +427,35 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
     ]
     cards.sort(key=lambda item: item.card.name.casefold())
     return LibraryView(unlimited=False, alliance=library.alliance, cards=cards)
+
+
+@router.get("/me/alliance/cards", response_model=AllianceCards)
+def my_alliance_cards(
+    request: Request, principal: Active, library: CurrentLibrary, db: Db
+) -> AllianceCards:
+    """The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
+    every account, those that build from the whole catalog included: each says how many copies
+    the library holds (a playset while the alliance lasts, or more from elsewhere)."""
+    planeswalker = roster_of(request).get(library.alliance) if library.alliance else None
+    if planeswalker is None:
+        return AllianceCards(alliance=None, name=None, custom=False, cards=[])
+    ids = alliance_cards(db, roster_of(request)).get(planeswalker.id, [])
+    # One card per construction key, as the library counts them: the one with a default printing.
+    chosen: dict[str, UUID] = {}
+    for card_id, key in db.execute(
+        select(CardConcept.id, CardConcept.construction_key)
+        .where(CardConcept.id.in_(ids))
+        .order_by(CardConcept.default_printing_id.is_(None), CardConcept.normalized_name)
+    ):
+        chosen.setdefault(key, card_id)
+    summaries = summaries_by_id(db, set(chosen.values()))
+    mark_owned(db, summaries.values(), library)
+    return AllianceCards(
+        alliance=planeswalker.id,
+        name=planeswalker.name,
+        custom=planeswalker.custom,
+        cards=sorted(summaries.values(), key=lambda card: card.name.casefold()),
+    )
 
 
 @router.post("/admin/users/{user_id}/wins", response_model=Progress)

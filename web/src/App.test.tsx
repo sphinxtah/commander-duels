@@ -271,7 +271,7 @@ describe("the landing page", () => {
       // Nothing to read but the links line: the heading and the status are for screen readers
       // only.
       expect(screen.getByRole("main")).toHaveTextContent(
-        /^Sign in\s*Preparing Google sign-in…\s*About · Privacy · Terms$/,
+        /^Sign in\s*Preparing Google sign-in…\s*By signing in you accept the terms of use and the privacy policy\.\s*About · Privacy · Terms$/,
       );
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
         "Sign in",
@@ -555,13 +555,17 @@ describe("an account that is not active", () => {
     expect(insideCalls()).toEqual([]);
 
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
-    const heading = await screen.findByRole("heading", {
-      name: "Welcome to the table.",
-    });
+    await screen.findByRole("heading", { name: "Welcome to the table." });
     expect(window.location.hash).toBe("#profile");
     expect(screen.getByRole("navigation")).toBeInTheDocument();
-    expect(screen.getByLabelText("Handle")).toBeInTheDocument();
-    expect(document.activeElement).toBe(heading);
+    // The setup wizard opens on the approved account (v0.4.2), with focus on its welcome.
+    const welcome = await screen.findByRole("heading", {
+      name: "Welcome to Commander Duels",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(welcome));
+    expect(
+      screen.getByRole("button", { name: "Continue setup" }),
+    ).toBeInTheDocument();
   });
 
   it("asks the API for nothing of the app at any address", async () => {
@@ -859,74 +863,89 @@ describe("the account", () => {
   });
 });
 
-describe("a new account's handle", () => {
-  it("every page but Profile points there until the account has one", async () => {
+describe("a new account's setup (v0.4.2)", () => {
+  it("opens the wizard by itself each time the site opens, and every page but Profile points to it", async () => {
     const fresh: Me = { ...alice, onboarding: "handle", handle: null };
     on("GET /api/v1/me", () => reply(200, fresh));
     on("PATCH /api/v1/me", () =>
-      reply(200, { ...fresh, onboarding: "complete", handle: "alice" }),
+      reply(200, { ...fresh, onboarding: "starters", handle: "alice" }),
     );
+    on("GET /api/v1/decks/starters", () => reply(200, starterDecks));
     // The landing page kept the address, so the first page is rarely Profile.
     window.location.hash = "#play";
     render(<App />);
-    const link = await screen.findByRole("link", {
-      name: "Choose yours on Profile",
-    });
-    expect(link).toHaveAttribute("href", "#profile");
+    expect(
+      await screen.findByRole("heading", {
+        name: "Welcome to Commander Duels",
+      }),
+    ).toBeInTheDocument();
+    // A quick look at the game: four screenshots, each with its words.
+    const shots = screen.getByRole("list", { name: "A look at the game" });
+    expect(within(shots).getAllByRole("img")).toHaveLength(4);
+    expect(within(shots).getAllByRole("img")[0]).toHaveAttribute(
+      "src",
+      "/welcome/table-640.webp",
+    );
+    // Closing waits for later: the page points the way back.
+    fireEvent.click(screen.getByRole("button", { name: "Finish later" }));
+    expect(
+      screen.queryByRole("heading", { name: "Welcome to Commander Duels" }),
+    ).toBeNull();
     expect(screen.getByRole("main")).toHaveTextContent(
-      "Other players know you by your handle.",
+      "Your game is not set up yet: choose the name other players see, and claim two free starter decks.",
     );
     // So does the sidebar, where the handle would be.
     expect(
       screen.getByRole("link", { name: /Alice\s*Choose your handle/ }),
     ).toHaveAttribute("href", "#profile");
 
-    window.location.hash = "#profile";
-    await screen.findByRole("heading", { name: "Welcome to the table." });
-    expect(
-      screen.queryByRole("link", { name: "Choose yours on Profile" }),
-    ).toBeNull();
-    fireEvent.change(screen.getByLabelText("Handle"), {
+    // The notice opens it at the account's own step.
+    fireEvent.click(screen.getByRole("button", { name: /Continue setup/ }));
+    fireEvent.change(await screen.findByLabelText("Handle"), {
       target: { value: "alice" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save handle" }));
-    await screen.findByText("Signed in");
-
-    window.location.hash = "#play";
-    await screen.findByRole("heading", { name: /Gather your cards/ });
+    fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
     expect(
-      screen.queryByText("Other players know you by your handle."),
-    ).toBeNull();
+      await screen.findByRole("heading", {
+        name: "Claim your two free starter decks",
+      }),
+    ).toBeInTheDocument();
+    expect(client.PATCH).toHaveBeenCalledWith("/api/v1/me", {
+      body: { handle: "alice" },
+    });
   });
 
-  it("then every page but Profile points to the starter decks until they are chosen (v0.3.1)", async () => {
+  it("opens again on the next visit until the starter decks are chosen, and Profile opens it too", async () => {
     on("GET /api/v1/me", () =>
       reply(200, { ...alice, onboarding: "starters" }),
     );
     on("GET /api/v1/decks/starters", () => reply(200, starterDecks));
     window.location.hash = "#settings";
     render(<App />);
-    const link = await screen.findByRole("link", {
-      name: "Choose them on Profile",
-    });
-    expect(link).toHaveAttribute("href", "#profile");
-    expect(screen.getByRole("main")).toHaveTextContent(
-      "Two starter decks of your choice begin your card library.",
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Finish later" }),
     );
-    expect(
-      screen.queryByText("Other players know you by your handle."),
-    ).toBeNull();
+    expect(screen.getByRole("main")).toHaveTextContent(
+      "Two free starter decks are waiting for you to claim them.",
+    );
     expect(
       screen.getByRole("link", { name: /alice\s*Choose your starter decks/ }),
     ).toHaveAttribute("href", "#profile");
 
     window.location.hash = "#profile";
     expect(
-      await screen.findByRole("heading", { name: "Choose two starter decks" }),
+      await screen.findByRole("heading", { name: "Set up your game" }),
     ).toBeInTheDocument();
+    // Profile has its own way back, so the notice is not there.
     expect(
-      screen.queryByRole("link", { name: "Choose them on Profile" }),
+      screen.queryByText(
+        "Two free starter decks are waiting for you to claim them.",
+      ),
     ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+    expect(
+      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
+    ).toBeInTheDocument();
   });
 });
 

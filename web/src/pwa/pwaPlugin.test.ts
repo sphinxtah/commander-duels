@@ -116,13 +116,14 @@ describe("the service worker build", () => {
       swVersion("0.3.0", [{ name: "assets/a.js", content: "2" }]),
     ).not.toBe(a);
     expect(precacheList(["b", "a", "a"])).toEqual(["/", "/a", "/b"]);
-    // Portraits load on demand, and the public pages are not the app.
+    // Portraits and the wizard's screenshots load on demand, and the public pages are not the app.
     expect(
       precacheList([
         "portraits/jace-128.webp",
         "brand/mark.webp",
         "pages/about.html",
         "pages/pages.css",
+        "welcome/table-1280.webp",
       ]),
     ).toEqual(["/", "/brand/mark.webp"]);
     expect(

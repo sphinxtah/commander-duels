@@ -77,6 +77,18 @@ if ! docker compose run --rm -T migrate; then
   echo "docs/deployment.md." >&2
   exit 1
 fi
+# The kits of 0.1.1 to 0.4.0 had .env say CD_GAMES_MAX=6. Since 0.4.1 the site runs up to 64 games
+# at once (the owner's limit) and the engine is sized for them, but an .env kept from before still
+# held the engine to 6. Deploying over one of those versions raises that 6 to 64; any other value
+# is the owner's own choice and stays, as does a 6 set after this.
+case "$previous" in
+  0.1.* | 0.2.* | 0.3.* | 0.4.0 | 0.4.1)
+    if [ "$(setting CD_GAMES_MAX)" = 6 ]; then
+      sed -i 's/^CD_GAMES_MAX=6$/CD_GAMES_MAX=64/' .env
+      echo "CD_GAMES_MAX in .env: 6, from the kits before 0.4.1, is now 64"
+    fi
+    ;;
+esac
 docker compose up -d --wait --remove-orphans || fall_back "$tag did not start."
 sed -i "s/^CD_VERSION=.*/CD_VERSION=$tag/" .env
 

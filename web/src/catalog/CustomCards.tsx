@@ -5,10 +5,10 @@ import type { CustomCard } from "./catalog";
 import styles from "./catalog.module.css";
 
 /**
- * The Godlike tier's custom cards (v0.3.1), for an account at that tier; none otherwise. Below it
- * the API answers as for a route that does not exist, and the page then shows nothing of them at
- * all: no tab, no hint that there is anything to reach. Nothing about them is in the page's own
- * code; it learns of them only from this answer.
+ * The Godlike tier's custom cards (v0.3.1), for an account at that tier while it is allied with
+ * their Planeswalker (v0.4.2); none otherwise. Below the tier the API answers as for a route that
+ * does not exist, and the page then shows nothing of them at all: no hint that there is anything
+ * to reach. Nothing about them is in the page's own code; it learns of them only from this answer.
  */
 export function useCustomCards(): CustomCard[] {
   const [cards, setCards] = useState<CustomCard[]>([]);
@@ -39,14 +39,21 @@ export function engineWords(card: CustomCard): string {
 
 /** The custom cards with their images, each saying whether the running game engine has loaded
  * it: a deck holding one it has not loaded cannot start a game. */
-export function GodlikeCards({ cards }: { cards: CustomCard[] }) {
+export function GodlikeCards({
+  cards,
+  title = "Godlike cards",
+}: {
+  cards: CustomCard[];
+  title?: string;
+}) {
   return (
     <section className={styles.custom} aria-labelledby="godlike-title">
-      <h2 id="godlike-title">Godlike cards</h2>
+      <h2 id="godlike-title">{title}</h2>
       <p className={styles.lead}>
-        Custom cards that only the Godlike tier opens. Put them in your decks
-        from the deck builder; a game plays them wherever the game engine has
-        loaded them, and everyone at that table sees them.
+        Custom cards that only the Godlike tier opens, yours while you are
+        allied with their Planeswalker. Put them in your decks from the deck
+        builder; a game plays them wherever the game engine has loaded them, and
+        everyone at that table sees them.
       </p>
       <ul className={styles.customList}>
         {cards.map((card) => (

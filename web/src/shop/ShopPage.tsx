@@ -8,6 +8,7 @@ import {
 } from "react";
 import { client, describe, type Me } from "../api";
 import shell from "../App.module.css";
+import { DeckShelf } from "./DeckShelf";
 import { Leng } from "./Leng";
 import { PackOpening } from "./PackOpening";
 import {
@@ -32,7 +33,10 @@ import styles from "./shop.module.css";
 
 // Leng's card shop (v0.4.0): booster packs from Revised to the current set, bought with the tokens
 // wins earn, and opened at Leng's counter. The server prices, sells and draws every pack; the page
-// shows what it says and keeps one client key per purchase, so a retried request buys once.
+// shows what it says and keeps one client key per purchase, so a retried request buys once. Since
+// v0.4.2 a second tab sells the starter decks (DeckShelf).
+
+type Shelf = "packs" | "decks";
 
 function day(value: string | null | undefined): string {
   if (!value) return "—";
@@ -55,11 +59,15 @@ function speech(view: ShopView | undefined): string {
 export function ShopPage({
   me,
   heading,
+  onSetup,
 }: {
   me: Me;
   heading: RefObject<HTMLHeadingElement | null>;
+  /** Opens the setup wizard, where the two free starter decks are chosen. */
+  onSetup: () => void;
 }) {
   const [view, setView] = useState<ShopView>();
+  const [shelf, setShelf] = useState<Shelf>("packs");
   const [history, setHistory] = useState<OpeningSummary[]>([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -86,9 +94,10 @@ export function ShopPage({
     } else setError(describe(shop.error));
     if (opened.data) setHistory(opened.data);
   }, []);
+  // Choosing the free starter decks (in the setup wizard, over this page) prices the others.
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, me.onboarding]);
   useEffect(() => {
     if (buying) dialog.current?.showModal?.();
   }, [buying]);
@@ -220,229 +229,264 @@ export function ShopPage({
         {message}
       </p>
 
-      <section className={styles.section} aria-labelledby="packs-title">
-        <h2 id="packs-title">Your packs</h2>
-        {view && view.inventory.length === 0 ? (
-          <p className={styles.note}>
-            No unopened packs. Packs you buy wait here until you open them.
-          </p>
-        ) : (
-          <ul className={styles.inventory} aria-label="Unopened packs">
-            {view?.inventory.map((item) => (
-              <li key={item.product.id} aria-label={item.product.name}>
-                <div>
-                  <strong>{item.product.name}</strong>{" "}
-                  <span>
-                    × {item.count} · {kindLabels[item.product.kind]}
-                  </span>
-                </div>
-                {item.openable ? (
-                  <button
-                    type="button"
-                    className={shell.primary}
-                    disabled={busy}
-                    aria-label={`Open a pack of ${item.product.name}`}
-                    onClick={() => void open(item.next_pack)}
-                  >
-                    Open a pack
-                  </button>
-                ) : (
-                  <span>Its booster data has not been read yet.</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className={styles.section} aria-labelledby="shelves-title">
-        <h2 id="shelves-title">On the shelves</h2>
-        <div className={styles.filters}>
-          <label className={styles.field}>
-            <span>Search by set name or code</span>
-            <input
-              type="search"
-              value={filters.q}
-              maxLength={80}
-              onChange={(event) => update("q", event.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Year</span>
-            <select
-              value={filters.year}
-              onChange={(event) => update("year", event.target.value)}
-            >
-              <option value="">Any year</option>
-              {years.map((year) => (
-                <option key={year} value={String(year)}>
-                  {year}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span>Booster type</span>
-            <select
-              value={filters.kind}
-              onChange={(event) =>
-                update("kind", event.target.value as Filters["kind"])
-              }
-            >
-              <option value="">Any type</option>
-              {kinds.map((kind) => (
-                <option key={kind} value={kind}>
-                  {kindLabels[kind]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span>Sort</span>
-            <select
-              value={filters.sort}
-              onChange={(event) => update("sort", event.target.value as Sort)}
-            >
-              {(Object.keys(sortLabels) as Sort[]).map((sort) => (
-                <option key={sort} value={sort}>
-                  {sortLabels[sort]}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <p className={styles.note} aria-live="polite">
-          {view
-            ? `${shown.length} of ${products.length} ${products.length === 1 ? "product" : "products"} on sale.`
-            : "Loading the shelves…"}
-        </p>
-        {groups.map(({ era, products: group }) => (
-          <section
-            key={era?.id ?? "all"}
-            className={styles.era}
-            aria-label={era ? era.name : "Every product"}
+      <div className={styles.tabs} role="tablist" aria-label="Leng sells">
+        {(["packs", "decks"] as Shelf[]).map((item) => (
+          <button
+            key={item}
+            role="tab"
+            type="button"
+            aria-selected={shelf === item}
+            onClick={() => setShelf(item)}
           >
-            {era && (
-              <h3>
-                {era.name} <small>since {era.since.slice(0, 4)}</small>
-              </h3>
-            )}
-            <ul className={styles.products}>
-              {group.map((product) => {
-                const short = product.price - balance;
-                return (
-                  <li
-                    key={product.id}
-                    className={styles.product}
-                    aria-label={product.name}
-                  >
-                    <header>
-                      <strong>{product.name}</strong>
-                      <span className={styles.code}>{product.set_code}</span>
-                    </header>
-                    <p>
-                      {product.set_name} · {day(product.released)}
-                    </p>
-                    <p>
-                      {kindLabels[product.kind]}
-                      {product.pack_size ? ` · ${product.pack_size} cards` : ""}
-                      {product.price_basis === "unpriced"
-                        ? " · not priced yet"
-                        : ""}
-                    </p>
-                    <div className={styles.price}>
-                      <b>{tokens(product.price)}</b>
+            {item === "packs" ? "Packs" : "Starter decks"}
+          </button>
+        ))}
+      </div>
+
+      {shelf === "decks" ? (
+        <DeckShelf
+          decks={view?.decks ?? []}
+          free={view?.free_decks ?? false}
+          balance={balance}
+          onSetup={onSetup}
+          onBought={async (said) => {
+            setMessage(said);
+            await load();
+          }}
+        />
+      ) : (
+        <>
+          <section className={styles.section} aria-labelledby="packs-title">
+            <h2 id="packs-title">Your packs</h2>
+            {view && view.inventory.length === 0 ? (
+              <p className={styles.note}>
+                No unopened packs. Packs you buy wait here until you open them.
+              </p>
+            ) : (
+              <ul className={styles.inventory} aria-label="Unopened packs">
+                {view?.inventory.map((item) => (
+                  <li key={item.product.id} aria-label={item.product.name}>
+                    <div>
+                      <strong>{item.product.name}</strong>{" "}
+                      <span>
+                        × {item.count} · {kindLabels[item.product.kind]}
+                      </span>
+                    </div>
+                    {item.openable ? (
                       <button
                         type="button"
-                        className={styles.secondary}
-                        aria-disabled={short > 0}
-                        title={
-                          short > 0
-                            ? `You need ${tokens(short)} more.`
-                            : undefined
-                        }
-                        aria-label={`Buy ${product.name}`}
-                        onClick={() => short <= 0 && choose(product)}
+                        className={shell.primary}
+                        disabled={busy}
+                        aria-label={`Open a pack of ${item.product.name}`}
+                        onClick={() => void open(item.next_pack)}
                       >
-                        Buy
+                        Open a pack
                       </button>
-                    </div>
-                    {short > 0 && (
-                      <p className={styles.note}>
-                        You need {tokens(short)} more.
-                      </p>
+                    ) : (
+                      <span>Its booster data has not been read yet.</span>
                     )}
                   </li>
-                );
-              })}
-            </ul>
+                ))}
+              </ul>
+            )}
           </section>
-        ))}
-      </section>
 
-      <section className={styles.section} aria-labelledby="history-title">
-        <h2 id="history-title">Packs you opened</h2>
-        {history.length === 0 ? (
-          <p className={styles.note}>None yet.</p>
-        ) : (
-          <ul className={styles.history} aria-label="Packs you opened">
-            {history.map((item) => (
-              <li key={item.id}>
-                <div>
-                  <strong>{item.product.name}</strong>{" "}
-                  <span>
-                    {new Date(item.opened_at).toLocaleString("en-US", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}{" "}
-                    · {item.cards} cards · {item.new_cards} new · best:{" "}
-                    {rarityLabels[item.best] ?? item.best}
-                    {item.foils ? ` · ${item.foils} foil` : ""}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  aria-label={`See its cards: the ${item.product.name} opened ${day(item.opened_at)}`}
-                  onClick={() => void show(item)}
+          <section className={styles.section} aria-labelledby="shelves-title">
+            <h2 id="shelves-title">On the shelves</h2>
+            <div className={styles.filters}>
+              <label className={styles.field}>
+                <span>Search by set name or code</span>
+                <input
+                  type="search"
+                  value={filters.q}
+                  maxLength={80}
+                  onChange={(event) => update("q", event.target.value)}
+                />
+              </label>
+              <label className={styles.field}>
+                <span>Year</span>
+                <select
+                  value={filters.year}
+                  onChange={(event) => update("year", event.target.value)}
                 >
-                  See its cards
-                </button>
-              </li>
+                  <option value="">Any year</option>
+                  {years.map((year) => (
+                    <option key={year} value={String(year)}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>Booster type</span>
+                <select
+                  value={filters.kind}
+                  onChange={(event) =>
+                    update("kind", event.target.value as Filters["kind"])
+                  }
+                >
+                  <option value="">Any type</option>
+                  {kinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {kindLabels[kind]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>Sort</span>
+                <select
+                  value={filters.sort}
+                  onChange={(event) =>
+                    update("sort", event.target.value as Sort)
+                  }
+                >
+                  {(Object.keys(sortLabels) as Sort[]).map((sort) => (
+                    <option key={sort} value={sort}>
+                      {sortLabels[sort]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className={styles.note} aria-live="polite">
+              {view
+                ? `${shown.length} of ${products.length} ${products.length === 1 ? "product" : "products"} on sale.`
+                : "Loading the shelves…"}
+            </p>
+            {groups.map(({ era, products: group }) => (
+              <section
+                key={era?.id ?? "all"}
+                className={styles.era}
+                aria-label={era ? era.name : "Every product"}
+              >
+                {era && (
+                  <h3>
+                    {era.name} <small>since {era.since.slice(0, 4)}</small>
+                  </h3>
+                )}
+                <ul className={styles.products}>
+                  {group.map((product) => {
+                    const short = product.price - balance;
+                    return (
+                      <li
+                        key={product.id}
+                        className={styles.product}
+                        aria-label={product.name}
+                      >
+                        <header>
+                          <strong>{product.name}</strong>
+                          <span className={styles.code}>
+                            {product.set_code}
+                          </span>
+                        </header>
+                        <p>
+                          {product.set_name} · {day(product.released)}
+                        </p>
+                        <p>
+                          {kindLabels[product.kind]}
+                          {product.pack_size
+                            ? ` · ${product.pack_size} cards`
+                            : ""}
+                          {product.price_basis === "unpriced"
+                            ? " · not priced yet"
+                            : ""}
+                        </p>
+                        <div className={styles.price}>
+                          <b>{tokens(product.price)}</b>
+                          <button
+                            type="button"
+                            className={styles.secondary}
+                            aria-disabled={short > 0}
+                            title={
+                              short > 0
+                                ? `You need ${tokens(short)} more.`
+                                : undefined
+                            }
+                            aria-label={`Buy ${product.name}`}
+                            onClick={() => short <= 0 && choose(product)}
+                          >
+                            Buy
+                          </button>
+                        </div>
+                        {short > 0 && (
+                          <p className={styles.note}>
+                            You need {tokens(short)} more.
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             ))}
-          </ul>
-        )}
-      </section>
+          </section>
 
-      <section className={styles.section} aria-labelledby="about-title">
-        <h2 id="about-title">About the packs</h2>
-        <div className={styles.about}>
-          <p>
-            Pull ratios follow{" "}
-            <a href="https://mtgjson.com" target="_blank" rel="noreferrer">
-              MTGJSON
-            </a>
-            's booster data (MIT licence)
-            {view?.data.mtgjson_version
-              ? `, version ${view.data.mtgjson_version}`
-              : ""}
-            : each pack is drawn from its set's own booster layouts and print
-            sheets, slot by slot, foils included. They describe real packs as
-            well as the community has recorded them, not a promise of any retail
-            product's odds.
-          </p>
-          <p>
-            Prices follow the market prices of sealed packs
-            {view?.data.prices_as_of
-              ? `, read on ${day(view.data.prices_as_of)}`
-              : ""}
-            , scaled so a current pack costs 500 tokens and a Revised pack
-            150,000. Tokens are play money: wins earn them, and they cannot be
-            bought, sold or cashed out. Alpha and Beta are not sold here; they
-            are for tournaments.
-          </p>
-        </div>
-      </section>
+          <section className={styles.section} aria-labelledby="history-title">
+            <h2 id="history-title">Packs you opened</h2>
+            {history.length === 0 ? (
+              <p className={styles.note}>None yet.</p>
+            ) : (
+              <ul className={styles.history} aria-label="Packs you opened">
+                {history.map((item) => (
+                  <li key={item.id}>
+                    <div>
+                      <strong>{item.product.name}</strong>{" "}
+                      <span>
+                        {new Date(item.opened_at).toLocaleString("en-US", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}{" "}
+                        · {item.cards} cards · {item.new_cards} new · best:{" "}
+                        {rarityLabels[item.best] ?? item.best}
+                        {item.foils ? ` · ${item.foils} foil` : ""}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      aria-label={`See its cards: the ${item.product.name} opened ${day(item.opened_at)}`}
+                      onClick={() => void show(item)}
+                    >
+                      See its cards
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className={styles.section} aria-labelledby="about-title">
+            <h2 id="about-title">About the packs</h2>
+            <div className={styles.about}>
+              <p>
+                Pull ratios follow{" "}
+                <a href="https://mtgjson.com" target="_blank" rel="noreferrer">
+                  MTGJSON
+                </a>
+                's booster data (MIT licence)
+                {view?.data.mtgjson_version
+                  ? `, version ${view.data.mtgjson_version}`
+                  : ""}
+                : each pack is drawn from its set's own booster layouts and
+                print sheets, slot by slot, foils included. They describe real
+                packs as well as the community has recorded them, not a promise
+                of any retail product's odds.
+              </p>
+              <p>
+                Prices follow the market prices of sealed packs
+                {view?.data.prices_as_of
+                  ? `, read on ${day(view.data.prices_as_of)}`
+                  : ""}
+                , scaled so a current pack costs 500 tokens and a Revised pack
+                150,000. Tokens are play money: wins earn them, and they cannot
+                be bought, sold or cashed out. Alpha and Beta are not sold here;
+                they are for tournaments.
+              </p>
+            </div>
+          </section>
+        </>
+      )}
 
       <dialog
         ref={dialog}

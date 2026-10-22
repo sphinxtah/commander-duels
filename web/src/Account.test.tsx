@@ -7,12 +7,22 @@ import {
   within,
 } from "@testing-library/react";
 import { createRef, useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { Account, SignIn, Waiting } from "./Account";
+import { SetupWizard } from "./app/SetupWizard";
 import {
   ANSWER_MS,
   client,
   currentCsrfToken,
+  onboarding,
   setCsrfToken,
   type Me,
 } from "./api";
@@ -104,8 +114,16 @@ function Page({
 }) {
   const [me, setMe] = useState<Me | null>(initial);
   const [notice, setNotice] = useState("");
+  // The setup wizard, as App opens it (v0.4.2): by itself when an account still setting up
+  // arrives, at its step from Profile.
+  const opens = (value: Me | null) =>
+    value?.status === "active" && onboarding(value) ? "welcome" : null;
+  const [setup, setSetup] = useState<"welcome" | "current" | null>(() =>
+    opens(initial),
+  );
   const change = (value: Me | null) => {
     seen?.(value);
+    if (me?.status !== "active" && opens(value)) setSetup("welcome");
     setMe(value);
     if (value) setNotice("");
   };
@@ -134,15 +152,35 @@ function Page({
       />
     );
   return (
-    <Account
-      me={me}
-      onChange={change}
-      onSignedOut={signedOut}
-      heading={createRef()}
-    />
+    <>
+      <Account
+        me={me}
+        onChange={change}
+        onSignedOut={signedOut}
+        onSetup={() => setSetup("current")}
+        heading={createRef()}
+      />
+      <SetupWizard
+        me={me}
+        onChange={change}
+        open={setup}
+        onClose={() => setSetup(null)}
+      />
+    </>
   );
 }
 
+beforeAll(() => {
+  // jsdom has no modal dialogs; the setup wizard is one (v0.4.2).
+  const dialog = HTMLDialogElement.prototype;
+  dialog.showModal ??= function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  };
+  dialog.close ??= function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+    this.dispatchEvent(new Event("close"));
+  };
+});
 beforeEach(() => {
   calls = [];
   queues.clear();
@@ -518,8 +556,12 @@ describe("the wait for approval", () => {
     expect(
       await screen.findByRole("heading", { name: "Welcome to the table." }),
     ).toBeInTheDocument();
+    // The setup wizard opens on the approved account (v0.4.2).
     expect(
-      screen.getByRole("heading", { name: "Choose your handle" }),
+      screen.getByRole("heading", { name: "Welcome to Commander Duels" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Set up your game" }),
     ).toBeInTheDocument();
     expect(seen).toHaveBeenLastCalledWith(
       expect.objectContaining({ status: "active" }),
@@ -665,11 +707,18 @@ describe("the signed-out screen", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Sign in",
     );
-    // While Google's script loads, only the hidden heading and status are there: no privacy
-    // note or sign-up policy any more (v0.3.0).
+    // While Google's script loads, only the hidden heading and status are there, and what signing
+    // in accepts (v0.4.2): no privacy note or sign-up policy any more (v0.3.0).
     expect(document.body).toHaveTextContent(
-      /^Sign in\s*Preparing Google sign-in…$/,
+      /^Sign in\s*Preparing Google sign-in…\s*By signing in you accept the terms of use and the privacy policy\.$/,
     );
+    expect(screen.getByRole("link", { name: "terms of use" })).toHaveAttribute(
+      "href",
+      "/terms",
+    );
+    expect(
+      screen.getByRole("link", { name: "privacy policy" }),
+    ).toHaveAttribute("href", "/privacy");
   });
 
   it("does not claim sign-in is unconfigured before the bootstrap loads", () => {
@@ -859,13 +908,23 @@ describe("the Google button", () => {
   });
 });
 
-describe("the starter decks at onboarding (v0.3.1)", () => {
+describe("the setup wizard (v0.4.2)", () => {
   const choosing = () => account({ onboarding: "starters" });
   beforeEach(() => {
     on("GET /api/v1/decks/starters", () => reply(200, starterDecks));
   });
+  /** The wizard, opened by itself on an account choosing its starter decks, at that step. */
+  async function atStarters() {
+    render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Continue setup",
+      }),
+    );
+    return screen.findByRole("checkbox", { name: "Stand-in Skies" });
+  }
 
-  it("follow the handle, with focus on their heading", async () => {
+  it("welcomes, then takes the handle and the starter decks, with focus on each step's heading", async () => {
     on("PATCH /api/v1/me", () => reply(200, choosing()));
     render(
       <Page
@@ -873,29 +932,44 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
         auth={google}
       />,
     );
+    const welcome = await screen.findByRole("heading", {
+      name: "Welcome to Commander Duels",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(welcome));
+    expect(
+      screen.getByRole("list", { name: "Setting up your game" }),
+    ).toHaveTextContent("1 Welcome2 Your name3 Starter decks4 Alliance");
+    expect(
+      screen.getByText(
+        "Three quick steps: the name other players see, two free starter decks, and a Planeswalker to ally with.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Set up my game" }));
+    const name = await screen.findByRole("heading", {
+      name: "Choose your name",
+    });
+    await waitFor(() => expect(document.activeElement).toBe(name));
+    expect(
+      screen.getByText(/in the chat during games when it comes/),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Handle"), {
       target: { value: "alice" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save handle" }));
-    const heading = await screen.findByRole("heading", {
-      name: "Choose two starter decks",
+    fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    const decks = await screen.findByRole("heading", {
+      name: "Claim your two free starter decks",
     });
-    // The heading takes focus once the step has drawn, which a busy machine may finish a tick
-    // after the heading appears.
-    await waitFor(() => expect(document.activeElement).toBe(heading));
+    await waitFor(() => expect(document.activeElement).toBe(decks));
+    expect(screen.getByText(/Your 1,000 welcome tokens/)).toBeInTheDocument();
+    // Behind it, Profile waits with its own way back; the profile itself comes after.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Welcome to the table.",
     );
-    // The profile, the alliance and the progress wait until onboarding is done.
     expect(screen.queryByLabelText("Display name")).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Your alliance" })).toBeNull();
   });
 
-  it("show each deck's commander, colours, description, how to play it and what it teaches, and take exactly two", async () => {
-    render(<Page initial={choosing()} auth={google} />);
-    const skies = await screen.findByRole("checkbox", {
-      name: "Stand-in Skies",
-    });
+  it("shows each deck's commander card, colours, description, how to play it and what it teaches, and takes exactly two", async () => {
+    const skies = await atStarters();
     const item = skies.closest("li")!;
     expect(item.querySelector("img")).toHaveAttribute(
       "src",
@@ -911,10 +985,8 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
     expect(embers.closest("li")!.querySelector("img")).toBeNull();
     expect(embers.closest("li")).toHaveTextContent("Stand-in Embers Leader");
 
-    const confirm = screen.getByRole("button", {
-      name: "Confirm these two decks",
-    });
-    expect(confirm).toHaveAttribute("aria-disabled", "true");
+    const claim = screen.getByRole("button", { name: "Claim these two decks" });
+    expect(claim).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByText("No deck chosen yet.")).toBeInTheDocument();
     fireEvent.click(skies);
     expect(
@@ -926,19 +998,16 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
     ).toBeInTheDocument();
     // Two are the most: the third waits until one of the two is let go.
     expect(embers).toBeDisabled();
-    expect(confirm).toHaveAttribute("aria-disabled", "false");
+    expect(claim).toHaveAttribute("aria-disabled", "false");
     fireEvent.click(skies);
     expect(embers).toBeEnabled();
-    expect(confirm).toHaveAttribute("aria-disabled", "true");
+    expect(claim).toHaveAttribute("aria-disabled", "true");
   });
 
-  it("say so when Confirm is pressed before two are chosen", async () => {
-    render(<Page initial={choosing()} auth={google} />);
+  it("says so when the decks are claimed before two are chosen", async () => {
+    fireEvent.click(await atStarters());
     fireEvent.click(
-      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Confirm these two decks" }),
+      screen.getByRole("button", { name: "Claim these two decks" }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Choose two starter decks first.",
@@ -946,7 +1015,7 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
     expect(count("POST /api/v1/me/starters")).toBe(0);
   });
 
-  it("are sent in the order chosen, then an alliance is offered, which can wait until later", async () => {
+  it("sends the decks in the order chosen, then offers an alliance, which can wait until later", async () => {
     on("POST /api/v1/me/starters", () =>
       reply(201, { decks: ["deck-1", "deck-2"] }),
     );
@@ -954,16 +1023,21 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
     const seen = vi.fn();
     render(<Page initial={choosing()} auth={google} seen={seen} />);
     fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Continue setup",
+      }),
+    );
+    fireEvent.click(
       await screen.findByRole("checkbox", { name: "Stand-in Graves" }),
     );
     fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Skies" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm these two decks" }),
+      screen.getByRole("button", { name: "Claim these two decks" }),
     );
     const offer = await screen.findByRole("heading", {
       name: "Choose an alliance",
     });
-    expect(document.activeElement).toBe(offer);
+    await waitFor(() => expect(document.activeElement).toBe(offer));
     expect(client.POST).toHaveBeenCalledWith("/api/v1/me/starters", {
       body: { decks: ["starter_two", "starter_one"] },
     });
@@ -976,22 +1050,27 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ally with Kaya" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Later" }));
-    const alliance = await screen.findByRole("heading", {
-      name: "Your alliance",
-    });
-    expect(document.activeElement).toBe(alliance);
+    expect(
+      await screen.findByRole("heading", {
+        name: "You're ready to play, alice.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Play a practice game" }),
+    ).toHaveAttribute("href", "#play");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("heading", { name: /ready to play/ })).toBeNull();
+    // The profile, now that onboarding is done.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Welcome back, Alice.",
     );
     expect(
-      screen.getByText(
-        "You are in no alliance yet, so your profile shows your avatar.",
-      ),
+      screen.getByRole("heading", { name: "Your alliance" }),
     ).toBeInTheDocument();
     expect(count("PUT /api/v1/me/alliance")).toBe(0);
   });
 
-  it("lead to an alliance chosen at once, which the profile then shows", async () => {
+  it("leads to an alliance chosen at once, which the profile then shows", async () => {
     on("POST /api/v1/me/starters", () =>
       reply(201, { decks: ["deck-1", "deck-2"] }),
     );
@@ -1006,37 +1085,28 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
         progress({ alliance: "rowan", alliance_since: "2026-10-21T10:00:00Z" }),
       ),
     );
-    render(<Page initial={choosing()} auth={google} />);
-    fireEvent.click(
-      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
-    );
+    fireEvent.click(await atStarters());
     fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm these two decks" }),
+      screen.getByRole("button", { name: "Claim these two decks" }),
     );
     fireEvent.click(
       await screen.findByRole("button", { name: "Ally with Rowan" }),
     );
     expect(
-      await screen.findByText(
-        "You are allied with Rowan. Their Planeswalker cards are in your library, four copies of each.",
-      ),
+      await screen.findByRole("heading", {
+        name: "You're ready to play, alice.",
+      }),
     ).toBeInTheDocument();
     expect(client.PUT).toHaveBeenCalledWith("/api/v1/me/alliance", {
       body: { planeswalker: "rowan" },
     });
-    expect(
-      screen.getByRole("heading", { name: "Your alliance" }),
-    ).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Account" })).toHaveTextContent(
       "Allied with Rowan",
     );
-    expect(
-      screen.getByRole("button", { name: "Leave the alliance with Rowan" }),
-    ).toBeInTheDocument();
   });
 
-  it("go on when another tab chose them first", async () => {
+  it("goes on when another tab chose the decks first", async () => {
     on("POST /api/v1/me/starters", () =>
       reply(409, {
         code: "starters_chosen",
@@ -1044,20 +1114,17 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
       }),
     );
     on("GET /api/v1/me", () => reply(200, account()));
-    render(<Page initial={choosing()} auth={google} />);
-    fireEvent.click(
-      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
-    );
+    fireEvent.click(await atStarters());
     fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm these two decks" }),
+      screen.getByRole("button", { name: "Claim these two decks" }),
     );
     expect(
       await screen.findByRole("heading", { name: "Choose an alliance" }),
     ).toBeInTheDocument();
   });
 
-  it("say why they could not be chosen, and stay", async () => {
+  it("says why the decks could not be chosen, and stays", async () => {
     on("POST /api/v1/me/starters", () =>
       reply(503, {
         code: "starters_unavailable",
@@ -1065,30 +1132,34 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
           "The card catalog is not ready for the starter decks yet. Try again later.",
       }),
     );
-    render(<Page initial={choosing()} auth={google} />);
-    fireEvent.click(
-      await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
-    );
+    fireEvent.click(await atStarters());
     fireEvent.click(screen.getByRole("checkbox", { name: "Stand-in Graves" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm these two decks" }),
+      screen.getByRole("button", { name: "Claim these two decks" }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The card catalog is not ready for the starter decks yet.",
     );
     expect(
-      screen.getByRole("heading", { name: "Choose two starter decks" }),
+      screen.getByRole("heading", {
+        name: "Claim your two free starter decks",
+      }),
     ).toBeInTheDocument();
     expect(count("GET /api/v1/me")).toBe(0);
   });
 
-  it("offer Try again when the list does not arrive", async () => {
+  it("offers Try again when the list does not arrive", async () => {
     on(
       "GET /api/v1/decks/starters",
       () => Promise.reject(new TypeError("Failed to fetch")),
       () => reply(200, starterDecks),
     );
     render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: "Continue setup",
+      }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The application service is unavailable. Try again.",
     );
@@ -1097,6 +1168,27 @@ describe("the starter decks at onboarding (v0.3.1)", () => {
       await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("closes for later, and Profile opens it again at the account's step", async () => {
+    render(<Page initial={choosing()} auth={google} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Finish later" }),
+    );
+    expect(
+      screen.queryByRole("heading", { name: "Welcome to Commander Duels" }),
+    ).toBeNull();
+    expect(
+      screen.getByText(
+        "Claim your two free starter decks, then ally with a Planeswalker.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+    expect(
+      await screen.findByRole("heading", {
+        name: "Claim your two free starter decks",
+      }),
+    ).toBeInTheDocument();
   });
 });
 

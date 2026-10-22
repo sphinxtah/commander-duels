@@ -1,0 +1,176 @@
+/* The setup wizard (v0.4.2): a large dialog over the app, in the shell's own colours. */
+
+.wizard {
+  width: min(1120px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: auto;
+  background: #16211e;
+  color: #eceee5;
+  border: 1px solid #ad986555;
+  border-radius: 10px;
+  box-shadow: 0 30px 90px #0009;
+}
+.wizard::backdrop {
+  background: #050d0bed;
+}
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: #16211ef2;
+  border-bottom: 1px solid #ffffff12;
+}
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: #87968b;
+  font-size: 0.72rem;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.steps li span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #ffffff2a;
+  border-radius: 50%;
+  font-size: 0.66rem;
+}
+.steps li[aria-current="step"] {
+  color: #efcc8d;
+  font-weight: 650;
+}
+.steps li[aria-current="step"] span {
+  border-color: #d5b77c;
+  background: #d5b77c;
+  color: #192220;
+}
+.steps li[data-done] span {
+  border-color: #d5b77c88;
+  color: #d5b77c;
+}
+.close {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid #ffffff2a;
+  color: #c9d0c6;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+}
+.close:hover {
+  border-color: #d5b77c;
+}
+.body,
+.welcome,
+.done {
+  padding: 24px clamp(16px, 4vw, 40px) 32px;
+}
+.welcome h2,
+.done h2 {
+  font:
+    clamp(2rem, 4vw, 3.2rem) / 1.1 Georgia,
+    "Times New Roman",
+    serif;
+  letter-spacing: -1px;
+  font-weight: 400;
+  margin: 12px 0 14px;
+}
+.lead {
+  max-width: 760px;
+  color: #c3cbbf;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin: 0 0 22px;
+}
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.shots figure {
+  margin: 0;
+}
+.shots img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border: 1px solid #ffffff1c;
+  border-radius: 6px;
+  background: #0c1412;
+  box-shadow: 0 10px 30px #0008;
+}
+.shots figcaption {
+  margin-top: 9px;
+  color: #aab5a8;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+.shots figcaption strong {
+  color: #eceee5;
+}
+.next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px 24px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid #ffffff12;
+}
+.next p {
+  margin: 0;
+  color: #c3cbbf;
+  font-size: 0.85rem;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: 1px solid #d5b77c;
+  color: #ebece6;
+  padding: 12px 18px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.secondary:hover {
+  background: #d5b77c1a;
+}
+
+@media (max-width: 600px) {
+  .top {
+    padding: 10px 16px;
+  }
+  .steps {
+    font-size: 0.66rem;
+    gap: 4px 12px;
+  }
+}

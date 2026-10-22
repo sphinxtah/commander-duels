@@ -330,7 +330,7 @@ def test_players_build_from_their_library(client, engine):
 def test_alliances_open_by_tier_and_bring_their_cards(client):
     ada = Account(client, "ada")
     roster = {item["id"]: item for item in ada.get("/api/v1/planeswalkers").json()}
-    assert len(roster) == 99
+    assert len(roster) == 89
     assert roster["tibalt"]["open"] and roster["tibalt"]["cards"] == 1
     assert roster["teferi"]["open"] is False and roster["teferi"]["wins"] == 1_000
     assert roster["the-sphinx"]["custom"] and roster["the-sphinx"]["tier"] == "godlike"
@@ -366,6 +366,39 @@ def test_alliances_open_by_tier_and_bring_their_cards(client):
     assert listed[deck["id"]]["collection_locked"] is True
     done = [action for action, _ in actions(client)]
     assert "alliance.joined" in done and "alliance.left" in done
+
+
+def test_the_alliance_tab_lists_the_allied_planeswalkers_cards(client):
+    # v0.4.2: the Cards page's alliance tab follows the alliance, for SysOp as for players.
+    ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
+    none = {"alliance": None, "name": None, "custom": False, "cards": []}
+    assert ada.get("/api/v1/me/alliance/cards").json() == none
+    ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "tibalt"})
+    tibalt = ada.get("/api/v1/me/alliance/cards").json()
+    assert (tibalt["alliance"], tibalt["name"], tibalt["custom"]) == ("tibalt", "Tibalt", False)
+    assert [(card["name"], card["owned"]) for card in tibalt["cards"]] == [
+        ("Valki, God of Lies // Tibalt, Cosmic Impostor", 4)
+    ]
+    # Another alliance lists its own cards, and the library follows.
+    root.send("POST", f"/api/v1/admin/users/{ada.id}/wins", {"wins": 1_000, "reason": "Platinum"})
+    assert ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "teferi"}).status_code == 200
+    teferi = ada.get("/api/v1/me/alliance/cards").json()
+    assert [(card["name"], card["owned"]) for card in teferi["cards"]] == [
+        ("Teferi, Temporal Archmage", 4)
+    ]
+    library = {item["card"]["name"] for item in ada.get("/api/v1/library").json()["cards"]}
+    assert "Teferi, Temporal Archmage" in library
+    assert "Valki, God of Lies // Tibalt, Cosmic Impostor" not in library
+    # SysOp builds from the whole catalog: the tab shows the alliance's cards, without copies.
+    root.send("PUT", "/api/v1/me/alliance", {"planeswalker": "tibalt"})
+    theirs = root.get("/api/v1/me/alliance/cards").json()
+    assert [(card["name"], card["owned"]) for card in theirs["cards"]] == [
+        ("Valki, God of Lies // Tibalt, Cosmic Impostor", None)
+    ]
+    # The Godlike tier's Planeswalker has no catalog cards: its own are GET /custom-cards.
+    root.send("PUT", "/api/v1/me/alliance", {"planeswalker": "the-sphinx"})
+    sphinx = root.get("/api/v1/me/alliance/cards").json()
+    assert (sphinx["custom"], sphinx["cards"]) == (True, [])
 
 
 def test_wins_count_once_and_raise_levels(client):
@@ -447,15 +480,18 @@ def test_tiers_and_roster():
     for planeswalker in roster.values():
         tiers[planeswalker.tier] = tiers.get(planeswalker.tier, 0) + 1
     assert tiers == {
-        "bronze": 40,
-        "silver": 25,
+        "bronze": 32,
+        "silver": 23,
         "gold": 21,
         "platinum": 10,
         "mythic": 2,
         "godlike": 1,
     }
     assert roster["jace"].tier == "mythic" and roster["the-sphinx"].custom
-    wanderer, luxior = roster["the-wanderer"], roster["luxior"]
+    wanderer = roster["the-wanderer"]
+    # Luxior, whose subtype names an Equipment, left the roster in v0.4.2: none of its cards plays.
+    luxior = Planeswalker("luxior", "Luxior", "bronze", "Luxior", None, None, None, False, False)
+    assert "luxior" not in roster and "dungeon-master" not in roster
     assert belongs(wanderer, "The Wanderer", "Legendary Planeswalker")
     assert not belongs(wanderer, "Someone Else", "Legendary Planeswalker")
     assert belongs(luxior, "x", "Legendary Planeswalker — Equipment Luxior")
@@ -493,7 +529,7 @@ def test_content_files_hold_only_what_players_may_see():
         }
     roster = json.loads((CONTENT / "planeswalkers.json").read_text(encoding="utf-8"))
     ids = [entry["id"] for entry in roster["planeswalkers"]]
-    assert len(ids) == len(set(ids)) == 99
+    assert len(ids) == len(set(ids)) == 89
     portraits = Path(__file__).resolve().parent.parent / "web" / "public" / "portraits"
     for entry in roster["planeswalkers"]:
         if entry["portrait"]:
@@ -552,12 +588,24 @@ def test_custom_cards_are_seen_only_at_godlike(client):
     assert root.get("/api/v1/cards", q="Stand-in").json()["total"] == 0
     assert ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "the-sphinx"}).status_code == 403
 
-    # At Godlike it is listed, and an alliance with its Planeswalker puts it in the library.
+    # At Godlike it is listed only while allied with its Planeswalker (v0.4.2), which puts it in
+    # the library; allied with another, or with none, the list is empty, SysOp's too.
     root.send("POST", f"/api/v1/admin/users/{ada.id}/wins", {"wins": 100_000, "reason": "Godlike"})
-    listed = ada.get("/api/v1/custom-cards").json()
-    assert [item["name"] for item in listed] == ["Stand-in Sigil"] and not listed[0]["in_library"]
+    assert ada.get("/api/v1/custom-cards").json() == []
+    assert ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "tibalt"}).status_code == 200
+    assert ada.get("/api/v1/custom-cards").json() == []
+    assert root.get("/api/v1/custom-cards").json() == []
+    # SysOp's upload list stays whole.
+    assert [item["name"] for item in root.get("/api/v1/admin/custom-cards").json()] == [
+        "Stand-in Sigil"
+    ]
     assert ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "the-sphinx"}).status_code == 200
-    assert ada.get("/api/v1/custom-cards").json()[0]["in_library"] is True
+    listed = ada.get("/api/v1/custom-cards").json()
+    assert [item["name"] for item in listed] == ["Stand-in Sigil"] and listed[0]["in_library"]
+    assert (
+        root.send("PUT", "/api/v1/me/alliance", {"planeswalker": "the-sphinx"}).status_code == 200
+    )
+    assert [item["name"] for item in root.get("/api/v1/custom-cards").json()] == ["Stand-in Sigil"]
     image = ada.get(card["image_url"])
     assert image.status_code == 200 and image.content == PNG
     assert image.headers["content-type"] == "image/png"

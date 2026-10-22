@@ -12,6 +12,7 @@ export type Opening = components["schemas"]["Opening"];
 export type OpeningSummary = components["schemas"]["OpeningSummary"];
 export type PulledCard = components["schemas"]["PulledCard"];
 export type Purchase = components["schemas"]["Purchase"];
+export type DeckOffer = components["schemas"]["DeckOffer"];
 export type BoosterKind = Product["kind"];
 
 export const kindLabels: Record<BoosterKind, string> = {

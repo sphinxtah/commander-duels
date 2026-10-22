@@ -51,6 +51,15 @@ Since v0.4.0 players spend the tokens their wins earn on booster packs in Leng's
 - **The opening** at Leng's counter: the pack tears open, the cards are dealt face down and turn over one at a time (a click, or Space), rares glow gold and mythic rares orange, foils shimmer, each with a sound generated in the browser through the table's sound module and at its volume; "Reveal all" turns the rest. A summary follows, with new cards marked and each card's details a click away. With reduced motion every step is immediate and nothing moves; larger text enlarges the cards.
 - **History.** "Packs you opened" lists every opening, newest first; each can be shown again.
 
+## Starter decks (v0.4.2)
+
+The shop's second tab, beside the packs, sells the ten Commander starter decks ([progression](progression.md#the-starter-decks)), at the owner's request at the start of v0.4.2.
+
+- **The first two are free.** A new account chooses them in the setup wizard; until then the tab shows each deck as free, with a button that opens the wizard, and sells none (`409 starters_first`). The 1,000 welcome tokens stay for packs.
+- **After them, each sells once** (`POST /api/v1/shop/decks`, with the deck's ID; permission `decks.edit`). In one transaction the price leaves the balance, the deck becomes a deck of the player's own, and every copy of its cards joins the library for good, exactly as choosing it would have (`library_grants`, source `starter`, key `starter:<deck>`). The ledger entry is a shop purchase (kind `pack`), keyed `deck:<account>:<deck>` and named "Starter deck: <title>", so a retried request buys nothing more and answers with the deck it bought (`repeated`). A deck chosen or bought shows "In your decks" (`409 deck_owned`). Each shows its commander's card.
+- **Priced by its cards.** `content/starter-deck-prices.json` holds the market value of the cards each deck grants, basic lands left out (a library holds those without limit), each at the market price of the printing the owner chose for it, as Scryfall gave it on 2026-10-21 (TCGplayer's market price); a printing with no price takes the cheapest printing of the same card. `scripts/starter_deck_prices.py` reads them again. The API turns a deck's value into tokens at the current pack's rate, 500 tokens for $6.07, so a dollar of cards costs what a dollar of a current pack does, rounded to two significant figures as packs are (`api/products.py`). A deck the file does not price is not sold. Players never see the dollars.
+- **What that gives.** Each deck holds one Revised dual land, which is most of its value: on 2026-10-21 the ten cost from 35,000 tokens (Forged in Battle, $423.02) to 94,000 (Graveyard Shift, $1,145.58). Without their dual lands their cards come to about $30–46, about 2,500–3,800 tokens.
+
 ## SysOp gives packs
 
 SysOp gives unopened packs to any account, its own included (permission `economy.manage`): 1 to 100 of one product at a time, with a reason, audited (`shop.packs_granted`). Administration's Card shop tab has the form. Administrators see the shop's data but give nothing.

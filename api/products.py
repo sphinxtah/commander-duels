@@ -13,6 +13,8 @@
   and each change is audited.
 - A product is **sold** while staff keep it on sale, its booster data is ready (every card found in
   the catalog) and it has been released.
+- **Starter decks** (v0.4.2) are priced from the market value of the cards they grant, basic lands
+  aside (content/starter-deck-prices.json), at the current pack's rate, rounded the same way.
 """
 
 import hashlib
@@ -33,6 +35,7 @@ from api.identity import utcnow
 from api.models import ShopProduct
 
 PRICE_LIST = "pack-prices.json"
+DECK_PRICES = "starter-deck-prices.json"
 ANCHOR_USD = 6.07
 ANCHOR_TOKENS = 500
 TOP_USD = 343.28
@@ -109,6 +112,31 @@ def two_figures(value: float) -> int:
 def curve_price(usd: float) -> int:
     """Tokens for a pack whose market price is usd: 500 at $6.07, 150,000 at $343.28."""
     return two_figures(ANCHOR_TOKENS * (usd / ANCHOR_USD) ** EXPONENT)
+
+
+def deck_price(usd: float) -> int:
+    """Tokens for a starter deck whose cards are worth usd (v0.4.2): at the current pack's rate,
+    500 tokens for $6.07, so a dollar of cards costs what a dollar of a current pack does."""
+    return two_figures(ANCHOR_TOKENS * usd / ANCHOR_USD)
+
+
+@lru_cache(maxsize=4)
+def deck_prices_at(path: str, modified: float) -> dict[str, int]:
+    content = json.loads(Path(path).read_bytes())
+    return {
+        str(item["id"]): deck_price(float(item["usd"]))
+        for item in content["decks"]
+        if isinstance(item.get("usd"), int | float) and item["usd"] > 0
+    }
+
+
+def deck_prices(content_dir: str) -> dict[str, int]:
+    """Each starter deck's price in tokens, by its ID, from content/starter-deck-prices.json
+    (scripts/starter_deck_prices.py); a deck it does not price is not sold."""
+    path = Path(content_dir) / DECK_PRICES
+    if not path.is_file():
+        return {}
+    return deck_prices_at(str(path), path.stat().st_mtime)
 
 
 def price_of(product: ShopProduct) -> tuple[int, PriceBasis]:

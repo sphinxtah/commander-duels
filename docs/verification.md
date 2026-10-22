@@ -1,5 +1,19 @@
 # Verification
 
+## v0.4.2
+
+Validated locally on Windows on October 21, 2026, on the work of v0.4.2 (the live 64-game limit, the alliance tab, the setup wizard, the starter decks in the shop, the roster of 89, the terms line and the upload preview). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine did not change.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 96 files formatted, 65 Python source files type-checked |
+| Python suite | 214 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New: the alliance tab's cards follow the alliance, SysOp's included, and the custom card list holds only the allied Planeswalker's (`tests/test_progression.py`); the starter decks free first, then each sold once at its price, refused when owned, unpriced, short of tokens or before the free ones, and a retry buying nothing more (`tests/test_shop.py`); `deploy.sh` raising the old kits' `CD_GAMES_MAX=6` once and keeping any other value (`tests/test_deploy_kit.py`) |
+| Migrations | `alembic upgrade head && alembic check` on a fresh PostgreSQL: one head, `0014_roster_playable`, no drift |
+| The roster | Counted on the development catalog of 2026-10-21 (revision 2, the same engine build as the live site): ten Planeswalkers had no certified card, every other one at least one |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated |
+| Web unit tests and build | 880 Vitest tests in 72 files passed; `tsc -b`, the service worker's `tsc -p sw` and the production build passed. New: the setup wizard from the welcome to the last step, closing for later and opening again from the notice and Profile; the Cards page's alliance tab; the shop's Starter decks tab, free and then for sale; the terms line; the upload preview as a `data:` URL |
+| Browser journeys (CI's verify job) | 44 passed, 13 skipped that need the engine or the built image, on a throwaway API from the source with the test catalog and Vite's dev server. Changed: `identity.spec.ts` (an approval opens the wizard, which leads to the handle) and `pages.spec.ts` (the terms line's two links) |
+
 ## v0.4.1
 
 Validated locally on Windows on October 21, 2026, on the work as merged for v0.4.1 (the public pages, problem reports and the counts, account deletion, 64 games at once, and The Sphinx's portrait). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository, with Pillow 12.3.0; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine's tests ran in its image's Maven build.

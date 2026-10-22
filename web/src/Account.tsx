@@ -25,13 +25,11 @@ import { GiveTokens } from "./tokens/GiveTokens";
 import { TokensPanel } from "./tokens/TokensPanel";
 import { Portrait } from "./alliance/Portrait";
 import {
-  AllianceOffer,
   AlliancePanel,
   ProgressPanel,
   useAllianceChange,
 } from "./alliance/StandingPanels";
 import { useStanding } from "./alliance/useStanding";
-import { StarterPicker } from "./alliance/StarterPicker";
 import { TierBadge } from "./alliance/TierBadge";
 import { loadGoogle } from "./google";
 import styles from "./Account.module.css";
@@ -291,7 +289,14 @@ export function SignIn({
           </p>
         )
       ) : auth.google_client_id ? (
-        <GoogleSignIn onSignedIn={onSignedIn} />
+        <>
+          <GoogleSignIn onSignedIn={onSignedIn} />
+          {/* The terms say signing in accepts them (v0.4.1), so the button says so too (v0.4.2). */}
+          <p className={styles.consent}>
+            By signing in you accept the <a href="/terms">terms of use</a> and
+            the <a href="/privacy">privacy policy</a>.
+          </p>
+        </>
       ) : (
         <p className={styles.fine}>
           Google sign-in is not set up on this server yet. The operator needs to
@@ -307,18 +312,40 @@ export function SignIn({
   );
 }
 
-function HandleForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
+/**
+ * The handle: the name other players know the account by, at the table, in the lobby and, later,
+ * in a game's chat. Chosen first in the setup wizard (v0.4.2), and changed later on Profile.
+ */
+export function HandleForm({
+  me,
+  onChange,
+  heading,
+}: {
+  me: Me;
+  onChange: (me: Me) => void;
+  /** Focused when the wizard arrives at this step. */
+  heading?: RefObject<HTMLHeadingElement | null>;
+}) {
   const [handle, setHandle] = useState(me.handle ?? "");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const { data, error } = await client.PATCH("/api/v1/me", {
-      body: { handle },
-    });
-    if (data) {
-      onChange(data);
-      setMessage("");
-    } else setMessage(describe(error));
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data, error } = await client.PATCH("/api/v1/me", {
+        body: { handle },
+      });
+      if (data) {
+        onChange(data);
+        setMessage("");
+      } else setMessage(describe(error));
+    } catch {
+      setMessage(describe(undefined));
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <form
@@ -326,10 +353,13 @@ function HandleForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
       onSubmit={submit}
       aria-labelledby="handle-title"
     >
-      <h2 id="handle-title">Choose your handle</h2>
+      <h2 id="handle-title" ref={heading} tabIndex={-1}>
+        Choose your name
+      </h2>
       <p className={styles.fine}>
-        Your handle is how other players know you: 3–20 letters, digits, hyphens
-        or underscores.
+        Your handle is the name other players see: at the table, in the lobby,
+        and in the chat during games when it comes. 3–20 letters, digits,
+        hyphens or underscores.
       </p>
       <label className={styles.field}>
         <span>Handle</span>
@@ -347,8 +377,12 @@ function HandleForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
           {message}
         </p>
       )}
-      <button className={shell.primary} type="submit">
-        Save handle
+      <button
+        className={shell.primary}
+        type="submit"
+        aria-disabled={busy || undefined}
+      >
+        Save and continue
       </button>
     </form>
   );
@@ -828,44 +862,28 @@ export function Waiting({
 }
 
 /**
- * The Profile page. App shows it, like every page, only to an active account (v0.3.0). A new
- * account finishes onboarding here: its handle, then its two starter decks, then an alliance to
- * choose or leave for later (v0.3.1). Once done, it shows the account's progress, its alliance
- * and the alliance picker, the profile form and where the account is signed in.
+ * The Profile page. App shows it, like every page, only to an active account (v0.3.0). Until the
+ * account has its handle and its two starter decks, the setup wizard does that (v0.4.2): here a
+ * panel opens it again. Then the page shows the account's progress, its alliance and the
+ * alliance picker, the profile form and where the account is signed in.
  */
 export function Account({
   me,
   onChange,
   onSignedOut,
+  onSetup,
   heading,
 }: {
   me: Me;
   onChange: (me: Me) => void;
   /** This browser's session ended; the notice is what the sign-in page then says. */
   onSignedOut: (notice: string) => void;
+  /** Opens the setup wizard at the account's step. */
+  onSetup: () => void;
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const standing = useStanding(me.id);
   const alliance = useAllianceChange(me, onChange, standing);
-  // The alliance offered right after the starter decks; skipping it keeps nothing on the server.
-  const [offer, setOffer] = useState(false);
-  const step =
-    me.onboarding === "handle"
-      ? "handle"
-      : me.onboarding === "starters"
-        ? "starters"
-        : offer
-          ? "alliance"
-          : "profile";
-  // Each step that follows another takes focus to its heading, as following a link does: the
-  // button that finished the step went with it.
-  const stepHeading = useRef<HTMLHeadingElement>(null);
-  const shownStep = useRef(step);
-  useEffect(() => {
-    if (shownStep.current === step) return;
-    shownStep.current = step;
-    stepHeading.current?.focus();
-  }, [step]);
   const allied = me.alliance
     ? standing.roster?.find((found) => found.id === me.alliance)
     : undefined;
@@ -876,7 +894,7 @@ export function Account({
     <>
       <span className={shell.eyebrow}>YOUR ACCOUNT</span>
       <h1 ref={heading} tabIndex={-1}>
-        {onboarding(me) || offer
+        {onboarding(me)
           ? "Welcome to the table."
           : `Welcome back, ${me.display_name}.`}
       </h1>
@@ -913,28 +931,18 @@ export function Account({
           ))}
         </ul>
       </section>
-      {step === "handle" ? (
-        <section className={styles.panel}>
-          {/* Keyed by account: a form must never keep another account's values. */}
-          <HandleForm key={me.id} me={me} onChange={onChange} />
+      {onboarding(me) ? (
+        <section className={styles.panel} aria-labelledby="setup-title">
+          <h2 id="setup-title">Set up your game</h2>
+          <p className={styles.fine}>
+            {me.onboarding === "handle"
+              ? "Choose the name other players see, claim your two free starter decks, and ally with a Planeswalker."
+              : "Claim your two free starter decks, then ally with a Planeswalker."}
+          </p>
+          <button type="button" className={shell.primary} onClick={onSetup}>
+            Continue setup
+          </button>
         </section>
-      ) : step === "starters" ? (
-        <section className={styles.panel}>
-          <StarterPicker
-            key={me.id}
-            me={me}
-            onChange={onChange}
-            onChosen={() => setOffer(true)}
-            heading={stepHeading}
-          />
-        </section>
-      ) : step === "alliance" ? (
-        <AllianceOffer
-          standing={standing}
-          alliance={alliance}
-          onDone={() => setOffer(false)}
-          heading={stepHeading}
-        />
       ) : (
         <>
           {progress ? (
@@ -956,12 +964,7 @@ export function Account({
             )
           )}
           <TokensPanel refresh={tokensShown} />
-          <AlliancePanel
-            me={me}
-            standing={standing}
-            alliance={alliance}
-            heading={stepHeading}
-          />
+          <AlliancePanel me={me} standing={standing} alliance={alliance} />
           <section className={styles.panel}>
             <ProfileForm key={me.id} me={me} onChange={onChange} />
           </section>

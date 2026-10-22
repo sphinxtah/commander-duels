@@ -264,7 +264,9 @@ export function AllianceOffer({
       </h2>
       <p className={account.fine}>
         Your starter decks are in your library. Now ally with one of the
-        Planeswalkers your tier has opened, or choose later on this page.
+        Planeswalkers your tier has opened: their cards join your library while
+        the alliance lasts, and their portrait becomes your picture. You can
+        also choose later on your profile.
       </p>
       <AllianceRules />
       {alliance.error && (

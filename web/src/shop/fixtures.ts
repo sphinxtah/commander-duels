@@ -1,6 +1,7 @@
 import type { Me } from "../api";
 import type { components } from "../generated/api";
 import type {
+  DeckOffer,
   EraInfo,
   Opening,
   OpeningSummary,
@@ -89,7 +90,30 @@ export const shopView: ShopView = {
     prices_as_of: "2026-10-21",
     checked_at: "2026-10-21T11:00:00Z",
   },
+  decks: [],
+  free_decks: false,
 };
+
+/** A starter deck on Leng's shelf (v0.4.2). */
+export function deckOffer(
+  id: string,
+  fields: Partial<DeckOffer> = {},
+): DeckOffer {
+  return {
+    id,
+    title: `Stand-in ${id}`,
+    commander: `${id} Leader`,
+    colors: "WU",
+    color_names: "White / Blue",
+    guild: "Azorius",
+    description: `Stand-in ${id} plays a stand-in game.`,
+    commander_card_id: `card-${id}`,
+    commander_printing_id: `printing-${id}`,
+    price: 40_000,
+    owned: false,
+    ...fields,
+  };
+}
 
 export function card(
   position: number,

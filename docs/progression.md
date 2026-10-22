@@ -1,6 +1,6 @@
 # The Planeswalker Alliance (v0.3.1)
 
-Since v0.3.1 a player's game wins raise their level, each level opens more of the owner's 98 Planeswalkers to ally with, and the alliance brings that Planeswalker's cards into the player's card library. Players build decks from their own library, which starts with two of ten Commander starter decks; administrators and SysOp build from the whole catalog. The owner's decisions are in [the v0.3.1 plan](plans/0.3.1.md#decisions-at-the-start-of-v031). This is the scope's earned collection policy (PROG01), with the ledger and the result rules of PROG03–PROG05.
+Since v0.3.1 a player's game wins raise their level, each level opens more of the owner's Planeswalkers to ally with (88 since v0.4.2, and the Godlike tier's own), and the alliance brings that Planeswalker's cards into the player's card library. Players build decks from their own library, which starts with two of ten Commander starter decks; administrators and SysOp build from the whole catalog. The owner's decisions are in [the v0.3.1 plan](plans/0.3.1.md#decisions-at-the-start-of-v031). This is the scope's earned collection policy (PROG01), with the ledger and the result rules of PROG03–PROG05.
 
 ## Wins and levels
 
@@ -12,21 +12,24 @@ Since v0.3.1 a player's game wins raise their level, each level opens more of th
 
 | Tier | Reached at | Opens | Open in all |
 | --- | --- | --- | --- |
-| Bronze | the start | 40 Planeswalkers | 40 |
-| Silver | 10 wins | 25 more | 65 |
-| Gold | 100 wins | 21 more | 86 |
-| Platinum | 1,000 wins | 10 more | 96 |
-| Mythic | 10,000 wins | Jace and Liliana | 98 |
-| Godlike | 100,000 wins | The Sphinx, the owner's custom Planeswalker | 98 + 1 |
+| Bronze | the start | 32 Planeswalkers | 32 |
+| Silver | 10 wins | 23 more | 55 |
+| Gold | 100 wins | 21 more | 76 |
+| Platinum | 1,000 wins | 10 more | 86 |
+| Mythic | 10,000 wins | Jace and Liliana | 88 |
+| Godlike | 100,000 wins | The Sphinx, the owner's custom Planeswalker | 88 + 1 |
 
-The roster is `content/planeswalkers.json`: each Planeswalker's stable ID, name, tier, Planeswalker subtype, first Planeswalker card and a one-line description of its portrait, used as alternative text. `scripts/planeswalkers.py roster` makes it from the owner's tier list (`docs/plans/0.3.1-planeswalkers.csv`) and the portrait folder's data files. Changing a tier is a commit, not an administrative setting.
+Until v0.4.2 Bronze opened 40 and Silver 25 (98 in all). The owner then removed the ten whose every card the game engine cannot play: Abian, B.O.B., Deb Thomas, Dungeon Master, Ersta, Luxior, Mr. Monopoly, Svega (Bronze), Sifa and Thomil (Silver), counted on the catalog of 2026-10-21. Migration `0014_roster_playable` ends any alliance with them; their portraits went too.
+
+The roster is `content/planeswalkers.json`: each Planeswalker's stable ID, name, tier, Planeswalker subtype, first Planeswalker card and a one-line description of its portrait, used as alternative text. `scripts/planeswalkers.py roster` makes it from the owner's tier list (`docs/plans/0.3.1-planeswalkers.csv`) and the portrait folder's data files, leaving out the ten removed in v0.4.2. Changing a tier is a commit, not an administrative setting.
 
 ## Alliances
 
 - **One at a time, any time.** A player allies with a Planeswalker their tier has opened, and may switch or leave whenever they like. Each change is audited (`alliance.joined`, `alliance.left`). An alliance stays if SysOp later lowers the account's wins: it was a choice the tier allowed.
-- **Its cards.** While the alliance lasts, the library holds a playset (4) of each of the Planeswalker's own Planeswalker cards: every deck card in the catalog with a face whose types include Planeswalker and whose subtypes include the roster's subtype (Tibalt's cards include the back face of Valki, God of Lies). The Wanderer, whose card has no subtype, is matched by name. Cards that only name a Planeswalker ("Chandra's Outrage") are not included. 17 of the 97 regular Planeswalkers have no card that can be played here: Un-set and promotional characters, the set first printed on 2026-10-19 (not Commander-legal in Scryfall's data yet), and Urza. They stay in the roster for their portraits, and the picker says so.
+- **Its cards.** While the alliance lasts, the library holds a playset (4) of each of the Planeswalker's own Planeswalker cards: every deck card in the catalog with a face whose types include Planeswalker and whose subtypes include the roster's subtype (Tibalt's cards include the back face of Valki, God of Lies). The Wanderer, whose card has no subtype, is matched by name. Cards that only name a Planeswalker ("Chandra's Outrage") are not included. Since v0.4.2 every Planeswalker in the roster has at least one card a game can play (above).
 - **Leaving** takes the cards out at once, except copies owned from another source. Every deck of the player is revalidated then, so a deck that needed the alliance's cards is shown as collection-locked straight away.
 - **The portrait is the alliance's.** The allied Planeswalker's portrait is the player's picture on the profile, in the sidebar and at the table. With no alliance, the generated sigil stays.
+- **The Cards page's alliance tab** (v0.4.2). Named for the allied Planeswalker ("Teferi's cards"), it shows only that Planeswalker's cards, for every account, SysOp's too, and follows the alliance when it changes (`GET /api/v1/me/alliance/cards`). For The Sphinx it shows the custom cards. It replaced the "Godlike cards" tab, which had shown every custom card to any Godlike account whatever its alliance (the owner's report at the start of v0.4.2).
 
 ## The library
 
@@ -49,7 +52,9 @@ A player's library is what they may build from (PROG01's earned policy, DECK08):
 ## The starter decks
 
 - **The ten decks** are `content/starter-decks.json`: one 100-card Commander deck per two-colour pair, each with its commander, colours, description, how to play it and what it teaches, and the printing the owner chose for every card. `scripts/starter_decks.py` makes it from the owner's workbook, which stays out of git: the workbook also holds private production notes (reference prices, and which card is each deck's guaranteed bonus) that must not reach players or the client, and the script keeps none of them. Each list was checked against the catalog on 2026-10-20: every card is certified and Commander-legal, and none is a Game Changer.
-- **Choosing two.** After choosing a handle, a player chooses two of the ten (`onboarding` goes `handle`, then `starters`, then `complete`). Both become decks of their own, with every copy of their cards granted to the library for good, and the choice is audited (`library.starters_chosen`). Players who had finished onboarding before v0.3.1 choose theirs at their next visit.
+- **Choosing two.** After choosing a handle, a player chooses two of the ten (`onboarding` goes `handle`, then `starters`, then `complete`). Both become decks of their own, with every copy of their cards granted to the library for good, and the choice is audited (`library.starters_chosen`). They are free: the 1,000 welcome tokens stay for the shop. Players who had finished onboarding before v0.3.1 choose theirs at their next visit.
+- **The setup wizard** (v0.4.2, `web/src/app/SetupWizard.tsx`). A new account sets up its game in one dialog: a welcome with four screenshots of the game, its handle (the name other players see, at the table, in the lobby and later in a game's chat), the two free starter decks, each shown with its commander's card, and an alliance, which may wait. It opens by itself each time the site opens on an account that has not chosen its handle and its starter decks, a new sign-in or a reload, until both are done; "Finish later" closes it, and the notice on every page and Profile's "Continue setup" open it again at the account's step. The server decides every step, as before.
+- **The other eight in Leng's shop** (v0.4.2). Once the two free ones are chosen, the shop sells each of the others once, priced by the market value of its cards ([shop](shop.md#starter-decks-v042)).
 - **The six old starter decks** (the engine's fixture decks) are no longer offered to players. They remain the engine's test decks: SysOp sees them at the practice table, and the browser journeys and the engine's smoke games play them.
 - **The bots** at the practice table play the ten in Commander, a different one each, when no deck is chosen for them; Legacy bots keep the two Legacy fixture decks. `CD_BOT_DECKS=fixtures` keeps Commander bots on the fixture decks too, as CI's browser game journeys need: their leak checks tell concealed cards apart by name, and the starter decks share cards. A starter deck whose cards the catalog cannot all map to the engine falls back to a fixture deck.
 
@@ -59,7 +64,7 @@ The Godlike tier opens a Planeswalker of the owner's own making and its cards, a
 
 - **SysOp uploads them** in Administration, over the site's HTTPS (permission `custom_cards.manage`). The browser fits each image to Scryfall's 745 × 1040 card size and encodes it as WebP under 750 KB, which base64 makes 1,000,000 characters, so a request stays under the proxies' 1 MB limit; the API checks it is the image it claims to be, at most 900 KB. A card of the same name is replaced. The audit trail records each upload and removal by the card's ID, never its name or text.
 - **A table of their own** (`custom_cards`), outside the catalog's: no search, card page or catalog count reaches them. The images are stored in the database, so they are in the nightly backups.
-- **Only Godlike accounts see them.** `GET /api/v1/custom-cards` and each card's image answer only an account with 100,000 wins or more (SysOp included); to everyone else they answer exactly as a route that does not exist. Images are sent `Cache-Control: private, no-store`.
+- **Only Godlike accounts see them.** `GET /api/v1/custom-cards` and each card's image answer only an account with 100,000 wins or more (SysOp included); to everyone else they answer exactly as a route that does not exist. Images are sent `Cache-Control: private, no-store`. Since v0.4.2 the list holds only the allied Planeswalker's custom cards, so it is empty unless the account is allied with The Sphinx, SysOp's too: the Cards page and the deck builder's finder show them only then. SysOp's upload list in Administration stays whole.
 - **In the library.** An alliance with The Sphinx puts a playset (4) of each in the library, while the account is at the Godlike tier. Administrators and SysOp at that tier build with them as with any card.
 
 ### Playing them (v0.4.0)
@@ -82,12 +87,13 @@ Since v0.4.0 the custom cards are playable in every game, practice games and hum
 | `GET /api/v1/decks/starters` | `decks.edit` | the ten starter decks, with the two chosen |
 | `POST /api/v1/me/starters` | `decks.edit` | choose two (409 `starters_chosen`, `handle_first`; 422 `same_starter`) |
 | `GET /api/v1/library` | any active account | the library's cards, copies and sources |
+| `GET /api/v1/me/alliance/cards` | any active account | the allied Planeswalker's own catalog cards, with the library's copies (v0.4.2) |
 | `GET /api/v1/cards?owned=true` | any active account | search within the library |
 | `POST /api/v1/admin/users/{id}/wins` | SysOp (`progress.manage`) | set an account's wins, with a reason |
 | `GET`, `POST /api/v1/admin/custom-cards`, `DELETE /api/v1/admin/custom-cards/{id}` | SysOp (`custom_cards.manage`) | the custom cards |
-| `GET /api/v1/custom-cards`, `GET /api/v1/custom-cards/{id}/image` | Godlike accounts | the custom cards, each as decks hold it and with whether the running engine has loaded it (v0.4.0); 404 to everyone else |
+| `GET /api/v1/custom-cards`, `GET /api/v1/custom-cards/{id}/image` | Godlike accounts | the allied Planeswalker's custom cards (v0.4.2), each as decks hold it and with whether the running engine has loaded it (v0.4.0); 404 to everyone else |
 
 ## The portraits and badges
 
-- **Portraits.** The owner's 98 portraits (1254 × 1254, transparent), and since v0.4.1 The Sphinx's, the Godlike tier's, stay outside the repository. `scripts/planeswalkers.py portraits` writes their web sizes, WebP with alpha at 128, 256 and 512 pixels, contain-fitted and never cropped, to `web/public/portraits/<id>-<size>.webp` (about 12 MB). The installed app does not precache them: a screen fetches one when it shows it, and the web server lets browsers keep them for a week. `docs/asset-provenance.csv` records them.
+- **Portraits.** The owner's 98 portraits (1254 × 1254, transparent), and since v0.4.1 The Sphinx's, the Godlike tier's, stay outside the repository; since v0.4.2 the site keeps 89 of them, the roster's. `scripts/planeswalkers.py portraits` writes their web sizes, WebP with alpha at 128, 256 and 512 pixels, contain-fitted and never cropped, to `web/public/portraits/<id>-<size>.webp` (about 11 MB). The installed app does not precache them: a screen fetches one when it shows it, and the web server lets browsers keep them for a week. `docs/asset-provenance.csv` records them.
 - **Badges.** Until the owner's own arrive, each tier's badge is a generated metal crest (bronze, silver, gold and platinum metal, Mythic in the mythic rarity's orange-red, Godlike prismatic in the five colours), drawn as SVG in the page.

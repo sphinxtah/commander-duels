@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { client, type Me } from "../api";
 import { CardDetails, CardTile } from "./CardViews";
-import { GodlikeCards, useCustomCards } from "./CustomCards";
+import {
+  AllianceCardsView,
+  allianceTabName,
+  useAllianceCards,
+} from "./AllianceCards";
+import { useCustomCards } from "./CustomCards";
 import { MyLibrary } from "./MyLibrary";
 import {
   catalogSearch,
@@ -16,9 +21,11 @@ import styles from "./catalog.module.css";
 
 const PAGE_SIZE = 60;
 
-/** The whole catalog (CAT: every card stays searchable), the player's own library, and at the
- * Godlike tier its custom cards; that tab is not there at all below it. */
-type View = "catalog" | "library" | "custom";
+/** The whole catalog (CAT: every card stays searchable), the player's own library, and the
+ * allied Planeswalker's cards (v0.4.2), which at the Godlike tier's Planeswalker are its custom
+ * cards. */
+type View = "catalog" | "library" | "alliance";
+const VIEWS: View[] = ["catalog", "library", "alliance"];
 
 export function catalogLine(status: CatalogStatus | undefined): string {
   if (!status) return "";
@@ -100,9 +107,7 @@ function Browser({
   const dialog = useRef<HTMLDialogElement>(null);
   const status = useCatalogStatus();
   const custom = useCustomCards();
-  const views: View[] = custom.length
-    ? ["catalog", "library", "custom"]
-    : ["catalog", "library"];
+  const alliance = useAllianceCards();
   // A search that names playability itself (status:unsupported, is:playable) decides it, and the
   // "Playable here" filter steps aside rather than contradict it.
   const typed = namesPlayability(search.q);
@@ -133,7 +138,7 @@ function Browser({
       </h1>
       <p className={styles.lead}>{catalogLine(status)}</p>
       <div className={styles.tabs} role="tablist" aria-label="Which cards">
-        {views.map((item) => (
+        {VIEWS.map((item) => (
           <button
             key={item}
             role="tab"
@@ -145,14 +150,21 @@ function Browser({
               {
                 catalog: "All cards",
                 library: "My library",
-                custom: "Godlike cards",
+                alliance: allianceTabName(alliance.cards),
               }[item]
             }
           </button>
         ))}
       </div>
       {view === "library" && <MyLibrary onOpen={setOpen} />}
-      {view === "custom" && <GodlikeCards cards={custom} />}
+      {view === "alliance" && (
+        <AllianceCardsView
+          cards={alliance.cards}
+          error={alliance.error}
+          custom={custom}
+          onOpen={setOpen}
+        />
+      )}
       {view === "catalog" && (
         <>
           <SearchControls

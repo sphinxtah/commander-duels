@@ -19,10 +19,11 @@ import account from "../Account.module.css";
 import shell from "../App.module.css";
 
 /**
- * Onboarding's second step (v0.3.1), right after the handle: two of the ten Commander starter
- * decks, chosen once. Both become decks of the player's own, and every copy of their cards joins
- * the library for good. Each deck shows its commander, colours, description, how to play it and
- * what it teaches; exactly two can be chosen, and Confirm sends them.
+ * The setup wizard's starter decks (v0.3.1; in the wizard since v0.4.2), right after the handle:
+ * two of the ten Commander starter decks, free and chosen once. Both become decks of the player's
+ * own, and every copy of their cards joins the library for good; the welcome tokens are not
+ * touched. Each deck shows its commander's card, its colours, description, how to play it and
+ * what it teaches; exactly two can be chosen, and the button claims them.
  */
 export function StarterPicker({
   me,
@@ -32,9 +33,9 @@ export function StarterPicker({
 }: {
   me: Me;
   onChange: (me: Me) => void;
-  /** The decks are chosen: the page offers an alliance next. */
+  /** The decks are chosen: the wizard offers an alliance next. */
   onChosen: () => void;
-  /** Focused when the page arrives here from the handle. */
+  /** Focused when the wizard arrives at this step. */
   heading: RefObject<HTMLHeadingElement | null>;
 }) {
   const [decks, setDecks] = useState<StarterDeck[]>();
@@ -120,12 +121,14 @@ export function StarterPicker({
       aria-labelledby="starters-title"
     >
       <h2 id="starters-title" ref={heading} tabIndex={-1}>
-        Choose two starter decks
+        Claim your two free starter decks
       </h2>
       <p className={account.fine}>
-        Two of these ten Commander decks start your library. Each becomes a deck
-        of your own, ready to play, and its cards stay in your library for good.
-        You choose once.
+        Pick any two of these ten Commander decks. They are free and yours to
+        keep: each becomes a deck of your own, ready to play right away, and
+        every card in it joins your library for good. Your 1,000 welcome tokens
+        stay yours for packs in Leng's card shop, where the other decks are sold
+        later.
       </p>
       {decks === undefined && !error && (
         <p role="status" className={account.fine}>
@@ -239,7 +242,7 @@ export function StarterPicker({
             className={shell.primary}
             aria-disabled={busy || chosen.length !== 2}
           >
-            Confirm these two decks
+            Claim these two decks
           </button>
         )}
       </div>

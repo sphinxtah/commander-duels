@@ -17,11 +17,12 @@ export interface BuiltFile {
   content: string | Uint8Array;
 }
 
-// Folders left out of the precache. The Planeswalker portraits (v0.3.1: 98 of them in three
-// sizes, about 12 MB) load when a screen shows one, and the HTTP cache keeps them; precaching them
+// Folders left out of the precache. The Planeswalker portraits (v0.3.1: 89 since v0.4.2, in three
+// sizes, about 11 MB) load when a screen shows one, and the HTTP cache keeps them; precaching them
 // would make every install and every update fetch them all. The public pages (v0.4.1: About,
 // Privacy and Terms) are not the app, and the worker never answers for them (src/pwa/swRules.ts).
-const NOT_PRECACHED = ["portraits/", "pages/"];
+// The setup wizard's screenshots (v0.4.2) show once, to a new account.
+const NOT_PRECACHED = ["portraits/", "pages/", "welcome/"];
 
 /**
  * "/" and every file by its URL, sorted: every chunk (lazy ones too), asset and public file,

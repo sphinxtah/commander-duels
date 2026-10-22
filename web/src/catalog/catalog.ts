@@ -8,6 +8,7 @@ export type CatalogStatus = components["schemas"]["CatalogStatus"];
 export type LibraryView = components["schemas"]["LibraryView"];
 export type LibraryCard = components["schemas"]["LibraryCard"];
 export type CustomCard = components["schemas"]["CustomCardInfo"];
+export type AllianceCards = components["schemas"]["AllianceCards"];
 
 export type Search = {
   q: string;

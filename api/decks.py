@@ -52,6 +52,7 @@ from api.library import (
     Library,
     Starter,
     at_godlike,
+    commander_printing,
     starter_entries,
     starters_in,
 )
@@ -536,7 +537,7 @@ def starter_deck(
     validation = validate_deck(
         db, DeckContent(format="commander", entries=entries), today(), library.collection()
     )
-    leader = next((entry for entry in entries if entry.location == "commander"), None)
+    leader, printing = commander_printing(db, entries)
     return StarterDeck(
         name=starter.id,
         title=starter.title,
@@ -550,8 +551,8 @@ def starter_deck(
         description=starter.description,
         how_to_play=starter.how_to_play,
         teaches=starter.teaches,
-        commander_card_id=leader.card_id if leader else None,
-        commander_printing_id=leader.printing_id if leader else None,
+        commander_card_id=leader,
+        commander_printing_id=printing,
         chosen=starter.id in (chosen or []),
     )
 

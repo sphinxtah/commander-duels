@@ -481,6 +481,55 @@
         "title": "AdminUser",
         "type": "object"
       },
+      "AllianceCards": {
+        "additionalProperties": false,
+        "properties": {
+          "alliance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The allied Planeswalker; null with no alliance.",
+            "title": "Alliance"
+          },
+          "cards": {
+            "description": "Its own Planeswalker cards in the catalog, playable or not, one per card.",
+            "items": {
+              "$ref": "#/components/schemas/CardSummary"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "custom": {
+            "description": "The Godlike tier's Planeswalker, whose cards are its custom cards (GET /api/v1/custom-cards), none from the catalog.",
+            "title": "Custom",
+            "type": "boolean"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "required": [
+          "alliance",
+          "name",
+          "custom",
+          "cards"
+        ],
+        "title": "AllianceCards",
+        "type": "object"
+      },
       "AllianceChange": {
         "additionalProperties": false,
         "properties": {
@@ -793,7 +842,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.4.1",
+            "default": "0.4.2",
             "title": "Version",
             "type": "string"
           }
@@ -2451,6 +2500,158 @@
         "title": "DeckEntry",
         "type": "object"
       },
+      "DeckOffer": {
+        "additionalProperties": false,
+        "description": "A starter deck in Leng's shop (v0.4.2).",
+        "properties": {
+          "color_names": {
+            "title": "Color Names",
+            "type": "string"
+          },
+          "colors": {
+            "title": "Colors",
+            "type": "string"
+          },
+          "commander": {
+            "title": "Commander",
+            "type": "string"
+          },
+          "commander_card_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commander Card Id"
+          },
+          "commander_printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The commander's picture.",
+            "title": "Commander Printing Id"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "guild": {
+            "title": "Guild",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "owned": {
+            "description": "Chosen as a free starter deck, or bought: each sells once.",
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "In tokens, from the value of its cards; null while the account's two free starter decks are still to choose, or when it is not priced.",
+            "title": "Price"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "commander",
+          "colors",
+          "color_names",
+          "guild",
+          "description",
+          "commander_card_id",
+          "commander_printing_id",
+          "price",
+          "owned"
+        ],
+        "title": "DeckOffer",
+        "type": "object"
+      },
+      "DeckPurchase": {
+        "additionalProperties": false,
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "integer"
+          },
+          "deck": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new deck of the player's own; null on a retry once it has been deleted.",
+            "title": "Deck"
+          },
+          "repeated": {
+            "description": "A retry: the deck was bought already.",
+            "title": "Repeated",
+            "type": "boolean"
+          },
+          "starter": {
+            "title": "Starter",
+            "type": "string"
+          },
+          "tokens": {
+            "description": "The price paid.",
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deck",
+          "starter",
+          "tokens",
+          "balance",
+          "repeated"
+        ],
+        "title": "DeckPurchase",
+        "type": "object"
+      },
+      "DeckPurchaseRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "deck": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Deck",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deck"
+        ],
+        "title": "DeckPurchaseRequest",
+        "type": "object"
+      },
       "DeckSource": {
         "additionalProperties": false,
         "properties": {
@@ -3524,7 +3725,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.4.1",
+            "default": "0.4.2",
             "title": "Version",
             "type": "string"
           }
@@ -6466,12 +6667,26 @@
           "data": {
             "$ref": "#/components/schemas/ShopData"
           },
+          "decks": {
+            "description": "The ten starter decks.",
+            "items": {
+              "$ref": "#/components/schemas/DeckOffer"
+            },
+            "title": "Decks",
+            "type": "array"
+          },
           "eras": {
             "items": {
               "$ref": "#/components/schemas/EraInfo"
             },
             "title": "Eras",
             "type": "array"
+          },
+          "free_decks": {
+            "default": false,
+            "description": "The account's two free starter decks are still to choose; the shop sells none until they are.",
+            "title": "Free Decks",
+            "type": "boolean"
           },
           "inventory": {
             "items": {
@@ -7559,7 +7774,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.4.1"
+    "version": "0.4.2"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -12833,7 +13048,7 @@
     },
     "/api/v1/custom-cards": {
       "get": {
-        "description": "The custom cards, for accounts at the Godlike tier only, each with whether the running\nengine has loaded it.",
+        "description": "The allied Planeswalker's custom cards, for accounts at the Godlike tier only, each with\nwhether the running engine has loaded it. Since v0.4.2 an account allied with another\nPlaneswalker, or with none, gets none, SysOp included: the Cards page and the deck builder\nshow only the alliance's cards.",
         "operationId": "custom_cards_api_v1_custom_cards_get",
         "responses": {
           "200": {
@@ -15996,6 +16211,105 @@
         "summary": "Join Alliance"
       }
     },
+    "/api/v1/me/alliance/cards": {
+      "get": {
+        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere).",
+        "operationId": "my_alliance_cards_api_v1_me_alliance_cards_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllianceCards"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Alliance Cards"
+      }
+    },
     "/api/v1/me/progress": {
       "get": {
         "operationId": "my_progress_api_v1_me_progress_get",
@@ -17488,6 +17802,115 @@
           }
         },
         "summary": "Shop"
+      }
+    },
+    "/api/v1/shop/decks": {
+      "post": {
+        "description": "Buys a starter deck, once: its price leaves the balance, it becomes a deck of the player's\nown, and every copy of its cards joins the library for good, together.",
+        "operationId": "buy_deck_api_v1_shop_decks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckPurchaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckPurchase"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Buy Deck"
       }
     },
     "/api/v1/shop/openings": {

@@ -10,6 +10,7 @@ import {
   CardImageError,
   fitCardImage,
   toBase64,
+  toDataUrl,
   type FittedImage,
 } from "./cardImage";
 import account from "../Account.module.css";
@@ -107,13 +108,6 @@ export function CustomCards() {
   useEffect(() => {
     void load();
   }, []);
-  // A preview's object URL is let go once it is replaced, or the section closes.
-  useEffect(() => {
-    const url = image?.preview;
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [image]);
 
   function set<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields((current) => ({ ...current, [key]: value }));
@@ -125,7 +119,7 @@ export function CustomCards() {
     setPreparing(true);
     try {
       const fitted = await fitCardImage(chosen);
-      setImage({ ...fitted, preview: URL.createObjectURL(fitted.blob) });
+      setImage({ ...fitted, preview: await toDataUrl(fitted.blob) });
     } catch (caught) {
       setError(
         caught instanceof CardImageError

@@ -437,16 +437,21 @@ test("an account waiting for approval sees only its wait, and approval opens the
     permissions: ["profile.edit"],
   });
   await page.getByRole("button", { name: "Check again" }).click();
+  // Its handle is still to choose: the setup wizard opens by itself (v0.4.2), and leads there.
+  await expect(
+    page.getByRole("heading", { name: "Welcome to Commander Duels" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Set up my game" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Choose your name" }),
+  ).toBeVisible();
+  // Behind it, the app at the address the account was approved at.
+  await page.getByRole("button", { name: "Finish later" }).click();
   await expect(
     page.getByRole("heading", { name: "Make yourself at home." }),
   ).toBeVisible();
   await expect(page.getByRole("navigation")).toBeVisible();
   await expect(page).toHaveURL(/#settings$/);
-  // Its handle is still to choose, and the page points the way.
-  await page.getByRole("link", { name: "Choose yours on Profile" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Choose your handle" }),
-  ).toBeVisible();
 });
 
 test("a denied account sees that it was not approved, and signs out to the landing page", async ({

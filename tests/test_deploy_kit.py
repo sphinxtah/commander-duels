@@ -258,6 +258,32 @@ def test_deploy_names_a_private_engine_and_stops_when_it_cannot_pull(tmp_path):
     assert public["status"] == "1" and "ghcr.io" not in public["stderr"]
 
 
+def games_max(tmp_path: Path) -> list[str]:
+    return re.findall(r"^CD_GAMES_MAX=(.*)$", (tmp_path / "kit" / ".env").read_text(), re.M)
+
+
+@needs_bash
+def test_deploy_raises_the_old_kits_game_limit_once(tmp_path):
+    # v0.4.2: the live .env still said 6 after 0.4.1's deploy, so the engine ran 6 games.
+    old = "CD_GAMES_MAX=6\n"
+    raised = deploy(tmp_path / "raised", "0.4.1", "0.4.2", settings=old)
+    assert raised["status"] == "0"
+    assert games_max(tmp_path / "raised") == ["64"]
+    assert "is now 64" in raised["stdout"]
+    # After that, a 6 is the owner's own; so is any other value.
+    for case, previous, settings in (
+        ("later", "0.4.2", old),
+        ("own", "0.4.1", "CD_GAMES_MAX=32\n"),
+        ("unset", "0.4.1", ""),
+    ):
+        kept = deploy(tmp_path / case, previous, "0.4.3", settings=settings)
+        assert kept["status"] == "0" and "is now 64" not in kept["stdout"]
+        assert games_max(tmp_path / case) == re.findall(r"=(\d+)", settings)
+    # Nothing changes when the deploy stops before replacing anything.
+    stopped = deploy(tmp_path / "stopped", "0.4.1", "0.4.2", settings=old, STUB_PULL_FAIL="0.4.2")
+    assert stopped["status"] == "1" and games_max(tmp_path / "stopped") == ["6"]
+
+
 @needs_bash
 def test_failed_migrations_leave_the_running_version_alone(tmp_path):
     result = deploy(tmp_path, "0.1.0", "0.1.1", STUB_MIGRATE_FAIL="0.1.1")

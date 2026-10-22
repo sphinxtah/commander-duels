@@ -107,6 +107,7 @@ An unknown key or a malformed term is refused with a message that says what was 
 ## On screen
 
 - **Cards** (the navigation's Cards page): playable cards by default, with search, the syntax help, filters, sorting and pages; each card opens its details: images of every printing, Oracle text, legality, rulings, tags, why it is or is not playable here, and the illustrator of the image on show.
+- **Its three tabs:** All cards; My library ([progression](progression.md#the-library)); and since v0.4.2 the allied Planeswalker's cards, named for them ("Teferi's cards"), which follow the alliance ([progression](progression.md#alliances)).
 - **Images as Scryfall serves them.** A card image is never dimmed, recoloured, blurred, cropped or covered over its artist or copyright line (Scryfall's image rules); a card that is not playable says so in its caption and badge instead.
 - **Administration → Card catalog:** the sync's state and recent runs, "Run the catalog sync now", the engine's coverage per format, and the cards to review, with accept, suspend and restore, and a search to suspend any other card.
 

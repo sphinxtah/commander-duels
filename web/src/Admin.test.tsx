@@ -685,15 +685,6 @@ describe("the custom cards (v0.3.1)", () => {
   beforeEach(() => {
     on(USERS, () => page([]));
     vi.mocked(fitCardImage).mockReset();
-    // jsdom has no object URLs.
-    Object.assign(URL, {
-      createObjectURL: vi.fn(() => "blob:preview"),
-      revokeObjectURL: vi.fn(),
-    });
-  });
-  afterEach(() => {
-    Reflect.deleteProperty(URL, "createObjectURL");
-    Reflect.deleteProperty(URL, "revokeObjectURL");
   });
   async function open(me: Me = sysop) {
     render(<Admin me={me} heading={createRef()} />);
@@ -807,7 +798,11 @@ describe("the custom cards (v0.3.1)", () => {
       within(form).getByRole("img", {
         name: "The image as it will be uploaded",
       }),
-    ).toHaveAttribute("src", "blob:preview");
+      // A data: URL (v0.4.2): the site's Content-Security-Policy refuses blob: images.
+    ).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^data:image\/webp;base64,/),
+    );
     fireEvent.click(
       within(form).getByRole("button", { name: "Upload the card" }),
     );

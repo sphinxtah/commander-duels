@@ -20,6 +20,7 @@ import { Landing } from "./app/Landing";
 import { guardLiveGame } from "./app/liveGame";
 import { useOnline } from "./app/online";
 import { ReportButton } from "./app/ReportProblem";
+import { SetupWizard } from "./app/SetupWizard";
 import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { SiteLinks } from "./app/SiteLinks";
@@ -178,6 +179,22 @@ export function App() {
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const navigated = useRef(false);
+  // The setup wizard (v0.4.2) and where it opens. It opens by itself once each time the site opens
+  // on an account still setting up, a new sign-in or a reload; the account it opened for is kept,
+  // so the account's own changes inside it do not open it again.
+  const [setup, setSetup] = useState<"welcome" | "current" | null>(null);
+  const setupOpened = useRef<string | null>(null);
+  useEffect(() => {
+    if (me?.status !== "active") {
+      setupOpened.current = null;
+      setSetup(null);
+      return;
+    }
+    if (onboarding(me) && setupOpened.current !== me.id) {
+      setupOpened.current = me.id;
+      setSetup("welcome");
+    }
+  }, [me]);
   // Counts the account's changes made here (a sign-in, an approval, a sign-out). An answer
   // asked for before the latest one (an account check started by going online or Try again, a
   // preferences save) is dropped, so it can never bring back an account just signed out.
@@ -543,32 +560,27 @@ export function App() {
           <div className={styles.breadcrumb}>
             COMMANDER DUELS <span>/</span> {shown.toUpperCase()}
           </div>
-          {/* Sign-in and approval keep the address, so a new account rarely lands on Profile,
-              where it chooses its handle and then its two starter decks (v0.3.1): every other
-              page points the way until both are done. */}
+          {/* Until the account has its handle and its two starter decks (v0.3.1), every page but
+              Profile, which has its own, points to the setup wizard (v0.4.2). */}
           {onboarding(me) && page !== "Profile" && (
             <p className={styles.handleNotice}>
-              {me.onboarding === "handle" ? (
-                <>
-                  Other players know you by your handle.{" "}
-                  <a href="#profile">
-                    Choose yours on Profile <span aria-hidden="true">→</span>
-                  </a>
-                </>
-              ) : (
-                <>
-                  Two starter decks of your choice begin your card library.{" "}
-                  <a href="#profile">
-                    Choose them on Profile <span aria-hidden="true">→</span>
-                  </a>
-                </>
-              )}
+              {me.onboarding === "handle"
+                ? "Your game is not set up yet: choose the name other players see, and claim two free starter decks."
+                : "Two free starter decks are waiting for you to claim them."}{" "}
+              <button
+                type="button"
+                className={styles.noticeButton}
+                onClick={() => setSetup("current")}
+              >
+                Continue setup <span aria-hidden="true">→</span>
+              </button>
             </p>
           )}
           {page === "Profile" ? (
             <Account
               me={me}
               onChange={accountChanged}
+              onSetup={() => setSetup("current")}
               onSignedOut={signedOut}
               heading={heading}
             />
@@ -596,7 +608,11 @@ export function App() {
           ) : page === "Cards" ? (
             <CardsPage me={me} heading={heading} />
           ) : page === "Shop" ? (
-            <ShopPage me={me} heading={heading} />
+            <ShopPage
+              me={me}
+              heading={heading}
+              onSetup={() => setSetup("current")}
+            />
           ) : page === "Tables" ? (
             <TablesPage
               key={tableRoute ?? "lobby"}
@@ -778,6 +794,12 @@ export function App() {
           </footer>
         </main>
       </div>
+      <SetupWizard
+        me={me}
+        onChange={accountChanged}
+        open={setup}
+        onClose={() => setSetup(null)}
+      />
       <dialog
         ref={dialog}
         className={styles.dialog}

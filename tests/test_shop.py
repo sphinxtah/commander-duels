@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, make_url, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
+from test_decks_api import starter
 from test_games import SERVICE_TOKEN, SYSOP_ADDRESS
 from test_progression import Account
 
@@ -64,6 +65,36 @@ def content(tmp_path_factory) -> Path:
     folder = tmp_path_factory.mktemp("shop-content")
     for name in ("planeswalkers.json", "pack-prices.json"):
         shutil.copy(CONTENT / name, folder / name)
+    # Starter decks from the test catalog (v0.4.2); the last has no price, so it is not sold.
+    decks = [
+        starter(
+            "starter_red_test", 1, "Red Test", [(1, "Kenrith, the Returned King"), (99, "Mountain")]
+        ),
+        starter(
+            "starter_blue_test", 2, "Blue Test", [(1, "Thrasios, Triton Hero"), (99, "Island")]
+        ),
+        starter(
+            "starter_karlach_test",
+            3,
+            "Karlach Test",
+            [(1, "Karlach, Fury of Avernus"), (1, "Lightning Bolt"), (98, "Mountain")],
+        ),
+        starter(
+            "starter_pir_test", 4, "Pir Test", [(1, "Pir, Imaginative Rascal"), (99, "Forest")]
+        ),
+    ]
+    (folder / "starter-decks.json").write_text(
+        json.dumps({"version": 1, "source": "tests", "decks": decks}), encoding="utf-8"
+    )
+    prices = [
+        ("starter_red_test", 6.07),
+        ("starter_blue_test", 3.0),
+        ("starter_karlach_test", 18.21),
+    ]
+    (folder / "starter-deck-prices.json").write_text(
+        json.dumps({"decks": [{"id": ident, "usd": usd} for ident, usd in prices]}),
+        encoding="utf-8",
+    )
     return folder
 
 
@@ -613,6 +644,74 @@ def test_buying_spends_once_per_key(client):
     assert [
         (item["product"]["set_code"], item["count"], item["openable"]) for item in inventory
     ] == [("ZNR", 2, True)]
+
+
+def buy_deck(account: Account, deck: str) -> httpx.Response:
+    return account.send("POST", "/api/v1/shop/decks", {"deck": deck})
+
+
+def test_starter_decks_are_free_first_then_sold_once_each(client):
+    # v0.4.2: the two starter decks chosen at onboarding cost nothing; after them, Leng sells the
+    # others, each once, priced from the value of its cards.
+    new = Account(client, "newcomer", onboarding="starters")
+    root = Account(client, "root-newcomer", kind="sysop")
+    give = {"amount": 1_000, "reason": "Stands in for the welcome grant"}
+    root.send("POST", f"/api/v1/admin/users/{new.id}/tokens", give)
+    view = new.get("/api/v1/shop").json()
+    assert view["free_decks"] is True
+    assert [(deck["id"], deck["price"], deck["owned"]) for deck in view["decks"]] == [
+        ("starter_red_test", None, False),
+        ("starter_blue_test", None, False),
+        ("starter_karlach_test", None, False),
+        ("starter_pir_test", None, False),
+    ]
+    # The commander's picture: the catalog's own printing where the chosen one is missing.
+    assert all(deck["commander_printing_id"] for deck in view["decks"])
+    refused = buy_deck(new, "starter_karlach_test")
+    assert (refused.status_code, refused.json()["code"]) == (409, "starters_first")
+
+    chosen = new.send(
+        "POST", "/api/v1/me/starters", {"decks": ["starter_red_test", "starter_blue_test"]}
+    )
+    assert chosen.status_code == 201, chosen.text
+    view = new.get("/api/v1/shop").json()
+    assert (view["free_decks"], view["balance"]) == (False, 1_000)
+    assert [(deck["id"], deck["price"], deck["owned"]) for deck in view["decks"]] == [
+        ("starter_red_test", 500, True),
+        ("starter_blue_test", 250, True),
+        ("starter_karlach_test", 1_500, False),
+        ("starter_pir_test", None, False),
+    ]
+    owned = buy_deck(new, "starter_red_test")
+    assert (owned.status_code, owned.json()["code"]) == (409, "deck_owned")
+    unpriced = buy_deck(new, "starter_pir_test")
+    assert (unpriced.status_code, unpriced.json()["code"]) == (409, "not_on_sale")
+    assert buy_deck(new, "starter_nobody").status_code == 404
+    short = buy_deck(new, "starter_karlach_test")
+    assert (short.status_code, short.json()["code"]) == (409, "not_enough_tokens")
+
+    root.send("POST", f"/api/v1/admin/users/{new.id}/tokens", give)
+    bought = buy_deck(new, "starter_karlach_test")
+    assert bought.status_code == 201, bought.text
+    purchase = bought.json()
+    assert (purchase["tokens"], purchase["balance"], purchase["repeated"]) == (1_500, 500, False)
+    decks = {deck["id"]: deck for deck in new.get("/api/v1/decks").json()}
+    assert decks[purchase["deck"]]["title"] == "Karlach Test"
+    library = {item["card"]["name"]: item for item in new.get("/api/v1/library").json()["cards"]}
+    assert library["Karlach, Fury of Avernus"]["sources"] == ["starter"]
+    assert library["Lightning Bolt"]["copies"] == 1
+    # A retry buys nothing more; the deck is owned from now on.
+    again = buy_deck(new, "starter_karlach_test").json()
+    assert (again["deck"], again["balance"], again["repeated"]) == (purchase["deck"], 500, True)
+    view = new.get("/api/v1/shop").json()
+    assert [deck["owned"] for deck in view["decks"]] == [True, True, True, False]
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        spent = db.scalars(
+            select(TokenEntry).where(TokenEntry.user_id == new.id, TokenEntry.amount < 0)
+        ).all()
+        assert [(entry.kind, entry.key, entry.amount, entry.reason) for entry in spent] == [
+            ("pack", f"deck:{new.id}:starter_karlach_test", -1_500, "Starter deck: Karlach Test")
+        ]
 
 
 def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):

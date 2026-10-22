@@ -642,3 +642,102 @@
   color: #c9d0c6;
   line-height: 1.6;
 }
+
+/* The shop's two shelves (v0.4.2): packs, and the starter decks. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid #ffffff12;
+  margin: 26px 0 4px;
+}
+.tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 10px 14px;
+  color: #9caaa5;
+}
+.tabs button[aria-selected="true"] {
+  color: #e6c68c;
+  border-bottom-color: #d4b47a;
+}
+.freeDecks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid #d5b77c66;
+  border-radius: 6px;
+  background: #d5b77c0f;
+}
+.freeDecks p {
+  margin: 0;
+  max-width: 640px;
+  color: #c9d0c6;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.decks {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 12px;
+}
+.deck {
+  display: flex;
+  gap: 14px;
+  border: 1px solid #ffffff14;
+  border-radius: 6px;
+  background: #18221f;
+  padding: 14px;
+}
+.deckArt {
+  flex: 0 0 112px;
+}
+.deckArt img {
+  display: block;
+  width: 112px;
+  height: auto;
+  border-radius: 5px;
+  box-shadow: 0 4px 12px #00000088;
+}
+.deckFrame {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  aspect-ratio: 63 / 88;
+  padding: 8px;
+  border: 1px solid #ffffff26;
+  border-radius: 5px;
+  color: #c9d0c6;
+  font-size: 0.7rem;
+  text-align: center;
+}
+.deckText {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+.deckText strong {
+  font:
+    1.1rem Georgia,
+    serif;
+}
+.deckText p {
+  margin: 0;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+.deckColors {
+  color: #dec38b;
+  font-size: 0.74rem;
+}

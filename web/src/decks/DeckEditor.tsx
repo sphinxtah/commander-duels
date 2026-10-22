@@ -706,7 +706,8 @@ function withinIdentity(card: CardSummary, identity: string | null): boolean {
 /**
  * The Godlike tier's custom cards (v0.4.0), for an account at that tier, with their images. The
  * catalog's search never finds them, so the finder offers them here. Each says whether the
- * running game engine has loaded it. Below the tier the API lists none, and nothing shows.
+ * running game engine has loaded it. Below the tier, or allied with another Planeswalker (v0.4.2,
+ * SysOp too), the API lists none, and nothing shows.
  */
 function GodlikeFinder({
   format,

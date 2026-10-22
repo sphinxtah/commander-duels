@@ -531,10 +531,18 @@ h1 {
   font-size: 0.82rem;
   line-height: 1.6;
 }
-.handleNotice a {
+.handleNotice a,
+.noticeButton {
   color: #e2c78f;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.noticeButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
 }
 .skip {
   position: fixed;

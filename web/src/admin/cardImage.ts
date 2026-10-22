@@ -111,12 +111,17 @@ export async function fitCardImage(file: Blob): Promise<FittedImage> {
 }
 
 /** The blob as base64, without the data URL's prefix: what the API's JSON carries. */
-export function toBase64(blob: Blob): Promise<string> {
+/** The image as a data: URL. The preview shows it so (v0.4.2): the site's Content-Security-Policy
+ * lets images come from the site and from data: URLs only, so a blob: object URL would not show. */
+export function toDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () =>
-      resolve(String(reader.result).replace(/^data:[^,]*,/, ""));
+    reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+export async function toBase64(blob: Blob): Promise<string> {
+  return (await toDataUrl(blob)).replace(/^data:[^,]*,/, "");
 }

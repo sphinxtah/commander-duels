@@ -247,6 +247,31 @@ def starter_entries(db: Session, starter: Starter) -> tuple[list[DeckEntry], lis
     return entries, missing
 
 
+def commander_printing(db: Session, entries: list[DeckEntry]) -> tuple[UUID | None, UUID | None]:
+    """The deck's commander and the printing whose image stands for the deck: the one the owner
+    chose, or, where the catalog lacks it, the card's own default printing (v0.4.2), so the
+    commander's picture shows whenever the catalog has one."""
+    leader = next((entry for entry in entries if entry.location == "commander"), None)
+    if leader is None:
+        return None, None
+    if leader.printing_id is not None:
+        return leader.card_id, leader.printing_id
+    return leader.card_id, db.scalar(
+        select(CardConcept.default_printing_id).where(CardConcept.id == leader.card_id)
+    )
+
+
+def owned_starters(db: Session, user: User) -> set[str]:
+    """The starter decks the account has: the two it chose, and those it bought in Leng's shop
+    (v0.4.2). Both grant their cards under the deck's own key."""
+    keys = db.scalars(
+        select(LibraryGrant.grant_key)
+        .where(LibraryGrant.user_id == user.id, LibraryGrant.grant_key.startswith("starter:"))
+        .distinct()
+    )
+    return set(user.starter_decks or []) | {key.removeprefix("starter:") for key in keys}
+
+
 def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckEntry]) -> None:
     """Every copy of the deck's cards, for good; the grant is keyed by the deck, so it is made
     once whatever retries. Basic lands need no grant."""

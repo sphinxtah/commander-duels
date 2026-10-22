@@ -1,0 +1,114 @@
+{
+  "as_of": "2026-10-21",
+  "currency": "USD",
+  "source": "Scryfall (TCGplayer market prices) for each card's chosen printing",
+  "note": "The market value of the cards each starter deck grants, basic lands left out: inputs for the shop's token price, not trading advice. lowest_printing names the cards whose chosen printing has no price, priced at their cheapest printing instead.",
+  "decks": [
+    {
+      "id": "starter_wu_v1",
+      "title": "Skyward Patrol",
+      "usd": 727.0,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Wayfarer's Bauble"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_ub_v1",
+      "title": "Graveyard Shift",
+      "usd": 1145.58,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Wayfarer's Bauble",
+        "Go for the Throat"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_br_v1",
+      "title": "Ember Rebellion",
+      "usd": 631.59,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Wayfarer's Bauble",
+        "Go for the Throat"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_rg_v1",
+      "title": "Wild Stampede",
+      "usd": 490.98,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [],
+      "unpriced": []
+    },
+    {
+      "id": "starter_gw_v1",
+      "title": "United Front",
+      "usd": 453.63,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [],
+      "unpriced": []
+    },
+    {
+      "id": "starter_wb_v1",
+      "title": "Life and Legacy",
+      "usd": 506.7,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Wayfarer's Bauble"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_ur_v1",
+      "title": "Spellfire Squadron",
+      "usd": 1021.57,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Wayfarer's Bauble"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_bg_v1",
+      "title": "Saproling Swarm",
+      "usd": 558.7,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Go for the Throat"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_rw_v1",
+      "title": "Forged in Battle",
+      "usd": 423.02,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [
+        "Wayfarer's Bauble"
+      ],
+      "unpriced": []
+    },
+    {
+      "id": "starter_gu_v1",
+      "title": "Tides of Growth",
+      "usd": 644.21,
+      "cards_priced": 70,
+      "basic_lands": 30,
+      "lowest_printing": [],
+      "unpriced": []
+    }
+  ]
+}

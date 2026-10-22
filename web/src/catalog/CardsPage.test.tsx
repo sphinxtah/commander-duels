@@ -76,6 +76,9 @@ function pageApi() {
   api.on("GET /api/v1/custom-cards", () =>
     reply(404, { code: "not_found", message: "Not found." }),
   );
+  api.on("GET /api/v1/me/alliance/cards", () =>
+    reply(200, { alliance: null, name: null, custom: false, cards: [] }),
+  );
   return api;
 }
 
@@ -327,7 +330,7 @@ describe("the Cards page", () => {
     expect(within(table).getByText("Arcane Signet")).toBeInTheDocument();
   });
 
-  it("shows nothing at all of the Godlike tier's cards below that tier", async () => {
+  it("shows nothing at all of the Godlike tier's cards below that tier, and an alliance tab with none", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
     render(<CardsPage me={player} heading={createRef()} />);
@@ -338,11 +341,51 @@ describe("the Cards page", () => {
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "All cards",
       "My library",
+      "Alliance cards",
     ]);
     expect(document.body).not.toHaveTextContent(/godlike|custom/i);
+    fireEvent.click(screen.getByRole("tab", { name: "Alliance cards" }));
+    expect(
+      await screen.findByText(/You are in no alliance yet/),
+    ).toBeInTheDocument();
   });
 
-  it("shows the Godlike tier's cards in a tab of their own, with whether the engine has loaded each", async () => {
+  it("names the alliance tab for the allied Planeswalker and shows only their cards (v0.4.2)", async () => {
+    const api = pageApi();
+    api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
+    const teferi = card("Teferi, Temporal Archmage", {
+      type_line: "Legendary Planeswalker — Teferi",
+      owned: 4,
+    });
+    const unplayable = card("Teferi, Who Slows the Sunset", {
+      type_line: "Legendary Planeswalker — Teferi",
+      playable: false,
+      owned: 4,
+    });
+    api.on("GET /api/v1/me/alliance/cards", () =>
+      reply(200, {
+        alliance: "teferi",
+        name: "Teferi",
+        custom: false,
+        cards: [teferi, unplayable],
+      }),
+    );
+    render(<CardsPage me={player} heading={createRef()} />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Teferi's cards" }));
+    const section = screen.getByRole("region", { name: "Teferi's cards" });
+    expect(section).toHaveTextContent("2 cards, 1 playable here");
+    expect(
+      within(section)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining("Teferi, Temporal Archmage"),
+      expect.stringContaining("Teferi, Who Slows the Sunset"),
+    ]);
+    expect(document.body).not.toHaveTextContent(/godlike/i);
+  });
+
+  it("shows the Godlike tier's cards on the tab of their Planeswalker's alliance, with whether the engine has loaded each", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
     const herald = {
@@ -353,9 +396,19 @@ describe("the Cards page", () => {
       playable: true,
     };
     api.on("GET /api/v1/custom-cards", () => reply(200, [sigil, herald]));
+    api.on("GET /api/v1/me/alliance/cards", () =>
+      reply(200, {
+        alliance: "the-sphinx",
+        name: "The Sphinx",
+        custom: true,
+        cards: [],
+      }),
+    );
     render(<CardsPage me={player} heading={createRef()} />);
-    fireEvent.click(await screen.findByRole("tab", { name: "Godlike cards" }));
-    const section = screen.getByRole("region", { name: "Godlike cards" });
+    fireEvent.click(
+      await screen.findByRole("tab", { name: "The Sphinx's cards" }),
+    );
+    const section = screen.getByRole("region", { name: "The Sphinx's cards" });
     const first = within(section)
       .getByRole("heading", { name: /^Stand-in Sigil/ })
       .closest("li")!;

@@ -31,7 +31,7 @@ browser ──HTTPS──▶ public IP 136.63.10.16 ──UniFi forwards 80/443�
 | Login | `sphinx`, by SSH key. The deploying computer uses its own key, `~/.ssh/commander_duels_deploy`, through the `duels` entry in its `~/.ssh/config` |
 | Ports forwarded from the internet | None. The proxy reaches port 8080 over the LAN |
 
-Sizing (since v0.4.1, the owner's limit for the beta): the live site runs at most 64 games at once (`CD_GAMES_MAX`, 1–64). The engine gets the same number of slots (`CD_ENGINE_MAX_GAMES` follows `CD_GAMES_MAX` in the production Compose file), a 12 GB heap and a 16 GB container limit. PostgreSQL, the API, the worker and the web container are small. The development Compose file keeps two games and a 1.5 GB limit. From v0.1.1 to v0.4.0 the site ran six games, with a 3 GB heap and a 4 GB limit.
+Sizing (since v0.4.1, the owner's limit for the beta): the live site runs at most 64 games at once (`CD_GAMES_MAX`, 1–64; the engine's start line says how many, "at most 64 games at once"). The engine gets the same number of slots (`CD_ENGINE_MAX_GAMES` follows `CD_GAMES_MAX` in the production Compose file), a 12 GB heap and a 16 GB container limit. PostgreSQL, the API, the worker and the web container are small. The development Compose file keeps two games and a 1.5 GB limit. From v0.1.1 to v0.4.0 the site ran six games, with a 3 GB heap and a 4 GB limit.
 
 The sizing comes from a load test on the development machine (v0.4.1, [verification](verification.md#v041)): 64 practice games started together through the API, half Legacy against one bot and half Commander against three, bot skill 1 to 3, with the engine held to 16 CPUs like the VM. The scripted players answer at once, so the bots think nearly all the time: a heavier load than people playing.
 
@@ -286,7 +286,7 @@ After the first deploy and at each version's close-out:
 | `CD_SIGNUP_POLICY` | `approval` |
 | `CD_PROXY_ADDRESS` | The TSH proxy, 10.10.50.2 |
 | `CD_SYSOP_NETWORKS` | The home LAN, 10.10.1.0/24 |
-| `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 and 64 (since v0.4.1; the `.env` of earlier versions says 6: change it to 64 when deploying v0.4.1) |
+| `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 and 64 (since v0.4.1). The `.env` of earlier versions says 6, and the live one still did after 0.4.1's deploy, so the engine ran 6 games; since v0.4.2 `deploy.sh` raises a 6 to 64 when it deploys over 0.1.1–0.4.1, and keeps any other value |
 | `CD_DB_PASSWORD`, `CD_ENGINE_SERVICE_TOKEN` | Generated on the VM by the bootstrap |
 | `CD_ENGINE_IMAGE` | Since v0.4.0: the engine image without its tag. Empty or absent: the public `ghcr.io/sphinxtah/commander-duels/engine`. The live site: `ghcr.io/sphinxtah/commander-duels-engine-sphinx`, the private image with the custom cards ([above](#the-engine-with-the-custom-cards-v040)) |
 
