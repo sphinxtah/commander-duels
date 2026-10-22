@@ -15,6 +15,8 @@ Validated locally on Windows on October 22, 2026, on the work of v0.4.4 (chat be
 | Browser journeys (CI's engine job) | 17 passed in 2 m 48 s on a throwaway Compose stack built from the tree, through the web container's nginx: `game.spec.ts`, `tables.spec.ts` (now with the table's chat: a greeting, an alliance offered and accepted from the plates, and a message to the ally, every frame under the leak check), `social.spec.ts` (now with chat: a docked window, the pop-up beside the bell, the Messages page, the answer reaching the window live, and a report), `pwa.spec.ts` and `pages.spec.ts` |
 | The new screens | Looked at in Chromium: the table's chat drawer and the plates' alliance menu at 1920 x 1080, from the faked table's journey |
 
+**Hosted CI.** Run #95 on 3dc7d1d passed in 17 m 39 s, with 263 pytest (the git-clone tests included), 956 Vitest tests and 45 + 17 browser journeys ([release notes](releases/0.4.4.md#verification)).
+
 ## v0.4.3
 
 Validated locally on Windows on October 22, 2026, on the work of v0.4.3 as merged (the player search, profiles, friends, blocks, presence, privacy settings and the notification bell; the pack artwork and Leng's painting, built in a worktree by a subagent and merged; the weekly sale; the CI hang's guards). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine did not change.
