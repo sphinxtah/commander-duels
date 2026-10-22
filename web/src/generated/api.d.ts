@@ -476,6 +476,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset User
+         * @description SysOp resets an account to a new one's state (v0.4.5, api/resets.py), so the setup wizard
+         *     runs again: its handle, alliance, library and packs are cleared, its decks go to the trash,
+         *     and its wins and tokens go back to 0 and 1,000; its friends, messages and reports stay.
+         *     Refused 409 while it plays a game or sits at an open table. The account's game lock is held
+         *     meanwhile, as for a deletion, so no game of it starts.
+         */
+        post: operations["reset_user_api_v1_admin_users__user_id__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/roles/{role}": {
         parameters: {
             query?: never;
@@ -1938,7 +1962,7 @@ export interface paths {
         };
         /**
          * Openings
-         * @description The account's opened packs, newest first.
+         * @description The account's opened packs, newest first: since its latest reset, if any.
          */
         get: operations["openings_api_v1_shop_openings_get"];
         put?: never;
@@ -2144,6 +2168,39 @@ export interface components {
         AccountDeletion: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * AccountReset
+         * @description What SysOp's reset of an account cleared (v0.4.5), and the account as Administration now
+         *     lists it: no handle, 0 wins, 1,000 tokens and no alliance.
+         */
+        AccountReset: {
+            account: components["schemas"]["AdminUser"];
+            /**
+             * Cards
+             * @description Copies of cards the library held for good, now cleared.
+             */
+            cards: number;
+            /**
+             * Decks
+             * @description Decks moved to the trash.
+             */
+            decks: number;
+            /**
+             * Packs
+             * @description Unopened packs, now cleared.
+             */
+            packs: number;
+            /**
+             * Tokens
+             * @description The tokens it had, now the welcome's 1,000.
+             */
+            tokens: number;
+            /**
+             * Wins
+             * @description The wins it had, now 0.
+             */
+            wins: number;
         };
         /** AdminCounts */
         AdminCounts: {
@@ -3771,7 +3828,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -8164,6 +8221,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reset_user_api_v1_admin_users__user_id__reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountReset"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Too Many Requests */

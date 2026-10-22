@@ -21,6 +21,7 @@ import { pendingWords, unreadWords } from "./admin/counts";
 import { CustomCards } from "./admin/CustomCards";
 import { DeleteAccount } from "./admin/DeleteAccount";
 import { Reports } from "./admin/Reports";
+import { ResetAccount, resetWords } from "./admin/ResetAccount";
 import { SetWins } from "./admin/SetWins";
 import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
@@ -91,6 +92,8 @@ function Users({
   const [givingTokens, setGivingTokens] = useState<string>();
   // The account whose deletion the dialog asks to confirm (v0.4.1), if any.
   const [deleting, setDeleting] = useState<AdminUser>();
+  // The account SysOp is resetting to a new one's state (v0.4.5), if any.
+  const [resetting, setResetting] = useState<AdminUser>();
   const latest = useRef(0);
   // The message a failed load left, so a load that works can take it back.
   const loadFailure = useRef("");
@@ -100,6 +103,10 @@ function Users({
   const progress = me.permissions.includes("progress.manage");
   // SysOp gives and takes back tokens (v0.4.0).
   const economy = me.permissions.includes("economy.manage");
+  // SysOp resets an account to a new one's state, for the setup wizard (v0.4.5).
+  const resets = me.permissions.includes("admin.users.reset");
+  // SysOp's changes, which any account's row offers, an administrator's too.
+  const sysopChanges = progress || economy || resets;
   useEffect(() => {
     let active = true;
     void client
@@ -360,7 +367,7 @@ function Users({
                     ))}
                   </fieldset>
                 )}
-                {!deleted && ((manage && !locked) || progress || economy) && (
+                {!deleted && ((manage && !locked) || sysopChanges) && (
                   <div className={styles.actions}>
                     {/* SysOp sets any account's wins, and so its tier (v0.3.1). */}
                     {progress && settingWins !== user.id && (
@@ -422,6 +429,15 @@ function Users({
                           Restore {name}
                         </button>
                       )}
+                    {/* A fresh start, so the setup wizard runs again (v0.4.5). */}
+                    {resets && user.id !== me.id && (
+                      <button
+                        className={styles.danger}
+                        onClick={() => setResetting(user)}
+                      >
+                        Reset {name}'s account…
+                      </button>
+                    )}
                     {/* For good, when its owner asks (v0.4.1); never your own account. */}
                     {manage && !locked && user.id !== me.id && (
                       <button
@@ -486,6 +502,18 @@ function Users({
             );
           }}
           onClose={() => setDeleting(undefined)}
+        />
+      )}
+      {resetting && (
+        <ResetAccount
+          user={resetting}
+          onReset={(reset) => {
+            replace(reset.account);
+            setMessage(
+              resetWords(resetting.handle ?? resetting.display_name, reset),
+            );
+          }}
+          onClose={() => setResetting(undefined)}
         />
       )}
     </section>

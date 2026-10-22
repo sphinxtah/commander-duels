@@ -1,10 +1,11 @@
 """Administration: accounts, roles and the audit trail (AUTH06, SEC05).
 
 Administrators approve, deny, disable, restore and delete accounts and grant the moderator and
-content-editor roles. Only SysOp makes or removes administrators. SysOp itself never appears
-here: it cannot be listed, changed, demoted or disabled through the interface, and other viewers
-see its audit events as the site administrator's. A deleted account (v0.4.1, api/accounts.py) is
-listed only when asked for, as "Deleted player", and nothing changes it afterwards.
+content-editor roles. Only SysOp makes or removes administrators, and resets an account to a new
+one's state (v0.4.5, api/resets.py). SysOp itself never appears here: it cannot be listed,
+changed, demoted or disabled through the interface, and other viewers see its audit events as the
+site administrator's. A deleted account (v0.4.1, api/accounts.py) is listed only when asked for,
+as "Deleted player", and nothing changes it afterwards.
 """
 
 import base64
@@ -40,8 +41,11 @@ from api.identity import (
 )
 from api.models import AuditEvent, ExternalIdentity, RoleGrant, User
 from api.progression import admin_progress
+from api.resets import reset_account
+from api.roster import roster_of
 from api.schemas import (
     AccountDeletion,
+    AccountReset,
     AccountStatus,
     AdminUser,
     AuditActor,
@@ -59,6 +63,7 @@ CanReadUsers = Annotated[Principal, Depends(require_permission("admin.users.read
 CanManageUsers = Annotated[Principal, Depends(require_permission("admin.users.manage"))]
 CanManageRoles = Annotated[Principal, Depends(require_permission("admin.roles.manage"))]
 CanReadAudit = Annotated[Principal, Depends(require_permission("admin.audit.read"))]
+CanResetUsers = Annotated[Principal, Depends(require_permission("admin.users.reset"))]
 SITE_ADMINISTRATOR = "Site administrator"
 
 
@@ -294,6 +299,42 @@ def deleted_by(
     )
     db.commit()
     return admin_user(db, user, principal)
+
+
+@router.post("/users/{user_id}/reset", response_model=AccountReset)
+async def reset_user(
+    user_id: UUID, request: Request, principal: CanResetUsers, db: Db
+) -> AccountReset:
+    """SysOp resets an account to a new one's state (v0.4.5, api/resets.py), so the setup wizard
+    runs again: its handle, alliance, library and packs are cleared, its decks go to the trash,
+    and its wins and tokens go back to 0 and 1,000; its friends, messages and reports stay.
+    Refused 409 while it plays a game or sits at an open table. The account's game lock is held
+    meanwhile, as for a deletion, so no game of it starts."""
+    require_recent_sign_in(request, principal)
+    user = await run_in_threadpool(managed_user, db, principal, user_id)
+    async with hub_of(request).locks[user.id]:
+        return await run_in_threadpool(reset_by, db, request, principal, user)
+
+
+def reset_by(db: Session, request: Request, principal: Principal, user: User) -> AccountReset:
+    cleared = reset_account(db, user, principal.user, roster_of(request))
+    audit(
+        db,
+        request,
+        "admin.user_reset",
+        actor_id=principal.user.id,
+        target_user_id=user.id,
+        details=cleared.details(),
+    )
+    db.commit()
+    return AccountReset(
+        account=admin_user(db, user, principal),
+        decks=cleared.decks,
+        cards=cleared.cards,
+        packs=cleared.packs,
+        wins=cleared.wins,
+        tokens=cleared.tokens,
+    )
 
 
 def actor_label(user: User | None, viewer: Principal) -> AuditActor | None:

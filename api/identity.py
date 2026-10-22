@@ -65,8 +65,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
 # Held by SysOp alone and grantable to no role: making or removing administrators, seeing
 # concealed information in a running game (SysOp's exception to SEC05 and NET14, accepted on
 # 2026-10-18), putting any card in the engine's database into its own library, setting any
-# account's wins (v0.3.1), uploading the Godlike tier's custom cards, and giving tokens and
-# setting the economy's limits (v0.4.0).
+# account's wins (v0.3.1), uploading the Godlike tier's custom cards, giving tokens and setting
+# the economy's limits (v0.4.0), reading any chat (v0.4.4), and resetting an account to a new
+# one's state (v0.4.5).
 SYSOP_ONLY = ALL_PERMISSIONS - frozenset().union(*ROLE_PERMISSIONS.values())
 
 

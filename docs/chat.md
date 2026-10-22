@@ -108,7 +108,7 @@ Administrators and SysOp read the copy in Administration → Reports, the report
 ## Kept, and removed
 
 - Friends' messages 365 days, and their conversation once it has none left; a table's lines 30 days (a game lasts hours). The worker's daily job removes them, with the requests never approved ([accounts](identity.md)).
-- Deleting an account removes its conversations, with both sides' messages, and its own lines in tables' chats ([deleting an account](social.md#deleting-an-account)).
+- Deleting an account removes its conversations, with both sides' messages, and its own lines in tables' chats ([deleting an account](social.md#deleting-an-account)). Resetting one (v0.4.5) keeps them ([resetting an account](identity.md#resetting-an-account-v045)).
 - Alliances live only with the running game, in the API's memory.
 - The [privacy policy](../web/public/pages/privacy.html) says all of this to players, and the [terms](../web/public/pages/terms.html) say what may not be written.
 

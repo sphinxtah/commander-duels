@@ -83,6 +83,7 @@ export type Format = components["schemas"]["Format"];
 export type PracticeFormat = components["schemas"]["PracticeFormat"];
 export type Me = components["schemas"]["Me"];
 export type AdminUser = components["schemas"]["AdminUser"];
+export type AccountReset = components["schemas"]["AccountReset"];
 export type AuditEntry = components["schemas"]["AuditEntry"];
 export type SessionSummary = components["schemas"]["SessionSummary"];
 export type ProfileUpdate = components["schemas"]["ProfileUpdate"];

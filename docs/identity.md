@@ -167,6 +167,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  |  | ✓ | ✓ |
 | `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  |  | ✓ | ✓ |
 | `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  |  | ✓ |
+| `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  |  | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
@@ -186,13 +187,14 @@ Every active account is a player. Grants add the other roles. Permissions are ch
   - **Inspection.** SysOp's view of every hand and library, in any running game, audited at every opening.
   - **Any card.** Deck lists naming any card in the engine's card database, on SysOp's practice games.
 - Since v0.4.4 `chat.read_all` is SysOp's alone too: it reads any conversation between friends and any table's chat, allies-only messages included, and every reading is audited ([chat](chat.md#sysops-reader)). Administrators read a chat message only when a player reports it.
+- Since v0.4.5 `admin.users.reset` is SysOp's alone: it resets an account to a new one's state, so the setup wizard runs again ([resetting an account](#resetting-an-account-v045)). Administrators, who delete accounts, cannot reset one.
 - Administrators and moderators keep SEC05's and NET14's restrictions: there is no "view all live hands" for them.
 
 **Errors** follow the scope's rules:
 - 401 when signed out;
 - 403 when the account lacks the permission or is pending or denied;
 - 404, identical to a missing path, for SysOp or another account's session;
-- 409 for conflicts such as a taken handle, a change to your own account, or since v0.4.1 a change to a deleted account (`account_deleted`) and deleting an account that is playing (`account_in_game`);
+- 409 for conflicts such as a taken handle, a change to your own account, or since v0.4.1 a change to a deleted account (`account_deleted`) and deleting an account that is playing (`account_in_game`), and since v0.4.5 resetting one that is playing or seated at an open table (`account_in_game`, `account_at_table`);
 - 422 `invalid_request` for input the contract does not allow. That includes a NUL character in a display name, a status reason, the account search or the audit filter, which PostgreSQL cannot store.
 
 ## SysOp, the local root account
@@ -246,7 +248,7 @@ Actions recorded:
 - **Sessions:** `auth.logout`, `auth.logout_all` and `auth.session_revoked`.
 - **SysOp:** `auth.sysop_login`, `auth.sysop_login_failed`, `auth.sysop_logout`, `account.sysop_password_changed` and `account.sysop_password_set` (from the console).
 - **Profile:** `profile.updated`.
-- **Administration:** `admin.user_status_changed`, `admin.role_granted`, `admin.role_revoked`, `admin.sessions_revoked` and, since v0.4.1, `admin.user_deleted`.
+- **Administration:** `admin.user_status_changed`, `admin.role_granted`, `admin.role_revoked`, `admin.sessions_revoked`, since v0.4.1 `admin.user_deleted` and since v0.4.5 `admin.user_reset` ([resetting an account](#resetting-an-account-v045)).
 - **Problem reports** (v0.4.1): `admin.report_status_changed`, with the report's ID and the statuses `from` and `to`; its account is the reporter ([problem reports](reports.md#statuses)).
 - **The system** (v0.4.1, no actor): `account.unapproved_deleted`.
 
@@ -297,6 +299,32 @@ Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions
 **Routes.**
 - `POST /api/v1/admin/users/{id}/delete` with `{"reason": "…"}` answers with the account as Administration now lists it.
 - `GET /api/v1/admin/users?status=deleted` lists deleted accounts. Without a status, they are left out.
+
+## Resetting an account (v0.4.5)
+
+Asked for by the owner on 2026-10-22 ([the plan](plans/0.4.5.md#added-during-v045)), for a beta tester who had set up his account and wanted to try the setup wizard. The owner chose a fresh start: SysOp returns an account to a new one's state, and the wizard then runs as a new player sees it. One function does it (`api/resets.py`), in one transaction.
+
+**Who may reset.**
+- SysOp alone (`admin.users.reset`, which no role can be granted). Never SysOp's own account or a deleted one; an administrator's account may be reset.
+- The sign-in must be at most `CD_REAUTH_MINUTES` old, as for every account change.
+- In the Accounts list, "Reset *handle*'s account…" opens a dialog that says what is cleared and what is kept. Its button works once the account's handle is typed (RESET for an account without one), in any case. The list then says what was cleared, for example "bob's account is new again: 5 decks moved to the trash, 212 cards and 2 unopened packs cleared, 15 wins set back to 0 and 1,134 tokens to 1,000."
+
+**What is cleared.**
+- **The profile.** The handle, which anyone may then take. Onboarding goes back to its first step (`handle`), the two starter decks chosen are forgotten, and the alliance ends.
+- **The library.** Every card it held for good: the starter decks chosen and bought, the cards from packs, and the cards of decks saved before libraries existed. Grants are append-only, so they stay recorded; the library counts only those made after the reset (`users.reset_at`). The two free starter decks can be chosen again, and the shop sells each of the others once more: a starter deck granted or bought after a reset carries the reset's time in its keys (`starter:<deck>:<time>`, and the purchase's `deck:<account>:<deck>:<time>`), so it is a new grant and a new purchase.
+- **Packs.** The unopened packs, and "Packs you opened", go the same way: the packs and openings from before the reset stay recorded and no longer count. The cards of the next packs opened are new again.
+- **Decks.** Every deck goes to the trash, as its owner trashing it would: private, its share link ended. Each is checked against the emptied library first, so a deck restored from the trash shows as collection-locked until the library holds its cards again.
+- **Wins and tokens.** Back to 0, and to the 1,000 every new account gets, through the ledgers' own entries with the reason "Account reset by SysOp": a setting of wins (`wins_set`), kept apart from wins counted from games, and a grant of tokens (`grant`). Both ledgers keep their history, so the profile shows, for example, 1 win counted and −1 set ([progression](progression.md#wins-and-levels), [tokens](tokens.md#sysop-and-administrators)).
+
+**What is kept.** The account's row and status, its Google sign-in, name, picture, settings, privacy settings and roles, and its sessions; friends, requests and blocks, conversations and table chats, notifications and problem reports; game results; the ledgers' history and the audit trail. The player stays signed in: the app shows the new state the next time it asks for the account (when the site opens or is reloaded), and the setup wizard then opens by itself. Until a handle is chosen again, as for any account without one, the player search does not find the account and friends' lists leave it out; the friendships stay.
+
+**While the account plays.** A reset is refused with 409 `account_in_game` while the account holds a seat in a running game: SysOp may close the game first, or wait for it to end. It is refused with 409 `account_at_table` while the account sits at an open table, as host or guest, until it leaves or the table starts or closes. The reset holds the account's game lock, as a deletion does, and locks its row, so meanwhile no game of it starts, and no seat is taken, pack bought or opened, or starter deck chosen.
+
+**The audit trail** records `admin.user_reset`, with what was cleared: the wins and tokens before, the copies of cards granted for good, the unopened packs, the decks moved to the trash, and the alliance and starter decks chosen, by their IDs; never a handle or a name. A second reset finds nothing more to clear and writes no ledger entry.
+
+**Route.** `POST /api/v1/admin/users/{id}/reset`, with no body, answers with what was cleared (`decks`, `cards`, `packs`, and the `wins` and `tokens` before) and the account as Administration now lists it (`account`).
+
+**The database.** Migration `0020_account_reset` adds `users.reset_at`, the time of the latest reset. Going back drops it: a reset account's library and packs from before its reset count again.
 
 ## Data
 

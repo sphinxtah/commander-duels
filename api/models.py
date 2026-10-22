@@ -97,6 +97,9 @@ class User(Base):
     starter_decks: Mapped[list[str] | None] = mapped_column(JsonType)
     # When the account was deleted (v0.4.1); its status is then deleted for good.
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # When SysOp last reset the account to a new one's state (v0.4.5, api/resets.py): its library
+    # and its packs count only what came after.
+    reset_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # Presence (v0.4.3, api/social.py): the app's latest check-in from any tab, and the latest
     # from a tab its player was using.
     presence_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
@@ -808,7 +811,8 @@ class ProgressEntry(Base):
 class LibraryGrant(Base):
     """Copies of a card granted into an account's library for good: a starter deck's cards, or
     the cards of decks saved before libraries existed. An alliance's cards are not granted: they
-    are in the library while the alliance lasts. Append-only, like the ledger."""
+    are in the library while the alliance lasts. Append-only, like the ledger: a reset (v0.4.5)
+    leaves the grants before it recorded, and the library counts only those after it."""
 
     __tablename__ = "library_grants"
     __table_args__ = (
@@ -824,7 +828,8 @@ class LibraryGrant(Base):
     quantity: Mapped[int]
     source: Mapped[str] = mapped_column(String(16))
     # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,
-    # pack:<opening>.
+    # pack:<opening>; after a reset, a starter deck's carries the reset's time (starter:<deck>:
+    # <time>), so the deck can be granted again.
     grant_key: Mapped[str] = mapped_column(String(96))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
@@ -1006,7 +1011,7 @@ class BoosterSource(Base):
 class Pack(Base):
     """A pack an account holds, bought with tokens (ledger key pack:<id>) or given by SysOp. It is
     unopened until an opening names it. A purchase carries the client's key, so a retried request
-    buys once. Append-only."""
+    buys once. Append-only: the account's packs from before a reset (v0.4.5) no longer count."""
 
     __tablename__ = "packs"
     __table_args__ = (
