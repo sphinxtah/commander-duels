@@ -1,5 +1,36 @@
 # Verification
 
+## v0.4.1
+
+Validated locally on Windows on October 21, 2026, on the work as merged for v0.4.1 (the public pages, problem reports and the counts, account deletion, 64 games at once, and The Sphinx's portrait). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository, with Pillow 12.3.0; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine's tests ran in its image's Maven build.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 94 files formatted, 64 Python source files type-checked |
+| Python suite | 211 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New: `tests/test_reports.py` (a JPEG's EXIF, GPS, XMP, ICC and text gone after re-encoding; types, bytes and pixels refused; 20 a day; who reads them; audited statuses; the counts; deletion removes them), `tests/test_accounts.py` (each table deletion touches, revisions games played kept and stripped, a fresh sign-in after deletion, refusals, the 30-day job with an injected clock); on PostgreSQL, the revision trigger's one exception for a deleted account's titles and notes |
+| Migrations | `alembic upgrade head && alembic check` on a fresh PostgreSQL: one head, `0013_account_deletion`, no drift |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated on the merged tree |
+| Engine (JUnit) | 100 passed, among them the search pool's size from `CD_ENGINE_AI_THREADS` and the 64-game ceiling |
+| Web unit tests and build | 876 Vitest tests in 72 files passed; `tsc -b`, the service worker's `tsc -p sw` and the production build passed |
+| Browser journeys (CI's verify job) | 44 passed, 13 skipped that need the engine or the built image, on a throwaway API from the source with the test catalog and Vite's dev server. New: `reports.spec.ts` (a report with a JPEG sent, read in Administration with its screenshot, its status set, no sideways scroll at 390 px). `table.spec.ts` failed once: its missing portrait was The Sphinx's, which now exists; it uses a made-up ID since |
+| Browser journeys (CI's engine job) | 16 passed in 2 m 48 s on a throwaway Compose stack built from the tree (the engine image included), through the web container's nginx: `game.spec.ts`, `tables.spec.ts`, `pwa.spec.ts` and the new `pages.spec.ts` (About, Privacy and Terms without JavaScript, their headers and CSP, no redirects, a phone width, and the service worker leaving them to the network, offline included) |
+
+### The load test: 64 games at once
+
+On the development machine (24 CPUs, 33.6 GB for Docker), with the engine image built from this version and held to 16 CPUs like the VM. A throwaway Compose project (database, API built from the tree, engine) took `CD_GAMES_MAX=64`; one client container started 64 practice games through the API as SysOp, 0.2 s apart, with `scripts/api_practice_game.py`: even games Legacy against one bot, odd ones Commander against three, bot skill 1 to 3, every prompt answered at once by the scripted player. The engine logged its GC (`-Xlog:gc`) and, at each game's end, each bot's searches.
+
+| | 16 GB heap, 20 GB limit | 12 GB heap, 16 GB limit (the live settings) |
+| --- | --- | --- |
+| Games | 64 of 64 finished (completed, turn limit or the human eliminated) and recorded, in 291 s; a game's median 208 s | 64 of 64, in 302 s; median 207 s |
+| Heap after a collection, at most | 8,674 MB (11,320 MB committed) | 7,643 MB (11,600 MB committed) |
+| Engine container's memory, at most | 16.05 GB | 12.74 GB |
+| Engine CPU, at most and median | 1314% and 342% (of 1600%) | 1408% and 372% |
+| The bots' searches | 14,943; 86 cut off by the budget; none abandoned, unstarted or failed | 14,689; 91 cut off; none abandoned, unstarted or failed |
+| Longest wait for a search thread | 96 ms (median of the bots' longest 5 ms) | 461 ms (median 24 ms) |
+| Errors in the engine's or the API's log | None | None |
+
+An earlier run of 8 games checked the harness: all finished, and the engine started with "at most 8 games at once, 16 bot search threads".
+
 ## v0.4.0
 
 Validated locally on Windows on October 21, 2026, on the work as merged for v0.4.0 (tokens, human tables, Leng's card shop, the custom cards in play, and the long-choices fix). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine's tests ran in its image's Maven build.
