@@ -18,6 +18,50 @@
         "title": "AccountDeletion",
         "type": "object"
       },
+      "AccountReset": {
+        "additionalProperties": false,
+        "description": "What SysOp's reset of an account cleared (v0.4.5), and the account as Administration now\nlists it: no handle, 0 wins, 1,000 tokens and no alliance.",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AdminUser"
+          },
+          "cards": {
+            "description": "Copies of cards the library held for good, now cleared.",
+            "title": "Cards",
+            "type": "integer"
+          },
+          "decks": {
+            "description": "Decks moved to the trash.",
+            "title": "Decks",
+            "type": "integer"
+          },
+          "packs": {
+            "description": "Unopened packs, now cleared.",
+            "title": "Packs",
+            "type": "integer"
+          },
+          "tokens": {
+            "description": "The tokens it had, now the welcome's 1,000.",
+            "title": "Tokens",
+            "type": "integer"
+          },
+          "wins": {
+            "description": "The wins it had, now 0.",
+            "title": "Wins",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "account",
+          "decks",
+          "cards",
+          "packs",
+          "wins",
+          "tokens"
+        ],
+        "title": "AccountReset",
+        "type": "object"
+      },
       "AdminCounts": {
         "additionalProperties": false,
         "properties": {
@@ -4536,7 +4580,8 @@
                 "shop.manage",
                 "reports.manage",
                 "players.presence",
-                "chat.read_all"
+                "chat.read_all",
+                "admin.users.reset"
               ],
               "type": "string"
             },
@@ -12266,6 +12311,117 @@
           }
         },
         "summary": "Give Packs"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/reset": {
+      "post": {
+        "description": "SysOp resets an account to a new one's state (v0.4.5, api/resets.py), so the setup wizard\nruns again: its handle, alliance, library and packs are cleared, its decks go to the trash,\nand its wins and tokens go back to 0 and 1,000; its friends, messages and reports stay.\nRefused 409 while it plays a game or sits at an open table. The account's game lock is held\nmeanwhile, as for a deletion, so no game of it starts.",
+        "operationId": "reset_user_api_v1_admin_users__user_id__reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountReset"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reset User"
       }
     },
     "/api/v1/admin/users/{user_id}/roles/{role}": {
@@ -21532,7 +21688,7 @@
     },
     "/api/v1/shop/openings": {
       "get": {
-        "description": "The account's opened packs, newest first.",
+        "description": "The account's opened packs, newest first: since its latest reset, if any.",
         "operationId": "openings_api_v1_shop_openings_get",
         "parameters": [
           {

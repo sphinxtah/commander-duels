@@ -11,6 +11,10 @@ Copies count, as in Magic Duels: a deck may hold no more copies of a card than t
 counting every printing and Oracle version of the card together. Copies are a limit per deck, not
 spent by one: two decks may each hold the same owned card.
 
+Since v0.4.5 SysOp may reset an account to a new one's state (api/resets.py). Grants are
+append-only, so those before the reset stay recorded, and the library counts only those made
+after it (since_reset), as the shop does the account's packs.
+
 The Godlike tier's custom cards (v0.4.0) are open only to an account at that tier: an alliance
 with their Planeswalker then holds a playset of each, kept apart from the catalog's copies, and
 administrators and SysOp build with them as with any card. Below Godlike the account's library
@@ -25,14 +29,15 @@ import json
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Request
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import ColumnElement, func, select, true
+from sqlalchemy.orm import InstrumentedAttribute, Session
 from starlette.concurrency import run_in_threadpool
 
 from api.engine_cards import engine_cards_of
@@ -84,6 +89,20 @@ def at_godlike(db: Session, user_id: UUID) -> bool:
     return int(wins or 0) >= GODLIKE.wins
 
 
+def since_reset(user: User, created: InstrumentedAttribute[datetime]) -> ColumnElement[bool]:
+    """The account's grants, packs or openings that count: those made since SysOp last reset it
+    (v0.4.5), or all of them when it never was."""
+    return created > user.reset_at if user.reset_at is not None else true()
+
+
+def reset_key(user: User, key: str) -> str:
+    """The key of a grant or purchase that a reset lets happen once more (a starter deck chosen
+    or bought): after a reset it carries the reset's time, so it is a new fact."""
+    if user.reset_at is None:
+        return key
+    return f"{key}:{user.reset_at.astimezone(UTC):%Y%m%dT%H%M%S%f}"
+
+
 def library_of(
     db: Session, user: User, permissions: frozenset[str], roster: dict[str, Planeswalker]
 ) -> Library:
@@ -96,7 +115,7 @@ def library_of(
     granted = db.execute(
         select(CardConcept.construction_key, LibraryGrant.source, func.sum(LibraryGrant.quantity))
         .join(CardConcept, CardConcept.id == LibraryGrant.concept_id)
-        .where(LibraryGrant.user_id == user.id)
+        .where(LibraryGrant.user_id == user.id, since_reset(user, LibraryGrant.created_at))
         .group_by(CardConcept.construction_key, LibraryGrant.source)
     )
     for key, source, quantity in granted:
@@ -263,18 +282,23 @@ def commander_printing(db: Session, entries: list[DeckEntry]) -> tuple[UUID | No
 
 def owned_starters(db: Session, user: User) -> set[str]:
     """The starter decks the account has: the two it chose, and those it bought in Leng's shop
-    (v0.4.2). Both grant their cards under the deck's own key."""
+    (v0.4.2), since any reset. Both grant their cards under the deck's own key."""
     keys = db.scalars(
         select(LibraryGrant.grant_key)
-        .where(LibraryGrant.user_id == user.id, LibraryGrant.grant_key.startswith("starter:"))
+        .where(
+            LibraryGrant.user_id == user.id,
+            LibraryGrant.grant_key.startswith("starter:"),
+            since_reset(user, LibraryGrant.created_at),
+        )
         .distinct()
     )
-    return set(user.starter_decks or []) | {key.removeprefix("starter:") for key in keys}
+    # starter:<deck>, or starter:<deck>:<time> after a reset (reset_key).
+    return set(user.starter_decks or []) | {key.split(":")[1] for key in keys}
 
 
 def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckEntry]) -> None:
     """Every copy of the deck's cards, for good; the grant is keyed by the deck, so it is made
-    once whatever retries. Basic lands need no grant."""
+    once whatever retries (once more after a reset). Basic lands need no grant."""
     quantities: dict[UUID, int] = defaultdict(int)
     for entry in entries:
         quantities[entry.card_id] += entry.quantity
@@ -285,7 +309,7 @@ def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckE
             )
         )
     )
-    key = f"starter:{starter.id}"
+    key = reset_key(user, f"starter:{starter.id}")
     done = db.scalar(
         select(LibraryGrant.id).where(
             LibraryGrant.user_id == user.id, LibraryGrant.grant_key == key

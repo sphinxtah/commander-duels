@@ -1,5 +1,6 @@
-/* "Delete account…" (v0.4.1): the confirmation dialog in Administration's account list. It fits
-   a phone: the dialog takes the width less the page's 16px gutters, and its buttons wrap. */
+/* "Delete account…" (v0.4.1): the confirmation dialog in Administration's account list, which
+   "Reset account…" (v0.4.5) shares. It fits a phone: the dialog takes the width less the page's
+   16px gutters, and its buttons wrap. */
 
 .dialog {
   width: 100%;

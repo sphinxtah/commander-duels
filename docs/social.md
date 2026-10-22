@@ -53,6 +53,8 @@ On Profile, under "Privacy" (`PrivacySettings.tsx`): who sees whether you are on
 
 Deleting an account ([accounts](../api/accounts.py), `CLEANUPS`) removes its friendships and requests, its blocks either way, and the notifications it received or caused; since v0.4.4 also its conversations and its lines in tables' chats ([chat](chat.md#kept-and-removed)).
 
+Resetting an account (v0.4.5, [resetting an account](identity.md#resetting-an-account-v045)) keeps all of them, and its privacy settings. It clears the handle, so until the player chooses one again the search does not find the account and other players' lists of friends leave it out, as for any account without a handle; the friendships and requests stay and show again with the new handle.
+
 ## The data
 
 Migration `0015_friends`: `friendships` (one row a pair, whichever asked: `user_low` is the lower ID; `pending` or `accepted`), `player_blocks`, `notifications`, and on `users` the presence (`presence_at`, `active_at`) and the privacy settings (`presence_visibility`, `appear_offline`, `email_searchable`).

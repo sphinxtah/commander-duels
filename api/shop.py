@@ -21,7 +21,10 @@ the Magic Duels style, their cards the player's for good.
   sells none. Buying one, in one transaction, spends its price (api/products.py, from the value of
   its cards), makes it a deck of the player's own and grants every copy of its cards for good, as
   choosing it would have (library_grants, source starter, key starter:<deck>). The ledger entry's
-  key is deck:<account>:<deck>, so a retried request buys it once.
+  key is deck:<account>:<deck>, so a retried request buys it once. After a reset (v0.4.5) both
+  keys carry the reset's time (library.reset_key), so each deck sells once more.
+- **A reset** (v0.4.5, api/resets.py) clears the account's packs: those from before it, opened or
+  not, no longer count (library.since_reset), and they stay recorded, as packs are append-only.
 - **Pack artwork** (v0.4.3). Every answer that names a product (the shelves, the packs held,
   purchases, openings and their history, Administration) carries its pack's picture when
   content/pack-art.json names one, and its set's symbol; with no picture the browser draws the
@@ -66,6 +69,8 @@ from api.library import (
     grant_starter,
     library_of,
     owned_starters,
+    reset_key,
+    since_reset,
     starter_entries,
 )
 from api.models import (
@@ -412,11 +417,15 @@ def products_of(request: Request, db: Session) -> list[ShopProduct]:
     return list(db.scalars(select(ShopProduct)))
 
 
-def inventory_of(db: Session, user_id: UUID, art: ArtIndex) -> list[InventoryItem]:
+def inventory_of(db: Session, user: User, art: ArtIndex) -> list[InventoryItem]:
     unopened = db.execute(
         select(Pack.id, Pack.product_id)
         .outerjoin(PackOpening, PackOpening.pack_id == Pack.id)
-        .where(Pack.user_id == user_id, PackOpening.id.is_(None))
+        .where(
+            Pack.user_id == user.id,
+            PackOpening.id.is_(None),
+            since_reset(user, Pack.created_at),
+        )
         .order_by(Pack.created_at, Pack.id)
     ).all()
     counts: dict[UUID, int] = defaultdict(int)
@@ -483,7 +492,7 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
         balance=balance_of(db, principal.user.id),
         products=[info_of(product, art, sale) for product in on_sale],
         eras=[EraInfo(id=era.id, name=era.name, since=era.since) for era in ERAS],
-        inventory=inventory_of(db, principal.user.id, art),
+        inventory=inventory_of(db, principal.user, art),
         data=ShopData(
             mtgjson_version=version,
             prices_as_of=listing.as_of if listing else None,
@@ -563,7 +572,7 @@ def buy_deck(
     # The account's row is locked first, so a retry waits for the request it repeats.
     lock_account(db, user.id)
     db.refresh(user)
-    key = f"deck:{user.id}:{starter.id}"
+    key = reset_key(user, f"deck:{user.id}:{starter.id}")
     earlier = db.scalar(select(TokenEntry).where(TokenEntry.key == key))
     if earlier is not None:
         return deck_bought(db, user, starter, earlier)
@@ -717,7 +726,7 @@ def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
     )
 
 
-def granted_keys(db: Session, user_id: UUID, keys: set[str]) -> set[str]:
+def granted_keys(db: Session, user: User, keys: set[str]) -> set[str]:
     """The construction keys among these that the account holds copies of for good."""
     if not keys:
         return set()
@@ -725,7 +734,11 @@ def granted_keys(db: Session, user_id: UUID, keys: set[str]) -> set[str]:
         db.scalars(
             select(CardConcept.construction_key)
             .join(LibraryGrant, LibraryGrant.concept_id == CardConcept.id)
-            .where(LibraryGrant.user_id == user_id, CardConcept.construction_key.in_(keys))
+            .where(
+                LibraryGrant.user_id == user.id,
+                CardConcept.construction_key.in_(keys),
+                since_reset(user, LibraryGrant.created_at),
+            )
             .distinct()
         )
     )
@@ -760,7 +773,9 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
         key=lambda card: reveal_order(printings[card.printing_id].rarity, card.finish),
     )
     user_id = principal.user.id
-    owned = granted_keys(db, user_id, {concept.construction_key for concept in concepts.values()})
+    owned = granted_keys(
+        db, principal.user, {concept.construction_key for concept in concepts.values()}
+    )
     opening = PackOpening(
         id=uuid4(),
         pack_id=pack.id,
@@ -813,8 +828,16 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
 def open_one(pack_id: UUID, request: Request, principal: Active, db: Db) -> Opening:
     """Opens one of the account's packs. A pack opens once: asking again returns its cards."""
     lock_account(db, principal.user.id)
-    pack = db.get(Pack, pack_id)
-    if pack is None or pack.user_id != principal.user.id:
+    # Read again under the lock, so a reset that got there first leaves its packs behind.
+    db.refresh(principal.user)
+    pack = db.scalar(
+        select(Pack).where(
+            Pack.id == pack_id,
+            Pack.user_id == principal.user.id,
+            since_reset(principal.user, Pack.created_at),
+        )
+    )
+    if pack is None:
         raise not_found()
     opened = db.scalar(select(PackOpening).where(PackOpening.pack_id == pack.id))
     if opened is None:
@@ -837,8 +860,11 @@ def openings(
     limit: Annotated[int, Query(ge=1, le=200)] = HISTORY_SHOWN,
     before: datetime | None = None,
 ) -> list[OpeningSummary]:
-    """The account's opened packs, newest first."""
-    query = select(PackOpening).where(PackOpening.user_id == principal.user.id)
+    """The account's opened packs, newest first: since its latest reset, if any."""
+    query = select(PackOpening).where(
+        PackOpening.user_id == principal.user.id,
+        since_reset(principal.user, PackOpening.created_at),
+    )
     if before is not None:
         query = query.where(PackOpening.created_at < before)
     found = list(db.scalars(query.order_by(PackOpening.created_at.desc()).limit(limit)))
@@ -878,8 +904,14 @@ def openings(
 
 @router.get("/shop/openings/{opening_id}", response_model=Opening)
 def opening(opening_id: UUID, request: Request, principal: Active, db: Db) -> Opening:
-    found = db.get(PackOpening, opening_id)
-    if found is None or found.user_id != principal.user.id:
+    found = db.scalar(
+        select(PackOpening).where(
+            PackOpening.id == opening_id,
+            PackOpening.user_id == principal.user.id,
+            since_reset(principal.user, PackOpening.created_at),
+        )
+    )
+    if found is None:
         raise not_found()
     return opening_of(db, found, art_of(request))
 
@@ -933,14 +965,14 @@ def give_packs(
         },
     )
     db.commit()
-    return PacksGranted(granted=body.count, inventory=inventory_of(db, user.id, art_of(request)))
+    return PacksGranted(granted=body.count, inventory=inventory_of(db, user, art_of(request)))
 
 
 @router.get("/admin/users/{user_id}/packs", response_model=list[InventoryItem])
 def account_packs(
     user_id: UUID, request: Request, principal: EconomyManager, db: Db
 ) -> list[InventoryItem]:
-    return inventory_of(db, target(db, user_id, principal).id, art_of(request))
+    return inventory_of(db, target(db, user_id, principal), art_of(request))
 
 
 # Administration (shop.manage: administrators and SysOp).

@@ -134,6 +134,7 @@ Permission = Literal[
     "reports.manage",
     "players.presence",
     "chat.read_all",
+    "admin.users.reset",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]
@@ -249,6 +250,18 @@ class AccountDeletion(Contract):
     describe the request, not the person."""
 
     reason: Annotated[StoredText, Field(min_length=3, max_length=200)]
+
+
+class AccountReset(Contract):
+    """What SysOp's reset of an account cleared (v0.4.5), and the account as Administration now
+    lists it: no handle, 0 wins, 1,000 tokens and no alliance."""
+
+    account: AdminUser
+    decks: int = Field(description="Decks moved to the trash.")
+    cards: int = Field(description="Copies of cards the library held for good, now cleared.")
+    packs: int = Field(description="Unopened packs, now cleared.")
+    wins: int = Field(description="The wins it had, now 0.")
+    tokens: int = Field(description="The tokens it had, now the welcome's 1,000.")
 
 
 class AuditActor(Contract):
