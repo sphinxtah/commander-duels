@@ -16,6 +16,8 @@ Validated locally on Windows on October 22, 2026, on the work of v0.4.3 as merge
 | The new screens | Looked at in Chromium at 1400 x 900 and 375 x 812: the search and its results, the bell's bubble and count, Friends, a profile, the privacy panel, the history; and the shop's counter with Leng's painting and the weekly sale at 1366 x 768 |
 | The pack artwork | 365 of 392 products with their real picture from TCGplayer, checked on contact sheets; 27 drawn; 180 set symbols; 10.7 MB in all, outside the precache |
 
+**Hosted CI.** Run #91 on 90696a3 passed in 15 m 59 s, with 247 pytest (the git-clone tests included), 907 Vitest tests and 44 + 17 browser journeys; run #90 before it stopped at the verify job's new time limit on a table test's hang, fixed in 90696a3 ([release notes](releases/0.4.3.md#verification)).
+
 ## v0.4.2
 
 Validated locally on Windows on October 21, 2026, on the work of v0.4.2 (the live 64-game limit, the alliance tab, the setup wizard, the starter decks in the shop, the roster of 89, the terms line and the upload preview). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine did not change.
