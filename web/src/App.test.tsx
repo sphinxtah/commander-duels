@@ -977,6 +977,34 @@ describe("a new account's setup (v0.4.2)", () => {
       await screen.findByRole("checkbox", { name: "Stand-in Skies" }),
     ).toBeInTheDocument();
   });
+
+  it("opens again when SysOp resets the account during the visit, once the tab is used again (v0.4.5)", async () => {
+    on(
+      "GET /api/v1/me",
+      () => reply(200, alice),
+      () => reply(200, { ...alice, onboarding: "handle", handle: null }),
+    );
+    on("GET /api/v1/decks/starters", () => reply(200, starterDecks));
+    window.location.hash = "#settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    expect(
+      screen.queryByRole("heading", { name: "Welcome to Commander Duels" }),
+    ).toBeNull();
+    // Focus right away asks nothing: at most every half a minute.
+    act(() => void window.dispatchEvent(new Event("focus")));
+    await settle();
+    expect(count("GET /api/v1/me")).toBe(1);
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 31_000);
+    act(() => void window.dispatchEvent(new Event("focus")));
+    expect(
+      await screen.findByRole("heading", {
+        name: "Welcome to Commander Duels",
+      }),
+    ).toBeInTheDocument();
+    expect(count("GET /api/v1/me")).toBe(2);
+  });
 });
 
 describe("the account's picture (v0.3.1)", () => {

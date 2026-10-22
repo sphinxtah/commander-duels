@@ -57,6 +57,8 @@ import {
 } from "./preferences";
 import styles from "./App.module.css";
 
+/** The account is asked for again on the tab's focus at most this often (v0.4.5). */
+const RECHECK_MS = 30_000;
 const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
 const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
 const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
@@ -135,7 +137,8 @@ export function App() {
   const navigated = useRef(false);
   // The setup wizard (v0.4.2) and where it opens. It opens by itself once each time the site opens
   // on an account still setting up, a new sign-in or a reload; the account it opened for is kept,
-  // so the account's own changes inside it do not open it again.
+  // so the account's own changes inside it do not open it again. An account that finished setting
+  // up and starts again (SysOp's reset, v0.4.5) gets it again, even in the same visit.
   const [setup, setSetup] = useState<"welcome" | "current" | null>(null);
   const setupOpened = useRef<string | null>(null);
   useEffect(() => {
@@ -144,7 +147,11 @@ export function App() {
       setSetup(null);
       return;
     }
-    if (onboarding(me) && setupOpened.current !== me.id) {
+    if (!onboarding(me)) {
+      setupOpened.current = null;
+      return;
+    }
+    if (setupOpened.current !== me.id) {
       setupOpened.current = me.id;
       setSetup("welcome");
     }
@@ -365,6 +372,37 @@ export function App() {
     [accountChanged],
   );
   const retry = () => setAttempt((value) => value + 1);
+  // What changed on the account elsewhere (SysOp resetting it, v0.4.5) shows when the tab is used
+  // again: its account is asked for once more on focus, at most every half a minute. A network
+  // failure is no news; a signed-out answer signs the page out, as any account check does.
+  useEffect(() => {
+    if (!admitted) return;
+    let last = Date.now();
+    const check = () => {
+      if (
+        document.visibilityState === "hidden" ||
+        Date.now() - last < RECHECK_MS
+      )
+        return;
+      last = Date.now();
+      const sent = generation.current;
+      const ask = answerTimeout();
+      loadMe(ask.signal, { token: false })
+        .then((value) => {
+          if (sent !== generation.current) return;
+          setCsrfToken(value?.csrf_token);
+          changeMe(value);
+        })
+        .catch(() => undefined)
+        .finally(ask.done);
+    };
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, [admitted, changeMe]);
 
   function updatePreference(key: keyof Preferences, value: boolean) {
     const next = { ...preferences, [key]: value };
