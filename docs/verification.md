@@ -16,6 +16,8 @@ Validated locally on Windows on October 22, 2026, on the work of v0.4.5 as merge
 | Widths | A scratch journey loaded the main menu, Decks, Settings, Tables and the shop at 18 widths from 1920 to 390 px: none ran wider than the window, after the top bar was made to give way step by step (its first version overflowed at 1366 px, which the shell and identity journeys caught) |
 | The new screens | Looked at in Chromium at 1920 x 1080, 1600 x 900, 1366 x 768 and 390 x 844: the title screen, the main menu with and without an ally, the account's menu, Play, Tables with its rules, Decks, Cards with the prepare cards, the shop, Friends, Messages, Profile, Settings and Administration. The installed app's screenshot is the main menu at 1920 x 1080 |
 
+**Hosted CI.** Run #100 on 772a400 passed in 21 m 1 s, with 279 pytest (the git-clone tests included), 976 Vitest tests and 45 + 17 browser journeys ([release notes](releases/0.4.5.md#verification)).
+
 ## v0.4.4
 
 Validated locally on Windows on October 22, 2026, on the work of v0.4.4 (chat between friends, the table's chat with alliances and emotes, reports of a message, SysOp's reader, and the card pictures that did not load). The table's chat panel and Administration's views were built by two subagents in this checkout, on files of their own, and checked here with the rest. Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine did not change.
