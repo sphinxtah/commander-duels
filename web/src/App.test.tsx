@@ -1276,7 +1276,8 @@ describe("what waits for Administration (v0.4.1)", () => {
         screen.getByRole("link", { name: "Administration" }),
       ).toBeInTheDocument(),
     );
-    expect(document.title).toBe("Commander Duels");
+    // The title follows in an effect of its own, which may run a moment after the menu's words.
+    await waitFor(() => expect(document.title).toBe("Commander Duels"));
   });
 
   it("is never asked for by a player, who still finds Report a problem on every page", async () => {
