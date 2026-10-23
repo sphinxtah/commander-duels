@@ -1,6 +1,6 @@
 # Human tables (v0.4.0)
 
-Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Since v0.5.0 players also find each other through public queues, whose games of two players or more are table games, and a table's players may play their game again with Rematch ([queues and rematches](queues.md)).
+Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Since v0.5.0 players also find each other through public queues, whose games of two players or more are table games, and a table's players may play their game again with Rematch ([queues and rematches](queues.md)). Since v0.5.1 a table may be Two-Headed Giant's: two teams of two ([below](#two-headed-giant-v051)).
 
 ## The lobby
 
@@ -55,23 +55,38 @@ There are no turn timers.
 - **Coming back.** A player who comes back before the vote passes ends it. A removed player who comes back sees that the others removed them, and how the game ended.
 - **The engine's backstop.** The engine closes a game in which nothing has happened for an hour (`idle_timeout`, the engine's longest). A player thinking for a few minutes keeps the game; an away player is voted out long before. Practice games keep the engine's 15 minutes.
 
+## Two-Headed Giant (v0.5.1)
+
+The owner's decision at the start of v0.5.1 ([plan](plans/0.5.1.md#decisions-at-the-start-of-v051)): Two-Headed Giant at human tables (FMT10), four players or players with bots, both winners paid. The game itself is the engine's ([Two-Headed Giant](engine/two-headed-giant.md)): shared team turns, 30 life a team, team poison.
+
+- **Opening.** The host chooses Two-Headed Giant: four seats in two teams, seats 0 and 1 (Team 1, the host's) against seats 2 and 3 (Team 2). The host chooses whether their teammate is a bot, and whether the other team is two players, a player and a bot, or two bots. A table keeps at least two players' seats, so a bot teammate leaves the other team at least one player. That covers four players, three players and a bot, two players on a team against two bots, and a player and a bot on each side. The table records which seats are its bots' (`game_tables.bot_seats`); bots sit in the other team's last seat first.
+- **Choosing a team.** A player joins a team (`team`), or takes the first free seat. A player may move to a free seat of the other team. The lobby lists a Two-Headed Giant table with its teams ("Team 1: ada and an open seat · Team 2: bob and a bot"), and its page shows the seats by team, with "Join Team 2" or "Move to Team 1".
+- **Decks.** Each deck is a Legacy deck, checked as at a Legacy table by the table's rules (casual by default; "Cards not legal in Legacy" is Legacy's legality). Two-Headed Giant Constructed has no sideboard (MTR 9.5): a deck's stays out of the game. A table refusing banned cards also refuses Erayo, Soratami Ascendant, banned in Two-Headed Giant itself (MTR 9.5); SysOp's decks play whatever the rules say, as everywhere.
+- **The team's decks** follow Unified Deck Construction (MTR 8.4): no two decks on a team may hold the same card, by English name, except basic lands. Checked when a player gets ready, against their teammate's deck as it stands: a refusal (`422 team_decks`) names the shared cards to the player, whose teammate may see them in the game's hands anyway (810.5): "Your deck and ada's share Lightning Bolt. In Two-Headed Giant teammates' decks may share only basic lands: one of you needs another deck." Changing deck or team makes the player, and the teammate they then have, not ready again, so two teammates who are both ready were checked together. Bots get one of the engine's four Legacy fixture decks, a different one each, sharing no card with their teammate's deck.
+- **Readiness and the start follow the teams.** The host starts once every player's seat is taken and every other player is ready, as at any table. At the start every deck is bound and checked again, and each team's two decks together (`409 team_decks`): the host's own team is told the cards, another team is named without its cards ("bob's and dan's decks share a card…"), and both of its players are made not ready.
+- **Conceding is the team's** (810.8b: "If a player concedes, their team leaves the game immediately. That team loses the game."). One player's concession loses the game for their team, and with two teams the game ends at once with the other team's win. The game screen says so before a player concedes ([the game screen](game-screen.md)).
+- **Away players.** The vote works as at any table: the other players still in the game vote, the teammate among them, and a majority removes the away player. A removal concedes the seat in the engine, so in Two-Headed Giant the away player's team loses. A player whose teammate is a bot is voted on by the other team's players alone.
+- **Results.** The engine's result names the winning team (`winner_seats`). Every player of the winning team counts a win, and each is paid for each seat of the other team, a player by their wins and a bot by its skill, under their own daily limits ([wins](progression.md#wins-and-levels), [tokens](tokens.md)); a teammate is never a seat beaten. Each player's quests, achievements and record count their own result, with the other team as their opponents ([quests and records](quests.md#results)).
+- **Chat.** The table chat's allies channel is the team's, fixed for the whole game ([the team's channel](chat.md#the-teams-channel-v051)).
+- **Rematch.** A Two-Headed Giant table's rematch keeps the teams: every player keeps their seat, and bots take the seats bots or removed players held ([rematches](queues.md#rematches)).
+
 ## Routes
 
 | Route | What |
 | --- | --- |
 | `GET /api/v1/tables` | Open tables, newest first: the public ones and your own (SysOp: every one) |
-| `POST /api/v1/tables` | Open a table: `format`, `seats` (2 in Legacy, 2–4 in Commander), `bots`, `bot_skill`, `turn_cap`, `visibility`, `rules` (since v0.4.5: `{"banned": bool, "not_legal": bool}`, both true by default), `best_of` (since v0.5.0: 1, or 3 in Legacy), `deck_id` |
-| `GET /api/v1/tables/{code}` | A table by its invite code: its rules, its seats (handles, portraits, ready), your own deck, and its game once started (for its players and SysOp) |
-| `POST /api/v1/tables/{code}/join` | Take the first free seat with `deck_id` |
-| `PATCH /api/v1/tables/{code}/seat` | Change `deck_id`, or `ready` |
+| `POST /api/v1/tables` | Open a table: `format` (since v0.5.1 also `two_headed_giant`), `seats` (2 in Legacy, 2–4 in Commander, 4 in Two-Headed Giant), `bots`, `bot_teammate` (since v0.5.1, Two-Headed Giant: one of the bots is your teammate), `bot_skill`, `turn_cap`, `visibility`, `rules` (since v0.4.5: `{"banned": bool, "not_legal": bool}`, both true by default), `best_of` (since v0.5.0: 1, or 3 in Legacy), `deck_id` |
+| `GET /api/v1/tables/{code}` | A table by its invite code: its rules, its seats (handles, portraits, ready, since v0.5.1 each seat's `team`), your own deck, and its game once started (for its players and SysOp) |
+| `POST /api/v1/tables/{code}/join` | Take the first free seat with `deck_id`, or since v0.5.1 the first free seat of `team` (0 or 1) |
+| `PATCH /api/v1/tables/{code}/seat` | Change `deck_id`, `ready`, or since v0.5.1 `team` |
 | `POST /api/v1/tables/{code}/leave` | Leave; the host closes the table |
 | `POST /api/v1/tables/{code}/start` | The host starts the game |
 
 Every route needs `games.play`, and seats need `decks.edit`. Refusals:
 - 404 for a code no table has.
-- 409 `at_a_table` (another open table), `in_queue` (since v0.5.0: waiting in a public queue), `game_limit` (no room for another running game, naming the player at the start), `table_full`, `table_closed`, `already_seated`, `not_seated`, `not_ready`, `table_not_full`, `deck_not_playable` (another player's deck at the start), `player_unavailable`, `table_changed` (a player left as it started).
+- 409 `at_a_table` (another open table), `in_queue` (since v0.5.0: waiting in a public queue), `game_limit` (no room for another running game, naming the player at the start), `table_full`, `table_closed`, `already_seated`, `not_seated`, `not_ready`, `table_not_full`, `deck_not_playable` (another player's deck at the start), `player_unavailable`, `table_changed` (a player left as it started); since v0.5.1 `team_full` (no free seat in that team) and, at the start, `team_decks` (a team's decks share a card).
 - 403 `not_host` for a start by anyone but the host.
-- 422 `invalid_table`, the practice table's deck refusals (`invalid_deck`, `deck_not_playable`), and since v0.4.5 `deck_not_allowed`: your deck holds cards the table's rules do not allow, named in the message.
+- 422 `invalid_table`, the practice table's deck refusals (`invalid_deck`, `deck_not_playable`), and since v0.4.5 `deck_not_allowed`: your deck holds cards the table's rules do not allow, named in the message; since v0.5.1 `team_decks` as you get ready: your deck and your teammate's share cards, named.
 - 429 `games_busy` and 503 as for practice games.
 
 Away players and votes go over the game's WebSocket: the `presence` message and the `vote` message ([games](games.md#the-websocket)).
@@ -92,6 +107,8 @@ Migration `0019_table_rules` (v0.4.5) adds each table's rules, `game_tables.allo
 
 Migration `0023_matches` (v0.5.0) adds `game_tables.best_of`, 1 for the tables already there, and the matches a best-of-three table plays ([matches](matches.md#data)).
 
+Migration `0026_two_headed_giant_tables` (v0.5.1) lets a table's format be `two_headed_giant` and adds `game_tables.bot_seats`, the seats its bots fill when they are not the last ones (null for every table already there). It also makes the Two-Headed Giant queue's places and invitations possible ([queues](queues.md#data)). It only adds. Going back deletes the Two-Headed Giant tables that never started, with their seats, and marks those that started as Legacy tables; their games stay recorded as Two-Headed Giant games.
+
 ## Verification
 
 - **API tests (`tests/test_tables.py`).** Against a fake engine with a token and a view for each player's seat:
@@ -104,6 +121,13 @@ Migration `0023_matches` (v0.5.0) adds `game_tables.best_of`, 1 for the tables a
   - every player's limit of running games at the start, and another player's deck named by its player only;
   - a concession freeing the seat, SysOp observing the first seat and closing, and the migration going back;
   - since v0.4.5, the table's rules: a tournament table refusing the host's banned deck, a join and a deck change with the cards named, a deck edited after it sat down stopped at the start with its player named only, the host's own named with its cards, casual by default, one option alone, SysOp's deck at any table, and the tables open at the upgrade becoming casual.
+- **API tests (`tests/test_team_play.py`, v0.5.1).** Against the tables' fake engine taught that a concession is the team's:
+  - a four-player table from the lobby: the seats by team, a Commander deck refused, a player choosing a team and another taking the first free seat, a full team refused, the lobby listing the teams without a deck, Unified Deck Construction as a player gets ready with the shared card named, the host's deck change making only her teammate not ready, the start sending four Legacy decks without sideboards;
+  - the fixed team channel at that game: the teams as the alliances, offering or ending one refused, a team's lines received by its other player and by no connection of the other team, a tab connecting late told its own team's lines only, SysOp watching and its reader reading both;
+  - one player conceding for the team: both winners counting a win and paid 50 for each player of the other team, nothing for the losers, each player's result with the other team as opponents, both earning "First Victory", a replayed end and the win and pay counted again adding nothing, and the history marking the teammate;
+  - a bot teammate and a player and bot opposite: bots dealt fixture decks their teammate shares no card with, the team channel refused beside a bot, the winner paid for a player and a bot of skill 5; two players against two bots, both paid for the bots and neither counted as beating a player; refused configurations;
+  - the start checking each team again after two players edited their decks: the host told whose decks, not which card, and both made not ready;
+  - Erayo refused at a tournament table, SysOp's deck aside; a rematch keeping the teams, with a bot in a removed player's seat.
 - **Engine (`CommanderGameTest`).** A concession that leaves one player ends the game without that player's answer.
 - **Web tests.** The lobby, a table's page (seating, ready, following the start into the game, the host's start), the away players and their votes, and the game screen at a table (handles, the vote, the tokens paid, the way back to the lobby). Since v0.4.5: each table's rules as tags, the host's two boxes and Tournament rules, and the decks the rules do not take greyed with the reason, in the lobby and on a table's page.
 - **Browser journey (`web/e2e/tables.spec.ts`).** SysOp and a second account in two browsers: SysOp opens a Legacy table, the player finds it in the lobby, joins by its invite link and gets ready, and SysOp starts. Both play their own seats for a few turns, the player concedes, and both see the result, SysOp with the 50 tokens the win paid. Every frame of each browser is checked for the other's concealed cards. It needs the engine, SysOp and `CD_E2E_PLAYER_SESSION` from `scripts/e2e_player.py`.

@@ -203,7 +203,7 @@ test.describe("a human table in two browsers", () => {
         host.getByRole("heading", { name: "Sit down with other players." }),
       ).toBeVisible();
       const form = host.getByRole("region", { name: "Open a table" });
-      await form.getByRole("radio", { name: /Legacy/ }).check();
+      await form.getByRole("radio", { name: /^Legacy/ }).check();
       await form.getByLabel("Your deck").selectOption({
         label: `Table host ${stamp}`,
       });
