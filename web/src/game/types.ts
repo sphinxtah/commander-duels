@@ -174,10 +174,15 @@ export interface ManaPool {
 export interface PlayerView {
   seat: Seat;
   name: string;
+  /** Two-Headed Giant (v0.5.0): 0 for seats 0 and 1, 1 for seats 2 and 3; teammates share one
+   * life total, so both show the team's. Null or missing in other games. */
+  team?: number | null;
   life: number;
   counters: Record<string, number>;
   library_count: number;
   hand_count: number;
+  /** A teammate's hand, shown to its teammate only (Two-Headed Giant); null for everyone else. */
+  hand?: CardView[] | null;
   graveyard: CardView[];
   exile: CardView[];
   mana_pool: ManaPool;
@@ -256,6 +261,8 @@ export interface GameResultView {
     | "humans_eliminated"
     | "error";
   winner_seat: Seat | null;
+  /** Every winning seat (v0.5.0): in Two-Headed Giant the winning team. */
+  winner_seats?: Seat[];
   draw: boolean;
   conceded_seats: Seat[];
   turns: number;
@@ -271,7 +278,7 @@ export interface LogLine {
 }
 
 export interface SeatSettings {
-  format: "legacy" | "commander";
+  format: "legacy" | "commander" | "two_headed_giant";
   rules_profile: string;
   seats: { seat: Seat; player: "human" | "bot"; deck: string | null }[];
   skill: number;

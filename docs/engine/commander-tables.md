@@ -151,7 +151,7 @@ Results are in [the release notes](../releases/0.0.4.md) and [verification](../v
 
 ## Open items
 
-- **Two-Headed Giant (FMT08–FMT10).** See [the feasibility note](two-headed-giant.md).
+- **Two-Headed Giant (FMT08–FMT10).** See [the feasibility note](two-headed-giant.md). Since v0.5.0 an early practice game, on a patched XMage.
 - **AI hidden information (AI02).** Unchanged here; fixed in v0.3.1 ([fair bots](fair-bots.md)).
 - **Lobbies and settings.** Readiness (NET02–NET03) and Rule Zero settings (FMT03–FMT04) are not built.
 - **Prompt families.** Only choices longer than 64 entries (naming a card) are still `unsupported`.

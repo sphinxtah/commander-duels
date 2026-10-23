@@ -183,7 +183,10 @@ def outcome_of(result: dict[str, object] | None, seat: GameSeat) -> Outcome:
     winner = found.get("winner_seat")
     kind = found.get("kind")
     if kind == "completed" and isinstance(winner, int):
-        return "win" if winner == seat.seat else "loss"
+        # A team wins together (Two-Headed Giant, v0.5.0): every seat of winner_seats won.
+        team = found.get("winner_seats")
+        won = seat.seat in team if isinstance(team, list) and team else winner == seat.seat
+        return "win" if won else "loss"
     conceded = found.get("conceded_seats")
     if (
         kind == "humans_eliminated"

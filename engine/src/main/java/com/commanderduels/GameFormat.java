@@ -3,6 +3,7 @@ package com.commanderduels;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import mage.cards.decks.Deck;
@@ -34,11 +35,18 @@ import mage.game.mulligan.MulliganType;
  * follow the table, as the Comprehensive Rules do: a two-player game is not multiplayer, so the
  * starting player skips the first draw and no mulligan is free (rules 103.8a and 103.5c); with three
  * or four players nobody skips the first draw and each player's first mulligan is free.
+ *
+ * <p>Two-Headed Giant (since v0.5.0, early) seats four players in turn order, seats 0 and 1 against
+ * seats 2 and 3, with Legacy-legal decks: see {@link TwoHeadedGiant}. Each deck is checked here on
+ * its own; the team's deck rule (no card in both teammates' decks) is the API's, which builds the
+ * teams.
  */
 enum GameFormat {
     LEGACY("legacy", "Legacy", 2, 2, LegacyDuel.DECKS, Legacy::new),
     COMMANDER("commander", "Commander", 2, 4, List.of("commander-mono-white-soldiers", "commander-mono-blue-flyers",
-        "commander-mono-red-raiders", "commander-mono-green-stompers"), Commander::new);
+        "commander-mono-red-raiders", "commander-mono-green-stompers"), Commander::new),
+    TWO_HEADED_GIANT("two_headed_giant", "Two-Headed Giant", 4, 4, List.of("legacy-mono-red-burn",
+        "legacy-mono-green-creatures", "legacy-mono-white-weenie", "legacy-mono-blue-skies"), Legacy::new);
 
     static final int COMMANDER_START_LIFE = 40;
     private static final int START_HAND = 7;
@@ -95,12 +103,35 @@ enum GameFormat {
         if (this == LEGACY) {
             return "legacy_two_player_duel";
         }
+        if (this == TWO_HEADED_GIANT) {
+            return "two_headed_giant_legacy";
+        }
         return seats == 2 ? "commander_two_seat" : "commander_free_for_all";
     }
 
-    /** XMage's range of influence: everyone at a Commander table, as XMage's own Commander tables use. */
+    /**
+     * XMage's range of influence: everyone at a Commander table, as XMage's own Commander tables
+     * use, and at a Two-Headed Giant table.
+     */
     RangeOfInfluence range() {
         return this == LEGACY ? RangeOfInfluence.ONE : RangeOfInfluence.ALL;
+    }
+
+    /** Whether seats play in teams: seats 0 and 1 against seats 2 and 3. */
+    boolean teams() {
+        return this == TWO_HEADED_GIANT;
+    }
+
+    /** The team of a seat, or null outside team formats. */
+    Integer teamOf(int seat) {
+        return teams() ? seat / 2 : null;
+    }
+
+    /** Names the teams in a team game, once its players are seated; nothing in other formats. */
+    void seatTeams(Game game, List<UUID> seatIds) {
+        if (game instanceof TwoHeadedGiant giant) {
+            giant.setTeams(List.of(seatIds.subList(0, 2), seatIds.subList(2, 4)));
+        }
     }
 
     /** A new game that stops at the untap step after {@code turnCap} turns. */
@@ -109,7 +140,10 @@ enum GameFormat {
             return LegacyDuel.newGame(turnCap);
         }
         Game game;
-        if (seats == 2) {
+        if (this == TWO_HEADED_GIANT) {
+            // 103.5c: a multiplayer game, so each player's first mulligan is free.
+            game = new TwoHeadedGiant(MulliganType.LONDON.getMulligan(1), START_HAND);
+        } else if (seats == 2) {
             game = new CommanderDuel(MultiplayerAttackOption.LEFT, RangeOfInfluence.ALL,
                 MulliganType.LONDON.getMulligan(0), COMMANDER_START_LIFE, START_HAND);
         } else {
@@ -126,6 +160,12 @@ enum GameFormat {
     Match newMatch(String name, int seats) {
         if (this == LEGACY) {
             return LegacyDuel.newMatch(name);
+        }
+        if (this == TWO_HEADED_GIANT) {
+            var options = new MatchOptions(name, "Two-Headed Giant", false);
+            options.setDeckType("Constructed - Legacy");
+            options.setWinsNeeded(1);
+            return new TwoHeadedGiant.Match(options);
         }
         var options = new MatchOptions(name, seats == 2 ? "Commander Two Player Duel" : "Commander Free For All",
             false);

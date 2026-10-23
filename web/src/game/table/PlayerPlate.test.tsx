@@ -487,3 +487,39 @@ describe("alliances on the plates (v0.4.4)", () => {
     }
   });
 });
+
+describe("a Two-Headed Giant teammate's plate (v0.5.0)", () => {
+  function giant(): TableFixture {
+    const f = tableFixture("four");
+    f.snapshot.settings.format = "two_headed_giant";
+    const view = f.snapshot.view!;
+    for (const p of [view.you!, ...view.opponents])
+      p.team = Math.floor(p.seat / 2);
+    const mate = view.opponents[0];
+    mate.hand = [
+      { ...view.hand[0], id: "o00000000000000a1" },
+      { ...view.hand[0], id: "o00000000000000a2", name: "Grizzly Bears" },
+    ];
+    mate.hand_count = 2;
+    return f;
+  }
+
+  it("is marked as your teammate's, with shared life and its hand named", () => {
+    plate(giant(), 1);
+    expect(screen.getByText("Your teammate")).toBeInTheDocument();
+    expect(screen.getByText("Teammate · shared life")).toBeInTheDocument();
+    const hand = screen.getByRole("img", {
+      name: /^2 cards in your teammate's hand: /,
+    });
+    expect(hand).toHaveAttribute(
+      "title",
+      expect.stringMatching(/^Your teammate's hand: .+, Grizzly Bears$/),
+    );
+  });
+
+  it("is an opponent's as at any table for the other team", () => {
+    plate(giant(), 2);
+    expect(screen.queryByText("Teammate · shared life")).toBeNull();
+    expect(screen.getByRole("img", { name: /^\d+ cards in hand$/ })).toBeVisible();
+  });
+});

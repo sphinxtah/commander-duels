@@ -6,7 +6,7 @@ v0.0.6 routes games through the API. A signed-in player starts a practice game a
 
 Agreed on 2026-10-19 at the start of v0.0.6:
 - **Transport.** WebSocket now, as the scope's protocol, not long-polling first.
-- **Formats.** Legacy against one bot, and Commander against one to three bots.
+- **Formats.** Legacy against one bot, and Commander against one to three bots. Since v0.5.0, early: Two-Headed Giant with a bot teammate against two bots.
 - **SysOp's any-card decks.** In v0.0.6: a deck list on SysOp's practice game, any card the engine implements.
 - **Persistence.** Games, seats, owners and results in PostgreSQL now; engine seat tokens stay in the API's memory.
 - **Small fix.** PostgreSQL's host port is configurable (`CD_DB_PORT`).
@@ -44,7 +44,7 @@ POST /api/v1/practice-games
 
 | Field | Meaning |
 | --- | --- |
-| `format` | `legacy` (one bot, the default) or `commander` (one to three bots, three by default) |
+| `format` | `legacy` (one bot, the default), `commander` (one to three bots, three by default) or, since v0.5.0, `two_headed_giant` (three bots: your teammate, then the two opponents; [below](#two-headed-giant-v050-early)) |
 | `deck` | Your fixture deck. Without one, the engine picks the format's first unused fixture |
 | `deck_id` | Since v0.2.0: one of your own decks instead ([decks](decks.md#at-the-practice-table)). The API stores a revision of it and sends the engine its main deck and commanders |
 | `deck_list` | SysOp only (`cards.any`): a deck list as text, below |
@@ -64,6 +64,16 @@ Refusals:
 - 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`). For an own deck: `invalid_deck` when it is not one of yours or not of the format, `deck_not_playable` until it is legal and every card is playable, and since v0.4.5 `deck_not_allowed` when it holds cards the game's `rules` do not allow, named in the message. SysOp's decks need only cards in the game (until v0.4.5, cards the engine implements). A deck list naming a card not in the game gets `cards_not_playable` (v0.4.5). Since v0.4.0, a deck holding Godlike custom cards the running engine has not loaded gets `custom_not_loaded` (their names in `names`), and a bot seat holding one gets `custom_cards_for_bots` ([progression](progression.md#playing-them-v040)).
 - 429 `games_busy` with `Retry-After: 30` when the API runs `CD_GAMES_MAX` games (default 2) or the engine is full (`CD_ENGINE_MAX_GAMES`). Games still being created count toward `CD_GAMES_MAX`, so requests at the same moment cannot all pass the check.
 - 503 `games_unavailable` without a service token; 503 `engine_unavailable` when the engine does not answer.
+
+### Two-Headed Giant (v0.5.0, early)
+
+You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the engine's patched XMage ([Two-Headed Giant](engine/two-headed-giant.md)). The team takes its turns together and shares one life total of 30.
+- **Decks.** Legacy decks: your own Legacy deck (`deck_id`), and for SysOp a fixture or a deck list. They are checked as Legacy decks, by the game's `rules`, and the game records Legacy's format version. A deck's sideboard stays out: Two-Headed Giant Constructed has none (MTR 9.5). One game only (`best_of` 1).
+- **Teams** (`api/teams.py`). The Magic Tournament Rules for Two-Headed Giant Constructed (effective 2026-02-27, sections 9.5 and 8.4) let no two decks on a team hold the same card, by English name, except cards with the basic supertype. A team whose decks share a card gets 422 `team_decks`, naming the cards. Section 9.5 also bans Erayo, Soratami Ascendant: a game whose rules refuse banned cards refuses it (`deck_not_allowed`); casual rules allow it.
+- **Bots.** A bot with no deck chosen plays one of the engine's four Legacy fixture decks (mono-red burn, mono-green creatures, mono-white weenie, mono-blue skies), which share no card. The API deals them in that order, giving the teammate the first one that shares no card with your deck. If every free fixture shares a card with it, the teammate's deck must be chosen (`team_decks`).
+- **Results.** The engine's result names the winning team (`winner_seats`); `winner_seat` is its first seat, which is yours when your team wins. Your win counts once, and the tokens pay for the two opponents, never for your teammate.
+
+`GET /api/v1/formats` lists Two-Headed Giant as available, with `early: true`.
 
 ### Reading and ending games
 
@@ -195,6 +205,8 @@ Migration `0006_decks` (v0.2.0) adds the deck revision to each seat played with 
 Migration `0009_tables` (v0.4.0) adds the human tables and their seats, the `table` kind of game, and when and why a seat left a game that went on ([human tables](tables.md#data)).
 
 Migration `0022_queues` (v0.5.0) adds each practice game's request (`games.settings`, as `POST /api/v1/practice-games` took it), which its Rematch plays again, and the public queues and rematches ([queues and rematches](queues.md#data)). A public queue's game is a practice game for a player alone with bots, and a table's game for two players or more.
+
+Migration `0024_two_headed_giant` (v0.5.0) lets a game's format be `two_headed_giant`. Its downgrade turns those games into Legacy ones, which their decks are, keeping their wins and tokens. Since v0.5.0 a game's result also keeps `winner_seats`; a result from an older engine gets the winner alone.
 
 One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Recovery and replay journals (NET08–NET09) remain later work.
 

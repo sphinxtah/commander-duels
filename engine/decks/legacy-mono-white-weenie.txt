@@ -1,0 +1,13 @@
+// Commander Duels engine fixture: mono-white weenie with lifelink, 60 cards, Legacy-legal (since v0.5.0, for Two-Headed Giant).
+// Simple cards only, no name shared with another Legacy fixture. Keep card lines contiguous: XMage's text importer treats a blank line as the sideboard switch.
+20 Plains
+4 Eager Cadet
+4 Squire
+4 Sanctuary Cat
+4 Healer's Hawk
+4 Veteran Cavalier
+4 Knight of Meadowgrain
+4 White Knight
+4 Ajani's Pridemate
+4 Glorious Charge
+4 Moment of Heroism

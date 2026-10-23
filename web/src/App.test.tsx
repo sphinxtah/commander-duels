@@ -127,6 +127,7 @@ const formats: Format[] = [
     default_seats: 4,
     description: "Build around your commander.",
     available: false,
+    early: false,
   },
   {
     id: "legacy",
@@ -135,6 +136,7 @@ const formats: Format[] = [
     default_seats: 2,
     description: "Two players.",
     available: false,
+    early: false,
   },
   {
     id: "two_headed_giant",
@@ -142,7 +144,9 @@ const formats: Format[] = [
     seats: [4],
     default_seats: 4,
     description: "Two teams of two.",
-    available: false,
+    // The server's answer since v0.5.0: open against the bots, and early.
+    available: true,
+    early: true,
   },
 ];
 const alice: Me = {
@@ -1064,7 +1068,7 @@ describe("what this version offers", () => {
     expect(screen.queryByText(/FRAMEWORK/)).toBeNull();
   });
 
-  it("the Play page opens Commander and Legacy, and shows Two-Headed Giant as coming soon", async () => {
+  it("the Play page opens Commander and Legacy, and Two-Headed Giant as early (v0.5.0)", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
     window.location.hash = "#play";
     render(<App />);
@@ -1074,7 +1078,8 @@ describe("what this version offers", () => {
       document.querySelector<HTMLElement>(`[data-format="${id}"]`)!;
     expect(card("commander")).toHaveTextContent("Open to play");
     expect(card("legacy")).toHaveTextContent("Open to play");
-    expect(card("two_headed_giant")).toHaveTextContent("Coming soon");
+    expect(card("two_headed_giant")).toHaveTextContent("Early");
+    expect(card("two_headed_giant")).not.toHaveTextContent("Coming soon");
 
     // The format's dialog; the page's other one is Report a problem's (v0.4.1).
     const dialog = document.querySelector(
@@ -1091,10 +1096,12 @@ describe("what this version offers", () => {
     await waitFor(() => expect(dialog).toHaveTextContent("Legacy"));
     expect(dialog).toHaveTextContent("OPEN TO PLAY");
     fireEvent.click(about("two_headed_giant"));
-    await waitFor(() => expect(dialog).toHaveTextContent("COMING SOON"));
+    await waitFor(() => expect(dialog).toHaveTextContent("EARLY"));
     expect(dialog).toHaveTextContent("4 seats. Default table: 4 players.");
-    expect(dialog).toHaveTextContent("Two-Headed Giant is coming soon.");
-    expect(dialog).not.toHaveTextContent(/planned/i);
+    expect(dialog).toHaveTextContent(
+      "An early version of Two-Headed Giant: you and a bot teammate against two bots",
+    );
+    expect(dialog).not.toHaveTextContent(/coming soon|planned/i);
   });
 });
 

@@ -232,6 +232,7 @@ def closed() -> dict[str, Any]:
     return {
         "kind": "closed",
         "winner_seat": None,
+        "winner_seats": [],
         "draw": False,
         "turns": 1,
         "conceded_seats": [],
@@ -464,7 +465,7 @@ def test_a_practice_game_belongs_to_its_owner(
     ada, bea = Account(client, "ada"), Account(client, "bea")
     options = ada.get("/api/v1/practice-games/options").json()
     assert options["deck_lists"] is False
-    assert [f["id"] for f in options["formats"]] == ["legacy", "commander"]
+    assert [f["id"] for f in options["formats"]] == ["legacy", "commander", "two_headed_giant"]
 
     refused = ada.post("/api/v1/practice-games", {}, csrf=False)
     assert refused.json()["code"] == "csrf_failed"
@@ -639,6 +640,8 @@ def test_results_are_recorded_and_restarts_interrupt(
     assert finished["result"] == {
         "kind": "completed",
         "winner_seat": 1,
+        # The fake engine names no winning team, as engines before v0.5.0 did.
+        "winner_seats": [1],
         "draw": False,
         "turns": 2,
         "conceded_seats": [0],

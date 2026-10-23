@@ -29,7 +29,9 @@ def test_framework_is_live_and_practice_play_cards_and_decks_are_available(tmp_p
         formats = client.get("/api/v1/formats").json()
         assert formats[0]["seats"] == [2, 3, 4]
         playable = {item["id"] for item in formats if item["available"]}
-        assert playable == {"commander", "legacy"}
+        # Two-Headed Giant since v0.5.0, as an early practice game against bots.
+        assert playable == {"commander", "legacy", "two_headed_giant"}
+        assert [item["id"] for item in formats if item["early"]] == ["two_headed_giant"]
         assert client.get("/api/v1/me").status_code == 401
         missing = client.get("/api/v1/missing")
         assert missing.status_code == 404

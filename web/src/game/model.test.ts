@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playerName, resultText } from "./model";
+import { playerName, resultText, teammateOf } from "./model";
 import type { GameView, PlayerView } from "./types";
 
 function player(seat: number, name: string): PlayerView {
@@ -74,5 +74,44 @@ describe("the result in words", () => {
     expect(playerName(view, 0)).toBe("You");
     expect(playerName(view, 0, true)).toBe("Alice");
     expect(playerName(view, 1, true)).toBe("Bot 2");
+  });
+});
+
+describe("Two-Headed Giant (v0.5.0)", () => {
+  // Seat 0's view: seat 1 is its teammate; seats 2 and 3 the other team.
+  const team = (seat: number, name: string): PlayerView => ({
+    ...player(seat, name),
+    team: Math.floor(seat / 2),
+    life: 30,
+  });
+  const giant: GameView = {
+    ...view,
+    you: team(0, "Alice"),
+    opponents: [team(1, "Bot 2"), team(2, "Bot 3"), team(3, "Bot 4")],
+  };
+  const teamWon = (winners: number[]) => ({
+    ...won(winners[0]),
+    winner_seats: winners,
+  });
+
+  it("knows the viewer's teammate", () => {
+    expect(teammateOf(giant)).toBe(1);
+    expect(teammateOf(view)).toBeNull();
+    expect(teammateOf({ ...giant, you: null })).toBeNull();
+  });
+
+  it("tells a team's win to both teammates", () => {
+    expect(resultText(giant, 0, teamWon([0, 1]))).toEqual({
+      title: "Victory",
+      detail: "Your team won in 12 turns.",
+    });
+    expect(resultText(giant, 1, teamWon([0, 1]))).toEqual({
+      title: "Victory",
+      detail: "Your team won in 12 turns.",
+    });
+    expect(resultText(giant, 0, teamWon([2, 3]))).toEqual({
+      title: "Defeat",
+      detail: "Bot 3 and Bot 4 won in 12 turns.",
+    });
   });
 });
