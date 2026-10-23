@@ -1449,11 +1449,13 @@ class PixiTableScene implements TableScene {
         );
         if (node.key === "more:hand") view.root.zIndex = 3_400_000;
       }
+      // Your hand's "+N" is a pile of backs at its fan's end; a Two-Headed Giant teammate's
+      // (v0.5.1) is a plate on its fan's last card, as a pile's is.
       view.update(
         node,
         node.opens.kind === "stack"
           ? "diamond"
-          : node.opens.kind === "hand"
+          : node.key === "more:hand"
             ? "hand"
             : "plate",
       );
@@ -1751,10 +1753,19 @@ class PixiTableScene implements TableScene {
             if (event.emblem === "block") caption = "Block!";
             if (event.emblem === "turn") {
               const active = players.find((p) => p.seat === model.activeSeat);
+              // Two-Headed Giant (v0.5.1): a team takes its turn together (805.4a).
+              const team = active?.team ?? null;
+              const watching = model.observing || model.viewSeat === null;
               caption =
-                active && active.seat === model.viewSeat && !model.observing
+                active &&
+                !watching &&
+                (active.seat === model.viewSeat || active.teammate)
                   ? "Your Turn"
-                  : `${active?.name ?? "Next"}’s Turn`;
+                  : team !== null
+                    ? watching
+                      ? `Team ${team + 1}’s Turn`
+                      : "Other Team’s Turn"
+                    : `${active?.name ?? "Next"}’s Turn`;
             }
             this.showEmblem(event.emblem, caption, layout, "emblem");
           }

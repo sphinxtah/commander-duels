@@ -471,9 +471,250 @@ describe("Two-Headed Giant (v0.5.0)", () => {
   it("has no teams at other tables", () => {
     const m = fixtureModel("four");
     expect(m.teammateSeat).toBeNull();
-    expect(m.opponents.every((p) => !p.teammate && p.team === null)).toBe(
-      true,
-    );
+    expect(
+      m.opponents.every(
+        (p) =>
+          !p.teammate &&
+          p.team === null &&
+          p.teamPill === null &&
+          p.teamPoison === null &&
+          p.hand === null,
+      ),
+    ).toBe(true);
     expect(m.opponents[0].title).not.toBe("Your teammate");
+  });
+});
+
+describe("Two-Headed Giant at the table (v0.5.1)", () => {
+  /** The giant fixture from another seat's view: what the engine sends that seat, its
+   * teammate's hand included and every other hand a count. */
+  function fromSeat(seat: number): TableFixture {
+    const f = tableFixture("giant");
+    const v = f.snapshot.view!;
+    const everyone: PlayerView[] = [v.you!, ...v.opponents].map((p) => ({
+      ...p,
+      hand: null,
+    }));
+    const mate = everyone.find(
+      (p) => p.team === Math.floor(seat / 2) && p.seat !== seat,
+    )!;
+    mate.hand = Array.from({ length: mate.hand_count }, (_, i) => ({
+      ...CARD,
+      id: `mate-${seat}-${i}`,
+    }));
+    const you = everyone.find((p) => p.seat === seat)!;
+    f.snapshot = {
+      ...f.snapshot,
+      prompt: null,
+      view: {
+        ...v,
+        seat,
+        you,
+        opponents: everyone.filter((p) => p !== you),
+        hand: [],
+      },
+    };
+    f.seat = seat;
+    return f;
+  }
+  const CARD = {
+    hidden: false,
+    name: "Lightning Bolt",
+    mana_cost: "{R}",
+    type_line: "Instant",
+    power: null,
+    toughness: null,
+    rules: ["Lightning Bolt deals 3 damage to any target."],
+  };
+
+  it("shows the teammate's hand card for card, face up and never playable", () => {
+    const f = tableFixture("giant");
+    const theirs = f.snapshot.view!.opponents[0].hand!;
+    // Even a prompt naming the teammate's cards gives them no options on the table.
+    f.snapshot.prompt!.options.push(
+      {
+        id: "99",
+        action: "cast",
+        label: null,
+        object_id: theirs[0].id,
+        seat: null,
+        selected: false,
+      },
+      {
+        id: "98",
+        action: "choose",
+        label: null,
+        object_id: theirs[1].id,
+        seat: null,
+        selected: false,
+      },
+    );
+    const m = model(f);
+    const mate = m.opponents[0];
+    expect(mate.seat).toBe(1);
+    expect(mate.hand).toEqual(theirs.map((card) => `hand:${card.id}`));
+    for (const [i, key] of mate.hand!.entries()) {
+      const card = m.cards.get(key)!;
+      expect(card).toMatchObject({
+        zone: "hand",
+        ownerSeat: 1,
+        controllerSeat: 1,
+        offered: [],
+        mark: "none",
+        drag: null,
+        located: { id: theirs[i].id, zone: "hand", seat: 1 },
+      });
+      expect(card.card).toEqual(theirs[i]);
+      expect(card.label).toBe(cardLabel(card.card, card.located));
+    }
+    expect(m.cards.get(mate.hand![0])!.label).toBe("Lightning Bolt, Instant");
+    // Your own hand stays yours alone.
+    expect(m.hand).toHaveLength(5);
+    expect(m.hand.some((key) => mate.hand!.includes(key))).toBe(false);
+    expect(m.anchored!.hand).toBeNull();
+    expect(m.opponents.slice(1).every((p) => p.hand === null)).toBe(true);
+  });
+
+  it("sits each viewer's teammate first and the other team beside it", () => {
+    expect(fixtureModel("giant").opponents.map((p) => p.seat)).toEqual([
+      1, 2, 3,
+    ]);
+    for (const [seat, order] of [
+      [0, [1, 2, 3]],
+      [1, [0, 2, 3]],
+      [2, [3, 0, 1]],
+      [3, [2, 0, 1]],
+    ] as const) {
+      const m = model(fromSeat(seat));
+      expect(
+        m.opponents.map((p) => p.seat),
+        `seat ${seat}`,
+      ).toEqual(order);
+      expect(m.teammateSeat).toBe(order[0]);
+      expect(m.opponents[0]).toMatchObject({ teammate: true });
+      expect(m.opponents[0].hand).toHaveLength(
+        m.opponents[0].player.hand_count,
+      );
+      const l = layoutTable(m, { expandedSeat: null, textScale: 1 });
+      expect(validateHits(l, m), `seat ${seat}`).toEqual([]);
+    }
+  });
+
+  it("marks every plate's team: to a player the teammate and the other team, to SysOp each team's number", () => {
+    const m = fixtureModel("giant");
+    expect(m.anchored!.teamPill).toBeNull();
+    expect(m.opponents.map((p) => p.teamPill)).toEqual([
+      { text: "Teammate", tone: "team" },
+      { text: "Other team", tone: "foe" },
+      { text: "Other team", tone: "foe" },
+    ]);
+    const sysop = fixtureModel("giantSysop");
+    expect(sysop.teammateSeat).toBeNull();
+    expect(
+      [sysop.anchored!, ...sysop.opponents].map((p) => [
+        p.seat,
+        p.teamPill?.text,
+        p.articleLabel,
+      ]),
+    ).toEqual([
+      [0, "Team 1", null],
+      [1, "Team 1", "Bot 2, seat 2, team 1"],
+      [2, "Team 2", "Bot 3, seat 3, team 2"],
+      [3, "Team 2", "Bot 4, seat 4, team 2"],
+    ]);
+    // SysOp sees what the watched seat sees: its teammate's hand too.
+    expect(sysop.opponents[0].hand).toHaveLength(6);
+    expect(sysop.opponents[0].title).toBe("Mono Red Burn");
+  });
+
+  it("shows a spectator every team by its number, and no hand", () => {
+    const f = tableFixture("giant");
+    const v = f.snapshot.view!;
+    f.snapshot = {
+      ...f.snapshot,
+      prompt: null,
+      view: {
+        ...v,
+        seat: null,
+        you: null,
+        opponents: [v.you!, ...v.opponents].map((p) => ({
+          ...p,
+          hand: null,
+        })),
+        hand: [],
+        priority: null,
+      },
+    };
+    f.seat = null;
+    f.role = "observer";
+    const m = model(f);
+    expect(m.anchored!.seat).toBe(0);
+    expect(m.opponents.map((p) => [p.seat, p.teamPill?.text, p.hand])).toEqual([
+      [1, "Team 1", null],
+      [2, "Team 2", null],
+      [3, "Team 2", null],
+    ]);
+    expect([...m.cards.values()].some((c) => c.zone === "hand")).toBe(false);
+  });
+
+  it("counts poison for the team and colours your team's portraits", () => {
+    const m = fixtureModel("giant");
+    expect(m.anchored!.teamPoison).toBe(0);
+    expect(m.opponents.map((p) => [p.teamPoison, p.sigil.grey])).toEqual([
+      [0, false],
+      [7, true],
+      [7, true],
+    ]);
+    const sysop = fixtureModel("giantSysop");
+    expect(sysop.opponents.map((p) => p.sigil.grey)).toEqual([
+      false,
+      true,
+      true,
+    ]);
+  });
+
+  it("draws a teammate's casts and attacks as the viewer's own", () => {
+    const f = tableFixture("giant");
+    const v = f.snapshot.view!;
+    const guide = v.battlefield.find(
+      (p) => p.controller_seat === 1 && p.card.name === "Goblin Guide",
+    )!;
+    guide.attacking = true;
+    const lions = v.battlefield.find((p) => p.card.name === "Savannah Lions")!;
+    v.stack = [
+      {
+        id: "s1",
+        kind: "spell",
+        controller_seat: 1,
+        name: "Lightning Bolt",
+        text: null,
+        hidden: false,
+        targets: [{ kind: "player", seat: 2, object_id: null, label: null }],
+      },
+      {
+        id: "s2",
+        kind: "spell",
+        controller_seat: 2,
+        name: "Shock",
+        text: null,
+        hidden: false,
+        targets: [],
+      },
+    ];
+    v.combat = [
+      {
+        attackers: [guide.id],
+        defender: { kind: "player", seat: 2, object_id: null, label: null },
+        blockers: [lions.id],
+        blocked: true,
+      },
+    ];
+    const m = model(f);
+    const owner = (key: string) => m.lines.find((l) => l.key === key)?.owner;
+    expect(owner("cast:s1")).toBe("viewer");
+    expect(owner("target:s1:0")).toBe("viewer");
+    expect(owner("cast:s2")).toBe("opponent");
+    expect(owner(`attack:battlefield:${guide.id}`)).toBe("viewer");
+    expect(owner(`block:battlefield:${lions.id}:0`)).toBe("opponent");
   });
 });

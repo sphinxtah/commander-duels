@@ -128,7 +128,9 @@ export const buildTableModel: BuildTableModel = (input) => {
   ];
 
   // The anchored player sits below: you, the owner SysOp observes, or for a spectator the
-  // lowest seat. The others go on top, left to right in turn order after the anchored seat.
+  // lowest seat. The others go on top, left to right in turn order after the anchored seat. In
+  // Two-Headed Giant (v0.5.1) the anchored player's teammate sits first, at the left, and the
+  // other team beside it: each team together, whichever seat the viewer holds.
   const everyone = [...(view.you ? [view.you] : []), ...view.opponents];
   const anchoredView: PlayerView | null =
     view.you ??
@@ -136,12 +138,16 @@ export const buildTableModel: BuildTableModel = (input) => {
       ? view.opponents.reduce((a, b) => (b.seat < a.seat ? b : a))
       : null);
   const anchoredSeat = anchoredView?.seat ?? null;
+  const anchoredTeam = anchoredView?.team ?? null;
+  const sameTeam = (player: PlayerView | undefined) =>
+    anchoredTeam !== null && player?.team === anchoredTeam;
   const others = everyone
     .filter((p) => p !== anchoredView)
     .sort((a, b) => {
       const after = (seat: Seat) =>
         anchoredSeat === null || seat > anchoredSeat ? seat : seat + 1000;
-      return after(a.seat) - after(b.seat);
+      const team = (p: PlayerView) => (sameTeam(p) ? 0 : 1);
+      return team(a) - team(b) || after(a.seat) - after(b.seat);
     });
   const arrangement: Arrangement =
     everyone.length <= 2 ? "duel" : everyone.length === 3 ? "three" : "four";
@@ -219,6 +225,25 @@ export const buildTableModel: BuildTableModel = (input) => {
         ),
       )
     : [];
+  // A teammate's hand (Two-Headed Giant, 810.5; v0.5.1): the view carries it to the teammate
+  // alone, and SysOp observing sees what the watched seat sees. Its cards are shown, never
+  // played: they carry no options, whatever a prompt names.
+  const shownHands = new Map<Seat, string[]>();
+  for (const player of view.opponents)
+    if (player.hand && player !== anchoredView)
+      shownHands.set(
+        player.seat,
+        player.hand.map((card) =>
+          addCard(
+            "hand",
+            card,
+            { id: card.id, zone: "hand", seat: player.seat, card },
+            player.seat,
+            player.seat,
+            [],
+          ),
+        ),
+      );
   const permanentKey = new Map<PermanentView, string>();
   for (const permanent of view.battlefield)
     permanentKey.set(
@@ -376,9 +401,29 @@ export const buildTableModel: BuildTableModel = (input) => {
     const summary = summaryOf(seat);
     const kind = summary?.player ?? null;
     const self = viewSeat !== null && seat === viewSeat;
-    // Two-Headed Giant (v0.5.0): your teammate is marked as such, and life is the team's.
+    // Two-Headed Giant (v0.5.0): your teammate is marked as such, and life is the team's. Since
+    // v0.5.1 every plate says its team: the teammate's and the other team's to a player, the
+    // team's number to SysOp observing and to spectators; the anchored player's team is in
+    // colour, the other team grey, and poison is counted for the team (810.10a).
     const team = player.team ?? null;
     const teammate = seat === base.teammateSeat;
+    const ours = anchored || sameTeam(player);
+    const teamPill: TablePlayer["teamPill"] =
+      team === null
+        ? null
+        : youSeat === null
+          ? { text: `Team ${team + 1}`, tone: ours ? "team" : "foe" }
+          : anchored
+            ? null
+            : ours
+              ? { text: "Teammate", tone: "team" }
+              : { text: "Other team", tone: "foe" };
+    const teamPoison =
+      team === null
+        ? null
+        : everyone
+            .filter((p) => p.team === team)
+            .reduce((n, p) => n + (p.counters.poison ?? 0), 0);
     // Other seats' decks are private: only SysOp sees their names (design §23.4).
     const title = self
       ? deckTitle(summary?.deck)
@@ -428,7 +473,10 @@ export const buildTableModel: BuildTableModel = (input) => {
       kind,
       team,
       teammate,
-      sigil: { seed, grey: !anchored },
+      teamPill,
+      teamPoison,
+      hand: anchored ? null : (shownHands.get(seat) ?? null),
+      sigil: { seed, grey: !ours },
       portrait,
       active: view.active_seat === seat,
       priority: view.priority_seat === seat,
@@ -445,7 +493,15 @@ export const buildTableModel: BuildTableModel = (input) => {
         : null,
       articleLabel: anchored
         ? null
-        : `${player.name}, seat ${seat + 1}${teammate ? ", your teammate" : team !== null ? ", the other team" : ""}`,
+        : `${player.name}, seat ${seat + 1}${
+            team === null
+              ? ""
+              : youSeat === null
+                ? `, team ${team + 1}`
+                : teammate
+                  ? ", your teammate"
+                  : ", the other team"
+          }`,
       battlefieldLabel:
         seat === youSeat ? "Your battlefield" : `${player.name}'s battlefield`,
       units,
@@ -488,10 +544,14 @@ export const buildTableModel: BuildTableModel = (input) => {
           );
         });
 
-  // Curves: casts and targets from the stack, attacks and blocks from combat (§8.3).
+  // Curves: casts and targets from the stack, attacks and blocks from combat (§8.3). A
+  // teammate's are drawn as the viewer's own (v0.5.1): the team plays together.
   const lines: LineModel[] = [];
   const ownerOf = (seat: Seat | null): LineModel["owner"] =>
-    seat !== null && seat === anchoredSeat ? "viewer" : "opponent";
+    seat !== null &&
+    (seat === anchoredSeat || sameTeam(everyone.find((p) => p.seat === seat)))
+      ? "viewer"
+      : "opponent";
   for (const entry of stack) {
     const emphasis = entry.position === 0 ? "always" : "hover";
     const owner = ownerOf(entry.item.controller_seat);

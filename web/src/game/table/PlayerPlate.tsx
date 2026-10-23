@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { boxStyle, OptionMenu, useGameContext, useOptionMenu } from "../Board";
 import { CardFace } from "../Card";
 import { playerName, words } from "../model";
-import type { CardView, ManaPool, Seat } from "../types";
+import type { ManaPool, Seat } from "../types";
 import { AllianceControl, AlliancePills } from "./Alliance";
 import { MENU, diamondBox } from "./geometry";
 import { noteBlur, noteFocus } from "./pointer";
@@ -36,7 +36,8 @@ import styles from "./table.module.css";
 // and the board's Expand or Show button. Names, life and status are DOM text at every scale; the
 // scene draws the diamonds, the portrait or sigil and the counts' numerals unless the dom painter
 // does. A Planeswalker portrait (v0.3.1) is named in both painters. At a human table (v0.4.4) the
-// pills say the player's alliances, and another player's plate has its Alliance button.
+// pills say the player's alliances, and another player's plate has its Alliance button. In
+// Two-Headed Giant (v0.5.1) a pill says the player's team, and poison is the team's.
 
 const poolColours: [keyof ManaPool, string][] = [
   ["white", "W"],
@@ -46,13 +47,6 @@ const poolColours: [keyof ManaPool, string][] = [
   ["green", "G"],
   ["colorless", "C"],
 ];
-
-/** A Two-Headed Giant teammate's hand (v0.5.0, 810.5), card names in the view's order. */
-function teammateHand(cards: CardView[]): string {
-  return cards.length === 0
-    ? "no cards"
-    : cards.map((card) => card.name ?? "a hidden card").join(", ");
-}
 
 /** The phase beside your portrait, as Magic Duels names it. */
 const phaseCaptions: Record<string, string> = {
@@ -257,23 +251,20 @@ function PlayerTarget({
 }
 
 /** A count in its small diamond: hand and library by name, the graveyard's for the eye only (its
- * tile is the button). A Two-Headed Giant teammate's hand (v0.5.0) names its cards on hover. */
+ * tile is the button). */
 function Count({
   at,
   count,
   label,
-  title,
 }: {
   at: Diamond;
   count: number;
   label?: string;
-  title?: string;
 }) {
   return (
     <span
       className={styles.diamond}
       style={diamondStyle(at)}
-      title={title}
       {...(label
         ? { role: "img", "aria-label": label }
         : { "aria-hidden": true })}
@@ -398,6 +389,16 @@ function StatusRow({
   const game = useGameContext();
   const p = player.player;
   const pool = poolColours.filter(([key]) => p.mana_pool[key] > 0);
+  // In Two-Headed Giant poison is the team's (810.10a, v0.5.1): both plates show the team's count.
+  const counters: [string, number][] =
+    player.teamPoison === null
+      ? Object.entries(p.counters)
+      : [
+          ...(player.teamPoison > 0
+            ? [["team poison", player.teamPoison] as [string, number]]
+            : []),
+          ...Object.entries(p.counters).filter(([name]) => name !== "poison"),
+        ];
   const from = (seat: Seat) => {
     const name = playerName(game.view, seat, game.observing);
     return name === "You" ? "your" : `${name}’s`;
@@ -426,7 +427,7 @@ function StatusRow({
           ))}
         </span>
       )}
-      {Object.entries(p.counters).map(([counter, count]) => (
+      {counters.map(([counter, count]) => (
         <span key={counter} className={styles.chip}>
           {count} {counter.replace(/_/g, " ")}
         </span>
@@ -561,9 +562,10 @@ export function PlayerPlate({
         data-align={align}
         style={boxStyle(node.pills)}
       >
-        {player.teammate && (
-          <span className={styles.pill} data-tone="team">
-            Teammate
+        {/* A chip has no room for it; its article's name still says the team. */}
+        {player.teamPill && !node.chip && (
+          <span className={styles.pill} data-tone={player.teamPill.tone}>
+            {player.teamPill.text}
           </span>
         )}
         {player.active && <span className={styles.pill}>Active turn</span>}
@@ -599,15 +601,15 @@ export function PlayerPlate({
           {p.life}
         </span>
       </span>
+      {/* A teammate's hand (v0.5.1) lies face up under their board, each card named there. */}
       <Count
         at={node.counts.hand}
         count={p.hand_count}
         label={
-          p.hand
-            ? `${p.hand_count} cards in your teammate's hand: ${teammateHand(p.hand)}`
+          player.hand && player.teammate
+            ? `${p.hand_count} cards in your teammate's hand`
             : `${p.hand_count} cards in hand`
         }
-        title={p.hand ? `Your teammate's hand: ${teammateHand(p.hand)}` : undefined}
       />
       <Count at={node.counts.graveyard} count={p.graveyard.length} />
       <Count

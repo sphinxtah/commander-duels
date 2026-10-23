@@ -17,6 +17,7 @@ import {
   REGIONS,
   ROW_MORE,
   STACK,
+  TEAM_HAND,
   THREE,
   YOU,
   centre,
@@ -27,12 +28,14 @@ import {
   overlaps,
   rect,
   rowCard,
+  withTeamHand,
   type RowSpec,
   type SeatGeometry,
 } from "./geometry";
 import {
   STAGE_H,
   STAGE_W,
+  type Arrangement,
   type BadgePlacement,
   type BandLayout,
   type CardNode,
@@ -496,6 +499,55 @@ export function fanHand(
       face: { x: x - w / 2, y, w, h },
       rotation,
       hit: { x: x - w / 2, y, w: width, h: STAGE_H - y },
+    };
+  });
+}
+
+/* ---------- a teammate's hand (Two-Headed Giant, v0.5.1) ---------- */
+
+/** Where a teammate's hand fans in their area: along its near edge, on one side of the stack's
+ * lane (the side with more room). */
+export function teamHandRegion(area: Rect): { x0: SU; x1: SU } {
+  let x0 = area.x + TEAM_HAND.inset.left;
+  let x1 = area.x + area.w - TEAM_HAND.inset.right;
+  const laneX0 = STACK.lane.x - TEAM_HAND.inset.lane;
+  const laneX1 = STACK.lane.x + STACK.lane.w + TEAM_HAND.inset.lane;
+  if (x0 < laneX1 && x1 > laneX0) {
+    if (laneX0 - x0 >= x1 - laneX1) x1 = laneX0;
+    else x0 = laneX1;
+  }
+  return { x0, x1 };
+}
+
+/** A teammate's hand's slots: a small fan, face up, as many cards as keep a hit 36 su wide
+ * each, the last slot becoming "+N" when the hand holds more. */
+export function fanTeamHand(
+  n: number,
+  region: { x0: SU; x1: SU },
+): { face: Rect; rotation: number; hit: Rect }[] {
+  const { w, h } = TEAM_HAND.card;
+  const spread = region.x1 - region.x0 - w;
+  if (n <= 0 || spread < 0) return [];
+  const slots = Math.min(n, Math.floor(spread / MIN_HIT + EPSILON) + 1);
+  const step =
+    slots > 1 ? Math.min(TEAM_HAND.maxStep, spread / (slots - 1)) : 0;
+  const mid = (region.x0 + region.x1) / 2;
+  const half = (slots - 1) / 2;
+  return Array.from({ length: slots }, (_, i) => {
+    const offset = i - half;
+    const x = mid + offset * step;
+    const y =
+      TEAM_HAND.top + (half > 0 ? TEAM_HAND.arc * (offset / half) ** 2 : 0);
+    const rotation = clamp(
+      TEAM_HAND.tilt * offset,
+      -TEAM_HAND.maxTilt,
+      TEAM_HAND.maxTilt,
+    );
+    const width = i < slots - 1 ? Math.min(step, w) : w;
+    return {
+      face: { x: x - w / 2, y, w, h },
+      rotation,
+      hit: { x: x - w / 2, y, w: width, h },
     };
   });
 }
@@ -1075,9 +1127,62 @@ export const layoutTable: LayoutTable = (model, options) => {
     });
   };
 
+  /* --- a teammate's hand (Two-Headed Giant, v0.5.1) --- */
+  // Face up along the near edge of their area, under their front row, as many cards as keep
+  // their hits; the rest behind a "+N" that lists the whole hand.
+  const teamHand = (player: TablePlayer, g: SeatGeometry) => {
+    const keys = player.hand;
+    if (!keys || keys.length === 0) return;
+    const slots = fanTeamHand(keys.length, teamHandRegion(g.area));
+    if (slots.length === 0) return;
+    const withHits =
+      keys.length > slots.length ? slots.length - 1 : keys.length;
+    const unit = `hand:${player.seat}`;
+    // Under the front row: an attacker drawn towards the band passes over the fan.
+    const z0 = Z.row(g.front.y) - 500;
+    const handKeys: string[] = [];
+    keys.forEach((key, i) => {
+      const slot = slots[Math.min(i, slots.length - 1)];
+      const node = cardNode(
+        key,
+        unit,
+        "teammate-hand",
+        {
+          face: slot.face,
+          rotation: slot.rotation,
+          footprint: turnedBox(slot.face, slot.rotation, centre(slot.face)),
+        },
+        i < withHits ? slot.hit : null,
+        z0 + i,
+        slot.face.w,
+      );
+      if (node?.hit) handKeys.push(key);
+    });
+    if (keys.length > slots.length) {
+      const last = slots[slots.length - 1];
+      const more = moreNode(
+        `more:${unit}`,
+        last.hit,
+        keys.length - withHits,
+        `Show all ${keys.length} cards in ${player.name}'s hand (${keys.length - withHits} more)`,
+        { kind: "hand", seat: player.seat },
+      );
+      if (more) handKeys.push(more.key);
+    }
+    rows.push({
+      key: unit,
+      seat: player.seat,
+      label: `${player.name}'s hand`,
+      nodes: handKeys,
+    });
+  };
+
   /* --- opponents --- */
   const opponentGeometry = new Map<Seat, { g: SeatGeometry; c: number }>();
   const chips: TablePlayer[] = [];
+  // A seat that shows a teammate's hand (v0.5.1) lifts its rows for the fan under them.
+  const shown = (player: TablePlayer, g: SeatGeometry, rows: Arrangement) =>
+    player.hand ? withTeamHand(g, TEAM_HAND.rows[rows]) : g;
   if (model.arrangement === "duel" || expandedSeat !== null) {
     for (const player of model.opponents) {
       if (
@@ -1086,7 +1191,7 @@ export const layoutTable: LayoutTable = (model, options) => {
           : player.seat === expandedSeat
       )
         opponentGeometry.set(player.seat, {
-          g: DUEL,
+          g: shown(player, DUEL, "duel"),
           c: C_FACTOR.duel.opponents,
         });
       else chips.push(player);
@@ -1098,7 +1203,7 @@ export const layoutTable: LayoutTable = (model, options) => {
       if (x0 === undefined) chips.push(player);
       else
         opponentGeometry.set(player.seat, {
-          g: spec.seat(x0),
+          g: shown(player, spec.seat(x0), model.arrangement),
           c: C_FACTOR[model.arrangement].opponents,
         });
     });
@@ -1167,6 +1272,9 @@ export const layoutTable: LayoutTable = (model, options) => {
       library: g.library,
       command: g.command,
     });
+    teamHand(player, g);
+    // Nobody attacks their teammate: a drop there means nothing (v0.5.1).
+    if (player.teammate) continue;
     drops.push(
       model.arrangement === "duel" || player.seat === expandedSeat
         ? {
@@ -1562,7 +1670,8 @@ export const layoutTable: LayoutTable = (model, options) => {
     PLANE.bandSocket,
   ];
 
-  // Rows in DOM order: opponents left to right, then your battlefield, command zone and hand.
+  // Rows in DOM order: opponents left to right (a teammate's hand after their battlefield), then
+  // your battlefield, command zone and hand.
   const seatRank = new Map(
     [...model.opponents, ...(anchored ? [anchored] : [])].map((p, i) => [
       p.seat,
@@ -1575,7 +1684,11 @@ export const layoutTable: LayoutTable = (model, options) => {
       : row.key.startsWith("command:")
         ? 2e6
         : (seatRank.get(row.seat ?? -1) ?? 1e3) * 10 +
-          (row.key.endsWith(":lands") ? 1 : 0);
+          (row.key.endsWith(":lands")
+            ? 1
+            : row.key.startsWith("hand:")
+              ? 2
+              : 0);
   rows.sort((a, b) => rank(a) - rank(b));
 
   return {
@@ -1817,8 +1930,13 @@ function coverage(layout: TableLayout, model: TableModel): string[] {
             problems.push(`${key} is drawn on a chipped board`);
           count(`more:chip:${player.seat}`);
         }
+      // A chipped teammate's hand waits, undrawn, until the board is collapsed again.
+      for (const key of player.hand ?? [])
+        if (layout.nodes.has(key))
+          problems.push(`${key} is drawn beside a chip`);
       continue;
     }
+    player.hand?.forEach((key) => need(key, `more:hand:${player.seat}`));
     for (const unit of player.units) {
       const keys = [...unit.cards, ...unit.attachments];
       const shown = keys.some((key) => layout.nodes.get(key)?.hit);

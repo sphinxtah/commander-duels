@@ -121,6 +121,36 @@ describe("the magnifier", () => {
     expect(container).toHaveTextContent("A face-down card");
   });
 
+  it("says whose hand a Two-Headed Giant teammate's card is in, and only theirs (v0.5.1)", () => {
+    const giant = tableFixture("giant");
+    const m = buildTableModel(fixtureInput(giant));
+    const l = layoutTable(m, { expandedSeat: null, textScale: 1 });
+    const ui = createTableUi();
+    const fit = stageFit(1920, 1080, 1);
+    const draw = (key: string) => {
+      ui.set({ magnified: { key, side: "right", level: 1 } });
+      return render(
+        <TableContext.Provider
+          value={{ painter: "webgl", ui, layout: l, model: m, fit, drag: null }}
+        >
+          <Magnifier
+            model={m}
+            layout={l}
+            fit={fit}
+            view={giant.snapshot.view}
+            observing={false}
+            painter="webgl"
+          />
+        </TableContext.Provider>,
+      );
+    };
+    const theirs = draw(m.opponents[0].hand![0]).container;
+    expect(theirs).toHaveTextContent("Lightning Bolt");
+    expect(theirs).toHaveTextContent("In Bot 2’s hand");
+    const yours = draw(m.hand[1]).container;
+    expect(yours).not.toHaveTextContent(/In .+ hand/);
+  });
+
   it("draws the risen hand card only when the DOM paints the table", () => {
     const risen = { risen: { key: inHand.key, source: "pointer" as const } };
     expect(

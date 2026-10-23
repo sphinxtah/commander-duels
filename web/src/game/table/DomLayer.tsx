@@ -22,10 +22,10 @@ import styles from "./table.module.css";
 
 // The table's DOM layer (design §9.1): every card, stack item, player, zone tile and "+N" as a
 // real, named button at its layout hit, in this order (which is the Tab order): the opponents,
-// each in an article with their plate and battlefield rows; the stack on the band and the
-// combat in words; then your side with your plate, rows, command zone and hand. Sections, rows
-// and articles take no pointer events and hold no layout of their own: their buttons are placed
-// on the stage.
+// each in an article with their plate and battlefield rows (and a Two-Headed Giant teammate's
+// hand, v0.5.1); the stack on the band and the combat in words; then your side with your plate,
+// rows, command zone and hand. Sections, rows and articles take no pointer events and hold no
+// layout of their own: their buttons are placed on the stage.
 
 export function DomLayer({
   model,
@@ -92,12 +92,16 @@ export function DomLayer({
   const battlefieldRows = (seat: number) =>
     layout.rows.filter(
       (r) =>
-        r.seat === seat && r.key !== "hand" && !r.key.startsWith("command:"),
+        r.seat === seat &&
+        r.key !== "hand" &&
+        !r.key.startsWith("hand:") &&
+        !r.key.startsWith("command:"),
     );
 
-  /** A player's plate and battlefield rows. */
+  /** A player's plate and battlefield rows, and a teammate's hand (v0.5.1) after them. */
   const side = (player: TablePlayer) => {
     const plate = layout.players.get(player.seat);
+    const shownHand = layout.rows.find((r) => r.key === `hand:${player.seat}`);
     return (
       <>
         {plate && (
@@ -113,6 +117,7 @@ export function DomLayer({
         {player.units.length === 0 && (
           <p className={gameStyles.visuallyHidden}>No permanents</p>
         )}
+        {shownHand && row(shownHand)}
       </>
     );
   };
