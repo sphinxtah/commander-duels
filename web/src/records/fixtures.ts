@@ -22,6 +22,7 @@ export function stats(fields: Partial<Stats> = {}): Stats {
     formats: [],
     against_bots: totals(),
     against_players: totals(),
+    matches: totals(),
     history: false,
     ...fields,
   };

@@ -15,8 +15,8 @@ The owner's answers left these open; each may be revisited:
 
 ## The queues
 
-- **Four queues.** Legacy for two players, and Commander for two, three or four, each size its own queue. The player picks the size.
-- **A queue is a key.** In the code a queue is `QueueKey(format, seats)`. Best-of-three would join it as a third field.
+- **Five queues.** Legacy for two players, one game or best of three ([matches](matches.md)), and Commander for two, three or four, each size its own queue. The player picks the size, and in Legacy the games.
+- **A queue is a key.** In the code a queue is `QueueKey(format, seats, best_of)`. The best-of-three queue seats its players at a best-of-three table, or a player alone with a bot at a practice match, whose first game begins the match ([matches](matches.md)).
 - **Casual only.** There is no ranked queue and no rating. Every queue's game takes the casual table's rules: decks may hold banned cards and cards not legal in the format ([the table's rules](tables.md#the-tables-rules-v045)). The format's deck rules always apply.
 
 ## Joining and waiting
@@ -57,7 +57,8 @@ The owner's answers left these open; each may be revisited:
   - **It starts once every player asked has accepted,** within 2 minutes. Every page follows into the new game.
   - **It ends** when a player declines (or withdraws their own offer), when a player leaves the result screen while it stands, or when 2 minutes pass. The others then go back with the result screen's own link: **Find another game** for a queue's game (and its rematches), **Back to the lobby** for a table's.
   - **Checked again at the start,** as at a table's start: every deck, as it stands now, with the table's rules, and every player's limit. A deck or a limit that stops it ends the rematch for everyone, naming whose ("bob's deck cannot be played now."), never what the deck holds. The player whose own deck stopped it is told why in full.
-  - **The new table** keeps the old one's visibility, rules, bots' skill, turn limit and whether the queue made it.
+  - **The new table** keeps the old one's visibility, rules, bots' skill, turn limit, whether the queue made it, and whether it plays best of three.
+- **A best-of-three match's rematch** is a whole new match: it is offered only once the match is over (`409 match_running` before), and replays the match's request or table.
 - **Free to play.** Offering or accepting needs room under the account's limit of running games, and no open table or queue of your own: the rematch is your one table.
 - **One rematch a game.** Asking again answers with the first.
 - **Busy.** If the last answer comes while every game slot is in use, or the engine does not answer, the offer stands and that answer is asked again.
@@ -83,7 +84,7 @@ Every route needs `games.play`, and joining needs `decks.edit`. Refusals:
 ## Data
 
 Migration `0022_queues` adds:
-- **`queue_entries`.** One row an account: its queue (format and seats), deck, players only, status (`waiting`, `starting` while a match makes its game, `matched`, `left` or `refused`), when it joined and when its app last asked, the game it found, and why it was taken out.
+- **`queue_entries`.** One row an account: its queue (format and seats; since `0023_matches` also `best_of`), deck, players only, status (`waiting`, `starting` while a match makes its game, `matched`, `left` or `refused`), when it joined and when its app last asked, the game it found, and why it was taken out.
 - **`rematches`** and **`rematch_players`.** At most one rematch a game: who asked, its status, when it lapses, the new game, who declined and why it failed; and each player it asks, by their seat, with their answer.
 - **`games.settings`.** A practice game's request, for its rematch; null for a table's game.
 - **`game_tables.queued`.** A table the queue made, or a rematch of one.

@@ -6531,6 +6531,8 @@ export interface components {
              * @description Whether you may read this player's games one by one: your own, or SysOp.
              */
             history: boolean;
+            /** @description Best-of-three matches that ended (api/matches.py), each once: a match won, lost or drawn, or closed with no result. Their games count among the games too. */
+            matches: components["schemas"]["Totals"];
             totals: components["schemas"]["Totals"];
         };
         /** StatusChange */

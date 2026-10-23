@@ -90,7 +90,7 @@ The badges are generated medallions drawn as SVG in the page (`web/src/records/B
 
 ## Statistics and the match history
 
-- **Totals for everyone who may open the profile** (the owner's decision): games, wins, losses, draws and games with no result, in all, by format, and against bots alone or with another player; the share of games won; the achievements earned and the pinned badges. Whoever may open a player's profile ([profiles](social.md#profiles)) sees them.
+- **Totals for everyone who may open the profile** (the owner's decision): games, wins, losses, draws and games with no result, in all, by format, and against bots alone or with another player; best-of-three matches ([matches](matches.md)), each once beside its games, as won, lost, drawn or closed with no result; the share of games won; the achievements earned and the pinned badges. Whoever may open a player's profile ([profiles](social.md#profiles)) sees them.
 - **The history for the player and SysOp alone:** each game with its date, format and kind, the opponents (a player by handle, a bot by its skill, and which seat won), the player's own deck with its revision, the outcome, the turns and the length, newest first, 20 at a time. Another player asking answers 403 `history_private`. SysOp reads anyone's (permission `players.history`, SysOp's alone, [identity](identity.md#roles-and-permissions-auth06-auth07-sec05)); the reading is not audited, since the history holds nothing hidden.
 - **What it never shows** (PROG08): another seat's deck, at any time, to anyone; a table's code; an email address. A history names only the player's own deck, as its seat names it.
 - **Replays.** No game is recorded for replay yet, so the history offers none (PROG08's "replay availability").

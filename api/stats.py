@@ -12,7 +12,8 @@ record of each game that ended. docs/quests.md describes them for players and st
   being voted out. A draw is a game the engine reports drawn. Anything else has no result: a turn
   limit, an idle timeout, a closed game, a game the API interrupted.
 - **Totals** count games, wins, losses, draws and games with no result: in all, by format, and
-  against bots alone or with another player at the table. Whoever may open a profile sees them.
+  against bots alone or with another player at the table, and best-of-three matches (v0.5.0,
+  api/matches.py) once each beside their games. Whoever may open a profile sees them.
 - **The history** lists the games one by one, newest first: when, the format, the opponents, the
   player's own deck and its revision, the outcome, the turns and the length. Only its player and
   SysOp (players.history) read it. It never names another seat's deck, and never a table's code.
@@ -39,7 +40,7 @@ from api.auth import INPUT_ERRORS
 from api.decks import identity_of, revision_entries
 from api.identity import Active, ApiError, Db, Principal, utcnow
 from api.library import since_reset
-from api.models import DeckRevision, Game, GameSeat, PlayerResult, User
+from api.models import DeckRevision, Game, GameSeat, Match, MatchPlayer, PlayerResult, User
 from api.schemas import Contract, Error
 from api.social import PlayerRef, player_ref, visible_player
 
@@ -133,6 +134,10 @@ class Stats(Contract):
     formats: list[FormatTotals] = Field(description="Each format played, Commander first.")
     against_bots: Totals = Field(description="Games where every other seat was a bot.")
     against_players: Totals = Field(description="Games with at least one other player.")
+    matches: Totals = Field(
+        description="Best-of-three matches that ended (api/matches.py), each once: a match won, "
+        "lost or drawn, or closed with no result. Their games count among the games too."
+    )
     history: bool = Field(
         description="Whether you may read this player's games one by one: your own, or SysOp."
     )
@@ -285,8 +290,36 @@ def stats_of(db: Session, user: User, *, history: bool) -> Stats:
         formats=[FormatTotals(format=name, **formats[name]) for name in order],
         against_bots=Totals(**bots),
         against_players=Totals(**players),
+        matches=match_totals(db, user),
         history=history,
     )
+
+
+def match_totals(db: Session, user: User) -> Totals:
+    """The player's best-of-three matches that ended (v0.5.0), since a reset: won when their seat
+    won the match, drawn on equal game wins, no result when it closed (a game closed or timed out,
+    or the next game could not start), and lost otherwise."""
+    found = empty()
+    rows = db.execute(
+        select(Match.status, Match.winner_seat, Match.draw, MatchPlayer.seat)
+        .join(MatchPlayer, MatchPlayer.match_id == Match.id)
+        .where(
+            MatchPlayer.user_id == user.id,
+            Match.status.in_(("finished", "closed")),
+            since_reset(user, Match.finished_at),
+        )
+    ).all()
+    for status, winner, draw, seat in rows:
+        found["games"] += 1
+        if status == "closed":
+            found["no_result"] += 1
+        elif draw:
+            found["draws"] += 1
+        elif winner == seat:
+            found["wins"] += 1
+        else:
+            found["losses"] += 1
+    return Totals(**found)
 
 
 # The history.

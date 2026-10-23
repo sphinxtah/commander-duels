@@ -26,6 +26,8 @@ export function RecordTable({ stats, label }: { stats: Stats; label: string }) {
     ]),
     ["Against bots", stats.against_bots],
     ["Against players", stats.against_players],
+    // Each match once, beside its games (v0.5.0).
+    ["Best-of-three matches", stats.matches],
   ];
   return (
     <>

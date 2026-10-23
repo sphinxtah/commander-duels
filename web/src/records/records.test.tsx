@@ -110,6 +110,26 @@ describe("a record's table (v0.5.0)", () => {
     ]);
   });
 
+  it("counts best-of-three matches once each, beside their games", () => {
+    render(
+      <RecordTable
+        label="Your record"
+        stats={stats({
+          totals: totals({ games: 5, wins: 3, losses: 2 }),
+          formats: [
+            { format: "legacy", ...totals({ games: 5, wins: 3, losses: 2 }) },
+          ],
+          against_players: totals({ games: 5, wins: 3, losses: 2 }),
+          matches: totals({ games: 2, wins: 1, losses: 1 }),
+        })}
+      />,
+    );
+    const rows = within(
+      screen.getByRole("table", { name: "Your record" }),
+    ).getAllByRole("row");
+    expect(rows.at(-1)).toHaveTextContent("Best-of-three matches21100");
+  });
+
   it("says when there is nothing to count", () => {
     render(<RecordTable label="Your record" stats={stats()} />);
     expect(screen.getByText("No games finished yet.")).toBeInTheDocument();

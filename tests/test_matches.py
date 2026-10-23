@@ -262,6 +262,10 @@ def test_a_practice_match_won_two_games_to_none(client, engine):
         ) == len(paid)
     assert counted_wins(ada) == 2
     assert wins(match_of(ada, match_id)) == [2, 0]
+    # The profile's record counts the match once, beside its two games.
+    stats = ada.get("/api/v1/me/stats").json()
+    assert stats["matches"] == {"games": 1, "wins": 1, "losses": 0, "draws": 0, "no_result": 0}
+    assert (stats["totals"]["games"], stats["totals"]["wins"]) == (2, 2)
 
 
 def test_a_table_match_won_two_to_one_with_the_losers_choice(client, engine, monkeypatch):
@@ -342,6 +346,10 @@ def test_a_table_match_won_two_to_one_with_the_losers_choice(client, engine, mon
             for user in (ada.id, bob.id)
         }
     assert kinds == {ada.id: ["human_win", "human_win"], bob.id: ["human_win"]}
+    # The loser's record: one match lost, with a game won and two lost.
+    stats = bob.get("/api/v1/me/stats").json()
+    assert stats["matches"] == {"games": 1, "wins": 0, "losses": 1, "draws": 0, "no_result": 0}
+    assert (stats["totals"]["wins"], stats["totals"]["losses"]) == (1, 2)
 
 
 def test_draws_and_games_without_a_result_add_games_up_to_five(client, engine):

@@ -10146,6 +10146,10 @@
             "title": "History",
             "type": "boolean"
           },
+          "matches": {
+            "$ref": "#/components/schemas/Totals",
+            "description": "Best-of-three matches that ended (api/matches.py), each once: a match won, lost or drawn, or closed with no result. Their games count among the games too."
+          },
           "totals": {
             "$ref": "#/components/schemas/Totals"
           }
@@ -10155,6 +10159,7 @@
           "formats",
           "against_bots",
           "against_players",
+          "matches",
           "history"
         ],
         "title": "Stats",

@@ -1,12 +1,12 @@
 # Best-of-three matches (v0.5.0)
 
-Since v0.5.0 Legacy is played best of three, with sideboards: the scope's FMT05 (matches), FMT06 (the play/draw choice for later games) and FMT07 (wishes). The owner's decisions are in [the v0.5.0 plan](plans/0.5.0.md#decisions-at-the-start-of-v050): best of three at Legacy human tables and Legacy practice games, later in the Legacy queue; every game won counts as a win and pays its tokens as a single game does; the match result is recorded for the statistics.
+Since v0.5.0 Legacy is played best of three, with sideboards: the scope's FMT05 (matches), FMT06 (the play/draw choice for later games) and FMT07 (wishes). The owner's decisions are in [the v0.5.0 plan](plans/0.5.0.md#decisions-at-the-start-of-v050): best of three at Legacy human tables, Legacy practice games and in a public queue of its own ([queues](queues.md)); every game won counts as a win and pays its tokens as a single game does; the match result is recorded for the statistics.
 
 ## Starting a match
 
 - **Where.** A Legacy human table's host chooses best of one game or best of three when opening the table ([human tables](tables.md)). A player at the practice table chooses the same for a Legacy game against the bot ([games](games.md#practice-games)). Commander plays one game.
 - **The first game** starts as any game does: the table's start, or the practice table's. Each player's deck is bound then to an immutable revision (DECK01), and the whole match plays that revision. The engine draws who chooses to play first in it, as for any game.
-- **For whatever starts games.** `api/matches.py: begin(db, game, best_of)` makes a newly recorded first game a match's, in the same transaction. The practice table and the tables call it; a queue calls it the same way.
+- **For whatever starts games.** `api/matches.py: begin(db, game, best_of)` makes a newly recorded first game a match's, in the same transaction. The practice table and the tables call it, and so does the best-of-three Legacy queue (its tables through `add_table_game`, a player alone with a bot through its practice game).
 
 ## Winning
 
@@ -36,7 +36,7 @@ Since v0.5.0 Legacy is played best of three, with sideboards: the scope's FMT05 
 
 ## Wins and tokens
 
-Every game of a match is recorded by `record_end` as any game is, and in the same transaction its match counts it. So every game won counts as one win and pays its tokens exactly as a single game does, once: a replayed end records nothing twice. The match itself pays nothing more; it records each player's game wins, its winner (or a draw) and why it ended, for the statistics.
+Every game of a match is recorded by `record_end` as any game is, and in the same transaction its match counts it. So every game won counts as one win and pays its tokens exactly as a single game does, once: a replayed end records nothing twice. The match itself pays nothing more; it records each player's game wins, its winner (or a draw) and why it ended, for the statistics: a profile's record counts each match once, beside its games ([quests and records](quests.md)).
 
 ## Wishes (FMT07)
 
