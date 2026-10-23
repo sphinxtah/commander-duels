@@ -15,6 +15,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { ChatContext, type Chat } from "../chat/chat";
 import { GameScreen } from "./GameScreen";
 import type {
   GameView,
@@ -789,6 +790,57 @@ describe("Report a problem at the table (v0.4.1)", () => {
         context: expect.objectContaining({ game_id: "g1", game_turn: 12 }),
       }),
     });
+  });
+});
+
+describe("the chat bar's diamond (v0.5.1)", () => {
+  it("is on the band at every table, counts friends' messages and brings the bar out", () => {
+    const setTableOpen = vi.fn();
+    const chat = {
+      unread: 2,
+      tableOpen: false,
+      setTableOpen,
+    } as unknown as Chat;
+    render(
+      <ChatContext.Provider value={chat}>
+        <GameScreen gameId="g1" me={null} />
+      </ChatContext.Provider>,
+    );
+    const socket = FakeSocket.made[0];
+    act(() => {
+      socket.accept();
+      socket.deliver(welcome(0, false));
+      socket.deliver({
+        type: "lease",
+        role: "controller",
+        controlled: true,
+        reason: "granted",
+      });
+      socket.deliver({
+        type: "snapshot",
+        snapshot: snapshot(5, priority("A")),
+      });
+    });
+    // A practice game, with no table chat: the diamond takes the chat's slot.
+    expect(screen.queryByRole("button", { name: /Table chat/ })).toBeNull();
+    const diamond = screen.getByRole("button", {
+      name: "Friends and messages, 2 unread",
+    });
+    expect(diamond).toHaveAttribute("aria-expanded", "false");
+    expect(diamond).toHaveAttribute("aria-controls", "chat-bar");
+    fireEvent.click(diamond);
+    expect(setTableOpen).toHaveBeenCalledWith(true);
+    // P pressed in the chat bar is the chat's, never the table's pass.
+    const bar = document.body.appendChild(document.createElement("aside"));
+    bar.setAttribute("data-chat-bar", "");
+    const friend = bar.appendChild(document.createElement("button"));
+    fireEvent.keyDown(friend, { key: "p" });
+    expect(socket.commands()).toEqual([]);
+    fireEvent.keyDown(document.body, { key: "p" });
+    expect(socket.commands()).toEqual([
+      expect.objectContaining({ prompt_id: "A" }),
+    ]);
+    bar.remove();
   });
 });
 

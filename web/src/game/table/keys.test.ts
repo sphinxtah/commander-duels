@@ -129,4 +129,23 @@ describe("the table's keys", () => {
     press("Escape");
     expect(closeLayer).toHaveBeenCalledTimes(2);
   });
+
+  it("leave every key pressed in the chat bar to it, on its buttons too (v0.5.1)", () => {
+    const closeLayer = vi.fn(() => true);
+    const a = keys({ closeLayer });
+    renderHook(() => useTableKeys(a));
+    const bar = add("aside", { "data-chat-bar": "" });
+    const friend = bar.appendChild(document.createElement("button"));
+    const box = bar.appendChild(document.createElement("textarea"));
+    for (const target of [friend, box])
+      for (const key of ["f", "t", " ", "Escape"])
+        expect(press(key, target).defaultPrevented).toBe(false);
+    expect(press(" ", friend, "keyup").defaultPrevented).toBe(false);
+    expect(a.fullscreen.toggle).not.toHaveBeenCalled();
+    expect(a.timer!.stop).not.toHaveBeenCalled();
+    expect(closeLayer).not.toHaveBeenCalled();
+    // Off the bar, the table's keys work as ever.
+    press("f");
+    expect(a.fullscreen.toggle).toHaveBeenCalledTimes(1);
+  });
 });

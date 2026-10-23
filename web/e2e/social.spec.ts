@@ -114,9 +114,10 @@ test.describe("friends in two browsers", () => {
       await player.getByRole("checkbox", { name: /Appear offline/ }).uncheck();
       await expect(player.getByText("Privacy settings saved.")).toBeVisible();
 
-      // Chat (v0.4.4): SysOp writes from the profile in a docked window; the message pops up
-      // beside the player's bell at once, and waits on their Messages page; the answer reaches
-      // SysOp's window without a reload. Then the player reports SysOp's message.
+      // Chat (v0.4.4; on the chat bar since v0.5.1): SysOp writes from the profile in a window on
+      // its bar; the message pops up beside the player's bell at once and counts on the player's
+      // bar, whose friends list opens the conversation; the answer reaches SysOp's window without
+      // a reload. Then the player reports SysOp's message.
       const hello = `Hello, rival! ${Date.now()}`;
       await sysop.getByRole("button", { name: "Message", exact: true }).click();
       const window = sysop.getByRole("region", { name: "Chat with rival" });
@@ -127,12 +128,16 @@ test.describe("friends in two browsers", () => {
       ).toContainText(hello);
       const popup = player.getByRole("button", { name: new RegExp(hello) });
       await expect(popup).toBeVisible({ timeout: 15_000 });
-      await player.goto("/#messages");
-      await player
-        .getByRole("list", { name: "Conversations" })
-        .getByRole("link", { name: /sysop/ })
+      const bar = player.getByRole("complementary", {
+        name: "Friends and messages",
+      });
+      await bar
+        .getByRole("button", { name: /^Friends, .*unread messages?$/ })
         .click();
-      const thread = player.getByRole("list", { name: "Messages with sysop" });
+      await bar.getByRole("button", { name: /^Chat with sysop/ }).click();
+      const thread = bar
+        .getByRole("region", { name: "Chat with sysop" })
+        .getByRole("list", { name: "Messages with sysop" });
       await expect(thread).toContainText(hello);
       const answer = `Hello, SysOp. ${Date.now()}`;
       await player.getByLabel("Write to sysop").fill(answer);

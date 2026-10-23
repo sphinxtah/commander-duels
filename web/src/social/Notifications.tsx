@@ -102,7 +102,7 @@ export function NotificationRow({
   const chat = useChatContext();
   useEffect(() => setShown(item), [item]);
   const actor = shown.actor;
-  // New messages open the conversation: its docked window, or the Messages page. A rematch
+  // New messages open the conversation's window on the chat bar (v0.5.1). A rematch
   // (v0.5.0) opens its game's result screen, which holds the offer.
   const message = shown.kind === "message" && actor;
   // A quest completed opens the main menu, an achievement Profile (v0.5.0).

@@ -16,6 +16,14 @@ function typing(target: EventTarget | null): boolean {
   );
 }
 
+/** A key pressed in the chat bar (v0.5.1), which floats over the table when brought out: the
+ * chat's own, Escape included (it puts the bar away). */
+export function inChatBar(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element && target.closest("[data-chat-bar]") !== null
+  );
+}
+
 function dialogOpen(): boolean {
   return document.querySelector("dialog[open]") !== null;
 }
@@ -49,6 +57,7 @@ export function useTableKeys(a: {
     };
 
     const down = (event: KeyboardEvent) => {
+      if (inChatBar(event.target)) return;
       if (event.key === "Escape") {
         if (event.defaultPrevented || dialogOpen()) return;
         if (

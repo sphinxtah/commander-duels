@@ -171,7 +171,7 @@ button:disabled {
   font-family: Georgia, serif;
 }
 
-/* Presence: green online, gold in a game, amber idle, grey offline. */
+/* Presence: green online, gold in a game or a queue (v0.5.1), amber idle, grey offline. */
 .presence {
   display: inline-flex;
   align-items: center;
@@ -190,7 +190,8 @@ button:disabled {
 .dot[data-state="online"] {
   background: #7fc394;
 }
-.dot[data-state="in_game"] {
+.dot[data-state="in_game"],
+.dot[data-state="in_queue"] {
   background: #e6c68c;
 }
 .dot[data-state="idle"] {
