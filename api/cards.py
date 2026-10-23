@@ -75,6 +75,17 @@ class CardImageRef(Contract):
     artist: str | None = None
 
 
+class EditionCopies(Contract):
+    """An edition (printing) of a card the player's library holds, with its copies (v0.5.0)."""
+
+    printing_id: UUID
+    set_code: str
+    set_name: str
+    collector_number: str
+    released_at: date | None
+    copies: int
+
+
 class CardSummary(Contract):
     id: UUID
     name: str
@@ -113,6 +124,11 @@ class CardSummary(Contract):
         default=None,
         description="Copies in the player's library (v0.3.1); null when not limited: basic "
         "lands, and accounts that build from the whole catalog.",
+    )
+    editions: list[EditionCopies] | None = Field(
+        default=None,
+        description="The editions of the card the player's library holds, the most copies first "
+        "(v0.5.0): a deck may hold only those, copy by copy. Null when not limited, as owned is.",
     )
     custom: bool = Field(
         default=False,
@@ -166,7 +182,10 @@ class CardDetail(CardSummary):
     capabilities: dict[str, object]
     all_legalities: dict[str, str]
     printings: list[PrintingSummary]
-    printing_count: int
+    printing_count: int = Field(
+        description="How many printings the card has; when only the owned or the chosen ones "
+        "are asked for (v0.5.0), how many are listed."
+    )
     rulings: list[Ruling]
     tags: list[str]
     related: list[Related]
@@ -354,8 +373,23 @@ def summaries(db: Session, concepts: list[CardConcept]) -> list[CardSummary]:
     ]
 
 
+def editions_of(library: Library, card_id: UUID) -> list[EditionCopies]:
+    return [
+        EditionCopies(
+            printing_id=edition.printing_id,
+            set_code=edition.set_code,
+            set_name=edition.set_name,
+            collector_number=edition.collector_number,
+            released_at=edition.released_at,
+            copies=edition.copies,
+        )
+        for edition in library.editions_of(card_id)
+    ]
+
+
 def mark_owned(db: Session, items: Iterable[CardSummary], library: Library) -> None:
-    """Sets each card's copies in the player's library; basic lands stay unlimited."""
+    """Sets each card's copies in the player's library, and since v0.5.0 the editions it holds of
+    it; basic lands stay unlimited."""
     found = list(items)
     if library.unlimited or not found:
         return
@@ -370,6 +404,7 @@ def mark_owned(db: Session, items: Iterable[CardSummary], library: Library) -> N
     for item in found:
         key = keys.get(item.id)
         item.owned = library.owned(key) if key is not None else None
+        item.editions = editions_of(library, item.id) if key is not None else None
 
 
 def summaries_by_id(db: Session, ids: set[UUID]) -> dict[UUID, CardSummary]:
@@ -560,6 +595,15 @@ def card_detail(
     library: CurrentLibrary,
     db: Db,
     printing: Annotated[UUID | None, Query()] = None,
+    printings: Annotated[
+        Literal["all", "owned", "chosen"],
+        Query(
+            description="Which printings to list (v0.5.0): all of them, the newest 60 first; "
+            "owned, the editions the player's library holds (every printing for a basic land, "
+            "or an account that builds from the whole catalog); chosen, only `printing`, as a "
+            "card pulled from a pack is."
+        ),
+    ] = "all",
 ) -> CardDetail:
     """A card's details, with its newest 60 printings. `printing` (a deck entry's chosen printing)
     is listed among them even when it is older, so the screen can show it and credit its artist.
@@ -567,14 +611,31 @@ def card_detail(
     concept = in_game(db, card_id)
     base = summaries(db, [concept])[0]
     mark_owned(db, [base], library)
-    printings = list(db.scalars(printings_query(card_id).limit(MAX_PRINTINGS)))
-    if printing is not None and all(shown.id != printing for shown in printings):
-        chosen = db.get(CardPrinting, printing)
-        if chosen is not None and chosen.concept_id == card_id:
-            printings.append(chosen)
-    count = db.scalar(
-        select(func.count()).select_from(CardPrinting).where(CardPrinting.concept_id == card_id)
-    )
+    chosen = db.get(CardPrinting, printing) if printing is not None else None
+    if chosen is not None and chosen.concept_id != card_id:
+        chosen = None
+    if printings == "chosen" and chosen is not None:
+        shown = [chosen]
+        count = 1
+    elif printings == "owned" and base.editions is not None:
+        # The entry's own edition too, which the screen marks when the library lacks it.
+        held = {edition.printing_id for edition in base.editions} | (
+            {chosen.id} if chosen is not None else set()
+        )
+        shown = list(db.scalars(printings_query(card_id).where(CardPrinting.id.in_(held))))
+        count = len(shown)
+    else:
+        shown = list(db.scalars(printings_query(card_id).limit(MAX_PRINTINGS)))
+        if chosen is not None and all(item.id != chosen.id for item in shown):
+            shown.append(chosen)
+        count = (
+            db.scalar(
+                select(func.count())
+                .select_from(CardPrinting)
+                .where(CardPrinting.concept_id == card_id)
+            )
+            or 0
+        )
     rulings = db.scalars(
         select(CardRuling)
         .where(CardRuling.concept_id == card_id)
@@ -593,8 +654,8 @@ def card_detail(
         review=concept.review == "pending",
         capabilities=dict(concept.capabilities or {}),
         all_legalities=dict(concept.legalities or {}),
-        printings=[printing_summary(printing) for printing in printings],
-        printing_count=count or 0,
+        printings=[printing_summary(found) for found in shown],
+        printing_count=count,
         rulings=[
             Ruling(source=ruling.source, published_at=ruling.published_at, comment=ruling.comment)
             for ruling in rulings

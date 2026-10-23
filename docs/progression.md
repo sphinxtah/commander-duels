@@ -37,21 +37,36 @@ The roster is `content/planeswalkers.json`: each Planeswalker's stable ID, name,
 
 A player's library is what they may build from (PROG01's earned policy, DECK08):
 
-| Source | Copies | For how long |
-| --- | --- | --- |
-| The two starter decks chosen at onboarding | every copy of every card in both | for good |
-| Decks saved before v0.3.1 (migration 0007) | per card, the most any one of the player's decks held outside its maybeboard | for good |
-| The alliance | 4 of each of the Planeswalker's cards | while allied |
-| Basic lands | without limit | always |
-| Packs (v0.4.0) | the cards pulled | for good |
+| Source | Copies | Edition (v0.5.0) | For how long |
+| --- | --- | --- | --- |
+| The two starter decks chosen at onboarding | every copy of every card in both | the printing the owner chose for each card | for good |
+| Decks saved before v0.3.1 (migration 0007) | per card, the most any one of the player's decks held outside its maybeboard | that deck's printings (migration 0025) | for good |
+| The alliance | 4 of each of the Planeswalker's cards | each card's default printing | while allied |
+| Basic lands | without limit | every edition | always |
+| Packs (v0.4.0) | the cards pulled | the printing pulled | for good |
 
-- **Copies count, as in Magic Duels.** A deck may hold no more copies of a card than the library does, within the format's own limit, counting every printing and Oracle version of the card together. Copies are a limit per deck: two decks may each hold the same owned card.
-- **Grants are recorded.** Every grant is a row in `library_grants` with its source and a key naming what granted it (`starter:<deck>`, `grandfathered:0.3.1`); PostgreSQL refuses updates and deletes. A starter grant is made once, whatever retries. The alliance's cards are not granted: they are in the library while the alliance lasts.
+- **Copies count, as in Magic Duels.** A deck may hold no more copies of a card than the library does, within the format's own limit, counting every printing and Oracle version of the card together. Copies are a limit per deck: two decks may each hold the same owned card. Since v0.5.0 they count by edition too ([below](#the-library-by-edition-v050)).
+- **Grants are recorded.** Every grant is a row in `library_grants` with its source, a key naming what granted it (`starter:<deck>`, `grandfathered:0.3.1`, `pack:<opening>`) and since v0.5.0 the edition it gives (`printing_id`); PostgreSQL refuses updates and deletes. A starter grant is made once, whatever retries. The alliance's cards are not granted: they are in the library while the alliance lasts.
 - **After a reset** (v0.4.5, [resetting an account](identity.md#resetting-an-account-v045)) the library is empty: the grants stay recorded, and the library counts only those made after the reset's time (`users.reset_at`). A starter deck chosen or bought again is a new grant, keyed with that time (`starter:<deck>:<time>`).
 - **Collection-locked decks.** Validation reports a deck holding more copies than the library as `collection.locked` (kind `collection_locked`), with what the library holds. Such a deck is legal and stays saved, but it cannot start a game until it is fixed. The deck's stored flags are refreshed whenever the library changes.
 - **Administrators and SysOp** hold `library.unlimited`: they build from the whole catalog, and only the format's rules apply. SysOp keeps its any-card deck lists.
 - **Where it shows.** Every card in search results and card details says how many copies the player's library holds (`owned`; null when not limited). The deck builder's finder starts on the library, and the Cards page browses the whole catalog with an "In my library" filter and a library view.
 - **Cards out of the game** (v0.4.5). Copies of a card the game cannot play ([catalog](catalog.md#only-playable-cards-are-in-the-game-v045)) stay recorded, as every grant does, but are hidden: the library's list and the alliance tab leave the card out, and no deck's draft holds it. If the engine learns the card, the copies are there again, as many as before.
+
+## The library by edition (v0.5.0)
+
+The owner's request of 2026-10-22, with a screenshot of Goblin King's details opened from a pack, which listed all 27 of its printings: "someone's library always only shows the specific cards by edition." Asked whether decks should follow, the owner chose to lock them to owned editions: "a deck may hold only editions the player owns, copy by copy." Basic lands, administrators and SysOp stay as they were.
+
+- **Grants name their edition.** A pack's cards are granted in the printings it pulled, a starter deck's (chosen or bought) in the printings it holds, so it plays at once: the owner's choice for each card, or the card's default printing where the catalog lacks that one. One grant gives one edition (`uq_library_grants_edition`: account, key and printing); a grant of several editions of a card is a row each.
+- **The alliance's playset** is in each card's default printing (`card_concepts.default_printing_id`, else its newest), one playset per card.
+- **Grants from before v0.5.0** got their editions from migration `0025_library_editions`: a pack's from the printings the opening pulled (`pack_cards`, by the opening in its key); a starter deck's from `content/starter-decks.json`, read as the API reads it (`CD_CONTENT_DIR`); a grandfathered one (v0.3.1) from the player's deck that held the most copies of the card, among its drafts and the versions saved by then, preferring one holding exactly as many, a copy that named no printing taking the default; and wherever none was found, the card's default printing. Its downgrade adds each grant's editions back into one row per card.
+- **The library lists each card by edition** (`GET /api/v1/library`): one item per card and edition, with the edition (set name and code, collector number, release date, rarity), its copies and where they came from, and the card's picture that edition's image. My library's tiles name the edition under the card's name ("Revised Edition (3ED #150)"); the list has an Edition column; the line above counts cards, editions and copies ("3 cards in 4 editions, 8 copies"). "Find in your library" also finds a set by name or code, and "From" (now with "Packs you opened") keeps working.
+- **Card details** show only the editions that matter where they are opened: from a pack, only the edition it held; from My library, only the editions the library holds; from All cards, every printing, with the editions held and their copies under "Your library" ([catalog](catalog.md#on-screen)). Every card a player is sent carries `editions`, the editions their library holds of it.
+- **Decks hold only owned editions** ([decks](decks.md#validation-deck08-t03t05)). Each deck entry's copies count against its edition's; a copy naming no edition takes one the library holds when the draft is saved. A deck holding more copies of an edition than the library is collection-locked, with what to switch to.
+- **Once, at deploy,** every player's deck drafts were switched to the editions their library holds where it held enough copies ([decks](decks.md#editions-switched-at-deploy-v050)).
+- **Packs.** A pack's card is "new" when its edition is new to the library ([shop](shop.md#buying-and-opening)).
+- **Reset and deletion** are unchanged: the library counts the grants since `users.reset_at`, by edition as by card.
+- **Checked by** `tests/test_library_editions.py` (grants from packs and starter decks, the library's items, card details, validation by edition, saves, imports, guided creation, the deploy's switch with its note, a reset, and the migration's backfill and downgrade on SQLite and PostgreSQL), and Vitest for My library, card details from a pack and from the library, and the deck editor's edition choice.
 
 ## The starter decks
 
@@ -90,7 +105,7 @@ Since v0.4.0 the custom cards are playable in every game, practice games and hum
 | `PUT /api/v1/me/alliance`, `DELETE /api/v1/me/alliance` | any active account | join (403 `alliance_locked` above the tier), leave |
 | `GET /api/v1/decks/starters` | `decks.edit` | the ten starter decks, with the two chosen |
 | `POST /api/v1/me/starters` | `decks.edit` | choose two (409 `starters_chosen`, `handle_first`; 422 `same_starter`) |
-| `GET /api/v1/library` | any active account | the library's cards, copies and sources (since v0.4.5 the cards in the game) |
+| `GET /api/v1/library` | any active account | the library's cards, copies and sources (since v0.4.5 the cards in the game; since v0.5.0 one item per card and edition) |
 | `GET /api/v1/me/alliance/cards` | any active account | the allied Planeswalker's own catalog cards in the game, with the library's copies (v0.4.2) |
 | `GET /api/v1/cards?owned=true` | any active account | search within the library |
 | `POST /api/v1/admin/users/{id}/wins` | SysOp (`progress.manage`) | set an account's wins, with a reason |

@@ -7,6 +7,11 @@ export type PrintingSummary = components["schemas"]["PrintingSummary"];
 export type CatalogStatus = components["schemas"]["CatalogStatus"];
 export type LibraryView = components["schemas"]["LibraryView"];
 export type LibraryCard = components["schemas"]["LibraryCard"];
+export type LibraryEdition = components["schemas"]["LibraryEdition"];
+export type EditionCopies = components["schemas"]["EditionCopies"];
+/** Which of a card's printings its details list (v0.5.0): every one, the editions the player's
+ * library holds, or only the one chosen (a card pulled from a pack). */
+export type PrintingsShown = "all" | "owned" | "chosen";
 export type CustomCard = components["schemas"]["CustomCardInfo"];
 export type AllianceCards = components["schemas"]["AllianceCards"];
 
@@ -102,6 +107,25 @@ export function ownedWords(card: Pick<CardSummary, "owned">): string | null {
   return card.owned > 0
     ? `In your library: ${card.owned}`
     : "Not in your library";
+}
+
+/** An edition by its set, code and number: "Revised Edition (3ED #150)". */
+export function editionName(
+  edition: Pick<EditionCopies, "set_name" | "set_code" | "collector_number">,
+): string {
+  return `${edition.set_name} (${edition.set_code.toUpperCase()} #${edition.collector_number})`;
+}
+
+/** The editions of a card a library holds, with their copies, in words; null when the library
+ * does not limit the card (v0.5.0). */
+export function editionsWords(
+  card: Pick<CardSummary, "editions">,
+): string | null {
+  if (!card.editions) return null;
+  if (card.editions.length === 0) return "No edition of it";
+  return card.editions
+    .map((edition) => `${editionName(edition)} × ${edition.copies}`)
+    .join(", ");
 }
 
 /** Where a library's copies came from. */

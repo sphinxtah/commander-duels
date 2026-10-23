@@ -3,6 +3,7 @@ import { client, describe } from "../api";
 import { ManaCost } from "../game/Card";
 import { CardTile, ViewSwitch } from "./CardViews";
 import {
+  editionName,
   sourceLabels,
   type CardSummary,
   type LibraryCard,
@@ -21,23 +22,36 @@ const sourceNotes: [Source, string][] = [
     "A playset (4) of each of your allied Planeswalker's own cards, while the alliance lasts.",
   ],
   [
+    "pack",
+    "The cards of the packs you opened at Leng's counter, each in its own edition, yours for good.",
+  ],
+  [
     "grandfathered",
     "The cards your decks held when libraries began, so none of them stopped working.",
   ],
 ];
+/** The sources every library names, whether or not they gave it anything yet. */
+const alwaysNamed: Source[] = ["starter", "alliance"];
+
+function plural(count: number, one: string, many: string): string {
+  return `${count.toLocaleString()} ${count === 1 ? one : many}`;
+}
 
 /**
  * The player's card library (v0.3.1): the cards they build from, each with its copies and where
  * they came from. Copies are a limit per deck, not spent: two decks may each hold every copy. An
  * account that builds from the whole catalog has no library, and is told so. Since v0.5.0 it shows
- * the cards themselves, as the owner asked, with the list a switch away.
+ * the cards themselves, as the owner asked, with the list a switch away, and holds them by edition:
+ * each item is one edition of a card, with that edition's picture, name and copies, and opening it
+ * shows only the editions the library holds.
  */
 export function MyLibrary({
   onOpen,
   view,
   onView,
 }: {
-  onOpen: (card: CardSummary) => void;
+  /** Opens a card at the edition shown. */
+  onOpen: (card: CardSummary, printingId: string) => void;
   view: CardView;
   onView: (view: CardView) => void;
 }) {
@@ -56,11 +70,15 @@ export function MyLibrary({
       active = false;
     };
   }, []);
+  // How many cards (not editions) each source gave.
   const counts = useMemo(() => {
-    const found: Partial<Record<Source, number>> = {};
+    const found: Partial<Record<Source, Set<string>>> = {};
     for (const item of library?.cards ?? [])
-      for (const from of item.sources) found[from] = (found[from] ?? 0) + 1;
-    return found;
+      for (const from of item.sources)
+        (found[from] ??= new Set()).add(item.card.id);
+    return Object.fromEntries(
+      Object.entries(found).map(([from, cards]) => [from, cards.size]),
+    ) as Partial<Record<Source, number>>;
   }, [library]);
   const shown = useMemo(() => {
     const words = find.trim().toLowerCase();
@@ -69,7 +87,9 @@ export function MyLibrary({
         (!source || item.sources.includes(source)) &&
         (!words ||
           item.card.name.toLowerCase().includes(words) ||
-          item.card.type_line.toLowerCase().includes(words)),
+          item.card.type_line.toLowerCase().includes(words) ||
+          item.edition.set_name.toLowerCase().includes(words) ||
+          item.edition.set_code.toLowerCase() === words),
     );
   }, [library, find, source]);
 
@@ -94,24 +114,25 @@ export function MyLibrary({
     (sum, item) => sum + (item.copies ?? 0),
     0,
   );
+  const cards = new Set(library.cards.map((item) => item.card.id)).size;
+  const editions = library.cards.length;
   return (
     <section className={styles.library} aria-labelledby="library-title">
       <h2 id="library-title">Your library</h2>
       <p className={styles.lead}>
-        Your decks are built from these cards. A deck may hold as many copies of
-        a card as your library does; two decks may each hold them all. Basic
-        lands are yours without limit, so they are not listed.
+        Your decks are built from these cards, each in the edition you own. A
+        deck may hold an edition as many times as your library does; two decks
+        may each hold them all. Basic lands are yours without limit, in every
+        edition, so they are not listed.
       </p>
       <dl className={styles.sources}>
         {sourceNotes
-          .filter(([from]) => counts[from] || from !== "grandfathered")
+          .filter(([from]) => counts[from] || alwaysNamed.includes(from))
           .map(([from, note]) => (
             <div key={from}>
               <dt>
                 {sourceLabels[from]}{" "}
-                <small>
-                  {counts[from] ?? 0} {counts[from] === 1 ? "card" : "cards"}
-                </small>
+                <small>{plural(counts[from] ?? 0, "card", "cards")}</small>
               </dt>
               <dd>
                 {note}
@@ -134,7 +155,7 @@ export function MyLibrary({
           <input
             type="search"
             value={find}
-            placeholder="A name or a type"
+            placeholder="A name, a type or a set"
             onChange={(event) => setFind(event.target.value)}
           />
         </label>
@@ -157,15 +178,13 @@ export function MyLibrary({
       </div>
       <div className={styles.resultRow}>
         <p role="status" className={styles.resultLine}>
-          {shown.length === library.cards.length
-            ? `${library.cards.length.toLocaleString()} ${library.cards.length === 1 ? "card" : "cards"}, ${copies.toLocaleString()} ${copies === 1 ? "copy" : "copies"}`
-            : `${shown.length.toLocaleString()} of ${library.cards.length.toLocaleString()} cards`}
+          {shown.length === editions
+            ? `${plural(cards, "card", "cards")} in ${plural(editions, "edition", "editions")}, ${plural(copies, "copy", "copies")}`
+            : `${shown.length.toLocaleString()} of ${plural(editions, "edition", "editions")}`}
         </p>
-        {library.cards.length > 0 && (
-          <ViewSwitch view={view} onChange={onView} />
-        )}
+        {editions > 0 && <ViewSwitch view={view} onChange={onView} />}
       </div>
-      {library.cards.length === 0 ? (
+      {editions === 0 ? (
         <p className={styles.note}>
           Nothing yet beyond basic lands: your two starter decks and an alliance
           fill it.
@@ -173,11 +192,13 @@ export function MyLibrary({
       ) : view === "pictures" ? (
         <ul className={styles.grid} aria-label="Your library">
           {shown.map((item) => (
-            // The tile's own note says the copies; the line under it, where they came from.
+            // The tile's own note says the edition's copies; the line under it, where they came
+            // from.
             <CardTile
-              key={item.card.id}
+              key={item.edition.printing_id}
               card={{ ...item.card, owned: item.copies }}
-              onOpen={onOpen}
+              edition={editionName(item.edition)}
+              onOpen={(card) => onOpen(card, item.edition.printing_id)}
             >
               <span className={styles.tileSources}>
                 {item.sources.map((from) => sourceLabels[from]).join(", ")}
@@ -191,6 +212,7 @@ export function MyLibrary({
             <thead>
               <tr>
                 <th scope="col">Card</th>
+                <th scope="col">Edition</th>
                 <th scope="col">Type</th>
                 <th scope="col">Copies</th>
                 <th scope="col">From</th>
@@ -198,17 +220,20 @@ export function MyLibrary({
             </thead>
             <tbody>
               {shown.map((item) => (
-                <tr key={item.card.id}>
+                <tr key={item.edition.printing_id}>
                   <th scope="row">
                     <button
                       type="button"
                       className={styles.cardLink}
-                      onClick={() => onOpen(item.card)}
+                      onClick={() =>
+                        onOpen(item.card, item.edition.printing_id)
+                      }
                     >
                       {item.card.name}
                     </button>{" "}
                     <ManaCost cost={item.card.mana_cost} />
                   </th>
+                  <td>{editionName(item.edition)}</td>
                   <td>{item.card.type_line}</td>
                   <td>{item.copies ?? "Any number"}</td>
                   <td>

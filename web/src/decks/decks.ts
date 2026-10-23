@@ -69,26 +69,113 @@ export function collectionLocked(
   );
 }
 
+/** A deck entry's card and edition, as the editor tells its rows apart. */
+export function entryKey(
+  entry: Pick<DeckEntry, "card_id" | "printing_id">,
+): string {
+  return `${entry.card_id}|${entry.printing_id ?? ""}`;
+}
+
+/** Why the player's library holds an entry back (v0.5.0): too few copies of the card, or of the
+ * edition it names. */
+export type Shortage = "card" | "edition";
+
 /**
- * The cards the deck holds more copies of than the player's library does, counted as the server
- * counts them: every location but the maybeboard. A card the library does not limit (a basic
- * land, or any card for an account that builds from the whole catalog) is never among them. The
- * server's validation stays the authority; this only marks the deck's rows.
+ * The entries the player's library holds back, counted as the server counts them: every location
+ * but the maybeboard. A card the library does not limit (a basic land, or any card for an account
+ * that builds from the whole catalog) is never among them. Since v0.5.0 the library holds cards by
+ * edition: with enough copies of the card, an entry naming an edition is held back when the deck
+ * holds more of that edition than the library does, and one naming none when the editions the
+ * deck leaves over are too few. Keyed by entryKey. The server's validation stays the authority;
+ * this only marks the deck's rows.
  */
 export function beyondLibrary(
   entries: DeckEntry[],
   cards: Record<string, CardSummary>,
-): Set<string> {
+): Map<string, Shortage> {
+  const playing = entries.filter((entry) => entry.location !== "maybeboard");
   const held = new Map<string, number>();
-  for (const entry of entries)
-    if (entry.location !== "maybeboard")
-      held.set(entry.card_id, (held.get(entry.card_id) ?? 0) + entry.quantity);
-  const found = new Set<string>();
-  for (const [id, count] of held) {
-    const owned = cards[id]?.owned;
-    if (owned !== null && owned !== undefined && count > owned) found.add(id);
+  const named = new Map<string, number>();
+  const unnamed = new Map<string, number>();
+  for (const entry of playing) {
+    held.set(entry.card_id, (held.get(entry.card_id) ?? 0) + entry.quantity);
+    if (entry.printing_id)
+      named.set(
+        entryKey(entry),
+        (named.get(entryKey(entry)) ?? 0) + entry.quantity,
+      );
+    else
+      unnamed.set(
+        entry.card_id,
+        (unnamed.get(entry.card_id) ?? 0) + entry.quantity,
+      );
+  }
+  const found = new Map<string, Shortage>();
+  for (const entry of playing) {
+    const card = cards[entry.card_id];
+    const owned = card?.owned;
+    if (!card || owned === null || owned === undefined) continue;
+    if ((held.get(entry.card_id) ?? 0) > owned) {
+      found.set(entryKey(entry), "card");
+      continue;
+    }
+    if (!card.editions) continue;
+    const copies = (printing: string) =>
+      card.editions?.find((edition) => edition.printing_id === printing)
+        ?.copies ?? 0;
+    if (entry.printing_id) {
+      if ((named.get(entryKey(entry)) ?? 0) > copies(entry.printing_id))
+        found.set(entryKey(entry), "edition");
+      continue;
+    }
+    const spare = card.editions.reduce(
+      (sum, edition) =>
+        sum +
+        Math.max(
+          0,
+          edition.copies -
+            (named.get(
+              entryKey({
+                card_id: entry.card_id,
+                printing_id: edition.printing_id,
+              }),
+            ) ?? 0),
+        ),
+      0,
+    );
+    if ((unnamed.get(entry.card_id) ?? 0) > spare)
+      found.set(entryKey(entry), "edition");
   }
   return found;
+}
+
+/**
+ * The edition a copy added to the deck takes (v0.5.0): of the editions the player's library holds,
+ * the first (the most copies) the deck leaves a copy of, outside the maybeboard. Null when the
+ * library does not limit the card, or the deck holds every copy already: the server's save gives
+ * it one if it can, and says so if it cannot.
+ */
+export function editionFor(
+  card: Pick<CardSummary, "id" | "editions">,
+  entries: DeckEntry[],
+): string | null {
+  if (!card.editions) return null;
+  const used = new Map<string, number>();
+  for (const entry of entries)
+    if (
+      entry.card_id === card.id &&
+      entry.printing_id &&
+      entry.location !== "maybeboard"
+    )
+      used.set(
+        entry.printing_id,
+        (used.get(entry.printing_id) ?? 0) + entry.quantity,
+      );
+  return (
+    card.editions.find(
+      (edition) => edition.copies > (used.get(edition.printing_id) ?? 0),
+    )?.printing_id ?? null
+  );
 }
 
 /** One entry per card, printing and location; quantities added. */

@@ -1235,8 +1235,8 @@ def own_deck(
             raise ApiError(
                 422,
                 "deck_not_playable",
-                f"{deck.title} holds more copies of some cards than your library does: open it "
-                "in the deck builder to see which.",
+                f"{deck.title} holds more copies of some cards, or of their editions, than your "
+                "library does: open it in the deck builder to see which.",
             )
         if not sysop_ok:
             raise ApiError(

@@ -33,6 +33,8 @@ import {
   collectionLocked,
   combine,
   differences,
+  editionFor,
+  entryKey,
   exactly,
   locationNames,
   locationsFor,
@@ -44,6 +46,7 @@ import {
   type DeckDetail,
   type DeckEntry,
   type Location,
+  type Shortage,
   type Validation,
 } from "./decks";
 import styles from "./decks.module.css";
@@ -121,6 +124,9 @@ export function DeckEditor({
       version.current = data.version;
       setValidation(data.validation);
       setCards((current) => ({ ...current, ...data.cards }));
+      // The draft as the server saved it (v0.5.0: copies naming no edition take one the library
+      // holds), unless the player changed it meanwhile: then the next save sends theirs.
+      if (changes.current === sent) setEntries(data.entries);
       setSaveState(changes.current === sent ? "saved" : "dirty");
       setSaveError("");
       return;
@@ -165,10 +171,12 @@ export function DeckEditor({
   }
 
   function add(card: CardSummary, location: Location) {
+    // An edition the player's library holds (v0.5.0), while it has a copy the deck leaves.
+    const printing = editionFor(card, entries);
     change(
       [
         ...entries,
-        { card_id: card.id, printing_id: null, quantity: 1, location },
+        { card_id: card.id, printing_id: printing, quantity: 1, location },
       ],
       card,
     );
@@ -214,6 +222,20 @@ export function DeckEditor({
     if (data)
       setDeck((current) =>
         current ? { ...current, removed_cards: data.removed_cards } : current,
+      );
+    else setMessage(describe(error));
+  }
+
+  async function dismissSwitched() {
+    const { data, error } = await client.DELETE(
+      "/api/v1/decks/{deck_id}/switched-editions",
+      { params: { path: { deck_id: deckId } } },
+    );
+    if (data)
+      setDeck((current) =>
+        current
+          ? { ...current, switched_editions: data.switched_editions }
+          : current,
       );
     else setMessage(describe(error));
   }
@@ -347,6 +369,10 @@ export function DeckEditor({
         />
         <div className={styles.deckColumn}>
           <RemovedCards deck={deck} onDismiss={() => void dismissRemoved()} />
+          <SwitchedEditions
+            deck={deck}
+            onDismiss={() => void dismissSwitched()}
+          />
           <ProblemList
             validation={validation}
             cards={cards}
@@ -402,6 +428,9 @@ export function DeckEditor({
             <CardDetails
               cardId={opened.card.id}
               chosenPrinting={opened.entry?.printing_id ?? null}
+              // A deck entry's edition is one the player's library holds (v0.5.0); the server
+              // lists every printing for a basic land, or an account without a library.
+              printings={opened.entry ? "owned" : "all"}
               onChoosePrinting={
                 opened.entry
                   ? (printingId) => {
@@ -553,6 +582,42 @@ function RemovedCards({
               {card.quantity} {card.name}
             </strong>
             : {card.reason}
+          </li>
+        ))}
+      </ul>
+      <button type="button" className={styles.secondary} onClick={onDismiss}>
+        Dismiss
+      </button>
+    </section>
+  );
+}
+
+/** The copies switched to editions the player's library holds when v0.5.0 deployed, until the
+ * owner dismisses the note. */
+function SwitchedEditions({
+  deck,
+  onDismiss,
+}: {
+  deck: DeckDetail;
+  onDismiss: () => void;
+}) {
+  const switched = deck.switched_editions ?? [];
+  if (switched.length === 0) return null;
+  return (
+    <section className={styles.removed} aria-labelledby="switched-title">
+      <h2 id="switched-title">Editions switched to the ones you own</h2>
+      <p>
+        Decks hold only the editions your library holds, so these copies now
+        name the edition you own. Versions of the deck that games played keep
+        theirs.
+      </p>
+      <ul>
+        {switched.map((item) => (
+          <li key={`${item.name}|${item.before}|${item.after}`}>
+            <strong>
+              {item.quantity} {item.name}
+            </strong>
+            : from {item.before} to {item.after}
           </li>
         ))}
       </ul>
@@ -925,13 +990,14 @@ function DeckSections({
                     )
                     .map((entry) => {
                       const card = cards[entry.card_id];
+                      const shortage = beyond.get(entryKey(entry));
                       return (
                         <li
-                          key={`${entry.card_id}|${entry.printing_id ?? ""}`}
+                          key={entryKey(entry)}
                           id={`entry-${entry.card_id}`}
                           data-highlight={highlight.has(entry.card_id)}
                           data-playable={card?.playable ?? false}
-                          data-locked={beyond.has(entry.card_id) || undefined}
+                          data-locked={shortage ? true : undefined}
                         >
                           <div className={styles.quantity}>
                             <button
@@ -970,20 +1036,18 @@ function DeckSections({
                             onClick={() => card && onOpen(card, entry)}
                           >
                             {card?.name ?? "Loading…"}
-                            {entry.printing_id && (
-                              <small> · chosen printing</small>
+                            {card && entryEdition(entry, card) && (
+                              <small> · {entryEdition(entry, card)}</small>
                             )}
                           </button>
                           {card && <ManaCost cost={card.mana_cost} />}
                           {card && !card.playable && (
                             <StatusBadge card={card} />
                           )}
-                          {card && beyond.has(entry.card_id) && (
+                          {card && shortage && (
                             <span className={styles.lockNote}>
                               <LockIcon />
-                              {card.owned
-                                ? `You own ${card.owned}`
-                                : "Not in your library"}
+                              {lockWords(entry, card, shortage)}
                             </span>
                           )}
                           <button
@@ -1005,6 +1069,34 @@ function DeckSections({
       })}
     </div>
   );
+}
+
+/** The edition a deck entry names, in words: the set of one the library holds (v0.5.0), else
+ * that it is not the library's; for an account without a library, that one was chosen. */
+function entryEdition(entry: DeckEntry, card: CardSummary): string | null {
+  if (!entry.printing_id) return null;
+  if (!card.editions) return "chosen printing";
+  const edition = card.editions.find(
+    (item) => item.printing_id === entry.printing_id,
+  );
+  return edition ? edition.set_name : "an edition not in your library";
+}
+
+/** Why the library holds an entry back, in a few words. */
+function lockWords(
+  entry: DeckEntry,
+  card: CardSummary,
+  shortage: Shortage,
+): string {
+  if (shortage === "card")
+    return card.owned ? `You own ${card.owned}` : "Not in your library";
+  if (!entry.printing_id) return "No edition of yours left";
+  const copies =
+    card.editions?.find((item) => item.printing_id === entry.printing_id)
+      ?.copies ?? 0;
+  return copies
+    ? `You own ${copies} of this edition`
+    : "You don't own this edition";
 }
 
 function percent(value: number): string {

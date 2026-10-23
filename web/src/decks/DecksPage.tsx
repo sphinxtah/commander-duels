@@ -30,6 +30,14 @@ const stateWords: Record<DeckState, string> = {
   draft: "Draft",
 };
 
+/** The copies a deck switched to the editions its owner's library holds (v0.5.0), in words. */
+function switchedWords(
+  switched: NonNullable<DeckSummary["switched_editions"]>,
+): string {
+  const copies = switched.reduce((sum, item) => sum + item.quantity, 0);
+  return `${copies} ${copies === 1 ? "copy" : "copies"} switched to your editions`;
+}
+
 /** A deck's state in the list, with a padlock when the player's library holds it back. */
 function StateBadge({ state }: { state: DeckState }) {
   return (
@@ -301,6 +309,9 @@ function Decks({
                   {/* v0.4.5: the editor's note says which, and why. */}
                   {deck.removed_cards.length > 0 &&
                     ` · ${deck.removed_cards.length} ${deck.removed_cards.length === 1 ? "card" : "cards"} left the game`}
+                  {/* v0.5.0: copies switched to the editions the library holds. */}
+                  {(deck.switched_editions?.length ?? 0) > 0 &&
+                    ` · ${switchedWords(deck.switched_editions ?? [])}`}
                 </span>
                 <NeedsTags needs={deck.needs} format={deck.format} />
               </div>

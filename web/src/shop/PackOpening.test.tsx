@@ -18,9 +18,22 @@ const sound = vi.hoisted(() => ({
   setMuted: vi.fn(),
 }));
 vi.mock("../game/sound/engine", () => ({ getSoundEngine: () => sound }));
-// The card's details are CardViews' own tests; here the dialog only has to name the card.
+// The card's details are CardViews' own tests; here the dialog only has to name the card, and
+// since v0.5.0 the one edition the pack held.
 vi.mock("../catalog/CardViews", () => ({
-  CardDetails: ({ cardId }: { cardId: string }) => <p>Details of {cardId}</p>,
+  CardDetails: ({
+    cardId,
+    chosenPrinting,
+    printings,
+  }: {
+    cardId: string;
+    chosenPrinting?: string;
+    printings?: string;
+  }) => (
+    <p>
+      Details of {cardId} at {chosenPrinting}, {printings ?? "all"}
+    </p>
+  ),
 }));
 
 beforeAll(() => {
@@ -151,7 +164,9 @@ describe("opening a pack", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Details of Mythic Card" }),
     );
-    expect(screen.getByText("Details of card-4")).toBeInTheDocument();
+    expect(
+      screen.getByText("Details of card-4 at printing-4, chosen"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Open another/ }));
     expect(another).toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Back to the shop" }));

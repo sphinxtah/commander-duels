@@ -348,6 +348,21 @@
   color: #8f9e94;
   font-size: 0.72rem;
 }
+/* The edition a library's tile shows (v0.5.0), in the gold of the frames. */
+.tileEdition {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #d4b47a;
+  font-size: 0.74rem;
+}
+/* The editions a library holds of a card, in its details (v0.5.0). */
+.ownedEditions {
+  margin: 4px 0 0;
+  padding: 0 0 0 18px;
+  color: #b5d6c0;
+  font-size: 0.82rem;
+}
 .note {
   display: block;
   margin-top: 4px;
