@@ -507,7 +507,7 @@ describe("a Two-Headed Giant teammate's plate (v0.5.0)", () => {
   it("is marked as your teammate's, with shared life and its hand named", () => {
     plate(giant(), 1);
     expect(screen.getByText("Your teammate")).toBeInTheDocument();
-    expect(screen.getByText("Teammate · shared life")).toBeInTheDocument();
+    expect(screen.getByText("Teammate", { exact: true })).toBeInTheDocument();
     const hand = screen.getByRole("img", {
       name: /^2 cards in your teammate's hand: /,
     });
@@ -519,7 +519,9 @@ describe("a Two-Headed Giant teammate's plate (v0.5.0)", () => {
 
   it("is an opponent's as at any table for the other team", () => {
     plate(giant(), 2);
-    expect(screen.queryByText("Teammate · shared life")).toBeNull();
-    expect(screen.getByRole("img", { name: /^\d+ cards in hand$/ })).toBeVisible();
+    expect(screen.queryByText("Teammate", { exact: true })).toBeNull();
+    expect(
+      screen.getByRole("img", { name: /^\d+ cards in hand$/ }),
+    ).toBeVisible();
   });
 });

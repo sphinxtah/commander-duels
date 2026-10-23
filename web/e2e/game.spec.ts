@@ -195,9 +195,18 @@ class Table {
           this.problems.push(
             `hand holds ${card.name}, not in this seat's deck`,
           );
-      for (const opponent of view.opponents)
-        for (const key of ["hand", "library"])
-          if (key in opponent) this.problems.push(`an opponent carries ${key}`);
+      // Since v0.5.0 every player carries `hand`, null but for a Two-Headed Giant teammate's,
+      // whose hand is the seat's to see (rule 810.5).
+      for (const opponent of view.opponents) {
+        const teammate =
+          opponent.team != null && opponent.team === view.you?.team;
+        for (const key of ["hand", "library"] as const)
+          if (
+            (opponent as unknown as Record<string, unknown>)[key] != null &&
+            !(key === "hand" && teammate)
+          )
+            this.problems.push(`an opponent carries ${key}`);
+      }
     }
     // As the engine's own check: a concealed name may not be a card's or an option's name, nor a
     // phrase in a prompt, before it has been public. Type lines and rules text are not checked,
@@ -796,10 +805,11 @@ test.describe("practice games in the browser", () => {
       turnCap: 4,
     });
     await expect(page.getByRole("article")).toHaveCount(3);
-    await expect(page.getByText("Teammate · shared life")).toBeVisible();
+    await expect(page.getByText("Teammate", { exact: true })).toBeVisible();
+    // The plates' articles are the canvas painter's accessible layer: present, not drawn.
     await expect(
       page.getByRole("article", { name: /seat 2, your teammate$/ }),
-    ).toBeVisible();
+    ).toHaveCount(1);
     const { snapshot, answered } = await play(page, table, "mouse");
     note(
       testInfo,

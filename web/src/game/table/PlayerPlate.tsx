@@ -563,7 +563,7 @@ export function PlayerPlate({
       >
         {player.teammate && (
           <span className={styles.pill} data-tone="team">
-            Teammate · shared life
+            Teammate
           </span>
         )}
         {player.active && <span className={styles.pill}>Active turn</span>}

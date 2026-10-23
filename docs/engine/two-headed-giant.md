@@ -91,7 +91,7 @@ The practice route (`POST /api/v1/practice-games`, `format: "two_headed_giant"`,
 The web app (since v0.5.0):
 - **Play page.** Two-Headed Giant is marked "Early" instead of "Coming soon" (`GET /api/v1/formats` says `available` and `early`), and its details say what the early version is.
 - **Practice table.** The format reads "Early · a bot teammate against two bots, 30 life a team"; the player's Legacy decks are offered; the bots' decks are labelled the teammate's and the two opponents'.
-- **Game screen.** The four seats sit as at any four-player table (the layout is unchanged): you below, your teammate first above. The teammate's plate is titled "Your teammate" with a "Teammate · shared life" pill; life labels say "team life", and seat labels say which players are your teammate and which the other team. The turn line says "Your team's turn" while your teammate holds the team's turn, and a team's win is a victory for both teammates. The teammate's hand count names the cards in that hand (on hover, and to screen readers); the table does not lay them out as cards yet.
+- **Game screen.** The four seats sit as at any four-player table (the layout is unchanged): you below, your teammate first above. The teammate's plate is titled "Your teammate" with a "Teammate" pill (v0.5.0 first said "Teammate · shared life", which the plate cut short); life labels say "team life", and seat labels say which players are your teammate and which the other team. The turn line says "Your team's turn" while your teammate holds the team's turn, and a team's win is a victory for both teammates. The teammate's hand count names the cards in that hand (on hover, and to screen readers); the table does not lay them out as cards yet.
 
 ## How it was checked
 

@@ -99,8 +99,12 @@ class Checks:
         view = snapshot.get("view") or {}
         you = view.get("you") or {}
         for player in [you, *(view.get("opponents") or [])]:
+            # Since v0.5.0 a player carries `hand`, null but for a Two-Headed Giant teammate's,
+            # whose hand is the seat's to see (rule 810.5).
+            teammate = player is not you and player.get("team") is not None
+            teammate = teammate and player.get("team") == you.get("team")
             for key in ("hand", "library"):
-                if key in player:
+                if player.get(key) is not None and not (key == "hand" and teammate):
                     self.problem(f"seat {player.get('seat')}'s {key} contents reached seat {seat}")
         if you and len(view.get("hand", [])) != you.get("hand_count"):
             self.problem(f"seat {seat}'s hand size disagrees with its count")
