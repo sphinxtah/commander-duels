@@ -11,13 +11,24 @@ import type {
 import styles from "./table.module.css";
 
 // The zone browsers (ZD1–ZD4): everything in a graveyard, an exile, a command zone, a board, a
-// pile, the stack or the hand, as whole cards that answer as they do on the table. The table
-// shows only the top of these, or as many as fit; a browser lists them all.
+// pile, the stack or the hand (yours, or a Two-Headed Giant teammate's since v0.5.1), as whole
+// cards that answer as they do on the table. The table shows only the top of these, or as many as
+// fit; a browser lists them all.
 
 function playerAt(model: TableModel, seat: Seat): TablePlayer | null {
   return (
     [model.anchored, ...model.opponents].find((p) => p?.seat === seat) ?? null
   );
+}
+
+/** A hand browser's seat when it lists another seat's hand than the anchored one. */
+function shownSeat(
+  target: Extract<ZoneBrowserTarget, { kind: "hand" }>,
+  model: TableModel,
+): Seat | null {
+  return target.seat === undefined || target.seat === model.anchored?.seat
+    ? null
+    : target.seat;
 }
 
 /** "Your", the player's name, or "Seat N" when the seat is not in the view (defect 7). Visible
@@ -52,8 +63,10 @@ export function zoneTitle(
     }
     case "stack":
       return "Stack";
-    case "hand":
-      return model.handTitle;
+    case "hand": {
+      const seat = shownSeat(target, model);
+      return seat === null ? model.handTitle : `${whose(model, seat)} hand`;
+    }
   }
 }
 
@@ -73,8 +86,10 @@ function keysOf(target: ZoneBrowserTarget, model: TableModel): string[] {
     }
     case "stack":
       return model.stack.map((entry) => entry.key);
-    case "hand":
-      return model.hand;
+    case "hand": {
+      const seat = shownSeat(target, model);
+      return seat === null ? model.hand : (playerAt(model, seat)?.hand ?? []);
+    }
   }
 }
 

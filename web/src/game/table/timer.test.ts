@@ -185,6 +185,19 @@ describe("the response timer's eligibility", () => {
     expect(timerKey(input({ view: blocks }))).toBe(
       "p1|attack:3:declare_blockers",
     );
+    // In Two-Headed Giant the other team's attack is an opponent's (v0.5.1).
+    const giant = view({
+      ...attack,
+      active_seat: 2,
+      you: { ...player(0, "Alice"), team: 0 },
+      opponents: [
+        { ...player(1, "Bram"), team: 0 },
+        { ...player(2, "Cara"), team: 1 },
+      ],
+    });
+    expect(timerKey(input({ view: giant }))).toBe(
+      "p1|attack:3:declare_attackers",
+    );
   });
 
   it.each<[string, Partial<TimerInput>]>([
@@ -213,6 +226,20 @@ describe("the response timer's eligibility", () => {
     [
       "the attack is the seat's own",
       { view: view({ ...attack, active_seat: 0 }) },
+    ],
+    [
+      "the attack is the seat's Two-Headed Giant team's, its teammate holding the turn",
+      {
+        view: view({
+          ...attack,
+          active_seat: 1,
+          you: { ...player(0, "Alice"), team: 0 },
+          opponents: [
+            { ...player(1, "Bram"), team: 0 },
+            { ...player(2, "Cara"), team: 1 },
+          ],
+        }),
+      },
     ],
     ["nobody attacks", { view: view({ ...attack, combat: [] }) }],
     [

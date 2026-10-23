@@ -369,6 +369,79 @@ describe("moving cards", () => {
   });
 });
 
+describe("a Two-Headed Giant teammate's hand (v0.5.1)", () => {
+  it("draws the teammate's cards by key into their fan, and counts the other team's", () => {
+    const a = fx("giant");
+    const drawn = card(CARDS.mountain);
+    const b = next(a, (v) => {
+      const mate = v.opponents[0];
+      mate.hand!.push(drawn);
+      mate.hand_count++;
+      mate.library_count--;
+      v.opponents[1].hand_count++;
+      v.opponents[1].library_count--;
+    });
+    expect(of(events(a, b), "draw")).toEqual([
+      { type: "draw", seat: 1, keys: [`hand:${drawn.id}`], count: 1 },
+      { type: "draw", seat: 2, keys: [], count: 1 },
+    ]);
+  });
+
+  it("plays the teammate's spell and land from their cards, face up", () => {
+    const a = fx("giant");
+    const theirs = a.snapshot.view!.opponents[0].hand!;
+    const bolt = theirs.find((c) => c.name === "Lightning Bolt")!;
+    const mountain = theirs.find((c) => c.name === "Mountain")!;
+    const item = spell(1, CARDS.lightningBolt);
+    const land = permanent(1, CARDS.mountain);
+    const b = next(a, (v) => {
+      const mate = v.opponents[0];
+      mate.hand = mate.hand!.filter(
+        (c) => c.id !== bolt.id && c.id !== mountain.id,
+      );
+      mate.hand_count -= 2;
+      v.stack.push(item);
+      v.battlefield.push(land);
+    });
+    const list = events(a, b);
+    expect(of(list, "cast")).toEqual([
+      {
+        type: "cast",
+        key: `stack:${item.id}`,
+        controllerSeat: 1,
+        from: { kind: "node", key: `hand:${bolt.id}` },
+      },
+    ]);
+    expect(of(list, "enter")[0].from).toEqual({
+      kind: "node",
+      key: `hand:${mountain.id}`,
+    });
+    expect(of(list, "draw")).toEqual([]);
+  });
+
+  it("calls a turn the teammate holds the viewer's own (805.4a)", () => {
+    const a = fx("giant");
+    const b = next(a, (v) => {
+      v.turn = 9;
+      v.active_seat = 1;
+    });
+    expect(of(events(a, b), "turn")).toEqual([
+      { type: "turn", turn: 9, activeSeat: 1, yours: true },
+    ]);
+    const c = next(a, (v) => {
+      v.turn = 8;
+      v.active_seat = 2;
+    });
+    expect(of(events(a, c), "turn")[0].yours).toBe(false);
+    const watched = fx("giantSysop");
+    const d = next(watched, (v) => {
+      v.turn = 8;
+      v.active_seat = 0;
+    });
+    expect(of(events(watched, d), "turn")[0].yours).toBe(false);
+  });
+});
+
 describe("changes in place", () => {
   it("reports taps, counters, damage, life and commander damage", () => {
     const a = fx("three");
@@ -433,7 +506,7 @@ describe("changes in place", () => {
       v.phase = "beginning";
     });
     expect(events(a, b).slice(0, 2)).toEqual([
-      { type: "turn", turn: 8, activeSeat: 1 },
+      { type: "turn", turn: 8, activeSeat: 1, yours: false },
       { type: "step", phase: "beginning", step: "upkeep", emblem: "turn" },
     ]);
     const before = next(fx("three"), (v) => {

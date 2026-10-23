@@ -66,6 +66,7 @@ test.describe("the table at every size", () => {
     "stress",
     "stack",
     "hand25",
+    "giant",
   ] as FixtureName[])
     test(`draws the ${fixture} table at 1920 × 1080 with every control in reach`, async ({
       browser,
@@ -510,5 +511,252 @@ test.describe("a human table's chat (v0.4.4)", () => {
     expect(table.commands).toEqual([]);
     expect(await occluded(page)).toEqual([]);
     expect(await table.problems()).toEqual([]);
+  });
+});
+
+// Two-Headed Giant at the table (v0.5.1): four humans in two teams, Alice's view. Her teammate
+// bram's hand lies face up under his board (810.5); cara's and dave's are counts only.
+test.describe("Two-Headed Giant at the table (v0.5.1)", () => {
+  const HUMANS = { 1: "bram", 2: "cara", 3: "dave" };
+
+  /** A copy of a snapshot one revision on, changed by `change`. */
+  function after(
+    snapshot: TableFixture["snapshot"],
+    change: (view: NonNullable<TableFixture["snapshot"]["view"]>) => void,
+  ): TableFixture["snapshot"] {
+    const next = structuredClone(snapshot);
+    next.revision += 1;
+    change(next.view!);
+    return next;
+  }
+
+  for (const [painter, size] of [
+    ["webgl", { width: 1280, height: 720, dpr: 1 }],
+    ["dom", { width: 1920, height: 1080, dpr: 1 }],
+  ] as const)
+    test(`shows the teammate's hand face up by their board, never to be played (${painter}, ${size.width} × ${size.height})`, async ({
+      browser,
+    }, testInfo) => {
+      const page = await tablePage(browser, size);
+      const table = await openTable(page, {
+        fixture: "giant",
+        humans: HUMANS,
+        settings: { painter: painter === "dom" ? "dom" : "auto" },
+      });
+      await sizeChecks(page, size, painter);
+
+      // The teams: bram is Alice's teammate, at the left; cara and dave the other team.
+      const mate = page.getByRole("article", {
+        name: "bram, seat 2, your teammate",
+      });
+      await expect(mate.getByText("Teammate", { exact: true })).toBeVisible();
+      for (const name of ["cara, seat 3", "dave, seat 4"]) {
+        const other = page.getByRole("article", {
+          name: `${name}, the other team`,
+        });
+        await expect(other.getByText("Other team")).toBeVisible();
+        await expect(other.getByText("7 team poison")).toBeVisible();
+        await expect(other.getByRole("group", { name: /hand/ })).toHaveCount(0);
+      }
+      await expect(
+        page.getByRole("img", { name: "24 team life" }).first(),
+      ).toBeAttached();
+
+      // bram's six cards, each a named button, painted face up, none offered.
+      const hand = mate.getByRole("group", { name: "bram's hand" });
+      const cards = hand.getByRole("button");
+      await expect(cards).toHaveCount(6);
+      await expect(cards.first()).toHaveAccessibleName(
+        "Lightning Bolt, Instant",
+      );
+      await expect(page.locator('[data-role="teammate-hand"]')).toHaveCount(6);
+      await expect(
+        page.locator('[data-role="teammate-hand"][data-actionable]'),
+      ).toHaveCount(0);
+      if (painter === "dom")
+        for (const card of await cards.all())
+          await expect(card.locator("img")).toHaveCount(1);
+      expect(await occluded(page)).toEqual([]);
+
+      // Hovering one magnifies it, saying whose hand it is in.
+      const guide = cards.nth(2);
+      await expect(guide).toHaveAccessibleName(/^Goblin Guide/);
+      await guide.hover();
+      const magnifier = page.locator("[data-magnifier]").first();
+      await expect(magnifier).toBeVisible();
+      await expect(magnifier).toContainText("Goblin Guide");
+      await expect(magnifier).toContainText("In bram’s hand");
+      await page.screenshot({
+        path: testInfo.outputPath(`table-giant-${painter}-${size.width}.jpg`),
+        quality: 80,
+      });
+
+      // The keyboard reaches them as one zone: the arrow keys move along it.
+      await page.keyboard.press("Shift");
+      await cards.first().focus();
+      await page.keyboard.press("ArrowRight");
+      await expect(cards.nth(1)).toBeFocused();
+      await expect(magnifier).toContainText("Mountain");
+
+      // Pressing one shows its details and plays nothing.
+      await cards.first().click();
+      const zoom = page.getByRole("dialog", { name: /Lightning Bolt/ });
+      await expect(zoom).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(zoom).toBeHidden();
+
+      // bram draws a Swamp and plays his Mountain: the fan follows.
+      const swamp = {
+        id: "g-swamp",
+        hidden: false,
+        name: "Swamp",
+        mana_cost: null,
+        type_line: "Basic Land — Swamp",
+        power: null,
+        toughness: null,
+        rules: ["({T}: Add {B}.)"],
+      };
+      const mountain = table.fixture.snapshot.view!.opponents[0].hand![1];
+      table.send(
+        after(table.fixture.snapshot, (view) => {
+          const bram = view.opponents[0];
+          bram.hand = [
+            ...bram.hand!.filter((card) => card.id !== mountain.id),
+            swamp,
+          ];
+          bram.library_count -= 1;
+          view.battlefield.push({
+            id: mountain.id,
+            controller_seat: 1,
+            owner_seat: 1,
+            card: mountain,
+            tapped: false,
+            summoning_sick: false,
+            damage: 0,
+            counters: {},
+            attacking: false,
+            blocking: false,
+            attached_to: null,
+          });
+        }),
+      );
+      await expect(hand.getByRole("button", { name: /^Swamp/ })).toHaveCount(1);
+      await expect(hand.getByRole("button", { name: /^Mountain/ })).toHaveCount(
+        0,
+      );
+      await expect(cards).toHaveCount(6);
+      await expect(
+        mate
+          .getByRole("group", { name: "bram's battlefield: lands" })
+          .getByRole("button", { name: /^Mountain/ }),
+      ).toHaveCount(4);
+      expect(await occluded(page)).toEqual([]);
+      expect(table.commands).toEqual([]);
+      expect(await table.problems()).toEqual([]);
+      await page.context().close();
+    });
+
+  test("says whose turn it is by team, and names the winning team", async ({
+    browser,
+  }) => {
+    const size = { width: 1920, height: 1080, dpr: 1 };
+    const page = await tablePage(browser, size);
+    const table = await openTable(page, { fixture: "giant", humans: HUMANS });
+    await sizeChecks(page, size);
+    const turn = page.locator("p[aria-live]").first();
+    await expect(turn).toContainText("Turn 7 · Your turn");
+    // bram holds the team's turn: it is Alice's too.
+    let snapshot = after(table.fixture.snapshot, (view) => {
+      view.turn = 8;
+      view.active_seat = 1;
+    });
+    table.send(snapshot);
+    await expect(turn).toContainText("Turn 8 · Your team’s turn");
+    snapshot = after(snapshot, (view) => {
+      view.turn = 9;
+      view.active_seat = 2;
+    });
+    table.send(snapshot);
+    await expect(turn).toContainText("Turn 9 · Other team’s turn");
+    // The whole line shows: while connected the status chip's place is the line's too.
+    expect(
+      await turn
+        .locator("span")
+        .first()
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
+    table.send({
+      ...after(snapshot, () => undefined),
+      status: "finished",
+      prompt: null,
+      result: {
+        kind: "completed",
+        winner_seat: 0,
+        winner_seats: [0, 1],
+        draw: false,
+        conceded_seats: [],
+        turns: 9,
+        error: null,
+      },
+    });
+    await expect(
+      page
+        .getByRole("dialog", { name: "Victory" })
+        .getByText("You and bram won in 9 turns."),
+    ).toBeVisible();
+    expect(await table.problems()).toEqual([]);
+    await page.context().close();
+  });
+
+  test("numbers each team for SysOp observing, who sees the watched seat's teammate's hand", async ({
+    browser,
+  }, testInfo) => {
+    const size = { width: 1920, height: 1080, dpr: 1 };
+    const page = await tablePage(browser, size);
+    const table = await openTable(page, { fixture: "giantSysop" });
+    await sizeChecks(page, size);
+    await expect(page.locator("p[aria-live]").first()).toContainText(
+      "Turn 7 · Team 1’s turn",
+    );
+    for (const [name, team] of [
+      ["Bot 2, seat 2, team 1", "Team 1"],
+      ["Bot 3, seat 3, team 2", "Team 2"],
+      ["Bot 4, seat 4, team 2", "Team 2"],
+    ])
+      await expect(
+        page.getByRole("article", { name }).getByText(team, { exact: true }),
+      ).toBeVisible();
+    await expect(
+      page
+        .getByRole("article", { name: "Bot 2, seat 2, team 1" })
+        .getByRole("group", { name: "Bot 2's hand" })
+        .getByRole("button"),
+    ).toHaveCount(6);
+    await page.screenshot({
+      path: testInfo.outputPath("table-giant-sysop.jpg"),
+      quality: 80,
+    });
+    table.send({
+      ...after(table.fixture.snapshot, () => undefined),
+      status: "finished",
+      prompt: null,
+      result: {
+        kind: "completed",
+        winner_seat: 2,
+        winner_seats: [2, 3],
+        draw: false,
+        conceded_seats: [],
+        turns: 9,
+        error: null,
+      },
+    });
+    await expect(
+      page
+        .getByRole("dialog", { name: "Game over" })
+        .getByText("Team 2 won in 9 turns: Bot 3 and Bot 4."),
+    ).toBeVisible();
+    expect(table.commands).toEqual([]);
+    expect(await table.problems()).toEqual([]);
+    await page.context().close();
   });
 });

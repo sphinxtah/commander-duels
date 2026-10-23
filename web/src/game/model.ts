@@ -68,6 +68,9 @@ export function objectIndex(view: GameView | null): Map<ObjectId, Located> {
     index.set(card.id, { id: card.id, zone, seat, card });
   view.hand.forEach((card) => add(card, "hand", view.seat));
   for (const player of players(view)) {
+    // A Two-Headed Giant teammate's hand, which the seat may see (810.5, v0.5.1).
+    if (player !== view.you)
+      player.hand?.forEach((card) => add(card, "hand", player.seat));
     player.graveyard.forEach((card) => add(card, "graveyard", player.seat));
     player.exile.forEach((card) => add(card, "exile", player.seat));
     player.command_zone.forEach((card) => add(card, "command", player.seat));
@@ -275,24 +278,36 @@ export function resultText(
       detail: `The game ended in a draw after ${turns}.`,
     };
   if (result.winner_seat !== null) {
-    // A team wins together (Two-Headed Giant): either teammate's seat is a victory.
+    // A team wins together (Two-Headed Giant): either teammate's seat is a victory. Since v0.5.1
+    // the result names the winning team: you and your teammate, the other team's players, or to
+    // SysOp observing the team's number as the plates give it.
     const seats = result.winner_seats ?? [];
     const team = seats.length > 1 ? seats : [];
-    if (result.winner_seat === seat || (seat !== null && team.includes(seat)))
+    if (result.winner_seat === seat || (seat !== null && team.includes(seat))) {
+      const mates = team.filter((other) => other !== seat).map(nameOf);
       return {
         title: "Victory",
         detail:
           team.length > 1
-            ? `Your team won in ${turns}.`
+            ? mates.length > 0
+              ? `You and ${mates.join(" and ")} won in ${turns}.`
+              : `Your team won in ${turns}.`
             : `You won in ${turns}.`,
       };
+    }
     const winner =
       team.length > 1
         ? team.map(nameOf).join(" and ")
         : nameOf(result.winner_seat);
+    const number = view
+      ? players(view).find((p) => p.seat === team[0])?.team
+      : undefined;
     return {
       title: seat === null ? "Game over" : "Defeat",
-      detail: `${winner} won in ${turns}.`,
+      detail:
+        seat === null && team.length > 1 && typeof number === "number"
+          ? `Team ${number + 1} won in ${turns}: ${winner}.`
+          : `${winner} won in ${turns}.`,
     };
   }
   const kinds: Record<string, string> = {

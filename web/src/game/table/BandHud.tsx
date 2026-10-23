@@ -107,14 +107,18 @@ export function BandHud({
   const chatAt =
     chat &&
     diamond(BAND.hud.inspection + (sysop ? step : 0), BAND.y, BAND.hud.side);
+  // While connected the status chip is hidden, and the turn line takes its place too (v0.5.1): a
+  // long line ("Turn 12 · Your team’s turn") stays whole.
+  const connected = statusText === "Connected";
+  const status = band?.status ?? BAND.status;
+  const shown = band && {
+    ...band.turnText,
+    w: connected ? status.x + status.w - band.turnText.x : band.turnText.w,
+  };
   const turnText =
-    band && chat && sysop
-      ? {
-          ...band.turnText,
-          x: band.turnText.x + step,
-          w: band.turnText.w - step,
-        }
-      : band?.turnText;
+    shown && chat && sysop
+      ? { ...shown, x: shown.x + step, w: shown.w - step }
+      : shown;
   const toggle = (id: DrawerId) => ({
     "aria-expanded": drawer === id,
     "aria-controls": `drawer-${id}`,
@@ -200,10 +204,10 @@ export function BandHud({
       )}
       <span
         className={styles.status}
-        style={boxStyle(band?.status ?? BAND.status)}
+        style={boxStyle(status)}
         role="status"
         data-phase={statusPhase}
-        data-connected={statusText === "Connected" || undefined}
+        data-connected={connected || undefined}
       >
         {statusText}
       </span>

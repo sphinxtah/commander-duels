@@ -187,7 +187,9 @@ function cueOf(
     case "block":
       return { cue: "block" };
     case "turn":
-      return viewSeat !== null && event.activeSeat === viewSeat
+      // A Two-Headed Giant teammate's turn is the viewer's too (v0.5.1): the event says so.
+      return (event.yours ??
+        (viewSeat !== null && event.activeSeat === viewSeat))
         ? { cue: "yourTurn" }
         : null;
     case "step":

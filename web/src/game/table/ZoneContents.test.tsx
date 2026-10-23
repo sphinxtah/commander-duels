@@ -156,6 +156,29 @@ describe("zone browsers", () => {
     ).toHaveLength(25);
   });
 
+  it("show a Two-Headed Giant teammate's whole hand, which plays nothing (v0.5.1)", () => {
+    const giant = modelOf("giant");
+    expect(zoneTitle({ kind: "hand", seat: 1 }, giant)).toBe("Bot 2’s hand");
+    expect(zoneTitle({ kind: "hand", seat: 0 }, giant)).toBe("Your hand");
+    const { model, game } = browse("giant", { kind: "hand", seat: 1 });
+    const cards = within(
+      screen.getByRole("group", { name: "Bot 2’s hand" }),
+    ).getAllByRole("button");
+    expect(cards.map((card) => card.dataset.card)).toEqual(
+      model.opponents[0].hand!.map((key) => model.cards.get(key)!.id),
+    );
+    fireEvent.click(cards[0]);
+    expect(game.choose).not.toHaveBeenCalled();
+    expect(game.zoom).toHaveBeenCalled();
+    // A seat whose hand this viewer may not see lists nothing.
+    expect(zoneTitle({ kind: "hand", seat: 2 }, giant)).toBe("Bot 3’s hand");
+  });
+
+  it("list no other seat's hand", () => {
+    browse("giant", { kind: "hand", seat: 2 });
+    expect(screen.getByText("Empty")).toBeInTheDocument();
+  });
+
   it("show the whole stack, top first, items past the sixth included", () => {
     const { model } = browse("stack", { kind: "stack" });
     const items = within(

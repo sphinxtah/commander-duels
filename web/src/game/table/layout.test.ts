@@ -11,12 +11,14 @@ import { MIN_ROW_SCALE, diamondBox, rowCard } from "./geometry";
 import {
   dropZoneAt,
   fanHand,
+  fanTeamHand,
   hitEntries,
   hitTest,
   imageRect,
   layoutTable,
   magnifierSide,
   packRow,
+  teamHandRegion,
   validateHits,
   type RowUnitBox,
 } from "./layout";
@@ -499,6 +501,174 @@ describe("pointing at the table", () => {
     expect(magnifierSide(959)).toBe("right");
     expect(magnifierSide(960)).toBe("left");
     expect(magnifierSide(1800)).toBe("left");
+  });
+});
+
+describe("a Two-Headed Giant teammate's hand (v0.5.1)", () => {
+  /** The giant fixture with the teammate holding `n` cards. */
+  function holding(n: number): TableModel {
+    const f = tableFixture("giant");
+    const mate = f.snapshot.view!.opponents[0];
+    const first = mate.hand![0];
+    mate.hand = Array.from({ length: n }, (_, i) => ({
+      ...first,
+      id: `mate-${i}`,
+    }));
+    mate.hand_count = n;
+    return model(f);
+  }
+  const hand = (l: TableLayout, m: TableModel) =>
+    m.opponents[0].hand!.map((key) => card(l, key));
+
+  it("fans face up under the teammate's board, in the left column by the band", () => {
+    const m = fixtureModel("giant");
+    const l = layout(m);
+    expect(validateHits(l, m)).toEqual([]);
+    const cards = hand(l, m);
+    expect(cards).toHaveLength(6);
+    const front = Math.max(
+      ...[...l.nodes.values()]
+        .filter(
+          (n): n is CardNode =>
+            n.kind === "card" &&
+            n.role !== "teammate-hand" &&
+            m.cards.get(n.key)?.controllerSeat === 1,
+        )
+        .map((n) => n.hit!.y + n.hit!.h),
+    );
+    for (const node of cards) {
+      expect(node).toMatchObject({
+        role: "teammate-hand",
+        faceUp: true,
+        unit: "hand:1",
+        mark: "none",
+        badges: [],
+        tag: null,
+      });
+      const hit = node.hit!;
+      expect(hit.x).toBeGreaterThanOrEqual(20);
+      expect(hit.x + hit.w).toBeLessThanOrEqual(590);
+      expect(hit.w).toBeGreaterThanOrEqual(36);
+      expect(hit.y).toBeGreaterThanOrEqual(front);
+      expect(hit.y + hit.h).toBeLessThanOrEqual(488);
+      expect(Math.abs(node.rotation)).toBeLessThanOrEqual(6);
+    }
+    // Left to right, slices of the same step, the last card whole.
+    const xs = cards.map((n) => n.hit!.x);
+    expect([...xs].sort((a, b) => a - b)).toEqual(xs);
+    expect(cards.at(-1)!.hit!.w).toBeCloseTo(62, 5);
+    expect(l.rows.find((r) => r.key === "hand:1")).toEqual({
+      key: "hand:1",
+      seat: 1,
+      label: "Bot 2's hand",
+      nodes: m.opponents[0].hand,
+    });
+    // After the teammate's battlefield in the DOM's order, before the other team's.
+    const order = l.rows.map((r) => r.key);
+    expect(order.indexOf("hand:1")).toBeGreaterThan(
+      order.indexOf("row:1:lands"),
+    );
+    expect(order.indexOf("hand:1")).toBeLessThan(order.indexOf("row:2:others"));
+    // The other team's columns keep their rows where they were.
+    expect(
+      Math.min(
+        ...[...l.nodes.values()]
+          .filter(
+            (n): n is CardNode =>
+              n.kind === "card" && m.cards.get(n.key)?.controllerSeat === 2,
+          )
+          .map((n) => n.face.y),
+      ),
+    ).toBeCloseTo(232 - rowCard(232, 0.66).h / 2, 3);
+  });
+
+  it("keeps every card a hit up to fifteen, then puts the rest behind a “+N” listing the hand", () => {
+    for (const n of [1, 7, 15]) {
+      const m = holding(n);
+      const l = layout(m);
+      expect(validateHits(l, m)).toEqual([]);
+      expect(hand(l, m).every((node) => node.hit)).toBe(true);
+      expect(l.nodes.has("more:hand:1")).toBe(false);
+    }
+    const m = holding(20);
+    const l = layout(m);
+    expect(validateHits(l, m)).toEqual([]);
+    expect(hand(l, m).filter((node) => node.hit)).toHaveLength(14);
+    expect(more(l, "more:hand:1")).toMatchObject({
+      count: 6,
+      opens: { kind: "hand", seat: 1 },
+      label: "Show all 20 cards in Bot 2's hand (6 more)",
+    });
+    expect(l.rows.find((r) => r.key === "hand:1")!.nodes.at(-1)).toBe(
+      "more:hand:1",
+    );
+    // An empty hand draws nothing and lists no row.
+    const none = layout(holding(0));
+    expect(none.rows.some((r) => r.key === "hand:1")).toBe(false);
+  });
+
+  it("stays with the teammate's expanded board, and waits beside a chip", () => {
+    const m = holding(9);
+    const expanded = layout(m, 1);
+    expect(expanded.expandedSeat).toBe(1);
+    expect(validateHits(expanded, m)).toEqual([]);
+    expect(hand(expanded, m).every((node) => node.hit)).toBe(true);
+    const chipped = layout(m, 2);
+    expect(chipped.expandedSeat).toBe(2);
+    expect(chipped.players.get(1)?.chip).toBe(true);
+    expect(validateHits(chipped, m)).toEqual([]);
+    expect(m.opponents[0].hand!.some((key) => chipped.nodes.has(key))).toBe(
+      false,
+    );
+  });
+
+  it("takes no attack dropped on the teammate", () => {
+    const l = layout(fixtureModel("giant"));
+    expect(
+      l.drops.some((drop) => drop.kind === "attack" && drop.seat === 1),
+    ).toBe(false);
+    expect(dropZoneAt(l, { x: 300, y: 300 })).toBeNull();
+    expect(dropZoneAt(l, { x: 960, y: 300 })).toMatchObject({
+      kind: "attack",
+      seat: 2,
+    });
+  });
+
+  it("holds the invariants on 300 random Two-Headed Giant boards", () => {
+    const problems: string[] = [];
+    for (let seed = 1; seed <= 300; seed++) {
+      const f = randomFixture(seed, 4, { twoHeadedGiant: true });
+      const m = model(f);
+      const seat = [null, 1, 2, 3][seed % 4];
+      const found = validateHits(layout(m, seat, seed % 2 ? 1 : 1.25), m);
+      if (found.length > 0)
+        problems.push(`${f.name}: ${found.slice(0, 4).join("; ")}`);
+    }
+    expect(problems).toEqual([]);
+  }, 15_000);
+
+  it("fans at most as many cards as keep 36 su each, on one side of the stack's lane", () => {
+    expect(teamHandRegion({ x: 0, y: 0, w: 640, h: 476 })).toEqual({
+      x0: 20,
+      x1: 590,
+    });
+    expect(teamHandRegion({ x: 0, y: 0, w: 1920, h: 488 })).toEqual({
+      x0: 20,
+      x1: 590,
+    });
+    expect(teamHandRegion({ x: 1280, y: 0, w: 640, h: 476 })).toEqual({
+      x0: 1330,
+      x1: 1870,
+    });
+    const slots = fanTeamHand(30, { x0: 20, x1: 590 });
+    expect(slots).toHaveLength(15);
+    for (const [i, slot] of slots.entries())
+      if (i < slots.length - 1)
+        expect(slots[i + 1].hit.x - slot.hit.x).toBeGreaterThanOrEqual(36);
+    expect(fanTeamHand(3, { x0: 20, x1: 590 }).map((s) => s.hit.w)).toEqual([
+      50, 50, 62,
+    ]);
+    expect(fanTeamHand(5, { x0: 0, x1: 40 })).toEqual([]);
   });
 });
 

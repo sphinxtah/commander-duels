@@ -756,6 +756,21 @@ describe("the cues for a diff", () => {
     expect(cues.map((call) => call.cue)).toEqual(["yourTurn"]);
   });
 
+  it("chimes Your Turn for a Two-Headed Giant teammate's turn, as the event says (v0.5.1)", () => {
+    const team = cuesFor(
+      diff({ ...events.theirTurn, yours: true }, events.turnEmblem),
+      layout,
+      0,
+    );
+    expect(team.map((call) => call.cue)).toEqual(["yourTurn"]);
+    const other = cuesFor(
+      diff({ ...events.yourTurn, yours: false }, events.turnEmblem),
+      layout,
+      0,
+    );
+    expect(other.map((call) => call.cue)).toEqual(["phase"]);
+  });
+
   it("keeps the most telling six when a diff would make more", () => {
     const cues = cuesFor(
       diff(

@@ -223,9 +223,13 @@
 .pill[data-tone="offer"] {
   color: #c8a8ff;
 }
-/* Two-Headed Giant (v0.5.0): your teammate, who shares your life total. */
+/* Two-Headed Giant (v0.5.0): your teammate, who shares your life total; since v0.5.1 the other
+   team in a warm red, and to SysOp and spectators each team by its number. */
 .pill[data-tone="team"] {
   color: #74c7b5;
+}
+.pill[data-tone="foe"] {
+  color: #f0957a;
 }
 /* Another player's Alliance button, under their pills: DOM in both painters. */
 .alliance {

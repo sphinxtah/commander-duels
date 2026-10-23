@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playerName, resultText, teammateOf } from "./model";
+import { objectIndex, playerName, resultText, teammateOf } from "./model";
 import type { GameView, PlayerView } from "./types";
 
 function player(seat: number, name: string): PlayerView {
@@ -100,18 +100,61 @@ describe("Two-Headed Giant (v0.5.0)", () => {
     expect(teammateOf({ ...giant, you: null })).toBeNull();
   });
 
-  it("tells a team's win to both teammates", () => {
+  it("indexes the teammate's hand it shows, so prompts may name its cards (v0.5.1)", () => {
+    const bolt = {
+      id: "mate-1",
+      hidden: false,
+      name: "Lightning Bolt",
+      mana_cost: "{R}",
+      type_line: "Instant",
+      power: null,
+      toughness: null,
+      rules: [],
+    };
+    const shown: GameView = {
+      ...giant,
+      opponents: [
+        { ...giant.opponents[0], hand: [bolt], hand_count: 1 },
+        ...giant.opponents.slice(1),
+      ],
+    };
+    expect(objectIndex(shown).get("mate-1")).toEqual({
+      id: "mate-1",
+      zone: "hand",
+      seat: 1,
+      card: bolt,
+    });
+    expect(objectIndex(giant).has("mate-1")).toBe(false);
+  });
+
+  it("tells a team's win to both teammates, naming the team (v0.5.1)", () => {
     expect(resultText(giant, 0, teamWon([0, 1]))).toEqual({
       title: "Victory",
-      detail: "Your team won in 12 turns.",
+      detail: "You and Bot 2 won in 12 turns.",
     });
-    expect(resultText(giant, 1, teamWon([0, 1]))).toEqual({
+    // Seat 1's teammate is seat 0, here by the name its own view would give it.
+    expect(
+      resultText(giant, 1, teamWon([0, 1]), (seat) =>
+        seat === 0 ? "Alice" : `Seat ${seat + 1}`,
+      ),
+    ).toEqual({
       title: "Victory",
-      detail: "Your team won in 12 turns.",
+      detail: "You and Alice won in 12 turns.",
     });
     expect(resultText(giant, 0, teamWon([2, 3]))).toEqual({
       title: "Defeat",
       detail: "Bot 3 and Bot 4 won in 12 turns.",
+    });
+  });
+
+  it("names the winning team by its number to SysOp observing (v0.5.1)", () => {
+    expect(resultText(giant, null, teamWon([2, 3]))).toEqual({
+      title: "Game over",
+      detail: "Team 2 won in 12 turns: Bot 3 and Bot 4.",
+    });
+    expect(resultText(giant, null, teamWon([0, 1]))).toEqual({
+      title: "Game over",
+      detail: "Team 1 won in 12 turns: Alice and Bot 2.",
     });
   });
 });

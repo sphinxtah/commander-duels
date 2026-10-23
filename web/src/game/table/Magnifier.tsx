@@ -144,6 +144,13 @@ function Facts({
   const lines: string[] = [];
   if (shown.power !== null)
     lines.push(`Power and toughness ${shown.power}/${shown.toughness}`);
+  // A Two-Headed Giant teammate's card (v0.5.1): shown, not yours to play.
+  if (
+    card.zone === "hand" &&
+    card.ownerSeat !== null &&
+    card.ownerSeat !== (model.anchored?.seat ?? null)
+  )
+    lines.push(`In ${name(card.ownerSeat)}’s hand`);
   lines.push(...permanentState(permanent));
   if (permanent?.attached_to) {
     const host = view?.battlefield.find((p) => p.id === permanent.attached_to);

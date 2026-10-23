@@ -168,6 +168,7 @@ interface Internals {
   portraitPictures: Map<string, Texture | string>;
   portraitLoads: Set<AbortController>;
   curves: Map<string, { drawnShare: number; root: Container }>;
+  mores: Map<string, { root: Container; backs: Container }>;
   floats: Map<string, { root: Container }>;
   emblem: { root: Container; caption: { text: string } };
   frames: { size: number; bytesHeld: number; entries: Map<string, unknown> };
@@ -558,6 +559,96 @@ describe("animation", () => {
     });
     expect(table.internals.emblem.caption.text).toBe("Bot 2’s Turn");
     table.scene.destroy();
+  });
+
+  it("draws a Two-Headed Giant teammate's hand face up, their draw flying in from their library (v0.5.1)", async () => {
+    const table = new Table("giant");
+    const first = await table.start();
+    const keys = first.model.opponents[0].hand!;
+    expect(keys).toHaveLength(6);
+    for (const key of keys) {
+      const view = table.internals.cards.get(key)!;
+      expect(view, key).toBeDefined();
+      expect(view.back.visible).toBe(false);
+      expect(view.image.visible).toBe(true);
+    }
+    // No other seat's hand is drawn: only the teammate's and your own.
+    const hands = [...table.internals.cards.keys()].filter((key) =>
+      key.startsWith("hand:"),
+    );
+    expect(hands.sort()).toEqual([...keys, ...first.model.hand].sort());
+    const frame = table.next((s) => {
+      const mate = s.view!.opponents[0];
+      mate.hand!.push({
+        id: "g-drawn",
+        hidden: false,
+        name: "Mountain",
+        mana_cost: null,
+        type_line: "Basic Land — Mountain",
+        power: null,
+        toughness: null,
+        rules: [],
+      });
+      mate.hand_count += 1;
+      mate.library_count -= 1;
+    });
+    expect(frame.diff.events).toContainEqual({
+      type: "draw",
+      seat: 1,
+      keys: ["hand:g-drawn"],
+      count: 1,
+    });
+    expect(table.internals.cards.has("hand:g-drawn")).toBe(true);
+    expect(table.internals.timeline.has("p:hand:g-drawn")).toBe(true);
+    expect(table.internals.timeline.has("f:hand:g-drawn")).toBe(true);
+    table.scene.destroy();
+  });
+
+  it("puts a long teammate's hand's “+N” on its fan as a plate, never at your hand's end (v0.5.1)", async () => {
+    const table = new Table("giant", (f) => {
+      const mate = f.snapshot.view!.opponents[0];
+      const first = mate.hand![0];
+      mate.hand = Array.from({ length: 20 }, (_, i) => ({
+        ...first,
+        id: `mate-${i}`,
+      }));
+      mate.hand_count = 20;
+    });
+    const first = await table.start("none");
+    const more = table.internals.mores.get("more:hand:1")!;
+    expect(more).toBeDefined();
+    expect(more.backs.children).toHaveLength(0);
+    // Fourteen of the twenty are drawn; the plate stands for the rest.
+    expect(
+      first.model.opponents[0].hand!.filter((key) =>
+        table.internals.cards.has(key),
+      ),
+    ).toHaveLength(14);
+    table.scene.destroy();
+  });
+
+  it("calls a Two-Headed Giant team's turn the viewer's, whichever teammate holds it (v0.5.1)", async () => {
+    const table = new Table("giant");
+    await table.start();
+    table.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 2;
+    });
+    expect(table.internals.emblem.caption.text).toBe("Other Team’s Turn");
+    table.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 1;
+    });
+    expect(table.internals.emblem.caption.text).toBe("Your Turn");
+    table.scene.destroy();
+    const watched = new Table("giantSysop");
+    await watched.start();
+    watched.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 3;
+    });
+    expect(watched.internals.emblem.caption.text).toBe("Team 2’s Turn");
+    watched.scene.destroy();
   });
 
   it("plays a diff's events once, however many frames carry it", async () => {
