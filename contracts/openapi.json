@@ -627,6 +627,65 @@
         "title": "AllianceChange",
         "type": "object"
       },
+      "ArrangedCard": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "main": {
+            "maximum": 250.0,
+            "minimum": 0.0,
+            "title": "Main",
+            "type": "integer"
+          },
+          "printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printing Id"
+          },
+          "sideboard": {
+            "maximum": 250.0,
+            "minimum": 0.0,
+            "title": "Sideboard",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card_id",
+          "main",
+          "sideboard"
+        ],
+        "title": "ArrangedCard",
+        "type": "object"
+      },
+      "ArrangementRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/ArrangedCard"
+            },
+            "maxItems": 400,
+            "title": "Cards",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cards"
+        ],
+        "title": "ArrangementRequest",
+        "type": "object"
+      },
       "AuditActor": {
         "additionalProperties": false,
         "properties": {
@@ -3709,6 +3768,70 @@
         "title": "FriendList",
         "type": "object"
       },
+      "GameMatch": {
+        "additionalProperties": false,
+        "description": "The best-of-three match a game is part of (v0.5.0), as it stands now.",
+        "properties": {
+          "best_of": {
+            "title": "Best Of",
+            "type": "integer"
+          },
+          "draw": {
+            "title": "Draw",
+            "type": "boolean"
+          },
+          "game": {
+            "description": "This game's number in the match, from 1.",
+            "title": "Game",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "playing",
+              "sideboarding",
+              "finished",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "winner_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner Seat"
+          },
+          "wins": {
+            "description": "Each seat's game wins so far, by seat.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Wins",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "best_of",
+          "game",
+          "status",
+          "wins",
+          "winner_seat",
+          "draw"
+        ],
+        "title": "GameMatch",
+        "type": "object"
+      },
       "GameResult": {
         "additionalProperties": false,
         "properties": {
@@ -3904,6 +4027,17 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameMatch"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its best-of-three match (v0.5.0); null for a single game."
           },
           "result": {
             "anyOf": [
@@ -4530,6 +4664,357 @@
           "cards"
         ],
         "title": "LibraryView",
+        "type": "object"
+      },
+      "MatchGameView": {
+        "additionalProperties": false,
+        "properties": {
+          "game": {
+            "title": "Game",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GameResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "active",
+              "finished",
+              "interrupted"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the game paid you, once it is recorded.",
+            "title": "Tokens"
+          }
+        },
+        "required": [
+          "game",
+          "id",
+          "status",
+          "result",
+          "tokens"
+        ],
+        "title": "MatchGameView",
+        "type": "object"
+      },
+      "MatchPlayerView": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_cards": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Sideboard"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your own seat's arrangement; another seat's only to SysOp."
+          },
+          "game_wins": {
+            "title": "Game Wins",
+            "type": "integer"
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conceded",
+                  "removed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "player": {
+            "enum": [
+              "human",
+              "bot"
+            ],
+            "title": "Player",
+            "type": "string"
+          },
+          "portrait": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A player's allied Planeswalker.",
+            "title": "Portrait"
+          },
+          "ready": {
+            "description": "Bots always are.",
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "seat": {
+            "title": "Seat",
+            "type": "integer"
+          },
+          "you": {
+            "title": "You",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seat",
+          "player",
+          "handle",
+          "portrait",
+          "you",
+          "game_wins",
+          "ready",
+          "left",
+          "deck_cards"
+        ],
+        "title": "MatchPlayerView",
+        "type": "object"
+      },
+      "MatchView": {
+        "additionalProperties": false,
+        "properties": {
+          "best_of": {
+            "title": "Best Of",
+            "type": "integer"
+          },
+          "chooser_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who chooses to play or draw the next game: the last game's loser.",
+            "title": "Chooser Seat"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "draw": {
+            "title": "Draw",
+            "type": "boolean"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "games",
+                  "conceded",
+                  "removed",
+                  "closed",
+                  "failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The game in play.",
+            "title": "Game Id"
+          },
+          "game_number": {
+            "description": "The game in play, or while sideboarding the next one.",
+            "title": "Game Number",
+            "type": "integer"
+          },
+          "games": {
+            "items": {
+              "$ref": "#/components/schemas/MatchGameView"
+            },
+            "title": "Games",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "practice",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/MatchPlayerView"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "sideboard_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the next game starts with each deck as it is arranged.",
+            "title": "Sideboard Until"
+          },
+          "starting_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The seat that plays first, once chosen.",
+            "title": "Starting Seat"
+          },
+          "status": {
+            "enum": [
+              "playing",
+              "sideboarding",
+              "finished",
+              "closed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "waiting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the next game has not started although every player is ready.",
+            "title": "Waiting"
+          },
+          "winner_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winner Seat"
+          },
+          "your_seat": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Seat"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "format",
+          "best_of",
+          "status",
+          "game_number",
+          "players",
+          "games",
+          "your_seat",
+          "game_id",
+          "chooser_seat",
+          "starting_seat",
+          "sideboard_until",
+          "winner_seat",
+          "draw",
+          "end_reason",
+          "waiting",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "MatchView",
         "type": "object"
       },
       "Me": {
@@ -5445,6 +5930,14 @@
       "PracticeFormat": {
         "additionalProperties": false,
         "properties": {
+          "best_of": {
+            "description": "Since v0.5.0: 1, and 3 in Legacy for a best-of-three match.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Best Of",
+            "type": "array"
+          },
           "bots": {
             "items": {
               "type": "integer"
@@ -5498,6 +5991,16 @@
         "additionalProperties": false,
         "description": "A practice game: your seat first, then the bots in turn order.",
         "properties": {
+          "best_of": {
+            "default": 1,
+            "description": "Since v0.5.0, Legacy only: 3 plays a best-of-three match, with sideboarding between its games (docs/matches.md).",
+            "enum": [
+              1,
+              3
+            ],
+            "title": "Best Of",
+            "type": "integer"
+          },
           "bot_skill": {
             "default": 4,
             "maximum": 6.0,
@@ -6644,7 +7147,31 @@
         "title": "ReaderTranscript",
         "type": "object"
       },
-      "Readiness": {
+      "Readiness-Input": {
+        "additionalProperties": false,
+        "properties": {
+          "play_first": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The chooser's choice: play first (true) or draw first (false). Left out, an earlier choice stands, else the chooser plays first.",
+            "title": "Play First"
+          },
+          "ready": {
+            "default": true,
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "title": "Readiness",
+        "type": "object"
+      },
+      "Readiness-Output": {
         "additionalProperties": false,
         "properties": {
           "database": {
@@ -8231,6 +8758,116 @@
         "title": "ShopView",
         "type": "object"
       },
+      "Sideboard": {
+        "additionalProperties": false,
+        "description": "A player's arrangement of their bound deck for the next game: theirs alone, SysOp apart.",
+        "properties": {
+          "can_sideboard": {
+            "description": "False for a deck with no sideboard to swap with: a fixture deck or a list.",
+            "title": "Can Sideboard",
+            "type": "boolean"
+          },
+          "cards": {
+            "description": "Every card of the locked pool.",
+            "items": {
+              "$ref": "#/components/schemas/SideboardCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "deck": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The deck's title, as bound at the match's start.",
+            "title": "Deck"
+          },
+          "main": {
+            "title": "Main",
+            "type": "integer"
+          },
+          "sideboard": {
+            "title": "Sideboard",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deck",
+          "can_sideboard",
+          "main",
+          "sideboard",
+          "cards"
+        ],
+        "title": "Sideboard",
+        "type": "object"
+      },
+      "SideboardCard": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "main": {
+            "description": "Copies in the main deck for the next game.",
+            "title": "Main",
+            "type": "integer"
+          },
+          "mana_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mana Cost"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Printing Id"
+          },
+          "sideboard": {
+            "description": "Copies in the sideboard.",
+            "title": "Sideboard",
+            "type": "integer"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "card_id",
+          "printing_id",
+          "name",
+          "type_line",
+          "mana_cost",
+          "main",
+          "sideboard"
+        ],
+        "title": "SideboardCard",
+        "type": "object"
+      },
       "StarterChoice": {
         "additionalProperties": false,
         "properties": {
@@ -8675,6 +9312,16 @@
         "additionalProperties": false,
         "description": "A new table: the host takes the first seat with one of their decks.",
         "properties": {
+          "best_of": {
+            "default": 1,
+            "description": "Since v0.5.0, Legacy only: 3 plays a best-of-three match, with sideboarding between its games (docs/matches.md).",
+            "enum": [
+              1,
+              3
+            ],
+            "title": "Best Of",
+            "type": "integer"
+          },
           "bot_skill": {
             "default": 4,
             "maximum": 6.0,
@@ -8766,6 +9413,12 @@
       "TableView": {
         "additionalProperties": false,
         "properties": {
+          "best_of": {
+            "default": 1,
+            "description": "Since v0.5.0: 3 for a best-of-three match.",
+            "title": "Best Of",
+            "type": "integer"
+          },
           "bot_skill": {
             "title": "Bot Skill",
             "type": "integer"
@@ -18943,6 +19596,573 @@
         "summary": "My Library"
       }
     },
+    "/api/v1/matches": {
+      "get": {
+        "description": "Your matches, newest first: running ones say where they stand, and none shows decks.",
+        "operationId": "list_matches_api_v1_matches_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MatchView"
+                  },
+                  "title": "Response List Matches Api V1 Matches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Matches"
+      }
+    },
+    "/api/v1/matches/{match_id}": {
+      "get": {
+        "description": "The match: its players, games and score, and your own deck's arrangement for the next\ngame. A match whose sideboarding is over starts its next game.",
+        "operationId": "get_match_api_v1_matches__match_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Match"
+      }
+    },
+    "/api/v1/matches/{match_id}/concede": {
+      "post": {
+        "description": "Concedes the match: the game in play too, and the match is the other player's.",
+        "operationId": "concede_api_v1_matches__match_id__concede_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Concede"
+      }
+    },
+    "/api/v1/matches/{match_id}/ready": {
+      "post": {
+        "description": "Ready for the next game (or not), and for the last game's loser the choice to play or draw\nit. The next game starts once every player is ready; the reply names it.",
+        "operationId": "ready_api_v1_matches__match_id__ready_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Readiness-Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ready"
+      }
+    },
+    "/api/v1/matches/{match_id}/sideboard": {
+      "put": {
+        "description": "Saves your arrangement for the next game: the same cards, between main deck and\nsideboard. It makes you not ready.",
+        "operationId": "sideboard_api_v1_matches__match_id__sideboard_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "match_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Match Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArrangementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Sideboard"
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "me_api_v1_me_get",
@@ -21138,7 +22358,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Readiness"
+                  "$ref": "#/components/schemas/Readiness-Output"
                 }
               }
             },
@@ -21148,7 +22368,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Readiness"
+                  "$ref": "#/components/schemas/Readiness-Output"
                 }
               }
             },

@@ -78,6 +78,8 @@ from api.models import (
     FormatVersion,
     Game,
     GameSeat,
+    Match,
+    MatchPlayer,
     User,
     UserSession,
 )
@@ -98,7 +100,7 @@ from api.schemas import (
     TableRules,
 )
 from api.schemas import GameSeat as SeatSummary
-from api.validation import DeckContent, Problem, not_allowed, validate_deck
+from api.validation import DeckContent, DeckEntry, Problem, not_allowed, validate_deck
 from catalog.statuses import playable
 from catalog.text import normalize
 
@@ -119,6 +121,8 @@ FIXTURE_DECKS: dict[str, list[FixtureDeck]] = {
 }
 BOTS = {"legacy": [1], "commander": [1, 2, 3]}
 DEFAULT_BOTS = {"legacy": 1, "commander": 3}
+# Best of one game, or (v0.5.0) a best-of-three match with sideboards: Legacy only.
+BEST_OF = {"legacy": [1, 3], "commander": [1]}
 FORMAT_NAMES = {"legacy": "Legacy", "commander": "Commander"}
 SERVICE_HEADER = "X-Service-Token"
 LONG_POLL_MS = 25_000
@@ -556,6 +560,12 @@ class GameHub:
         )
         game.recorded.set()
         self.presence_changed(game)
+        # A match's game (v0.5.0): sideboarding for the next one starts its clock. Imported here:
+        # api.matches imports this module.
+        from api import matches
+
+        with suppress(SQLAlchemyError):
+            await matches.after_game(self, game.id)
         await asyncio.sleep(RETAIN_FINISHED_SECONDS)
         for connection in list(game.connections.values()):
             connection.close(1000)
@@ -903,6 +913,10 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
                 .where(Game.id.in_(ids))
                 .values(status="interrupted", finished_at=utcnow())
             )
+            # Their matches (v0.5.0) count them as games without a result.
+            from api import matches  # Imported here: api.matches imports this module.
+
+            matches.games_interrupted(db, ids)
             db.commit()
         return ids
 
@@ -910,7 +924,10 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
 def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, Any] | None) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
     won it (api/progression.py) and the tokens it pays (api/economy.py), so a result is never
-    recorded without its win and its pay, or twice."""
+    recorded without its win and its pay, or twice. Since v0.5.0 a match's game also counts in
+    its match (api/matches.py), which ends or goes on to its next game."""
+    from api import matches  # Imported here: api.matches imports this module.
+
     with Session(database) as db:
         game = db.get(Game, game_id)
         if game is not None and game.status == "active":
@@ -921,6 +938,7 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             db.flush()
             count_win(db, game)
             pay_game(db, game)
+            matches.game_ended(db, game)
             db.commit()
 
 
@@ -953,6 +971,10 @@ def record_removal(
         if found is not None:
             found.left_at = found.left_at or utcnow()
             found.left_reason = "removed"
+        # Removed from a match's game, the player is out of the match (v0.5.0).
+        from api import matches  # Imported here: api.matches imports this module.
+
+        matches.player_removed(db, game_id, seat.user_id)
         audit(
             db,
             websocket,
@@ -970,8 +992,9 @@ def record_removal(
 
 def active_games_of(db: Session, user_id: UUID) -> int:
     """The account's running games: those where its seat is still in play. A seat that conceded,
-    was removed or lost while a table's game goes on no longer counts."""
-    return (
+    was removed or lost while a table's game goes on no longer counts. Since v0.5.0 a match counts
+    as one running game, between its games too, until it ends or the player leaves it."""
+    games = (
         db.scalar(
             select(func.count(func.distinct(Game.id)))
             .select_from(Game)
@@ -980,6 +1003,25 @@ def active_games_of(db: Session, user_id: UUID) -> int:
                 GameSeat.user_id == user_id,
                 GameSeat.left_at.is_(None),
                 Game.status == "active",
+                Game.match_id.is_(None),
+            )
+        )
+        or 0
+    )
+    return games + running_matches_of(db, user_id)
+
+
+def running_matches_of(db: Session, user_id: UUID) -> int:
+    """The account's matches still being played (v0.5.0, api/matches.py), which it has not left."""
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(MatchPlayer)
+            .join(Match, Match.id == MatchPlayer.match_id)
+            .where(
+                MatchPlayer.user_id == user_id,
+                MatchPlayer.left_at.is_(None),
+                Match.status.in_(("playing", "sideboarding")),
             )
         )
         or 0
@@ -991,6 +1033,9 @@ def full_access(principal: Principal) -> bool:
 
 
 def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
+    # A match's game (v0.5.0) shows its match. Imported here: api.matches imports this module.
+    from api.matches import match_ref
+
     seats = db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     rows = list(seats)
     owners = [row.user_id for row in rows if row.user_id is not None]
@@ -1027,6 +1072,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
             if your_seat is not None and game.status == "finished"
             else None
         ),
+        match=match_ref(db, game),
     )
 
 
@@ -1065,6 +1111,7 @@ def practice_options(principal: Player) -> PracticeOptions:
                 bots=BOTS[fmt],
                 default_bots=DEFAULT_BOTS[fmt],
                 decks=decks if fixtures else [],
+                best_of=BEST_OF[fmt],
             )
             for fmt, decks in FIXTURE_DECKS.items()
         ],
@@ -1136,7 +1183,9 @@ def own_deck(
         )
     revision = publish(db, deck, library)
     entries = [
-        entry for entry in revision_entries(db, revision) if entry.location in ("main", "commander")
+        entry
+        for entry in revision_entries(db, revision)
+        if entry.location in ("main", "commander", "sideboard")
     ]
     validation = validate_deck(
         db,
@@ -1144,22 +1193,7 @@ def own_deck(
         datetime.now(UTC).date(),
         library.collection(),
     )
-    names = dict(
-        db.execute(
-            select(CardConcept.id, CardConcept.engine_name).where(
-                CardConcept.id.in_({entry.card_id for entry in entries}), playable()
-            )
-        ).all()
-    )
-    if library.godlike:
-        # The Godlike tier's custom cards go to the engine by their own names (v0.4.0).
-        names |= dict(
-            db.execute(
-                select(CustomCard.id, CustomCard.name).where(
-                    CustomCard.id.in_({entry.card_id for entry in entries} - names.keys())
-                )
-            ).all()
-        )
+    names = engine_names(db, entries, library.godlike)
     if not validation.playable:
         sysop_ok = "cards.any" in permissions and all(names.get(e.card_id) for e in entries)
         locked = any(problem.kind == "collection_locked" for problem in validation.errors)
@@ -1180,22 +1214,70 @@ def own_deck(
     refused = not_allowed(validation, rules)
     if refused and "cards.any" not in permissions:
         raise ApiError(422, "deck_not_allowed", refusal(db, refused, fmt))
+    deck_list = engine_deck_list(db, entries, names, fmt)
+    if deck_list is None:
+        raise ApiError(422, "deck_not_playable", f"{deck.title} holds a card the engine lacks.")
+    return {"deck_list": deck_list}, revision.id, deck.title[:64]
+
+
+def engine_names(db: Session, entries: list[DeckEntry], godlike: bool) -> dict[UUID, str | None]:
+    """The engine's name of each playable card the entries hold: a catalog card's, and the
+    Godlike tier's custom cards by their own names (v0.4.0)."""
+    names = dict(
+        db.execute(
+            select(CardConcept.id, CardConcept.engine_name).where(
+                CardConcept.id.in_({entry.card_id for entry in entries}), playable()
+            )
+        ).all()
+    )
+    if godlike:
+        names |= dict(
+            db.execute(
+                select(CustomCard.id, CustomCard.name).where(
+                    CustomCard.id.in_({entry.card_id for entry in entries} - names.keys())
+                )
+            ).all()
+        )
+    return names
+
+
+def engine_deck_list(
+    db: Session, entries: list[DeckEntry], names: dict[UUID, str | None], fmt: str
+) -> dict[str, object] | None:
+    """A deck's main deck and commanders as the engine's deck list, or None when a card has no
+    engine name. Since v0.5.0 a Legacy deck's sideboard goes with it: XMage keeps it outside the
+    game, where wishes find it (FMT07). Companions stay out of it, as the companion location does,
+    since XMage would offer a sideboard's companion as one."""
     counts: dict[str, int] = defaultdict(int)
+    sideboard: dict[str, int] = defaultdict(int)
     commanders: list[str] = []
+    companions = set(
+        db.scalars(
+            select(CardConcept.id).where(
+                CardConcept.id.in_({entry.card_id for entry in entries}), CardConcept.companion
+            )
+        )
+    )
     for entry in entries:
         name = names.get(entry.card_id)
         if not name:
-            raise ApiError(422, "deck_not_playable", f"{deck.title} holds a card the engine lacks.")
+            return None
         if entry.location == "commander":
             commanders.append(name)
-        else:
+        elif entry.location == "main":
             counts[name] += entry.quantity
+        elif entry.location == "sideboard" and fmt == "legacy" and entry.card_id not in companions:
+            sideboard[name] += entry.quantity
     deck_list: dict[str, object] = {
         "cards": [{"name": name, "count": count} for name, count in counts.items()]
     }
     if fmt == "commander":
         deck_list["commanders"] = commanders
-    return {"deck_list": deck_list}, revision.id, deck.title[:64]
+    if sideboard:
+        deck_list["sideboard"] = [
+            {"name": name, "count": count} for name, count in sideboard.items()
+        ]
+    return deck_list
 
 
 def engine_seat(
@@ -1392,6 +1474,11 @@ def record_game(
                 deck_revision_id=plan.revision,
             )
         )
+    # Best of three (v0.5.0): the first game of a match. Imported here: api.matches imports this
+    # module.
+    from api import matches
+
+    matches.begin(db, game, body.best_of)
     lists = [
         index
         for index, plan in enumerate(plans)
@@ -1463,6 +1550,8 @@ async def create_practice_game(
         raise ApiError(
             422, "invalid_table", f"{FORMAT_NAMES[fmt]} takes {BOTS[fmt]} bots, not {len(bots)}."
         )
+    if body.best_of not in BEST_OF[fmt]:
+        raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
     plans = await run_in_threadpool(plan_seats, db, request, principal, body, bots)
     await require_loaded(request, plans)
     seats = [plan.engine for plan in plans]

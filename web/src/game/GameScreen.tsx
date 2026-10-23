@@ -23,6 +23,13 @@ import { ReportDialog } from "../app/ReportProblem";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
+import {
+  ConcedeMatchDialog,
+  MatchChip,
+  MatchOutcome,
+  matchLink,
+  useFollowMatch,
+} from "../matches/GameMatch";
 import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
@@ -153,6 +160,10 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   const [fullscreenHint, setFullscreenHint] = useState(false);
   const [ui] = useState(createTableUi);
   const concedeDialog = useRef<HTMLDialogElement>(null);
+  const concedeMatchDialog = useRef<HTMLDialogElement>(null);
+  // "Review the board" after a match's game keeps the screen here instead of going on to
+  // sideboarding (v0.5.0).
+  const [reviewing, setReviewing] = useState(false);
   const resultDialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   /** Where focus was when a drawer opened, to go back to when it closes. */
@@ -576,9 +587,19 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     ? resultText(view, state.seat, result, seatName)
     : null;
   const format = snapshot?.settings.format ?? summary?.format;
-  const back = atTable
-    ? { href: "#tables", text: "Back to the lobby" }
-    : { href: "#play", text: "Back to the table" };
+  // A best-of-three match's game (v0.5.0): the score on the table, and once the game is recorded
+  // the way on to sideboarding, which the screen follows by itself.
+  const match = summary?.match ?? null;
+  const following = useFollowMatch(
+    match,
+    summary !== undefined && summary.status !== "active",
+    !reviewing && state.seat !== null,
+  );
+  const back = match
+    ? matchLink(match)
+    : atTable
+      ? { href: "#tables", text: "Back to the lobby" }
+      : { href: "#play", text: "Back to the table" };
   const paid =
     summary?.status === "finished" && summary.tokens ? summary.tokens : null;
   const tokensLine =
@@ -681,6 +702,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                     Full screen: F
                   </span>
                 )}
+                {match && <MatchChip match={match} seat={state.seat} />}
               </div>
               <GameMenu
                 open={menuOpen}
@@ -698,6 +720,14 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   concedeDialog.current?.showModal();
                 }}
                 concedeDisabled={concedeDisabled}
+                onConcedeMatch={
+                  match?.status === "playing"
+                    ? () => {
+                        closeMenu(false);
+                        concedeMatchDialog.current?.showModal();
+                      }
+                    : undefined
+                }
                 onLeave={leave}
               />
 
@@ -800,6 +830,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                       <h2 id="result-side-title">{outcome.title}</h2>
                       <p>{outcome.detail}</p>
                       {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+                      {match && (
+                        <MatchOutcome
+                          match={match}
+                          seat={state.seat}
+                          following={following}
+                        />
+                      )}
                       <a
                         href={back.href}
                         className={styles.secondaryButton}
@@ -956,9 +993,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               <h2 id="concede-title">Concede this game?</h2>
               <p>
                 You lose this game at once.{" "}
-                {atTable
-                  ? "The other players play on without you."
-                  : "The bots play on without you."}
+                {match
+                  ? "The match goes on to its next game."
+                  : atTable
+                    ? "The other players play on without you."
+                    : "The bots play on without you."}
               </p>
               <form method="dialog" className={styles.confirmButtons}>
                 <button
@@ -1002,8 +1041,19 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               <h2 id="result-title">{outcome?.title}</h2>
               <p>{outcome?.detail}</p>
               {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+              {match && (
+                <MatchOutcome
+                  match={match}
+                  seat={state.seat}
+                  following={following}
+                />
+              )}
               <form method="dialog" className={styles.confirmButtons}>
-                <button type="submit" className={styles.secondaryButton}>
+                <button
+                  type="submit"
+                  className={styles.secondaryButton}
+                  onClick={() => setReviewing(true)}
+                >
                   Review the board
                 </button>
                 <a
@@ -1015,6 +1065,9 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 </a>
               </form>
             </dialog>
+            {match && (
+              <ConcedeMatchDialog match={match} dialog={concedeMatchDialog} />
+            )}
             {chatting && (
               <ReportMessageDialog
                 message={reportedLine}

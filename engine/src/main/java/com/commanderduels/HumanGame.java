@@ -329,7 +329,15 @@ final class HumanGame {
             closing = endRequest != null;
         }
         if (!closing) {
-            created.start(seatIds.get(RandomUtil.nextInt(seatIds.size())));
+            Integer starting = request.startingSeat();
+            if (starting != null) {
+                // The seat chosen before the game (v0.5.0: a match's loser chose to play or draw)
+                // takes the first turn, and XMage asks nobody who starts.
+                created.setStartingPlayerId(seatIds.get(starting));
+                created.start(seatIds.get(starting));
+            } else {
+                created.start(seatIds.get(RandomUtil.nextInt(seatIds.size())));
+            }
         }
     }
 

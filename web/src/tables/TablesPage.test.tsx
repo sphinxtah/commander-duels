@@ -73,6 +73,7 @@ function table(fields: Partial<TableView> = {}): TableView {
     bot_skill: 4,
     turn_cap: 60,
     rules: { banned: true, not_legal: true },
+    best_of: 1,
     host: "bob",
     players: [
       seat({ seat: 0, taken: true, handle: "bob", host: true, ready: true }),
@@ -421,5 +422,32 @@ describe("a table", () => {
       "This table is closed.",
     );
     expect(screen.queryByRole("button", { name: "Take a seat" })).toBeNull();
+  });
+});
+
+describe("best of three at a table (v0.5.0)", () => {
+  it("tags a best-of-three table, and lets a Legacy host open one", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/tables", () => reply(200, [table({ best_of: 3 })]));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    api.on("POST /api/v1/tables", () =>
+      reply(201, table({ host: "ada", your_seat: 0, best_of: 3 })),
+    );
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    expect(
+      within(screen.getByRole("listitem")).getByText("Best of three"),
+    ).toBeInTheDocument();
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Best of three/ }).click(),
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Open the table" }).click(),
+    );
+    await settle();
+    const opened = api.calls.find((c) => c.route === "POST /api/v1/tables")!;
+    expect(opened.options).toMatchObject({
+      body: { format: "legacy", best_of: 3 },
+    });
   });
 });

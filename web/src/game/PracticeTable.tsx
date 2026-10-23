@@ -12,6 +12,7 @@ import {
   exitTableFullscreen,
 } from "../app/fullscreen";
 import { readTableSettings } from "../app/tableSettings";
+import { RunningMatches } from "../matches/RunningMatches";
 import { RulesFields } from "../tables/TableParts";
 import { casualRules, unfit, type TableRules } from "../tables/tables";
 import { getSoundEngine } from "./sound/engine";
@@ -22,6 +23,7 @@ type Options = components["schemas"]["PracticeOptions"];
 type GameSummary = components["schemas"]["GameSummary"];
 type Request = components["schemas"]["PracticeGameRequest"];
 type Deck = NonNullable<Request["deck"]>;
+type BestOf = NonNullable<Request["best_of"]>;
 type OwnDeck = components["schemas"]["DeckSummary"];
 /** Own decks ride in the deck selects as "own:<id>"; fixture decks by name. */
 const OWN = "own:";
@@ -211,6 +213,8 @@ function Table({ me }: { me: Me }) {
   const [skill, setSkill] = useState(4);
   const [turnCap, setTurnCap] = useState(60);
   const [rules, setRules] = useState<TableRules>(casualRules);
+  // One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards.
+  const [bestOf, setBestOf] = useState<BestOf>(1);
   const [useList, setUseList] = useState(false);
   const [deckList, setDeckList] = useState("");
   const [query, setQuery] = useState("");
@@ -336,6 +340,7 @@ function Table({ me }: { me: Me }) {
       bot_skill: skill,
       turn_cap: turnCap,
       rules,
+      best_of: chosenFormat?.best_of?.includes(bestOf) ? bestOf : 1,
       bots: Array.from({ length: bots }, (_, i) =>
         seatChoice(allowed(botDecks[i] ?? "")),
       ),
@@ -413,6 +418,35 @@ function Table({ me }: { me: Me }) {
             </label>
           ))}
         </fieldset>
+        {chosenFormat?.best_of?.includes(3) && (
+          <fieldset>
+            <legend>Games</legend>
+            <label className={styles.choice}>
+              <input
+                type="radio"
+                name="best-of"
+                checked={bestOf === 1}
+                onChange={() => setBestOf(1)}
+              />
+              <span>
+                <strong>One game</strong>
+                <small>The main deck alone</small>
+              </span>
+            </label>
+            <label className={styles.choice}>
+              <input
+                type="radio"
+                name="best-of"
+                checked={bestOf === 3}
+                onChange={() => setBestOf(3)}
+              />
+              <span>
+                <strong>Best of three</strong>
+                <small>Sideboard between games; every game won counts</small>
+              </span>
+            </label>
+          </fieldset>
+        )}
         <RulesFields rules={rules} format={format} onChange={setRules} />
         {noDeck ? (
           <div className={styles.field} data-no-deck>
@@ -581,6 +615,7 @@ function Table({ me }: { me: Me }) {
         </div>
       </form>
 
+      <RunningMatches refreshKey={games} />
       <div className={styles.gamesHead}>
         <h3>{everyone ? "Every player's games" : "Your games"}</h3>
         {sysop && (
@@ -615,6 +650,7 @@ function Table({ me }: { me: Me }) {
                   </strong>{" "}
                   <span>{players}</span>
                   <small>
+                    {game.match ? `Game ${game.match.game} of a match · ` : ""}
                     {outcome(game)} · started {ago(game.created_at)}
                     {game.your_seat !== null &&
                       ` · ${deckName(game.seats.find((s) => s.seat === game.your_seat)?.deck)}`}

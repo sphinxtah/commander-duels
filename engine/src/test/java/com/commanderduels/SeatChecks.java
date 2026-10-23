@@ -104,13 +104,14 @@ class SeatChecks implements HumanGame.Hooks {
         concealedFromSomeone.addAll(all);
     }
 
-    /** Card names in a seat's deck: its deck list, or its fixture deck file. */
+    /** Card names in a seat's deck: its deck list with its sideboard (v0.5.0), or its fixture deck file. */
     static Set<String> deckNames(HumanGameRequest.Seat seat) throws IOException {
         if (seat.custom() == null) {
             return deckNames(seat.deck());
         }
         Set<String> names = new HashSet<>(seat.custom().commanders());
         seat.custom().cards().forEach(entry -> names.add(entry.name()));
+        seat.custom().sideboard().forEach(entry -> names.add(entry.name()));
         return names;
     }
 

@@ -44,6 +44,7 @@ import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
 import { GameScreen } from "./game/GameScreen";
 import { TablesPage } from "./tables/TablesPage";
+import { MatchPage } from "./matches/MatchPage";
 import { HomeHub } from "./shell/HomeHub";
 import { useHud } from "./shell/hud";
 import { PageBand } from "./shell/PageBand";
@@ -63,6 +64,7 @@ const GAME_ROUTE = /^#game\/([0-9a-f-]{36})$/i;
 const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
 const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
 const TABLE_ROUTE = /^#tables\/([A-Za-z0-9_-]{8,32})$/;
+const MATCH_ROUTE = /^#match\/([0-9a-f-]{36})$/i;
 /** #game/<id> opens a game's table, full screen. */
 function currentGame(): string | undefined {
   return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -87,6 +89,10 @@ function currentDeck(): { deck?: string; shared?: string } {
 function currentTable(): string | undefined {
   return TABLE_ROUTE.exec(window.location.hash)?.[1];
 }
+/** #match/<id> opens a best-of-three match (v0.5.0): its score and its sideboarding. */
+function currentMatch(): string | undefined {
+  return MATCH_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
+}
 /** #messages/<id> opens a conversation with a friend (v0.4.4) on the Messages page. */
 function currentMessages(): string | undefined {
   return MESSAGES_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -102,6 +108,7 @@ function currentPage(): Page {
   if (path.startsWith("player/")) return "Friends";
   if (path.startsWith("messages/")) return "Messages";
   if (path.startsWith("tables/")) return "Tables";
+  if (path.startsWith("match/")) return "Play";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
   // The Play page's own anchors: its practice table and its formats.
   if (path === "practice" || path === "formats") return "Play";
@@ -114,6 +121,7 @@ export function App() {
   const [game, setGame] = useState(currentGame);
   const [deckRoute, setDeckRoute] = useState(currentDeck);
   const [tableRoute, setTableRoute] = useState(currentTable);
+  const [matchRoute, setMatchRoute] = useState(currentMatch);
   const [playerRoute, setPlayerRoute] = useState(currentPlayer);
   const [messagesRoute, setMessagesRoute] = useState(currentMessages);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
@@ -222,6 +230,7 @@ export function App() {
       setGame(currentGame());
       setDeckRoute(currentDeck());
       setTableRoute(currentTable());
+      setMatchRoute(currentMatch());
       setPlayerRoute(currentPlayer());
       setMessagesRoute(currentMessages());
     };
@@ -579,6 +588,12 @@ export function App() {
               />
             ) : page === "SysOp" && entrance ? (
               <SysopSignIn onSignedIn={accountChanged} heading={heading} />
+            ) : page === "Play" && matchRoute ? (
+              <MatchPage
+                key={matchRoute}
+                matchId={matchRoute}
+                heading={heading}
+              />
             ) : page === "Play" ? (
               <PlayPage
                 me={me}

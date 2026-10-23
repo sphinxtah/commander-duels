@@ -52,6 +52,7 @@ POST /api/v1/practice-games
 | `bot_skill` | XMage's AI skill, 1–6 (default 4) |
 | `turn_cap` | 1–200 turns (default 60) |
 | `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)). Both true, casual, by default. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
+| `best_of` | Since v0.5.0: 1 (the default), or in Legacy 3 for a best-of-three match with sideboards ([matches](matches.md)) |
 
 The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
 
@@ -76,7 +77,7 @@ Refusals:
 
 Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp. Since v0.4.0 a summary also gives the game's `kind` (`practice` or `table`), each seat's `left` (`conceded`, `removed` or `eliminated` while the game went on), and `tokens`, what the finished game paid you.
 
-The account's running games, for `CD_GAMES_PER_ACCOUNT`, are the active games where its seat is still in play (since v0.4.0): a seat out of a table's game that goes on no longer counts.
+The account's running games, for `CD_GAMES_PER_ACCOUNT`, are the active games where its seat is still in play (since v0.4.0): a seat out of a table's game that goes on no longer counts. Since v0.5.0 a best-of-three match counts as one running game, between its games too, and a summary gives a match's game its `match` ([matches](matches.md#routes)).
 
 Since v0.3.1 the transaction that records a finished game also counts its win, when a player's seat won it: one entry in the progression ledger, never two ([the Planeswalker Alliance](progression.md#wins-and-levels)).
 
@@ -174,7 +175,7 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 
 | Route | Purpose |
 | --- | --- |
-| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit. Unknown card names return 400 `unknown_cards` |
+| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit. Unknown card names return 400 `unknown_cards`. Since v0.5.0 a Legacy deck list may carry its `sideboard`, kept outside the game for wishes, and the request may name the `starting_seat` ([matches](matches.md#the-engine)) |
 | `GET` and `POST` under `/v1/service/games/{id}/` (`view`, `commands`) | As the development routes; the seat token still selects the seat |
 | `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices |
 | `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |
