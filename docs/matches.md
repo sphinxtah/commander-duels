@@ -46,7 +46,7 @@ A Legacy deck of a player's own goes to the engine with its sideboard, in every 
 
 - **The match page** (`#match/<id>`, under Play) shows the score, each game's result and what it paid you, and between games the sideboarding: every card of the pool with its copies in the main deck and the sideboard, the counts against Legacy's limits, what the rules say of them, the play/draw choice for the loser, the clock, and Ready. A valid arrangement saves by itself a moment after the last change; Ready saves it at once. The page follows the match into each new game.
 - **The game screen** shows the game's number and the score ("Game 2 · 1–0") on the table. The Game menu offers "Concede the game" and "Concede the match". The result says where the match stands ("Match 1–1. Game 3 is next") and leads to sideboarding; after 6 seconds the screen goes there by itself, unless the player chose to review the board.
-- **The Play page** lists the running matches, with Resume and Concede the match, and marks each game of a match in the list of games.
+- **The Play page** lists the running matches, with Resume and Concede the match, and marks each game of a match in the list of games. Since v0.5.1 its Concede the match asks first, as the match page's and the Game menu's do (the owner's change to a v0.5.0 decision).
 - **Opening a table and the practice table** offer "One game" or "Best of three" in Legacy. The lobby tags a best-of-three table.
 - **The deck editor** always shows a Legacy deck's sideboard, and says what it is for.
 

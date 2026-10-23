@@ -1,6 +1,6 @@
 # The menus (v0.4.5)
 
-Since v0.4.5 the app's menus and pages take the look of Magic Duels' front end, as v0.3.0 did for the table ([the game screen](game-screen.md)): a title screen, a main menu of large tiles under a game-style top bar, and a title band over every page. The owner's decisions are in [the v0.4.5 plan](plans/0.4.5.md#decisions-at-the-start-of-v045). The art is the owner's own: the Planeswalker portraits, the banner, the mark and Leng's painting. Card art never appears in the menus.
+Since v0.4.5 the app's menus and pages take the look of Magic Duels' front end, as v0.3.0 did for the table ([the game screen](game-screen.md)): a title screen, a main menu of large tiles under a game-style top bar, and a title band over every page. The owner's decisions are in [the v0.4.5 plan](plans/0.4.5.md#decisions-at-the-start-of-v045). The art is the owner's own: the Planeswalker portraits, the banner, the mark, Leng's painting and, since v0.5.1, the paintings behind four of the main menu's tiles. Card art never appears in the menus.
 
 ## The look
 
@@ -33,6 +33,8 @@ The app opens on the main menu (`#home`; any address that names no page, the old
 - **Decks**, with the number of the account's decks.
 - **Cards.**
 - **Friends**, with the number of friends online.
+
+Since v0.5.1 Tables, Decks, Cards and Friends lie over the owner's paintings too, as Play and the shop do: a round table set for a game, a deck and a hand on a desk, three cards floating over a library's chest, and friends laughing at a table (`web/public/menu`, each at 640 and 1280 pixels wide for sharp screens). Each is darkened where the tile's words lie: from the left for Tables, from the bottom for the others.
 
 Since v0.5.0, **Today's quests** runs across the main menu below them: the day's three quests, each with its reward and a bar of the wins counted so far, the time until the next day's quests, and Swap on each quest not done while the day's swap is unused ([quests](quests.md#daily-quests)).
 
