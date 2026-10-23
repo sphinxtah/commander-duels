@@ -472,6 +472,11 @@ async function play(
     await table.checkScreen(page);
     if (snapshot.result) return { snapshot, answered, kinds };
     await beforeAnswer?.(snapshot);
+    // A card clicked as its prompt moved on opens its details over the table (CI #105); the
+    // player closes them, as a person would, before answering.
+    const details = page.locator('dialog[aria-labelledby="zoom-title"][open]');
+    if ((await details.count()) > 0)
+      await details.getByRole("button", { name: "Close card details" }).click();
     const prompt = snapshot.prompt!;
     kinds[prompt.kind] = (kinds[prompt.kind] ?? 0) + 1;
     if (prompt.kind === "unsupported") {
