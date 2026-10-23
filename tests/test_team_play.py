@@ -434,6 +434,87 @@ def test_the_start_checks_each_team_again(client, engine):
     assert "Lightning Bolt" in again.json()["message"]
 
 
+# A card of the test catalog for each fixture deck, in order: the engine's decks hold cards the
+# catalog lacks, so each fixture stands for one of these, and a deck may share a card with any.
+STAND_INS = ("Lightning Bolt", "Grizzly Bears", "Swords to Plowshares", "Brainstorm")
+
+
+def stand_ins(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The fixture decks, each holding its stand-in card alone."""
+    decks = list(teams.FIXTURES)
+    held = {deck: frozenset({name}) for deck, name in zip(decks, STAND_INS, strict=True)}
+    monkeypatch.setattr(teams, "FIXTURES", held)
+    return decks
+
+
+def holding(client: TestClient, *names: str) -> list[dict[str, object]]:
+    """A Legacy deck's entries: four of each card named, and Mountains."""
+    counted = [(name, 4) for name in names] + [("Mountain", 60 - 4 * len(names))]
+    return [
+        {"card_id": card(client, name), "quantity": quantity, "location": "main"}
+        for name, quantity in counted
+    ]
+
+
+def built(account: Account, client: TestClient, *names: str) -> str:
+    """A deck of `holding`'s, which an administrator may build."""
+    entries = holding(client, *names)
+    made = account.send(
+        "POST", "/api/v1/decks", {"title": "Mixed", "format": "legacy", "entries": entries}
+    ).json()
+    assert made["playable"] is True, made
+    return str(made["id"])
+
+
+def test_a_bot_teammate_gets_a_deck_whenever_one_can(client, engine, monkeypatch):
+    """Regression (v0.5.1): the bots' fixture decks were dealt first-fit, so a start another
+    dealing allowed was refused, naming nobody and making nobody not ready; and a player beside a
+    bot learnt of a deck no bot could play beside only from the host's failed start."""
+    decks = stand_ins(monkeypatch)
+    ada, bob, cara, dan = (Account(client, n, admin=True) for n in ("ada", "bob", "cara", "dan"))
+    # Ada's deck rules out the first fixture for her bot; Bob's every one but the second for his.
+    code = team_table(ada, built(ada, client, STAND_INS[0]), bots=2, bot_teammate=True)["code"]
+    assert sit(bob, code, built(bob, client, *STAND_INS[:1], *STAND_INS[2:])).status_code == 200
+    assert ready(bob, code).status_code == 200
+    started = ada.send("POST", f"/api/v1/tables/{code}/start")
+    assert started.status_code == 200, started.text
+    seats = engine.created[-1]["seats"]
+    assert (seats[1]["deck"], seats[3]["deck"]) == (decks[2], decks[1])
+
+    # A deck sharing a card with every fixture deck is refused as its player gets ready.
+    every = built(dan, client, *STAND_INS)
+    code = team_table(cara, built(cara, client, STAND_INS[0]), bots=2, bot_teammate=True)["code"]
+    sit(dan, code, every)
+    refused = ready(dan, code)
+    assert (refused.status_code, refused.json()["code"]) == (422, "team_decks")
+    assert refused.json()["message"] == tables.NO_BOT_TEAMMATE
+    # Dan gets ready with another, then edits it in the builder until it holds them all.
+    bears = built(dan, client, STAND_INS[1])
+    dan.send("PATCH", f"/api/v1/tables/{code}/seat", {"deck_id": bears})
+    assert ready(dan, code).status_code == 200
+    every_card = holding(client, *STAND_INS)
+    saved = dan.send("PUT", f"/api/v1/decks/{bears}/draft", {"version": 1, "entries": every_card})
+    assert saved.status_code == 200, saved.text
+    refused = cara.send("POST", f"/api/v1/tables/{code}/start")
+    assert (refused.status_code, refused.json()["code"]) == (409, "team_decks")
+    # The host learns whose deck, never its cards, and Dan must get ready again.
+    assert refused.json()["message"] == (
+        "dan's deck shares a card with every bot deck, so no bot can be their teammate: they need "
+        "another deck."
+    )
+    players = cara.get(f"/api/v1/tables/{code}").json()["players"]
+    assert [p["ready"] for p in players if p["handle"] == "dan"] == [False]
+    # The host's own deck is named to the host, and Dan, whose deck suits a bot, stays ready.
+    dan.send("PATCH", f"/api/v1/tables/{code}/seat", {"deck_id": built(dan, client)})
+    assert ready(dan, code).status_code == 200
+    cara.send("PATCH", f"/api/v1/tables/{code}/seat", {"deck_id": built(cara, client, *STAND_INS)})
+    refused = cara.send("POST", f"/api/v1/tables/{code}/start")
+    assert (refused.status_code, refused.json()["code"]) == (409, "team_decks")
+    assert refused.json()["message"] == tables.NO_BOT_TEAMMATE
+    players = cara.get(f"/api/v1/tables/{code}").json()["players"]
+    assert [p["ready"] for p in players if p["handle"] == "dan"] == [True]
+
+
 def test_two_headed_giants_own_banned_card():
     """MTR 9.5 bans Erayo, Soratami Ascendant in Two-Headed Giant Constructed: a table refusing
     banned cards refuses it, unless the deck is SysOp's."""
@@ -647,6 +728,41 @@ def test_bots_come_after_a_minute(client, engine, clock):
     game_id = place(dan)["game_id"]
     seated = [seat.user_id for seat in seats_of(client, game_id)]
     assert set(seated[:2]) == {ada.id, dan.id} and seated[2:] == [None, None]
+
+
+def test_the_queue_refuses_only_a_deck_no_bot_can_play_beside(client, engine, clock, monkeypatch):
+    """Regression (v0.5.1): when one bot got no fixture deck, every player beside a bot was taken
+    out, told falsely that their deck shared a card with every bot deck; and the decks were dealt
+    first-fit, so that happened when another dealing worked."""
+    decks = stand_ins(monkeypatch)
+    bob, cara, dan, erin = (Account(client, n, admin=True) for n in ("bob", "cara", "dan", "erin"))
+    # Bob's deck rules out the first fixture for his bot, Cara's every one but the second; both
+    # hold a Bolt, so they sit on opposite sides, each with a bot.
+    queue(bob, built(bob, client, STAND_INS[0]))
+    clock.advance(1)
+    queue(cara, built(cara, client, *STAND_INS[:1], *STAND_INS[2:]))
+    clock.advance(61)
+    place(bob), place(cara)
+    tick(client)
+    assert (place(bob)["status"], place(cara)["status"]) == ("matched", "matched")
+    game_id = place(cara)["game_id"]
+    assert [seat.user_id for seat in seats_of(client, game_id)] == [bob.id, None, cara.id, None]
+    seats = engine.created[-1]["seats"]
+    assert (seats[1]["deck"], seats[3]["deck"]) == (decks[2], decks[1])
+
+    # Dan's deck shares a card with every fixture deck: he alone is taken out, and Erin, waiting
+    # again, plays with bots.
+    queue(dan, built(dan, client, *STAND_INS))
+    clock.advance(1)
+    queue(erin, built(erin, client, STAND_INS[0]))
+    clock.advance(61)
+    place(dan), place(erin)
+    tick(client)
+    refused = place(dan)
+    assert (refused["status"], refused["reason"]) == ("refused", "team_decks")
+    assert refused["message"].startswith("Your deck shares a card with every bot deck")
+    assert place(erin)["status"] == "matched"
+    assert [s["player"] for s in engine.created[-1]["seats"]] == ["human", "bot", "bot", "bot"]
 
 
 def test_a_rematch_keeps_the_teams(client, engine):

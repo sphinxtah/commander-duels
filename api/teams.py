@@ -7,7 +7,9 @@ uses Unified Deck Construction (section 8.4), so no two decks on a team may hold
 by its English name, except cards with the basic supertype. Section 9.5 also bans Erayo, Soratami
 Ascendant in every Two-Headed Giant Constructed tournament, which a table refusing banned cards
 refuses. A bot whose deck is not chosen plays one of the engine's four Legacy fixture decks, which
-share no card: the teammate's shares none with the player's deck either.
+share no card: the teammate's shares none with the player's deck either. Since v0.5.1 the decks
+are dealt by a search, so only a player whose deck shares a card with every fixture deck stops a
+bot teammate.
 """
 
 from collections.abc import Iterable
@@ -122,29 +124,69 @@ def listed(names: list[str]) -> str:
     return shown[0] if len(shown) == 1 else ", ".join(shown[:-1]) + " and " + shown[-1]
 
 
+def fits_a_fixture(names: set[str]) -> bool:
+    """Whether a bot can be this deck's teammate: some fixture deck shares no card with it."""
+    return any(not shared(set(fixture), names) for fixture in FIXTURES.values())
+
+
+def without_fixture(seats: list[dict[str, object]]) -> list[int]:
+    """The seats whose deck shares a card with every fixture deck while their teammate is a bot
+    with no deck (v0.5.1): no fixture deck can be that bot's, which is the only way the decks
+    cannot be dealt (``dealt``)."""
+    return [
+        index
+        for index, seat in enumerate(seats)
+        if (names := cards_of(seat)) is not None
+        and cards_of(seats[teammate(index)]) is None
+        and not fits_a_fixture(names)
+    ]
+
+
+def dealt(cards: list[set[str] | None], used: set[object], apart: bool) -> dict[int, str] | None:
+    """A fixture deck for each seat without one, sharing no card with its teammate's deck, or
+    None when there is no way (v0.5.1). It searches depth first, seats and fixtures in order, so
+    it deals as taking the first deck that fits would, unless that leaves a later bot no deck:
+    first-fit could refuse a start that another dealing allowed (at most four decks for three
+    bots, so trying them all is cheap). With ``apart`` no deck is dealt twice; without it only a
+    team's two decks differ, which sharing no card already means."""
+    index = next((seat for seat, names in enumerate(cards) if names is None), None)
+    if index is None:
+        return {}
+    mate = cards[teammate(index)]
+    for deck, names in FIXTURES.items():
+        if (apart and deck in used) or (mate and shared(set(names), mate)):
+            continue
+        rest = dealt(
+            [set(names) if seat == index else other for seat, other in enumerate(cards)],
+            used | {deck},
+            apart,
+        )
+        if rest is not None:
+            return {index: deck, **rest}
+    return None
+
+
 def assign_and_check(seats: list[dict[str, object]], banned_allowed: bool) -> None:
     """Gives each bot without a deck a fixture deck its teammate's shares no card with, then
     refuses a team whose decks share a card, or a deck holding a card banned in Two-Headed Giant
-    when the table refuses banned cards. Changes ``seats`` in place."""
+    when the table refuses banned cards. Changes ``seats`` in place, and only when it deals."""
     cards = [cards_of(seat) for seat in seats]
     used = {seat.get("deck") for seat in seats}
-    for index, seat in enumerate(seats):
-        if cards[index] is not None:
-            continue
-        mate = cards[teammate(index)]
-        for deck, names in FIXTURES.items():
-            if deck not in used and not (mate and shared(set(names), mate)):
-                seat["deck"] = deck
-                cards[index] = set(names)
-                used.add(deck)
-                break
-        else:
-            raise ApiError(
-                422,
-                "team_decks",
-                "Every fixture deck shares a card with your teammate's deck: choose a deck for "
-                "the bot.",
-            )
+    decks = dealt(cards, used, apart=True)
+    if decks is None:
+        # Two players whose decks leave their bots only the same fixture deck (v0.5.1): both
+        # teams' bots play it, as the rules allow, since only a team's own decks may share no card.
+        decks = dealt(cards, used, apart=False)
+    if decks is None:
+        raise ApiError(
+            422,
+            "team_decks",
+            "Every fixture deck shares a card with your teammate's deck: choose a deck for "
+            "the bot.",
+        )
+    for index, deck in decks.items():
+        seats[index]["deck"] = deck
+        cards[index] = set(FIXTURES[deck])
     for first, second in TEAMS:
         both = shared(cards[first] or set(), cards[second] or set())
         if both:
