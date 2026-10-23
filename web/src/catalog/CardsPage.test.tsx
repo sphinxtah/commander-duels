@@ -3,7 +3,12 @@ import { createRef } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
 import { card, mockApi, reply } from "../decks/fixtures";
-import { buildsFromLibrary, ownedWords, type CustomCard } from "./catalog";
+import {
+  buildsFromLibrary,
+  ownedWords,
+  type CardSummary,
+  type CustomCard,
+} from "./catalog";
 import { CardsPage, resultWords } from "./CardsPage";
 
 const player = {
@@ -393,7 +398,19 @@ describe("the Cards page", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: /^Lightning Bolt from/ }),
     );
+    // The picture first, big (v0.5.1): the edition's, then its details a button away.
+    const zoom = await screen.findByRole("dialog", {
+      name: "Lightning Bolt, enlarged",
+    });
+    expect(
+      within(zoom).getByRole("img", { name: "Lightning Bolt" }),
+    ).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/p-bolt-m10?size=png",
+    );
+    fireEvent.click(within(zoom).getByRole("button", { name: "Card details" }));
     await screen.findByRole("dialog", { name: "Lightning Bolt" });
+    expect(zoom).not.toHaveAttribute("open");
     const asked = api.calls.find(
       (call) => call.route === "GET /api/v1/cards/{card_id}",
     )!.options as { params: { query: Record<string, unknown> } };
@@ -404,6 +421,7 @@ describe("the Cards page", () => {
     // From All cards, every printing.
     fireEvent.click(screen.getByRole("button", { name: "Close the card" }));
     fireEvent.click(screen.getByRole("tab", { name: "All cards" }));
+    // A card with no picture has nothing to show big: its details open at once.
     fireEvent.click(
       await screen.findByRole("button", { name: "Lightning Bolt, Artifact" }),
     );
@@ -575,11 +593,77 @@ describe("the Cards page", () => {
     expect(first).toHaveTextContent("Not loaded by this engine");
     expect(first).toHaveTextContent("In your library.");
     expect(first.querySelector("img")).toHaveAttribute("src", sigil.image_url);
+    // A click shows the picture big, alone (v0.5.1); a click on it closes it again.
+    fireEvent.click(
+      within(first).getByRole("button", { name: "Enlarge Stand-in Sigil" }),
+    );
+    const zoom = screen.getByRole("dialog", {
+      name: "Stand-in Sigil, enlarged",
+    });
+    expect(
+      within(zoom).getByRole("img", { name: "Stand-in Sigil" }),
+    ).toHaveAttribute("src", sigil.image_url);
+    expect(
+      within(zoom).queryByRole("button", { name: "Card details" }),
+    ).toBeNull();
+    fireEvent.click(within(zoom).getByRole("img", { name: "Stand-in Sigil" }));
+    expect(zoom).not.toHaveAttribute("open");
     const second = within(section)
       .getByRole("heading", { name: /^Stand-in Herald/ })
       .closest("li")!;
     expect(second).toHaveTextContent("Playable");
     expect(second).not.toHaveTextContent("Not loaded");
+  });
+});
+
+describe("a card's picture, big (v0.5.1)", () => {
+  it("opens from any tab's picture, turns a two-faced card over, and closes with its button", async () => {
+    const api = pageApi();
+    const delver = card("Delver of Secrets", {
+      type_line: "Creature — Human Wizard",
+      image: { printing_id: "p-delver", faces: 2, artist: null },
+    } as Partial<CardSummary>);
+    api.on("GET /api/v1/cards", () => reply(200, page([delver])));
+    api.on("GET /api/v1/me/alliance/cards", () =>
+      reply(200, {
+        alliance: "teferi",
+        name: "Teferi",
+        custom: false,
+        cards: [delver],
+      }),
+    );
+    renderCatalog();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Delver of Secrets,/ }),
+    );
+    const zoom = screen.getByRole("dialog", {
+      name: "Delver of Secrets, enlarged",
+    });
+    const picture = () =>
+      within(zoom).getByRole("img", { name: "Delver of Secrets" });
+    expect(picture()).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/p-delver?size=png&face=0",
+    );
+    fireEvent.click(within(zoom).getByRole("button", { name: "Turn over" }));
+    expect(zoom).toHaveAttribute("open");
+    expect(picture()).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/p-delver?size=png&face=1",
+    );
+    fireEvent.click(
+      within(zoom).getByRole("button", { name: "Close the picture" }),
+    );
+    expect(zoom).not.toHaveAttribute("open");
+    // The alliance's tab does the same.
+    fireEvent.click(screen.getByRole("tab", { name: "Teferi's cards" }));
+    const section = screen.getByRole("region", { name: "Teferi's cards" });
+    fireEvent.click(
+      within(section).getByRole("button", { name: /^Delver of Secrets,/ }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Delver of Secrets, enlarged" }),
+    ).toHaveAttribute("open");
   });
 });
 

@@ -47,11 +47,14 @@ function plural(count: number, one: string, many: string): string {
  */
 export function MyLibrary({
   onOpen,
+  onZoom,
   view,
   onView,
 }: {
   /** Opens a card at the edition shown. */
   onOpen: (card: CardSummary, printingId: string) => void;
+  /** Shows the edition's picture big (v0.5.1). */
+  onZoom: (card: CardSummary, printingId: string) => void;
   view: CardView;
   onView: (view: CardView) => void;
 }) {
@@ -199,6 +202,7 @@ export function MyLibrary({
               card={{ ...item.card, owned: item.copies }}
               edition={editionName(item.edition)}
               onOpen={(card) => onOpen(card, item.edition.printing_id)}
+              onZoom={(card) => onZoom(card, item.edition.printing_id)}
             >
               <span className={styles.tileSources}>
                 {item.sources.map((from) => sourceLabels[from]).join(", ")}

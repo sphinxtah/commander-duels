@@ -209,7 +209,13 @@ test.describe("decks and the card catalog", () => {
       page.getByRole("button", { name: /^Counterspell,/ }),
     ).toHaveCount(0);
     await bolt.click();
-    const details = page.getByRole("dialog");
+    // Its picture shows big first (v0.5.1), alone; its details are a button away.
+    const zoom = page.getByRole("dialog", { name: "Lightning Bolt, enlarged" });
+    await expect(
+      zoom.getByRole("img", { name: "Lightning Bolt" }),
+    ).toBeVisible();
+    await zoom.getByRole("button", { name: "Card details" }).click();
+    const details = page.getByRole("dialog", { name: "Lightning Bolt" });
     await expect(details).toContainText(
       "Lightning Bolt deals 3 damage to any target.",
     );

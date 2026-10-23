@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { client, type Me } from "../api";
 import { CardDetails, CardTable, CardTile, ViewSwitch } from "./CardViews";
+import { CardZoom, customZoomOf, zoomOf, type Zoomed } from "./CardZoom";
 import { useCardView } from "./cardView";
 import {
   AllianceCardsView,
@@ -106,6 +107,17 @@ function Browser({
     printings: PrintingsShown;
   }>();
   const openCard = (card: CardSummary) => setOpen({ card, printings: "all" });
+  // A card's picture shown big (v0.5.1), with its details a button away.
+  const [zoom, setZoom] = useState<Zoomed>();
+  const zoomCard = (
+    card: CardSummary,
+    details: () => void,
+    printing?: string,
+  ) => {
+    const zoomed = zoomOf(card, printing, details);
+    if (zoomed) setZoom(zoomed);
+    else details();
+  };
   // Pictures or a list (v0.5.0), the same on every tab and remembered in this browser.
   const [shownAs, setShownAs] = useCardView();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -155,6 +167,13 @@ function Browser({
           onOpen={(card, printing) =>
             setOpen({ card, printing, printings: "owned" })
           }
+          onZoom={(card, printing) =>
+            zoomCard(
+              card,
+              () => setOpen({ card, printing, printings: "owned" }),
+              printing,
+            )
+          }
           view={shownAs}
           onView={setShownAs}
         />
@@ -165,6 +184,8 @@ function Browser({
           error={alliance.error}
           custom={custom}
           onOpen={openCard}
+          onZoom={(card) => zoomCard(card, () => openCard(card))}
+          onZoomCustom={(card) => setZoom(customZoomOf(card))}
           view={shownAs}
           onView={setShownAs}
         />
@@ -197,7 +218,12 @@ function Browser({
             (shownAs === "pictures" ? (
               <ul className={styles.grid} aria-label="Cards">
                 {results.items.map((card) => (
-                  <CardTile key={card.id} card={card} onOpen={openCard} />
+                  <CardTile
+                    key={card.id}
+                    card={card}
+                    onOpen={openCard}
+                    onZoom={(card) => zoomCard(card, () => openCard(card))}
+                  />
                 ))}
               </ul>
             ) : (
@@ -251,9 +277,11 @@ function Browser({
             cardId={open.card.id}
             chosenPrinting={open.printing}
             printings={open.printings}
+            onZoom={setZoom}
           />
         )}
       </dialog>
+      <CardZoom zoomed={zoom} onClose={() => setZoom(undefined)} />
     </>
   );
 }

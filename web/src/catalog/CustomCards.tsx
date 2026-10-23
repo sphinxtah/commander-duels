@@ -42,9 +42,12 @@ export function engineWords(card: CustomCard): string {
 export function GodlikeCards({
   cards,
   title = "Godlike cards",
+  onZoom,
 }: {
   cards: CustomCard[];
   title?: string;
+  /** The picture, clicked, shows big (v0.5.1). */
+  onZoom?: (card: CustomCard) => void;
 }) {
   return (
     <section className={styles.custom} aria-labelledby="godlike-title">
@@ -59,14 +62,32 @@ export function GodlikeCards({
         {cards.map((card) => (
           <li key={card.id}>
             {/* The text beside the image says all it shows, so the image is not announced. */}
-            <div className={styles.cardImage}>
-              <img
-                src={card.image_url}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
+            {onZoom ? (
+              <button
+                type="button"
+                className={styles.zoomable}
+                aria-label={`Enlarge ${card.name}`}
+                onClick={() => onZoom(card)}
+              >
+                <div className={styles.cardImage}>
+                  <img
+                    src={card.image_url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              </button>
+            ) : (
+              <div className={styles.cardImage}>
+                <img
+                  src={card.image_url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+            )}
             <div className={styles.customText}>
               <h3 className={styles.detailName}>
                 {card.name} <ManaCost cost={card.mana_cost} />
