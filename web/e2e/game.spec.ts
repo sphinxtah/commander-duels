@@ -795,10 +795,11 @@ test.describe("practice games in the browser", () => {
   }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     // The teammate's hand is the player's to see (810.5); the opponents' decks stay concealed.
+    // v0.5.1: the bots play the measured pairs, red and white against green and blue.
     const mine = deckNames("legacy-mono-red-burn");
-    const teammate = deckNames("legacy-mono-green-creatures");
+    const teammate = deckNames("legacy-mono-white-weenie");
     const concealed = new Set(
-      ["legacy-mono-white-weenie", "legacy-mono-blue-skies"]
+      ["legacy-mono-green-creatures", "legacy-mono-blue-skies"]
         .flatMap((deck) => [...deckNames(deck)])
         .filter((name) => !mine.has(name) && !teammate.has(name)),
     );

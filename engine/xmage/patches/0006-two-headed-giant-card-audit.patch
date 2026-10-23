@@ -1,0 +1,1405 @@
+Two-Headed Giant (Commander Duels v0.5.1 card audit): the cards the audit fixed one by one.
+
+Reason: the cards whose own code reads one active player, one attacking player or one player's poison
+counters, where part 3's rules do not reach. In a team game (Game.getTeammates, from part 1):
+- "your turn" compared with the active player by id reads the team's turn (805.9: Game.isActivePlayer);
+- custom triggers worded for "each player's" step and "that player" trigger for each player of the
+  active team, and a few "each player's" triggers built as "each step" say so (805.4d:
+  triggersForEachTeamPlayer, withTriggersForEachTeamPlayer);
+- watchers that record the beginning of a turn record it for each player of the active team;
+- "you attack with" counts the creatures you control, and "that attacking player" is the one
+  attacking the enchanted player (805.10a, 805.10c);
+- effects that check a player's poison counters count the team's (810.10a), and Melira, Sylvok
+  Outcast keeps the whole team from getting them (810.10c);
+- Biorhythm, Shaman of Forgotten Ways and Reverse the Sands set or redistribute one life total per
+  team (810.9d, 810.9f).
+docs/engine/two-headed-giant-audit.csv in Commander Duels lists every card reviewed and its verdict.
+Every other game type names no teammates, and each change reduces to the card's own code there.
+Needs parts 1 and 3.
+Upstream: none yet; to be offered to magefree/mage with the other parts.
+Remove when: XMage upstream implements Two-Headed Giant, or the format is dropped.
+
+diff --git a/Mage.Sets/src/mage/cards/a/AlluringSuitor.java b/Mage.Sets/src/mage/cards/a/AlluringSuitor.java
+index 229793ea..1cb89cfe 100644
+--- a/Mage.Sets/src/mage/cards/a/AlluringSuitor.java
++++ b/Mage.Sets/src/mage/cards/a/AlluringSuitor.java
+@@ -89,10 +89,10 @@ class AlluringSuitorTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        return isControlledBy(game.getCombat().getAttackingPlayerId())
++        return game.getCombat().isAttackingPlayer(getControllerId(), game) // 805.10a
+                 && game
+                 .getCombat()
+-                .getAttackers()
++                .getAttackers(getControllerId(), game)
+                 .stream()
+                 .map(game::getPermanent)
+                 .filter(permanent -> permanent.isCreature(game))
+diff --git a/Mage.Sets/src/mage/cards/a/AnointWithAffliction.java b/Mage.Sets/src/mage/cards/a/AnointWithAffliction.java
+index b3f2cacb..b7150097 100644
+--- a/Mage.Sets/src/mage/cards/a/AnointWithAffliction.java
++++ b/Mage.Sets/src/mage/cards/a/AnointWithAffliction.java
+@@ -68,7 +68,7 @@ class AnointWithAfflictionEffect extends OneShotEffect {
+                 || Optional
+                 .ofNullable(game.getPlayer(permanent.getControllerId()))
+                 .filter(Objects::nonNull)
+-                .map(p -> p.getCountersCount(CounterType.POISON) >= 3)
++                .map(p -> game.getPoisonCounters(p.getId()) >= 3) // 810.10a: the team's
+                 .orElse(false))
+                 && player.moveCards(permanent, Zone.EXILED, source, game);
+     }
+diff --git a/Mage.Sets/src/mage/cards/b/BelbeCorruptedObserver.java b/Mage.Sets/src/mage/cards/b/BelbeCorruptedObserver.java
+index 9f18ea28..d1122a54 100644
+--- a/Mage.Sets/src/mage/cards/b/BelbeCorruptedObserver.java
++++ b/Mage.Sets/src/mage/cards/b/BelbeCorruptedObserver.java
+@@ -39,7 +39,7 @@ public final class BelbeCorruptedObserver extends CardImpl {
+         // At the beginning of each player's postcombat main phase, that player adds {C}{C} for each of your opponents who lost life this turn.
+         this.addAbility(new BeginningOfPostcombatMainTriggeredAbility(
+                 TargetController.ANY, new BelbeCorruptedObserverEffect(), false
+-        ).addHint(hint), new BelbeCorruptedObserverWatcher());
++        ).withTriggersForEachTeamPlayer(true).addHint(hint), new BelbeCorruptedObserverWatcher());
+     }
+ 
+     private BelbeCorruptedObserver(final BelbeCorruptedObserver card) {
+diff --git a/Mage.Sets/src/mage/cards/b/BelloBardOfTheBrambles.java b/Mage.Sets/src/mage/cards/b/BelloBardOfTheBrambles.java
+index c823c0bf..aeb3d8b5 100644
+--- a/Mage.Sets/src/mage/cards/b/BelloBardOfTheBrambles.java
++++ b/Mage.Sets/src/mage/cards/b/BelloBardOfTheBrambles.java
+@@ -82,7 +82,7 @@ class BelloBardOfTheBramblesEffect extends ContinuousEffectImpl {
+ 
+     @Override
+     public boolean apply(Layer layer, SubLayer sublayer, Ability source, Game game) {
+-        if (!source.isControlledBy(game.getActivePlayerId())) {
++        if (!game.isActivePlayer(source.getControllerId())) { // 805.9: or your team's turn
+             return false;
+         }
+         switch (layer) {
+diff --git a/Mage.Sets/src/mage/cards/b/Biorhythm.java b/Mage.Sets/src/mage/cards/b/Biorhythm.java
+index 3ed8f89b..b392ba6a 100644
+--- a/Mage.Sets/src/mage/cards/b/Biorhythm.java
++++ b/Mage.Sets/src/mage/cards/b/Biorhythm.java
+@@ -1,6 +1,7 @@
+ 
+ package mage.cards.b;
+ 
++import java.util.ArrayList;
+ import java.util.UUID;
+ import mage.abilities.Ability;
+ import mage.abilities.effects.OneShotEffect;
+@@ -55,7 +56,9 @@ class BiorhythmEffect extends OneShotEffect {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
+-        for(UUID playerId : game.getState().getPlayersInRange(source.getControllerId(), game)) {
++        // 810.9d: with a shared team life total, one player of each team, whom the team chooses
++        for(UUID playerId : game.chooseLifeTotalsToSet(new ArrayList<>(game.getState().getPlayersInRange(source.getControllerId(), game)),
++                id -> game.getBattlefield().countAll(filter, id, game))) {
+             Player player = game.getPlayer(playerId);
+             if(player != null) {
+                 int diff = player.getLife() - game.getBattlefield().countAll(filter, playerId, game);
+diff --git a/Mage.Sets/src/mage/cards/b/BringTheEnding.java b/Mage.Sets/src/mage/cards/b/BringTheEnding.java
+index e938b3a8..1a72fe92 100644
+--- a/Mage.Sets/src/mage/cards/b/BringTheEnding.java
++++ b/Mage.Sets/src/mage/cards/b/BringTheEnding.java
+@@ -69,7 +69,7 @@ class BringTheEndingCounterEffect extends OneShotEffect {
+         UUID controllerId = game.getControllerId(targetId);
+         Player player = game.getPlayer(controllerId);
+ 
+-        if (player != null && player.getCountersCount(CounterType.POISON) >= 3) {
++        if (player != null && game.getPoisonCounters(player.getId()) >= 3) {
+             hardCounterEffect.setTargetPointer(this.getTargetPointer().copy());
+             return hardCounterEffect.apply(game, source);
+         } else {
+diff --git a/Mage.Sets/src/mage/cards/b/BurningCinderFuryOfCrimsonChaosFire.java b/Mage.Sets/src/mage/cards/b/BurningCinderFuryOfCrimsonChaosFire.java
+index 2067a9f6..b609b457 100644
+--- a/Mage.Sets/src/mage/cards/b/BurningCinderFuryOfCrimsonChaosFire.java
++++ b/Mage.Sets/src/mage/cards/b/BurningCinderFuryOfCrimsonChaosFire.java
+@@ -39,7 +39,8 @@ public final class BurningCinderFuryOfCrimsonChaosFire extends CardImpl {
+ 
+         // At the beginning of each player’s end step, if that player didn’t tap any nonland permanents that turn, Burning Cinder Fury of Crimson Chaos Fire deals 3 damage to that player.
+         this.addAbility(new BeginningOfEndStepTriggeredAbility(TargetController.ANY, new DamageTargetEffect(3).setText("{this} deals 3 damage to that player"),
+-                false, new BurningCinderFuryOfCrimsonChaosFireCondition()), new BurningCinderFuryOfCrimsonChaosFireWatcher());
++                false, new BurningCinderFuryOfCrimsonChaosFireCondition()).withTriggersForEachTeamPlayer(true),
++                new BurningCinderFuryOfCrimsonChaosFireWatcher());
+     }
+ 
+     private BurningCinderFuryOfCrimsonChaosFire(final BurningCinderFuryOfCrimsonChaosFire card) {
+diff --git a/Mage.Sets/src/mage/cards/c/ChainedThroatseeker.java b/Mage.Sets/src/mage/cards/c/ChainedThroatseeker.java
+index 9d214a09..1d697667 100644
+--- a/Mage.Sets/src/mage/cards/c/ChainedThroatseeker.java
++++ b/Mage.Sets/src/mage/cards/c/ChainedThroatseeker.java
+@@ -66,7 +66,7 @@ class ChainedThroatseekerCantAttackEffect extends RestrictionEffect {
+     @Override
+     public boolean canAttack(Permanent attacker, UUID defenderId, Ability source, Game game, boolean canUseChooseDialogs) {
+         Player targetPlayer = game.getPlayerOrPlaneswalkerController(defenderId);
+-        return targetPlayer != null && targetPlayer.getCountersCount(CounterType.POISON) > 0;
++        return targetPlayer != null && game.getPoisonCounters(targetPlayer.getId()) > 0;
+     }
+ 
+     @Override
+diff --git a/Mage.Sets/src/mage/cards/c/CoramTheUndertaker.java b/Mage.Sets/src/mage/cards/c/CoramTheUndertaker.java
+index 40b9f884..84bc4a24 100644
+--- a/Mage.Sets/src/mage/cards/c/CoramTheUndertaker.java
++++ b/Mage.Sets/src/mage/cards/c/CoramTheUndertaker.java
+@@ -150,7 +150,7 @@ class CoramTheUndertakerPlayLandFromGraveyardEffect extends AsThoughEffectImpl {
+     @Override
+     public boolean applies(UUID objectId, Ability source, UUID affectedControllerId, Game game) {
+         if (!source.isControlledBy(affectedControllerId)
+-                || !affectedControllerId.equals(game.getActivePlayerId()) // only during your turns (e.g. prevent flash creatures)
++                || !game.isActivePlayer(affectedControllerId) // only during your (team's, 805.9) turns (e.g. prevent flash creatures)
+                 || !Zone.GRAVEYARD.equals(game.getState().getZone(objectId))) {
+             return false;
+         }
+@@ -188,7 +188,7 @@ class CoramTheUndertakerCastSpellFromGraveyardEffect extends AsThoughEffectImpl
+     @Override
+     public boolean applies(UUID objectId, Ability source, UUID affectedControllerId, Game game) {
+         if (!source.isControlledBy(affectedControllerId)
+-                || !affectedControllerId.equals(game.getActivePlayerId()) // only during your turns (e.g. prevent flash creatures)
++                || !game.isActivePlayer(affectedControllerId) // only during your (team's, 805.9) turns (e.g. prevent flash creatures)
+                 || !Zone.GRAVEYARD.equals(game.getState().getZone(objectId))) {
+             return false;
+         }
+diff --git a/Mage.Sets/src/mage/cards/c/CorruptedResolve.java b/Mage.Sets/src/mage/cards/c/CorruptedResolve.java
+index 8874b1ea..1cb833d2 100644
+--- a/Mage.Sets/src/mage/cards/c/CorruptedResolve.java
++++ b/Mage.Sets/src/mage/cards/c/CorruptedResolve.java
+@@ -54,7 +54,7 @@ class CorruptedResolveEffect extends OneShotEffect {
+         Spell spell = game.getStack().getSpell(getTargetPointer().getFirst(game, source));
+         if (spell != null) {
+             Player player = game.getPlayer(spell.getControllerId());
+-            if (player != null && player.getCountersCount(CounterType.POISON) > 0) {
++            if (player != null && game.getPoisonCounters(player.getId()) > 0) {
+                 return game.getStack().counter(getTargetPointer().getFirst(game, source), source, game);
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/c/CreepyPuppeteer.java b/Mage.Sets/src/mage/cards/c/CreepyPuppeteer.java
+index b54eab63..1cc66be2 100644
+--- a/Mage.Sets/src/mage/cards/c/CreepyPuppeteer.java
++++ b/Mage.Sets/src/mage/cards/c/CreepyPuppeteer.java
+@@ -68,14 +68,14 @@ class CreepyPuppeteerTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!isControlledBy(game.getCombat().getAttackingPlayerId())
++        if (!game.getCombat().isAttackingPlayer(getControllerId(), game) // 805.10a
+                 || !game.getCombat().getAttackers().contains(getSourceId())
+-                || game.getCombat().getAttackers().size() != 2) {
++                || game.getCombat().getAttackers(getControllerId(), game).size() != 2) {
+             return false;
+         }
+         UUID otherAttacker = game
+                 .getCombat()
+-                .getAttackers()
++                .getAttackers(getControllerId(), game)
+                 .stream()
+                 .filter(uuid -> !getSourceId().equals(uuid))
+                 .findFirst()
+diff --git a/Mage.Sets/src/mage/cards/c/CurseOfChaos.java b/Mage.Sets/src/mage/cards/c/CurseOfChaos.java
+index 90f6c4b7..6c0100b6 100644
+--- a/Mage.Sets/src/mage/cards/c/CurseOfChaos.java
++++ b/Mage.Sets/src/mage/cards/c/CurseOfChaos.java
+@@ -74,7 +74,7 @@ class CurseOfChaosTriggeredAbility extends TriggeredAbilityImpl {
+                 && enchantment.getAttachedTo() != null
+                 && game.getCombat().getPlayerDefenders(game, false).contains(enchantment.getAttachedTo())) {
+             for (Effect effect : this.getEffects()) {
+-                effect.setTargetPointer(new FixedTarget(game.getCombat().getAttackingPlayerId()));
++                effect.setTargetPointer(new FixedTarget(game.getCombat().getAttackingPlayerOf(enchantment.getAttachedTo(), game)));
+             }
+             return true;
+         }
+diff --git a/Mage.Sets/src/mage/cards/c/CurseOfInertia.java b/Mage.Sets/src/mage/cards/c/CurseOfInertia.java
+index c31c6e39..f67f21a2 100644
+--- a/Mage.Sets/src/mage/cards/c/CurseOfInertia.java
++++ b/Mage.Sets/src/mage/cards/c/CurseOfInertia.java
+@@ -75,7 +75,7 @@ class CurseOfInertiaTriggeredAbility extends TriggeredAbilityImpl {
+                 && enchantment.getAttachedTo() != null
+                 && game.getCombat().getPlayerDefenders(game, false).contains(enchantment.getAttachedTo())) {
+             TargetPermanent target = new TargetPermanent();
+-            target.setTargetController(game.getCombat().getAttackingPlayerId());
++            target.setTargetController(game.getCombat().getAttackingPlayerOf(enchantment.getAttachedTo(), game)); // 805.10c
+             this.getTargets().clear();
+             this.addTarget(target);
+             return true;
+diff --git a/Mage.Sets/src/mage/cards/c/CurseOfShallowGraves.java b/Mage.Sets/src/mage/cards/c/CurseOfShallowGraves.java
+index bcc06572..1d045653 100644
+--- a/Mage.Sets/src/mage/cards/c/CurseOfShallowGraves.java
++++ b/Mage.Sets/src/mage/cards/c/CurseOfShallowGraves.java
+@@ -79,7 +79,7 @@ class CurseOfShallowTriggeredAbility extends TriggeredAbilityImpl {
+                 && enchantment.getAttachedTo() != null
+                 && game.getCombat().getPlayerDefenders(game, false).contains(enchantment.getAttachedTo())) {
+             for (Effect effect : this.getEffects()) {
+-                effect.setTargetPointer(new FixedTarget(game.getCombat().getAttackingPlayerId()));
++                effect.setTargetPointer(new FixedTarget(game.getCombat().getAttackingPlayerOf(enchantment.getAttachedTo(), game)));
+             }
+             return true;
+         }
+diff --git a/Mage.Sets/src/mage/cards/d/DefenseGrid.java b/Mage.Sets/src/mage/cards/d/DefenseGrid.java
+index 57dd6ef5..eb3b455e 100644
+--- a/Mage.Sets/src/mage/cards/d/DefenseGrid.java
++++ b/Mage.Sets/src/mage/cards/d/DefenseGrid.java
+@@ -57,7 +57,7 @@ class DefenseGridCostModificationEffect extends CostModificationEffectImpl {
+     @Override
+     public boolean applies(Ability abilityToModify, Ability source, Game game) {
+         if (abilityToModify instanceof SpellAbility) {
+-            if (!abilityToModify.isControlledBy(game.getActivePlayerId())) {
++            if (!game.isActivePlayer(abilityToModify.getControllerId())) { // 805.9: or your team's turn
+                 return true;
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/d/DesertWereWorm.java b/Mage.Sets/src/mage/cards/d/DesertWereWorm.java
+index d45396c1..0875c426 100644
+--- a/Mage.Sets/src/mage/cards/d/DesertWereWorm.java
++++ b/Mage.Sets/src/mage/cards/d/DesertWereWorm.java
+@@ -89,7 +89,7 @@ class DesertWereWormAttackAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!isControlledBy(game.getCombat().getAttackingPlayerId())) {
++        if (!game.getCombat().isAttackingPlayer(getControllerId(), game)) { // 805.10a
+             return false;
+         }
+         DesertWereWormWatcher watcher = game.getState().getWatcher(DesertWereWormWatcher.class);
+diff --git a/Mage.Sets/src/mage/cards/d/DictateOfKruphix.java b/Mage.Sets/src/mage/cards/d/DictateOfKruphix.java
+index a3f9a85f..129162a5 100644
+--- a/Mage.Sets/src/mage/cards/d/DictateOfKruphix.java
++++ b/Mage.Sets/src/mage/cards/d/DictateOfKruphix.java
+@@ -50,6 +50,11 @@ class DictateOfKruphixAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public DictateOfKruphixAbility copy() {
+         return new DictateOfKruphixAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/d/DimensionalBreach.java b/Mage.Sets/src/mage/cards/d/DimensionalBreach.java
+index 6560ce4c..68b7cd6e 100644
+--- a/Mage.Sets/src/mage/cards/d/DimensionalBreach.java
++++ b/Mage.Sets/src/mage/cards/d/DimensionalBreach.java
+@@ -109,6 +109,11 @@ class DimensionalBreachDelayedTriggeredAbility extends DelayedTriggeredAbility {
+         return morSet.stream().map(mor -> mor.getCard(game)).anyMatch(Objects::nonNull);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public DimensionalBreachDelayedTriggeredAbility copy() {
+         return new DimensionalBreachDelayedTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/d/DuelistsHeritage.java b/Mage.Sets/src/mage/cards/d/DuelistsHeritage.java
+index 47ccd3f0..fb268db2 100644
+--- a/Mage.Sets/src/mage/cards/d/DuelistsHeritage.java
++++ b/Mage.Sets/src/mage/cards/d/DuelistsHeritage.java
+@@ -71,7 +71,7 @@ class DuelistsHeritageTriggeredAbility extends TriggeredAbilityImpl {
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+         // AI workaround to disable it on opponent's attacks - JayDi85
+-        if (game.getCombat().getAttackingPlayerId().equals(this.getControllerId())) {
++        if (game.getCombat().isAttackingPlayer(this.getControllerId(), game)) { // 805.10a
+             this.addCustomOutcome(Outcome.Benefit);
+         } else {
+             this.addCustomOutcome(Outcome.AIDontUseIt);
+diff --git a/Mage.Sets/src/mage/cards/e/EbonyOwlNetsuke.java b/Mage.Sets/src/mage/cards/e/EbonyOwlNetsuke.java
+index 3be16e3d..0f63ccf7 100644
+--- a/Mage.Sets/src/mage/cards/e/EbonyOwlNetsuke.java
++++ b/Mage.Sets/src/mage/cards/e/EbonyOwlNetsuke.java
+@@ -46,6 +46,11 @@ class EbonyOwlNetsukeTriggeredAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public EbonyOwlNetsukeTriggeredAbility copy() {
+         return new EbonyOwlNetsukeTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/e/EnergyVortex.java b/Mage.Sets/src/mage/cards/e/EnergyVortex.java
+index e009fc6c..b7b28614 100644
+--- a/Mage.Sets/src/mage/cards/e/EnergyVortex.java
++++ b/Mage.Sets/src/mage/cards/e/EnergyVortex.java
+@@ -46,7 +46,8 @@ public final class EnergyVortex extends CardImpl {
+         // At the beginning of the chosen player's upkeep, Energy Vortex deals 3 damage to that player unless they pay {1} for each vortex counter on Energy Vortex.
+         this.addAbility(new BeginningOfUpkeepTriggeredAbility(
+                 TargetController.ANY, new EnergyVortexEffect(), false
+-        ).withTriggerCondition(EnergyVortexCondition.instance)
++        ).withTriggersForEachTeamPlayer(true) // 805.4d: at the chosen player's own step
++                .withTriggerCondition(EnergyVortexCondition.instance)
+                 .setTriggerPhrase("At the beginning of the chosen player's upkeep, "));
+ 
+         // {X}: Put X vortex counters on Energy Vortex. Activate this ability only during your upkeep.
+diff --git a/Mage.Sets/src/mage/cards/f/FblthpImpossiblyLost.java b/Mage.Sets/src/mage/cards/f/FblthpImpossiblyLost.java
+index bd88d27a..73650df1 100644
+--- a/Mage.Sets/src/mage/cards/f/FblthpImpossiblyLost.java
++++ b/Mage.Sets/src/mage/cards/f/FblthpImpossiblyLost.java
+@@ -67,7 +67,7 @@ class FblthpImpossiblyLostTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!isControlledBy(game.getActivePlayerId())
++        if (!game.isActivePlayer(getControllerId()) // 805.9: or your team's turn
+                 || !game.getOpponents(getControllerId()).contains(event.getTargetId())
+                 || !((DamagedBatchForOnePlayerEvent) event).isCombatDamage()) {
+             return false;
+diff --git a/Mage.Sets/src/mage/cards/f/FeedTheInfection.java b/Mage.Sets/src/mage/cards/f/FeedTheInfection.java
+index 8eee8ee6..67b116b2 100644
+--- a/Mage.Sets/src/mage/cards/f/FeedTheInfection.java
++++ b/Mage.Sets/src/mage/cards/f/FeedTheInfection.java
+@@ -62,7 +62,7 @@ class FeedTheInfectionEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         for (UUID playerId : game.getOpponents(source.getControllerId())) {
+             Player player = game.getPlayer(playerId);
+-            if (player != null && player.getCountersCount(CounterType.POISON) >= 3) {
++            if (player != null && game.getPoisonCounters(player.getId()) >= 3) {
+                 player.loseLife(3, game, source, false);
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/f/FestivalOfEmbers.java b/Mage.Sets/src/mage/cards/f/FestivalOfEmbers.java
+index 81cd11c9..3198fc5b 100644
+--- a/Mage.Sets/src/mage/cards/f/FestivalOfEmbers.java
++++ b/Mage.Sets/src/mage/cards/f/FestivalOfEmbers.java
+@@ -80,7 +80,7 @@ class FestivalOfEmbersCastEffect extends AsThoughEffectImpl {
+         Player player = game.getPlayer(affectedControllerId);
+         if (card == null
+                 || player == null
+-                || !game.getActivePlayerId().equals(affectedControllerId)
++                || !game.isActivePlayer(affectedControllerId) // 805.9: or your team's turn
+                 || !card.isOwnedBy(affectedControllerId)
+                 || !card.isInstantOrSorcery(game)
+                 || !game.getState().getZone(objectId).match(Zone.GRAVEYARD)) {
+diff --git a/Mage.Sets/src/mage/cards/f/FightOrFlight.java b/Mage.Sets/src/mage/cards/f/FightOrFlight.java
+index 2a1a4f5e..d311133d 100644
+--- a/Mage.Sets/src/mage/cards/f/FightOrFlight.java
++++ b/Mage.Sets/src/mage/cards/f/FightOrFlight.java
+@@ -66,7 +66,7 @@ class FightOrFlightEffect extends OneShotEffect {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player player = game.getPlayer(source.getControllerId());
+-        Player targetPlayer = game.getPlayer(game.getCombat().getAttackingPlayerId());
++        Player targetPlayer = game.getPlayer(game.getActivePlayerId()); // 805.9: the opponent whose step it is
+         if (player == null || targetPlayer == null) {
+             return false;
+         }
+diff --git a/Mage.Sets/src/mage/cards/f/FireAndBrimstone.java b/Mage.Sets/src/mage/cards/f/FireAndBrimstone.java
+index 701183ef..38804ab6 100644
+--- a/Mage.Sets/src/mage/cards/f/FireAndBrimstone.java
++++ b/Mage.Sets/src/mage/cards/f/FireAndBrimstone.java
+@@ -54,6 +54,14 @@ enum FireAndBrimstonePredicate implements ObjectSourcePlayerPredicate<Player> {
+             return false;
+         }
+         AttackedThisTurnWatcher watcher = game.getState().getWatcher(AttackedThisTurnWatcher.class);
++        if (!game.getTeammates(player.getId()).isEmpty()) {
++            // 805.10a: with shared team turns, an attacking player who attacked with a creature they control
++            return watcher != null
++                    && game.isActivePlayer(player.getId())
++                    && watcher.getAttackedThisTurnCreatures().stream()
++                    .map(mor -> mor.getPermanentOrLKIBattlefield(game))
++                    .anyMatch(attacker -> attacker != null && attacker.isControlledBy(player.getId()));
++        }
+         return watcher != null
+                 && !watcher.getAttackedThisTurnCreatures().isEmpty()
+                 && player.getId().equals(game.getActivePlayerId());
+diff --git a/Mage.Sets/src/mage/cards/f/FiresOfInvention.java b/Mage.Sets/src/mage/cards/f/FiresOfInvention.java
+index 45176819..326c2db4 100644
+--- a/Mage.Sets/src/mage/cards/f/FiresOfInvention.java
++++ b/Mage.Sets/src/mage/cards/f/FiresOfInvention.java
+@@ -80,7 +80,7 @@ class FiresOfInventionCastEffect extends ContinuousRuleModifyingEffectImpl {
+             return false;
+         }
+         return watcher.getAmountOfSpellsPlayerCastOnCurrentTurn(source.getControllerId()) > 1
+-                || !game.getActivePlayerId().equals(source.getControllerId());
++                || !game.isActivePlayer(source.getControllerId()); // 805.9: or your team's turn
+     }
+ 
+ }
+diff --git a/Mage.Sets/src/mage/cards/f/FontOfMythos.java b/Mage.Sets/src/mage/cards/f/FontOfMythos.java
+index 40e42bf8..c990a458 100644
+--- a/Mage.Sets/src/mage/cards/f/FontOfMythos.java
++++ b/Mage.Sets/src/mage/cards/f/FontOfMythos.java
+@@ -45,6 +45,11 @@ class FontOfMythosAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public FontOfMythosAbility copy() {
+         return new FontOfMythosAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/f/ForgeAnew.java b/Mage.Sets/src/mage/cards/f/ForgeAnew.java
+index 2cbcab53..883181d3 100644
+--- a/Mage.Sets/src/mage/cards/f/ForgeAnew.java
++++ b/Mage.Sets/src/mage/cards/f/ForgeAnew.java
+@@ -78,7 +78,7 @@ class ForgeAnewCostEffect extends CostModificationEffectImpl {
+     public boolean applies(Ability abilityToModify, Ability source, Game game) {
+         return abilityToModify instanceof EquipAbility
+                 && source.isControlledBy(abilityToModify.getControllerId())
+-                && game.getActivePlayerId().equals(source.getControllerId())
++                && game.isActivePlayer(source.getControllerId()) // 805.9: or your team's turn
+                 && !ForgeAnewWatcher.checkPlayer(abilityToModify.getControllerId(), game);
+     }
+ 
+diff --git a/Mage.Sets/src/mage/cards/g/GandalfOfTheSecretFire.java b/Mage.Sets/src/mage/cards/g/GandalfOfTheSecretFire.java
+index d47ea6a6..aac93f55 100644
+--- a/Mage.Sets/src/mage/cards/g/GandalfOfTheSecretFire.java
++++ b/Mage.Sets/src/mage/cards/g/GandalfOfTheSecretFire.java
+@@ -65,7 +65,7 @@ class GandalfOfTheSecretFireTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!isControlledBy(event.getPlayerId()) || getControllerId().equals(game.getActivePlayerId())) {
++        if (!isControlledBy(event.getPlayerId()) || game.isActivePlayer(getControllerId())) { // 805.9: or your team's turn
+             return false;
+         }
+         Spell spell = game.getStack().getSpell(event.getTargetId());
+diff --git a/Mage.Sets/src/mage/cards/g/GethsSummons.java b/Mage.Sets/src/mage/cards/g/GethsSummons.java
+index 0dc0148c..ce7b89f3 100644
+--- a/Mage.Sets/src/mage/cards/g/GethsSummons.java
++++ b/Mage.Sets/src/mage/cards/g/GethsSummons.java
+@@ -64,7 +64,7 @@ enum GethsSummonsAdjuster implements TargetAdjuster {
+         // corrupted opponents' graveyards
+         for (UUID opponentId : game.getOpponents(ability.getControllerId(), true)) {
+             Player opponent = game.getPlayer(opponentId);
+-            if (opponent == null || opponent.getCountersCount(CounterType.POISON) < 3) {
++            if (opponent == null || game.getPoisonCounters(opponentId) < 3) {
+                 continue;
+             }
+             FilterCard filter = new FilterCard("creature card from " + opponent.getLogName() + "'s graveyard");
+diff --git a/Mage.Sets/src/mage/cards/g/GideonTheOathsworn.java b/Mage.Sets/src/mage/cards/g/GideonTheOathsworn.java
+index 78381f20..37207bf8 100644
+--- a/Mage.Sets/src/mage/cards/g/GideonTheOathsworn.java
++++ b/Mage.Sets/src/mage/cards/g/GideonTheOathsworn.java
+@@ -86,10 +86,10 @@ class GideonTheOathswornTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (game.getCombat().getAttackingPlayerId().equals(getControllerId())) {
++        if (game.getCombat().isAttackingPlayer(getControllerId(), game)) { // 805.10a
+             int attackerCount = 0;
+             Set<MageObjectReference> attackers = new HashSet();
+-            for (UUID attackerId : game.getCombat().getAttackers()) {
++            for (UUID attackerId : game.getCombat().getAttackers(getControllerId(), game)) {
+                 Permanent permanent = game.getPermanent(attackerId);
+                 if (permanent != null && permanent.isCreature(game) && !permanent.hasSubtype(SubType.GIDEON, game)) {
+                     attackerCount++;
+diff --git a/Mage.Sets/src/mage/cards/g/Glademuse.java b/Mage.Sets/src/mage/cards/g/Glademuse.java
+index 6c94ccb3..7428b6f9 100644
+--- a/Mage.Sets/src/mage/cards/g/Glademuse.java
++++ b/Mage.Sets/src/mage/cards/g/Glademuse.java
+@@ -55,6 +55,6 @@ enum GlademusePredicate implements Predicate<StackObject> {
+ 
+     @Override
+     public boolean apply(StackObject spell, Game game) {
+-        return spell != null && !spell.getControllerId().equals(game.getActivePlayerId());
++        return spell != null && !game.isActivePlayer(spell.getControllerId()); // 805.9: nor their team's turn
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/g/GlissasRetriever.java b/Mage.Sets/src/mage/cards/g/GlissasRetriever.java
+index 5bb92708..40248b52 100644
+--- a/Mage.Sets/src/mage/cards/g/GlissasRetriever.java
++++ b/Mage.Sets/src/mage/cards/g/GlissasRetriever.java
+@@ -80,7 +80,7 @@ enum GlissasRetrieverAdjuster implements TargetAdjuster {
+         int amount = 0;
+         for (UUID opponentId : game.getOpponents(ability.getControllerId(), true)) {
+             Player player = game.getPlayer(opponentId);
+-            if (player != null && player.getCountersCount(CounterType.POISON) >= 3) {
++            if (player != null && game.getPoisonCounters(opponentId) >= 3) {
+                 amount++;
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/g/GoblinRockSled.java b/Mage.Sets/src/mage/cards/g/GoblinRockSled.java
+index 2c1158a2..3bbc1ce6 100644
+--- a/Mage.Sets/src/mage/cards/g/GoblinRockSled.java
++++ b/Mage.Sets/src/mage/cards/g/GoblinRockSled.java
+@@ -89,7 +89,7 @@ class DontUntapIfAttackedLastTurnSourceEffect extends ContinuousRuleModifyingEff
+         if (game.getTurnStepType() == PhaseStep.UNTAP
+                 && event.getTargetId().equals(source.getSourceId())) {
+             Permanent permanent = game.getPermanent(source.getSourceId());
+-            if (permanent != null && permanent.isControlledBy(game.getActivePlayerId())) {
++            if (permanent != null && game.isActivePlayer(permanent.getControllerId())) { // 805.9: or your team's turn
+                 AttackedLastTurnWatcher watcher = game.getState().getWatcher(AttackedLastTurnWatcher.class);
+                 if (watcher != null) {
+                     Set<MageObjectReference> attackingCreatures = watcher.getAttackedLastTurnCreatures(permanent.getControllerId());
+diff --git a/Mage.Sets/src/mage/cards/g/GrandMoffTarkin.java b/Mage.Sets/src/mage/cards/g/GrandMoffTarkin.java
+index 0699b726..ff53df88 100644
+--- a/Mage.Sets/src/mage/cards/g/GrandMoffTarkin.java
++++ b/Mage.Sets/src/mage/cards/g/GrandMoffTarkin.java
+@@ -78,6 +78,11 @@ class GrandMoffTarkinTriggeredAbility extends TriggeredAbilityImpl {
+         return false;
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public GrandMoffTarkinTriggeredAbility copy() {
+         return new GrandMoffTarkinTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/h/Heroism.java b/Mage.Sets/src/mage/cards/h/Heroism.java
+index 12506d9e..95c839da 100644
+--- a/Mage.Sets/src/mage/cards/h/Heroism.java
++++ b/Mage.Sets/src/mage/cards/h/Heroism.java
+@@ -81,24 +81,27 @@ class HeroismEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+         if (controller != null) {
+-            Player player = game.getPlayer(game.getActivePlayerId());
+             Cost cost = new ManaCostsImpl<>("{2}{R}");
+             List<Permanent> permanentsToPrevent = new ArrayList<>();
+-            for (Permanent permanent : game.getBattlefield().getAllActivePermanents(filter, game.getActivePlayerId(), game)) {
+-                cost.clearPaid();
+-                String message = "Pay " + cost.getText() + "? If you don't, " + permanent.getLogName() + "'s combat damage will be prevented this turn.";
+-                if (player != null) {
+-                    if (player.chooseUse(Outcome.Neutral, message, source, game)) {
+-                        if (cost.pay(source, game, source, player.getId(), false, null)) {
+-                            game.informPlayers(player.getLogName() + " paid " + cost.getText() + " for " + permanent.getLogName());
+-
+-                        } else {
++            // 805.10a: with shared team turns, each attacking player pays for the creatures they control
++            for (UUID attackingPlayerId : game.getTeam(game.getActivePlayerId())) {
++                Player player = game.getPlayer(attackingPlayerId);
++                for (Permanent permanent : game.getBattlefield().getAllActivePermanents(filter, attackingPlayerId, game)) {
++                    cost.clearPaid();
++                    String message = "Pay " + cost.getText() + "? If you don't, " + permanent.getLogName() + "'s combat damage will be prevented this turn.";
++                    if (player != null) {
++                        if (player.chooseUse(Outcome.Neutral, message, source, game)) {
++                            if (cost.pay(source, game, source, player.getId(), false, null)) {
++                                game.informPlayers(player.getLogName() + " paid " + cost.getText() + " for " + permanent.getLogName());
++
++                            } else {
++                                game.informPlayers(player.getLogName() + " didn't pay " + cost.getText() + " for " + permanent.getLogName());
++                                permanentsToPrevent.add(permanent);
++                            }
++                        } else{
+                             game.informPlayers(player.getLogName() + " didn't pay " + cost.getText() + " for " + permanent.getLogName());
+                             permanentsToPrevent.add(permanent);
+                         }
+-                    } else{
+-                        game.informPlayers(player.getLogName() + " didn't pay " + cost.getText() + " for " + permanent.getLogName());
+-                        permanentsToPrevent.add(permanent);
+                     }
+                 }
+             }
+diff --git a/Mage.Sets/src/mage/cards/h/HowlingMine.java b/Mage.Sets/src/mage/cards/h/HowlingMine.java
+index 5bc3fcf9..dc01df72 100644
+--- a/Mage.Sets/src/mage/cards/h/HowlingMine.java
++++ b/Mage.Sets/src/mage/cards/h/HowlingMine.java
+@@ -45,6 +45,11 @@ class HowlingMineAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public HowlingMineAbility copy() {
+         return new HowlingMineAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/h/HyldasCrownOfWinter.java b/Mage.Sets/src/mage/cards/h/HyldasCrownOfWinter.java
+index 0dc2a950..dbff4a9b 100644
+--- a/Mage.Sets/src/mage/cards/h/HyldasCrownOfWinter.java
++++ b/Mage.Sets/src/mage/cards/h/HyldasCrownOfWinter.java
+@@ -83,7 +83,7 @@ enum HyldasCrownOfWinterAdjuster implements CostAdjuster {
+ 
+     @Override
+     public void reduceCost(Ability ability, Game game) {
+-        if (ability.getControllerId().equals(game.getActivePlayerId())) {
++        if (game.isActivePlayer(ability.getControllerId())) { // 805.9: or your team's turn
+             CardUtil.reduceCost(ability, 1);
+         }
+     }
+diff --git a/Mage.Sets/src/mage/cards/i/Impatience.java b/Mage.Sets/src/mage/cards/i/Impatience.java
+index 763f1422..3015c651 100644
+--- a/Mage.Sets/src/mage/cards/i/Impatience.java
++++ b/Mage.Sets/src/mage/cards/i/Impatience.java
+@@ -28,7 +28,7 @@ public final class Impatience extends CardImpl {
+         Effect effect = new DamageTargetEffect(2);
+         effect.setText("{this} deals 2 damage to that player.");
+         this.addAbility(new BeginningOfEndStepTriggeredAbility(TargetController.ANY, effect,
+-                false, new ImpatienceCondition()));
++                false, new ImpatienceCondition()).withTriggersForEachTeamPlayer(true));
+     }
+ 
+     private Impatience(final Impatience card) {
+diff --git a/Mage.Sets/src/mage/cards/i/IslandSanctuary.java b/Mage.Sets/src/mage/cards/i/IslandSanctuary.java
+index 0cc35ad0..a04dcf37 100644
+--- a/Mage.Sets/src/mage/cards/i/IslandSanctuary.java
++++ b/Mage.Sets/src/mage/cards/i/IslandSanctuary.java
+@@ -81,7 +81,7 @@ class IslandSanctuaryEffect extends ReplacementEffectImpl {
+ 
+     @Override
+     public boolean applies(GameEvent event, Ability source, Game game) {
+-        return source.isControlledBy(event.getPlayerId()) && game.getTurnStepType() == PhaseStep.DRAW && game.getActivePlayerId().equals(source.getControllerId());
++        return source.isControlledBy(event.getPlayerId()) && game.getTurnStepType() == PhaseStep.DRAW && game.isActivePlayer(source.getControllerId()); // 805.9: or your team's turn
+     }
+ 
+     @Override
+diff --git a/Mage.Sets/src/mage/cards/i/IxhelScionOfAtraxa.java b/Mage.Sets/src/mage/cards/i/IxhelScionOfAtraxa.java
+index 4ebf1229..3eaff3b0 100644
+--- a/Mage.Sets/src/mage/cards/i/IxhelScionOfAtraxa.java
++++ b/Mage.Sets/src/mage/cards/i/IxhelScionOfAtraxa.java
+@@ -79,7 +79,7 @@ class IxhelScionOfAtraxaEffect extends OneShotEffect {
+         Cards cards = new CardsImpl();
+         for (UUID opponentId : game.getOpponents(source.getControllerId(), true)) {
+             Player opponent = game.getPlayer(opponentId);
+-            if (opponent == null || opponent.getCountersCount(CounterType.POISON) < 3 || !opponent.getLibrary().hasCards()) {
++            if (opponent == null || game.getPoisonCounters(opponentId) < 3 || !opponent.getLibrary().hasCards()) {
+                 continue;
+             }
+             Card card = opponent.getLibrary().getFromTop(game);
+diff --git a/Mage.Sets/src/mage/cards/k/KetramoseTheNewDawn.java b/Mage.Sets/src/mage/cards/k/KetramoseTheNewDawn.java
+index 1a90c517..38bb7a12 100644
+--- a/Mage.Sets/src/mage/cards/k/KetramoseTheNewDawn.java
++++ b/Mage.Sets/src/mage/cards/k/KetramoseTheNewDawn.java
+@@ -93,7 +93,7 @@ class KetramoseTriggeredAbility extends TriggeredAbilityImpl implements BatchTri
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        return game.getActivePlayerId().equals(getControllerId())
++        return game.isActivePlayer(getControllerId()) // 805.9: or your team's turn
+                 && !getFilteredEvents((ZoneChangeBatchEvent) event, game).isEmpty();
+     }
+ 
+diff --git a/Mage.Sets/src/mage/cards/k/KuonOgreAscendant.java b/Mage.Sets/src/mage/cards/k/KuonOgreAscendant.java
+index 3cef4d9b..aa4245f4 100644
+--- a/Mage.Sets/src/mage/cards/k/KuonOgreAscendant.java
++++ b/Mage.Sets/src/mage/cards/k/KuonOgreAscendant.java
+@@ -66,7 +66,7 @@ class KuonsEssenceToken extends TokenImpl {
+         // At the beginning of each player's upkeep, that player sacrifices a creature..
+         this.addAbility(new BeginningOfUpkeepTriggeredAbility(
+                 TargetController.ANY, new SacrificeEffect(StaticFilters.FILTER_PERMANENT_CREATURE, 1, "that player"),
+-                false));
++                false).withTriggersForEachTeamPlayer(true));
+     }
+     private KuonsEssenceToken(final KuonsEssenceToken token) {
+         super(token);
+diff --git a/Mage.Sets/src/mage/cards/l/Leeches.java b/Mage.Sets/src/mage/cards/l/Leeches.java
+index eb2ee661..3b806aef 100644
+--- a/Mage.Sets/src/mage/cards/l/Leeches.java
++++ b/Mage.Sets/src/mage/cards/l/Leeches.java
+@@ -60,7 +60,7 @@ class LeechesEffect extends OneShotEffect {
+             return false;
+         }
+ 
+-        int countPoisonCounters = targetPlayer.getCountersCount(CounterType.POISON);
++        int countPoisonCounters = game.getPoisonCounters(targetPlayer.getId()); // 810.10a: the team's
+         if (countPoisonCounters > 0) {
+             targetPlayer.loseAllCounters(CounterType.POISON.getName(), source, game);
+             targetPlayer.damage(countPoisonCounters, source.getSourceId(), source, game);
+diff --git a/Mage.Sets/src/mage/cards/m/ManaCache.java b/Mage.Sets/src/mage/cards/m/ManaCache.java
+index b6592f70..41f882f4 100644
+--- a/Mage.Sets/src/mage/cards/m/ManaCache.java
++++ b/Mage.Sets/src/mage/cards/m/ManaCache.java
+@@ -80,7 +80,7 @@ class ManaCacheManaAbility extends ActivatedManaAbilityImpl {
+         // any player, but only during their turn before the end step
+         Player player = game.getPlayer(playerId);
+         if (player == null
+-                || !playerId.equals(game.getActivePlayerId())
++                || !game.isActivePlayer(playerId) // 805.9: or their team's turn
+                 || !game.getTurnStepType().isBefore(PhaseStep.END_TURN)) {
+             return ActivationStatus.getFalse();
+         }
+diff --git a/Mage.Sets/src/mage/cards/m/MeliraSylvokOutcast.java b/Mage.Sets/src/mage/cards/m/MeliraSylvokOutcast.java
+index 1eb3e90f..2cef8931 100644
+--- a/Mage.Sets/src/mage/cards/m/MeliraSylvokOutcast.java
++++ b/Mage.Sets/src/mage/cards/m/MeliraSylvokOutcast.java
+@@ -85,7 +85,7 @@ class MeliraSylvokOutcastEffect extends ReplacementEffectImpl {
+ 
+     @Override
+     public boolean applies(GameEvent event, Ability source, Game game) {
+-        return event.getData().equals(CounterType.POISON.getName()) && event.getTargetId().equals(source.getControllerId());
++        return event.getData().equals(CounterType.POISON.getName()) && game.getTeam(event.getTargetId()).contains(source.getControllerId()); // 810.10c
+     }
+ 
+ }
+diff --git a/Mage.Sets/src/mage/cards/m/MindstormCrown.java b/Mage.Sets/src/mage/cards/m/MindstormCrown.java
+index 5994ad52..5874243e 100644
+--- a/Mage.Sets/src/mage/cards/m/MindstormCrown.java
++++ b/Mage.Sets/src/mage/cards/m/MindstormCrown.java
+@@ -14,6 +14,8 @@ import mage.game.permanent.Permanent;
+ import mage.players.Player;
+ import mage.watchers.Watcher;
+ 
++import java.util.HashMap;
++import java.util.Map;
+ import java.util.UUID;
+ 
+ /**
+@@ -63,7 +65,7 @@ class MindstormCrownEffect extends OneShotEffect {
+         }
+         MindstormCrownWatcher watcher = game.getState().getWatcher(MindstormCrownWatcher.class);
+         if (watcher != null
+-                && watcher.getCardsInHandCount() == 0) {
++                && watcher.getCardsInHandCount(controller.getId()) == 0) {
+             controller.drawCards(1, source, game);
+         } else {
+             if (permanent != null) {
+@@ -77,6 +79,8 @@ class MindstormCrownEffect extends OneShotEffect {
+ class MindstormCrownWatcher extends Watcher {
+ 
+     private int cardsInHandCount;
++    // 805.4: with shared team turns, the turn begins for each player of the active team
++    private final Map<UUID, Integer> teammatesCardsInHand = new HashMap<>();
+ 
+     public MindstormCrownWatcher() {
+         super(WatcherScope.GAME);
+@@ -92,16 +96,22 @@ class MindstormCrownWatcher extends Watcher {
+                 cardsInHand = player.getHand().size();
+             }
+             cardsInHandCount = cardsInHand;
++            teammatesCardsInHand.clear();
++            for (UUID teammateId : game.getTeammates(game.getActivePlayerId())) {
++                Player teammate = game.getPlayer(teammateId);
++                teammatesCardsInHand.put(teammateId, teammate == null ? 0 : teammate.getHand().size());
++            }
+         }
+     }
+ 
+-    public int getCardsInHandCount() {
+-        return cardsInHandCount;
++    public int getCardsInHandCount(UUID playerId) {
++        return teammatesCardsInHand.getOrDefault(playerId, cardsInHandCount);
+     }
+ 
+     @Override
+     public void reset() {
+         cardsInHandCount = 0;
++        teammatesCardsInHand.clear();
+     }
+ 
+ }
+diff --git a/Mage.Sets/src/mage/cards/m/MisersCage.java b/Mage.Sets/src/mage/cards/m/MisersCage.java
+index 4786e402..ea2b98e0 100644
+--- a/Mage.Sets/src/mage/cards/m/MisersCage.java
++++ b/Mage.Sets/src/mage/cards/m/MisersCage.java
+@@ -46,6 +46,11 @@ class MisersCageTriggeredAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public MisersCageTriggeredAbility copy() {
+         return new MisersCageTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/m/MobMentality.java b/Mage.Sets/src/mage/cards/m/MobMentality.java
+index 676f89ea..d323bea9 100644
+--- a/Mage.Sets/src/mage/cards/m/MobMentality.java
++++ b/Mage.Sets/src/mage/cards/m/MobMentality.java
+@@ -78,7 +78,7 @@ class MobMentalityTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!game.getCombat().getAttackingPlayerId().equals(getControllerId())) {
++        if (!game.getCombat().isAttackingPlayer(getControllerId(), game)) { // 805.10a
+             return false;
+         }
+         Permanent aura = game.getPermanent(getSourceId());
+diff --git a/Mage.Sets/src/mage/cards/m/MuldrothaTheGravetide.java b/Mage.Sets/src/mage/cards/m/MuldrothaTheGravetide.java
+index f9ec0bc9..bedb77a9 100644
+--- a/Mage.Sets/src/mage/cards/m/MuldrothaTheGravetide.java
++++ b/Mage.Sets/src/mage/cards/m/MuldrothaTheGravetide.java
+@@ -89,7 +89,7 @@ class MuldrothaTheGravetideCastFromGraveyardEffect extends AsThoughEffectImpl {
+     public boolean applies(UUID objectId, Ability source, UUID affectedControllerId, Game game) {
+         if (source.isControlledBy(affectedControllerId)
+                 && source.isControlledBy(game.getOwnerId(objectId)) // only from your graveyard
+-                && affectedControllerId.equals(game.getActivePlayerId()) // only during your turns (e.g. prevent flash creatures)
++                && game.isActivePlayer(affectedControllerId) // only during your (team's, 805.9) turns (e.g. prevent flash creatures)
+                 && Zone.GRAVEYARD.equals(game.getState().getZone(objectId))) {
+             MuldrothaTheGravetideWatcher watcher = game.getState().getWatcher(MuldrothaTheGravetideWatcher.class);
+             MageObject mageObject = game.getObject(objectId);
+diff --git a/Mage.Sets/src/mage/cards/n/NerivCracklingVanguard.java b/Mage.Sets/src/mage/cards/n/NerivCracklingVanguard.java
+index 86ced19a..0d71bcd4 100644
+--- a/Mage.Sets/src/mage/cards/n/NerivCracklingVanguard.java
++++ b/Mage.Sets/src/mage/cards/n/NerivCracklingVanguard.java
+@@ -139,7 +139,7 @@ class CommanderAttackedThisTurnCondition implements Condition {
+             ability = source;
+         }
+         // your turn
+-        if (!ability.isControlledBy(game.getActivePlayerId())) {
++        if (!game.isActivePlayer(ability.getControllerId())) { // 805.9: or your team's turn
+             return false;
+         }
+         Player controller = game.getPlayer(ability.getControllerId());
+diff --git a/Mage.Sets/src/mage/cards/n/NornsDecree.java b/Mage.Sets/src/mage/cards/n/NornsDecree.java
+index b41b1a3d..bf3a755e 100644
+--- a/Mage.Sets/src/mage/cards/n/NornsDecree.java
++++ b/Mage.Sets/src/mage/cards/n/NornsDecree.java
+@@ -62,7 +62,7 @@ enum NornsDecreeCondition implements Condition {
+                 .distinct()
+                 .map(game::getPlayer)
+                 .filter(Objects::nonNull)
+-                .anyMatch(player -> player.getCountersCount(CounterType.POISON) > 0);
++                .anyMatch(player -> game.getPoisonCounters(player.getId()) > 0); // 810.10d: the team's
+     }
+ 
+     @Override
+diff --git a/Mage.Sets/src/mage/cards/o/OverwhelmingInstinct.java b/Mage.Sets/src/mage/cards/o/OverwhelmingInstinct.java
+index 1be5830f..9e47bd7e 100644
+--- a/Mage.Sets/src/mage/cards/o/OverwhelmingInstinct.java
++++ b/Mage.Sets/src/mage/cards/o/OverwhelmingInstinct.java
+@@ -59,6 +59,7 @@ class OverwhelmingInstinctTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        return game.getCombat().getAttackers().size() >= 3 && game.getCombat().getAttackingPlayerId().equals(getControllerId());
++        return game.getCombat().getAttackers(getControllerId(), game).size() >= 3
++                && game.getCombat().isAttackingPlayer(getControllerId(), game); // 805.10a
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java b/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java
+index 37379146..ab31fe4c 100644
+--- a/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java
++++ b/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java
+@@ -64,7 +64,7 @@ class PhyresisOutbreakEffect extends OneShotEffect {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         for (UUID opponentId : game.getOpponents(source.getControllerId(), true)) {
+-            int totalPoison = game.getPlayer(opponentId).getCountersCount(CounterType.POISON);
++            int totalPoison = game.getPoisonCounters(opponentId); // 810.10a: the team's
+             BoostTargetEffect effect = new BoostTargetEffect(totalPoison * -1, totalPoison * -1, Duration.EndOfTurn);
+             for (Permanent permanent : game.getBattlefield().getAllActivePermanents(StaticFilters.FILTER_PERMANENT_A_CREATURE, opponentId, game)) {
+                 effect.setTargetPointer(new FixedTarget(permanent, game));
+diff --git a/Mage.Sets/src/mage/cards/p/PhyrexianAtlas.java b/Mage.Sets/src/mage/cards/p/PhyrexianAtlas.java
+index 4286e6c6..8da39a25 100644
+--- a/Mage.Sets/src/mage/cards/p/PhyrexianAtlas.java
++++ b/Mage.Sets/src/mage/cards/p/PhyrexianAtlas.java
+@@ -60,7 +60,7 @@ class PhyrexianAtlasEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         for (UUID playerId : game.getOpponents(source.getControllerId())) {
+             Player player = game.getPlayer(playerId);
+-            if (player != null && player.getCountersCount(CounterType.POISON) >= 3) {
++            if (player != null && game.getPoisonCounters(player.getId()) >= 3) {
+                 player.loseLife(1, game, source, false);
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/p/PowerSurge.java b/Mage.Sets/src/mage/cards/p/PowerSurge.java
+index cc617ecf..650b25b6 100644
+--- a/Mage.Sets/src/mage/cards/p/PowerSurge.java
++++ b/Mage.Sets/src/mage/cards/p/PowerSurge.java
+@@ -14,6 +14,8 @@ import mage.game.events.GameEvent;
+ import mage.players.Player;
+ import mage.watchers.Watcher;
+ 
++import java.util.HashMap;
++import java.util.Map;
+ import java.util.UUID;
+ 
+ /**
+@@ -55,7 +57,7 @@ class PowerSurgeDamageEffect extends OneShotEffect {
+         if (player != null) {
+             PowerSurgeWatcher watcher = game.getState().getWatcher(PowerSurgeWatcher.class);
+             if (watcher != null) {
+-                int damage = watcher.getUntappedLandCount();
++                int damage = watcher.getUntappedLandCount(player.getId());
+                 player.damage(damage, source.getSourceId(), source, game);
+                 return true;
+             }
+@@ -78,6 +80,8 @@ class PowerSurgeWatcher extends Watcher {
+     }
+ 
+     private int untappedLandCount;
++    // 805.4: with shared team turns, the turn begins for each player of the active team
++    private final Map<UUID, Integer> teammatesUntappedLandCount = new HashMap<>();
+ 
+     public PowerSurgeWatcher() {
+         super(WatcherScope.GAME);
+@@ -88,15 +92,20 @@ class PowerSurgeWatcher extends Watcher {
+         if (event.getType() == GameEvent.EventType.BEGINNING_PHASE_PRE
+                 && game.getPhase() != null) {
+             untappedLandCount = game.getBattlefield().countAll(filter, game.getActivePlayerId(), game);
++            teammatesUntappedLandCount.clear();
++            for (UUID teammateId : game.getTeammates(game.getActivePlayerId())) {
++                teammatesUntappedLandCount.put(teammateId, game.getBattlefield().countAll(filter, teammateId, game));
++            }
+         }
+     }
+ 
+-    public int getUntappedLandCount() {
+-        return untappedLandCount;
++    public int getUntappedLandCount(UUID playerId) {
++        return teammatesUntappedLandCount.getOrDefault(playerId, untappedLandCount);
+     }
+ 
+     @Override
+     public void reset() {
+         untappedLandCount = 0;
++        teammatesUntappedLandCount.clear();
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java b/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java
+index 8a119271..0f39b5fd 100644
+--- a/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java
++++ b/Mage.Sets/src/mage/cards/q/QuestForTheNihilStone.java
+@@ -55,6 +55,11 @@ class QuestForTheNihilStoneTriggeredAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public QuestForTheNihilStoneTriggeredAbility copy() {
+         return new QuestForTheNihilStoneTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/r/RalMonsoonMage.java b/Mage.Sets/src/mage/cards/r/RalMonsoonMage.java
+index eb49a5d2..f058fc31 100644
+--- a/Mage.Sets/src/mage/cards/r/RalMonsoonMage.java
++++ b/Mage.Sets/src/mage/cards/r/RalMonsoonMage.java
+@@ -131,7 +131,7 @@ class RalMonsoonMageTriggeredAbility extends SpellCastControllerTriggeredAbility
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        return game.getActivePlayerId().equals(getControllerId()) && super.checkTrigger(event, game);
++        return game.isActivePlayer(getControllerId()) && super.checkTrigger(event, game); // 805.9: or your team's turn
+     }
+ }
+ 
+diff --git a/Mage.Sets/src/mage/cards/r/ReturnThePast.java b/Mage.Sets/src/mage/cards/r/ReturnThePast.java
+index edb2db6e..e981c46b 100644
+--- a/Mage.Sets/src/mage/cards/r/ReturnThePast.java
++++ b/Mage.Sets/src/mage/cards/r/ReturnThePast.java
+@@ -60,7 +60,7 @@ class ReturnThePastEffect extends ContinuousEffectImpl {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player player = game.getPlayer(source.getControllerId());
+-        if (player == null || game.getActivePlayerId() != source.getControllerId()) {
++        if (player == null || !game.isActivePlayer(source.getControllerId())) { // 805.9: or your team's turn
+             return false;
+         }
+         for (Card card : player.getGraveyard().getCards(StaticFilters.FILTER_CARD_INSTANT_OR_SORCERY, game)) {
+diff --git a/Mage.Sets/src/mage/cards/r/ReverseTheSands.java b/Mage.Sets/src/mage/cards/r/ReverseTheSands.java
+index 859e52f5..3beeea9d 100644
+--- a/Mage.Sets/src/mage/cards/r/ReverseTheSands.java
++++ b/Mage.Sets/src/mage/cards/r/ReverseTheSands.java
+@@ -1,8 +1,10 @@
+ 
+ package mage.cards.r;
+ 
++import java.util.ArrayList;
+ import java.util.HashSet;
+ import java.util.LinkedHashSet;
++import java.util.List;
+ import java.util.Set;
+ import java.util.UUID;
+ import mage.abilities.Ability;
+@@ -61,14 +63,21 @@ class ReverseTheSandsEffect extends OneShotEffect {
+         if (controller != null) {
+             Choice lifeChoice = new ChoiceImpl(true);
+             Set<String> choices = new LinkedHashSet<>();
++            // 810.9f: with a shared team life total, at most one player of each team is affected
++            List<UUID> players = new ArrayList<>();
+             for (UUID playerId : game.getState().getPlayersInRange(controller.getId(), game)) {
++                if (players.stream().noneMatch(other -> game.getTeammates(other).contains(playerId))) {
++                    players.add(playerId);
++                }
++            }
++            for (UUID playerId : players) {
+                 Player player = game.getPlayer(playerId);
+                 if (player != null) {
+                     choices.add(Integer.toString(player.getLife()) + " life of " + player.getLogName());
+                 }
+             }
+             lifeChoice.setChoices(choices);
+-            for (UUID playersId : game.getState().getPlayersInRange(controller.getId(), game)) {
++            for (UUID playersId : players) {
+                 Player player = game.getPlayer(playersId);
+                 if (player != null) {
+                     String selectedChoice;
+diff --git a/Mage.Sets/src/mage/cards/r/RitesOfFlourishing.java b/Mage.Sets/src/mage/cards/r/RitesOfFlourishing.java
+index fe463171..add7383d 100644
+--- a/Mage.Sets/src/mage/cards/r/RitesOfFlourishing.java
++++ b/Mage.Sets/src/mage/cards/r/RitesOfFlourishing.java
+@@ -51,6 +51,11 @@ class RitesOfFlourishingAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public RitesOfFlourishingAbility copy() {
+         return new RitesOfFlourishingAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/r/Rivalry.java b/Mage.Sets/src/mage/cards/r/Rivalry.java
+index 901ad553..a8da52a3 100644
+--- a/Mage.Sets/src/mage/cards/r/Rivalry.java
++++ b/Mage.Sets/src/mage/cards/r/Rivalry.java
+@@ -50,6 +50,11 @@ class RivalryTriggeredAbility extends TriggeredAbilityImpl {
+         super(ability);
+     }
+ 
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        return true; // 805.4d: each player's step, and "that player"
++    }
++
+     @Override
+     public RivalryTriggeredAbility copy() {
+         return new RivalryTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/r/RobberOfTheRich.java b/Mage.Sets/src/mage/cards/r/RobberOfTheRich.java
+index 7bbfbffe..770d8282 100644
+--- a/Mage.Sets/src/mage/cards/r/RobberOfTheRich.java
++++ b/Mage.Sets/src/mage/cards/r/RobberOfTheRich.java
+@@ -96,7 +96,7 @@ class RogueAttackedThisTurnCondition implements Condition {
+             ability = source;
+         }
+         // your turn
+-        if (!ability.isControlledBy(game.getActivePlayerId())) {
++        if (!game.isActivePlayer(ability.getControllerId())) { // 805.9: or your team's turn
+             return false;
+         }
+         // attacked with Rogue
+diff --git a/Mage.Sets/src/mage/cards/s/SarkhansScorn.java b/Mage.Sets/src/mage/cards/s/SarkhansScorn.java
+index 50cd3703..79a4478e 100644
+--- a/Mage.Sets/src/mage/cards/s/SarkhansScorn.java
++++ b/Mage.Sets/src/mage/cards/s/SarkhansScorn.java
+@@ -77,9 +77,12 @@ class SarkhansScornWatcher extends Watcher {
+         if (game.getTurnNum() == 1) {
+             playerMap.clear();
+         }
+-        playerMap
+-                .computeIfAbsent(game.getActivePlayerId(), x -> new HashSet<>())
+-                .add(game.getTurnNum());
++        // 805.4: with shared team turns, each player of the active team begins the turn
++        for (UUID playerId : game.getTeam(game.getActivePlayerId())) {
++            playerMap
++                    .computeIfAbsent(playerId, x -> new HashSet<>())
++                    .add(game.getTurnNum());
++        }
+     }
+ 
+     static int getCount(UUID playerId, Game game) {
+diff --git a/Mage.Sets/src/mage/cards/s/ScytheclawRaptor.java b/Mage.Sets/src/mage/cards/s/ScytheclawRaptor.java
+index aa84d7e1..16fcb03a 100644
+--- a/Mage.Sets/src/mage/cards/s/ScytheclawRaptor.java
++++ b/Mage.Sets/src/mage/cards/s/ScytheclawRaptor.java
+@@ -59,7 +59,7 @@ enum ScytheclawRaptorPredicate implements Predicate<StackObject> {
+ 
+     @Override
+     public boolean apply(StackObject spell, Game game) {
+-        return spell != null && !spell.getControllerId().equals(game.getActivePlayerId());
++        return spell != null && !game.isActivePlayer(spell.getControllerId()); // 805.9: nor their team's turn
+     }
+ }
+ 
+diff --git a/Mage.Sets/src/mage/cards/s/SeasonOfTheWitch.java b/Mage.Sets/src/mage/cards/s/SeasonOfTheWitch.java
+index 445cf780..75855dc8 100644
+--- a/Mage.Sets/src/mage/cards/s/SeasonOfTheWitch.java
++++ b/Mage.Sets/src/mage/cards/s/SeasonOfTheWitch.java
+@@ -118,7 +118,14 @@ class CouldAttackThisTurnWatcher extends Watcher {
+     @Override
+     public void watch(GameEvent event, Game game) {
+         if (event.getType() == GameEvent.EventType.DECLARE_ATTACKERS_STEP_PRE) {
+-            Player activePlayer = game.getPlayer(game.getActivePlayerId());
++            // 805.10a: with shared team turns, each player of the active team may attack
++            for (UUID activePlayerId : game.getTeam(game.getActivePlayerId())) {
++                watchCouldAttack(game.getPlayer(activePlayerId), game);
++            }
++        }
++    }
++
++    private void watchCouldAttack(Player activePlayer, Game game) {
+             if(activePlayer == null){
+                 return;
+             }
+@@ -138,7 +145,6 @@ class CouldAttackThisTurnWatcher extends Watcher {
+                     }
+                 }
+             }
+-        }
+     }
+ 
+     public Set<MageObjectReference> getCouldAttackThisTurnCreatures() {
+diff --git a/Mage.Sets/src/mage/cards/s/SepticRats.java b/Mage.Sets/src/mage/cards/s/SepticRats.java
+index 7581d8a1..cdad39e7 100644
+--- a/Mage.Sets/src/mage/cards/s/SepticRats.java
++++ b/Mage.Sets/src/mage/cards/s/SepticRats.java
+@@ -69,7 +69,7 @@ class SepticRatsTriggeredAbility extends TriggeredAbilityImpl {
+         if (event.getSourceId().equals(this.getSourceId())) {
+             Player target = game.getPlayer(event.getTargetId());
+             if (target != null) {
+-                if (target.getCountersCount(CounterType.POISON) > 0) {
++                if (game.getPoisonCounters(target.getId()) > 0) { // 810.10d: the team's
+                     return true;
+                 }
+             }
+diff --git a/Mage.Sets/src/mage/cards/s/ShamanOfForgottenWays.java b/Mage.Sets/src/mage/cards/s/ShamanOfForgottenWays.java
+index 482e2c26..c8224d7d 100644
+--- a/Mage.Sets/src/mage/cards/s/ShamanOfForgottenWays.java
++++ b/Mage.Sets/src/mage/cards/s/ShamanOfForgottenWays.java
+@@ -22,6 +22,7 @@ import mage.filter.common.FilterCreaturePermanent;
+ import mage.game.Game;
+ import mage.players.Player;
+ 
++import java.util.ArrayList;
+ import java.util.UUID;
+ 
+ /**
+@@ -91,7 +92,9 @@ class ShamanOfForgottenWaysEffect extends OneShotEffect {
+         Player controller = game.getPlayer(source.getControllerId());
+         if (controller != null) {
+             FilterPermanent filter = new FilterCreaturePermanent();
+-            for (UUID playerId : game.getState().getPlayersInRange(controller.getId(), game)) {
++            // 810.9d: with a shared team life total, one player of each team, whom the team chooses
++            for (UUID playerId : game.chooseLifeTotalsToSet(new ArrayList<>(game.getState().getPlayersInRange(controller.getId(), game)),
++                    id -> game.getBattlefield().getAllActivePermanents(filter, id, game).size())) {
+                 Player player = game.getPlayer(playerId);
+                 if (player != null) {
+                     int numberCreatures = game.getBattlefield().getAllActivePermanents(filter, playerId, game).size();
+diff --git a/Mage.Sets/src/mage/cards/s/ShareTheSpoils.java b/Mage.Sets/src/mage/cards/s/ShareTheSpoils.java
+index fff888a1..87faf26a 100644
+--- a/Mage.Sets/src/mage/cards/s/ShareTheSpoils.java
++++ b/Mage.Sets/src/mage/cards/s/ShareTheSpoils.java
+@@ -167,7 +167,7 @@ class ShareTheSpoilsPlayExiledCardEffect extends AsThoughEffectImpl {
+     @Override
+     public boolean applies(UUID sourceId, Ability source, UUID affectedControllerId, Game game) {
+         // Have to play on your turn
+-        if (!game.getActivePlayerId().equals(affectedControllerId)) {
++        if (!game.isActivePlayer(affectedControllerId)) { // 805.9: or their team's turn
+             return false;
+         }
+ 
+diff --git a/Mage.Sets/src/mage/cards/s/SkyclaveShade.java b/Mage.Sets/src/mage/cards/s/SkyclaveShade.java
+index 08e7007d..b7094af4 100644
+--- a/Mage.Sets/src/mage/cards/s/SkyclaveShade.java
++++ b/Mage.Sets/src/mage/cards/s/SkyclaveShade.java
+@@ -63,7 +63,7 @@ enum SkyclaveShadeCondition implements Condition {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
+-        return game.getActivePlayerId().equals(source.getControllerId())
++        return game.isActivePlayer(source.getControllerId()) // 805.9: or your team's turn
+                 && game.getState().getZone(source.getSourceId()) == Zone.GRAVEYARD;
+     }
+ 
+diff --git a/Mage.Sets/src/mage/cards/s/StonebindersFamiliar.java b/Mage.Sets/src/mage/cards/s/StonebindersFamiliar.java
+index f7d143b8..1ac15fa1 100644
+--- a/Mage.Sets/src/mage/cards/s/StonebindersFamiliar.java
++++ b/Mage.Sets/src/mage/cards/s/StonebindersFamiliar.java
+@@ -63,7 +63,7 @@ class StonebindersFamiliarTriggeredAbility extends TriggeredAbilityImpl {
+     public boolean checkTrigger(GameEvent event, Game game) {
+         ZoneChangeEvent zEvent = ((ZoneChangeEvent) event);
+         return zEvent.getToZone() == Zone.EXILED
+-                && isControlledBy(game.getActivePlayerId())
++                && game.isActivePlayer(getControllerId()) // 805.9: or your team's turn
+                 && (zEvent.getFromZone() != Zone.BATTLEFIELD
+                 || !(zEvent.getTarget() instanceof PermanentToken));
+     }
+diff --git a/Mage.Sets/src/mage/cards/t/TangleKelp.java b/Mage.Sets/src/mage/cards/t/TangleKelp.java
+index 978c1469..3f6dce71 100644
+--- a/Mage.Sets/src/mage/cards/t/TangleKelp.java
++++ b/Mage.Sets/src/mage/cards/t/TangleKelp.java
+@@ -100,7 +100,7 @@ class DontUntapIfAttackedLastTurnEnchantedEffect extends ContinuousRuleModifying
+             Permanent enchantment = game.getPermanent(source.getSourceId());
+             if (enchantment != null && enchantment.getAttachedTo() != null && event.getTargetId().equals(enchantment.getAttachedTo())) {
+                 Permanent permanent = game.getPermanent(enchantment.getAttachedTo());
+-                if (permanent != null &&  permanent.isControlledBy(game.getActivePlayerId())) {
++                if (permanent != null && game.isActivePlayer(permanent.getControllerId())) { // 805.9: or its controller's team's turn
+                     AttackedLastTurnWatcher watcher = game.getState().getWatcher(AttackedLastTurnWatcher.class);
+                     if (watcher != null) {
+                         Set<MageObjectReference> attackingCreatures = watcher.getAttackedLastTurnCreatures(permanent.getControllerId());
+diff --git a/Mage.Sets/src/mage/cards/t/TidalFlats.java b/Mage.Sets/src/mage/cards/t/TidalFlats.java
+index ab667efc..742840e3 100644
+--- a/Mage.Sets/src/mage/cards/t/TidalFlats.java
++++ b/Mage.Sets/src/mage/cards/t/TidalFlats.java
+@@ -79,25 +79,31 @@ class TidalFlatsEffect extends OneShotEffect {
+         if (controller == null) {
+             return false;
+         }
+-        Player player = game.getPlayer(game.getActivePlayerId());
+-        if (player == null) {
++        if (game.getPlayer(game.getActivePlayerId()) == null) {
+             return false;
+         }
+         Cost cost = new ManaCostsImpl<>("{1}");
+         List<Permanent> affectedPermanents = new ArrayList<>();
+-        for (Permanent permanent : game.getBattlefield().getAllActivePermanents(filter, player.getId(), game)) {
+-            cost.clearPaid();
+-            String message = "Pay " + cost.getText() + " for " + permanent.getLogName() + "? If you don't, creatures " + controller.getLogName() + " controls blocking it gain first strike until end of turn.";
+-            if (player.chooseUse(Outcome.Benefit, message, source, game)) {
+-                if (cost.pay(source, game, source, player.getId(), false, null)) {
+-                    game.informPlayers(player.getLogName() + " paid " + cost.getText() + " for " + permanent.getLogName());
++        // 805.10a: with shared team turns, each attacking player pays for the creatures they control
++        for (UUID attackingPlayerId : game.getTeam(game.getActivePlayerId())) {
++            Player player = game.getPlayer(attackingPlayerId);
++            if (player == null) {
++                continue;
++            }
++            for (Permanent permanent : game.getBattlefield().getAllActivePermanents(filter, player.getId(), game)) {
++                cost.clearPaid();
++                String message = "Pay " + cost.getText() + " for " + permanent.getLogName() + "? If you don't, creatures " + controller.getLogName() + " controls blocking it gain first strike until end of turn.";
++                if (player.chooseUse(Outcome.Benefit, message, source, game)) {
++                    if (cost.pay(source, game, source, player.getId(), false, null)) {
++                        game.informPlayers(player.getLogName() + " paid " + cost.getText() + " for " + permanent.getLogName());
++                    } else {
++                        game.informPlayers(player.getLogName() + " didn't pay " + cost.getText() + " for " + permanent.getLogName());
++                        affectedPermanents.add(permanent);
++                    }
+                 } else {
+                     game.informPlayers(player.getLogName() + " didn't pay " + cost.getText() + " for " + permanent.getLogName());
+                     affectedPermanents.add(permanent);
+                 }
+-            } else {
+-                game.informPlayers(player.getLogName() + " didn't pay " + cost.getText() + " for " + permanent.getLogName());
+-                affectedPermanents.add(permanent);
+             }
+         }
+ 
+diff --git a/Mage.Sets/src/mage/cards/t/TotalWar.java b/Mage.Sets/src/mage/cards/t/TotalWar.java
+index e02c5873..be6f8765 100644
+--- a/Mage.Sets/src/mage/cards/t/TotalWar.java
++++ b/Mage.Sets/src/mage/cards/t/TotalWar.java
+@@ -90,8 +90,18 @@ class TotalWarDestroyEffect extends OneShotEffect {
+         if (activePlayer == null) {
+             return false;
+         }
++        // 805.10a: with shared team turns, each player of the active team who attacked is "that player"
++        for (UUID attackingPlayerId : game.getTeam(activePlayer.getId())) {
++            if (game.getTeammates(attackingPlayerId).isEmpty()
++                    || !game.getCombat().getAttackers(attackingPlayerId, game).isEmpty()) {
++                destroyNonattackers(attackingPlayerId, source, game);
++            }
++        }
++        return true;
++    }
+ 
+-        for (Permanent permanent : game.getBattlefield().getAllActivePermanents(activePlayer.getId())) {
++    private void destroyNonattackers(UUID playerId, Ability source, Game game) {
++        for (Permanent permanent : game.getBattlefield().getAllActivePermanents(playerId)) {
+             // Noncreature cards are safe.
+             if (!permanent.isCreature(game)) {
+                 continue;
+@@ -117,6 +127,5 @@ class TotalWarDestroyEffect extends OneShotEffect {
+             // Destroy the rest.
+             permanent.destroy(source, game, false);
+         }
+-        return true;
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java b/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java
+index 4ec44145..fc0c9d9f 100644
+--- a/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java
++++ b/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java
+@@ -62,7 +62,7 @@ enum PoisonedCondition implements Condition {
+             Player opponent = game.getPlayer(opponentUuid);
+             if (opponent != null
+                     && opponent.isInGame()
+-                    && opponent.getCountersCount(CounterType.POISON) > 0) {
++                    && game.getPoisonCounters(opponent.getId()) > 0) { // 810.10d: the team's
+                 return true;
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java b/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java
+index 9243008f..5944a448 100644
+--- a/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java
++++ b/Mage.Sets/src/mage/cards/v/VraskaBetrayalsSting.java
+@@ -89,7 +89,7 @@ class VraskaBetrayalsStingEffect extends OneShotEffect {
+         if (targetPlayer == null) {
+             return false;
+         }
+-        int totalPoison = targetPlayer.getCountersCount(CounterType.POISON);
++        int totalPoison = game.getPoisonCounters(targetPlayer.getId()); // 810.10a: the team's
+         if (totalPoison < 9) {
+             targetPlayer.addCounters(CounterType.POISON.createInstance(9 - totalPoison), source.getControllerId(), source, game);
+         }
+diff --git a/Mage.Sets/src/mage/cards/w/WarRoomStarWars.java b/Mage.Sets/src/mage/cards/w/WarRoomStarWars.java
+index 032c2eeb..9e538dfc 100644
+--- a/Mage.Sets/src/mage/cards/w/WarRoomStarWars.java
++++ b/Mage.Sets/src/mage/cards/w/WarRoomStarWars.java
+@@ -62,7 +62,7 @@ class WarRoomStarWarsCondition implements Condition {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         AttackedOrBlockedThisCombatWatcher watcher = game.getState().getWatcher(AttackedOrBlockedThisCombatWatcher.class);
+-        if (game.getActivePlayerId() == source.getControllerId()) {
++        if (game.isActivePlayer(source.getControllerId())) { // 805.9: or your team's turn
+             if (watcher != null) {
+                 for (MageObjectReference mor : watcher.getAttackedThisTurnCreatures()) {
+                     if (mor.getPermanent(game).getControllerId() == source.getControllerId()) {
+diff --git a/Mage.Sets/src/mage/cards/w/Weftwalking.java b/Mage.Sets/src/mage/cards/w/Weftwalking.java
+index bb0277c9..c4404a17 100644
+--- a/Mage.Sets/src/mage/cards/w/Weftwalking.java
++++ b/Mage.Sets/src/mage/cards/w/Weftwalking.java
+@@ -54,10 +54,13 @@ class WeftwalkingEffect extends ContinuousEffectImpl {
+ 
+         @Override
+         public boolean apply(Game game, Ability source) {
++            // 805.4: with shared team turns, it is the turn of each player of the active team
++            UUID playerId = game.getTeammates(game.getActivePlayerId()).isEmpty()
++                    ? game.getActivePlayerId() : source.getControllerId();
+             return game
+                     .getState()
+                     .getWatcher(SpellsCastWatcher.class)
+-                    .getSpellsCastThisTurn(game.getActivePlayerId())
++                    .getSpellsCastThisTurn(playerId)
+                     .isEmpty();
+         }
+     }
+@@ -90,6 +93,13 @@ class WeftwalkingEffect extends ContinuousEffectImpl {
+         }
+         alternativeCastingCostAbility.setSourceId(source.getSourceId());
+         player.getAlternativeSourceCosts().add(alternativeCastingCostAbility);
++        // 805.4: with shared team turns, each player of the active team
++        for (UUID teammateId : game.getTeammates(player.getId())) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null) {
++                teammate.getAlternativeSourceCosts().add(alternativeCastingCostAbility);
++            }
++        }
+         return true;
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/w/WhisperingSpecter.java b/Mage.Sets/src/mage/cards/w/WhisperingSpecter.java
+index 202d2c24..6e5fa18a 100644
+--- a/Mage.Sets/src/mage/cards/w/WhisperingSpecter.java
++++ b/Mage.Sets/src/mage/cards/w/WhisperingSpecter.java
+@@ -67,7 +67,7 @@ class WhisperingSpecterEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         Player player = game.getPlayer(getTargetPointer().getFirst(game, source));
+         if (player != null) {
+-            int value = player.getCountersCount(CounterType.POISON);
++            int value = game.getPoisonCounters(player.getId()); // 810.10a: the team's
+             if (value > 0) {
+                 player.discard(value, false, false, source, game);
+                 return true;
+diff --git a/Mage.Sets/src/mage/cards/w/WordOfCommand.java b/Mage.Sets/src/mage/cards/w/WordOfCommand.java
+index 3aced165..fe2aa843 100644
+--- a/Mage.Sets/src/mage/cards/w/WordOfCommand.java
++++ b/Mage.Sets/src/mage/cards/w/WordOfCommand.java
+@@ -164,7 +164,7 @@ class WordOfCommandEffect extends OneShotEffect {
+         boolean canPlay = false;
+         if (card.isLand(game)) { // we can't use getPlayableObjects(game) in here because it disallows playing lands outside the main step // TODO: replace to getPlayable() checks with disable step condition?
+             if (targetPlayer.canPlayLand()
+-                    && game.getActivePlayerId().equals(targetPlayer.getId())) {
++                    && game.isActivePlayer(targetPlayer.getId())) { // 805.9: or their team's turn
+                 for (Ability ability : card.getAbilities(game)) {
+                     if (ability instanceof PlayLandAbility) {
+                         if (!game.getContinuousEffects().preventedByRuleModification(GameEvent.getEvent(GameEvent.EventType.PLAY_LAND, ability.getSourceId(), ability, targetPlayer.getId()), ability, game, true)) {
+diff --git a/Mage.Sets/src/mage/cards/w/Wurmquake.java b/Mage.Sets/src/mage/cards/w/Wurmquake.java
+index c286589e..27fd8a16 100644
+--- a/Mage.Sets/src/mage/cards/w/Wurmquake.java
++++ b/Mage.Sets/src/mage/cards/w/Wurmquake.java
+@@ -66,7 +66,7 @@ class WurmquakeEffect extends OneShotEffect {
+         new CreateTokenEffect(new PhyrexianWurmToken(xValue)).apply(game, source);
+         int amount = 0;
+         for (UUID opponentId : game.getOpponents(source.getControllerId())) {
+-            if (game.getPlayer(opponentId).getCountersCount(CounterType.POISON) >= 3) {
++            if (game.getPoisonCounters(opponentId) >= 3) { // 810.10a: the team's
+                 amount++;
+             }
+         }

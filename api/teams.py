@@ -7,7 +7,8 @@ uses Unified Deck Construction (section 8.4), so no two decks on a team may hold
 by its English name, except cards with the basic supertype. Section 9.5 also bans Erayo, Soratami
 Ascendant in every Two-Headed Giant Constructed tournament, which a table refusing banned cards
 refuses. A bot whose deck is not chosen plays one of the engine's four Legacy fixture decks, which
-share no card: the teammate's shares none with the player's deck either.
+share no card: the teammate's shares none with the player's deck either, and two bots on a team
+play one of the measured pairs (v0.5.1).
 """
 
 from collections.abc import Iterable
@@ -88,6 +89,13 @@ BASICS = frozenset(
 # MTR 9.5: banned in Two-Headed Giant Constructed, besides the format's own banned cards.
 BANNED = frozenset({"Erayo, Soratami Ascendant"})
 TEAMS = ((0, 1), (2, 3))
+# The bot decks' pairs (v0.5.1): red and white against green and blue, the most even of the three
+# pairings in bot-versus-bot games (docs/engine/two-headed-giant.md#fixture-decks). A team whose two
+# decks are both left to the table plays a pair, its own first (the first team's is red and white).
+PAIRS = (
+    ("legacy-mono-red-burn", "legacy-mono-white-weenie"),
+    ("legacy-mono-green-creatures", "legacy-mono-blue-skies"),
+)
 
 
 def teammate(seat: int) -> int:
@@ -123,11 +131,22 @@ def listed(names: list[str]) -> str:
 
 
 def assign_and_check(seats: list[dict[str, object]], banned_allowed: bool) -> None:
-    """Gives each bot without a deck a fixture deck its teammate's shares no card with, then
-    refuses a team whose decks share a card, or a deck holding a card banned in Two-Headed Giant
-    when the table refuses banned cards. Changes ``seats`` in place."""
+    """Gives each bot without a deck a fixture deck its teammate's shares no card with (a team of
+    two such bots a pair, PAIRS), then refuses a team whose decks share a card, or a deck holding a
+    card banned in Two-Headed Giant when the table refuses banned cards. Changes ``seats`` in
+    place."""
     cards = [cards_of(seat) for seat in seats]
     used = {seat.get("deck") for seat in seats}
+    for team, (first, second) in enumerate(TEAMS):
+        if cards[first] is not None or cards[second] is not None:
+            continue
+        for pair in PAIRS[team:] + PAIRS[:team]:
+            if not used & set(pair):
+                for index, deck in zip((first, second), pair, strict=True):
+                    seats[index]["deck"] = deck
+                    cards[index] = set(FIXTURES[deck])
+                used.update(pair)
+                break
     for index, seat in enumerate(seats):
         if cards[index] is not None:
             continue

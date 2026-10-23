@@ -93,7 +93,7 @@ public final class MatchLog {
             return;
         }
         int turn = game.getTurnNum();
-        int seat = seatIds.indexOf(game.getActivePlayerId());
+        int seat = seatIds.indexOf(game.getState().getActivePlayerId()); // the turn's holder (805.9)
         PhaseStep step = game.getTurnStepType();
         lastTurn = turn;
         lines++;

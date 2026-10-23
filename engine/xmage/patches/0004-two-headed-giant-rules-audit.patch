@@ -1,0 +1,1388 @@
+Two-Headed Giant (Commander Duels v0.5.1 card audit), part 3: the rules the audit found missing.
+
+Reason: v0.5.0's patches 0001 and 0002 made teams take turns and share life, but XMage still reads one
+active player in many rules, so cards that name "each player's" step, "your turn", a skip, turn
+control, "can't lose", poison counts or the attacking player played wrong for the teammate of the
+turn's holder. With this, in a game that names teammates (Game.getTeammates, from part 1):
+- 805.4d, 805.9: the beginning of a step or phase is checked for each player of the active team
+  (TeamStepEvent). An ability worded for "each player's" or "each opponent's" step that refers to
+  "that player" triggers once for each of them (TriggeredAbility.triggersForEachTeamPlayer, by the
+  rules text for AtStepTriggeredAbility); any other triggers once, at the first of the team's players
+  it applies to, so "your upkeep" triggers for the holder's teammate too, and an enchanted player's
+  step is that player's. While such an ability triggers, goes on the stack and resolves, the player
+  whose step it is is "the active player" for it (805.9: Game.asActivePlayer), so an effect that
+  reads the active player acts for that player.
+- 805.9: "not your turn" (NotMyTurnCondition) and the core's other "your turn" checks read the team's
+  turn; each player of the active team may play the extra lands an effect gives "each player".
+- 805.8: a turn, phase or step a player of the active team skips, or an extra phase or step they get,
+  is the team's (TurnMods.useNextForTeam; Step.skipStep and Phase.skipPhase ask for each team player;
+  a turn a teammate skips, Time Vault); controlling a player controls their whole team.
+- 805.10a, 805.10c: each player of the active team is an attacking player (Combat.isAttackingPlayer,
+  getAttackers(player), getAttackingPlayerOf); "you attack" counts the creatures you control.
+- 810.8a: a team can't lose (or win) when an effect says one of its players can't; no one on a team
+  loses for having 0 or less life when an effect says one of them doesn't.
+- 810.9d, 810.9e: an effect that sets each player's life total sets one per team, chosen by the team
+  (Game.chooseLifeTotalsToSet); teammates can't exchange life totals.
+- 810.10a, 810.10b: poison counts and the 704.5c loss read the team's counters (Game.getPoisonCounters,
+  getPoisonCountersToLose, public, replacing part 2's protected methods); poison counters a player
+  loses beyond their own come off their teammates'.
+- Assist: a teammate's mana counts as help, and a computer teammate helps pay.
+Every other game type names no teammates, and each change reduces to XMage's own code there.
+Needs parts 1 and 2.
+Upstream: none yet; to be offered to magefree/mage with parts 1 to 3.
+Remove when: XMage upstream implements Two-Headed Giant, or the format is dropped.
+
+diff --git a/Mage/src/main/java/mage/abilities/ActivatedAbilityImpl.java b/Mage/src/main/java/mage/abilities/ActivatedAbilityImpl.java
+index 86ac5730..26e0f08a 100644
+--- a/Mage/src/main/java/mage/abilities/ActivatedAbilityImpl.java
++++ b/Mage/src/main/java/mage/abilities/ActivatedAbilityImpl.java
+@@ -76,7 +76,8 @@ public abstract class ActivatedAbilityImpl extends AbilityImpl implements Activa
+             case EACH_PLAYER:
+                 return true;
+             case ACTIVE:
+-                return game.getActivePlayerId() == playerId;
++                // 805.5a: with shared team turns, any player of the active team
++                return game.getActivePlayerId() == playerId || game.getTeammates(playerId).contains(game.getActivePlayerId());
+             case NOT_YOU:
+                 return !isControlledByPlayer(playerId, game);
+             case TEAM:
+diff --git a/Mage/src/main/java/mage/abilities/DelayedTriggeredAbilities.java b/Mage/src/main/java/mage/abilities/DelayedTriggeredAbilities.java
+index d0a5a20d..7126cf4e 100644
+--- a/Mage/src/main/java/mage/abilities/DelayedTriggeredAbilities.java
++++ b/Mage/src/main/java/mage/abilities/DelayedTriggeredAbilities.java
+@@ -3,8 +3,10 @@ package mage.abilities;
+ import mage.constants.Duration;
+ import mage.game.Game;
+ import mage.game.events.GameEvent;
++import mage.game.events.TeamStepEvent;
+ 
+ import java.util.Iterator;
++import java.util.UUID;
+ 
+ /**
+  * @author BetaSteward_at_googlemail.com
+@@ -36,10 +38,19 @@ public class DelayedTriggeredAbilities extends AbilitiesImpl<DelayedTriggeredAbi
+             if (!ability.checkEventType(event, game)) {
+                 continue;
+             }
+-            if (ability.checkTrigger(event, game)) {
+-                ability.trigger(game, ability.controllerId, event);
+-                if (ability.getTriggerOnlyOnce()) {
+-                    it.remove();
++            // 805.4d: with shared team turns, a step of the team's turn is each of its players'; an
++            // ability triggers at it once, or once for each player (TriggeredAbility)
++            for (GameEvent stepEvent : TeamStepEvent.withTeamSteps(event, game)) {
++                UUID stepPlayerId = stepEvent instanceof TeamStepEvent ? stepEvent.getPlayerId() : null;
++                if (game.asActivePlayer(stepPlayerId, () -> ability.checkTrigger(stepEvent, game))) {
++                    ability.trigger(game, ability.controllerId, stepEvent);
++                    if (ability.getTriggerOnlyOnce()) {
++                        it.remove();
++                        break;
++                    }
++                    if (!ability.triggersForEachTeamPlayer()) {
++                        break;
++                    }
+                 }
+             }
+         }
+@@ -51,7 +62,7 @@ public class DelayedTriggeredAbilities extends AbilitiesImpl<DelayedTriggeredAbi
+ 
+     public void removeStartOfNewTurn(Game game) {
+         this.removeIf(ability -> ability.getDuration() == Duration.UntilYourNextTurn
+-                && game.getActivePlayerId().equals(ability.getControllerId())
++                && game.isActivePlayer(ability.getControllerId()) // 805.4: or the controller's team's turn
+         );
+     }
+ 
+diff --git a/Mage/src/main/java/mage/abilities/TriggeredAbilities.java b/Mage/src/main/java/mage/abilities/TriggeredAbilities.java
+index 1e745ea6..2066f4c5 100644
+--- a/Mage/src/main/java/mage/abilities/TriggeredAbilities.java
++++ b/Mage/src/main/java/mage/abilities/TriggeredAbilities.java
+@@ -5,6 +5,7 @@ import mage.constants.Zone;
+ import mage.game.Game;
+ import mage.game.events.GameEvent;
+ import mage.game.events.NumberOfTriggersEvent;
++import mage.game.events.TeamStepEvent;
+ import mage.game.permanent.Permanent;
+ import mage.game.stack.Spell;
+ import mage.util.CardUtil;
+@@ -107,7 +108,14 @@ public class TriggeredAbilities extends LinkedHashMap<String, TriggeredAbility>
+         try {
+             for (TriggeredAbility ability : currentTriggers) {
+                 if (ability.checkEventType(event, game)) {
+-                    checkTrigger(ability, event, game);
++                    // 805.4d: with shared team turns, a step of the team's turn is each of its players';
++                    // an ability triggers at it once, or once for each player (TriggeredAbility)
++                    boolean triggered = false;
++                    for (GameEvent stepEvent : TeamStepEvent.withTeamSteps(event, game)) {
++                        if (!triggered || ability.triggersForEachTeamPlayer()) {
++                            triggered = checkTeamStep(ability, stepEvent, game) || triggered;
++                        }
++                    }
+                 }
+                 this.processingDone(ability);
+             }
+@@ -217,7 +225,16 @@ public class TriggeredAbilities extends LinkedHashMap<String, TriggeredAbility>
+         this.processingDone.clear();
+     }
+ 
+-    private void checkTrigger(TriggeredAbility ability, GameEvent event, Game game) {
++    /** 805.9: checked at a team player's step (TeamStepEvent), that player is the ability's active player. */
++    private boolean checkTeamStep(TriggeredAbility ability, GameEvent event, Game game) {
++        if (event instanceof TeamStepEvent) {
++            return game.asActivePlayer(event.getPlayerId(), () -> checkTrigger(ability, event, game));
++        }
++        return checkTrigger(ability, event, game);
++    }
++
++    /** @return whether the ability triggered */
++    private boolean checkTrigger(TriggeredAbility ability, GameEvent event, Game game) {
+         // for effects like when leaves battlefield or destroyed use ShortLKI to check if permanent was in the correct zone before (e.g. Oblivion Ring or Karmic Justice)
+         if (this.enableIntegrityLogs) {
+             logger.info("---");
+@@ -247,7 +264,7 @@ public class TriggeredAbilities extends LinkedHashMap<String, TriggeredAbility>
+                                     && !isGainedAbility(ability, permanent) // the face down creature got the ability from an effect => so it should work
+                                     && !ability.getWorksFaceDown()) { // the ability is declared to work also face down
+                                 // Not all triggered abilities of face down creatures work if they are faced down
+-                                return;
++                                return false;
+                             }
+                             controllerSet = true;
+                             ability.setControllerId(permanent.getControllerId());
+@@ -263,7 +280,8 @@ public class TriggeredAbilities extends LinkedHashMap<String, TriggeredAbility>
+                     }
+                 }
+ 
+-                if (ability.checkTrigger(event, game) && ability.checkTriggeredLimit(game) && !ability.checkUsedAlready(game)) {
++                boolean triggers = ability.checkTrigger(event, game);
++                if (triggers && ability.checkTriggeredLimit(game) && !ability.checkUsedAlready(game)) {
+                     NumberOfTriggersEvent numberOfTriggersEvent = new NumberOfTriggersEvent(ability, event);
+                     // event == null - state based triggers like StateTriggeredAbility, must be ignored for number event
+                     if (event == null || !game.replaceEvent(numberOfTriggersEvent, ability)) {
+@@ -277,8 +295,10 @@ public class TriggeredAbilities extends LinkedHashMap<String, TriggeredAbility>
+                         }
+                     }
+                 }
++                return triggers;
+             }
+         }
++        return false;
+     }
+ 
+     /**
+diff --git a/Mage/src/main/java/mage/abilities/TriggeredAbility.java b/Mage/src/main/java/mage/abilities/TriggeredAbility.java
+index 7d0dd840..be5237eb 100644
+--- a/Mage/src/main/java/mage/abilities/TriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/TriggeredAbility.java
+@@ -29,6 +29,16 @@ public interface TriggeredAbility extends Ability {
+      */
+     boolean checkTrigger(GameEvent event, Game game);
+ 
++    /**
++     * 805.4d: with shared team turns, a step of the team's turn is each of its players' step
++     * (TeamStepEvent). An ability triggers at it once, at the first of the active team's players it
++     * applies to, unless it is worded for "each player's" (or "each opponent's") step and refers to
++     * "that player": then it triggers once for each of them.
++     */
++    default boolean triggersForEachTeamPlayer() {
++        return false;
++    }
++
+     /**
+      * If the trigger is limited per turn, check if it can trigger again or the limit is met.
+      * true if unlimited
+diff --git a/Mage/src/main/java/mage/abilities/TriggeredAbilityImpl.java b/Mage/src/main/java/mage/abilities/TriggeredAbilityImpl.java
+index fcef0db4..84e18c26 100644
+--- a/Mage/src/main/java/mage/abilities/TriggeredAbilityImpl.java
++++ b/Mage/src/main/java/mage/abilities/TriggeredAbilityImpl.java
+@@ -1,5 +1,6 @@
+ package mage.abilities;
+ 
++import mage.MageIdentifier;
+ import mage.MageObject;
+ import mage.abilities.condition.Condition;
+ import mage.abilities.effects.Effect;
+@@ -10,6 +11,7 @@ import mage.constants.Zone;
+ import mage.game.Game;
+ import mage.game.events.BatchEvent;
+ import mage.game.events.GameEvent;
++import mage.game.events.TeamStepEvent;
+ import mage.game.events.ZoneChangeEvent;
+ import mage.game.permanent.PermanentToken;
+ import mage.players.Player;
+@@ -70,12 +72,41 @@ public abstract class TriggeredAbilityImpl extends AbilityImpl implements Trigge
+ 
+     @Override
+     public void trigger(Game game, UUID controllerId, GameEvent triggeringEvent) {
+-        //20091005 - 603.4
+-        if (checkInterveningIfClause(game) && checkTriggerCondition(game)) {
+-            updateTurnCount(game);
+-            updateGameCount(game);
+-            game.addTriggeredAbility(this, triggeringEvent);
+-        }
++        // 805.9: triggered at the step of one of the active team's other players, the ability's active
++        // player is that player (TeamStepEvent)
++        game.asActivePlayer(teamStepPlayerId(triggeringEvent), () -> {
++            //20091005 - 603.4
++            if (checkInterveningIfClause(game) && checkTriggerCondition(game)) {
++                updateTurnCount(game);
++                updateGameCount(game);
++                game.addTriggeredAbility(this, triggeringEvent);
++            }
++            return null;
++        });
++    }
++
++    /** 805.9: the player whose step triggered the ability, when one of the active team's other players. */
++    private static UUID teamStepPlayerId(GameEvent triggeringEvent) {
++        return triggeringEvent instanceof TeamStepEvent ? triggeringEvent.getPlayerId() : null;
++    }
++
++    @Override
++    public void adjustTargets(Game game) {
++        game.asActivePlayer(teamStepPlayerId(triggerEvent), () -> {
++            super.adjustTargets(game);
++            return null;
++        });
++    }
++
++    @Override
++    public boolean canChooseTarget(Game game, UUID playerId) {
++        return game.asActivePlayer(teamStepPlayerId(triggerEvent), () -> super.canChooseTarget(game, playerId));
++    }
++
++    @Override
++    public boolean activate(Game game, Set<MageIdentifier> allowedIdentifiers, boolean noMana) {
++        return game.asActivePlayer(teamStepPlayerId(triggerEvent),
++                () -> super.activate(game, allowedIdentifiers, noMana));
+     }
+ 
+     // Used for triggers with a per-turn limit.
+@@ -257,6 +288,10 @@ public abstract class TriggeredAbilityImpl extends AbilityImpl implements Trigge
+ 
+     @Override
+     public boolean resolve(Game game) {
++        return game.asActivePlayer(teamStepPlayerId(triggerEvent), () -> resolveTriggered(game));
++    }
++
++    private boolean resolveTriggered(Game game) {
+         if (!checkInterveningIfClause(game)) {
+             return false;
+         }
+diff --git a/Mage/src/main/java/mage/abilities/common/AttacksWithCreaturesTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/AttacksWithCreaturesTriggeredAbility.java
+index 36f5196c..4579b436 100644
+--- a/Mage/src/main/java/mage/abilities/common/AttacksWithCreaturesTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/common/AttacksWithCreaturesTriggeredAbility.java
+@@ -78,15 +78,18 @@ public class AttacksWithCreaturesTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!isControlledBy(game.getCombat().getAttackingPlayerId())) {
++        // 805.10a: with shared team turns, each player of the active team is an attacking player
++        if (!game.getTeam(game.getCombat().getAttackingPlayerId()).contains(getControllerId())) {
+             return false;
+         }
++        boolean team = !game.getTeammates(getControllerId()).isEmpty();
+         List<Permanent> attackers = game
+                 .getCombat()
+                 .getAttackers()
+                 .stream()
+                 .map(game::getPermanent)
+                 .filter(Objects::nonNull)
++                .filter(permanent -> !team || permanent.isControlledBy(controllerId)) // you attack with them
+                 .filter(permanent -> filter.match(permanent, controllerId, this, game))
+                 .collect(Collectors.toList());
+         if (attackers.size() < minAttackers) {
+diff --git a/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java
+index 3e7e2ea1..bc5b5cac 100644
+--- a/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/common/CardsLeaveGraveyardTriggeredAbility.java
+@@ -48,7 +48,7 @@ public class CardsLeaveGraveyardTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (yourTurn && !isControlledBy(game.getActivePlayerId())) {
++        if (yourTurn && !game.isActivePlayer(getControllerId())) { // 805.9: or your team's turn
+             return false;
+         }
+         ZoneChangeGroupEvent zEvent = (ZoneChangeGroupEvent) event;
+diff --git a/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java
+index 1a366c33..759029a2 100644
+--- a/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/common/GainLoseLifeYourTurnTriggeredAbility.java
+@@ -33,7 +33,7 @@ public class GainLoseLifeYourTurnTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        return isControlledBy(game.getActivePlayerId())
++        return game.isActivePlayer(getControllerId()) // 805.9: or your team's turn
+                 && isControlledBy(event.getTargetId());
+     }
+ }
+diff --git a/Mage/src/main/java/mage/abilities/common/delayed/AtTheBeginOfStepOfYourNextTurnDelayedTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/delayed/AtTheBeginOfStepOfYourNextTurnDelayedTriggeredAbility.java
+index f6ceb05b..78092e4d 100644
+--- a/Mage/src/main/java/mage/abilities/common/delayed/AtTheBeginOfStepOfYourNextTurnDelayedTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/common/delayed/AtTheBeginOfStepOfYourNextTurnDelayedTriggeredAbility.java
+@@ -45,8 +45,8 @@ public class AtTheBeginOfStepOfYourNextTurnDelayedTriggeredAbility extends Delay
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (!isControlledBy(event.getPlayerId())) {
+-            // not your turn.
++        if (!game.getTeam(event.getPlayerId()).contains(getControllerId())) {
++            // not your turn (805.4a: nor your team's, with shared team turns).
+             return false;
+         }
+ 
+diff --git a/Mage/src/main/java/mage/abilities/common/delayed/WhenYouAttackDelayedTriggeredAbility.java b/Mage/src/main/java/mage/abilities/common/delayed/WhenYouAttackDelayedTriggeredAbility.java
+index 032828b7..3020b335 100644
+--- a/Mage/src/main/java/mage/abilities/common/delayed/WhenYouAttackDelayedTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/common/delayed/WhenYouAttackDelayedTriggeredAbility.java
+@@ -44,6 +44,12 @@ public class WhenYouAttackDelayedTriggeredAbility extends DelayedTriggeredAbilit
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+         UUID attackerId = game.getCombat().getAttackingPlayerId();
++        if (attackerId != null && !game.getTeammates(attackerId).isEmpty()) {
++            // 805.10a: with shared team turns, you attack when you attack with a creature you control
++            return game.getTeam(attackerId).contains(getControllerId()) && game.getCombat().getAttackers().stream()
++                    .map(game::getPermanent)
++                    .anyMatch(attacker -> attacker != null && attacker.isControlledBy(getControllerId()));
++        }
+         return attackerId != null && attackerId.equals(getControllerId()) && !game.getCombat().getAttackers().isEmpty();
+     }
+ }
+diff --git a/Mage/src/main/java/mage/abilities/condition/common/CorruptedCondition.java b/Mage/src/main/java/mage/abilities/condition/common/CorruptedCondition.java
+index 7d7668bf..82c8f07f 100644
+--- a/Mage/src/main/java/mage/abilities/condition/common/CorruptedCondition.java
++++ b/Mage/src/main/java/mage/abilities/condition/common/CorruptedCondition.java
+@@ -23,7 +23,7 @@ public enum CorruptedCondition implements Condition {
+                 .stream()
+                 .map(game::getPlayer)
+                 .filter(Objects::nonNull)
+-                .anyMatch(player -> player.getCountersCount(CounterType.POISON) >= 3);
++                .anyMatch(player -> game.getPoisonCounters(player.getId()) >= 3); // 810.10a: the team's
+     }
+ 
+     @Override
+diff --git a/Mage/src/main/java/mage/abilities/condition/common/IsPhaseCondition.java b/Mage/src/main/java/mage/abilities/condition/common/IsPhaseCondition.java
+index c153038f..f5caa51d 100644
+--- a/Mage/src/main/java/mage/abilities/condition/common/IsPhaseCondition.java
++++ b/Mage/src/main/java/mage/abilities/condition/common/IsPhaseCondition.java
+@@ -28,7 +28,7 @@ public class IsPhaseCondition implements Condition {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
+-        return turnPhase == game.getTurnPhaseType() && (!yourTurn || game.getActivePlayerId().equals(source.getControllerId()));
++        return turnPhase == game.getTurnPhaseType() && (!yourTurn || game.isActivePlayer(source.getControllerId())); // 805.9: or your team's
+     }
+ 
+     @Override
+diff --git a/Mage/src/main/java/mage/abilities/condition/common/NotMyTurnCondition.java b/Mage/src/main/java/mage/abilities/condition/common/NotMyTurnCondition.java
+index e87fe697..76634859 100644
+--- a/Mage/src/main/java/mage/abilities/condition/common/NotMyTurnCondition.java
++++ b/Mage/src/main/java/mage/abilities/condition/common/NotMyTurnCondition.java
+@@ -9,7 +9,7 @@ public enum NotMyTurnCondition implements Condition {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
+-        return !source.isControlledBy(game.getActivePlayerId());
++        return !game.isActivePlayer(source.getControllerId()); // 805.9: nor your team's turn
+     }
+ 
+     @Override
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/CrewsVehicleSourceTriggeredAbility.java b/Mage/src/main/java/mage/abilities/effects/common/CrewsVehicleSourceTriggeredAbility.java
+index cac0128b..a5d0f7a6 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/CrewsVehicleSourceTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/CrewsVehicleSourceTriggeredAbility.java
+@@ -44,7 +44,7 @@ public class CrewsVehicleSourceTriggeredAbility extends TriggeredAbilityImpl {
+ 
+     @Override
+     public boolean checkTrigger(GameEvent event, Game game) {
+-        if (yourMainPhaseOnly && !(game.isMainPhase() && this.isControlledBy(game.getActivePlayerId()))) {
++        if (yourMainPhaseOnly && !(game.isMainPhase() && game.isActivePlayer(this.getControllerId()))) { // 805.9
+             return false;
+         }
+         if (event.getTargetId().equals(getSourceId())) {
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/SkipUntapOptionalSourceEffect.java b/Mage/src/main/java/mage/abilities/effects/common/SkipUntapOptionalSourceEffect.java
+index ee9acc45..966cd280 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/SkipUntapOptionalSourceEffect.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/SkipUntapOptionalSourceEffect.java
+@@ -25,7 +25,7 @@ public class SkipUntapOptionalSourceEffect extends RestrictionEffect {
+     @Override
+     public boolean applies(Permanent permanent, Ability source, Game game) {
+         return permanent.getId().equals(source.getSourceId())
+-                && permanent.isControlledBy(game.getActivePlayerId()) && // your untap step
++                && game.isActivePlayer(permanent.getControllerId()) && // your (team's, 805.4) untap step
+                 permanent.isTapped();
+     }
+ 
+diff --git a/Mage/src/main/java/mage/abilities/effects/common/continuous/PlayAdditionalLandsAllEffect.java b/Mage/src/main/java/mage/abilities/effects/common/continuous/PlayAdditionalLandsAllEffect.java
+index 06373195..6795cf9c 100644
+--- a/Mage/src/main/java/mage/abilities/effects/common/continuous/PlayAdditionalLandsAllEffect.java
++++ b/Mage/src/main/java/mage/abilities/effects/common/continuous/PlayAdditionalLandsAllEffect.java
+@@ -10,6 +10,8 @@ import mage.game.Game;
+ import mage.players.Player;
+ import mage.util.CardUtil;
+ 
++import java.util.UUID;
++
+ /**
+  * Each player may play an additional land on each of their turns.
+  *
+@@ -53,6 +55,13 @@ public class PlayAdditionalLandsAllEffect extends ContinuousEffectImpl {
+             return false;
+         }
+         player.setLandsPerTurn(CardUtil.overflowInc(player.getLandsPerTurn(), numExtraLands));
++        // 805.4c: with shared team turns, each player of the active team may play lands
++        for (UUID teammateId : game.getTeammates(player.getId())) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null) {
++                teammate.setLandsPerTurn(CardUtil.overflowInc(teammate.getLandsPerTurn(), numExtraLands));
++            }
++        }
+         return true;
+     }
+ }
+diff --git a/Mage/src/main/java/mage/abilities/keyword/AssistAbility.java b/Mage/src/main/java/mage/abilities/keyword/AssistAbility.java
+index bb2e4572..3a651e70 100644
+--- a/Mage/src/main/java/mage/abilities/keyword/AssistAbility.java
++++ b/Mage/src/main/java/mage/abilities/keyword/AssistAbility.java
+@@ -1,5 +1,7 @@
+ package mage.abilities.keyword;
+ 
++import java.util.LinkedHashSet;
++import java.util.Set;
+ import java.util.UUID;
+ 
+ import mage.Mana;
+@@ -101,9 +103,11 @@ public class AssistAbility extends SimpleStaticAbility implements AlternateManaP
+             return options;
+         }
+ 
+-        // search opponents who can help with generic pay
++        // search opponents who can help with generic pay (with teams, the controller's teammates too)
+         int opponentCanPayMax = 0;
+-        for (UUID opponentId : game.getOpponents(source.getControllerId())) {
++        Set<UUID> helpers = new LinkedHashSet<>(game.getOpponents(source.getControllerId()));
++        helpers.addAll(game.getTeammates(source.getControllerId()));
++        for (UUID opponentId : helpers) {
+             Player opponent = game.getPlayer(opponentId);
+             if (opponent != null) {
+                 // basic and pool, but no coditional mana
+@@ -175,6 +179,13 @@ class AssistEffect extends OneShotEffect {
+             if (!targetPlayer.isComputer()) {
+                 amountToPay = targetPlayer.announceX(0, unpaid.getMana().getGeneric(),
+                         "How much mana to pay as assist for " + controller.getName() + "?", game, source, true);
++            } else if (game.getTeammates(controller.getId()).contains(targetPlayer.getId())) {
++                // a computer teammate helps as much as its untapped mana allows
++                int teammateCanPay = 0;
++                for (Mana mana : targetPlayer.getManaAvailable(game)) {
++                    teammateCanPay = Math.max(teammateCanPay, mana.count());
++                }
++                amountToPay = Math.min(unpaid.getMana().getGeneric(), teammateCanPay);
+             }
+ 
+             if (amountToPay > 0) {
+diff --git a/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java b/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java
+index 51e17e46..4c73786e 100644
+--- a/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java
++++ b/Mage/src/main/java/mage/abilities/triggers/AtStepTriggeredAbility.java
+@@ -11,14 +11,20 @@ import mage.players.Player;
+ import mage.target.targetpointer.FixedTarget;
+ 
+ import java.util.UUID;
++import java.util.regex.Pattern;
+ 
+ /**
+  * @author xenohedron
+  */
+ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
+ 
++    // 805.4d: rules text that refers to the player whose step it is
++    private static final Pattern STEP_PLAYER = Pattern.compile(
++            "\\b(that player|that opponent|the player|they|them|their)\\b", Pattern.CASE_INSENSITIVE);
++
+     protected final TargetController targetController;
+     private Boolean setTargetPointer; // null for default behavior (set target pointer if no targets)
++    private Boolean triggersForEachTeamPlayer; // 805.4d, null to decide by the rules text
+ 
+     protected AtStepTriggeredAbility(Zone zone, TargetController targetController, Effect effect, boolean optional) {
+         super(zone, effect, optional);
+@@ -30,6 +36,7 @@ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
+         super(ability);
+         this.targetController = ability.targetController;
+         this.setTargetPointer = ability.setTargetPointer;
++        this.triggersForEachTeamPlayer = ability.triggersForEachTeamPlayer;
+     }
+ 
+     @Override
+@@ -41,15 +48,17 @@ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
+         return false;
+     }
+ 
++    /**
++     * With shared team turns (805.4d) the step event is checked for each player of the active team
++     * (TeamStepEvent), and the player whose step it is is the event's player.
++     */
+     private boolean checkTargetController(GameEvent event, Game game) {
++        boolean teamTurn = !game.getTeammates(event.getPlayerId()).isEmpty();
+         switch (targetController) {
+-            // 805.4a: with shared team turns, a step of the team's turn is each of its players' step
+             case YOU:
+-                return isControlledBy(event.getPlayerId())
+-                        || game.getTeammates(event.getPlayerId()).contains(getControllerId());
++                return isControlledBy(event.getPlayerId());
+             case NOT_YOU:
+-                return !isControlledBy(event.getPlayerId())
+-                        && !game.getTeammates(event.getPlayerId()).contains(getControllerId());
++                return !isControlledBy(event.getPlayerId());
+             case ANY:
+             case NEXT:
+             case EACH_PLAYER:
+@@ -59,14 +68,18 @@ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
+                 return player != null && player.hasOpponent(event.getPlayerId(), game);
+             case ENCHANTED:
+                 Permanent permanent = getSourcePermanentIfItStillExists(game);
+-                return permanent != null && game.isActivePlayer(permanent.getAttachedTo());
++                return permanent != null && (teamTurn
++                        ? event.getPlayerId().equals(permanent.getAttachedTo())
++                        : game.isActivePlayer(permanent.getAttachedTo()));
+             case CONTROLLER_ATTACHED_TO:
+                 Permanent attachment = getSourcePermanentIfItStillExists(game);
+                 if (attachment == null) {
+                     return false;
+                 }
+                 Permanent attachedTo = game.getPermanent(attachment.getAttachedTo());
+-                return attachedTo != null && game.isActivePlayer(attachedTo.getControllerId());
++                return attachedTo != null && (teamTurn
++                        ? event.getPlayerId().equals(attachedTo.getControllerId())
++                        : game.isActivePlayer(attachedTo.getControllerId()));
+             case MONARCH:
+                 return event.getPlayerId().equals(game.getMonarchId());
+             default:
+@@ -74,6 +87,29 @@ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
+         }
+     }
+ 
++    /**
++     * 805.4d: with shared team turns, an ability worded for "each player's", "each opponent's" or
++     * "each other player's" step triggers once for each such player of the active team when its
++     * condition, effect or intervening "if" clause refers to "that player"; any other step trigger
++     * triggers once, at the first of the active team's players it applies to.
++     */
++    @Override
++    public boolean triggersForEachTeamPlayer() {
++        if (triggersForEachTeamPlayer != null) {
++            return triggersForEachTeamPlayer;
++        }
++        switch (targetController) {
++            case EACH_PLAYER:
++            case OPPONENT:
++            case NOT_YOU:
++                String rule = getRule();
++                String phrase = getTriggerPhrase();
++                return STEP_PLAYER.matcher(phrase == null ? rule : rule.replace(phrase, "")).find();
++            default:
++                return false;
++        }
++    }
++
+     /**
+      * In rare cases, if the default behavior (of setting the target pointer to the active player id
+      * if and only if there are no targets) is not adequate, manually specify whether target pointer should be set
+@@ -83,6 +119,15 @@ public abstract class AtStepTriggeredAbility extends TriggeredAbilityImpl {
+         return this;
+     }
+ 
++    /**
++     * 805.4d, with shared team turns: whether the ability triggers once for each player of the active
++     * team, when its rules text does not tell (see triggersForEachTeamPlayer).
++     */
++    public AtStepTriggeredAbility withTriggersForEachTeamPlayer(boolean triggersForEachTeamPlayer) {
++        this.triggersForEachTeamPlayer = triggersForEachTeamPlayer;
++        return this;
++    }
++
+     private void setTargetPointerIfNeeded(UUID playerId) {
+         if (Boolean.TRUE.equals(setTargetPointer) || (setTargetPointer == null && getTargets().isEmpty())) {
+             this.getEffects().setTargetPointer(new FixedTarget(playerId));
+diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
+index 7c3754ee..b2cd163f 100644
+--- a/Mage/src/main/java/mage/game/Game.java
++++ b/Mage/src/main/java/mage/game/Game.java
+@@ -17,6 +17,7 @@ import mage.cards.MeldCard;
+ import mage.cards.decks.Deck;
+ import mage.choices.Choice;
+ import mage.constants.*;
++import mage.counters.CounterType;
+ import mage.counters.Counters;
+ import mage.game.combat.Combat;
+ import mage.game.command.*;
+@@ -227,6 +228,17 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+         return Collections.emptySet();
+     }
+ 
++    /**
++     * The given player and their teammates (rule 805), the given player first. Just the player in
++     * games without teams.
++     */
++    default Set<UUID> getTeam(UUID playerId) {
++        Set<UUID> team = new LinkedHashSet<>();
++        team.add(playerId);
++        team.addAll(getTeammates(playerId));
++        return team;
++    }
++
+     /**
+      * 805.4a, 805.9: with shared team turns, the team whose turn it is is the active team, and each
+      * of its players is an active player.
+@@ -237,6 +249,73 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+                 && (activePlayerId.equals(playerId) || getTeammates(activePlayerId).contains(playerId));
+     }
+ 
++    /**
++     * 805.9: with shared team turns, "the active player" in an ability is one of the active team's
++     * players, chosen by the ability's controller. Runs the action with the given player as the
++     * active player getActivePlayerId names, when that player is one of the active team's other
++     * players (805.4d: a step trigger of that player's step); otherwise simply runs it.
++     */
++    default <T> T asActivePlayer(UUID playerId, java.util.function.Supplier<T> action) {
++        return action.get();
++    }
++
++    /**
++     * 810.10, 810.10a: the poison counters an effect or rule counts for a player: their own and,
++     * with shared team poison, their teammates' (the team's).
++     */
++    default int getPoisonCounters(UUID playerId) {
++        int counters = 0;
++        for (UUID teamPlayerId : getTeam(playerId)) {
++            Player teamPlayer = getPlayer(teamPlayerId);
++            if (teamPlayer != null) {
++                counters += teamPlayer.getCountersCount(CounterType.POISON);
++            }
++        }
++        return counters;
++    }
++
++    /** 704.5c: a player with ten or more poison counters loses; a team game may need more (810.8d). */
++    default int getPoisonCountersToLose() {
++        return 10;
++    }
++
++    /**
++     * 810.9d: with a shared team life total, an effect that sets each player's life total sets one
++     * player's of each team, whom the team chooses (its first player of the given ones chooses, when
++     * its players' new totals differ). Of the given players, the ones whose life total to set: every
++     * one outside team games.
++     */
++    default List<UUID> chooseLifeTotalsToSet(List<UUID> playerIds, java.util.function.ToIntFunction<UUID> newLife) {
++        List<UUID> chosen = new ArrayList<>();
++        Set<UUID> decided = new HashSet<>();
++        for (UUID playerId : playerIds) {
++            if (decided.contains(playerId)) {
++                continue;
++            }
++            List<UUID> team = playerIds.stream().filter(getTeam(playerId)::contains).collect(Collectors.toList());
++            decided.addAll(team);
++            UUID pick = playerId;
++            Player chooser = getPlayer(playerId);
++            if (chooser != null && team.stream().mapToInt(newLife).distinct().count() > 1) {
++                Map<String, UUID> options = new LinkedHashMap<>();
++                for (UUID teamPlayerId : team) {
++                    Player teamPlayer = getPlayer(teamPlayerId);
++                    if (teamPlayer != null) {
++                        options.put(newLife.applyAsInt(teamPlayerId) + " life (" + teamPlayer.getName() + ")", teamPlayerId);
++                    }
++                }
++                mage.choices.Choice choice = new mage.choices.ChoiceImpl(true);
++                choice.setMessage("Your team's life total becomes which player's?");
++                choice.setChoices(new LinkedHashSet<>(options.keySet()));
++                if (chooser.choose(Outcome.Neutral, choice, this) && options.containsKey(choice.getChoice())) {
++                    pick = options.get(choice.getChoice());
++                }
++            }
++            chosen.add(pick);
++        }
++        return chosen;
++    }
++
+     /**
+      * Checks if the given playerToCheckId is an opponent of player. Every other
+      * player is an opponent, except teammates in a team game (see
+diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
+index 24eee397..3d5265bc 100644
+--- a/Mage/src/main/java/mage/game/GameImpl.java
++++ b/Mage/src/main/java/mage/game/GameImpl.java
+@@ -164,6 +164,10 @@ public abstract class GameImpl implements Game {
+     private final int minimumDeckSize;
+     protected transient PlayerList playerList; // auto-generated from state, don't copy
+ 
++    // 805.9: while an ability acts for one of the active team's other players (asActivePlayer), that
++    // player is the active player; not copied, so a copy of the game names the turn's holder
++    private transient UUID abilityActivePlayerId;
++
+     // infinite loop check (temporary data, do not copy)
+     private transient int infiniteLoopCounter; // used to check if the game is in an infinite loop
+     private transient int lastNumberOfAbilitiesOnTheStack; // used to check how long no new ability was put to stack
+@@ -1112,8 +1116,13 @@ public abstract class GameImpl implements Game {
+                 }
+ 
+                 GameEvent event = new GameEvent(GameEvent.EventType.PLAY_TURN, null, null, playerByOrder.getId());
+-                if (!isTeamTurnTaken(playerByOrder.getId()) && !replaceEvent(event)) {
+-                    if (!playTurn(playerByOrder)) {
++                if (!isTeamTurnTaken(playerByOrder.getId())) {
++                    if (replaceEvent(event) || isTeamTurnSkipped(playerByOrder.getId())) {
++                        // 805.8: with shared team turns, the team skipped its turn: it has had it
++                        if (!getTeammates(playerByOrder.getId()).isEmpty()) {
++                            state.setActivePlayerId(playerByOrder.getId());
++                        }
++                    } else if (!playTurn(playerByOrder)) {
+                         break;
+                     }
+                 }
+@@ -1162,6 +1171,18 @@ public abstract class GameImpl implements Game {
+                 && (lastActivePlayerId.equals(playerId) || teammates.contains(lastActivePlayerId));
+     }
+ 
++    /** 805.8: with shared team turns, a turn a teammate of the player skips (Time Vault) is the team's. */
++    private boolean isTeamTurnSkipped(UUID playerId) {
++        for (UUID teammateId : getTeammates(playerId)) {
++            Player teammate = getPlayer(teammateId);
++            if (teammate != null && teammate.isInGame()
++                    && replaceEvent(new GameEvent(GameEvent.EventType.PLAY_TURN, null, null, teammateId))) {
++                return true;
++            }
++        }
++        return false;
++    }
++
+     private boolean playExtraTurns() {
+         //20091005 - 500.7
+         TurnMod extraTurn = useNextExtraTurn();
+@@ -2481,16 +2502,18 @@ public abstract class GameImpl implements Game {
+     }
+ 
+     /**
+-     * The poison counters that count towards the player's loss (704.5c): their own. A team game
+-     * counts its team's (810.10, 704.6b).
++     * 704.5a, 810.8a: a player with 0 or less life loses, unless an effect says they don't lose for
++     * it (Transcendence and the like). With a shared life total, such an effect on any player of the
++     * team keeps the whole team in the game.
+      */
+-    protected int getPoisonCounters(Player player) {
+-        return player.getCountersCount(CounterType.POISON);
+-    }
+-
+-    /** 704.5c: ten poison counters; a team game may need more (810.8d). */
+-    protected int getPoisonCountersToLose() {
+-        return 10;
++    private boolean losesForZeroOrLessLife(Player player) {
++        for (UUID teamPlayerId : getTeam(player.getId())) {
++            Player teamPlayer = getPlayer(teamPlayerId);
++            if (teamPlayer != null && teamPlayer.isInGame() && !teamPlayer.canLoseByZeroOrLessLife()) {
++                return false;
++            }
++        }
++        return true;
+     }
+ 
+     /**
+@@ -2509,13 +2532,14 @@ public abstract class GameImpl implements Game {
+         for (Player player : state.getPlayers().values()) {
+             if (!player.hasLost()) {
+                 String lostReason = "";
+-                if (player.getLife() <= 0 && player.canLoseByZeroOrLessLife()) {
++                if (player.getLife() <= 0 && losesForZeroOrLessLife(player)) {
+                     lostReason = "to having 0 or less life";
+                 }
+                 if (player.getLibrary().isEmptyDraw()) {
+                     lostReason = "drawing from an empty library";
+                 }
+-                if (getPoisonCounters(player) >= getPoisonCountersToLose()) {
++                // 810.10, 810.8d: with shared team poison, the team's counters against the format's count
++                if (getPoisonCounters(player.getId()) >= getPoisonCountersToLose()) {
+                     lostReason = "to having " + getPoisonCountersToLose() + " or more poison counters";
+                 }
+                 if (!lostReason.isEmpty() && player.lost(this)) {
+@@ -3632,7 +3656,21 @@ public abstract class GameImpl implements Game {
+ 
+     @Override
+     public UUID getActivePlayerId() {
+-        return state.getActivePlayerId();
++        return abilityActivePlayerId != null ? abilityActivePlayerId : state.getActivePlayerId();
++    }
++
++    @Override
++    public <T> T asActivePlayer(UUID playerId, java.util.function.Supplier<T> action) {
++        if (playerId == null || playerId.equals(getActivePlayerId()) || !isActivePlayer(playerId)) {
++            return action.get();
++        }
++        UUID previous = abilityActivePlayerId;
++        abilityActivePlayerId = playerId;
++        try {
++            return action.get();
++        } finally {
++            abilityActivePlayerId = previous;
++        }
+     }
+ 
+     @Override
+diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
+index fa416dab..9045c7f4 100644
+--- a/Mage/src/main/java/mage/game/combat/Combat.java
++++ b/Mage/src/main/java/mage/game/combat/Combat.java
+@@ -1943,6 +1943,50 @@ public class Combat implements Serializable, Copyable<Combat> {
+         return attackingPlayerId;
+     }
+ 
++    /**
++     * 805.10a: with shared team turns, each player of the active team is an attacking player. Whether
++     * the given player is one; outside team games, whether they are the attacking player.
++     */
++    public boolean isAttackingPlayer(UUID playerId, Game game) {
++        return attackingPlayerId != null && game.getTeam(attackingPlayerId).contains(playerId);
++    }
++
++    /**
++     * The attacking creatures the given attacking player attacks with: with shared team turns, those
++     * that player controls (805.10a); otherwise every attacking creature.
++     */
++    public Set<UUID> getAttackers(UUID playerId, Game game) {
++        Set<UUID> attackers = getAttackers();
++        if (attackingPlayerId != null && !game.getTeammates(attackingPlayerId).isEmpty()) {
++            attackers.removeIf(attackerId -> {
++                Permanent attacker = game.getPermanent(attackerId);
++                return attacker == null || !attacker.isControlledBy(playerId);
++            });
++        }
++        return attackers;
++    }
++
++    /**
++     * 805.10c: with shared team turns, "the attacking player" for a defending player is the controller
++     * of a creature attacking that player (or a planeswalker or battle of theirs). Otherwise, and when
++     * none attacks that player, the attacking player.
++     */
++    public UUID getAttackingPlayerOf(UUID defendingPlayerId, Game game) {
++        if (attackingPlayerId != null && !game.getTeammates(attackingPlayerId).isEmpty()) {
++            for (CombatGroup group : groups) {
++                if (defendingPlayerId.equals(group.getDefendingPlayerId())) {
++                    for (UUID attackerId : group.getAttackers()) {
++                        Permanent attacker = game.getPermanent(attackerId);
++                        if (attacker != null) {
++                            return attacker.getControllerId();
++                        }
++                    }
++                }
++            }
++        }
++        return attackingPlayerId;
++    }
++
+     public Map<UUID, Set<UUID>> getCreaturesForcedToAttack() {
+         return creaturesForcedToAttack;
+     }
+diff --git a/Mage/src/main/java/mage/game/combat/CombatGroup.java b/Mage/src/main/java/mage/game/combat/CombatGroup.java
+index 5f4ed13d..7ab51855 100644
+--- a/Mage/src/main/java/mage/game/combat/CombatGroup.java
++++ b/Mage/src/main/java/mage/game/combat/CombatGroup.java
+@@ -459,7 +459,7 @@ public class CombatGroup implements Serializable, Copyable<CombatGroup> {
+             return;
+         }
+         //Handle Banding
+-        Player player = game.getPlayer(attackerAssignsCombatDamage(game) ? game.getCombat().getAttackingPlayerId() : blocker.getControllerId());
++        Player player = game.getPlayer(attackerAssignsCombatDamage(game) ? getAttackingPlayerId(game) : blocker.getControllerId());
+         int damage = getDamageValueFromPermanent(blocker, game);
+ 
+         if (dealsDamageThisStep(blocker, first, game)) {
+@@ -546,6 +546,23 @@ public class CombatGroup implements Serializable, Copyable<CombatGroup> {
+         }
+     }
+ 
++    /**
++     * 805.10c: with shared team turns, the attacking player that a blocker's damage concerns is the
++     * controller of the attacking creature it blocks. Otherwise the combat's attacking player.
++     */
++    private UUID getAttackingPlayerId(Game game) {
++        UUID attackingPlayerId = game.getCombat().getAttackingPlayerId();
++        if (attackingPlayerId != null && !game.getTeammates(attackingPlayerId).isEmpty()) {
++            for (UUID attackerId : attackers) {
++                Permanent attacker = game.getPermanent(attackerId);
++                if (attacker != null) {
++                    return attacker.getControllerId();
++                }
++            }
++        }
++        return attackingPlayerId;
++    }
++
+     public boolean canBlock(Permanent blocker, Game game) {
+         // player can't block if another player is attacked, unless that player is a teammate (805.10d)
+         if (!defendingPlayerId.equals(blocker.getControllerId())
+@@ -853,7 +870,7 @@ public class CombatGroup implements Serializable, Copyable<CombatGroup> {
+     public boolean assignsDefendingPlayerAndOrDefendingCreaturesDividedDamage(Permanent creature, UUID playerId, boolean first, Game game, boolean isAttacking) {
+         // for handling Butcher Orgg
+         if (creature.getAbilities().containsKey(ControllerDivideCombatDamageAbility.getInstance().getId())) {
+-            Player player = game.getPlayer(defenderAssignsCombatDamage(game) ? defendingPlayerId : (!isAttacking && attackerAssignsCombatDamage(game) ? game.getCombat().getAttackingPlayerId() : playerId));
++            Player player = game.getPlayer(defenderAssignsCombatDamage(game) ? defendingPlayerId : (!isAttacking && attackerAssignsCombatDamage(game) ? getAttackingPlayerId(game) : playerId));
+             // 10/4/2004 	If it is blocked but then all of its blockers are removed before combat damage is assigned, then it won't be able to deal combat damage and you won't be able to use its ability.
+             // (same principle should apply if it's blocking and its blocked attacker is removed from combat)
+             if (!((blocked && blockers.isEmpty() && isAttacking) || (attackers.isEmpty() && !isAttacking)) && dealsDamageThisStep(creature, first, game)) {
+diff --git a/Mage/src/main/java/mage/game/events/TeamStepEvent.java b/Mage/src/main/java/mage/game/events/TeamStepEvent.java
+new file mode 100755
+index 00000000..8660e997
+--- /dev/null
++++ b/Mage/src/main/java/mage/game/events/TeamStepEvent.java
+@@ -0,0 +1,55 @@
++package mage.game.events;
++
++import mage.game.Game;
++import mage.players.Player;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.EnumSet;
++import java.util.List;
++import java.util.Set;
++import java.util.UUID;
++import java.util.stream.Collectors;
++
++/**
++ * 805.4d: with shared team turns (rule 805), a step or phase of the team's turn is each of its
++ * players' step or phase. The game fires the beginning of a step once, for the player who holds the
++ * team's turn; triggered abilities are also checked against this event for each of the active team's
++ * other players (TriggeredAbilities, DelayedTriggeredAbilities). While such an event is checked, and
++ * while an ability it triggered is put on the stack and resolves, that player is the active player
++ * for the ability (805.9, Game.asActivePlayer).
++ */
++public class TeamStepEvent extends GameEvent {
++
++    /** The events that begin a step or a phase. */
++    private static final Set<EventType> STEP_STARTS = Arrays.stream(EventType.values())
++            .filter(type -> type.name().endsWith("_STEP_PRE") || type.name().endsWith("_PHASE_PRE"))
++            .collect(Collectors.toCollection(() -> EnumSet.noneOf(EventType.class)));
++
++    public TeamStepEvent(GameEvent event, UUID playerId) {
++        super(event.getType(), event.getTargetId(), null, playerId);
++    }
++
++    /**
++     * The given event and, when it begins a step or phase of a team's turn, that step for each of the
++     * active team's other players still in the game. Just the event outside team games.
++     */
++    public static List<GameEvent> withTeamSteps(GameEvent event, Game game) {
++        List<GameEvent> events = new ArrayList<>(1);
++        events.add(event);
++        if (!STEP_STARTS.contains(event.getType())) {
++            return events;
++        }
++        UUID turnPlayerId = event.getPlayerId();
++        if (turnPlayerId == null || !turnPlayerId.equals(game.getState().getActivePlayerId())) {
++            return events;
++        }
++        for (UUID teammateId : game.getTeammates(turnPlayerId)) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null && teammate.isInGame()) {
++                events.add(new TeamStepEvent(event, teammateId));
++            }
++        }
++        return events;
++    }
++}
+diff --git a/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java b/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java
+index 593d8219..a03db06a 100644
+--- a/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java
++++ b/Mage/src/main/java/mage/game/permanent/token/TokenImpl.java
+@@ -448,7 +448,8 @@ public abstract class TokenImpl extends MageObjectImpl implements Token {
+                 }
+ 
+                 // must attack
+-                if (attacking && game.getCombat() != null && game.getActivePlayerId().equals(permanent.getControllerId())) {
++                // 805.10a: with shared team turns, each player of the active team is an attacking player
++                if (attacking && game.getCombat() != null && game.isActivePlayer(permanent.getControllerId())) {
+                     game.getCombat().addAttackingCreature(permanent.getId(), game, attackedPlayer);
+                 }
+ 
+diff --git a/Mage/src/main/java/mage/game/turn/Phase.java b/Mage/src/main/java/mage/game/turn/Phase.java
+index 38394cac..e6bcba73 100644
+--- a/Mage/src/main/java/mage/game/turn/Phase.java
++++ b/Mage/src/main/java/mage/game/turn/Phase.java
+@@ -86,7 +86,8 @@ public abstract class Phase implements Serializable {
+                     continue;
+                 }
+                 currentStep = step;
+-                TurnMod skipStepMod = game.getState().getTurnMods().useNextSkipStep(activePlayerId, getStep().getType());
++                TurnMod skipStepMod = TurnMods.useNextForTeam(game, activePlayerId,
++                        playerId -> game.getState().getTurnMods().useNextSkipStep(playerId, getStep().getType()));
+                 if (skipStepMod == null) {
+                     playStep(game);
+                     if (game.executingRollback()) {
+@@ -146,7 +147,8 @@ public abstract class Phase implements Serializable {
+                 return false;
+             }
+             currentStep = step;
+-            TurnMod skipStepMod = game.getState().getTurnMods().useNextSkipStep(activePlayerId, currentStep.getType());
++            TurnMod skipStepMod = TurnMods.useNextForTeam(game, activePlayerId,
++                    playerId -> game.getState().getTurnMods().useNextSkipStep(playerId, currentStep.getType()));
+             if (skipStepMod == null) {
+                 playStep(game);
+                 if (game.executingRollback()) {
+@@ -173,13 +175,23 @@ public abstract class Phase implements Serializable {
+     }
+ 
+     public boolean beginPhase(Game game, UUID activePlayerId) {
+-        if (!game.replaceEvent(new GameEvent(event, null, null, activePlayerId))) {
++        if (!skipPhase(game, activePlayerId)) {
+             game.fireEvent(new GameEvent(preEvent, null, null, activePlayerId));
+             return true;
+         }
+         return false;
+     }
+ 
++    /** 805.8: with shared team turns, a phase any player of the active team skips is the team's. */
++    private boolean skipPhase(Game game, UUID activePlayerId) {
++        for (UUID playerId : game.getTeam(activePlayerId)) {
++            if (game.replaceEvent(new GameEvent(event, null, null, playerId))) {
++                return true;
++            }
++        }
++        return false;
++    }
++
+     public void endPhase(Game game, UUID activePlayerId) {
+         game.fireEvent(new GameEvent(postEvent, null, null, activePlayerId));
+         game.getState().getTriggers().removeAbilitiesOfNonExistingSources(game); // e.g. tokens that left the battlefield
+@@ -240,7 +252,9 @@ public abstract class Phase implements Serializable {
+ 
+     private void playExtraSteps(Game game, PhaseStep afterStep) {
+         while (true) {
+-            TurnMod extraStepMod = game.getState().getTurnMods().useNextExtraStep(activePlayerId, afterStep);
++            PhaseStep previousStep = afterStep;
++            TurnMod extraStepMod = TurnMods.useNextForTeam(game, activePlayerId,
++                    playerId -> game.getState().getTurnMods().useNextExtraStep(playerId, previousStep));
+             if (extraStepMod == null) {
+                 return;
+             }
+diff --git a/Mage/src/main/java/mage/game/turn/Step.java b/Mage/src/main/java/mage/game/turn/Step.java
+index 56c18402..9c9ad446 100644
+--- a/Mage/src/main/java/mage/game/turn/Step.java
++++ b/Mage/src/main/java/mage/game/turn/Step.java
+@@ -80,7 +80,13 @@ public abstract class Step implements Serializable, Copyable<Step> {
+     }
+ 
+     public boolean skipStep(Game game, UUID activePlayerId) {
+-        return game.replaceEvent(new GameEvent(stepEvent, null, null, activePlayerId));
++        // 805.8: with shared team turns, a step any player of the active team skips is the team's
++        for (UUID playerId : game.getTeam(activePlayerId)) {
++            if (game.replaceEvent(new GameEvent(stepEvent, null, null, playerId))) {
++                return true;
++            }
++        }
++        return false;
+     }
+ 
+     public boolean getHasPriority() {
+diff --git a/Mage/src/main/java/mage/game/turn/Turn.java b/Mage/src/main/java/mage/game/turn/Turn.java
+index 4c3ee3b5..db960d14 100644
+--- a/Mage/src/main/java/mage/game/turn/Turn.java
++++ b/Mage/src/main/java/mage/game/turn/Turn.java
+@@ -88,7 +88,8 @@ public class Turn implements Serializable {
+             return false;
+         }
+ 
+-        TurnMod skipTurnMod = game.getState().getTurnMods().useNextSkipTurn(activePlayer.getId());
++        TurnMod skipTurnMod = TurnMods.useNextForTeam(game, activePlayer.getId(),
++                game.getState().getTurnMods()::useNextSkipTurn);
+         if (skipTurnMod != null) {
+             game.informPlayers(String.format("%s skips their turn%s",
+                     activePlayer.getLogName(),
+@@ -127,7 +128,8 @@ public class Turn implements Serializable {
+             }
+             currentPhase = phase;
+ 
+-            TurnMod skipPhaseMod = game.getState().getTurnMods().useNextSkipPhase(activePlayer.getId(), currentPhase.getType());
++            TurnMod skipPhaseMod = TurnMods.useNextForTeam(game, activePlayer.getId(),
++                    playerId -> game.getState().getTurnMods().useNextSkipPhase(playerId, currentPhase.getType()));
+             if (skipPhaseMod != null) {
+                 game.informPlayers(String.format("%s skips %s phase%s",
+                         activePlayer.getLogName(),
+@@ -173,7 +175,9 @@ public class Turn implements Serializable {
+         } while (nextPhase.type != needPhaseType);
+ 
+         // play first phase
+-        TurnMod skipPhaseMod = game.getState().getTurnMods().useNextSkipPhase(activePlayerId, nextPhase.getType());
++        Phase firstPhase = nextPhase;
++        TurnMod skipPhaseMod = TurnMods.useNextForTeam(game, activePlayerId,
++                playerId -> game.getState().getTurnMods().useNextSkipPhase(playerId, firstPhase.getType()));
+         if (skipPhaseMod != null && activePlayer != null) {
+             game.informPlayers(String.format("%s skips %s phase%s",
+                     activePlayer.getLogName(),
+@@ -200,7 +204,9 @@ public class Turn implements Serializable {
+             if (game.isPaused() || game.checkIfGameIsOver()) {
+                 return;
+             }
+-            skipPhaseMod = game.getState().getTurnMods().useNextSkipPhase(activePlayerId, nextPhase.getType());
++            Phase phaseToPlay = nextPhase;
++            skipPhaseMod = TurnMods.useNextForTeam(game, activePlayerId,
++                    playerId -> game.getState().getTurnMods().useNextSkipPhase(playerId, phaseToPlay.getType()));
+             if (skipPhaseMod != null && activePlayer != null) {
+                 game.informPlayers(String.format("%s skips %s phase%s",
+                         activePlayer.getLogName(),
+@@ -250,10 +256,29 @@ public class Turn implements Serializable {
+         });
+ 
+         // add new under control
+-        TurnMod newControllerMod = game.getState().getTurnMods().useNextNewController(activePlayerId);
+-        if (newControllerMod != null && !newControllerMod.getNewControllerId().equals(activePlayerId)) {
+-            // game logs added in child's call (controlPlayersTurn)
+-            game.getPlayer(newControllerMod.getNewControllerId()).controlPlayersTurn(game, activePlayerId, newControllerMod.getInfo());
++        // 805.8: with shared team turns, controlling a player controls their whole team: the last
++        // player-controlling effect created for any player of the active team works for all of them
++        TurnMods turnMods = game.getState().getTurnMods();
++        TurnMod newControllerMod = null;
++        int newest = -1;
++        for (UUID teamPlayerId : game.getTeam(activePlayerId)) {
++            int index = turnMods.lastNewControllerIndex(teamPlayerId);
++            TurnMod turnMod = turnMods.useNextNewController(teamPlayerId);
++            if (turnMod != null && index > newest) {
++                newControllerMod = turnMod;
++                newest = index;
++            }
++        }
++        if (newControllerMod != null) {
++            UUID newControllerId = newControllerMod.getNewControllerId();
++            for (UUID teamPlayerId : game.getTeam(activePlayerId)) {
++                Player teamPlayer = game.getPlayer(teamPlayerId);
++                if (!newControllerId.equals(teamPlayerId) && teamPlayer != null
++                        && (teamPlayerId.equals(activePlayerId) || teamPlayer.isInGame())) {
++                    // game logs added in child's call (controlPlayersTurn)
++                    game.getPlayer(newControllerId).controlPlayersTurn(game, teamPlayerId, newControllerMod.getInfo());
++                }
++            }
+         }
+     }
+ 
+@@ -270,7 +295,9 @@ public class Turn implements Serializable {
+      */
+     private boolean playExtraPhases(Game game, TurnPhase afterPhase) {
+         while (true) {
+-            TurnMod extraPhaseMod = game.getState().getTurnMods().useNextExtraPhase(activePlayerId, afterPhase);
++            TurnPhase previousPhase = afterPhase;
++            TurnMod extraPhaseMod = TurnMods.useNextForTeam(game, activePlayerId,
++                    playerId -> game.getState().getTurnMods().useNextExtraPhase(playerId, previousPhase));
+             if (extraPhaseMod == null) {
+                 // no more extra phases
+                 return false;
+diff --git a/Mage/src/main/java/mage/game/turn/TurnMods.java b/Mage/src/main/java/mage/game/turn/TurnMods.java
+index 6019143f..db3e45a9 100644
+--- a/Mage/src/main/java/mage/game/turn/TurnMods.java
++++ b/Mage/src/main/java/mage/game/turn/TurnMods.java
+@@ -2,12 +2,14 @@ package mage.game.turn;
+ 
+ import mage.constants.PhaseStep;
+ import mage.constants.TurnPhase;
++import mage.game.Game;
+ import mage.util.Copyable;
+ 
+ import java.io.Serializable;
+ import java.util.ArrayList;
+ import java.util.ListIterator;
+ import java.util.UUID;
++import java.util.function.Function;
+ 
+ /**
+  * Turn, phase and step modification for extra/skip (use it for one time mod only)
+@@ -37,6 +39,33 @@ public class TurnMods extends ArrayList<TurnMod> implements Serializable, Copyab
+         return super.add(turnMod);
+     }
+ 
++    /**
++     * 805.8: with shared team turns, an effect that gives a player an extra phase or step, or makes
++     * them skip a turn, phase or step, gives it to (or makes skip) their whole team. Uses the next
++     * modification of the active player or, failing that, of one of their teammates. Outside team
++     * games, just the active player's.
++     */
++    public static TurnMod useNextForTeam(Game game, UUID activePlayerId, Function<UUID, TurnMod> useNext) {
++        for (UUID playerId : game.getTeam(activePlayerId)) {
++            TurnMod turnMod = useNext.apply(playerId);
++            if (turnMod != null) {
++                return turnMod;
++            }
++        }
++        return null;
++    }
++
++    /** The position of the last player-controlling modification of the player, or -1 for none. */
++    public int lastNewControllerIndex(UUID playerId) {
++        for (int index = this.size() - 1; index >= 0; index--) {
++            TurnMod turnMod = this.get(index);
++            if (turnMod.getNewControllerId() != null && turnMod.getPlayerId().equals(playerId)) {
++                return index;
++            }
++        }
++        return -1;
++    }
++
+     public TurnMod useNextExtraTurn() {
+         ListIterator<TurnMod> it = this.listIterator(this.size());
+         while (it.hasPrevious()) {
+diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
+index 91297a1b..4c342403 100644
+--- a/Mage/src/main/java/mage/players/PlayerImpl.java
++++ b/Mage/src/main/java/mage/players/PlayerImpl.java
+@@ -2393,6 +2393,9 @@ public abstract class PlayerImpl implements Player, Serializable {
+ 
+     @Override
+     public void exchangeLife(Player player, Ability source, Game game) {
++        if (game.getTeammates(playerId).contains(player.getId())) {
++            return; // 810.9e: teammates share their life total, so it can't be exchanged between them
++        }
+         int lifePlayer1 = getLife();
+         int lifePlayer2 = player.getLife();
+         if ((lifePlayer1 != lifePlayer2 && this.isLifeTotalCanChange() && player.isLifeTotalCanChange())
+@@ -2568,6 +2571,23 @@ public abstract class PlayerImpl implements Player, Serializable {
+ 
+     @Override
+     public void loseCounters(String counterName, int amount, Ability source, Game game) {
++        // 810.10b: with shared team poison, the team loses the poison counters a player loses
++        int own = this.counters.getCount(counterName);
++        if (amount > own && CounterType.POISON.getName().equals(counterName) && !game.getTeammates(playerId).isEmpty()) {
++            int rest = amount - own;
++            if (own > 0) {
++                loseCounters(counterName, own, source, game);
++            }
++            for (UUID teammateId : game.getTeammates(playerId)) {
++                Player teammate = game.getPlayer(teammateId);
++                int theirs = teammate == null ? 0 : Math.min(rest, teammate.getCountersCount(counterName));
++                if (theirs > 0) {
++                    teammate.loseCounters(counterName, theirs, source, game);
++                    rest -= theirs;
++                }
++            }
++            return;
++        }
+ 
+         GameEvent removeCountersEvent = new RemoveCountersEvent(counterName, this, source, amount, false);
+         if (game.replaceEvent(removeCountersEvent)) {
+@@ -2608,6 +2628,12 @@ public abstract class PlayerImpl implements Player, Serializable {
+ 
+     @Override
+     public int loseAllCounters(String counterName, Ability source, Game game) {
++        if (CounterType.POISON.getName().equals(counterName) && !game.getTeammates(playerId).isEmpty()) {
++            // 810.10a, 810.10b: with shared team poison, a player's poison counters are the team's
++            int teamBefore = game.getPoisonCounters(playerId);
++            loseCounters(counterName, teamBefore, source, game);
++            return Math.max(0, teamBefore - game.getPoisonCounters(playerId));
++        }
+         int amountBefore = getCountersCount(counterName);
+         loseCounters(counterName, amountBefore, source, game);
+         int amountAfter = getCountersCount(counterName);
+@@ -2866,7 +2892,23 @@ public abstract class PlayerImpl implements Player, Serializable {
+     @Override
+     public boolean canLose(Game game) {
+         return hasLeft() // If a player concedes or has left the match they lose also if effect would say otherwise
+-                || !game.replaceEvent(new GameEvent(GameEvent.EventType.LOSES, null, null, playerId));
++                || (!game.replaceEvent(new GameEvent(GameEvent.EventType.LOSES, null, null, playerId))
++                && teamAllowsResult(game, GameEvent.EventType.LOSES));
++    }
++
++    /**
++     * 810.8a: players win and lose as a team; if an effect says a player can't lose (or can't win)
++     * the game, no one on that player's team can. Always true outside team games.
++     */
++    private boolean teamAllowsResult(Game game, GameEvent.EventType result) {
++        for (UUID teammateId : game.getTeammates(playerId)) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null && teammate.isInGame()
++                    && game.replaceEvent(new GameEvent(result, null, null, teammateId))) {
++                return false;
++            }
++        }
++        return true;
+     }
+ 
+     @Override
+@@ -2882,7 +2924,8 @@ public abstract class PlayerImpl implements Player, Serializable {
+         }
+         if (!opponentInGame
+                 || // if no more opponent is in game the wins event may no longer be replaced
+-                !game.replaceEvent(new GameEvent(GameEvent.EventType.WINS, null, null, playerId))) {
++                (!game.replaceEvent(new GameEvent(GameEvent.EventType.WINS, null, null, playerId))
++                        && teamAllowsResult(game, GameEvent.EventType.WINS))) {
+             logger.debug("player won -> start: " + this.getName());
+             if (!this.loses) {
+                 //20130501 - 800.7, 801.16
+diff --git a/Mage/src/main/java/mage/watchers/common/AttackedLastTurnWatcher.java b/Mage/src/main/java/mage/watchers/common/AttackedLastTurnWatcher.java
+index c636f31d..bc050fcf 100644
+--- a/Mage/src/main/java/mage/watchers/common/AttackedLastTurnWatcher.java
++++ b/Mage/src/main/java/mage/watchers/common/AttackedLastTurnWatcher.java
+@@ -29,26 +29,37 @@ public class AttackedLastTurnWatcher extends Watcher {
+     @Override
+     public void watch(GameEvent event, Game game) {
+         if (event.getType() == GameEvent.EventType.BEGINNING_PHASE_PRE) {
+-            UUID activePlayer = game.getActivePlayerId();
+-            if (attackedThisTurnCreatures.containsKey(activePlayer)) {
+-                if (attackedThisTurnCreatures.get(activePlayer) != null) {
+-                    attackedLastTurnCreatures.put(activePlayer, getAttackedThisTurnCreatures(activePlayer));
+-                }
+-                attackedThisTurnCreatures.remove(activePlayer);
+-            } else { // } else if (attackedLastTurnCreatures.containsKey(activePlayer)) {
+-                attackedLastTurnCreatures.remove(activePlayer);
++            // 805.4: with shared team turns, the turn is each player's of the active team
++            for (UUID activePlayer : game.getTeam(game.getActivePlayerId())) {
++                startTurn(activePlayer);
+             }
+         }
+         if (event.getType() == GameEvent.EventType.DECLARED_ATTACKERS) {
+-            UUID attackingPlayer = game.getCombat().getAttackingPlayerId();
+-            Set<MageObjectReference> attackingCreatures = getAttackedThisTurnCreatures(attackingPlayer);
+-            for (UUID attackerId : game.getCombat().getAttackers()) {
+-                Permanent attacker = game.getPermanent(attackerId);
+-                if (attacker != null) {
+-                    attackingCreatures.add(new MageObjectReference(attacker, game));
++            // 805.10a: with shared team turns, each player of the active team is an attacking player,
++            // who attacked with the creatures they control
++            UUID attackingPlayerId = game.getCombat().getAttackingPlayerId();
++            boolean team = !game.getTeammates(attackingPlayerId).isEmpty();
++            for (UUID attackingPlayer : game.getTeam(attackingPlayerId)) {
++                Set<MageObjectReference> attackingCreatures = getAttackedThisTurnCreatures(attackingPlayer);
++                for (UUID attackerId : game.getCombat().getAttackers()) {
++                    Permanent attacker = game.getPermanent(attackerId);
++                    if (attacker != null && (!team || attacker.isControlledBy(attackingPlayer))) {
++                        attackingCreatures.add(new MageObjectReference(attacker, game));
++                    }
+                 }
++                attackedThisTurnCreatures.put(attackingPlayer, attackingCreatures);
++            }
++        }
++    }
++
++    private void startTurn(UUID activePlayer) {
++        if (attackedThisTurnCreatures.containsKey(activePlayer)) {
++            if (attackedThisTurnCreatures.get(activePlayer) != null) {
++                attackedLastTurnCreatures.put(activePlayer, getAttackedThisTurnCreatures(activePlayer));
+             }
+-            attackedThisTurnCreatures.put(attackingPlayer, attackingCreatures);
++            attackedThisTurnCreatures.remove(activePlayer);
++        } else { // } else if (attackedLastTurnCreatures.containsKey(activePlayer)) {
++            attackedLastTurnCreatures.remove(activePlayer);
+         }
+     }
+ 
+diff --git a/Mage/src/main/java/mage/watchers/common/EndStepCountWatcher.java b/Mage/src/main/java/mage/watchers/common/EndStepCountWatcher.java
+index 1dea7622..1ea2fab6 100644
+--- a/Mage/src/main/java/mage/watchers/common/EndStepCountWatcher.java
++++ b/Mage/src/main/java/mage/watchers/common/EndStepCountWatcher.java
+@@ -27,7 +27,10 @@ public class EndStepCountWatcher extends Watcher {
+     @Override
+     public void watch(GameEvent event, Game game) {
+         if (event.getType() == GameEvent.EventType.END_TURN_STEP_PRE) {
+-            playerMap.compute(game.getActivePlayerId(), CardUtil::setOrIncrementValue);
++            // 805.4: with shared team turns, the end step of the team's turn is each of its players'
++            for (UUID playerId : game.getTeam(game.getActivePlayerId())) {
++                playerMap.compute(playerId, CardUtil::setOrIncrementValue);
++            }
+         }
+     }
+ 
