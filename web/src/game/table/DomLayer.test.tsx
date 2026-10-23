@@ -441,6 +441,99 @@ describe("the table's DOM layer", () => {
   });
 });
 
+describe("a Two-Headed Giant teammate's hand (v0.5.1)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("lists the teammate's cards in their article, after their board, each named and never offered", () => {
+    const { model, game } = fixture("giant");
+    const mate = screen.getByRole("article", {
+      name: "Bot 2, seat 2, your teammate",
+    });
+    const rows = within(mate)
+      .getAllByRole("group")
+      .map((group) => group.getAttribute("aria-label"));
+    expect(rows).toEqual([
+      "Bot 2's battlefield: creatures and other permanents",
+      "Bot 2's battlefield: lands",
+      "Bot 2's hand",
+    ]);
+    const hand = within(mate).getByRole("group", { name: "Bot 2's hand" });
+    const cards = within(hand).getAllByRole("button");
+    expect(cards.map((button) => button.getAttribute("aria-label"))).toEqual(
+      model.opponents[0].hand!.map((key) => {
+        const card = model.cards.get(key)!;
+        return cardLabel(card.card, card.located);
+      }),
+    );
+    expect(cards[0]).toHaveAccessibleName("Lightning Bolt, Instant");
+    for (const button of cards) {
+      expect(button).toHaveAttribute("data-role", "teammate-hand");
+      expect(button).not.toHaveAttribute("data-actionable");
+      expect(button).not.toHaveAttribute("aria-haspopup");
+      // The dom painter paints each face.
+      expect(button.querySelector("img")).not.toBeNull();
+    }
+    // Pressing one only shows it: nothing is played.
+    fireEvent.click(cards[0]);
+    expect(game.choose).not.toHaveBeenCalled();
+    expect(game.zoom).toHaveBeenCalledWith(
+      model.cards.get(model.opponents[0].hand![0])!.card,
+      model.cards.get(model.opponents[0].hand![0])!.located,
+    );
+    // No other article holds a hand.
+    for (const name of [
+      "Bot 3, seat 3, the other team",
+      "Bot 4, seat 4, the other team",
+    ])
+      expect(
+        within(screen.getByRole("article", { name })).queryByRole("group", {
+          name: /hand/,
+        }),
+      ).toBeNull();
+  });
+
+  it("is one tab stop, the arrow keys moving along it", () => {
+    fixture("giant");
+    const hand = screen.getByRole("group", { name: "Bot 2's hand" });
+    const cards = within(hand).getAllByRole("button");
+    expect(cards.filter((button) => button.tabIndex === 0)).toHaveLength(1);
+    cards[0].focus();
+    fireEvent.keyDown(cards[0], { key: "ArrowRight" });
+    expect(document.activeElement).toBe(cards[1]);
+    fireEvent.keyDown(cards[1], { key: "End" });
+    expect(document.activeElement).toBe(cards.at(-1));
+  });
+
+  it("magnifies a teammate's card on hover and on keyboard focus, at the side away from it", () => {
+    vi.useFakeTimers();
+    const s = setup(tableFixture("giant"), "webgl", { live: true });
+    const key = s.model.opponents[0].hand![2];
+    const hit = s.layout.nodes.get(key)!.hit!;
+    fireEvent.pointerMove(placed(key)[0], {
+      clientX: hit.x + hit.w / 2,
+      clientY: hit.y + hit.h / 2,
+    });
+    vi.advanceTimersByTime(HOVER_DWELL_MS);
+    expect(s.ui.get().magnified).toEqual({ key, side: "right", level: 1 });
+    // Hovering never lifts it as your own hand's cards are lifted.
+    expect(s.ui.get().risen).toBeNull();
+    s.ui.set({ magnified: null, hover: null });
+    // Focus from the keyboard (the page tells it by the key pressed before it).
+    act(() => placed(key)[0].focus());
+    const other = s.model.opponents[0].hand![4];
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    act(() => placed(other)[0].focus());
+    expect(s.ui.get()).toMatchObject({
+      focus: other,
+      focusVisible: true,
+      risen: null,
+      magnified: { key: other, side: "right", level: 1 },
+    });
+  });
+});
+
 describe("the layer under the pointer", () => {
   afterEach(() => {
     vi.useRealTimers();

@@ -44,7 +44,7 @@ Since v0.5.0, **Today's quests** runs across the main menu below them: the day's
 
 A title band runs across the top of every other page: **Main menu**, the way back, and the page's name engraved large across the band. The page's own title follows it. A new page opens at its top, its title focused for screen readers, as following a link does.
 
-**Play** keeps the owner's banner, now with the practice table below it and a button to the tables (since v0.5.0 "Find a game" first, the public queues, with buttons to it, the practice table and the tables), and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon (since v0.5.0 marked "Early": a practice game with a bot teammate against two bots, [Two-Headed Giant](engine/two-headed-giant.md)). Each format's details say how many seats it takes.
+**Play** keeps the owner's banner, now with the practice table below it and a button to the tables (since v0.5.0 "Find a game" first, the public queues, with buttons to it, the practice table and the tables), and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon (since v0.5.0 marked "Early": a practice game with a bot teammate against two bots, [Two-Headed Giant](engine/two-headed-giant.md); since v0.5.1 also at tables and in "Find a game", alone or with a friend, its details saying so and that a few cards do not follow the team rules yet). Each format's details say how many seats it takes.
 
 ## Gone in v0.4.5
 

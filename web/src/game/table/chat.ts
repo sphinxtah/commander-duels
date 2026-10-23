@@ -34,6 +34,13 @@ export const CHAT_LINES = 13;
 
 export type Channel = ChatLine["channel"];
 
+/** A chat tab's name. At a Two-Headed Giant table (v0.5.1) the allies-only channel is the
+ * team's. */
+export function channelName(channel: Channel, teams: boolean): string {
+  if (channel === "table") return "Table";
+  return teams ? "Team" : "Allies";
+}
+
 /** Who reads the chat, and how it names the table's players. */
 export interface ChatPeople {
   /** The viewer's seat; null for SysOp watching. */

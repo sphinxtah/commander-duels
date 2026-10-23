@@ -12,14 +12,17 @@ import { PlayerPicture, PresenceLine } from "./PlayerBits";
 import {
   playerLink,
   presenceRank,
+  timeAgo,
   type FriendList,
   type PlayerSummary,
+  type WaitingRequest,
 } from "./social";
 import styles from "./social.module.css";
 
 // Your friends (#friends, v0.4.3): requests waiting for your answer, your friends with what each
 // is doing (in a game first, then online, idle and offline), and your requests waiting for
-// theirs. Asked again every 30 seconds while the page is shown, as presence changes.
+// theirs, and since v0.5.1 for players found by email to choose a handle. Asked again every 30
+// seconds while the page is shown, as presence changes.
 
 export const FRIENDS_REFRESH_MS = 30_000;
 
@@ -92,6 +95,22 @@ export function FriendsPage({
     await load();
   }
 
+  // A request to a player found by email with no handle yet (v0.5.1).
+  async function withdraw(request: WaitingRequest) {
+    setBusy(request.player_id);
+    setSaid("");
+    const { data, error } = await client.DELETE(
+      "/api/v1/friends/waiting/{player_id}",
+      { params: { path: { player_id: request.player_id } } },
+    );
+    setBusy(undefined);
+    if (data) setSaid("Request withdrawn.");
+    // A player who chose a handle meanwhile is under Requests you sent now.
+    await load();
+    if (!data) setError(describe(error));
+  }
+
+  const waiting = list?.waiting ?? [];
   const friends = [...(list?.friends ?? [])].sort(
     (one, other) =>
       presenceRank(one.presence) - presenceRank(other.presence) ||
@@ -189,6 +208,39 @@ export function FriendsPage({
                   Withdraw
                 </button>
               </PlayerRow>
+            ))}
+          </ul>
+        </section>
+      )}
+      {waiting.length > 0 && (
+        <section className={styles.panel} aria-labelledby="waiting-title">
+          <h2 id="waiting-title">Waiting for a player name</h2>
+          <p className={styles.quiet}>
+            Players you found by email who haven&apos;t chosen a player name
+            yet. Each request reaches its player once they do.
+          </p>
+          <ul className={styles.friends}>
+            {waiting.map((request) => (
+              <li key={request.player_id} className={styles.friend}>
+                <span className={styles.friendLink}>
+                  <span>
+                    <strong>A player still choosing a name</strong>
+                    <small>Asked {timeAgo(request.requested_at)}</small>
+                  </span>
+                </span>
+                <span className={styles.answer}>
+                  <span className={styles.pending}>Pending</span>
+                  <button
+                    type="button"
+                    className={styles.smallQuiet}
+                    disabled={busy === request.player_id}
+                    onClick={() => void withdraw(request)}
+                    aria-label={`Withdraw your request asked ${timeAgo(request.requested_at)}`}
+                  >
+                    Withdraw
+                  </button>
+                </span>
+              </li>
             ))}
           </ul>
         </section>

@@ -17,6 +17,7 @@ import {
 } from "./catalog";
 import styles from "./catalog.module.css";
 import type { CardView } from "./cardView";
+import { zoomOf, type Zoomed } from "./CardZoom";
 
 /** The card's printed image over its text: a missing or slow image never hides the text. */
 export function CardImage({
@@ -130,11 +131,14 @@ export function OwnedNote({ card }: { card: CardSummary }) {
 export function CardTile({
   card,
   onOpen,
+  onZoom,
   edition,
   children,
 }: {
   card: CardSummary;
   onOpen: (card: CardSummary) => void;
+  /** Shows the picture big (v0.5.1) instead of opening the card's details. */
+  onZoom?: (card: CardSummary) => void;
   /** The edition the tile shows, in words. */
   edition?: string;
   children?: ReactNode;
@@ -145,7 +149,7 @@ export function CardTile({
       <button
         type="button"
         className={styles.tileButton}
-        onClick={() => onOpen(card)}
+        onClick={() => (onZoom ?? onOpen)(card)}
         aria-label={`${card.name}${edition ? ` from ${edition}` : ""}, ${card.type_line}${card.playable ? "" : `, ${statusLabel(card)}`}${owned ? `, ${owned.toLowerCase()}` : ""}`}
       >
         <CardImage card={card} />
@@ -252,12 +256,15 @@ export function CardDetails({
   onChoosePrinting,
   actions,
   printings: shownPrintings = "all",
+  onZoom,
 }: {
   cardId: string;
   chosenPrinting?: string | null;
   onChoosePrinting?: (printingId: string | null) => void;
   actions?: ReactNode;
   printings?: PrintingsShown;
+  /** Its picture, clicked, shows big (v0.5.1). */
+  onZoom?: (zoomed: Zoomed) => void;
 }) {
   const [card, setCard] = useState<CardDetail>();
   // A card the game cannot play is not in the game (v0.4.5): a version of a deck that games
@@ -327,12 +334,31 @@ export function CardDetails({
   return (
     <div className={styles.detail}>
       <div className={styles.detailImage}>
-        <CardImage
-          card={card}
-          printingId={preview}
-          face={imageFaces > 0 ? face : undefined}
-          size="large"
-        />
+        {onZoom ? (
+          <button
+            type="button"
+            className={styles.zoomable}
+            aria-label={`Enlarge ${card.name}`}
+            onClick={() => {
+              const zoomed = zoomOf(card, preview);
+              if (zoomed) onZoom(zoomed);
+            }}
+          >
+            <CardImage
+              card={card}
+              printingId={preview}
+              face={imageFaces > 0 ? face : undefined}
+              size="large"
+            />
+          </button>
+        ) : (
+          <CardImage
+            card={card}
+            printingId={preview}
+            face={imageFaces > 0 ? face : undefined}
+            size="large"
+          />
+        )}
         {imageFaces > 1 && (
           <button
             type="button"

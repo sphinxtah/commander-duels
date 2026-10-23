@@ -78,7 +78,8 @@ class Format(Contract):
     available: bool = False
     early: bool = Field(
         default=False,
-        description="A first playable version, against the bots only (v0.5.0: Two-Headed Giant).",
+        description="A first playable version, with known gaps (Two-Headed Giant: since v0.5.0, "
+        "and since v0.5.1 at tables and in the queue too).",
     )
 
 
@@ -291,10 +292,10 @@ class AuditPage(Contract):
     next_cursor: str | None
 
 
-# A game's format. Two-Headed Giant (v0.5.0, early) is a practice game against bots with Legacy
-# decks; decks, human tables and format versions keep Legacy and Commander (TableFormatId).
+# A game's format. Two-Headed Giant (v0.5.0, early) plays Legacy decks: decks and format versions
+# keep Legacy and Commander. Since v0.5.1 human tables and the public queues play it too.
 GameFormatId = Literal["legacy", "commander", "two_headed_giant"]
-TableFormatId = Literal["legacy", "commander"]
+TableFormatId = Literal["legacy", "commander", "two_headed_giant"]
 FixtureDeck = Literal[
     "legacy-mono-red-burn",
     "legacy-mono-green-creatures",

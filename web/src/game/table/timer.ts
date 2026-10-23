@@ -1,4 +1,4 @@
-import { playerName, primaryOption } from "../model";
+import { playerName, primaryOption, teammateOf } from "../model";
 import type { TimerInput, TimerKey, TimerPhase, TimerView } from "./types";
 
 // The response timer (design §12). When the seat gets priority only to answer an opponent's spell,
@@ -40,8 +40,11 @@ export const timerKey: TimerKey = (input) => {
   if (top)
     // The seat's own object on top is holding priority, not a response.
     return top.controller_seat !== view.seat ? `${prompt.id}|${top.id}` : null;
+  // In Two-Headed Giant (v0.5.1) the team attacks together: an attack in a turn the teammate
+  // holds is the seat's own team's.
   const attacked =
     view.active_seat !== view.seat &&
+    view.active_seat !== teammateOf(view) &&
     view.step !== null &&
     COMBAT_STEPS.has(view.step) &&
     view.combat.some((group) => group.attackers.length > 0);

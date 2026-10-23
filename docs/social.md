@@ -11,7 +11,17 @@ Since v0.4.3 players find each other with a search in the top bar, open each oth
 - **Who may search.** Every active account. An account searches at most 60 times a minute, and by email at most 30 times a day (`429 search_limited`); SysOp has no limit. The counts live in the API process's memory (it runs as one process), so a restart forgets them.
 - **A result** opens the player's profile.
 
-`GET /api/v1/players?q=<text>` answers `{players, by_email}`.
+`GET /api/v1/players?q=<text>` answers `{players, by_email, unnamed}`.
+
+### A player with no handle yet (v0.5.1)
+
+The owner reported on 2026-10-22 that a whole gmail.com address of an active player found no one. The live data, read with the owner's leave, showed why: the search lists only players with a handle, and that player had none. One tester was approved on 2026-10-22 (UTC) and chose a handle only the next day; another has had none since SysOp reset the account ([resetting an account](identity.md#resetting-an-account-v045)). Neither address held anything else that could miss (dots, capitals, `googlemail.com`), and nobody had blocked anyone.
+
+The owner chose to say so and to let the searcher ask anyway:
+- **The search says so.** When an email search finds no player with a handle but finds an active player who allows the search by email and has not chosen a handle yet, the answer's `unnamed` names only that player's ID and what is between the two accounts. The field says "That player hasn't chosen a player name yet", with **Add friend**. Nothing else about them shows, and they still have no profile. A search by handle never finds them.
+- **A request that waits.** **Add friend** there (`PUT /api/v1/friends/waiting/{id}`) sends a friend request that waits unseen: no notification, and nothing on the player's side. It counts against the 50 waiting requests. The asker's Friends page lists it under **Waiting for a player name**, as "A player still choosing a name" with the day it was asked, and **Withdraw** (`DELETE /api/v1/friends/waiting/{id}`, also allowed once the player no longer lets the search find them).
+- **It reaches them with their handle.** When the player chooses a handle, each request that waited becomes an ordinary request: the bell tells them, in the same commit as the handle, once a day at most per asker, and never from a player they have blocked. The asker sees the player under **Requests you sent**.
+- Asking needs the asker's own handle (`409 handle_required`); anyone else (with a handle, not active, not letting the search find them, or having blocked the asker) is not found (`404`).
 
 ## Profiles
 

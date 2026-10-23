@@ -662,6 +662,46 @@
   grid-column: span 3;
   min-height: 190px;
 }
+/* The owner's paintings behind the other tiles (v0.5.1): a round table set for a game; a deck
+   and a hand on a desk; three cards floating over a library's chest; friends at a table. Each is
+   darkened where the tile's words lie, a 2x copy for sharp screens. */
+.tablesTile {
+  --tile-art:
+    linear-gradient(90deg, #0b1312e6 0%, #0b131299 35%, #0b131200 70%),
+    image-set(url("/menu/tables-640.webp") 1x, url("/menu/tables-1280.webp") 2x);
+  background-position: right center;
+}
+.decksTile,
+.cardsTile,
+.friendsTile {
+  --tile-shade: linear-gradient(
+    180deg,
+    #0b131240 0%,
+    #0b1312a6 45%,
+    #0b1312f2 100%
+  );
+}
+.decksTile {
+  --tile-art:
+    var(--tile-shade),
+    image-set(url("/menu/decks-640.webp") 1x, url("/menu/decks-1280.webp") 2x);
+  background-position: 70% 40%;
+}
+.cardsTile {
+  --tile-art:
+    var(--tile-shade),
+    image-set(url("/menu/cards-640.webp") 1x, url("/menu/cards-1280.webp") 2x);
+  background-position: center 20%;
+}
+.friendsTile {
+  --tile-art:
+    var(--tile-shade),
+    image-set(
+      url("/menu/friends-640.webp") 1x,
+      url("/menu/friends-1280.webp") 2x
+    );
+  background-position: center 25%;
+}
 /* Leng at his counter (v0.4.3), the owner's painting. */
 .shopTile {
   --tile-art:

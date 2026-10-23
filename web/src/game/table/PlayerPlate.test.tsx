@@ -488,40 +488,70 @@ describe("alliances on the plates (v0.4.4)", () => {
   });
 });
 
-describe("a Two-Headed Giant teammate's plate (v0.5.0)", () => {
-  function giant(): TableFixture {
-    const f = tableFixture("four");
-    f.snapshot.settings.format = "two_headed_giant";
-    const view = f.snapshot.view!;
-    for (const p of [view.you!, ...view.opponents])
-      p.team = Math.floor(p.seat / 2);
-    const mate = view.opponents[0];
-    mate.hand = [
-      { ...view.hand[0], id: "o00000000000000a1" },
-      { ...view.hand[0], id: "o00000000000000a2", name: "Grizzly Bears" },
-    ];
-    mate.hand_count = 2;
-    return f;
-  }
-
-  it("is marked as your teammate's, with shared life and its hand named", () => {
-    plate(giant(), 1);
+describe("a Two-Headed Giant plate (v0.5.0, v0.5.1)", () => {
+  it("is marked as your teammate's, with shared life, and counts the hand shown on the table", () => {
+    plate("giant", 1);
     expect(screen.getByText("Your teammate")).toBeInTheDocument();
-    expect(screen.getByText("Teammate", { exact: true })).toBeInTheDocument();
+    const pill = screen.getByText("Teammate", { exact: true });
+    expect(pill).toHaveAttribute("data-tone", "team");
+    // The cards themselves lie face up by the plate, each named there (DomLayer).
     const hand = screen.getByRole("img", {
-      name: /^2 cards in your teammate's hand: /,
+      name: "6 cards in your teammate's hand",
     });
-    expect(hand).toHaveAttribute(
-      "title",
-      expect.stringMatching(/^Your teammate's hand: .+, Grizzly Bears$/),
-    );
+    expect(hand).not.toHaveAttribute("title");
+    expect(screen.getByRole("img", { name: "24 team life" })).toBeVisible();
   });
 
-  it("is an opponent's as at any table for the other team", () => {
-    plate(giant(), 2);
+  it("marks the other team's, and shows the team's poison on both its plates", () => {
+    for (const seat of [2, 3] as const) {
+      const { unmount } = plate("giant", seat);
+      expect(screen.queryByText("Teammate", { exact: true })).toBeNull();
+      expect(screen.getByText("Other team")).toHaveAttribute(
+        "data-tone",
+        "foe",
+      );
+      expect(
+        screen.getByRole("img", { name: /^\d+ cards in hand$/ }),
+      ).toBeVisible();
+      // Bot 3 has 4 poison counters and Bot 4 has 3: the team has 7 (810.10a).
+      expect(screen.getByText("7 team poison")).toBeInTheDocument();
+      expect(screen.queryByText(/^\d+ poison$/)).toBeNull();
+      unmount();
+    }
+  });
+
+  it("leaves the team pill off a chip, which has no room for it", () => {
+    plate("giant", 2, { expandedSeat: 1 });
+    expect(screen.queryByText("Other team")).toBeNull();
+    expect(screen.getByText("Bot 3")).toBeInTheDocument();
+  });
+
+  it("puts no team pill on your own plate, and no poison when the team has none", () => {
+    plate("giant", 0);
     expect(screen.queryByText("Teammate", { exact: true })).toBeNull();
-    expect(
-      screen.getByRole("img", { name: /^\d+ cards in hand$/ }),
-    ).toBeVisible();
+    expect(screen.queryByText("Other team")).toBeNull();
+    expect(screen.queryByText(/poison/)).toBeNull();
+  });
+
+  it("numbers each team for SysOp observing", () => {
+    for (const [seat, team] of [
+      [0, "Team 1"],
+      [1, "Team 1"],
+      [2, "Team 2"],
+      [3, "Team 2"],
+    ] as const) {
+      const { unmount } = plate("giantSysop", seat);
+      expect(screen.getByText(team)).toHaveAttribute(
+        "data-tone",
+        team === "Team 1" ? "team" : "foe",
+      );
+      expect(screen.queryByText("Your teammate")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("is a plate as at any table outside Two-Headed Giant", () => {
+    plate("four", 1);
+    expect(screen.queryByText(/^Team \d$|^Teammate$|^Other team$/)).toBeNull();
   });
 });

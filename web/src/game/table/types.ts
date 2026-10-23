@@ -88,6 +88,15 @@ export interface TablePlayer {
   kind: "human" | "bot" | null;
   team: number | null; // Two-Headed Giant (v0.5.0): 0 or 1; null in other games
   teammate: boolean; // the viewer's teammate, who shares the viewer's life total
+  /** The plate's team pill (v0.5.1): "Teammate" or "Other team" to a player, "Team 1" or
+   * "Team 2" to SysOp observing and spectators; null outside Two-Headed Giant and on your own. */
+  teamPill: { text: string; tone: "team" | "foe" } | null;
+  /** The team's poison counters (810.10a, v0.5.1): both teammates' together; null in other
+   * games. */
+  teamPoison: number | null;
+  /** A teammate's hand this viewer may see (810.5, v0.5.1), as card keys in the view's order;
+   * null for everyone else, and for the anchored player, whose hand is the model's `hand`. */
+  hand: string[] | null;
   sigil: { seed: string; grey: boolean }; // seed: `handle:<h>` | `bot:<seat>` | `seat:<seat>`
   portrait: string | null; // a human's allied Planeswalker (v0.3.1), shown instead of the sigil
   active: boolean;
@@ -145,7 +154,9 @@ export interface TableModel {
   activeSeat: Seat | null;
   prioritySeat: Seat | null;
   anchored: TablePlayer | null;
-  opponents: TablePlayer[]; // left → right: turn order after the anchored seat
+  /** Left → right: turn order after the anchored seat; in Two-Headed Giant (v0.5.1) the
+   * anchored player's teammate first, then the other team in turn order. */
+  opponents: TablePlayer[];
   hand: string[];
   handTitle: string;
   handBacks: number; // backs only for a spectator's anchored player
@@ -208,7 +219,13 @@ export interface CardNode {
   id: ObjectId;
   unit: string;
   role:
-    "battlefield" | "hand" | "command" | "stack" | "pile-member" | "attachment";
+    | "battlefield"
+    | "hand"
+    | "command"
+    | "stack"
+    | "pile-member"
+    | "attachment"
+    | "teammate-hand"; // a teammate's hand, face up by their plate (v0.5.1)
   face: Rect; // upright image rect before rotation (may leave the stage: the hand)
   rotation: number; // 0, 90 (tapped), or the hand-fan angle in degrees
   footprint: Rect; // rotated bounding box
@@ -228,7 +245,7 @@ export type ZoneBrowserTarget =
   | { kind: "battlefield"; seat: Seat }
   | { kind: "pile"; unit: string }
   | { kind: "stack" }
-  | { kind: "hand" };
+  | { kind: "hand"; seat?: Seat }; // a seat's hand: yours unless it names your teammate's
 export interface MoreNode {
   kind: "more";
   key: string;
@@ -426,7 +443,8 @@ export type TableEvent =
   | { type: "commanderDamage"; seat: Seat; fromSeat: Seat; delta: number }
   | { type: "attack"; keys: string[] }
   | { type: "block"; keys: string[] }
-  | { type: "turn"; turn: number; activeSeat: Seat | null }
+  // yours: the viewer's turn, or in Two-Headed Giant their team's (805.4a, v0.5.1)
+  | { type: "turn"; turn: number; activeSeat: Seat | null; yours?: boolean }
   | {
       type: "step";
       phase: string | null;

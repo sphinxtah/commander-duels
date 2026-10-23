@@ -9,6 +9,8 @@ export type PlayerSummary = components["schemas"]["PlayerSummary"];
 export type PlayerProfile = components["schemas"]["PlayerProfile"];
 export type Presence = components["schemas"]["Presence"];
 export type FriendList = components["schemas"]["FriendList"];
+export type UnnamedPlayer = components["schemas"]["UnnamedPlayer"];
+export type WaitingRequest = components["schemas"]["WaitingRequest"];
 export type BlockedPlayer = components["schemas"]["BlockedPlayer"];
 export type PrivacySettings = components["schemas"]["PrivacySettings"];
 export type NotificationItem = components["schemas"]["NotificationItem"];
@@ -59,9 +61,11 @@ export function presenceRank(presence: Presence | null | undefined): number {
 }
 
 /** Where a notification leads: a message to its conversation, a rematch (v0.5.0) to its
- * game's result screen, anything else to the player's profile. Null without a player. */
+ * game's result screen, an invitation to the Two-Headed Giant queue (v0.5.1) to Find a game on
+ * the Play page, anything else to the player's profile. Null without a player. */
 export function notificationLink(item: NotificationItem): string | null {
   if (item.kind === "rematch" && item.game_id) return `#game/${item.game_id}`;
+  if (item.kind === "team_invite") return "#find";
   if (!item.actor) return null;
   return playerLink(item.actor.id);
 }
@@ -93,6 +97,10 @@ export function notificationWords(item: NotificationItem): string {
       return item.request_pending
         ? `${who} offers a rematch.`
         : `${who} offered a rematch.`;
+    case "team_invite":
+      return item.request_pending
+        ? `${who} invites you to play Two-Headed Giant as their teammate.`
+        : `${who} invited you to play Two-Headed Giant as their teammate.`;
   }
 }
 

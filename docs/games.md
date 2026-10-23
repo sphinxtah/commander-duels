@@ -73,7 +73,7 @@ You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the 
 - **Bots.** A bot with no deck chosen plays one of the engine's four Legacy fixture decks (mono-red burn, mono-green creatures, mono-white weenie, mono-blue skies), which share no card. The API deals them in that order, giving the teammate the first one that shares no card with your deck. If every free fixture shares a card with it, the teammate's deck must be chosen (`team_decks`).
 - **Results.** The engine's result names the winning team (`winner_seats`); `winner_seat` is its first seat, which is yours when your team wins. Your win counts once, and the tokens pay for the two opponents, never for your teammate.
 
-`GET /api/v1/formats` lists Two-Headed Giant as available, with `early: true`.
+`GET /api/v1/formats` lists Two-Headed Giant as available, with `early: true`. Since v0.5.1 human tables and the public queue play it too, with players in either team, and every player of the winning team counts a win and is paid ([tables](tables.md#two-headed-giant-v051), [queues](queues.md#two-headed-giant-v051)); the practice game above is unchanged.
 
 ### Reading and ending games
 

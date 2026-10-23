@@ -4,7 +4,8 @@
   finished with a winning seat that a player owns, the same transaction writes one ledger entry
   keyed by the game and seat, so a retry or a replay counts nothing twice (PROG03, PROG05). Wins
   against bots of any skill count, in either format; a turn limit, a concession, an idle timeout or
-  a closed game has no winner. SysOp starts at 100,000 wins and may set any account's wins, its own
+  a closed game has no winner. A Two-Headed Giant team wins together: each of its players' seats
+  counts its own win (v0.5.1). SysOp starts at 100,000 wins and may set any account's wins, its own
   included; each setting is a ledger entry of its own with a reason, audited, and kept apart from
   counted wins.
 - **Levels** are the tiers of api/roster.py, from the account's wins.
@@ -199,29 +200,39 @@ def godlike(db: Session, user: User) -> bool:
     return total_wins(db, user.id) >= GODLIKE.wins
 
 
+def winning_seats(result: dict[str, object]) -> list[int]:
+    """Every seat that won a completed game: the winner, or in Two-Headed Giant (v0.5.0) the
+    winning team, whose players win together (810.8a). None for a game without a winner."""
+    winner = result.get("winner_seat")
+    if result.get("kind") != "completed" or not isinstance(winner, int):
+        return []
+    team = result.get("winner_seats")
+    if isinstance(team, list) and team:
+        return sorted({seat for seat in team if isinstance(seat, int)} | {winner})
+    return [winner]
+
+
 def count_win(db: Session, game: Game) -> None:
-    """The game's win, if a player's seat won it: one entry, in the caller's transaction."""
-    result = game.result or {}
-    seat = result.get("winner_seat")
-    if result.get("kind") != "completed" or not isinstance(seat, int):
-        return
-    owner = db.scalar(
-        select(GameSeat.user_id).where(GameSeat.game_id == game.id, GameSeat.seat == seat)
-    )
-    key = f"win:{game.id}:{seat}"
-    if owner is None or db.scalar(select(ProgressEntry.id).where(ProgressEntry.key == key)):
-        return
-    db.add(
-        ProgressEntry(
-            user_id=owner,
-            kind="game_win",
-            wins=1,
-            key=key,
-            game_id=game.id,
-            policy=POLICY,
-            created_at=utcnow(),
+    """The game's win for each player's seat that won it: one entry a seat, in the caller's
+    transaction. Since v0.5.1 both players of a winning Two-Headed Giant team count theirs."""
+    for seat in winning_seats(game.result or {}):
+        owner = db.scalar(
+            select(GameSeat.user_id).where(GameSeat.game_id == game.id, GameSeat.seat == seat)
         )
-    )
+        key = f"win:{game.id}:{seat}"
+        if owner is None or db.scalar(select(ProgressEntry.id).where(ProgressEntry.key == key)):
+            continue
+        db.add(
+            ProgressEntry(
+                user_id=owner,
+                kind="game_win",
+                wins=1,
+                key=key,
+                game_id=game.id,
+                policy=POLICY,
+                created_at=utcnow(),
+            )
+        )
 
 
 def set_wins(

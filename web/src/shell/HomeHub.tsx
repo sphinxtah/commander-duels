@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties, type RefObject } from "react";
 import { Portrait } from "../alliance/Portrait";
 import { client, type Me, type Planeswalker, type Progress } from "../api";
 import { DailyQuests } from "../quests/DailyQuests";
+import { formatNames } from "../tables/tables";
 import type { Hud } from "./hud";
 import { Embers } from "./Embers";
 import { hoverSound, selectSound } from "./menuSound";
@@ -33,8 +34,12 @@ function useHubData(me: Me): HubData {
     });
     if (me.permissions.includes("games.play"))
       void client.GET("/api/v1/queue").then(({ data }) => {
-        if (data?.status === "waiting" && data.format)
-          merge({ queue: data.format === "legacy" ? "Legacy" : "Commander" });
+        // Since v0.5.1 also Two-Headed Giant's queue, and a friend invited to it.
+        if (
+          (data?.status === "waiting" || data?.status === "inviting") &&
+          data.format
+        )
+          merge({ queue: formatNames[data.format] });
       });
     void client.GET("/api/v1/tables").then(({ data }) => {
       if (data)
@@ -211,6 +216,7 @@ export function HomeHub({
         />
         <Tile
           href="#decks"
+          className={styles.decksTile}
           icon="decks"
           title="Decks"
           lead="Build, tune and share your decks."
@@ -219,6 +225,7 @@ export function HomeHub({
         />
         <Tile
           href="#cards"
+          className={styles.cardsTile}
           icon="cards"
           title="Cards"
           lead="Every card you can play, and your library."
@@ -227,6 +234,7 @@ export function HomeHub({
         />
         <Tile
           href="#friends"
+          className={styles.friendsTile}
           icon="friends"
           title="Friends"
           lead="Find players, chat and play together."

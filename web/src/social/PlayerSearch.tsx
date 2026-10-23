@@ -14,6 +14,7 @@ import {
   playerLink,
   presenceWords,
   type PlayerSummary,
+  type UnnamedPlayer,
 } from "./social";
 import styles from "./social.module.css";
 
@@ -21,6 +22,8 @@ import styles from "./social.module.css";
 // or part of one, finds players as it is typed; an email address only when typed in full and
 // sent with Enter, so an address typed letter by letter spends none of the day's email
 // searches. A result opens the player's profile. The answers never hold an email address.
+// An address whose player has not chosen a handle yet (v0.5.1) has no profile to open: the
+// search says so, and Add friend sends a request that waits until they choose one.
 
 export const SEARCH_DELAY_MS = 300;
 // Fewer letters than this find too many to be useful.
@@ -29,14 +32,33 @@ const MIN_HANDLE = 2;
 type Found =
   | { state: "idle" }
   | { state: "searching" }
-  | { state: "found"; players: PlayerSummary[]; byEmail: boolean }
+  | {
+      state: "found";
+      players: PlayerSummary[];
+      byEmail: boolean;
+      unnamed: UnnamedPlayer | null;
+    }
   | { state: "error"; message: string };
+
+function unnamedWords(unnamed: UnnamedPlayer): string {
+  switch (unnamed.friendship) {
+    case "requested":
+      return "Your friend request waits for this player to choose a player name.";
+    case "friends":
+      return "You are already friends. They show here again once they choose a player name.";
+    case "requested_you":
+      return "That player asked to be your friend and hasn't chosen a player name yet. Add friend to accept.";
+    default:
+      return "That player hasn't chosen a player name yet. Add friend, and your request reaches them once they do.";
+  }
+}
 
 export function PlayerSearch({ className }: { className?: string }) {
   const [text, setText] = useState("");
   const [found, setFound] = useState<Found>({ state: "idle" });
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  const [asking, setAsking] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   // Only the latest question's answer counts.
@@ -46,6 +68,7 @@ export function PlayerSearch({ className }: { className?: string }) {
   const trimmed = text.trim();
   const email = looksLikeEmail(trimmed);
   const players = found.state === "found" ? found.players : [];
+  const unnamed = found.state === "found" ? found.unnamed : null;
 
   async function search(query: string) {
     const question = ++asked.current;
@@ -60,7 +83,26 @@ export function PlayerSearch({ className }: { className?: string }) {
         state: "found",
         players: data.players,
         byEmail: data.by_email,
+        unnamed: data.unnamed ?? null,
       });
+    else setFound({ state: "error", message: describe(error) });
+  }
+
+  // Add friend to a player with no handle yet, or withdraw that request (v0.5.1).
+  async function ask(player: UnnamedPlayer, add: boolean) {
+    setAsking(true);
+    const path = { params: { path: { player_id: player.id } } };
+    const { data, error } = add
+      ? await client.PUT("/api/v1/friends/waiting/{player_id}", path)
+      : await client.DELETE("/api/v1/friends/waiting/{player_id}", path);
+    setAsking(false);
+    // An answer for a search no longer shown changes nothing on screen.
+    if (data)
+      setFound((now) =>
+        now.state === "found" && now.unnamed?.id === player.id
+          ? { ...now, unnamed: data }
+          : now,
+      );
     else setFound({ state: "error", message: describe(error) });
   }
 
@@ -124,9 +166,11 @@ export function PlayerSearch({ className }: { className?: string }) {
       : found.state === "error"
         ? found.message
         : found.state === "found" && players.length === 0
-          ? found.byEmail
-            ? "No player found with that email address. Only a whole address finds a player, and only one who allows it."
-            : "No player found with that handle."
+          ? found.unnamed
+            ? unnamedWords(found.unnamed)
+            : found.byEmail
+              ? "No player found with that email address. Only a whole address finds a player, and only one who allows it."
+              : "No player found with that handle."
           : found.state === "idle" && email
             ? "Press Enter to search for this email address."
             : found.state === "idle"
@@ -195,6 +239,29 @@ export function PlayerSearch({ className }: { className?: string }) {
         <p className={styles.searchStatus} role="status">
           {status}
         </p>
+        {unnamed && unnamed.friendship !== "friends" && (
+          <div className={styles.unnamed}>
+            {unnamed.friendship === "requested" ? (
+              <button
+                type="button"
+                className={styles.smallQuiet}
+                disabled={asking}
+                onClick={() => void ask(unnamed, false)}
+              >
+                Withdraw request
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.small}
+                disabled={asking}
+                onClick={() => void ask(unnamed, true)}
+              >
+                Add friend
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

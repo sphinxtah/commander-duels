@@ -572,7 +572,7 @@ function log(turn: number, active: Seat, lines: string[]): LogLine[] {
 function fixture(f: {
   name: string;
   description: string;
-  format: "legacy" | "commander";
+  format: "legacy" | "commander" | "two_headed_giant";
   seats: SummarySeat[];
   view: GameView | null;
   prompt?: Prompt | null;
@@ -601,7 +601,10 @@ function fixture(f: {
       seat: f.view?.seat ?? null,
       settings: {
         format: f.format,
-        rules_profile: f.format,
+        rules_profile:
+          f.format === "two_headed_giant"
+            ? "two_headed_giant_legacy"
+            : f.format,
         seats: f.seats.map((s) => ({
           seat: s.seat,
           player: s.player,
@@ -976,6 +979,113 @@ function sysop(): TableFixture {
       bot(1, "legacy-mono-red-burn"),
     ],
     snapshot: { ...base.snapshot, game_id: "fx-sysop" },
+  };
+}
+
+/** Two-Headed Giant (v0.5.1): Alice (seat 0) and her teammate Bot 2 (seat 1) against Bot 3 and
+ * Bot 4. Each team shows its one life total on both plates; Bot 2's hand is in Alice's view, card
+ * for card (810.5), and the other team's hands are counts only. */
+function giant(): TableFixture {
+  const o = new Objects("g");
+  const hand = [
+    o.card(CARDS.forest),
+    o.card(CARDS.grizzlyBears),
+    o.card(CARDS.giantGrowth),
+    o.card(CARDS.rampantGrowth),
+    o.card(CARDS.crawWurm),
+  ];
+  const theirs = [
+    o.card(CARDS.lightningBolt),
+    o.card(CARDS.mountain),
+    o.card(CARDS.goblinGuide),
+    o.card(CARDS.lavaSpike),
+    o.card(CARDS.hillGiant),
+    o.card(CARDS.shock),
+  ];
+  const you = player(0, "Alice", {
+    team: 0,
+    life: 24,
+    library_count: 48,
+    hand_count: hand.length,
+  });
+  const teammate = player(1, "Bot 2", {
+    team: 0,
+    life: 24,
+    library_count: 49,
+    hand_count: theirs.length,
+    hand: theirs,
+    graveyard: [o.card(CARDS.shock)],
+  });
+  const bot3 = player(2, "Bot 3", {
+    team: 1,
+    life: 27,
+    library_count: 47,
+    hand_count: 5,
+    counters: { poison: 4 },
+  });
+  const bot4 = player(3, "Bot 4", {
+    team: 1,
+    life: 27,
+    library_count: 48,
+    hand_count: 4,
+    counters: { poison: 3 },
+    graveyard: [o.card(CARDS.counterspell)],
+  });
+  const [forest, bears, growth] = hand;
+  return fixture({
+    name: "giant",
+    description:
+      "Two-Headed Giant: your team's main phase, your teammate's hand face up by their plate, the other team's hands as counts.",
+    format: "two_headed_giant",
+    seats: [alice("legacy-mono-green-creatures"), bot(1), bot(2), bot(3)],
+    view: view({
+      turn: 7,
+      you,
+      opponents: [teammate, bot3, bot4],
+      hand,
+      battlefield: [
+        ...o.many(3, 0, CARDS.forest),
+        o.permanent(0, CARDS.llanowarElves),
+        o.permanent(0, CARDS.grizzlyBears),
+        ...o.many(3, 1, CARDS.mountain),
+        o.permanent(1, CARDS.goblinGuide),
+        ...o.many(3, 2, CARDS.plains),
+        o.permanent(2, CARDS.savannahLions),
+        o.permanent(2, CARDS.serraAngel),
+        ...o.many(3, 3, CARDS.island),
+        o.permanent(3, CARDS.airElemental),
+      ],
+    }),
+    prompt: prompt("p-giant", "priority", "Play spells and abilities.", [
+      () => option("pass"),
+      () => option("pass_until_next_turn"),
+      () => option("cast", { object_id: bears.id }),
+      () => option("cast", { object_id: growth.id }),
+      () => option("play_land", { object_id: forest.id }),
+    ]),
+    log: log(7, 0, ["Turn 7: Alice.", "Alice draws a card."]),
+  });
+}
+
+/** SysOp observing Alice's Two-Headed Giant game: her view, her teammate's hand in it. */
+function giantSysop(): TableFixture {
+  const base = giant();
+  return {
+    ...base,
+    name: "giantSysop",
+    description:
+      "SysOp observing Alice's Two-Headed Giant game: her view with her teammate's hand, every player named and every team numbered.",
+    seat: null,
+    role: "observer",
+    selfHandle: "sysop",
+    sysop: true,
+    summarySeats: [
+      alice("legacy-mono-green-creatures"),
+      bot(1, "legacy-mono-red-burn"),
+      bot(2, "legacy-mono-white-weenie"),
+      bot(3, "legacy-mono-blue-skies"),
+    ],
+    snapshot: { ...base.snapshot, game_id: "fx-giant-sysop" },
   };
 }
 
@@ -1481,18 +1591,22 @@ function randomPermanents(
 /** A seeded random board for `players` players: the same seed always gives the same board.
  * It covers what the layout must survive: 0–40 permanents per player, tapped cards, piles,
  * attachments (chained and across controllers), counters, combat, a stack of 0–8, a hand of
- * 0–25, command zones, eliminated players, and the spectator's and SysOp's views. */
+ * 0–25, command zones, eliminated players, and the spectator's and SysOp's views. As Two-Headed
+ * Giant (four players, v0.5.1) the teams share their life, and seat 0's view shows its
+ * teammate's hand of 0–20 cards. */
 export function randomFixture(
   seed: number,
   players: 2 | 3 | 4,
   change: {
     maxPermanents?: number;
     perspective?: "player" | "spectator" | "sysop";
+    twoHeadedGiant?: boolean;
   } = {},
 ): TableFixture {
   const random = mulberry32(seed * 7919 + players);
   const o = new Objects(`r${seed}-`);
-  const commanderGame = players > 2 || random() < 0.3;
+  const giant = change.twoHeadedGiant === true && players === 4;
+  const commanderGame = !giant && (players > 2 || random() < 0.3);
   const roll = random();
   const perspective =
     change.perspective ??
@@ -1704,10 +1818,24 @@ export function randomFixture(
 
   const youView = views[0];
   const spectating = perspective === "spectator";
+  if (giant) {
+    const lives = [between(random, 1, 30), between(random, 1, 30)];
+    for (const p of views) {
+      p.team = Math.floor(p.seat / 2);
+      p.life = p.lost ? 0 : lives[p.team];
+    }
+    // Seat 0's teammate's hand, in seat 0's view (a spectator's has none).
+    if (!spectating) {
+      views[1].hand = Array.from({ length: between(random, 0, 20) }, () =>
+        o.card(pick(random, [...LANDS, ...CREATURES, ...SPELLS])),
+      );
+      views[1].hand_count = views[1].hand.length;
+    }
+  }
   return fixture({
-    name: `random-${players}-${seed}`,
-    description: `Seeded random board ${seed} for ${players} players (${perspective}).`,
-    format: commanderGame ? "commander" : "legacy",
+    name: `random-${players}-${seed}${giant ? "-giant" : ""}`,
+    description: `Seeded random board ${seed} for ${players} players${giant ? " in Two-Headed Giant" : ""} (${perspective}).`,
+    format: giant ? "two_headed_giant" : commanderGame ? "commander" : "legacy",
     seats: seats.map((seat) =>
       seat === 0
         ? alice(perspective === "spectator" ? null : "custom")
@@ -1821,7 +1949,9 @@ export type FixtureName =
   | "blockers"
   | "revealed"
   | "stress"
-  | "starting";
+  | "starting"
+  | "giant"
+  | "giantSysop";
 
 const makers: Record<FixtureName, () => TableFixture> = {
   duel,
@@ -1829,6 +1959,8 @@ const makers: Record<FixtureName, () => TableFixture> = {
   four,
   spectator,
   sysop,
+  giant,
+  giantSysop,
   tokens,
   attachments,
   stack,

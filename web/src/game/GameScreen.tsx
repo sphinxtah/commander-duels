@@ -635,6 +635,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           : state.phase === "connecting"
             ? "Connecting…"
             : "Disconnected";
+  // Two-Headed Giant (v0.5.0): a team takes its turn together. Since v0.5.1 the other team's
+  // turn is the team's too, and SysOp observing reads each team by its number.
+  const activeTeam = view
+    ? (players(view).find((p) => p.seat === view.active_seat)?.team ?? null)
+    : null;
   const turnLine: TurnLine | null = view && {
     turn: [
       `Turn ${view.turn}`,
@@ -642,10 +647,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
         ? null
         : view.active_seat === view.seat && !observing
           ? "Your turn"
-          : // Two-Headed Giant (v0.5.0): a team takes its turn together.
-            view.active_seat === teammateOf(view) && !observing
+          : view.active_seat === teammateOf(view) && !observing
             ? "Your team’s turn"
-            : `${seatName(view.active_seat)}’s turn`,
+            : activeTeam !== null
+              ? observing || view.you === null
+                ? `Team ${activeTeam + 1}’s turn`
+                : "Other team’s turn"
+              : `${seatName(view.active_seat)}’s turn`,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -1011,12 +1019,16 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
             >
               <h2 id="concede-title">Concede this game?</h2>
               <p>
-                You lose this game at once.{" "}
-                {match
-                  ? "The match goes on to its next game."
-                  : atTable
-                    ? "The other players play on without you."
-                    : "The bots play on without you."}
+                {/* Two-Headed Giant (v0.5.1): a team wins and loses together (810.8a). */}
+                {format === "two_headed_giant"
+                  ? "You and your teammate lose this game at once: a team wins and loses together."
+                  : `You lose this game at once. ${
+                      match
+                        ? "The match goes on to its next game."
+                        : atTable
+                          ? "The other players play on without you."
+                          : "The bots play on without you."
+                    }`}
               </p>
               <form method="dialog" className={styles.confirmButtons}>
                 <button

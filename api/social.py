@@ -7,6 +7,11 @@ describes them for players and staff.
   handle; never SysOp, the one searching, or a player who has blocked them. An account searches
   SEARCHES_PER_MINUTE times a minute, EMAIL_SEARCHES_PER_DAY of them by email a day; SysOp has no
   limit.
+- **A player with no handle yet** (v0.5.1): an approved player who has not finished the setup
+  wizard's first step, or whose account SysOp reset, has no handle and so no profile. An email
+  search that finds no one else says when it found such a player (unnamed), and nothing more about
+  them; a friend request to them (PUT /friends/waiting/{id}) waits unseen until they choose a
+  handle, then reaches them as any request does.
 - **Profiles** (GET /players/{id}): the handle, portrait, tier, wins and first day, and what is
   between the two accounts: friends, a request either way, a block. Any active account with a
   handle has one, SysOp's included, though the search never lists SysOp.
@@ -95,6 +100,7 @@ NotificationKind = Literal[
     "quest_completed",
     "achievement_earned",
     "rematch",
+    "team_invite",
 ]
 AwardKind = Literal["quest_completed", "achievement_earned"]
 SearchText = Annotated[
@@ -147,15 +153,43 @@ class PlayerProfile(PlayerSummary):
     you: bool = Field(description="Whether this is your own profile.")
 
 
+class UnnamedPlayer(Contract):
+    """A player found by email who has not chosen a handle yet (v0.5.1): nothing about them but
+    what is between the two accounts."""
+
+    id: UUID
+    friendship: FriendState = Field(
+        description="requested when your friend request waits for them to choose a handle."
+    )
+
+
 class PlayerSearch(Contract):
     players: list[PlayerSummary]
     by_email: bool = Field(description="Whether the text was taken as an email address.")
+    unnamed: UnnamedPlayer | None = Field(
+        default=None,
+        description="By email, when no player with a handle matched (v0.5.1): an active player "
+        "who lets themselves be found by email but has not chosen a handle yet. A friend request "
+        "to them waits until they do.",
+    )
+
+
+class WaitingRequest(Contract):
+    """Your friend request to a player who has not chosen a handle yet (v0.5.1)."""
+
+    player_id: UUID
+    requested_at: datetime
 
 
 class FriendList(Contract):
     friends: list[PlayerSummary]
     incoming: list[PlayerSummary] = Field(description="Requests waiting for your answer.")
     outgoing: list[PlayerSummary] = Field(description="Your requests, waiting for theirs.")
+    waiting: list[WaitingRequest] = Field(
+        default_factory=list,
+        description="Your requests to players found by email who have not chosen a handle yet "
+        "(v0.5.1): each reaches its player once they choose one.",
+    )
 
 
 class BlockedPlayer(Contract):
@@ -214,8 +248,9 @@ class NotificationItem(Contract):
     )
     request_pending: bool = Field(
         default=False,
-        description="For a friend request, or since v0.5.0 a rematch: whether it still waits for "
-        "your answer.",
+        description="For a friend request, since v0.5.0 a rematch, or since v0.5.1 an invitation "
+        "to the Two-Headed Giant queue as a friend's teammate: whether it still waits for your "
+        "answer.",
     )
     messages: int = Field(
         default=0,
@@ -402,10 +437,12 @@ def games_by_user(db: Session, ids: Iterable[UUID]) -> dict[UUID, tuple[str, str
 
 
 def queues_by_user(db: Session, ids: Iterable[UUID]) -> dict[UUID, str]:
-    """Each account waiting in a public queue (v0.5.0): the queue's format."""
+    """Each account waiting in a public queue (v0.5.0), or since v0.5.1 inviting a friend to wait
+    with it: the queue's format."""
     rows = db.execute(
         select(QueueEntry.user_id, QueueEntry.format).where(
-            QueueEntry.user_id.in_(list(ids)), QueueEntry.status.in_(("waiting", "starting"))
+            QueueEntry.user_id.in_(list(ids)),
+            QueueEntry.status.in_(("inviting", "waiting", "starting")),
         )
     )
     return {user_id: game_format for user_id, game_format in rows}
@@ -507,6 +544,31 @@ def other_player(db: Session, principal: Principal, player_id: UUID) -> User:
     return visible_player(db, player_id)
 
 
+def unnamed_player(db: Session, principal: Principal, player_id: UUID, *, asking: bool) -> User:
+    """A player who has not chosen a handle yet (v0.5.1), for an account that has chosen its own:
+    to ask them, one an email search finds (active, letting themselves be found by email, neither
+    of the two having blocked the other); to withdraw or end, any active player without a handle
+    with whom the account has a request or a friendship, so an ID alone tells nothing."""
+    if not principal.user.normalized_handle:
+        raise ApiError(409, "handle_required", "Choose your handle first.")
+    user = db.get(User, player_id)
+    if (
+        user is None
+        or user.id == principal.user.id
+        or user.status != "active"
+        or user.kind != "player"
+        or user.normalized_handle is not None
+    ):
+        raise not_found()
+    if asking:
+        viewer = viewer_of(db, principal)
+        if not user.email_searchable or user.id in viewer.blocked_by | viewer.blocks:
+            raise not_found()
+    elif friendship_between(db, principal.user.id, user.id) is None:
+        raise not_found()
+    return user
+
+
 # Notifications.
 
 
@@ -572,6 +634,22 @@ def rematches_waiting(db: Session, user_id: UUID, game_ids: list[UUID]) -> set[U
     )
 
 
+def invitations_waiting(db: Session, user_id: UUID, inviters: list[UUID]) -> set[UUID]:
+    """The friends among these whose invitation to the Two-Headed Giant queue (v0.5.1) still waits
+    for the account's answer."""
+    if not inviters:
+        return set()
+    return set(
+        db.scalars(
+            select(QueueEntry.user_id).where(
+                QueueEntry.user_id.in_(inviters),
+                QueueEntry.status == "inviting",
+                QueueEntry.partner_id == user_id,
+            )
+        )
+    )
+
+
 def notified_since(
     db: Session, user_id: UUID, kind: NotificationKind, actor_id: UUID, after: datetime
 ) -> bool:
@@ -588,6 +666,28 @@ def notified_since(
         )
         is not None
     )
+
+
+def announce_waiting_requests(db: Session, user: User, now: datetime) -> None:
+    """A player who has just chosen a handle (v0.5.1, api/auth.py) hears of the friend requests
+    that waited for it, as if each came now; one from a player they have blocked stays unseen, as
+    any does, and one from an account no longer active or named says nothing."""
+    blocks = blocks_of(db, user.id)
+    for asker in db.scalars(
+        select(Friendship.requested_by)
+        .join(User, User.id == Friendship.requested_by)
+        .where(
+            or_(Friendship.user_low == user.id, Friendship.user_high == user.id),
+            Friendship.status == "pending",
+            Friendship.requested_by != user.id,
+            User.status == "active",
+            User.normalized_handle.is_not(None),
+        )
+    ):
+        if asker not in blocks and not notified_since(
+            db, user.id, "friend_request", asker, now - REQUEST_NOTICE_GAP
+        ):
+            notify(db, user.id, "friend_request", asker, now)
 
 
 def announce_online(db: Session, user: User, now: datetime) -> None:
@@ -629,6 +729,9 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
     waiting = rematches_waiting(
         db, viewer.id, [r.game_id for r in rows if r.kind == "rematch" and r.game_id]
     )
+    inviting = invitations_waiting(
+        db, viewer.id, [r.actor_id for r in rows if r.kind == "team_invite" and r.actor_id]
+    )
     actors = {
         user.id: user
         for user in db.scalars(
@@ -650,7 +753,8 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                     and actor is not None
                     and viewer.state_with(actor.id) == "requested_you"
                 )
-                or (row.kind == "rematch" and row.game_id in waiting),
+                or (row.kind == "rematch" and row.game_id in waiting)
+                or (row.kind == "team_invite" and row.actor_id in inviting),
                 messages=unread.get(row.actor_id, 0)
                 if row.kind == "message" and row.actor_id
                 else 0,
@@ -703,7 +807,6 @@ def search_players(
     query = select(User).where(
         User.status == "active",
         User.kind == "player",
-        User.normalized_handle.is_not(None),
         User.id != principal.user.id,
     )
     if viewer.blocked_by:
@@ -716,12 +819,12 @@ def search_players(
                 func.lower(ExternalIdentity.email) == text.lower(),
             )
             .distinct()
-            .order_by(User.normalized_handle)
         )
+        named = query.where(User.normalized_handle.is_not(None)).order_by(User.normalized_handle)
     else:
         wanted = text.casefold()
         pattern = escaped(wanted)
-        query = query.where(User.normalized_handle.like(f"%{pattern}%", escape="\\")).order_by(
+        named = query.where(User.normalized_handle.like(f"%{pattern}%", escape="\\")).order_by(
             case(
                 (User.normalized_handle == wanted, 0),
                 (User.normalized_handle.like(f"{pattern}%", escape="\\"), 1),
@@ -729,8 +832,16 @@ def search_players(
             ),
             User.normalized_handle,
         )
-    users = list(db.scalars(query.limit(SEARCH_RESULTS)))
-    return PlayerSearch(players=summaries(db, viewer, users), by_email=by_email)
+    users = list(db.scalars(named.limit(SEARCH_RESULTS)))
+    unnamed = None
+    if by_email and not users:
+        # Found, but with no handle and so no profile yet (v0.5.1): the owner's report of a whole
+        # address that "found no one" was a player who had not finished the setup wizard.
+        found = db.scalar(query.where(User.normalized_handle.is_(None)).limit(1))
+        # One this account blocked stays out of sight, as a profile it cannot open would.
+        if found is not None and found.id not in viewer.blocks:
+            unnamed = UnnamedPlayer(id=found.id, friendship=viewer.state_with(found.id))
+    return PlayerSearch(players=summaries(db, viewer, users), by_email=by_email, unnamed=unnamed)
 
 
 @router.get("/players/{player_id}", response_model=PlayerProfile)
@@ -757,18 +868,53 @@ def friend_list(principal: Active, db: Db) -> FriendList:
         )
     )
     shown = summaries(db, viewer, others)
+    unnamed = db.scalars(
+        select(User.id).where(
+            User.id.in_(list(viewer.friendships)),
+            User.status == "active",
+            User.normalized_handle.is_(None),
+        )
+    )
     return FriendList(
         friends=[player for player in shown if player.friendship == "friends"],
         incoming=[player for player in shown if player.friendship == "requested_you"],
         outgoing=[player for player in shown if player.friendship == "requested"],
+        waiting=sorted(
+            (
+                WaitingRequest(player_id=other, requested_at=viewer.friendships[other].created_at)
+                for other in unnamed
+                if viewer.state_with(other) == "requested"
+            ),
+            key=lambda request: request.requested_at,
+        ),
     )
 
 
 @router.put("/friends/{player_id}", response_model=PlayerProfile)
 def add_friend(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
     """Add friend: a request, or the answer to theirs, which makes the two friends."""
-    me = principal.user
     other = other_player(db, principal, player_id)
+    befriend(db, principal.user, other)
+    return profile_of(db, viewer_of(db, principal), other)
+
+
+@router.put("/friends/waiting/{player_id}", response_model=UnnamedPlayer)
+def ask_unnamed(player_id: UUID, principal: Active, db: Db) -> UnnamedPlayer:
+    """Add friend to a player an email search found with no handle yet (v0.5.1): the request
+    waits, unseen, until they choose one."""
+    other = unnamed_player(db, principal, player_id, asking=True)
+    befriend(db, principal.user, other)
+    # They may have chosen their handle while this request was on its way: their announcement
+    # could not see it, so it is told here.
+    db.refresh(other)
+    if other.normalized_handle:
+        announce_waiting_requests(db, other, utcnow())
+        db.commit()
+    return UnnamedPlayer(id=other.id, friendship=viewer_of(db, principal).state_with(other.id))
+
+
+def befriend(db: Session, me: User, other: User) -> None:
+    """A request to the other player, or the answer to theirs, which makes the two friends."""
     if db.scalar(
         select(PlayerBlock.id).where(
             PlayerBlock.blocker_id == me.id, PlayerBlock.blocked_id == other.id
@@ -803,9 +949,12 @@ def add_friend(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
                 user_low=low, user_high=high, requested_by=me.id, status="pending", created_at=now
             )
         )
-        # A player who blocked this one never hears of the request.
-        if not they_blocked and not notified_since(
-            db, other.id, "friend_request", me.id, now - REQUEST_NOTICE_GAP
+        # A player who blocked this one never hears of the request; one with no handle yet hears
+        # of it when they choose one (announce_waiting_requests).
+        if (
+            other.normalized_handle
+            and not they_blocked
+            and not notified_since(db, other.id, "friend_request", me.id, now - REQUEST_NOTICE_GAP)
         ):
             notify(db, other.id, "friend_request", me.id, now)
     elif row.status == "pending" and row.requested_by != me.id:
@@ -823,7 +972,6 @@ def add_friend(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
         )
         notify(db, other.id, "friend_accepted", me.id, now)
     db.commit()
-    return profile_of(db, viewer_of(db, principal), other)
 
 
 def forget_requests(db: Session, recipient: UUID, actor: UUID) -> None:
@@ -841,8 +989,22 @@ def forget_requests(db: Session, recipient: UUID, actor: UUID) -> None:
 def remove_friend(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
     """Withdraws a request, declines one, or ends a friendship. A request's notification stays,
     no longer waiting, so asking again within a day tells no one twice."""
-    me = principal.user
     other = other_player(db, principal, player_id)
+    unfriend(db, principal.user, other)
+    return profile_of(db, viewer_of(db, principal), other)
+
+
+@router.delete("/friends/waiting/{player_id}", response_model=UnnamedPlayer)
+def withdraw_unnamed(player_id: UUID, principal: Active, db: Db) -> UnnamedPlayer:
+    """Withdraws a request that waits for a player to choose a handle (v0.5.1), or ends what is
+    between the two accounts while they have none."""
+    other = unnamed_player(db, principal, player_id, asking=False)
+    unfriend(db, principal.user, other)
+    return UnnamedPlayer(id=other.id, friendship="none")
+
+
+def unfriend(db: Session, me: User, other: User) -> None:
+    """Withdraws a request, declines one, or ends a friendship."""
     row = friendship_between(db, me.id, other.id)
     if row is not None:
         if row.status == "pending" and row.requested_by == other.id:
@@ -859,7 +1021,6 @@ def remove_friend(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
             )
         db.delete(row)
         db.commit()
-    return profile_of(db, viewer_of(db, principal), other)
 
 
 # Blocks.

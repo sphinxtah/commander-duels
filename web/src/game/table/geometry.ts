@@ -363,6 +363,40 @@ export const FOUR = {
     }),
 };
 
+/* ---------- a teammate's hand (Two-Headed Giant, v0.5.1) ---------- */
+/** A teammate's hand fans face up along the near edge of their area, by the band, as yours fans
+ * along the stage's bottom edge. Their rows move up to make room, and the fan keeps to its side
+ * of the stack's lane. Its cards are a little smaller than the four columns' row cards; the
+ * magnifier shows each one large. */
+export const TEAM_HAND = {
+  card: { w: 62, h: (62 * BASE_CARD.h) / BASE_CARD.w },
+  top: 396,
+  /** The fan's ends inside the area, and its distance from the stack's lane. */
+  inset: { left: 20, right: 50, lane: 10 },
+  maxStep: 50,
+  arc: 2,
+  tilt: 1.5,
+  maxTilt: 6,
+  /** Row centres for a seat that shows a hand: its fan's cards and its front row never meet. */
+  rows: {
+    duel: { back: 180, front: 326 },
+    three: { back: 210, front: 330 },
+    four: { back: 220, front: 344 },
+  } as Record<Arrangement, { back: SU; front: SU }>,
+};
+
+/** A seat's geometry while it shows a teammate's hand: its rows a little higher. */
+export function withTeamHand(
+  g: SeatGeometry,
+  rows: { back: SU; front: SU },
+): SeatGeometry {
+  return {
+    ...g,
+    back: { ...g.back, y: rows.back },
+    front: { ...g.front, y: rows.front },
+  };
+}
+
 /* ---------- chips: collapsed opponents while another is expanded (§8.8) ---------- */
 export const CHIP = {
   /** Chip centres for the opponents left over: one in three players, two in four. */

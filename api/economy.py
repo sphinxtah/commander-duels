@@ -5,6 +5,8 @@
   the winning seat and the beaten seat, so a retry, a replay or a restart pays nothing twice
   (PROG03, PROG05). A beaten bot pays by the game's bot skill, 5 to 20 tokens; a beaten player pays
   `50 + 90 x log10(1 + wins)` tokens by their wins, at most 500. Every entry records its rule.
+  A Two-Headed Giant team wins together (since v0.5.1 at tables too): each of its players is
+  paid for the other team's seats, never for the teammate's.
 - **Limits** (PROG05). Wins over the same player pay tokens for the first 3 a day; later ones are
   recorded with nothing paid. SysOp may set a daily cap on tokens from bots, off by default. A day
   is a calendar day in Arizona time.
@@ -41,7 +43,7 @@ from api.identity import (
     utcnow,
 )
 from api.models import Game, GameSeat, SiteSetting, TokenEntry, User
-from api.progression import total_wins
+from api.progression import total_wins, winning_seats
 from api.schemas import Contract, StoredText
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -150,23 +152,29 @@ def bot_cap(db: Session) -> int | None:
 
 
 def pay_game(db: Session, game: Game) -> None:
-    """Pays the game's winner, if a player's seat won it, for every seat it beat: in the caller's
+    """Pays each player's seat that won the game for every seat it beat: in the caller's
     transaction, after the game's result is recorded. In Two-Headed Giant (v0.5.0) the winner's
-    teammate won with it, so it is not a seat the winner beat."""
-    result = game.result or {}
-    winner = result.get("winner_seat")
-    if result.get("kind") != "completed" or not isinstance(winner, int):
-        return
-    team = result.get("winner_seats")
-    winners = set(team) if isinstance(team, list) and team else {winner}
+    teammate won with it, so it is not a seat the winner beat; since v0.5.1 both players of the
+    winning team are paid, each for the other team's seats, under their own limits."""
+    winners = winning_seats(game.result or {})
     seats = list(
         db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     )
-    owner = next((seat.user_id for seat in seats if seat.seat == winner), None)
-    if owner is None:
-        return
-    # Two of the winner's games ending at once count today's paid wins one after the other.
-    lock_account(db, owner)
+    owners = {seat.seat: seat.user_id for seat in seats if seat.seat in winners and seat.user_id}
+    # Two of a winner's games ending at once count today's paid wins one after the other. The
+    # winners' rows are locked in one order, so two games paying the same players never wait on
+    # each other.
+    for owner in sorted(set(owners.values()), key=str):
+        lock_account(db, owner)
+    for winner, owner in owners.items():
+        pay_winner(db, game, seats, set(winners), winner, owner)
+
+
+def pay_winner(
+    db: Session, game: Game, seats: list[GameSeat], winners: set[int], winner: int, owner: UUID
+) -> None:
+    """Pays one winning seat's player for every seat outside the winning team, keyed by the game,
+    the winning seat and the beaten seat."""
     now = utcnow()
     start, end = arizona_day(now)
     today = (

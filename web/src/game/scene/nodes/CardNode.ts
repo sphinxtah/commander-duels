@@ -7,6 +7,7 @@ import type {
   TagPlacement,
 } from "../../table/types";
 import type { CardView } from "../../types";
+import { CORNER } from "../corners";
 import type { SceneKit } from "../createTableScene";
 import { diamondPath, drawIcon, type SceneIcon } from "../icons";
 import {
@@ -77,6 +78,9 @@ const COLOURS = {
 
 /** The glow's reach beyond the card's edge, in stage units (the 9-slice keeps it this wide). */
 export const GLOW_REACH = 10;
+/** The glow's rounded corner (v0.5.1), in stage units: a board card's, about 100 wide (the
+ * 9-slice keeps it this round on every card, a hand card's a little rounder). */
+export const GLOW_CORNER = 100 * CORNER;
 
 /** The pose a placement rests in: at its pivot, turned as the layout turns it. */
 export function restPose(
@@ -229,10 +233,10 @@ export class CardNode {
     this.kit = kit;
     this.glow = new NineSliceSprite({
       texture: kit.art.glowOffered,
-      leftWidth: GLOW_REACH,
-      topHeight: GLOW_REACH,
-      rightWidth: GLOW_REACH,
-      bottomHeight: GLOW_REACH,
+      leftWidth: GLOW_REACH + GLOW_CORNER,
+      topHeight: GLOW_REACH + GLOW_CORNER,
+      rightWidth: GLOW_REACH + GLOW_CORNER,
+      bottomHeight: GLOW_REACH + GLOW_CORNER,
     });
     this.glow.blendMode = "add";
     this.glow.visible = false;
@@ -291,7 +295,7 @@ export class CardNode {
       this.ring.clear();
       if (p.mark === "selected")
         this.ring
-          .rect(x - 2, y - 2, w + 4, h + 4)
+          .roundRect(x - 2, y - 2, w + 4, h + 4, w * CORNER + 2)
           .stroke({ width: 4, color: COLOURS.selected, alignment: 0.5 });
     }
 

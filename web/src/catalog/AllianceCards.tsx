@@ -48,6 +48,8 @@ export function AllianceCardsView({
   error,
   custom,
   onOpen,
+  onZoom,
+  onZoomCustom,
   view,
   onView,
 }: {
@@ -56,6 +58,9 @@ export function AllianceCardsView({
   /** The allied Planeswalker's custom cards (GET /custom-cards). */
   custom: CustomCard[];
   onOpen: (card: CardSummary) => void;
+  /** A picture clicked shows big (v0.5.1), the custom cards' too. */
+  onZoom: (card: CardSummary) => void;
+  onZoomCustom: (card: CustomCard) => void;
   /** Pictures or a list (v0.5.0); the custom cards always show image and text together. */
   view: CardView;
   onView: (view: CardView) => void;
@@ -83,7 +88,11 @@ export function AllianceCardsView({
     );
   if (cards.custom)
     return custom.length ? (
-      <GodlikeCards cards={custom} title={allianceTabName(cards)} />
+      <GodlikeCards
+        cards={custom}
+        title={allianceTabName(cards)}
+        onZoom={onZoomCustom}
+      />
     ) : (
       <section
         className={styles.library}
@@ -110,7 +119,12 @@ export function AllianceCardsView({
       {view === "pictures" ? (
         <ul className={styles.grid} aria-label={allianceTabName(cards)}>
           {cards.cards.map((card) => (
-            <CardTile key={card.id} card={card} onOpen={onOpen} />
+            <CardTile
+              key={card.id}
+              card={card}
+              onOpen={onOpen}
+              onZoom={onZoom}
+            />
           ))}
         </ul>
       ) : (

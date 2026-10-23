@@ -100,7 +100,7 @@ from api.schemas import (
     TableRules,
 )
 from api.schemas import GameSeat as SeatSummary
-from api.teams import assign_and_check
+from api.teams import TEAMS, assign_and_check
 from api.validation import DeckContent, DeckEntry, Problem, not_allowed, validate_deck
 from catalog.statuses import playable
 from catalog.text import normalize
@@ -395,6 +395,13 @@ class LiveGame:
     # waiting for an answer, each (from, to).
     alliances: set[frozenset[int]] = field(default_factory=set)
     offers: set[tuple[int, int]] = field(default_factory=set)
+    # A Two-Headed Giant table's game (v0.5.1): the teams are fixed, and the allies-only channel
+    # is each team's, its two players allied from the start when both are players.
+    teams: bool = False
+
+    def __post_init__(self) -> None:
+        if self.teams:
+            self.alliances = {frozenset(pair) for pair in TEAMS if set(pair) <= self.seats.keys()}
 
     @property
     def path(self) -> str:

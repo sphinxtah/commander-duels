@@ -225,33 +225,48 @@ export function cardBack(
 /**
  * A glow for the 9-slice drawn behind a card: soft light outside a rectangle and a crisp ring at
  * its edge, clear inside. The card's own picture covers the middle, so a glow never lies over an
- * image. `inset` is the glow's reach in pixels; the 9-slice keeps it at that width.
+ * image. `inset` is the glow's reach in pixels; the 9-slice keeps it at that width. `radius`
+ * rounds the rectangle's corners as the card's are (v0.5.1); the 9-slice's corners then reach
+ * that far inside the card too.
  */
-export function glow(colour: string, inset: number): HTMLCanvasElement {
-  const size = inset * 4;
+export function glow(
+  colour: string,
+  inset: number,
+  radius = 0,
+): HTMLCanvasElement {
+  const size = Math.max(inset * 4, (inset + radius) * 2 + 4);
   const c = canvas(size, size);
   const ctx = context(c);
   const edge = inset;
+  const inner = size - edge * 2;
   ctx.shadowColor = colour;
   ctx.shadowBlur = inset * 0.8;
   ctx.fillStyle = colour;
   ctx.globalAlpha = 0.9;
-  ctx.fillRect(edge, edge, size - edge * 2, size - edge * 2);
-  ctx.fillRect(edge, edge, size - edge * 2, size - edge * 2);
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.beginPath();
+    ctx.roundRect(edge, edge, inner, inner, radius);
+    ctx.fill();
+  }
   ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = "destination-out";
-  ctx.fillRect(edge, edge, size - edge * 2, size - edge * 2);
+  ctx.beginPath();
+  ctx.roundRect(edge, edge, inner, inner, radius);
+  ctx.fill();
   ctx.globalCompositeOperation = "source-over";
   // The inner ring, a little brighter, just outside the card's edge.
   ctx.strokeStyle = colour;
   ctx.lineWidth = Math.max(1, inset * 0.18);
-  ctx.strokeRect(
+  ctx.beginPath();
+  ctx.roundRect(
     edge - ctx.lineWidth / 2,
     edge - ctx.lineWidth / 2,
-    size - edge * 2 + ctx.lineWidth,
-    size - edge * 2 + ctx.lineWidth,
+    inner + ctx.lineWidth,
+    inner + ctx.lineWidth,
+    radius && radius + ctx.lineWidth / 2,
   );
+  ctx.stroke();
   return c;
 }
 

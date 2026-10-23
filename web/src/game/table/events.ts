@@ -175,6 +175,15 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
   // anchored player casts still leaves face down.
   const handSeat =
     prev.handBacks === 0 && next.handBacks === 0 ? anchoredSeat : null;
+  // The hands whose cards this viewer sees: that one, and a Two-Headed Giant teammate's shown
+  // before and after (v0.5.1). Their cards fly face up; every other hand's go face down.
+  const seenHands = new Set<Seat>(handSeat === null ? [] : [handSeat]);
+  for (const player of next.opponents)
+    if (
+      player.hand &&
+      prev.opponents.some((p) => p.seat === player.seat && p.hand)
+    )
+      seenHands.add(player.seat);
 
   // The commander link: the engine names each commander's object wherever it is public. One
   // that goes where this viewer cannot see is never followed there (§23.3).
@@ -198,7 +207,7 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
       const from = prevIndex.get(`${was.zone}:${was.id}`);
       if (!from || !isVanished.has(from)) continue;
       if (hiddenZones.has(c.zone)) {
-        if (!(c.zone === "hand" && player.seat === handSeat))
+        if (!(c.zone === "hand" && seenHands.has(player.seat)))
           intoHiding.add(from);
         continue;
       }
@@ -283,7 +292,7 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
         kind: "anchor",
         anchor: "hand",
         seat,
-        faceDown: seat !== handSeat,
+        faceDown: !seenHands.has(seat),
       };
     if (enters && spend(seat, "libraryDrop"))
       return { kind: "anchor", anchor: "library", seat, faceDown: true };
@@ -296,7 +305,7 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
     if (spend(seat, "graveyard"))
       return { kind: "anchor", anchor: "graveyard", seat };
     if (spend(seat, "exile")) return { kind: "anchor", anchor: "exile", seat };
-    if (seat !== handSeat && spend(seat, "hand"))
+    if (!seenHands.has(seat) && spend(seat, "hand"))
       return { kind: "anchor", anchor: "hand", seat };
     if (spend(seat, "library"))
       return { kind: "anchor", anchor: "library", seat };
@@ -306,8 +315,18 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
   /* ---------- the events, in the order they play ---------- */
   const events: TableEvent[] = [];
   const turned = next.turn !== prev.turn;
+  // In Two-Headed Giant a teammate's turn is the viewer's too (805.4a).
+  const viewer = next.observing ? null : next.viewSeat;
   if (turned)
-    events.push({ type: "turn", turn: next.turn, activeSeat: next.activeSeat });
+    events.push({
+      type: "turn",
+      turn: next.turn,
+      activeSeat: next.activeSeat,
+      yours:
+        viewer !== null &&
+        next.activeSeat !== null &&
+        (next.activeSeat === viewer || next.activeSeat === next.teammateSeat),
+    });
   const sameTurn = !turned;
   const attackNow = next.step === "declare_attackers" && hasAttackers(next);
   const attackBefore =
@@ -368,19 +387,20 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
         token: isToken(b.card),
       });
 
-  // Draws: the cards this viewer sees arrive in their hand; for other seats, only how many.
+  // Draws: the cards this viewer sees arrive in their hand (theirs, or a teammate's); for other
+  // seats, only how many.
   const drawn = appeared.filter(
     (b) => b.zone === "hand" && !pairedFrom.has(b.key),
   );
-  if (handSeat !== null && drawn.length > 0)
-    events.push({
-      type: "draw",
-      seat: handSeat,
-      keys: drawn.map((b) => b.key),
-      count: drawn.length,
-    });
+  for (const seat of seenHands) {
+    const keys = drawn
+      .filter((b) => (b.ownerSeat ?? handSeat) === seat)
+      .map((b) => b.key);
+    if (keys.length > 0)
+      events.push({ type: "draw", seat, keys, count: keys.length });
+  }
   for (const seat of after.keys()) {
-    if (seat === handSeat) continue;
+    if (seenHands.has(seat)) continue;
     const left = budget.get(seat)!;
     const count = Math.min(left.hand, left.libraryDrop);
     if (count > 0) events.push({ type: "draw", seat, keys: [], count });

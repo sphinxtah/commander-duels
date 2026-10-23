@@ -419,6 +419,49 @@ describe("best of three at the practice table (v0.5.0)", () => {
     expect(
       within(matches).getByRole("link", { name: "Resume" }),
     ).toHaveAttribute("href", "#match/00000000-0000-4000-8000-00000000aaaa");
+    // Conceding it asks first (v0.5.1): Keep playing sends nothing.
+    const dialogs = HTMLDialogElement.prototype;
+    dialogs.showModal ??= function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    };
+    dialogs.close ??= function (this: HTMLDialogElement) {
+      this.removeAttribute("open");
+      this.dispatchEvent(new Event("close"));
+    };
+    api.on("POST /api/v1/matches/{match_id}/concede", () => reply(200, {}));
+    await act(async () =>
+      within(matches)
+        .getByRole("button", { name: "Concede the match" })
+        .click(),
+    );
+    const confirm = screen.getByRole("dialog", { name: "Concede the match?" });
+    expect(confirm).toHaveTextContent(
+      "You lose the match. The games you won still count.",
+    );
+    await act(async () =>
+      within(confirm).getByRole("button", { name: "Keep playing" }).click(),
+    );
+    expect(
+      api.calls.filter((c) => c.route.startsWith("POST /api/v1/matches")),
+    ).toEqual([]);
+    await act(async () =>
+      within(matches)
+        .getByRole("button", { name: "Concede the match" })
+        .click(),
+    );
+    await act(async () =>
+      within(screen.getByRole("dialog", { name: "Concede the match?" }))
+        .getByRole("button", { name: "Concede the match" })
+        .click(),
+    );
+    await settle();
+    expect(
+      api.calls.find(
+        (c) => c.route === "POST /api/v1/matches/{match_id}/concede",
+      )!.options,
+    ).toMatchObject({
+      params: { path: { match_id: "00000000-0000-4000-8000-00000000aaaa" } },
+    });
     expect(screen.getByRole("radio", { name: /^One game/ })).toBeChecked();
     await act(async () =>
       screen.getByRole("radio", { name: /^Best of three/ }).click(),

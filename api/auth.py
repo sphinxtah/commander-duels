@@ -360,6 +360,7 @@ def update_profile(body: ProfileUpdate, request: Request, principal: SignedIn, d
     if user.kind == "sysop" and "handle" in changes:
         raise ApiError(409, "handle_fixed", "SysOp's handle cannot change.")
     changed: list[str] = []
+    first_handle = user.normalized_handle is None
     if body.handle is not None and body.handle != user.handle:
         normalized = normalized_handle(body.handle)
         taken = db.scalar(
@@ -394,6 +395,13 @@ def update_profile(body: ProfileUpdate, request: Request, principal: SignedIn, d
             details={"fields": changed},
         )
         try:
+            if "handle" in changed and first_handle:
+                # Friend requests sent while they had no handle reach them now (v0.5.1), with the
+                # handle: its write may lose a race here too. Imported here: the social routes
+                # use this module's error responses.
+                from api.social import announce_waiting_requests
+
+                announce_waiting_requests(db, user, utcnow())
             db.commit()
         except IntegrityError:
             # Another account claimed the handle between the check above and this write.

@@ -188,6 +188,48 @@
   color: #a9cdb5;
   font-size: 0.85rem;
 }
+/* Two-Headed Giant's teams (v0.5.1): the lobby's line, and a table's seats by team. */
+.teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: #c9d1c6;
+}
+.teams strong {
+  color: #e3c68f;
+  font-weight: 600;
+}
+.teamGroups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.team {
+  border: 1px solid #d4b47a33;
+  border-radius: 8px;
+  padding: 12px 14px 4px;
+  background: #d4b47a06;
+}
+.team[data-yours="true"] {
+  border-color: #d4b47a88;
+}
+.team h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.team .seats {
+  margin: 10px 0;
+  grid-template-columns: minmax(0, 1fr);
+}
 @media (max-width: 600px) {
   .seats {
     grid-template-columns: minmax(0, 1fr);
