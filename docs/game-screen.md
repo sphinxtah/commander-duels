@@ -157,6 +157,10 @@ A table's game ([human tables](tables.md)) uses the same screen. The other playe
 
 Since v0.4.4 a table's game has its chat: a diamond on the band opens it as a drawer at the right, with the Table and Allies tabs, the emotes and the alliances, and each other player's plate has an Alliance menu ([chat](chat.md#the-tables-chat)).
 
+## Best-of-three matches (v0.5.0)
+
+A match's game ([matches](matches.md)) shows its number and the score, from the player's side, as a chip on the table ("Game 2 · 1–0"). The Game menu's Concede becomes "Concede the game", and "Concede the match" follows it, behind its own question. The result, beside the board and in its dialog, says where the match stands ("Match 1–1. Game 3 is next: sideboard, then get ready.") and leads to the match's page; while the match goes on, the screen goes there by itself 6 seconds after the result is recorded, unless the player chose "Review the board". The practice table and the lobby offer best of three in Legacy.
+
 ## Accessibility
 
 - **Names.** Every card is a button named with its name, type, power and toughness, current state, owner when someone else controls it, and options. Players, zone tiles, the stack's objects and "+N" are named buttons too, in the table's order.

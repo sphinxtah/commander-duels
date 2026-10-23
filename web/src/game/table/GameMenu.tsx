@@ -21,6 +21,7 @@ export function GameMenu({
   onReport,
   onConcede,
   concedeDisabled,
+  onConcedeMatch,
   onLeave,
 }: {
   open: boolean;
@@ -33,6 +34,8 @@ export function GameMenu({
   onReport(): void;
   onConcede(): void;
   concedeDisabled: boolean;
+  /** In a best-of-three match (v0.5.0): concede the whole match, not only this game. */
+  onConcedeMatch?: () => void;
   onLeave(): void;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -115,9 +118,22 @@ export function GameMenu({
             disabled={concedeDisabled}
             onClick={onConcede}
           >
-            Concede
+            {onConcedeMatch ? "Concede the game" : "Concede"}
           </button>
         </li>
+        {onConcedeMatch && (
+          <li>
+            <button
+              type="button"
+              className={styles.danger}
+              aria-haspopup="dialog"
+              disabled={concedeDisabled}
+              onClick={onConcedeMatch}
+            >
+              Concede the match
+            </button>
+          </li>
+        )}
       </ul>
     </div>
   );
