@@ -545,25 +545,29 @@ describe("a human table's game (v0.4.0)", () => {
       left: null,
     });
     let finished = false;
-    get.mockImplementation((async () => ({
-      data: {
-        game: {
-          id: "g1",
-          kind: "table",
-          format: "legacy",
-          status: finished ? "finished" : "active",
-          seats: [human(0, "alice"), human(1, "bob")],
-          your_seat: 0,
-          bot_skill: 4,
-          turn_cap: 60,
-          created_at: "2026-10-21T10:00:00Z",
-          finished_at: finished ? "2026-10-21T10:30:00Z" : null,
-          result: finished ? result : null,
-          tokens: finished ? 50 : null,
-        },
-        snapshot: null,
-      },
-    })) as never);
+    // The game's summary; its rematch (v0.5.0) has its own tests (queues/queues.test.tsx).
+    get.mockImplementation((async (path: string) =>
+      path.endsWith("/rematch")
+        ? { data: undefined }
+        : {
+            data: {
+              game: {
+                id: "g1",
+                kind: "table",
+                format: "legacy",
+                status: finished ? "finished" : "active",
+                seats: [human(0, "alice"), human(1, "bob")],
+                your_seat: 0,
+                bot_skill: 4,
+                turn_cap: 60,
+                created_at: "2026-10-21T10:00:00Z",
+                finished_at: finished ? "2026-10-21T10:30:00Z" : null,
+                result: finished ? result : null,
+                tokens: finished ? 50 : null,
+              },
+              snapshot: null,
+            },
+          }) as never);
     try {
       render(<GameScreen gameId="g1" me={null} />);
       const socket = FakeSocket.made[0];

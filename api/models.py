@@ -225,6 +225,9 @@ class Game(Base):
     # The best-of-three match it is a game of (v0.5.0, api/matches.py), and its number there.
     match_id: Mapped[UUID | None] = mapped_column(ForeignKey("matches.id"), index=True)
     match_game: Mapped[int | None]
+    # A practice game's request (v0.5.0, api/rematches.py), for its rematch: the same format, decks,
+    # bots, skill, turn cap and rules. Null for a table's game and for games before v0.5.0.
+    settings: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class GameSeat(Base):
@@ -299,6 +302,9 @@ class GameTable(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Made by the public queue (v0.5.0, api/queues.py), or a rematch of such a table: started at
+    # once, never in the lobby, casual. Its players go back to the queue, not the lobby.
+    queued: Mapped[bool] = mapped_column(default=False)
 
 
 class TableSeat(Base):
@@ -399,6 +405,90 @@ class MatchPlayer(Base):
     # Out of the match: conceded it, or removed from one of its games while away.
     left_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     left_reason: Mapped[str | None] = mapped_column(String(16))
+
+
+class QueueEntry(Base):
+    """A player's place in a public queue (v0.5.0, api/queues.py), one row per account: waiting
+    with one of their decks, or what became of their last wait (the game it found, or why they were
+    taken out). A queue is a format and a number of seats; it seats its players in the order they
+    joined. A row being made into a game is starting, which no other match may take."""
+
+    __tablename__ = "queue_entries"
+    __table_args__ = (
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_queue_entries_format"),
+        CheckConstraint("seats BETWEEN 2 AND 4", name="ck_queue_entries_seats"),
+        CheckConstraint(
+            "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
+            name="ck_queue_entries_best_of",
+        ),
+        CheckConstraint(
+            "status IN ('waiting', 'starting', 'matched', 'left', 'refused')",
+            name="ck_queue_entries_status",
+        ),
+        # One queue's waiting players, in the order they joined.
+        Index("ix_queue_entries_queue", "format", "seats", "status", "joined_at"),
+    )
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    format: Mapped[str] = mapped_column(String(16))
+    seats: Mapped[int]
+    # Legacy's best-of-three queue (v0.5.0, api/matches.py) is a queue of its own.
+    best_of: Mapped[int] = mapped_column(default=1)
+    deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
+    # Wait for players only: bots never fill this player's game.
+    humans_only: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[str] = mapped_column(String(16))
+    joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # When the player's app last asked about their place: one that stops asking has left.
+    seen_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    # Why the player was taken out (refused, left), or why their match waits (games_busy), with
+    # the words the player sees.
+    reason: Mapped[str | None] = mapped_column(String(32))
+    message: Mapped[str | None] = mapped_column(Text)
+
+
+class Rematch(Base):
+    """A rematch of a finished game (v0.5.0, api/rematches.py), at most one a game. A practice
+    game's starts at once. A table's is offered to its players still there, and starts when every
+    one of them accepts; one who declines, or an offer nobody finishes answering in time, ends
+    it."""
+
+    __tablename__ = "rematches"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('open', 'starting', 'started', 'declined', 'lapsed', 'failed')",
+            name="ck_rematches_status",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), unique=True)
+    proposed_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    next_game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    declined_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    # Why it failed, in words every player may see: whose deck or game stopped it, never a card.
+    message: Mapped[str | None] = mapped_column(Text)
+
+
+class RematchPlayer(Base):
+    """A player a table's rematch asks, by their seat in the finished game, and their answer."""
+
+    __tablename__ = "rematch_players"
+    __table_args__ = (
+        UniqueConstraint("rematch_id", "seat"),
+        UniqueConstraint("rematch_id", "user_id"),
+        CheckConstraint("answer IS NULL OR answer IN ('yes', 'no')", name="ck_rematch_players"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    rematch_id: Mapped[UUID] = mapped_column(ForeignKey("rematches.id"), index=True)
+    seat: Mapped[int]
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    answer: Mapped[str | None] = mapped_column(String(8))
+    answered_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class CardImage(Base):
@@ -1298,16 +1388,17 @@ class PlayerBlock(Base):
 
 class Notification(Base):
     """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
-    come online, and since v0.4.4 new messages from a friend (one while unread, renewed by each
-    message). The actor is the other player. Since v0.5.0 a daily quest completed and an
-    achievement earned, which no player caused: the subject names which. Kept NOTIFICATION_DAYS,
-    at most a few hundred per account (api/social.py)."""
+    come online, since v0.4.4 new messages from a friend (one while unread, renewed by each
+    message), and since v0.5.0 a rematch offered (the game it would replay). The actor is the
+    other player. Since v0.5.0 also a daily quest completed and an achievement earned, which no
+    player caused: the subject names which. Kept NOTIFICATION_DAYS, at most a few hundred per
+    account (api/social.py)."""
 
     __tablename__ = "notifications"
     __table_args__ = (
         CheckConstraint(
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
-            "'quest_completed', 'achievement_earned')",
+            "'quest_completed', 'achievement_earned', 'rematch')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1321,6 +1412,8 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # The quest or the achievement (v0.5.0), by its ID.
     subject: Mapped[str | None] = mapped_column(String(48))
+    # A rematch's finished game (v0.5.0), whose result screen holds the offer.
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
 
 
 class Conversation(Base):

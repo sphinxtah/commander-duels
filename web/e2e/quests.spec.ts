@@ -55,7 +55,9 @@ test.describe("quests, achievements and the record", () => {
     await expect(
       achievements.getByRole("list", { name: "Commander" }),
     ).toContainText("Commander and Legacy addition");
-    await expect(page.getByRole("region", { name: "Your games" })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Your games" }),
+    ).toBeVisible();
 
     // SysOp's own page shows its badges, its record and, to its own player, its games.
     const me = await page.evaluate(async () => {

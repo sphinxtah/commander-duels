@@ -1467,6 +1467,8 @@ def record_game(
         format_version=db.scalar(
             select(func.max(FormatVersion.version)).where(FormatVersion.format == body.format)
         ),
+        # The request, for a rematch with the same settings (v0.5.0, api/rematches.py).
+        settings=body.model_dump(mode="json"),
     )
     db.add(game)
     db.flush()

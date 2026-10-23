@@ -38,10 +38,10 @@ export function RecordPanels() {
         )}
         {stats && <RecordTable stats={stats} label="Your record" />}
         <p className={account.fine}>
-          Every game the server recorded counts: a win, a loss when another
-          seat won or you conceded, a draw, or no result for a turn limit or a
-          game that was closed. Every player who opens your profile sees these
-          totals and your badges.
+          Every game the server recorded counts: a win, a loss when another seat
+          won or you conceded, a draw, or no result for a turn limit or a game
+          that was closed. Every player who opens your profile sees these totals
+          and your badges.
         </p>
       </section>
       <AchievementsPanel />

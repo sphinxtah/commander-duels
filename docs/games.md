@@ -194,6 +194,8 @@ Migration `0006_decks` (v0.2.0) adds the deck revision to each seat played with 
 
 Migration `0009_tables` (v0.4.0) adds the human tables and their seats, the `table` kind of game, and when and why a seat left a game that went on ([human tables](tables.md#data)).
 
+Migration `0022_queues` (v0.5.0) adds each practice game's request (`games.settings`, as `POST /api/v1/practice-games` took it), which its Rematch plays again, and the public queues and rematches ([queues and rematches](queues.md#data)). A public queue's game is a practice game for a player alone with bots, and a table's game for two players or more.
+
 One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Recovery and replay journals (NET08–NET09) remain later work.
 
 A short database outage cannot leave a game active and its owner blocked (since v0.1.1):

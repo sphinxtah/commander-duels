@@ -20,9 +20,10 @@ export function RecordTable({ stats, label }: { stats: Stats; label: string }) {
     return <p className={styles.fine}>No games finished yet.</p>;
   const rows: [string, Totals][] = [
     ["All games", totals],
-    ...stats.formats.map(
-      (row): [string, Totals] => [formatName(row.format), row],
-    ),
+    ...stats.formats.map((row): [string, Totals] => [
+      formatName(row.format),
+      row,
+    ]),
     ["Against bots", stats.against_bots],
     ["Against players", stats.against_players],
   ];

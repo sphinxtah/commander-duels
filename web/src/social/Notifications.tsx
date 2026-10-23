@@ -10,6 +10,7 @@ import { PlayerPicture } from "./PlayerBits";
 import type { Social } from "./presence";
 import {
   awardLink,
+  notificationLink,
   notificationWords,
   playerLink,
   timeAgo,
@@ -23,7 +24,8 @@ import styles from "./social.module.css";
 // read. A friend request answers from either. New notifications pop up beside the bell for a
 // moment, from the app's check-in (presence.ts). Since v0.4.4 new messages from a friend are one
 // notification while unread, which opens the conversation; a message itself pops up beside the
-// bell the moment it arrives, from the chat's connection (chat/chat.ts).
+// bell the moment it arrives, from the chat's connection (chat/chat.ts). Since v0.5.0 a rematch
+// offered opens the game's result screen, where it is answered.
 
 export const BUBBLE_ITEMS = 6;
 export const TOAST_MS = 8000;
@@ -39,7 +41,8 @@ function RequestAnswer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const actor = item.actor;
-  if (!actor || !item.request_pending) return null;
+  if (!actor || !item.request_pending || item.kind !== "friend_request")
+    return null;
   async function answer(accept: boolean) {
     setBusy(true);
     setError("");
@@ -99,14 +102,19 @@ export function NotificationRow({
   const chat = useChatContext();
   useEffect(() => setShown(item), [item]);
   const actor = shown.actor;
-  // New messages open the conversation: its docked window, or the Messages page.
+  // New messages open the conversation: its docked window, or the Messages page. A rematch
+  // (v0.5.0) opens its game's result screen, which holds the offer.
   const message = shown.kind === "message" && actor;
   // A quest completed opens the main menu, an achievement Profile (v0.5.0).
   const award = awardLink(shown);
   return (
     <li className={styles.note} data-unread={wasUnread || undefined}>
       {award ? (
-        <a href={award} className={styles.noteLink} onClick={() => onFollow?.()}>
+        <a
+          href={award}
+          className={styles.noteLink}
+          onClick={() => onFollow?.()}
+        >
           <span className={styles.noteText}>
             {notificationWords(shown)}
             <small>
@@ -121,7 +129,11 @@ export function NotificationRow({
         </a>
       ) : actor ? (
         <a
-          href={message ? messagesLink(actor.id) : playerLink(actor.id)}
+          href={
+            message
+              ? messagesLink(actor.id)
+              : (notificationLink(shown) ?? playerLink(actor.id))
+          }
           className={styles.noteLink}
           onClick={(event) => {
             if (message && chat) {
@@ -321,8 +333,8 @@ export function NotificationBell({
           {items === null && !error && <p className={styles.quiet}>Loading…</p>}
           {items?.length === 0 && (
             <p className={styles.quiet}>
-              Nothing yet. Friend requests, friends coming online, new
-              messages, quests completed and achievements earned show here.
+              Nothing yet. Friend requests, friends coming online, new messages,
+              rematches, quests completed and achievements earned show here.
             </p>
           )}
           {items && items.length > 0 && (
@@ -378,7 +390,7 @@ export function NotificationBell({
               </a>
             ) : item.actor ? (
               <a
-                href={playerLink(item.actor.id)}
+                href={notificationLink(item) ?? playerLink(item.actor.id)}
                 onClick={() => dismiss(item.id)}
               >
                 <PlayerPicture player={item.actor} size={30} />
@@ -451,9 +463,8 @@ export function NotificationsPage({
         Notifications
       </h1>
       <p className={styles.lead}>
-        Friend requests, answers to yours, friends coming online, new
-        messages, and your quests completed and achievements earned, kept for
-        90 days.
+        Friend requests, answers to yours, friends coming online, new messages,
+        and your quests completed and achievements earned, kept for 90 days.
       </p>
       {state === "error" && (
         <p className={styles.rowError} role="alert">

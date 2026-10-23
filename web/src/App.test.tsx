@@ -27,12 +27,7 @@ import {
   type Me,
 } from "./api";
 import { progress, roster, starterDecks } from "./alliance/fixtures";
-import {
-  achievements,
-  dailyQuests,
-  history,
-  stats,
-} from "./records/fixtures";
+import { achievements, dailyQuests, history, stats } from "./records/fixtures";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { initInstall } from "./app/install";
 import { holdLiveGame, markIntendedLeave } from "./app/liveGame";
@@ -275,6 +270,8 @@ beforeEach(() => {
   on("GET /api/v1/me/stats", () => reply(200, stats({ history: true })));
   on("GET /api/v1/me/achievements", () => reply(200, achievements()));
   on("GET /api/v1/me/history", () => reply(200, history()));
+  // The account's place in a public queue (v0.5.0): none.
+  on("GET /api/v1/queue", () => reply(200, { status: "none" }));
 });
 afterEach(() => {
   vi.restoreAllMocks();

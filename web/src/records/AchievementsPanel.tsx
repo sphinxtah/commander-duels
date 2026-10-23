@@ -72,7 +72,9 @@ function Item({
                 aria-valuemax={item.target}
                 aria-valuenow={item.progress}
               >
-                <span style={{ width: `${(item.progress / item.target) * 100}%` }} />
+                <span
+                  style={{ width: `${(item.progress / item.target) * 100}%` }}
+                />
               </span>
             )}
           </>
@@ -172,7 +174,10 @@ export function AchievementsPanel() {
               <p className={styles.group} aria-hidden="true">
                 {groupNames[group]}
               </p>
-              <ul className={styles.achievements} aria-label={groupNames[group]}>
+              <ul
+                className={styles.achievements}
+                aria-label={groupNames[group]}
+              >
                 {shown.achievements
                   .filter((item) => item.group === group)
                   .map((item) => (

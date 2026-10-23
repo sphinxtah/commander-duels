@@ -31,12 +31,10 @@ function ok(data: unknown) {
 
 /** The client's GET, answered by path. */
 function answer(routes: Record<string, unknown>) {
-  return vi
-    .spyOn(client, "GET")
-    .mockImplementation((async (path: string) => {
-      if (!(path in routes)) throw new Error(`No answer for ${path}`);
-      return ok(routes[path]);
-    }) as never);
+  return vi.spyOn(client, "GET").mockImplementation((async (path: string) => {
+    if (!(path in routes)) throw new Error(`No answer for ${path}`);
+    return ok(routes[path]);
+  }) as never);
 }
 
 describe("the words for a record (v0.5.0)", () => {
@@ -88,7 +86,10 @@ describe("a record's table (v0.5.0)", () => {
         stats={stats({
           totals: totals({ games: 8, wins: 5, losses: 2, no_result: 1 }),
           formats: [
-            { format: "commander", ...totals({ games: 8, wins: 5, losses: 2, no_result: 1 }) },
+            {
+              format: "commander",
+              ...totals({ games: 8, wins: 5, losses: 2, no_result: 1 }),
+            },
           ],
           against_bots: totals({ games: 8, wins: 5, losses: 2, no_result: 1 }),
           against_players: totals(),
@@ -176,7 +177,9 @@ describe("Profile's achievements (v0.5.0)", () => {
     expect(
       screen.getByRole("button", { name: "Pin Commander Victor" }),
     ).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Unpin First Victory" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Unpin First Victory" }),
+    );
     await settle();
     expect(put).toHaveBeenCalledWith("/api/v1/me/achievements/pinned", {
       body: { achievements: ["legacy-win", "win-red"] },
@@ -242,7 +245,9 @@ describe("the games one by one (v0.5.0)", () => {
     expect(items[1]).toHaveTextContent(
       "LostLegacy against bobBurn · 1 turn · under a minute",
     );
-    expect(screen.queryByRole("button", { name: "Show older games" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Show older games" }),
+    ).toBeNull();
   });
 
   it("say when there are none", async () => {
@@ -279,13 +284,17 @@ describe("a player's record on their page (v0.5.0)", () => {
     await settle();
     const shown = screen.getByRole("list", { name: "Pinned badges" });
     expect(shown).toHaveTextContent("Machine Breaker");
-    expect(screen.getByText("2 of 29 achievements earned.")).toBeInTheDocument();
+    expect(
+      screen.getByText("2 of 29 achievements earned."),
+    ).toBeInTheDocument();
     expect(
       within(screen.getByRole("list", { name: "Badges earned" })).getAllByRole(
         "img",
       ),
     ).toHaveLength(2);
-    expect(screen.getByRole("table", { name: "ada's record" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "ada's record" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Games" })).toBeNull();
     expect(get).not.toHaveBeenCalledWith(
       "/api/v1/players/{player_id}/history",
@@ -301,7 +310,9 @@ describe("a player's record on their page (v0.5.0)", () => {
     });
     render(<PlayerRecord playerId={ADA} handle="ada" />);
     await settle();
-    expect(screen.getByText("ada has pinned no badges yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText("ada has pinned no badges yet."),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Games" })).toBeInTheDocument();
     expect(
       screen.getByRole("list", { name: "Games, newest first" }),

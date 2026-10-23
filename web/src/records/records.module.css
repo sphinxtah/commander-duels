@@ -122,7 +122,8 @@
 }
 .achievement[data-earned] {
   border-color: #d5b77c4d;
-  background: radial-gradient(ellipse at 0% 0%, #d5b77c1f, transparent 70%), #0b131299;
+  background:
+    radial-gradient(ellipse at 0% 0%, #d5b77c1f, transparent 70%), #0b131299;
 }
 .achievement[data-pinned] {
   border-color: #f4dca6b3;

@@ -30,6 +30,7 @@ import {
   matchLink,
   useFollowMatch,
 } from "../matches/GameMatch";
+import { RematchPanel, useRematch } from "../queues/Rematch";
 import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
@@ -552,6 +553,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     [view],
   );
   const over = Boolean(snapshot?.result) || state.ended !== null;
+  // The result screen's Rematch (v0.5.0), once the game's end is recorded.
+  const rematch = useRematch(gameId, summary, over);
   const alliances = useMemo<TableAlliances | null>(
     () =>
       chatting
@@ -595,11 +598,18 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     summary !== undefined && summary.status !== "active",
     !reviewing && state.seat !== null,
   );
+  // A rematch replays a whole match, so none is offered while the match goes on.
+  const matchGoesOn =
+    match !== null &&
+    (match.status === "playing" || match.status === "sideboarding");
+  // A public queue's game (v0.5.0) leads back to the queue, as its rematch does.
   const back = match
     ? matchLink(match)
-    : atTable
-      ? { href: "#tables", text: "Back to the lobby" }
-      : { href: "#play", text: "Back to the table" };
+    : rematch.view?.origin === "queue"
+      ? { href: "#find", text: "Find another game" }
+      : atTable
+        ? { href: "#tables", text: "Back to the lobby" }
+        : { href: "#play", text: "Back to the table" };
   const paid =
     summary?.status === "finished" && summary.tokens ? summary.tokens : null;
   const tokensLine =
@@ -837,6 +847,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                           following={following}
                         />
                       )}
+                      {!matchGoesOn && <RematchPanel rematch={rematch} />}
                       <a
                         href={back.href}
                         className={styles.secondaryButton}
@@ -1048,6 +1059,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   following={following}
                 />
               )}
+              {!matchGoesOn && <RematchPanel rematch={rematch} />}
               <form method="dialog" className={styles.confirmButtons}>
                 <button
                   type="submit"

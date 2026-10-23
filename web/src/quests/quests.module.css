@@ -54,7 +54,8 @@
 }
 .quest[data-done] {
   border-color: #9fd9a466;
-  background: radial-gradient(ellipse at 0% 0%, #9fd9a41a, transparent 70%), #0b1312b3;
+  background:
+    radial-gradient(ellipse at 0% 0%, #9fd9a41a, transparent 70%), #0b1312b3;
 }
 .questTop {
   display: flex;

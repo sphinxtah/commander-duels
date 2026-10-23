@@ -108,14 +108,8 @@ export function Badge({
           ))}
         </linearGradient>
         <radialGradient id={`${id}-face`} cx="0.4" cy="0.32" r="0.8">
-          <stop
-            offset="0"
-            stopColor={earned ? "#fbe7ae" : "#3f4d49"}
-          />
-          <stop
-            offset="1"
-            stopColor={earned ? "#c18b35" : "#1a2423"}
-          />
+          <stop offset="0" stopColor={earned ? "#fbe7ae" : "#3f4d49"} />
+          <stop offset="1" stopColor={earned ? "#c18b35" : "#1a2423"} />
         </radialGradient>
       </defs>
       <circle cx="32" cy="32" r="30" fill={`url(#${id}-rim)`} />

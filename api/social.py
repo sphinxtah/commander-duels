@@ -16,14 +16,17 @@ describes them for players and staff.
   blocker's presence or find them.
 - **Presence** comes from the app's check-in (POST /presence, every CHECK_IN_SECONDS from each
   open tab), which says only whether its own player is using that tab, and from the games the
-  server runs: in a game, online, idle (no tab in use for IDLE_AFTER), or offline (no check-in for
-  OFFLINE_AFTER). Friends see it, or everyone when the player chooses. Appearing offline shows
-  offline to everyone but administrators and SysOp (players.presence), who see the real state and
-  that the player appears offline; nothing tells the player.
+  server runs: in a game, in a public queue (v0.5.0), online, idle (no tab in use for IDLE_AFTER),
+  or offline (no check-in for OFFLINE_AFTER). Friends see it, or everyone when the player
+  chooses. Appearing offline shows offline to everyone but administrators and SysOp
+  (players.presence), who see the real state and that the player appears offline; nothing tells
+  the player.
 - **Notifications:** a friend request, a request accepted, and a friend come online, the last only
   to friends online at that moment and at most once in ONLINE_NOTICE_GAP for the same friend; since
   v0.4.4 new messages from a friend too (api/chat.py), one while unread; since v0.5.0 a daily quest
-  completed and an achievement earned (api/quests.py, api/achievements.py), with no actor.
+  completed and an achievement earned (api/quests.py, api/achievements.py), with no actor, and a
+  rematch offered at the end of a table's game (api/rematches.py), which waits while the offer
+  stands.
   Kept NOTIFICATION_DAYS days, at most NOTIFICATION_LIMIT per account. The bell alone shows them:
   no email, no browser notifications.
 """
@@ -53,6 +56,9 @@ from api.models import (
     Notification,
     PlayerBlock,
     ProgressEntry,
+    QueueEntry,
+    Rematch,
+    RematchPlayer,
     User,
 )
 from api.progression import TierInfo, tier_info
@@ -80,7 +86,7 @@ EMAIL_SEARCHES_PER_DAY = 30
 PENDING_LIMIT = 50
 
 FriendState = Literal["none", "friends", "requested", "requested_you"]
-PresenceState = Literal["in_game", "online", "idle", "offline"]
+PresenceState = Literal["in_game", "in_queue", "online", "idle", "offline"]
 NotificationKind = Literal[
     "friend_request",
     "friend_accepted",
@@ -88,6 +94,7 @@ NotificationKind = Literal[
     "message",
     "quest_completed",
     "achievement_earned",
+    "rematch",
 ]
 AwardKind = Literal["quest_completed", "achievement_earned"]
 SearchText = Annotated[
@@ -104,7 +111,9 @@ class Presence(Contract):
     game_kind: Literal["practice", "table"] | None = Field(
         default=None, description="In a game: a practice game against bots, or a human table."
     )
-    game_format: GameFormatId | None = None
+    game_format: GameFormatId | None = Field(
+        default=None, description="In a game, or since v0.5.0 in a public queue: its format."
+    )
     appears_offline: bool = Field(
         default=False,
         description="Shown only to the player and to administrators and SysOp: everyone else "
@@ -205,11 +214,17 @@ class NotificationItem(Contract):
     )
     request_pending: bool = Field(
         default=False,
-        description="For a friend request: whether it still waits for your answer.",
+        description="For a friend request, or since v0.5.0 a rematch: whether it still waits for "
+        "your answer.",
     )
     messages: int = Field(
         default=0,
         description="For new messages (v0.4.4): how many from this friend are still unread.",
+    )
+    game_id: UUID | None = Field(
+        default=None,
+        description="For a rematch (v0.5.0): the finished game, whose result screen holds the "
+        "offer.",
     )
 
 
@@ -386,11 +401,23 @@ def games_by_user(db: Session, ids: Iterable[UUID]) -> dict[UUID, tuple[str, str
     return found
 
 
+def queues_by_user(db: Session, ids: Iterable[UUID]) -> dict[UUID, str]:
+    """Each account waiting in a public queue (v0.5.0): the queue's format."""
+    rows = db.execute(
+        select(QueueEntry.user_id, QueueEntry.format).where(
+            QueueEntry.user_id.in_(list(ids)), QueueEntry.status.in_(("waiting", "starting"))
+        )
+    )
+    return {user_id: game_format for user_id, game_format in rows}
+
+
 def online(user: User, now: datetime) -> bool:
     return user.presence_at is not None and now - user.presence_at <= OFFLINE_AFTER
 
 
-def real_presence(user: User, game: tuple[str, str] | None, now: datetime) -> Presence:
+def real_presence(
+    user: User, game: tuple[str, str] | None, now: datetime, queue: str | None = None
+) -> Presence:
     if not online(user, now):
         return Presence(state="offline")
     if game is not None:
@@ -399,15 +426,21 @@ def real_presence(user: User, game: tuple[str, str] | None, now: datetime) -> Pr
             game_kind=game[0],  # type: ignore[arg-type]
             game_format=game[1],  # type: ignore[arg-type]
         )
+    if queue is not None:
+        return Presence(state="in_queue", game_format=queue)  # type: ignore[arg-type]
     if user.active_at is None or now - user.active_at > IDLE_AFTER:
         return Presence(state="idle")
     return Presence(state="online")
 
 
 def presence_for(
-    viewer: Viewer, user: User, game: tuple[str, str] | None, now: datetime
+    viewer: Viewer,
+    user: User,
+    game: tuple[str, str] | None,
+    now: datetime,
+    queue: str | None = None,
 ) -> Presence | None:
-    real = real_presence(user, game, now)
+    real = real_presence(user, game, now, queue)
     if viewer.id == user.id or viewer.sees_all:
         # Administrators and SysOp see it passively: nothing records or tells that they did.
         return real.model_copy(update={"appears_offline": user.appear_offline})
@@ -433,12 +466,13 @@ def summaries(db: Session, viewer: Viewer, users: list[User]) -> list[PlayerSumm
     ids = [user.id for user in users]
     wins = wins_by_user(db, ids)
     games = games_by_user(db, ids)
+    queues = queues_by_user(db, ids)
     now = utcnow()
     return [
         PlayerSummary(
             **player_ref(user).model_dump(),
             tier=tier_info(tier_of(wins.get(user.id, 0))),
-            presence=presence_for(viewer, user, games.get(user.id), now),
+            presence=presence_for(viewer, user, games.get(user.id), now, queues.get(user.id)),
             friendship=viewer.state_with(user.id),
         )
         for user in users
@@ -496,9 +530,16 @@ def prune(db: Session, user_id: UUID, now: datetime) -> None:
 
 
 def notify(
-    db: Session, user_id: UUID, kind: NotificationKind, actor_id: UUID, now: datetime
+    db: Session,
+    user_id: UUID,
+    kind: NotificationKind,
+    actor_id: UUID,
+    now: datetime,
+    game_id: UUID | None = None,
 ) -> None:
-    db.add(Notification(user_id=user_id, kind=kind, actor_id=actor_id, created_at=now))
+    db.add(
+        Notification(user_id=user_id, kind=kind, actor_id=actor_id, created_at=now, game_id=game_id)
+    )
     db.flush()
     prune(db, user_id, now)
 
@@ -509,6 +550,26 @@ def notify_award(db: Session, user_id: UUID, kind: AwardKind, subject: str, now:
     db.add(Notification(user_id=user_id, kind=kind, subject=subject, created_at=now))
     db.flush()
     prune(db, user_id, now)
+
+
+def rematches_waiting(db: Session, user_id: UUID, game_ids: list[UUID]) -> set[UUID]:
+    """The games among these whose rematch (v0.5.0) still waits for the account's answer: open,
+    not lapsed, and not answered yet."""
+    if not game_ids:
+        return set()
+    return set(
+        db.scalars(
+            select(Rematch.game_id)
+            .join(RematchPlayer, RematchPlayer.rematch_id == Rematch.id)
+            .where(
+                Rematch.game_id.in_(game_ids),
+                Rematch.status == "open",
+                Rematch.expires_at > utcnow(),
+                RematchPlayer.user_id == user_id,
+                RematchPlayer.answer.is_(None),
+            )
+        )
+    )
 
 
 def notified_since(
@@ -565,6 +626,9 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
     from api.chat import unread_by_player
 
     unread = unread_by_player(db, viewer.id) if any(r.kind == "message" for r in rows) else {}
+    waiting = rematches_waiting(
+        db, viewer.id, [r.game_id for r in rows if r.kind == "rematch" and r.game_id]
+    )
     actors = {
         user.id: user
         for user in db.scalars(
@@ -581,13 +645,17 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                 created_at=row.created_at,
                 read=row.read_at is not None,
                 actor=player_ref(actor) if actor is not None and actor.normalized_handle else None,
-                request_pending=row.kind == "friend_request"
-                and actor is not None
-                and viewer.state_with(actor.id) == "requested_you",
+                request_pending=(
+                    row.kind == "friend_request"
+                    and actor is not None
+                    and viewer.state_with(actor.id) == "requested_you"
+                )
+                or (row.kind == "rematch" and row.game_id in waiting),
                 messages=unread.get(row.actor_id, 0)
                 if row.kind == "message" and row.actor_id
                 else 0,
                 award=award_of(row.kind, row.subject),
+                game_id=row.game_id if row.kind == "rematch" else None,
             )
         )
     return items

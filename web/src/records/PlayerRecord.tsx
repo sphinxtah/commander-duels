@@ -51,7 +51,10 @@ export function PlayerRecord({
         </p>
       )}
       {badges && (
-        <section className={styles.section} aria-labelledby="player-badges-title">
+        <section
+          className={styles.section}
+          aria-labelledby="player-badges-title"
+        >
           <h2 id="player-badges-title">Badges</h2>
           {badges.pinned.length > 0 ? (
             <ul className={styles.pinned} aria-label="Pinned badges">
@@ -71,7 +74,10 @@ export function PlayerRecord({
           {badges.earned.length > 0 && (
             <ul className={styles.earned} aria-label="Badges earned">
               {badges.earned.map((badge) => (
-                <li key={badge.id} title={`${badge.name}: ${badge.description}`}>
+                <li
+                  key={badge.id}
+                  title={`${badge.name}: ${badge.description}`}
+                >
                   <Badge
                     group={badge.group}
                     earned
@@ -85,13 +91,19 @@ export function PlayerRecord({
         </section>
       )}
       {stats && (
-        <section className={styles.section} aria-labelledby="player-record-title">
+        <section
+          className={styles.section}
+          aria-labelledby="player-record-title"
+        >
           <h2 id="player-record-title">Record</h2>
           <RecordTable stats={stats} label={`${handle}'s record`} />
         </section>
       )}
       {stats?.history && (
-        <section className={styles.section} aria-labelledby="player-games-title">
+        <section
+          className={styles.section}
+          aria-labelledby="player-games-title"
+        >
           <h2 id="player-games-title">Games</h2>
           <p className={styles.fine}>
             Only {handle} and SysOp see these games one by one.

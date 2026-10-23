@@ -694,6 +694,10 @@ def record_next(db: Session, plan: NextGame, created: dict[str, Any]) -> Game:
         ),
         match_id=match.id,
         match_game=plan.number,
+        # A practice match's request, which its rematch replays once the match is over.
+        settings=db.scalar(
+            select(Game.settings).where(Game.match_id == match.id, Game.match_game == 1)
+        ),
     )
     db.add(game)
     db.flush()

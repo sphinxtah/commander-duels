@@ -50,9 +50,7 @@ async function page(
 export function HistoryList({ playerId }: { playerId?: string }) {
   const [items, setItems] = useState<HistoryEntry[]>([]);
   const [next, setNext] = useState<string | null>(null);
-  const [state, setState] = useState<"loading" | "ready" | "error">(
-    "loading",
-  );
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   // Only the shown player's answers land: another player's page, or none once gone.
   const generation = useRef(0);
@@ -100,7 +98,10 @@ export function HistoryList({ playerId }: { playerId?: string }) {
       {items.length > 0 && (
         <ol className={styles.history} aria-label="Games, newest first">
           {items.map((item) => (
-            <li key={`${item.game_id}:${item.seat}`} data-outcome={item.outcome}>
+            <li
+              key={`${item.game_id}:${item.seat}`}
+              data-outcome={item.outcome}
+            >
               <span className={styles.outcome}>
                 {outcomeWords[item.outcome]}
               </span>

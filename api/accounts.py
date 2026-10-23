@@ -12,6 +12,7 @@ games refer to it, and their records stay whole. What identifies the person goes
   notes; its deck stays only as the row the revision belongs to, emptied, private and in the
   trash. The game seats that played it name it "Deleted deck".
 - **Tables.** The account leaves every table still open, as leaving does: a host's table closes.
+  Since v0.5.0 it leaves its public queue too, and its last wait is forgotten.
 - **Each feature's own rows**, removed by the functions in CLEANUPS.
 
 Wins, tokens, packs, the library, game results and the audit trail stay: they are no contact
@@ -245,6 +246,11 @@ def delete_account(db: Session, user: User, now: datetime) -> Removed:
         )
     removed = Removed(user.status)
     removed.tables_left = leave_open_tables(db, user.id, now)
+    # Imported here: api.queues imports api.games, which imports far. Before the decks go: a place
+    # in a queue names one.
+    from api.queues import remove_queue_of
+
+    remove_queue_of(db, user.id)
     user.status = "deleted"
     user.deleted_at = now
     user.handle = user.normalized_handle = None

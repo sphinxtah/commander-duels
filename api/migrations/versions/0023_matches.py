@@ -11,9 +11,11 @@
 - games.match_id and match_game: each game of a match is its own game, numbered from 1.
 - game_tables.best_of: a Legacy table's host chooses best of one or best of three; tables open at
   the upgrade play best of one, as before.
+- queue_entries.best_of: Legacy's best-of-three public queue is a queue of its own (api/queues.py).
 
 Expand only: the previous version ignores the new tables and columns. Downgrade drops them: every
-game stays, as a game of its own with its win and its tokens; matches between games are lost.
+game stays, as a game of its own with its win and its tokens; matches between games are lost, and
+so are places in the best-of-three queue.
 """
 
 import sqlalchemy as sa
@@ -21,7 +23,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0023_matches"
-down_revision = "0021_quests_achievements"
+down_revision = "0022_queues"
 branch_labels = None
 depends_on = None
 
@@ -106,9 +108,21 @@ def upgrade() -> None:
         tables.create_check_constraint(
             "ck_game_tables_best_of", "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')"
         )
+    with op.batch_alter_table("queue_entries") as entries:
+        entries.add_column(
+            sa.Column("best_of", sa.Integer(), nullable=False, server_default=sa.text("1"))
+        )
+        entries.create_check_constraint(
+            "ck_queue_entries_best_of", "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')"
+        )
 
 
 def downgrade() -> None:
+    # A place in the best-of-three queue has no queue to wait in before this revision.
+    op.execute("DELETE FROM queue_entries WHERE best_of = 3")
+    with op.batch_alter_table("queue_entries") as entries:
+        entries.drop_constraint("ck_queue_entries_best_of", type_="check")
+        entries.drop_column("best_of")
     with op.batch_alter_table("game_tables") as tables:
         tables.drop_constraint("ck_game_tables_best_of", type_="check")
         tables.drop_column("best_of")

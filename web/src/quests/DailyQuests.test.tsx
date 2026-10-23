@@ -116,7 +116,9 @@ describe("today's quests on the main menu (v0.5.0)", () => {
     render(<DailyQuests />);
     await settle();
     fireEvent.click(
-      screen.getByRole("button", { name: "Swap “Win a game” for another quest" }),
+      screen.getByRole("button", {
+        name: "Swap “Win a game” for another quest",
+      }),
     );
     await settle();
     expect(screen.getByRole("alert")).toHaveTextContent(
