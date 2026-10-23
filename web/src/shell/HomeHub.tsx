@@ -211,6 +211,7 @@ export function HomeHub({
         />
         <Tile
           href="#decks"
+          className={styles.decksTile}
           icon="decks"
           title="Decks"
           lead="Build, tune and share your decks."
@@ -219,6 +220,7 @@ export function HomeHub({
         />
         <Tile
           href="#cards"
+          className={styles.cardsTile}
           icon="cards"
           title="Cards"
           lead="Every card you can play, and your library."
@@ -227,6 +229,7 @@ export function HomeHub({
         />
         <Tile
           href="#friends"
+          className={styles.friendsTile}
           icon="friends"
           title="Friends"
           lead="Find players, chat and play together."
