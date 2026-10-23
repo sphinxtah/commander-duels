@@ -130,4 +130,14 @@ describe("today's quests on the main menu (v0.5.0)", () => {
     await settle();
     expect(screen.getByRole("alert")).toBeInTheDocument();
   });
+
+  it("stay away for an account the service gives none to", async () => {
+    vi.spyOn(client, "GET").mockResolvedValue({
+      error: { code: "not_signed_in", message: "Sign in to continue." },
+      response: new Response(null, { status: 401 }),
+    } as never);
+    const { container } = render(<DailyQuests />);
+    await settle();
+    expect(container).toBeEmptyDOMElement();
+  });
 });

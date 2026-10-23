@@ -168,6 +168,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  |  | ✓ | ✓ |
 | `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  |  | ✓ |
 | `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  |  | ✓ |
+| `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history)) |  |  |  |  | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
@@ -188,6 +189,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
   - **Any card.** Deck lists naming any card in the engine's card database, on SysOp's practice games.
 - Since v0.4.4 `chat.read_all` is SysOp's alone too: it reads any conversation between friends and any table's chat, allies-only messages included, and every reading is audited ([chat](chat.md#sysops-reader)). Administrators read a chat message only when a player reports it.
 - Since v0.4.5 `admin.users.reset` is SysOp's alone: it resets an account to a new one's state, so the setup wizard runs again ([resetting an account](#resetting-an-account-v045)). Administrators, who delete accounts, cannot reset one.
+- Since v0.5.0 `players.history` is SysOp's alone: it reads any player's games one by one, which otherwise only their player sees (the owner's decision, [the match history](quests.md#statistics-and-the-match-history)). Every player who may open a profile sees its totals and badges.
 - Administrators and moderators keep SEC05's and NET14's restrictions: there is no "view all live hands" for them.
 
 **Errors** follow the scope's rules:
@@ -276,7 +278,7 @@ Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions
 **What is kept, and why.**
 - The account's row, as "Deleted player", with the status `deleted` and the time. Other players' records refer to it and stay whole.
 - Game results and seats. Other players see the seat without a name.
-- The progression and token ledgers, packs and their openings, and the library grants. They hold no contact data, and they count wins and tokens against other players, so they stay as they are. Most are append-only anyway.
+- The progression and token ledgers, packs and their openings, and the library grants. They hold no contact data, and they count wins and tokens against other players, so they stay as they are. Most are append-only anyway. Since v0.5.0 the same holds for the account's results, daily quests and achievements ([quests](quests.md#after-a-reset-and-deleting-an-account)); other players' histories show its seats as a player who has left.
 - The audit trail, which is append-only (below).
 
 **Afterwards.** Administration lists deleted accounts only under the status "Deleted", with their wins and tokens. Nothing changes them: a status, a role, a sign-out, wins, tokens or packs answer 409 `account_deleted`. Their records can still be read.
@@ -315,6 +317,7 @@ Asked for by the owner on 2026-10-22 ([the plan](plans/0.4.5.md#added-during-v04
 - **Packs.** The unopened packs, and "Packs you opened", go the same way: the packs and openings from before the reset stay recorded and no longer count. The cards of the next packs opened are new again.
 - **Decks.** Every deck goes to the trash, as its owner trashing it would: private, its share link ended. Each is checked against the emptied library first, so a deck restored from the trash shows as collection-locked until the library holds its cards again.
 - **Wins and tokens.** Back to 0, and to the 1,000 every new account gets, through the ledgers' own entries with the reason "Account reset by SysOp": a setting of wins (`wins_set`), kept apart from wins counted from games, and a grant of tokens (`grant`). Both ledgers keep their history, so the profile shows, for example, 1 win counted and −1 set ([progression](progression.md#wins-and-levels), [tokens](tokens.md#sysop-and-administrators)).
+- **The record, quests and achievements** (v0.5.0). They stay recorded and count only what came after the reset's time: the totals and the games one by one start again at nothing, the day's quests are drawn again, and the achievements earned before no longer show; earned again, each pays again ([quests](quests.md#after-a-reset-and-deleting-an-account)). The reset itself writes none of their rows.
 
 **What is kept.** The account's row and status, its Google sign-in, name, picture, settings, privacy settings and roles, and its sessions; friends, requests and blocks, conversations and table chats, notifications and problem reports; game results; the ledgers' history and the audit trail. The player stays signed in: the app shows the new state the next time it asks for the account (when the site opens or is reloaded, or when its tab is used again, at most every half a minute), and the setup wizard then opens by itself, even if it already ran during that visit. Until a handle is chosen again, as for any account without one, the player search does not find the account and friends' lists leave it out; the friendships stay.
 

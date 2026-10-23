@@ -34,6 +34,8 @@ The app opens on the main menu (`#home`; any address that names no page, the old
 - **Cards.**
 - **Friends**, with the number of friends online.
 
+Since v0.5.0, **Today's quests** runs across the main menu below them: the day's three quests, each with its reward and a bar of the wins counted so far, the time until the next day's quests, and Swap on each quest not done while the day's swap is unused ([quests](quests.md#daily-quests)).
+
 ## Every other page
 
 A title band runs across the top of every other page: **Main menu**, the way back, and the page's name engraved large across the band. The page's own title follows it. A new page opens at its top, its title focused for screen readers, as following a link does.

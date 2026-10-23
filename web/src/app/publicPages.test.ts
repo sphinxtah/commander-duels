@@ -73,15 +73,18 @@ describe("the public pages", () => {
     expect(page("about")).toContain('<a href="/privacy">privacy policy</a>');
     expect(about).toContain('Press "Sign in with Google" on the home page');
     // The policy and the terms carry their effective date, and the policy its version: v0.4.3
-    // added the player search, friends, presence and notifications to the policy, and v0.4.4
-    // chat to both.
+    // added the player search, friends, presence and notifications to the policy, v0.4.4
+    // chat to both, and v0.5.0 the record and badges every profile shows.
     expect(text(page("terms"))).toContain(
       "Effective 22 October 2026 (2026-10-22)",
     );
     expect(text(page("privacy"))).toContain(
       "Effective 22 October 2026 (2026-10-22)",
     );
-    expect(text(page("privacy"))).toContain("Commander Duels version 0.4.4");
+    expect(text(page("privacy"))).toContain("Commander Duels version 0.5.0");
+    expect(text(page("privacy"))).toContain(
+      "Your games one by one (when, against whom, with which of your decks, and how they ended) are shown only to you and the operator.",
+    );
     expect(text(page("privacy"))).toContain(
       "Administrators read a message only if a player reports it",
     );

@@ -72,13 +72,18 @@ export function DailyQuests() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState("");
+  // An account the service gives no quests to (signed out meanwhile) has no panel, as a tile
+  // that cannot count stays plain.
+  const [none, setNone] = useState(false);
 
   useEffect(() => {
     let active = true;
     void client
       .GET("/api/v1/me/quests")
-      .then(({ data, error: refused }) => {
+      .then(({ data, error: refused, response }) => {
         if (!active) return;
+        if (response?.status === 401 || response?.status === 403)
+          return setNone(true);
         if (!data) return setError(describe(refused));
         setQuests(data);
         if (data.paid > 0) hudChanged();
@@ -110,6 +115,7 @@ export function DailyQuests() {
     }
   }
 
+  if (none) return null;
   return (
     <section className={styles.panel} aria-labelledby="quests-title">
       <header className={styles.head}>
