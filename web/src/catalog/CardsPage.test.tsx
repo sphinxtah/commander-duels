@@ -81,7 +81,19 @@ function pageApi() {
   api.on("GET /api/v1/me/alliance/cards", () =>
     reply(200, { alliance: null, name: null, custom: false, cards: [] }),
   );
+  api.on("GET /api/v1/library", () =>
+    reply(200, { unlimited: false, alliance: null, cards: [] }),
+  );
   return api;
+}
+
+/** The page on every card in the game: a player's opens on their library (v0.5.0, the owner's
+ * request), so the tab is chosen. */
+function renderCatalog(me: Me = player) {
+  const rendered = render(<CardsPage me={me} heading={createRef()} />);
+  if (!me.permissions.includes("library.unlimited"))
+    fireEvent.click(screen.getByRole("tab", { name: "All cards" }));
+  return rendered;
 }
 
 /** The query of each card search the page sent, in order. */
@@ -112,7 +124,7 @@ describe("the Cards page", () => {
   it("lists the cards in the game, with no word of playability (v0.4.5)", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     expect(await screen.findByText("1 card")).toHaveAttribute("role", "status");
     expect(searches(api)[0]).not.toHaveProperty("playable");
     const tile = screen
@@ -134,7 +146,7 @@ describe("the Cards page", () => {
       () => reply(200, page([bolt])),
       () => new Promise((resolve) => (answer = resolve)),
     );
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     await screen.findByText("1 card");
     fireEvent.change(screen.getByLabelText("Search cards"), {
       target: { value: "t:artifact" },
@@ -149,7 +161,7 @@ describe("the Cards page", () => {
   it("clears its filters back to where it started", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     await screen.findByText("1 card");
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.change(screen.getByLabelText("Rarity"), {
@@ -171,7 +183,7 @@ describe("the Cards page", () => {
       () => reply(200, page([ownedBolt, golem])),
       () => reply(200, page([ownedBolt])),
     );
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     // The page browses every card in the game, the player's cards marked in it.
     expect(await screen.findByText("2 cards")).toBeInTheDocument();
     expect(searches(api)[0]).not.toHaveProperty("owned");
@@ -256,8 +268,10 @@ describe("the Cards page", () => {
       }),
     );
     render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 card");
+    // My library is the first tab, and opens the page (v0.5.0, the owner's request).
     const tab = screen.getByRole("tab", { name: "My library" });
+    expect(screen.getAllByRole("tab")[0]).toBe(tab);
+    expect(tab).toHaveAttribute("aria-selected", "true");
     fireEvent.click(tab);
     expect(tab).toHaveAttribute("aria-selected", "true");
     // The cards themselves first (v0.5.0, the owner's request), one per edition (v0.5.0): each
@@ -375,7 +389,6 @@ describe("the Cards page", () => {
     );
     api.on("GET /api/v1/cards/{card_id}", () => new Promise(() => {}));
     render(<CardsPage me={player} heading={createRef()} />);
-    await screen.findByText("1 card");
     fireEvent.click(screen.getByRole("tab", { name: "My library" }));
     fireEvent.click(
       await screen.findByRole("button", { name: /^Lightning Bolt from/ }),
@@ -415,7 +428,7 @@ describe("the Cards page", () => {
         cards: [teferi],
       }),
     );
-    const { unmount } = render(<CardsPage me={player} heading={createRef()} />);
+    const { unmount } = renderCatalog();
     await screen.findByText("2 cards");
     expect(screen.getByRole("list", { name: "Cards" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "List" }));
@@ -453,7 +466,7 @@ describe("the Cards page", () => {
     // A later visit opens as it was left.
     fireEvent.click(within(section).getByRole("button", { name: "List" }));
     unmount();
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     expect(
       await screen.findByRole("table", { name: "Cards" }),
     ).toBeInTheDocument();
@@ -468,7 +481,7 @@ describe("the Cards page", () => {
     });
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     await screen.findByText("1 card");
     expect(screen.getByRole("list", { name: "Cards" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "List" }));
@@ -478,14 +491,14 @@ describe("the Cards page", () => {
   it("shows nothing at all of the Godlike tier's cards below that tier, and an alliance tab with none", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
-    render(<CardsPage me={player} heading={createRef()} />);
+    renderCatalog();
     await screen.findByText("1 card");
     expect(
       api.calls.filter((call) => call.route === "GET /api/v1/custom-cards"),
     ).toHaveLength(1);
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
-      "All cards",
       "My library",
+      "All cards",
       "Alliance cards",
     ]);
     expect(document.body).not.toHaveTextContent(/godlike|custom/i);

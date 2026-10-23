@@ -22,11 +22,12 @@ import styles from "./catalog.module.css";
 
 const PAGE_SIZE = 60;
 
-/** Every card in the game (since v0.4.5 only the cards the engine can play), the player's own
- * library, and the allied Planeswalker's cards (v0.4.2), which at the Godlike tier's Planeswalker
- * are its custom cards. */
+/** The player's own library, every card in the game (since v0.4.5 only the cards the engine can
+ * play), and the allied Planeswalker's cards (v0.4.2), which at the Godlike tier's Planeswalker
+ * are its custom cards. Since v0.5.0 the library comes first, and opens the page (the owner's
+ * request). */
 type View = "catalog" | "library" | "alliance";
-const VIEWS: View[] = ["catalog", "library", "alliance"];
+const VIEWS: View[] = ["library", "catalog", "alliance"];
 
 export function catalogLine(status: CatalogStatus | undefined): string {
   if (!status) return "";
@@ -92,7 +93,9 @@ function Browser({
   /** The account builds from a library of its own (v0.3.1), not the whole catalog. */
   library: boolean;
 }) {
-  const [view, setView] = useState<View>("catalog");
+  // An account that builds from the whole catalog has no library to show, so it opens on every
+  // card.
+  const [view, setView] = useState<View>(library ? "library" : "catalog");
   const [search, setSearch] = useState<Search>({ ...emptySearch });
   const [page, setPage] = useState(1);
   // The card open, and which of its printings its details list (v0.5.0): from the library only
