@@ -67,10 +67,22 @@ final class HumanGame {
     /**
      * @param kind          completed (a winner or a draw), turn_limit, closed, idle_timeout,
      *                      humans_eliminated (every human seat lost while bots remained) or error
+     * @param winnerSeat    the winning seat; in a team game the winning team's first seat
+     * @param winnerSeats   every winning seat (since v0.5.0): the winner, or in a team game the
+     *                      winning team; empty without a winner
      * @param concededSeats the seats that conceded, in the order they did
      */
-    record Result(String kind, Integer winnerSeat, boolean draw, List<Integer> concededSeats, int turns,
-                  String error) {}
+    record Result(String kind, Integer winnerSeat, List<Integer> winnerSeats, boolean draw,
+                  List<Integer> concededSeats, int turns, String error) {
+        Result {
+            winnerSeats = List.copyOf(winnerSeats);
+        }
+
+        /** A result without a winner. */
+        Result(String kind, List<Integer> concededSeats, int turns, String error) {
+            this(kind, null, List.of(), false, concededSeats, turns, error);
+        }
+    }
 
     record LogLine(int index, int turn, Integer activeSeat, String step, String text) {}
 
@@ -313,6 +325,7 @@ final class HumanGame {
         for (int index : additionOrder(players.size())) {
             LegacyDuel.seat(created, match, players.get(index), decks.get(index));
         }
+        format.seatTeams(created, seatIds);
         views = new SeatViews(created, seatIds, refs);
         log.attach(created, seatIds);
         created.addTableEventListener(event -> {
@@ -584,29 +597,30 @@ final class HumanGame {
         }
         if (failure != null) {
             // Every seat is sent the result: the details stay in the engine's log (see run).
-            return new Result("error", null, false, concededSeats, turns,
-                "The engine stopped the game after an internal error");
+            return new Result("error", concededSeats, turns, "The engine stopped the game after an internal error");
         }
         if (log.criticalError() != null) {
-            return new Result("error", null, false, concededSeats, turns,
-                "XMage ended the game after an internal error");
+            return new Result("error", concededSeats, turns, "XMage ended the game after an internal error");
         }
         if (requested != null) {
-            return new Result(requested, null, false, concededSeats, turns, null);
+            return new Result(requested, concededSeats, turns, null);
         }
         if (finished != null && finished.hasEnded()) {
-            Integer winner = null;
+            List<Integer> winners = new ArrayList<>();
             for (int seat = 0; seat < seatIds.size(); seat++) {
                 if (finished.getPlayer(seatIds.get(seat)).hasWon()) {
-                    winner = seat;
+                    winners.add(seat);
                 }
             }
-            return new Result("completed", winner, finished.isADraw(), concededSeats, turns, null);
+            // A team wins together (810.8a); otherwise there is at most one winner.
+            Integer winner = winners.isEmpty() ? null : request.format().teams() ? winners.get(0)
+                : winners.get(winners.size() - 1);
+            return new Result("completed", winner, winners, finished.isADraw(), concededSeats, turns, null);
         }
         if (finished != null && finished.getTurnNum() > request.turnCap()) {
-            return new Result("turn_limit", null, false, concededSeats, turns, null);
+            return new Result("turn_limit", concededSeats, turns, null);
         }
-        return new Result("error", null, false, concededSeats, turns, "Game stopped without a result");
+        return new Result("error", concededSeats, turns, "Game stopped without a result");
     }
 
     /** Request thread: answers the seat's open prompt. */

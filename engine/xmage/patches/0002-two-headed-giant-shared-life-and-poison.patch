@@ -1,0 +1,116 @@
+Two-Headed Giant (Commander Duels v0.5.0 spike), part 2 of 2: shared life and team poison.
+
+Reason: 810.4 and 810.9: a team has one life total. Damage, loss of life and gaining life happen to
+each player, and the result is the team's total, which each teammate then has (so every effect that
+reads a player's life reads the team's, 810.9a); a player can't gain or lose life when a teammate
+can't (810.9g, 810.9h). 810.10 and 810.8d: poison counters are given to each player but counted for
+the team, and a team loses at 15. The loss threshold and the count are overridable methods of
+GameImpl, 10 and the player's own counters by default, so other games are unchanged.
+Needs part 1 (Game.getTeammates).
+Upstream: none yet; to be offered to magefree/mage with part 1.
+Remove when: XMage upstream implements Two-Headed Giant's life and poison, or the format is dropped.
+
+diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
+index 2b6dbb6..85fe129 100644
+--- a/Mage/src/main/java/mage/game/GameImpl.java
++++ b/Mage/src/main/java/mage/game/GameImpl.java
+@@ -2467,6 +2477,19 @@ public abstract class GameImpl implements Game {
+         return played;
+     }
+ 
++    /**
++     * The poison counters that count towards the player's loss (704.5c): their own. A team game
++     * counts its team's (810.10, 704.6b).
++     */
++    protected int getPoisonCounters(Player player) {
++        return player.getCountersCount(CounterType.POISON);
++    }
++
++    /** 704.5c: ten poison counters; a team game may need more (810.8d). */
++    protected int getPoisonCountersToLose() {
++        return 10;
++    }
++
+     /**
+      * 117.5. Each time a player would get priority, the game first performs all
+      * applicable state-based actions as a single event (see rule 704,
+@@ -2489,8 +2512,8 @@ public abstract class GameImpl implements Game {
+                 if (player.getLibrary().isEmptyDraw()) {
+                     lostReason = "drawing from an empty library";
+                 }
+-                if (player.getCountersCount(CounterType.POISON) >= 10) {
+-                    lostReason = "to having 10 or more poison counters";
++                if (getPoisonCounters(player) >= getPoisonCountersToLose()) {
++                    lostReason = "to having " + getPoisonCountersToLose() + " or more poison counters";
+                 }
+                 if (!lostReason.isEmpty() && player.lost(this)) {
+                     this.informPlayers(player.getLogName() + " lost the game due " + lostReason);
+diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
+index 22f49e0..91297a1 100644
+--- a/Mage/src/main/java/mage/players/PlayerImpl.java
++++ b/Mage/src/main/java/mage/players/PlayerImpl.java
+@@ -2302,13 +2302,14 @@ public abstract class PlayerImpl implements Player, Serializable {
+ 
+     @Override
+     public int loseLife(int amount, Game game, Ability source, boolean atCombat, UUID attackerId) {
+-        if (!canLoseLife || !this.isInGame()) {
++        if (!canLoseLife || !this.isInGame() || !teamAllows(game, Player::isCanLoseLife)) {
+             return 0;
+         }
+         GameEvent event = new GameEvent(GameEvent.EventType.LOSE_LIFE,
+                 playerId, source, playerId, amount, atCombat);
+         if (!game.replaceEvent(event)) {
+             this.life = CardUtil.overflowDec(this.life, event.getAmount());
++            shareLifeTotal(game);
+             if (!game.isSimulation()) {
+                 UUID needId = attackerId;
+                 if (needId == null) {
+@@ -2344,7 +2345,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+ 
+     @Override
+     public int gainLife(int amount, Game game, Ability source) {
+-        if (!canGainLife || amount <= 0) {
++        if (!canGainLife || amount <= 0 || !teamAllows(game, Player::isCanGainLife)) {
+             return 0;
+         }
+         GameEvent event = new GameEvent(GameEvent.EventType.GAIN_LIFE,
+@@ -2354,6 +2355,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+             // (https://magic.wizards.com/en/articles/archive/news/unstable-faqawaslfaqpaftidawabiajtbt-2017-12-06 - "infinite" life total stays infinite no matter how much is gained or lost)
+             // this.life += event.getAmount();
+             this.life = CardUtil.overflowInc(this.life, event.getAmount());
++            shareLifeTotal(game);
+             if (!game.isSimulation()) {
+                 game.informPlayers(this.getLogName() + " gains " + event.getAmount() + " life" + CardUtil.getSourceLogName(game, source));
+             }
+@@ -2364,6 +2366,31 @@ public abstract class PlayerImpl implements Player, Serializable {
+         return 0;
+     }
+ 
++    /**
++     * 810.4, 810.9: a team shares one life total. Damage, loss of life and gaining life happen to
++     * each player individually, and the result is the team's life total, which each of its
++     * players then has (810.9a).
++     */
++    private void shareLifeTotal(Game game) {
++        for (UUID teammateId : game.getTeammates(playerId)) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null) {
++                teammate.initLife(this.life);
++            }
++        }
++    }
++
++    /** 810.9g, 810.9h: if a player on a team can't gain life (or lose life), no one on the team can. */
++    private boolean teamAllows(Game game, java.util.function.Predicate<Player> allows) {
++        for (UUID teammateId : game.getTeammates(playerId)) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null && teammate.isInGame() && !allows.test(teammate)) {
++                return false;
++            }
++        }
++        return true;
++    }
++
+     @Override
+     public void exchangeLife(Player player, Ability source, Game game) {
+         int lifePlayer1 = getLife();

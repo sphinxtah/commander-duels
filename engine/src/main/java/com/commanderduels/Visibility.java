@@ -12,7 +12,7 @@ import mage.game.stack.StackObject;
 
 /**
  * Whether a seat may see an object's identity, from its zone: public zones are visible, a hand only
- * to its owner, libraries to nobody. Revealed cards are visible to everyone and looked-at cards to
+ * to its owner (and, in a team game, the owner's teammate), libraries to nobody. Revealed cards are visible to everyone and looked-at cards to
  * the player who looked, while XMage keeps them in its revealed and looked-at lists. Face-down
  * objects are visible to their controller only. Anything unrecognised is treated as hidden. A null
  * viewer is a spectator: no hand, face-down object or looked-at card is theirs.
@@ -51,8 +51,10 @@ final class Visibility {
                 return card != null && !card.isFaceDown(game);
             }
             case HAND: {
+                // 810.5: in a team game, teammates may look at each other's hands.
                 Card card = game.getCard(objectId);
-                return card != null && viewerId != null && viewerId.equals(card.getOwnerId());
+                return card != null && viewerId != null && (viewerId.equals(card.getOwnerId())
+                    || game.getTeammates(card.getOwnerId()).contains(viewerId));
             }
             default:
                 return false;

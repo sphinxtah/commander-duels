@@ -98,7 +98,8 @@ class HumanGameHttpTest {
         assertEquals(405, send("GET", "/v1/games", null, null).statusCode());
         for (String invalid : new String[]{
             "{\"seats\":[{\"player\":\"human\",\"deck\":\"vintage-power\"},{\"player\":\"bot\"}]}",
-            "{\"format\":\"two_headed_giant\"}",
+            "{\"format\":\"vintage\"}",
+            "{\"format\":\"two_headed_giant\",\"seats\":[{\"player\":\"human\"},{\"player\":\"bot\"}]}",
             "{\"seats\":[{\"player\":\"bot\"},{\"player\":\"bot\"}]}",
             "{\"seats\":[{\"player\":\"human\"},{\"player\":\"bot\"},{\"player\":\"bot\"}]}",
             "{\"format\":\"commander\",\"seats\":[{\"player\":\"human\"}]}",
@@ -138,7 +139,8 @@ class HumanGameHttpTest {
         assertFalse(open.toString().contains("\"seed\""));
         assertEquals(0, open.get("seat").getAsInt());
         JsonObject opponent = open.getAsJsonObject("view").getAsJsonArray("opponents").get(0).getAsJsonObject();
-        assertFalse(opponent.has("hand"), "the opponent's hand is a count only");
+        // Since v0.5.0 a player's hand is shown to their teammate in Two-Headed Giant only.
+        assertTrue(opponent.get("hand").isJsonNull(), "the opponent's hand is a count only");
         assertTrue(opponent.get("hand_count").getAsInt() >= 0);
         assertTrue(open.getAsJsonObject("settings").getAsJsonArray("seats").get(1).getAsJsonObject().get("deck")
             .isJsonNull(), "the opponent's deck is private");

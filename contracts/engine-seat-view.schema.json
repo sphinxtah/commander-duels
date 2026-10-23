@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:commander-duels:engine-seat-view:v1",
   "title": "EngineSeatSnapshot",
-  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat, or to a spectator: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand, library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players. A spectator's snapshot has no seat, no prompt and no \"you\", and shows public information only, possibly delayed.",
+  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat, or to a spectator: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand (but a Two-Headed Giant teammate's, since v0.5.0), library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players. A spectator's snapshot has no seat, no prompt and no \"you\", and shows public information only, possibly delayed.",
   "type": "object",
   "additionalProperties": false,
   "required": ["game_id", "revision", "status", "seat", "settings", "prompt", "view", "result", "log_count", "log_from", "log"],
@@ -18,8 +18,8 @@
       "additionalProperties": false,
       "required": ["format", "rules_profile", "seats", "skill", "turn_cap", "idle_timeout_seconds", "spectator_delay_seconds"],
       "properties": {
-        "format": {"enum": ["legacy", "commander"]},
-        "rules_profile": {"enum": ["legacy_two_player_duel", "commander_two_seat", "commander_free_for_all"]},
+        "format": {"enum": ["legacy", "commander", "two_headed_giant"]},
+        "rules_profile": {"enum": ["legacy_two_player_duel", "commander_two_seat", "commander_free_for_all", "two_headed_giant_legacy"]},
         "seats": {
           "description": "Every seat in turn order. A seat sees only its own deck; other seats' decks are null.",
           "type": "array",
@@ -49,28 +49,77 @@
     "log_from": {"type": "integer", "minimum": 0},
     "log": {"type": "array", "maxItems": 200, "items": {"$ref": "#/$defs/logLine"}}
   },
-  "if": {"properties": {"seat": {"type": "null"}}},
-  "then": {
-    "description": "A spectator: no prompt, and a view with no you, hand, looked-at cards or messages.",
-    "properties": {
-      "prompt": {"type": "null"},
-      "view": {
-        "oneOf": [
-          {"type": "null"},
-          {
-            "type": "object",
-            "properties": {
-              "you": {"type": "null"},
-              "hand": {"maxItems": 0},
-              "looked_at": {"maxItems": 0},
-              "messages": {"maxItems": 0},
-              "priority": {"type": "null"}
-            }
+  "allOf": [
+    {
+      "if": {"properties": {"seat": {"type": "null"}}},
+      "then": {
+        "description": "A spectator: no prompt, and a view with no you, hand, looked-at cards or messages.",
+        "properties": {
+          "prompt": {"type": "null"},
+          "view": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "properties": {
+                  "you": {"type": "null"},
+                  "hand": {"maxItems": 0},
+                  "looked_at": {"maxItems": 0},
+                  "messages": {"maxItems": 0},
+                  "priority": {"type": "null"}
+                }
+              }
+            ]
           }
-        ]
+        }
+      }
+    },
+    {
+      "description": "Two-Headed Giant (since v0.5.0): a seat sees its teammate's hand (810.5, FMT10), so one opponent at most carries one. Every other game, and every spectator, shows no player's hand. A seat's own hand is the view's hand.",
+      "if": {
+        "properties": {
+          "seat": {"not": {"type": "null"}},
+          "settings": {"properties": {"format": {"const": "two_headed_giant"}}}
+        }
+      },
+      "then": {
+        "properties": {
+          "view": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "properties": {
+                  "you": {"oneOf": [{"type": "null"}, {"type": "object", "properties": {"hand": {"type": "null"}}}]},
+                  "opponents": {
+                    "contains": {"type": "object", "required": ["hand"], "properties": {"hand": {"type": "array"}}},
+                    "minContains": 0,
+                    "maxContains": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "view": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "properties": {
+                  "you": {"oneOf": [{"type": "null"}, {"type": "object", "properties": {"hand": {"type": "null"}}}]},
+                  "opponents": {"items": {"properties": {"hand": {"type": "null"}}}}
+                }
+              }
+            ]
+          }
+        }
       }
     }
-  },
+  ],
   "$defs": {
     "seat": {"type": "integer", "minimum": 0, "maximum": 3},
     "objectId": {"type": "string", "pattern": "^o[0-9a-f]{16}$"},
@@ -190,17 +239,25 @@
       }
     },
     "player": {
-      "description": "A player's public state. The hand and library appear only as counts. Commander fields are null or empty outside Commander.",
+      "description": "A player's public state. The hand and library appear only as counts, except that in Two-Headed Giant (since v0.5.0) a player's hand is shown to their teammate. Commander fields are null or empty outside Commander.",
       "type": "object",
       "additionalProperties": false,
       "required": ["seat", "name", "life", "counters", "library_count", "hand_count", "graveyard", "exile", "mana_pool", "lost", "won", "color_identity", "command_zone", "commanders"],
       "properties": {
         "seat": {"$ref": "#/$defs/seat"},
         "name": {"type": "string"},
+        "team": {
+          "description": "Two-Headed Giant (since v0.5.0): 0 for seats 0 and 1, 1 for seats 2 and 3; teammates share one life total, so both show the team's. Null in other games.",
+          "oneOf": [{"type": "null"}, {"enum": [0, 1]}]
+        },
         "life": {"type": "integer"},
         "counters": {"$ref": "#/$defs/counts"},
         "library_count": {"type": "integer", "minimum": 0},
         "hand_count": {"type": "integer", "minimum": 0},
+        "hand": {
+          "description": "The player's hand, shown only to their teammate in Two-Headed Giant (810.5, FMT10); null for everyone else.",
+          "oneOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "#/$defs/card"}}]
+        },
         "graveyard": {"type": "array", "items": {"$ref": "#/$defs/card"}},
         "exile": {"type": "array", "items": {"$ref": "#/$defs/card"}},
         "mana_pool": {
@@ -348,6 +405,10 @@
       "properties": {
         "kind": {"enum": ["completed", "turn_limit", "closed", "idle_timeout", "humans_eliminated", "error"]},
         "winner_seat": {"$ref": "#/$defs/nullableSeat"},
+        "winner_seats": {
+          "description": "Every winning seat (since v0.5.0): the winner, or in Two-Headed Giant the winning team; empty without a winner.",
+          "type": "array", "maxItems": 2, "items": {"$ref": "#/$defs/seat"}
+        },
         "draw": {"type": "boolean"},
         "conceded_seats": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/seat"}},
         "turns": {"type": "integer", "minimum": 0},

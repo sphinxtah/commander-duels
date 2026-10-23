@@ -32,7 +32,8 @@ pom_version=$(sed -n '0,/<version>/s/.*<version>\(.*\)<\/version>.*/\1/p' pom.xm
 [ "$pom_version" = "$version" ] || { echo "XMage POM is $pom_version, pin says $version" >&2; exit 1; }
 fetched=$(seconds)
 
-# Isolated upstream changes, applied in name order. None are required at the current pin.
+# Isolated upstream changes, applied in name order: at the current pin, Two-Headed Giant's
+# (patches/README.md).
 for patch in "$here"/patches/*.patch; do
     [ -e "$patch" ] || continue
     echo "Applying $(basename "$patch")"

@@ -1,0 +1,104 @@
+Two-Headed Giant (Commander Duels v0.5.0 spike): the computer player knows its teammate.
+
+Reason: XMage's AI keeps only itself out of the targets it searches for a harmful spell, and sorts
+the targets it picks outside a search into its own and everyone else's, so with teams it aimed burn
+at its teammate (seen in Commander Duels' four-bot games: the search cannot tell the targets apart
+while the spell is still on the stack). Its position score also counted only its own permanents and
+one opponent's. With this, in a team game (Game.getTeammates, from part 1) the teammate is kept out
+of harmful single targets in the search, a teammate and the teammate's objects count as the AI's own
+side when it picks targets, and each side's permanents are the whole team's. Other games are
+unchanged.
+Needs part 1.
+Upstream: none yet; to be offered to magefree/mage with parts 1 and 2.
+Remove when: XMage upstream's AI supports teams, or Two-Headed Giant is dropped.
+
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
+index 9d7347f..fa89ecc 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
+@@ -208,7 +208,9 @@ public final class SimulatedPlayer2 extends ComputerPlayer {
+                         iterator.remove();
+                         continue;
+                     }
+-                    if (ability1.getFirstTarget().equals(playerId)) {
++                    // nor its teammate in a team game (rule 805)
++                    if (ability1.getFirstTarget().equals(playerId)
++                            || game.getTeammates(playerId).contains(ability1.getFirstTarget())) {
+                         iterator.remove();
+                     }
+                 }
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
+index 4b4d6fd..b7cd140 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
+@@ -63,7 +63,8 @@ public class PossibleTargetsSelector {
+         this.opponents.clear();
+         this.any.clear();
+         found.forEach(item -> {
+-            if (isMyItem(abilityControllerId, item)) {
++            // in a team game, the AI's teammate and the teammate's objects are on its side
++            if (isMyItem(abilityControllerId, item) || isTeammateItem(abilityControllerId, item, game)) {
+                 this.me.add(item);
+             } else {
+                 this.opponents.add(item);
+@@ -152,6 +153,18 @@ public class PossibleTargetsSelector {
+         return false;
+     }
+ 
++    private static boolean isTeammateItem(UUID abilityControllerId, MageItem item, Game game) {
++        Set<UUID> teammates = game.getTeammates(abilityControllerId);
++        if (teammates.isEmpty()) {
++            return false;
++        } else if (item instanceof Player) {
++            return teammates.contains(item.getId());
++        } else if (item instanceof ControllableOrOwnerable) {
++            return teammates.contains(((ControllableOrOwnerable) item).getControllerOrOwnerId());
++        }
++        return false;
++    }
++
+     private boolean isAnyEffect() {
+         boolean isAnyEffect = outcome.anyTargetHasSameValue();
+ 
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
+index 9c96a61..68879b7 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
+@@ -28,6 +28,15 @@ public final class GameStateEvaluator2 {
+         return evaluate(playerId, game, true);
+     }
+ 
++    /** The permanents of the player and, in a team game, of the player's teammates. */
++    private static java.util.List<Permanent> teamPermanents(UUID playerId, Game game) {
++        java.util.List<Permanent> permanents = new java.util.ArrayList<>(game.getBattlefield().getAllActivePermanents(playerId));
++        for (UUID teammateId : game.getTeammates(playerId)) {
++            permanents.addAll(game.getBattlefield().getAllActivePermanents(teammateId));
++        }
++        return permanents;
++    }
++
+     public static PlayerEvaluateScore evaluate(UUID playerId, Game game, boolean useCombatPermanentScore) {
+         // TODO: add multi opponents support, so AI can take better actions
+         Player player = game.getPlayer(playerId);
+@@ -65,8 +74,8 @@ public final class GameStateEvaluator2 {
+             StringBuilder sbPlayer = new StringBuilder();
+             StringBuilder sbOpponent = new StringBuilder();
+ 
+-            // add values of player
+-            for (Permanent permanent : game.getBattlefield().getAllActivePermanents(playerId)) {
++            // add values of player (in a team game, of the player's team, rule 805)
++            for (Permanent permanent : teamPermanents(playerId, game)) {
+                 int onePermScore = evaluatePermanent(permanent, game, useCombatPermanentScore);
+                 playerPermanentsScore += onePermScore;
+                 if (logger.isDebugEnabled()) {
+@@ -79,8 +88,8 @@ public final class GameStateEvaluator2 {
+                 logger.debug(sbPlayer);
+             }
+ 
+-            // add values of opponent
+-            for (Permanent permanent : game.getBattlefield().getAllActivePermanents(opponent.getId())) {
++            // add values of opponent (in a team game, of the opponent's team)
++            for (Permanent permanent : teamPermanents(opponent.getId(), game)) {
+                 int onePermScore = evaluatePermanent(permanent, game, useCombatPermanentScore);
+                 opponentPermanentsScore += onePermScore;
+                 if (logger.isDebugEnabled()) {

@@ -204,6 +204,9 @@ class SeatChecks implements HumanGame.Hooks {
             player.graveyard().forEach(card -> names.add(card.name()));
             player.exile().forEach(card -> names.add(card.name()));
             player.commandZone().forEach(card -> names.add(card.name()));
+            if (player.hand() != null) {
+                player.hand().forEach(card -> names.add(card.name()));
+            }
         }
         view.revealed().forEach(group -> group.cards().forEach(card -> names.add(card.name())));
         names.remove(null);
@@ -277,6 +280,8 @@ class SeatChecks implements HumanGame.Hooks {
 
         Set<String> concealed = new HashSet<>(concealedNames.getOrDefault(seat, Set.of()));
         concealed.removeAll(everPublic);
+        // 810.5: a teammate's hand is the seat's to see; its library stays concealed.
+        concealed.removeAll(teammateHandNames(game, viewer));
         if (!concealed.isEmpty()) {
             names(EngineServer.JSON.toJsonTree(view), concealed, seat, "view");
             if (prompt != null) {
@@ -309,6 +314,7 @@ class SeatChecks implements HumanGame.Hooks {
                 reached.add("eliminated player shown");
             }
             commanders(game, refs, viewer, state, player);
+            teams(game, refs, viewer, state, player, where);
         }
         Player you = viewer == null ? null : game.getPlayer(viewer);
         if (you != null) {
@@ -474,6 +480,45 @@ class SeatChecks implements HumanGame.Hooks {
         }
     }
 
+    /**
+     * Two-Headed Giant: each player's team is the format's, teammates show the same (shared) life
+     * total, and a hand is shown only to its owner's teammate, card for card as XMage holds it.
+     */
+    private void teams(Game game, ObjectRefs refs, UUID viewer, SeatView.PlayerState state, Player player,
+                       String where) {
+        if (!request.format().teams()) {
+            check(state.team() == null && state.hand() == null, "no teams or shown hands outside team games");
+            return;
+        }
+        check(request.format().teamOf(state.seat()).equals(state.team()), "team" + where + state.team());
+        for (UUID teammateId : game.getTeammates(player.getId())) {
+            Player teammate = game.getPlayer(teammateId);
+            check(teammate.getLife() == player.getLife(), "shared life" + where + player.getLife() + ", teammate "
+                + teammate.getLife());
+        }
+        boolean teammate = viewer != null && game.getTeammates(viewer).contains(player.getId());
+        if (!teammate) {
+            check(state.hand() == null, "a hand shown to someone not on its owner's team" + where);
+            return;
+        }
+        reached.add("teammate hand shown");
+        List<UUID> shownHand = state.hand().stream().map(card -> refs.resolve(card.id()).orElse(null)).toList();
+        check(shownHand.size() == player.getHand().size() && player.getHand().containsAll(shownHand)
+            && state.hand().stream().noneMatch(SeatView.CardInfo::hidden), "teammate's hand" + where + shownHand.size()
+            + " cards, XMage " + player.getHand().size());
+    }
+
+    /** Names of the cards in the viewer's teammates' hands, which the viewer may see (810.5). */
+    private static Set<String> teammateHandNames(Game game, UUID viewer) {
+        Set<String> names = new HashSet<>();
+        if (viewer != null) {
+            for (UUID teammateId : game.getTeammates(viewer)) {
+                game.getPlayer(teammateId).getHand().getCards(game).forEach(card -> names.add(card.getName()));
+            }
+        }
+        return names;
+    }
+
     private void check(boolean condition, String what) {
         if (!condition) {
             fail("view disagrees with XMage: " + what);
@@ -487,12 +532,15 @@ class SeatChecks implements HumanGame.Hooks {
         }
     }
 
-    /** Cards whose identity the seat may not know: other players' hands and every library. */
+    /**
+     * Cards whose identity the seat may not know: other players' hands (but a teammate's, 810.5) and
+     * every library.
+     */
     private static Set<UUID> hiddenFrom(Game game, UUID viewer) {
         Set<UUID> hidden = new HashSet<>();
         for (Player player : game.getPlayers().values()) {
             hidden.addAll(player.getLibrary().getCardList());
-            if (!player.getId().equals(viewer)) {
+            if (!player.getId().equals(viewer) && (viewer == null || !game.getTeammates(viewer).contains(player.getId()))) {
                 hidden.addAll(player.getHand());
             }
         }
