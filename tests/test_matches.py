@@ -545,6 +545,7 @@ def test_a_match_holds_its_players_running_game_between_games(client, engine):
 
 def test_the_next_game_waits_for_a_free_slot(url, content, engine, monkeypatch):
     monkeypatch.setattr(matches, "RETRY_SECONDS", 0.2)
+    monkeypatch.setattr(matches, "BUSY_RETRY_SECONDS", 0.2)
     with serving(url, content, engine, games_max=1) as client:
         ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
         started = practice_match(ada, red(ada, client))

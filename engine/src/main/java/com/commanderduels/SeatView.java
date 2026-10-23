@@ -44,15 +44,20 @@ public record SeatView(
                                    boolean passAfterCasting, boolean fullControl) {}
 
     /**
+     * @param team          the player's team in a team game (Two-Headed Giant, since v0.5.0): 0 for
+     *                      seats 0 and 1, 1 for seats 2 and 3; null in other games. Teammates share
+     *                      one life total, so both show the team's
+     * @param hand          the player's hand, shown only to their teammate (810.5, FMT10); null for
+     *                      everyone else, whose hand appears only as a count
      * @param colorIdentity the combined colour identity of the player's commanders in WUBRG order
      *                      ("" for colourless); null outside Commander and before the game starts
      * @param commandZone   the objects in the command zone that the player owns or controls
      * @param commanders    one entry per commander the player owns; empty outside Commander
      */
-    public record PlayerState(int seat, String name, int life, Map<String, Integer> counters, int libraryCount,
-                              int handCount, List<CardInfo> graveyard, List<CardInfo> exile, ManaPoolInfo manaPool,
-                              boolean lost, boolean won, String colorIdentity, List<CardInfo> commandZone,
-                              List<CommanderState> commanders) {}
+    public record PlayerState(int seat, String name, Integer team, int life, Map<String, Integer> counters,
+                              int libraryCount, int handCount, List<CardInfo> hand, List<CardInfo> graveyard,
+                              List<CardInfo> exile, ManaPoolInfo manaPool, boolean lost, boolean won,
+                              String colorIdentity, List<CardInfo> commandZone, List<CommanderState> commanders) {}
 
     /**
      * One commander (FMT01). Its identity is public from the start of the game; its current object and

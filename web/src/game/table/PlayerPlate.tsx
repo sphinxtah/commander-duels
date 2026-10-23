@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { boxStyle, OptionMenu, useGameContext, useOptionMenu } from "../Board";
 import { CardFace } from "../Card";
 import { playerName, words } from "../model";
-import type { ManaPool, Seat } from "../types";
+import type { CardView, ManaPool, Seat } from "../types";
 import { AllianceControl, AlliancePills } from "./Alliance";
 import { MENU, diamondBox } from "./geometry";
 import { noteBlur, noteFocus } from "./pointer";
@@ -46,6 +46,13 @@ const poolColours: [keyof ManaPool, string][] = [
   ["green", "G"],
   ["colorless", "C"],
 ];
+
+/** A Two-Headed Giant teammate's hand (v0.5.0, 810.5), card names in the view's order. */
+function teammateHand(cards: CardView[]): string {
+  return cards.length === 0
+    ? "no cards"
+    : cards.map((card) => card.name ?? "a hidden card").join(", ");
+}
 
 /** The phase beside your portrait, as Magic Duels names it. */
 const phaseCaptions: Record<string, string> = {
@@ -250,20 +257,23 @@ function PlayerTarget({
 }
 
 /** A count in its small diamond: hand and library by name, the graveyard's for the eye only (its
- * tile is the button). */
+ * tile is the button). A Two-Headed Giant teammate's hand (v0.5.0) names its cards on hover. */
 function Count({
   at,
   count,
   label,
+  title,
 }: {
   at: Diamond;
   count: number;
   label?: string;
+  title?: string;
 }) {
   return (
     <span
       className={styles.diamond}
       style={diamondStyle(at)}
+      title={title}
       {...(label
         ? { role: "img", "aria-label": label }
         : { "aria-hidden": true })}
@@ -551,6 +561,11 @@ export function PlayerPlate({
         data-align={align}
         style={boxStyle(node.pills)}
       >
+        {player.teammate && (
+          <span className={styles.pill} data-tone="team">
+            Teammate
+          </span>
+        )}
         {player.active && <span className={styles.pill}>Active turn</span>}
         {player.priority && (
           <span className={styles.pill} data-tone="priority">
@@ -587,7 +602,12 @@ export function PlayerPlate({
       <Count
         at={node.counts.hand}
         count={p.hand_count}
-        label={`${p.hand_count} cards in hand`}
+        label={
+          p.hand
+            ? `${p.hand_count} cards in your teammate's hand: ${teammateHand(p.hand)}`
+            : `${p.hand_count} cards in hand`
+        }
+        title={p.hand ? `Your teammate's hand: ${teammateHand(p.hand)}` : undefined}
       />
       <Count at={node.counts.graveyard} count={p.graveyard.length} />
       <Count

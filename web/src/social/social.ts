@@ -25,6 +25,7 @@ export function playerLink(id: string): string {
 const formatNames: Record<string, string> = {
   commander: "Commander",
   legacy: "Legacy",
+  two_headed_giant: "Two-Headed Giant",
 };
 
 /** "Online", "Playing Commander at a table", "Idle"…; empty when the player does not share it. */

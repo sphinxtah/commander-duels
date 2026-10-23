@@ -145,13 +145,24 @@ final class SeatViews {
         }
         boolean commanderGame = game instanceof GameCommanderImpl;
         ManaPool pool = player.getManaPool();
+        // 810.5: teammates may look at each other's hands (FMT10's authorized teammate view).
+        List<SeatView.CardInfo> teammateHand = null;
+        if (viewer != null && game.getTeammates(viewer).contains(player.getId())) {
+            teammateHand = new ArrayList<>();
+            for (Card card : player.getHand().getCards(game)) {
+                teammateHand.add(card(card, true));
+            }
+        }
+        int seat = seatIds.indexOf(player.getId());
         return new SeatView.PlayerState(
-            seatIds.indexOf(player.getId()),
+            seat,
             player.getName(),
+            game instanceof TwoHeadedGiant giant ? Integer.valueOf(giant.teamOf(player.getId())) : null,
             player.getLife(),
             counters(player.getCountersAsCopy()),
             player.getLibrary().size(),
             player.getHand().size(),
+            teammateHand,
             graveyard,
             exile,
             new SeatView.ManaPoolInfo(pool.getWhite(), pool.getBlue(), pool.getBlack(), pool.getRed(), pool.getGreen(),

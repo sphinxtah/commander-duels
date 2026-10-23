@@ -49,12 +49,19 @@ test("connected shell, the main menu, all navigation, format dialog and saved pr
   expect((await page.request.get("/brand/favicon-32.png")).ok()).toBe(true);
   await page.getByRole("button", { name: "About this format" }).first().click();
   await expect(page.getByRole("dialog")).toBeVisible();
-  // Commander is open to play: only Two-Headed Giant is coming soon.
+  // Commander is open to play; Two-Headed Giant is early (v0.5.0), and nothing is coming soon.
   await expect(page.getByRole("dialog")).toContainText("OPEN TO PLAY");
   await expect(page.getByRole("dialog")).not.toContainText("planned");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  await expect(page.getByText("Coming soon")).toBeVisible();
+  const giant = page.locator('[data-format="two_headed_giant"]');
+  await expect(giant).toContainText("Early");
+  await expect(page.getByText("Coming soon")).toHaveCount(0);
+  await giant.getByRole("button", { name: "About this format" }).click();
+  await expect(page.getByRole("dialog")).toContainText("EARLY");
+  await expect(page.getByRole("dialog")).toContainText("a bot teammate");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).not.toBeVisible();
   // The title band's way back to the main menu.
   await page.getByRole("link", { name: "Main menu" }).click();
   await expect(page).toHaveURL(/#home$/);

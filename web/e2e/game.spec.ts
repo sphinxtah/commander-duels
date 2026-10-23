@@ -195,9 +195,18 @@ class Table {
           this.problems.push(
             `hand holds ${card.name}, not in this seat's deck`,
           );
-      for (const opponent of view.opponents)
-        for (const key of ["hand", "library"])
-          if (key in opponent) this.problems.push(`an opponent carries ${key}`);
+      // Since v0.5.0 every player carries `hand`, null but for a Two-Headed Giant teammate's,
+      // whose hand is the seat's to see (rule 810.5).
+      for (const opponent of view.opponents) {
+        const teammate =
+          opponent.team != null && opponent.team === view.you?.team;
+        for (const key of ["hand", "library"] as const)
+          if (
+            (opponent as unknown as Record<string, unknown>)[key] != null &&
+            !(key === "hand" && teammate)
+          )
+            this.problems.push(`an opponent carries ${key}`);
+      }
     }
     // As the engine's own check: a concealed name may not be a card's or an option's name, nor a
     // phrase in a prompt, before it has been public. Type lines and rules text are not checked,
@@ -294,7 +303,7 @@ async function signInSysop(page: Page) {
 async function startGame(
   page: Page,
   options: {
-    format: "Legacy" | "Commander";
+    format: "Legacy" | "Commander" | "Two-Headed Giant";
     deck: string;
     bots?: number;
     turnCap: number;
@@ -773,6 +782,43 @@ test.describe("practice games in the browser", () => {
         height,
         testInfo.outputPath(`commander-${width}.jpg`),
       );
+    expect(table.problems).toEqual([]);
+  });
+
+  test("a Two-Headed Giant table: a bot teammate against two bots, one life a team (v0.5.0)", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    // The teammate's hand is the player's to see (810.5); the opponents' decks stay concealed.
+    const mine = deckNames("legacy-mono-red-burn");
+    const teammate = deckNames("legacy-mono-green-creatures");
+    const concealed = new Set(
+      ["legacy-mono-white-weenie", "legacy-mono-blue-skies"]
+        .flatMap((deck) => [...deckNames(deck)])
+        .filter((name) => !mine.has(name) && !teammate.has(name)),
+    );
+    const table = new Table(page, new Set([...mine, ...teammate]), concealed);
+    await signInSysop(page);
+    await startGame(page, {
+      format: "Two-Headed Giant",
+      deck: "legacy-mono-red-burn",
+      turnCap: 4,
+    });
+    await expect(page.getByRole("article")).toHaveCount(3);
+    await expect(page.getByText("Teammate", { exact: true })).toBeVisible();
+    // The plates' articles are the canvas painter's accessible layer: present, not drawn.
+    await expect(
+      page.getByRole("article", { name: /seat 2, your teammate$/ }),
+    ).toHaveCount(1);
+    const { snapshot, answered } = await play(page, table, "mouse");
+    note(
+      testInfo,
+      `${snapshot.result!.kind} after ${snapshot.result!.turns} turns; ${answered} prompts`,
+    );
+    const view = snapshot.view!;
+    // One life total a team: teammates always show the same.
+    expect(view.opponents[0].life).toBe(view.you!.life);
+    expect(view.opponents[1].life).toBe(view.opponents[2].life);
     expect(table.problems).toEqual([]);
   });
 

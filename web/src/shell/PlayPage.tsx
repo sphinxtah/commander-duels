@@ -13,11 +13,16 @@ import styles from "./shell.module.css";
 const practiceFormats: Record<PracticeFormat["id"], true> = {
   commander: true,
   legacy: true,
+  two_headed_giant: true,
 };
 export function comingSoon(format: Format | undefined): boolean {
   return Boolean(
     format && !format.available && !(format.id in practiceFormats),
   );
+}
+/** A first playable version (v0.5.0: Two-Headed Giant against the bots), marked "Early". */
+export function early(format: Format | undefined): boolean {
+  return Boolean(format?.early) && !comingSoon(format);
 }
 const symbols: Record<string, string> = {
   commander: "♜",
@@ -84,8 +89,8 @@ export function PlayPage({
             </h1>
             <p>
               Find a game with other players in the queue, practice against the
-              bots in Legacy or Commander with your own decks, or sit down at a
-              table with an invite.
+              bots in Legacy, Commander or, early, Two-Headed Giant with your
+              own decks, or sit down at a table with an invite.
             </p>
           </div>
           <div className={styles.playActions}>
@@ -152,6 +157,10 @@ export function PlayPage({
                     <span className={shell.tag} data-tone="soon">
                       Coming soon
                     </span>
+                  ) : early(format) ? (
+                    <span className={shell.tag} data-tone="early">
+                      Early
+                    </span>
                   ) : (
                     <span className={shell.tag} data-tone="open">
                       Open to play
@@ -180,7 +189,11 @@ export function PlayPage({
           ×
         </button>
         <span className={shell.eyebrow}>
-          {comingSoon(selected) ? "COMING SOON" : "OPEN TO PLAY"}
+          {comingSoon(selected)
+            ? "COMING SOON"
+            : early(selected)
+              ? "EARLY"
+              : "OPEN TO PLAY"}
         </span>
         <h2 id="format-dialog-title">{selected?.name}</h2>
         <p>{selected?.description}</p>
@@ -191,7 +204,9 @@ export function PlayPage({
         <p>
           {comingSoon(selected)
             ? `${selected?.name} is coming soon.`
-            : "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables."}
+            : early(selected)
+              ? `An early version of ${selected?.name}: you and a bot teammate against two bots, with Legacy decks, from the practice table. Your team takes its turns together and shares one life total.`
+              : "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables."}
         </p>
         <button
           className={shell.primary}

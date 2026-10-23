@@ -440,3 +440,121 @@ describe("best of three at the practice table (v0.5.0)", () => {
     expect(screen.queryByRole("radio", { name: /^Best of three/ })).toBeNull();
   });
 });
+
+describe("Two-Headed Giant at the practice table (v0.5.0, early)", () => {
+  const player = {
+    ...sysop,
+    kind: "player",
+    handle: "pat",
+    permissions: ["games.play", "decks.edit", "profile.edit"],
+    roles: ["player"],
+  } as unknown as Me;
+  const giantOptions = {
+    formats: [
+      ...options.formats.map((f) => ({ ...f, decks: [], best_of: [1] })),
+      {
+        id: "two_headed_giant",
+        name: "Two-Headed Giant",
+        bots: [3],
+        default_bots: 3,
+        decks: [],
+        best_of: [1],
+      },
+    ],
+    deck_lists: false,
+    own_decks: true,
+  };
+  const legacy = summary({ id: "deck-l", title: "Red deck", format: "legacy" });
+  const commander = summary({
+    id: "deck-c",
+    title: "Skyward Patrol",
+    format: "commander",
+    card_count: 100,
+  });
+  const finished = {
+    id: "game-1",
+    kind: "practice",
+    format: "two_headed_giant",
+    status: "finished",
+    seats: [
+      { seat: 0, player: "human", handle: "pat", deck: "Red deck" },
+      { seat: 1, player: "bot", handle: null, deck: null },
+      { seat: 2, player: "bot", handle: null, deck: null },
+      { seat: 3, player: "bot", handle: null, deck: null },
+    ],
+    your_seat: 0,
+    bot_skill: 4,
+    turn_cap: 60,
+    created_at: "2026-10-22T10:00:00Z",
+    finished_at: "2026-10-22T10:20:00Z",
+    result: {
+      kind: "completed",
+      winner_seat: 0,
+      winner_seats: [0, 1],
+      draw: false,
+      turns: 11,
+      conceded_seats: [],
+    },
+    tokens: 28,
+  };
+
+  it("plays the player's Legacy decks with a bot teammate against two bots", async () => {
+    await navigate("#play");
+    const api = mockApi();
+    api.on("GET /api/v1/practice-games/options", () =>
+      reply(200, structuredClone(giantOptions)),
+    );
+    api.on("GET /api/v1/decks", () => reply(200, [legacy, commander]));
+    api.on("GET /api/v1/games", () => reply(200, [finished]));
+    api.on("GET /api/v1/matches", () => reply(200, []));
+    api.on("POST /api/v1/practice-games", () =>
+      reply(503, { code: "games_busy", message: "Busy." }),
+    );
+    render(
+      <StrictMode>
+        <PracticeTable me={player} />
+      </StrictMode>,
+    );
+    await settle();
+    const giant = screen.getByRole("radio", { name: /Two-Headed Giant/ });
+    expect(giant.closest("label")).toHaveTextContent(
+      "Early · a bot teammate against two bots, 30 life a team",
+    );
+    await act(async () => giant.click());
+    // Two-Headed Giant plays Legacy decks: the player's own, not the Commander one.
+    const deck = screen.getByLabelText("Your deck");
+    expect(deck).toHaveValue("own:deck-l");
+    expect(
+      within(deck)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Red deck"]);
+    expect(screen.queryByLabelText("Bots")).toBeNull();
+    for (const label of [
+      "Teammate's deck",
+      "Opponent 1's deck",
+      "Opponent 2's deck",
+    ])
+      expect(screen.getByLabelText(label)).toHaveValue("");
+    await act(async () =>
+      screen.getByRole("button", { name: "Start the game" }).click(),
+    );
+    await settle();
+    const started = api.calls.find(
+      (c) => c.route === "POST /api/v1/practice-games",
+    )!;
+    expect(started.options).toMatchObject({
+      body: {
+        format: "two_headed_giant",
+        deck_id: "deck-l",
+        bots: [{}, {}, {}],
+      },
+    });
+    // A game the team won: the player won it too.
+    const game = screen
+      .getAllByText("Two-Headed Giant")
+      .map((element) => element.closest("li"))
+      .find((item) => item !== null);
+    expect(game).toHaveTextContent("Won in 11 turns");
+  });
+});

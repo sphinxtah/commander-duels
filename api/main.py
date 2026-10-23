@@ -290,7 +290,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/v1/formats", response_model=list[Format])
     def formats() -> list[Format]:
-        # Practice games against the bots play Commander and Legacy (games.FIXTURE_DECKS).
+        # Practice games against the bots play these (games.FIXTURE_DECKS).
         return [
             Format(
                 id="commander",
@@ -308,12 +308,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 description="Two players. Deep card history. Your next decisive play.",
                 available=True,
             ),
+            # Early (v0.5.0): you and a bot teammate against two bots, on a patched XMage.
             Format(
                 id="two_headed_giant",
                 name="Two-Headed Giant",
                 seats=[4],
                 default_seats=4,
                 description="Two teams of two. Plan together and share the victory.",
+                available=True,
+                early=True,
             ),
         ]
 

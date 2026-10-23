@@ -1,0 +1,13 @@
+// Commander Duels engine fixture: mono-blue flyers and tempo, 60 cards, Legacy-legal (since v0.5.0, for Two-Headed Giant).
+// Simple cards only, no name shared with another Legacy fixture. Keep card lines contiguous: XMage's text importer treats a blank line as the sideboard switch.
+20 Island
+4 Coral Merfolk
+4 Cloud Sprite
+4 Vaporkin
+4 Welkin Tern
+4 Phantom Warrior
+4 Mist Raven
+4 Air Servant
+4 Vapor Snag
+4 Remove Soul
+4 Think Twice

@@ -4097,6 +4097,12 @@ export interface components {
             /** Description */
             description: string;
             /**
+             * Early
+             * @description A first playable version, against the bots only (v0.5.0: Two-Headed Giant).
+             * @default false
+             */
+            early: boolean;
+            /**
              * Id
              * @enum {string}
              */
@@ -4186,6 +4192,11 @@ export interface components {
             turns: number;
             /** Winner Seat */
             winner_seat: number | null;
+            /**
+             * Winner Seats
+             * @description Every winning seat (v0.5.0): the winner, or in Two-Headed Giant the winning team, whose first seat is winner_seat.
+             */
+            winner_seats?: number[];
         };
         /** GameSeat */
         GameSeat: {
@@ -4240,7 +4251,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /**
              * Id
              * Format: uuid
@@ -4657,7 +4668,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /**
              * Game Id
              * @description The game in play.
@@ -5163,14 +5174,14 @@ export interface components {
             /** Bots */
             bots: number[];
             /** Decks */
-            decks: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers")[];
+            decks: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "legacy-mono-white-weenie" | "legacy-mono-blue-skies" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers")[];
             /** Default Bots */
             default_bots: number;
             /**
              * Id
              * @enum {string}
              */
-            id: "legacy" | "commander";
+            id: "legacy" | "commander" | "two_headed_giant";
             /** Name */
             name: string;
         };
@@ -5193,11 +5204,11 @@ export interface components {
             bot_skill: number;
             /**
              * Bots
-             * @description One bot in Legacy; one to three in Commander (default three).
+             * @description One bot in Legacy; one to three in Commander (default three); three in Two-Headed Giant: your teammate, then the two opponents.
              */
             bots?: components["schemas"]["SeatChoice"][] | null;
             /** Deck */
-            deck?: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers") | null;
+            deck?: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "legacy-mono-white-weenie" | "legacy-mono-blue-skies" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers") | null;
             /**
              * Deck Id
              * @description One of your own decks: the game binds to a revision of it.
@@ -5213,7 +5224,7 @@ export interface components {
              * @default legacy
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /** @description Which cards the game's own decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
             /**
@@ -5263,7 +5274,7 @@ export interface components {
              * Game Format
              * @description In a game, or since v0.5.0 in a public queue: its format.
              */
-            game_format?: ("legacy" | "commander") | null;
+            game_format?: ("legacy" | "commander" | "two_headed_giant") | null;
             /**
              * Game Kind
              * @description In a game: a practice game against bots, or a human table.
@@ -6329,7 +6340,7 @@ export interface components {
          */
         SeatChoice: {
             /** Deck */
-            deck?: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers") | null;
+            deck?: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "legacy-mono-white-weenie" | "legacy-mono-blue-skies" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers") | null;
             /** Deck Id */
             deck_id?: string | null;
             /**

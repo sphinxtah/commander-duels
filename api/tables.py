@@ -76,7 +76,7 @@ from api.models import (
     User,
 )
 from api.roster import roster_of
-from api.schemas import BEST_OF_TEXT, BestOf, Contract, Error, GameFormatId, TableRules, casual
+from api.schemas import BEST_OF_TEXT, BestOf, Contract, Error, TableFormatId, TableRules, casual
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -91,7 +91,7 @@ Visibility = Literal["public", "private"]
 class TableRequest(Contract):
     """A new table: the host takes the first seat with one of their decks."""
 
-    format: GameFormatId = "legacy"
+    format: TableFormatId = "legacy"
     seats: int = Field(
         default=2,
         ge=2,
@@ -140,7 +140,7 @@ class TablePlayer(Contract):
 
 class TableView(Contract):
     code: str = Field(description="The invite link's code: #tables/<code>.")
-    format: GameFormatId
+    format: TableFormatId
     visibility: Visibility
     status: Literal["open", "started", "closed"]
     seats: int

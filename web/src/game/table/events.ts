@@ -475,11 +475,17 @@ function outcomeOf(
   model: TableModel,
   winner: Seat | null,
   draw: boolean,
+  winners: Seat[] = [],
 ): Outcome {
   if (draw) return "draw";
-  const seated = model.viewSeat !== null && !model.observing;
-  if (winner === null || !seated) return "over";
-  return winner === model.viewSeat ? "victory" : "defeat";
+  const viewSeat = model.observing ? null : model.viewSeat;
+  if (winner === null || viewSeat === null) return "over";
+  // A team wins together (Two-Headed Giant, v0.5.0): your teammate's win is yours.
+  return winner === viewSeat ||
+    winner === model.teammateSeat ||
+    winners.includes(viewSeat)
+    ? "victory"
+    : "defeat";
 }
 
 /** The diff with the end of the game told once, from the snapshot's result. `before` is the
@@ -500,7 +506,12 @@ export function withResult(
   if (!before && after)
     events.push({
       type: "result",
-      outcome: outcomeOf(model, after.winner_seat, after.draw),
+      outcome: outcomeOf(
+        model,
+        after.winner_seat,
+        after.draw,
+        after.winner_seats,
+      ),
     });
   return { baseline: false, events };
 }

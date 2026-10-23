@@ -87,8 +87,10 @@ MAX_GAMES = 5
 # Sideboarding between games: the next game starts once every player is ready, or after this long
 # with each deck as it is arranged.
 SIDEBOARD_SECONDS = 300.0
-# The next game asks again after this long when every game slot is in use or the engine is away.
+# The next game asks again after this long when the engine is away, and sooner when every game
+# slot is in use: a slot frees as any game ends, and asking costs no request to the engine.
 RETRY_SECONDS = 30.0
+BUSY_RETRY_SECONDS = 5.0
 RUNNING = ("playing", "sideboarding")
 # Results that end a match without one: someone closed the game, or the engine closed it after
 # nobody did anything for its idle timeout. Any other game without a winner adds a game.
@@ -761,7 +763,7 @@ async def next_game(hub: GameHub, match_id: UUID) -> None:
                 hub.reserve()
             except ApiError:
                 waiting_of(hub)[match_id] = BUSY
-                retry(hub, match_id)
+                retry(hub, match_id, BUSY_RETRY_SECONDS)
                 return
             try:
                 try:
@@ -770,7 +772,7 @@ async def next_game(hub: GameHub, match_id: UUID) -> None:
                     status, created = 503, None
                 if status == 429 or status >= 500 or (status == 201 and not created):
                     waiting_of(hub)[match_id] = BUSY if status == 429 else AWAY
-                    retry(hub, match_id)
+                    retry(hub, match_id, BUSY_RETRY_SECONDS if status == 429 else RETRY_SECONDS)
                     return
                 if status != 201:
                     # The engine refused the decks (a card it no longer knows): nothing to retry.
@@ -801,16 +803,17 @@ async def next_game(hub: GameHub, match_id: UUID) -> None:
                 hub.starting -= 1
 
 
-def retry(hub: GameHub, match_id: UUID) -> None:
-    """Asks for the next game again shortly, once however often it is asked meanwhile."""
+def retry(hub: GameHub, match_id: UUID, seconds: float | None = None) -> None:
+    """Asks for the next game again shortly (RETRY_SECONDS unless said), once however often it is
+    asked meanwhile."""
     pending = retrying_of(hub)
     if match_id not in pending:
         pending.add(match_id)
-        hub.spawn(again(hub, match_id))
+        hub.spawn(again(hub, match_id, RETRY_SECONDS if seconds is None else seconds))
 
 
-async def again(hub: GameHub, match_id: UUID) -> None:
-    await asyncio.sleep(RETRY_SECONDS)
+async def again(hub: GameHub, match_id: UUID, seconds: float) -> None:
+    await asyncio.sleep(seconds)
     retrying_of(hub).discard(match_id)
     await next_game(hub, match_id)
 

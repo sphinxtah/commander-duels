@@ -556,6 +556,32 @@ describe("the end of the game", () => {
       ]);
   });
 
+  it("tells a Two-Headed Giant team's win as the viewer's, whoever's flag it was (v0.5.0)", () => {
+    const giant = (v: GameView) => {
+      for (const p of [v.you!, ...v.opponents]) p.team = Math.floor(p.seat / 2);
+    };
+    const teamWon = finish(
+      "four",
+      ended({ winner_seat: 0, winner_seats: [0, 1] }),
+      (v) => {
+        giant(v);
+        v.opponents[0].won = true; // the teammate's flag
+      },
+    );
+    expect(results(teamWon.derived)).toEqual([
+      { type: "result", outcome: "victory" },
+    ]);
+    expect(results(teamWon.told)).toEqual([
+      { type: "result", outcome: "victory" },
+    ]);
+    const lost = finish(
+      "four",
+      ended({ winner_seat: 2, winner_seats: [2, 3] }),
+      giant,
+    );
+    expect(results(lost.told)).toEqual([{ type: "result", outcome: "defeat" }]);
+  });
+
   it("says nothing more once the result is known, and nothing on a baseline", () => {
     const a = fx("duel");
     const b = next(a, (v) => {

@@ -60,9 +60,11 @@ class Frames {
       for (const card of view.hand)
         if (card.name && !this.mine.has(card.name))
           this.problems.push(`hand holds ${card.name}, not this seat's card`);
+      // Since v0.5.0 every player carries `hand`, null at a human table.
       for (const opponent of view.opponents)
         for (const key of ["hand", "library"])
-          if (key in opponent) this.problems.push(`an opponent carries ${key}`);
+          if ((opponent as unknown as Record<string, unknown>)[key] != null)
+            this.problems.push(`an opponent carries ${key}`);
     }
     // Checked at the end against every name that became public by then.
     this.seen.push({ revision: snapshot.revision, text: frame });
@@ -343,7 +345,10 @@ test.describe("a human table in two browsers", () => {
       const tokens = (await host.evaluate(async () =>
         (await fetch("/api/v1/me/tokens")).json(),
       )) as { entries: { kind: string; amount: number; opponent: string }[] };
-      expect(tokens.entries[0]).toMatchObject({
+      // Since v0.5.0 the win may also complete a quest or earn an achievement, entered after it.
+      expect(
+        tokens.entries.find((entry) => entry.kind === "human_win"),
+      ).toMatchObject({
         kind: "human_win",
         amount: 50,
         opponent: "rival",

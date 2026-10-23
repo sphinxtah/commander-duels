@@ -190,6 +190,12 @@ h2 {
   color: var(--cd-gold-hi);
   background: #d5b77c14;
 }
+/* A first playable version (v0.5.0: Two-Headed Giant): open, but early. */
+.tag[data-tone="early"] {
+  border-color: #d5b77c80;
+  color: var(--cd-gold-hi);
+  background: #d5b77c14;
+}
 .footer {
   display: flex;
   flex-wrap: wrap;

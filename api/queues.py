@@ -91,9 +91,9 @@ from api.schemas import (
     BestOf,
     Contract,
     Error,
-    GameFormatId,
     PracticeGameRequest,
     SeatChoice,
+    TableFormatId,
     casual,
 )
 from api.tables import add_table_game, check_deck, open_table_of
@@ -138,7 +138,7 @@ SILENT = "The rules engine is not answering. Your game starts once it does."
 class QueueRequest(Contract):
     """A place in a queue, with one of your decks."""
 
-    format: GameFormatId = "legacy"
+    format: TableFormatId = "legacy"
     seats: int = Field(
         default=2,
         ge=2,
@@ -153,7 +153,7 @@ class QueueRequest(Contract):
 
 
 class QueueInfo(Contract):
-    format: GameFormatId
+    format: TableFormatId
     seats: int
     best_of: int
     name: str
@@ -168,7 +168,7 @@ class QueueStatus(Contract):
         "left, or your app stopped asking), or refused (taken out as the game started: reason "
         "and message say why)."
     )
-    format: GameFormatId | None
+    format: TableFormatId | None
     seats: int | None
     best_of: int = Field(default=1, description="3 in the best-of-three Legacy queue.")
     humans_only: bool
