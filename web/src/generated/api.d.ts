@@ -1601,6 +1601,47 @@ export interface paths {
         patch: operations["update_profile_api_v1_me_patch"];
         trace?: never;
     };
+    "/api/v1/me/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Achievements
+         * @description Every achievement with the account's progress, earning what it now qualifies for: a
+         *     history from before achievements existed earns here at the first look.
+         */
+        get: operations["my_achievements_api_v1_me_achievements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/achievements/pinned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Pin Badges
+         * @description Pins up to three earned badges to the profile, in order, in place of those pinned before.
+         */
+        put: operations["pin_badges_api_v1_me_achievements_pinned_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/alliance": {
         parameters: {
             query?: never;
@@ -1662,6 +1703,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My History */
+        get: operations["my_history_api_v1_me_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/privacy": {
         parameters: {
             query?: never;
@@ -1691,6 +1749,48 @@ export interface paths {
         get: operations["my_progress_api_v1_me_progress_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/quests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Quests
+         * @description Today's three quests, drawn now if this is the day's first look, with their progress. Wins
+         *     earlier today that complete one pay here.
+         */
+        get: operations["my_quests_api_v1_me_quests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/quests/{slot}/swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Swap Quest
+         * @description Today's swap: the slot's quest, not yet completed, gives way to another from a group the
+         *     other two do not hold. Once a day.
+         */
+        post: operations["swap_quest_api_v1_me_quests__slot__swap_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1746,6 +1846,23 @@ export interface paths {
          *     cards joins the library for good. Chosen once.
          */
         post: operations["choose_starters_api_v1_me_starters_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Stats */
+        get: operations["my_stats_api_v1_me_stats_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1858,6 +1975,66 @@ export interface paths {
         };
         /** Player Profile */
         get: operations["player_profile_api_v1_players__player_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players/{player_id}/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Badges
+         * @description A player's badges, pinned and earned, for whoever may open their profile.
+         */
+        get: operations["player_badges_api_v1_players__player_id__achievements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players/{player_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player History
+         * @description A player's games one by one: only their own, and SysOp's view of anyone's.
+         */
+        get: operations["player_history_api_v1_players__player_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/players/{player_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Stats
+         * @description A player's totals, for whoever may open their profile.
+         */
+        get: operations["player_stats_api_v1_players__player_id__stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2335,6 +2512,59 @@ export interface components {
              */
             wins: number;
         };
+        /** AchievementView */
+        AchievementView: {
+            /**
+             * Addition
+             * @description A Commander or Legacy addition (PROG07), not one of Magic Duels' own.
+             */
+            addition: boolean;
+            /** Description */
+            description: string;
+            /** Earned At */
+            earned_at: string | null;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "victories" | "commander" | "legacy" | "colours" | "bots" | "players" | "quests" | "shop" | "friends";
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Pin
+             * @description Its place among the pinned badges, 1 to 3.
+             */
+            pin: number | null;
+            /**
+             * Progress
+             * @description Towards the target, at most the target.
+             */
+            progress: number;
+            /** Target */
+            target: number;
+            /**
+             * Tokens
+             * @description Its one-time reward.
+             */
+            tokens: number;
+        };
+        /** Achievements */
+        Achievements: {
+            /**
+             * Achievements
+             * @description Every achievement, in their order.
+             */
+            achievements: components["schemas"]["AchievementView"][];
+            /** Earned */
+            earned: number;
+            /**
+             * Paid
+             * @description Tokens this look itself paid, for achievements it found earned.
+             */
+            paid: number;
+        };
         /** AdminCounts */
         AdminCounts: {
             /**
@@ -2598,6 +2828,21 @@ export interface components {
              * @enum {string}
              */
             signup_policy: "open" | "approval";
+        };
+        /**
+         * Award
+         * @description A daily quest completed or an achievement earned (v0.5.0), as the bell names it.
+         */
+        Award: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Tokens
+             * @description What it paid.
+             */
+            tokens: number;
         };
         /** BlockedPlayer */
         BlockedPlayer: {
@@ -3218,6 +3463,33 @@ export interface components {
             /** Type Line */
             type_line: string;
         };
+        /** DailyQuests */
+        DailyQuests: {
+            /**
+             * Can Swap
+             * @description Whether today's swap is still unused.
+             */
+            can_swap: boolean;
+            /**
+             * Day
+             * Format: date
+             * @description The day, in Arizona.
+             */
+            day: string;
+            /**
+             * Paid
+             * @description Tokens this look itself paid, for quests that wins before it completed.
+             */
+            paid: number;
+            /** Quests */
+            quests: components["schemas"]["QuestView"][];
+            /**
+             * Resets At
+             * Format: date-time
+             * @description Midnight in Arizona, when the next day's quests come.
+             */
+            resets_at: string;
+        };
         /** DeckCounts */
         DeckCounts: {
             /**
@@ -3525,6 +3797,35 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** EarnedBadge */
+        EarnedBadge: {
+            /**
+             * Addition
+             * @description A Commander or Legacy addition (PROG07), not one of Magic Duels' own.
+             */
+            addition: boolean;
+            /** Description */
+            description: string;
+            /**
+             * Earned At
+             * Format: date-time
+             */
+            earned_at: string;
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "victories" | "commander" | "legacy" | "colours" | "bots" | "players" | "quests" | "shop" | "friends";
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Tokens
+             * @description Its one-time reward.
+             */
+            tokens: number;
+        };
         /** EconomySettings */
         EconomySettings: {
             /**
@@ -3636,6 +3937,24 @@ export interface components {
             name: string;
             /** Seats */
             seats: number[];
+        };
+        /** FormatTotals */
+        FormatTotals: {
+            /** Draws */
+            draws: number;
+            /** Format */
+            format: string;
+            /** Games */
+            games: number;
+            /** Losses */
+            losses: number;
+            /**
+             * No Result
+             * @description Games with no result: a turn limit, an idle timeout, a closed or interrupted game.
+             */
+            no_result: number;
+            /** Wins */
+            wins: number;
         };
         /** FriendList */
         FriendList: {
@@ -3867,6 +4186,75 @@ export interface components {
              * @default 0.5.0
              */
             version: string;
+        };
+        /** HistoryEntry */
+        HistoryEntry: {
+            /**
+             * Colors
+             * @description The deck's colours, WUBRG letters.
+             */
+            colors: string;
+            /**
+             * Deck
+             * @description The player's own deck, as the seat names it.
+             */
+            deck: string | null;
+            /**
+             * Finished At
+             * Format: date-time
+             */
+            finished_at: string;
+            /** Format */
+            format: string;
+            /**
+             * Game Id
+             * Format: uuid
+             */
+            game_id: string;
+            /**
+             * Kind
+             * @description practice, table, or another kind of game.
+             */
+            kind: string;
+            /**
+             * Opponents
+             * @description Every other seat. Never their decks.
+             */
+            opponents: components["schemas"]["Opponent"][];
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "win" | "loss" | "draw" | "no_result";
+            /**
+             * Revision
+             * @description The deck's revision the game played (DECK01).
+             */
+            revision: number | null;
+            /** Seat */
+            seat: number;
+            /**
+             * Seconds
+             * @description How long the game lasted.
+             */
+            seconds: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Turns */
+            turns: number | null;
+        };
+        /** HistoryPage */
+        HistoryPage: {
+            /** Items */
+            items: components["schemas"]["HistoryEntry"][];
+            /**
+             * Next
+             * @description The cursor of the next, older page.
+             */
+            next: string | null;
         };
         /**
          * ImplementationList
@@ -4170,7 +4558,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -4223,6 +4611,8 @@ export interface components {
         /** NotificationItem */
         NotificationItem: {
             actor: components["schemas"]["PlayerRef"] | null;
+            /** @description For a quest completed or an achievement earned (v0.5.0): which, and what it paid. */
+            award?: components["schemas"]["Award"] | null;
             /**
              * Created At
              * Format: date-time
@@ -4237,7 +4627,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -4323,6 +4713,22 @@ export interface components {
             opened_at: string;
             product: components["schemas"]["ProductRef"];
         };
+        /** Opponent */
+        Opponent: {
+            /** Bot */
+            bot: boolean;
+            /** Bot Skill */
+            bot_skill: number | null;
+            /** @description The player at the seat; null for a bot or a player who has left. */
+            player: components["schemas"]["PlayerRef"] | null;
+            /** Seat */
+            seat: number;
+            /**
+             * Won
+             * @description Whether this seat won the game.
+             */
+            won: boolean;
+        };
         /**
          * PackArt
          * @description The picture of a sealed pack (v0.4.3), copied once and served from this site.
@@ -4370,6 +4776,14 @@ export interface components {
             /** Inventory */
             inventory: components["schemas"]["InventoryItem"][];
         };
+        /** Pins */
+        Pins: {
+            /**
+             * Achievements
+             * @description Up to three earned achievements, in order; none unpins all.
+             */
+            achievements: string[];
+        };
         /** PlaneswalkerInfo */
         PlaneswalkerInfo: {
             /**
@@ -4412,6 +4826,24 @@ export interface components {
              * @description The wins that open it.
              */
             wins: number;
+        };
+        /** PlayerBadges */
+        PlayerBadges: {
+            /**
+             * Earned
+             * @description Every badge earned, newest first.
+             */
+            earned: components["schemas"]["EarnedBadge"][];
+            /**
+             * Pinned
+             * @description Up to three, in the player's order.
+             */
+            pinned: components["schemas"]["EarnedBadge"][];
+            /**
+             * Total
+             * @description How many achievements there are.
+             */
+            total: number;
         };
         /** PlayerProfile */
         PlayerProfile: {
@@ -4947,6 +5379,34 @@ export interface components {
              * Format: uuid
              */
             product: string;
+        };
+        /** QuestView */
+        QuestView: {
+            /** Completed At */
+            completed_at: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Progress
+             * @description The wins counted so far, at most the target.
+             */
+            progress: number;
+            /** Slot */
+            slot: number;
+            /**
+             * Swapped
+             * @description Swapped in today: only games after the swap count.
+             */
+            swapped: boolean;
+            /**
+             * Target
+             * @description The wins it needs.
+             */
+            target: number;
+            /** Tokens */
+            tokens: number;
         };
         /**
          * ReaderChat
@@ -5749,6 +6209,24 @@ export interface components {
              */
             decks: string[];
         };
+        /** Stats */
+        Stats: {
+            /** @description Games where every other seat was a bot. */
+            against_bots: components["schemas"]["Totals"];
+            /** @description Games with at least one other player. */
+            against_players: components["schemas"]["Totals"];
+            /**
+             * Formats
+             * @description Each format played, Commander first.
+             */
+            formats: components["schemas"]["FormatTotals"][];
+            /**
+             * History
+             * @description Whether you may read this player's games one by one: your own, or SysOp.
+             */
+            history: boolean;
+            totals: components["schemas"]["Totals"];
+        };
         /** StatusChange */
         StatusChange: {
             /** Reason */
@@ -6041,7 +6519,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bot_win" | "human_win" | "back_pay" | "welcome" | "grant" | "pack";
+            kind: "bot_win" | "human_win" | "back_pay" | "welcome" | "grant" | "pack" | "quest" | "achievement";
             /**
              * Opponent
              * @description Whom the win beat: a bot by its skill, or a handle.
@@ -6056,7 +6534,7 @@ export interface components {
             balance: number;
             /**
              * Earned
-             * @description From wins, back pay included.
+             * @description From wins, back pay included, and since v0.5.0 daily quests and achievements.
              */
             earned: number;
             /**
@@ -6074,6 +6552,22 @@ export interface components {
              * @description On packs, as a positive number.
              */
             spent: number;
+        };
+        /** Totals */
+        Totals: {
+            /** Draws */
+            draws: number;
+            /** Games */
+            games: number;
+            /** Losses */
+            losses: number;
+            /**
+             * No Result
+             * @description Games with no result: a turn limit, an idle timeout, a closed or interrupted game.
+             */
+            no_result: number;
+            /** Wins */
+            wins: number;
         };
         /** Unread */
         Unread: {
@@ -14606,6 +15100,194 @@ export interface operations {
             };
         };
     };
+    my_achievements_api_v1_me_achievements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Achievements"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    pin_badges_api_v1_me_achievements_pinned_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Pins"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Achievements"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     join_alliance_api_v1_me_alliance_put: {
         parameters: {
             query?: never;
@@ -14978,6 +15660,101 @@ export interface operations {
             };
         };
     };
+    my_history_api_v1_me_history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     my_privacy_api_v1_me_privacy_get: {
         parameters: {
             query?: never;
@@ -15258,6 +16035,192 @@ export interface operations {
             };
         };
     };
+    my_quests_api_v1_me_quests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyQuests"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    swap_quest_api_v1_me_quests__slot__swap_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slot: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyQuests"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     my_sessions_api_v1_me_sessions_get: {
         parameters: {
             query?: never;
@@ -15453,6 +16416,98 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StarterResult"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_stats_api_v1_me_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Stats"];
                 };
             };
             /** @description Bad Request */
@@ -16017,6 +17072,291 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlayerProfile"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    player_badges_api_v1_players__player_id__achievements_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlayerBadges"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    player_history_api_v1_players__player_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string | null;
+            };
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoryPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    player_stats_api_v1_players__player_id__stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Stats"];
                 };
             };
             /** @description Bad Request */

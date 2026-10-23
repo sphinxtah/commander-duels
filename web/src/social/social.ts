@@ -66,7 +66,22 @@ export function notificationWords(item: NotificationItem): string {
         : item.messages === 1
           ? `${who} sent you a message.`
           : `${who} sent you messages.`;
+    case "quest_completed":
+      return item.award
+        ? `Quest complete: ${item.award.name}. +${item.award.tokens.toLocaleString("en-US")} tokens.`
+        : "You completed a daily quest.";
+    case "achievement_earned":
+      return item.award
+        ? `Achievement earned: ${item.award.name}. +${item.award.tokens.toLocaleString("en-US")} tokens.`
+        : "You earned an achievement.";
   }
+}
+
+/** Where a notification no player caused leads (v0.5.0): the quests' main menu, or Profile. */
+export function awardLink(item: NotificationItem): string | null {
+  if (item.kind === "quest_completed") return "#home";
+  if (item.kind === "achievement_earned") return "#profile";
+  return null;
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 days ago", then the date. */

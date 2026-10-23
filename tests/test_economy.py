@@ -24,6 +24,8 @@ url = test_progression.url
 content = test_progression.content
 engine = test_progression.engine
 client = test_progression.client
+# What daily quests and achievements pay (v0.5.0).
+REWARDS = ("quest", "achievement")
 
 
 def played(
@@ -66,12 +68,13 @@ def played(
 
 
 def ledger(client: TestClient, user_id: UUID) -> list[tuple[str, int, str | None]]:
+    """What wins paid. The achievements a win earns pay apart (v0.5.0, test_quests.py)."""
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
         return [
             (row.kind, row.amount, row.reason)
             for row in db.scalars(
                 select(TokenEntry)
-                .where(TokenEntry.user_id == user_id)
+                .where(TokenEntry.user_id == user_id, TokenEntry.kind.not_in(REWARDS))
                 .order_by(TokenEntry.created_at, TokenEntry.opponent_seat)
             )
         ]
@@ -105,8 +108,15 @@ def test_bot_wins_pay_per_bot_once(client):
         db.commit()
     assert ledger(client, ada.id) == [("bot_win", 20, None)] * 3
     tokens = ada.get("/api/v1/me/tokens").json()
-    assert (tokens["balance"], tokens["earned"], tokens["given"], tokens["spent"]) == (60, 60, 0, 0)
-    assert {line["opponent"] for line in tokens["entries"]} == {"a skill-6 bot"}
+    rewards = sum(line["amount"] for line in tokens["entries"] if line["kind"] in REWARDS)
+    assert (tokens["balance"], tokens["earned"], tokens["given"], tokens["spent"]) == (
+        60 + rewards,
+        60 + rewards,
+        0,
+        0,
+    )
+    wins = [line for line in tokens["entries"] if line["kind"] not in REWARDS]
+    assert {line["opponent"] for line in wins} == {"a skill-6 bot"}
     summary = ada.get(f"/api/v1/games/{won}").json()["game"]
     assert summary["tokens"] == 60
 

@@ -17,6 +17,8 @@ Since v0.4.3 players find each other with a search in the top bar, open each oth
 
 `#player/<id>` shows any active account with a handle, SysOp's included (the search never lists SysOp, but its notifications link to it): the handle, the portrait or avatar, the tier, the wins, the month the account began, the presence when shared, and what is between the two accounts. On a player's own profile it says so, with a link to Profile. Any other account is not found (`404`, as for a missing one). `GET /api/v1/players/{id}`.
 
+Since v0.5.0 a profile also shows the player's badges (the three they pinned first, then every one earned) and their record: games won, lost and drawn, by format and against bots or players. Their games one by one show only on their own profile and to SysOp ([quests, achievements and statistics](quests.md#statistics-and-the-match-history)).
+
 ## Friends
 
 - **Mutual** (the owner's decision). **Add friend** sends a request; the asker sees **Pending** until the other player accepts it, from the bell, the history, Friends or the asker's profile, or adds the asker back, which is the same thing. Either may withdraw or decline a request, or end a friendship (after a confirmation). `PUT /api/v1/friends/{id}` asks or accepts; `DELETE /api/v1/friends/{id}` withdraws, declines or ends.
@@ -40,7 +42,7 @@ A block (from the player's profile, after a confirmation) ends any friendship or
 ## Notifications and the bell
 
 - **The bell** sits in the top bar's right-hand corner, on every page of the app, with the count of unread notifications (also in the browser tab's title, with Administration's counts). It opens a bubble with the newest six and, at its bottom, **See all notifications**, the full history (`#notifications`), a page of 20 at a time with "Show older notifications". Opening either marks what it shows read. Escape, a click elsewhere or another page closes the bubble.
-- **What it tells** (`NotificationItem.kind`): a friend request (with Accept and Decline while it waits), a request accepted, and a friend coming online. The last goes only to friends online at that moment, and at most once in 30 minutes for the same friend. Since v0.4.4, `message`: new messages from a friend, one notification while unread with their count (`messages`), renewed by each message and read with the conversation; it opens the conversation ([chat](chat.md#friends-messages)).
+- **What it tells** (`NotificationItem.kind`): a friend request (with Accept and Decline while it waits), a request accepted, and a friend coming online. The last goes only to friends online at that moment, and at most once in 30 minutes for the same friend. Since v0.4.4, `message`: new messages from a friend, one notification while unread with their count (`messages`), renewed by each message and read with the conversation; it opens the conversation ([chat](chat.md#friends-messages)). Since v0.5.0, `quest_completed` and `achievement_earned`: a daily quest completed or an achievement earned, with no other player behind it, naming it and what it paid (`award`); the first opens the main menu, the second Profile ([quests](quests.md)).
 - **Pop-ups.** A notification that arrives while the app is open pops up beside the bell for 8 seconds, from the check-in's answer (`fresh`: unread notifications newer than the newest the page knew of). Nothing from before the page opened pops up. A message from a friend pops up the moment it arrives, from the chat's own connection, so its notification does not pop up again.
 - **Kept** 90 days, and at most the newest 200 per account; older ones go when a new one arrives. The bell alone: no email, no browser notifications.
 - `GET /api/v1/notifications?limit=&cursor=`, `POST /api/v1/notifications/read {up_to}`.
@@ -57,7 +59,7 @@ Resetting an account (v0.4.5, [resetting an account](identity.md#resetting-an-ac
 
 ## The data
 
-Migration `0015_friends`: `friendships` (one row a pair, whichever asked: `user_low` is the lower ID; `pending` or `accepted`), `player_blocks`, `notifications`, and on `users` the presence (`presence_at`, `active_at`) and the privacy settings (`presence_visibility`, `appear_offline`, `email_searchable`).
+Migration `0015_friends`: `friendships` (one row a pair, whichever asked: `user_low` is the lower ID; `pending` or `accepted`), `player_blocks`, `notifications`, and on `users` the presence (`presence_at`, `active_at`) and the privacy settings (`presence_visibility`, `appear_offline`, `email_searchable`). Migration `0021_quests_achievements` gives notifications their `subject`, the quest or achievement they name.
 
 ## Tests
 

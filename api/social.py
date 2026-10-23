@@ -22,7 +22,8 @@ describes them for players and staff.
   that the player appears offline; nothing tells the player.
 - **Notifications:** a friend request, a request accepted, and a friend come online, the last only
   to friends online at that moment and at most once in ONLINE_NOTICE_GAP for the same friend; since
-  v0.4.4 new messages from a friend too (api/chat.py), one while unread.
+  v0.4.4 new messages from a friend too (api/chat.py), one while unread; since v0.5.0 a daily quest
+  completed and an achievement earned (api/quests.py, api/achievements.py), with no actor.
   Kept NOTIFICATION_DAYS days, at most NOTIFICATION_LIMIT per account. The bell alone shows them:
   no email, no browser notifications.
 """
@@ -80,7 +81,15 @@ PENDING_LIMIT = 50
 
 FriendState = Literal["none", "friends", "requested", "requested_you"]
 PresenceState = Literal["in_game", "online", "idle", "offline"]
-NotificationKind = Literal["friend_request", "friend_accepted", "friend_online", "message"]
+NotificationKind = Literal[
+    "friend_request",
+    "friend_accepted",
+    "friend_online",
+    "message",
+    "quest_completed",
+    "achievement_earned",
+]
+AwardKind = Literal["quest_completed", "achievement_earned"]
 SearchText = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=320),
@@ -175,12 +184,25 @@ class CheckIn(Contract):
     )
 
 
+class Award(Contract):
+    """A daily quest completed or an achievement earned (v0.5.0), as the bell names it."""
+
+    id: str
+    name: str
+    tokens: int = Field(description="What it paid.")
+
+
 class NotificationItem(Contract):
     id: UUID
     kind: NotificationKind
     created_at: datetime
     read: bool
     actor: PlayerRef | None
+    award: Award | None = Field(
+        default=None,
+        description="For a quest completed or an achievement earned (v0.5.0): which, and what "
+        "it paid.",
+    )
     request_pending: bool = Field(
         default=False,
         description="For a friend request: whether it still waits for your answer.",
@@ -481,6 +503,14 @@ def notify(
     prune(db, user_id, now)
 
 
+def notify_award(db: Session, user_id: UUID, kind: AwardKind, subject: str, now: datetime) -> None:
+    """A quest completed or an achievement earned (v0.5.0): no player caused it, and the subject
+    names which."""
+    db.add(Notification(user_id=user_id, kind=kind, subject=subject, created_at=now))
+    db.flush()
+    prune(db, user_id, now)
+
+
 def notified_since(
     db: Session, user_id: UUID, kind: NotificationKind, actor_id: UUID, after: datetime
 ) -> bool:
@@ -530,7 +560,8 @@ def unread_of(db: Session, user_id: UUID) -> int:
 
 
 def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[NotificationItem]:
-    # Imported here: api.chat imports this module.
+    # Imported here: api.chat and api.awards import this module.
+    from api.awards import award_of
     from api.chat import unread_by_player
 
     unread = unread_by_player(db, viewer.id) if any(r.kind == "message" for r in rows) else {}
@@ -556,6 +587,7 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                 messages=unread.get(row.actor_id, 0)
                 if row.kind == "message" and row.actor_id
                 else 0,
+                award=award_of(row.kind, row.subject),
             )
         )
     return items

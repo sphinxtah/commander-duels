@@ -3,6 +3,7 @@ import { client, describe } from "../api";
 import { tierNames } from "../alliance/alliance";
 import { TierBadge } from "../alliance/TierBadge";
 import { useChatContext } from "../chat/chat";
+import { PlayerRecord } from "../records/PlayerRecord";
 import { PlayerPicture, PresenceLine } from "./PlayerBits";
 import type { PlayerProfile } from "./social";
 import styles from "./social.module.css";
@@ -11,7 +12,8 @@ import styles from "./social.module.css";
 // portrait, tier, wins and first day; their presence when they share it; and what is between the
 // two accounts. Friends are mutual: Add friend sends a request that waits ("Pending") until the
 // other player accepts it, here or from the bell, or adds back. Blocking ends any friendship or
-// request, and the blocked player no longer sees this account's presence or finds it.
+// request, and the blocked player no longer sees this account's presence or finds it. Since
+// v0.5.0 the page shows the player's badges and record too (records/PlayerRecord.tsx).
 
 type Action =
   "add" | "accept" | "withdraw" | "decline" | "remove" | "block" | "unblock";
@@ -298,6 +300,8 @@ export function PlayerPage({
       <p className={styles.said} role="status">
         {said}
       </p>
+      {/* Badges and totals for everyone, games one by one for the player and SysOp (v0.5.0). */}
+      <PlayerRecord playerId={profile.id} handle={profile.handle} />
     </>
   );
 }

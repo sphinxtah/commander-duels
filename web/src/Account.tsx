@@ -34,6 +34,7 @@ import { TierBadge } from "./alliance/TierBadge";
 import { loadGoogle } from "./google";
 import styles from "./Account.module.css";
 import { PrivacySettings } from "./social/PrivacySettings";
+import { RecordPanels } from "./records/RecordPanels";
 import shell from "./App.module.css";
 
 export const avatars: Record<Avatar, string> = {
@@ -965,6 +966,8 @@ export function Account({
             )
           )}
           <TokensPanel refresh={tokensShown} />
+          {/* The record, achievements and games one by one (v0.5.0). */}
+          <RecordPanels />
           <AlliancePanel me={me} standing={standing} alliance={alliance} />
           <section className={styles.panel}>
             <ProfileForm key={me.id} me={me} onChange={onChange} />

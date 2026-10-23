@@ -21,7 +21,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0023_matches"
-down_revision = "0020_account_reset"
+down_revision = "0021_quests_achievements"
 branch_labels = None
 depends_on = None
 

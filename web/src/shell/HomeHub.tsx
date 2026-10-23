@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type RefObject } from "react";
 import { Portrait } from "../alliance/Portrait";
 import { client, type Me, type Planeswalker, type Progress } from "../api";
+import { DailyQuests } from "../quests/DailyQuests";
 import type { Hud } from "./hud";
 import { Embers } from "./Embers";
 import { hoverSound, selectSound } from "./menuSound";
@@ -216,6 +217,8 @@ export function HomeHub({
           index={5}
         />
       </section>
+      {/* Today's three quests and the day's swap (v0.5.0). */}
+      <DailyQuests />
     </div>
   );
 }

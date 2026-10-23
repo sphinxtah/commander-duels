@@ -902,6 +902,9 @@ async def retried[T](work: Callable[[], T], what: str) -> T:
 
 
 def interrupt_active(database: Engine, before: datetime | None = None) -> list[UUID]:
+    # Imported here: api.awards reaches api.social, which imports api.admin, which imports this.
+    from api.awards import settle
+
     with Session(database) as db:
         active = select(Game.id).where(Game.status == "active")
         if before is not None:
@@ -913,6 +916,9 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
                 .where(Game.id.in_(ids))
                 .values(status="interrupted", finished_at=utcnow())
             )
+            # Each player's history shows the game, with no result (v0.5.0).
+            for game in db.scalars(select(Game).where(Game.id.in_(ids))):
+                settle(db, game)
             # Their matches (v0.5.0) count them as games without a result.
             from api import matches  # Imported here: api.matches imports this module.
 
@@ -923,10 +929,13 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
 
 def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, Any] | None) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
-    won it (api/progression.py) and the tokens it pays (api/economy.py), so a result is never
-    recorded without its win and its pay, or twice. Since v0.5.0 a match's game also counts in
-    its match (api/matches.py), which ends or goes on to its next game."""
-    from api import matches  # Imported here: api.matches imports this module.
+    won it (api/progression.py), the tokens it pays (api/economy.py), and since v0.5.0 the
+    players' results with the winner's quests and achievements (api/awards.py), so a result is
+    never recorded without its win, its pay and its rewards, or twice. Since v0.5.0 a match's
+    game also counts in its match (api/matches.py), which ends or goes on to its next game."""
+    # Imported here, as above; api.matches imports this module.
+    from api import matches
+    from api.awards import settle
 
     with Session(database) as db:
         game = db.get(Game, game_id)
@@ -938,6 +947,7 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             db.flush()
             count_win(db, game)
             pay_game(db, game)
+            settle(db, game)
             matches.game_ended(db, game)
             db.commit()
 
