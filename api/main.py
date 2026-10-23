@@ -309,7 +309,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 available=True,
             ),
             # Early (v0.5.0), on a patched XMage: at the practice table, and since v0.5.1 at human
-            # tables and in the public queue (alone or with a friend); some cards still misbehave.
+            # tables and in the public queue (alone or with a friend), with the card audit done;
+            # team priority (805.5-805.7) and 17 rare cards are not done yet.
             Format(
                 id="two_headed_giant",
                 name="Two-Headed Giant",

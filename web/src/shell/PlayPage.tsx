@@ -207,7 +207,7 @@ export function PlayPage({
           {comingSoon(selected)
             ? `${selected?.name} is coming soon.`
             : early(selected)
-              ? `Two teams of two, with Legacy decks: in the queue, alone or with a friend; at a table for four players, or players with bots as teammates or opponents; or with a bot teammate at the practice table. Your team takes its turns together, shares one life total and wins together. Early: a few cards that ask whose turn it is do not follow the team rules yet.`
+              ? `Two teams of two, with Legacy decks: in the queue, alone or with a friend; at a table for four players, or players with bots as teammates or opponents; or with a bot teammate at the practice table. Your team takes its turns together, shares one life total and wins together. Early: teammates still receive priority and make their choices one after the other rather than together, and a few rare cards do not follow the team rules yet.`
               : "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables."}
         </p>
         <button

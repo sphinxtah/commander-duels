@@ -9,7 +9,7 @@ What it proves:
 - The practice table's views pass every leak check with a teammate's hand shown to the human, and nothing of the opponents'.
 
 What it does not prove:
-- Four humans, or two humans with AI teammates, through the API and the browser (the engine plays them; tables do not offer them yet), team chat, or the full card audit. See [what remains](#what-remains-and-the-revised-estimate).
+- Four humans, or two humans with AI teammates, through the API and the browser (the engine plays them; tables do not offer them yet), team chat, or the full card audit. See [what remains](#what-remains-and-the-revised-estimate): v0.5.1 built all four.
 - That every card plays by rules 805 and 810: a sample of the card pool was read, and the cards known to misbehave were listed (v0.5.1 audited them: [the card audit](#the-card-audit-v051)).
 - Anything about face-down cards between teammates: a teammate's hand is shown, but their face-down permanents and spells stay hidden from them, as from everyone.
 
@@ -226,10 +226,10 @@ The note's estimate for the full format was three to five versions after the spi
 
 | Work | Status (v0.5.1) |
 | --- | --- |
-| **Four humans, and two humans with AI teammates** (FMT10): human tables with teams (`api/tables.py`: team seating, readiness by team, a team's concession), the human result paying both winners, and the browser's seat layout for two humans per team. The engine already plays any mix of humans and bots, as the scripted four-human game does | Being built in v0.5.1 (the teams and teamview agents) |
-| **Cooperative humans against AI** (two humans on a team against two bots): the same tables, with bots in the other team's seats | Being built in v0.5.1 (the teams agent) |
-| **A Two-Headed Giant queue**, solo or with a friend | Being built in v0.5.1 (the teams agent) |
-| **Team chat** (FMT10): the table chat's alliance channel (v0.4.4) as a fixed team channel, and the teammate's hand shown on the table (the view carries it) | Being built in v0.5.1 (the teams and teamview agents) |
+| **Four humans, and two humans with AI teammates** (FMT10): human tables with teams, bots in either team, readiness and Unified Deck Construction by team, one player's concession the team's (810.8b), both winners counted and paid, rematches keeping the teams; the browser's table for two humans per team | Done in v0.5.1 ([human tables](../tables.md#two-headed-giant-v051), [the game screen](../game-screen.md#two-headed-giant-v050-v051)) |
+| **Cooperative humans against AI** (two humans on a team against two bots) | Done in v0.5.1, at a table or from the queue |
+| **A Two-Headed Giant queue**, solo or with a friend | Done in v0.5.1 ([queues](../queues.md#two-headed-giant-v051)) |
+| **Team chat** (FMT10): the table chat's allies channel as the team's, fixed; and the teammate's hand shown on the table as cards (810.5) | Done in v0.5.1 ([chat](../chat.md#the-teams-channel-v051), [the teammate's hand](../game-screen.md#your-teammates-hand-8105-fmt10)) |
 | **The full card audit**: the misbehaving patterns patched (805.4d step triggers, 805.8 skips and turn control, 810.8a can't lose, 810.9d and 810.9f, 810.10a poison checks, Assist's mana count, "not your turn", 805.10c), the 134 cards that read the active player reviewed, with scripted tests for each pattern | Done in v0.5.1 ([the card audit](#the-card-audit-v051)); 17 cards still wrong, each with its reason in the review |
 | **The AI**: team attacks and blocks planned together, and the fifteen-counter poison check | Done in v0.5.1 as heuristics (patch 0005); the search still simulates one player at a time |
 | **805.5 to 805.7, team priority and team choices; 805.10b, attacks legal as a whole** | Not done: about a version (XMage's priority loop and the engine's prompts for two seats deciding together) |
