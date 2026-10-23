@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { client, describe } from "../api";
-import { CardTile } from "./CardViews";
+import { CardTable, CardTile, ViewSwitch } from "./CardViews";
 import { GodlikeCards } from "./CustomCards";
 import type { AllianceCards, CardSummary, CustomCard } from "./catalog";
 import styles from "./catalog.module.css";
+import type { CardView } from "./cardView";
 
 /** The allied Planeswalker's cards (v0.4.2), asked for once per visit to the Cards page. */
 export function useAllianceCards(): {
@@ -47,12 +48,17 @@ export function AllianceCardsView({
   error,
   custom,
   onOpen,
+  view,
+  onView,
 }: {
   cards: AllianceCards | undefined;
   error: string;
   /** The allied Planeswalker's custom cards (GET /custom-cards). */
   custom: CustomCard[];
   onOpen: (card: CardSummary) => void;
+  /** Pictures or a list (v0.5.0); the custom cards always show image and text together. */
+  view: CardView;
+  onView: (view: CardView) => void;
 }) {
   if (error)
     return (
@@ -95,14 +101,25 @@ export function AllianceCardsView({
         Planeswalker cards in your library while it lasts. Change it on{" "}
         <a href="#profile">your profile</a>.
       </p>
-      <p role="status" className={styles.resultLine}>
-        {`${cards.cards.length.toLocaleString()} ${cards.cards.length === 1 ? "card" : "cards"}`}
-      </p>
-      <ul className={styles.grid} aria-label={allianceTabName(cards)}>
-        {cards.cards.map((card) => (
-          <CardTile key={card.id} card={card} onOpen={onOpen} />
-        ))}
-      </ul>
+      <div className={styles.resultRow}>
+        <p role="status" className={styles.resultLine}>
+          {`${cards.cards.length.toLocaleString()} ${cards.cards.length === 1 ? "card" : "cards"}`}
+        </p>
+        {cards.cards.length > 0 && <ViewSwitch view={view} onChange={onView} />}
+      </div>
+      {view === "pictures" ? (
+        <ul className={styles.grid} aria-label={allianceTabName(cards)}>
+          {cards.cards.map((card) => (
+            <CardTile key={card.id} card={card} onOpen={onOpen} />
+          ))}
+        </ul>
+      ) : (
+        <CardTable
+          cards={cards.cards}
+          label={allianceTabName(cards)}
+          onOpen={onOpen}
+        />
+      )}
     </section>
   );
 }

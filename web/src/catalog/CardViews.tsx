@@ -14,6 +14,7 @@ import {
   type PrintingSummary,
 } from "./catalog";
 import styles from "./catalog.module.css";
+import type { CardView } from "./cardView";
 
 /** The card's printed image over its text: a missing or slow image never hides the text. */
 export function CardImage({
@@ -153,6 +154,81 @@ export function CardTile({
       <OwnedNote card={card} />
       {children}
     </li>
+  );
+}
+
+/** The Cards page's switch between the cards' pictures and a list of them (v0.5.0). */
+export function ViewSwitch({
+  view,
+  onChange,
+}: {
+  view: CardView;
+  onChange: (view: CardView) => void;
+}) {
+  return (
+    <div className={styles.viewSwitch} role="group" aria-label="Show cards as">
+      {(["pictures", "list"] as const).map((item) => (
+        <button
+          key={item}
+          type="button"
+          aria-pressed={view === item}
+          onClick={() => onChange(item)}
+        >
+          {item === "pictures" ? "Pictures" : "List"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Cards as a list (v0.5.0): name and cost, type, and for a player who builds from a library, the
+ * copies it holds. */
+export function CardTable({
+  cards,
+  label,
+  onOpen,
+}: {
+  cards: CardSummary[];
+  label: string;
+  onOpen: (card: CardSummary) => void;
+}) {
+  const owned = cards.some((card) => ownedWords(card) !== null);
+  return (
+    <div className={styles.libraryScroll}>
+      <table className={styles.libraryTable} aria-label={label}>
+        <thead>
+          <tr>
+            <th scope="col">Card</th>
+            <th scope="col">Type</th>
+            {owned && <th scope="col">In your library</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map((card) => (
+            <tr key={card.id} data-playable={card.playable}>
+              <th scope="row">
+                <button
+                  type="button"
+                  className={styles.cardLink}
+                  onClick={() => onOpen(card)}
+                >
+                  {card.name}
+                </button>{" "}
+                <ManaCost cost={card.mana_cost} />
+              </th>
+              <td>{card.type_line}</td>
+              {owned && (
+                <td>
+                  {card.owned === null || card.owned === undefined
+                    ? "Any number"
+                    : card.owned || "None"}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

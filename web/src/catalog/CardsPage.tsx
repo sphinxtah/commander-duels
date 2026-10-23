@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { client, type Me } from "../api";
-import { CardDetails, CardTile } from "./CardViews";
+import { CardDetails, CardTable, CardTile, ViewSwitch } from "./CardViews";
+import { useCardView } from "./cardView";
 import {
   AllianceCardsView,
   allianceTabName,
@@ -94,6 +95,8 @@ function Browser({
   const [search, setSearch] = useState<Search>({ ...emptySearch });
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<CardSummary>();
+  // Pictures or a list (v0.5.0), the same on every tab and remembered in this browser.
+  const [shownAs, setShownAs] = useCardView();
   const dialog = useRef<HTMLDialogElement>(null);
   const status = useCatalogStatus();
   const custom = useCustomCards();
@@ -136,13 +139,17 @@ function Browser({
           </button>
         ))}
       </div>
-      {view === "library" && <MyLibrary onOpen={setOpen} />}
+      {view === "library" && (
+        <MyLibrary onOpen={setOpen} view={shownAs} onView={setShownAs} />
+      )}
       {view === "alliance" && (
         <AllianceCardsView
           cards={alliance.cards}
           error={alliance.error}
           custom={custom}
           onOpen={setOpen}
+          view={shownAs}
+          onView={setShownAs}
         />
       )}
       {view === "catalog" && (
@@ -162,19 +169,23 @@ function Browser({
                   ? `${resultWords(results.total, shown.owned)}${loading ? " · searching…" : ""}`
                   : "Searching…"}
             </p>
+            <ViewSwitch view={shownAs} onChange={setShownAs} />
           </div>
           {error && (
             <p role="alert" className={styles.refusal}>
               {error}
             </p>
           )}
-          {results && (
-            <ul className={styles.grid} aria-label="Cards">
-              {results.items.map((card) => (
-                <CardTile key={card.id} card={card} onOpen={setOpen} />
-              ))}
-            </ul>
-          )}
+          {results &&
+            (shownAs === "pictures" ? (
+              <ul className={styles.grid} aria-label="Cards">
+                {results.items.map((card) => (
+                  <CardTile key={card.id} card={card} onOpen={setOpen} />
+                ))}
+              </ul>
+            ) : (
+              <CardTable cards={results.items} label="Cards" onOpen={setOpen} />
+            ))}
           {results && results.total > PAGE_SIZE && (
             <nav className={styles.pager} aria-label="Result pages">
               <button

@@ -206,6 +206,31 @@
   align-items: baseline;
   gap: 4px 14px;
 }
+/* Pictures or a list (v0.5.0): two joined buttons at the end of the result line. */
+.viewSwitch {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.viewSwitch button {
+  border: 0;
+  background: transparent;
+  padding: 5px 12px;
+  color: var(--cd-muted);
+  font-size: 0.8rem;
+}
+.viewSwitch button + button {
+  border-left: 1px solid var(--cd-gold-line);
+}
+.viewSwitch button[aria-pressed="true"] {
+  background: #d5b77c1f;
+  color: var(--cd-gold-hi);
+}
+.viewSwitch button:hover {
+  color: var(--cd-gold-hi);
+}
 .textButton {
   padding: 0;
   border: 0;
@@ -317,6 +342,11 @@
 }
 .owned[data-owned="false"] {
   color: #8f9e94;
+}
+/* Where a library's copies came from, under its tile (v0.5.0). */
+.tileSources {
+  color: #8f9e94;
+  font-size: 0.72rem;
 }
 .note {
   display: block;

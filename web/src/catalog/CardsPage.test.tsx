@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
 import { card, mockApi, reply } from "../decks/fixtures";
 import { buildsFromLibrary, ownedWords, type CustomCard } from "./catalog";
@@ -83,6 +83,17 @@ function searches(api: ReturnType<typeof mockApi>) {
     );
 }
 
+beforeAll(() => {
+  // jsdom has no modal dialogs; a card opens in one.
+  const dialog = HTMLDialogElement.prototype;
+  dialog.showModal ??= function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  };
+  dialog.close ??= function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+    this.dispatchEvent(new Event("close"));
+  };
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe("the Cards page", () => {
@@ -221,11 +232,35 @@ describe("the Cards page", () => {
     const tab = screen.getByRole("tab", { name: "My library" });
     fireEvent.click(tab);
     expect(tab).toHaveAttribute("aria-selected", "true");
-    const table = await screen.findByRole("table", { name: "Your library" });
+    // The cards themselves first (v0.5.0, the owner's request): each with its copies and sources.
+    const tiles = await screen.findByRole("list", { name: "Your library" });
     expect(screen.getByText("3 cards, 7 copies")).toHaveAttribute(
       "role",
       "status",
     );
+    expect(screen.queryByRole("table")).toBeNull();
+    const tile = within(tiles)
+      .getByRole("button", {
+        name: "Lightning Bolt, Artifact, in your library: 2",
+      })
+      .closest("li")!;
+    expect(tile).toHaveTextContent("In your library: 2");
+    expect(tile).toHaveTextContent("Your earlier decks, Starter decks");
+    fireEvent.change(screen.getByLabelText("From"), {
+      target: { value: "alliance" },
+    });
+    expect(within(tiles).getAllByRole("listitem")).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "" } });
+
+    // The list is a switch away, and the browser remembers it.
+    const switches = screen.getByRole("group", { name: "Show cards as" });
+    expect(
+      within(switches).getByRole("button", { name: "Pictures" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(within(switches).getByRole("button", { name: "List" }));
+    expect(localStorage.getItem("cd.cards.view.v1")).toBe("list");
+    const table = screen.getByRole("table", { name: "Your library" });
+    expect(screen.queryByRole("list", { name: "Your library" })).toBeNull();
     const row = screen
       .getByRole("button", { name: "Lightning Bolt" })
       .closest("tr")!;
@@ -259,6 +294,81 @@ describe("the Cards page", () => {
     });
     expect(within(table).getAllByRole("row")).toHaveLength(2);
     expect(within(table).getByText("Arcane Signet")).toBeInTheDocument();
+  });
+
+  it("shows every tab as pictures or as a list, the same on each and remembered (v0.5.0)", async () => {
+    const api = pageApi();
+    api.on("GET /api/v1/cards", () => reply(200, page([ownedBolt, golem])));
+    const teferi = card("Teferi, Temporal Archmage", {
+      type_line: "Legendary Planeswalker — Teferi",
+      owned: 4,
+    });
+    api.on("GET /api/v1/me/alliance/cards", () =>
+      reply(200, {
+        alliance: "teferi",
+        name: "Teferi",
+        custom: false,
+        cards: [teferi],
+      }),
+    );
+    const { unmount } = render(<CardsPage me={player} heading={createRef()} />);
+    await screen.findByText("2 cards");
+    expect(screen.getByRole("list", { name: "Cards" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    const table = screen.getByRole("table", { name: "Cards" });
+    expect(screen.queryByRole("list", { name: "Cards" })).toBeNull();
+    expect(
+      within(table)
+        .getAllByRole("row")
+        .map((row) =>
+          within(row)
+            .queryAllByRole("cell")
+            .map((cell) => cell.textContent),
+        ),
+    ).toEqual([[], ["Artifact", "2"], ["Artifact", "None"]]);
+    // A name in the list opens the card, as its picture does.
+    api.on("GET /api/v1/cards/{card_id}", () => new Promise(() => {}));
+    fireEvent.click(
+      within(table).getByRole("button", { name: "Lightning Bolt" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Lightning Bolt" }),
+    ).toBeInTheDocument();
+
+    // The alliance's tab follows the same switch.
+    fireEvent.click(screen.getByRole("tab", { name: "Teferi's cards" }));
+    const section = screen.getByRole("region", { name: "Teferi's cards" });
+    expect(
+      within(section).getByRole("table", { name: "Teferi's cards" }),
+    ).toHaveTextContent("Teferi, Temporal Archmage");
+    fireEvent.click(within(section).getByRole("button", { name: "Pictures" }));
+    expect(
+      within(section).getByRole("list", { name: "Teferi's cards" }),
+    ).toBeInTheDocument();
+
+    // A later visit opens as it was left.
+    fireEvent.click(within(section).getByRole("button", { name: "List" }));
+    unmount();
+    render(<CardsPage me={player} heading={createRef()} />);
+    expect(
+      await screen.findByRole("table", { name: "Cards" }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens in pictures when the browser keeps nothing", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    const api = pageApi();
+    api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
+    render(<CardsPage me={player} heading={createRef()} />);
+    await screen.findByText("1 card");
+    expect(screen.getByRole("list", { name: "Cards" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getByRole("table", { name: "Cards" })).toBeInTheDocument();
   });
 
   it("shows nothing at all of the Godlike tier's cards below that tier, and an alliance tab with none", async () => {
