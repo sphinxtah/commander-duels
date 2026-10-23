@@ -10,7 +10,6 @@ import java.util.UUID;
 import mage.constants.MultiplayerAttackOption;
 import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
-import mage.counters.CounterType;
 import mage.game.GameException;
 import mage.game.GameImpl;
 import mage.game.match.MatchImpl;
@@ -23,7 +22,8 @@ import mage.players.Player;
 /**
  * Two-Headed Giant (rule 810): two teams of two players, with shared team turns (rule 805).
  *
- * <p>The rules live in XMage, patched for this (engine/xmage/patches, 0001 and 0002): a team takes
+ * <p>The rules live in XMage, patched for this (engine/xmage/patches, 0001 and 0002, and v0.5.1's
+ * card audit, 0004 to 0006, for the rest of rules 805 and 810 that cards rely on): a team takes
  * one turn together, in which both its players untap, draw, have main phases and attack together;
  * the defending team blocks together; teammates are not opponents; and each team shares one life
  * total. This game type names the teams for those rules ({@link #getTeammates}) and adds what
@@ -111,21 +111,12 @@ final class TwoHeadedGiant extends GameImpl {
         }
     }
 
-    /** 810.10: poison counters are given to each player, but the team has them all. */
+    /**
+     * 810.8d. Poison counters are given to each player, but the team has them all (810.10): the
+     * patched XMage counts a player's teammates' with theirs ({@code Game.getPoisonCounters}).
+     */
     @Override
-    protected int getPoisonCounters(Player player) {
-        int counters = player.getCountersCount(CounterType.POISON);
-        for (UUID teammateId : getTeammates(player.getId())) {
-            Player teammate = getPlayer(teammateId);
-            if (teammate != null) {
-                counters += teammate.getCountersCount(CounterType.POISON);
-            }
-        }
-        return counters;
-    }
-
-    @Override
-    protected int getPoisonCountersToLose() {
+    public int getPoisonCountersToLose() {
         return POISON_TO_LOSE;
     }
 

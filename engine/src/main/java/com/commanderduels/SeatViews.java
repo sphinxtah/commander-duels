@@ -108,7 +108,8 @@ final class SeatViews {
         return new SeatView(
             viewer == null ? null : seatIds.indexOf(viewer),
             game.getTurnNum(),
-            seatOrNull(game.getActivePlayerId()),
+            // The turn's holder: in Two-Headed Giant an ability may act for the holder's teammate (805.9)
+            seatOrNull(state.getActivePlayerId()),
             seatOrNull(state.getPriorityPlayerId()),
             game.getTurnPhaseType() == null ? null : game.getTurnPhaseType().name().toLowerCase(Locale.ROOT),
             game.getTurnStepType() == null ? null : game.getTurnStepType().name().toLowerCase(Locale.ROOT),

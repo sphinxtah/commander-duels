@@ -1,0 +1,140 @@
+Two-Headed Giant (Commander Duels v0.5.1 card audit): the computer player attacks and blocks as a team.
+
+Reason: XMage's AI declares its own attackers and blockers alone. In a team game (Game.getTeammates,
+from part 1) its lethal-attack check now counts the attackers its teammate has declared or, when it
+declares first (it holds the team's turn), could declare (805.10b), against the defending team's
+blockers together (805.10d); a defending AI leaves alone the attackers its teammate has blocked; and
+the poison part of the lethal check counts the defending team's counters against the format's number
+(810.10, 810.8d: 15 in Two-Headed Giant) instead of a player's own against ten. Other games are
+unchanged.
+Needs parts 1 and 3 (Game.getPoisonCounters, getPoisonCountersToLose).
+Upstream: none yet; to be offered to magefree/mage with the other parts.
+Remove when: XMage upstream's AI supports teams, or Two-Headed Giant is dropped.
+
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+index ca070e50..d8ec815e 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+@@ -17,6 +17,7 @@ import mage.counters.CounterType;
+ import mage.filter.StaticFilters;
+ import mage.game.Game;
+ import mage.game.combat.Combat;
++import mage.game.combat.CombatGroup;
+ import mage.game.events.GameEvent;
+ import mage.game.permanent.Permanent;
+ import mage.game.stack.StackAbility;
+@@ -903,6 +904,16 @@ public class ComputerPlayer6 extends ComputerPlayer {
+             if (attackers == null) {
+                 return;
+             }
++            if (!game.getTeammates(playerId).isEmpty()) {
++                // 805.10d: the defending team blocks together; attackers the teammate blocked are covered
++                attackers.removeIf(attacker -> {
++                    CombatGroup group = game.getCombat().findGroup(attacker.getId());
++                    return group != null && !group.getBlockers().isEmpty();
++                });
++                if (attackers.isEmpty()) {
++                    return;
++                }
++            }
+ 
+             List<Permanent> possibleBlockers = super.getAvailableBlockers(game);
+             possibleBlockers = filterOutNonblocking(game, attackers, possibleBlockers);
+@@ -1003,11 +1014,17 @@ public class ComputerPlayer6 extends ComputerPlayer {
+                 if (attackersList.isEmpty()) {
+                     continue;
+                 }
+-                List<Permanent> possibleBlockers = defender.getAvailableBlockers(game);
+-                List<Permanent> killers = CombatUtil.canKillOpponent(game, attackersList, possibleBlockers, defender);
++                List<Permanent> possibleBlockers = defendingTeamBlockers(defender, game);
++                // 805.10b: with shared team turns, the active team plans one attack: its other players'
++                // attackers count towards a lethal attack, and each player declares its own
++                List<Permanent> myAttackers = attackersList;
++                List<Permanent> killers = CombatUtil.canKillOpponent(game, teamAttackers(attackersList, defenderId, game),
++                        possibleBlockers, defender);
+                 if (!killers.isEmpty()) {
+                     for (Permanent attacker : killers) {
+-                        attackingPlayer.declareAttacker(attacker.getId(), defenderId, game, false);
++                        if (myAttackers.contains(attacker)) {
++                            attackingPlayer.declareAttacker(attacker.getId(), defenderId, game, false);
++                        }
+                     }
+                     return;
+                 }
+@@ -1025,7 +1042,7 @@ public class ComputerPlayer6 extends ComputerPlayer {
+                 if (attackersList.isEmpty()) {
+                     continue;
+                 }
+-                List<Permanent> possibleBlockers = defender.getAvailableBlockers(game);
++                List<Permanent> possibleBlockers = defendingTeamBlockers(defender, game);
+ 
+                 // The AI will now attack more sanely.  Simple, but good enough for now.
+                 // The sim minmax does not work at the moment.
+@@ -1153,6 +1170,52 @@ public class ComputerPlayer6 extends ComputerPlayer {
+         }
+     }
+ 
++    /** 805.10d: with shared team turns, the defending team blocks together. */
++    private static List<Permanent> defendingTeamBlockers(Player defender, Game game) {
++        List<Permanent> blockers = defender.getAvailableBlockers(game);
++        for (UUID teammateId : game.getTeammates(defender.getId())) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate != null && teammate.isInGame()) {
++                blockers = new ArrayList<>(blockers);
++                blockers.addAll(teammate.getAvailableBlockers(game));
++            }
++        }
++        return blockers;
++    }
++
++    /**
++     * 805.10b: with shared team turns, the attack is the active team's. The creatures that will attack
++     * with this player's: its teammates' already attacking and, while they have yet to declare (the
++     * turn's holder declares first), the ones they could attack with. Just this player's outside team
++     * games.
++     */
++    private List<Permanent> teamAttackers(List<Permanent> attackers, UUID defenderId, Game game) {
++        Set<UUID> teammates = game.getTeammates(playerId);
++        if (teammates.isEmpty()) {
++            return attackers;
++        }
++        List<Permanent> team = new ArrayList<>(attackers);
++        boolean teammatesToDeclare = playerId.equals(game.getState().getActivePlayerId());
++        for (UUID teammateId : teammates) {
++            Player teammate = game.getPlayer(teammateId);
++            if (teammate == null || !teammate.isInGame()) {
++                continue;
++            }
++            for (UUID attackerId : game.getCombat().getAttackers()) {
++                Permanent attacker = game.getPermanent(attackerId);
++                if (attacker != null && attacker.isControlledBy(teammateId)) {
++                    team.add(attacker);
++                }
++            }
++            if (teammatesToDeclare) {
++                teammate.getAvailableAttackers(defenderId, game).stream()
++                        .filter(attacker -> !team.contains(attacker))
++                        .forEach(team::add);
++            }
++        }
++        return team;
++    }
++
+     @Override
+     public void selectAttackers(Game game, UUID attackingPlayerId) {
+         logger.debug("selectAttackers");
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/util/CombatUtil.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/util/CombatUtil.java
+index 32bc78c7..fbd951ea 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/util/CombatUtil.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/util/CombatUtil.java
+@@ -61,7 +61,9 @@ public final class CombatUtil {
+             return blockableAttackers;
+         }
+ 
+-        if (sumPoisonDamage(attackersThatWontBeBlocked, defender) >= 10 - defender.getCountersCount(CounterType.POISON)) {
++        // 810.10, 810.8d: with shared team poison, the defending team's counters against the format's count
++        if (sumPoisonDamage(attackersThatWontBeBlocked, defender)
++                >= game.getPoisonCountersToLose() - game.getPoisonCounters(defender.getId())) {
+             blockableAttackers.addAll(unblockableAttackers);
+             return blockableAttackers;
+         }
