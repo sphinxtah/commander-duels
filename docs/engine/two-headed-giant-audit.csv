@@ -1,0 +1,837 @@
+card,class,pattern,verdict,change,note
+Alluring Suitor,AlluringSuitor,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Creepy Puppeteer,CreepyPuppeteer,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Curse of Chaos,CurseOfChaos,805.10c attacking player,fixed,0006 Combat.getAttackingPlayerOf,
+Curse of Inertia,CurseOfInertia,805.10c attacking player,fixed,0006 Combat.getAttackingPlayerOf,
+Curse of Shallow Graves,CurseOfShallowGraves,805.10c attacking player,fixed,0006 Combat.getAttackingPlayerOf,
+Desert Were-Worm,DesertWereWorm,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Duelist's Heritage,DuelistsHeritage,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Fight or Flight,FightOrFlight,805.10c attacking player,fixed,0006 the opponent whose step it is (805.9),
+Flummoxed Cyclops,FlummoxedCyclops,805.10c attacking player,right,opponents of the controller: the other team either way,
+"Gideon, the Oathsworn",GideonTheOathsworn,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Invasion Plans,InvasionPlans,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
+Master Warcraft,MasterWarcraft,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
+Mob Mentality,MobMentality,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Overwhelming Instinct,OverwhelmingInstinct,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
+Tenuous Truce,TenuousTruce,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
+Territorial Hellkite,TerritorialHellkite,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
+"Tomik, Wielder of Law",TomikWielderOfLaw,805.10c attacking player,right,opponents of the controller: the other team either way,
+Accursed Witch,AccursedWitch,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Aggression,Aggression,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Apathy,Apathy,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Archivist of Gondor,ArchivistOfGondor,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Cruel Reality,CruelReality,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse Artifact,CurseArtifact,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of Leeches,CurseOfLeeches,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of Oblivion,CurseOfOblivion,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of Obsession,CurseOfObsession,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of Surveillance,CurseOfSurveillance,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of Thirst,CurseOfThirst,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of Unbinding,CurseOfUnbinding,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of the Bloody Tome,CurseOfTheBloodyTome,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Curse of the Pierced Heart,CurseOfThePiercedHeart,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Cursed Land,CursedLand,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Dance of the Dead,DanceOfTheDead,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Erosion,Erosion,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Errant Minion,ErrantMinion,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Essence Flare,EssenceFlare,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Feedback,Feedback,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Festering Wound,FesteringWound,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Insubordination,Insubordination,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Leeching Licid,LeechingLicid,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Maddening Wind,MaddeningWind,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Mind Whip,MindWhip,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Nettlevine Blight,NettlevineBlight,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+One Thousand Lashes,OneThousandLashes,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Overencumbered,Overencumbered,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Paralyze,Paralyze,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Parasitic Bond,ParasiticBond,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Paroxysm,Paroxysm,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Power Leak,PowerLeak,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Power Taint,PowerTaint,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Righteous Authority,RighteousAuthority,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Shadow of the Second Sun,ShadowOfTheSecondSun,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Slow Motion,SlowMotion,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Soul Bleed,SoulBleed,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Soul Tithe,SoulTithe,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Stab Wound,StabWound,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Super Intelligence,SuperIntelligence,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Takklemaggot,Takklemaggot,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Tenuous Truce,TenuousTruce,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Torment of Scarabs,TormentOfScarabs,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Unnatural Hunger,UnnaturalHunger,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Unstable Mutation,UnstableMutation,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Venarian Gold,VenarianGold,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Wanderlust,Wanderlust,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+Warp Artifact,WarpArtifact,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
+"Angrath, the Flame-Chained",AngrathTheFlameChained,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Berserk,Berserk,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Black Vise,BlackVise,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Bloodhall Ooze,BloodhallOoze,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Carpet of Flowers,CarpetOfFlowers,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Chancellor of the Dross,ChancellorOfTheDross,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Chancellor of the Forge,ChancellorOfTheForge,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Chancellor of the Spires,ChancellorOfTheSpires,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Chancellor of the Tangle,ChancellorOfTheTangle,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Channel,Channel,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Corrosive Ooze,CorrosiveOoze,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Crazed Armodon,CrazedArmodon,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Custodi Soulcaller,CustodiSoulcaller,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Devourer of Destiny,DevourerOfDestiny,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Dictate of Kruphix,DictateOfKruphix,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Dimensional Breach,DimensionalBreach,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Drumhunter,Drumhunter,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Ebony Owl Netsuke,EbonyOwlNetsuke,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+"Emeria, the Sky Ruin",EmeriaTheSkyRuin,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Exuberant Firestoker,ExuberantFirestoker,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Feral Encounter,FeralEncounter,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Foe-Razer Regent,FoeRazerRegent,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Font of Mythos,FontOfMythos,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Fraying Sanity,FrayingSanity,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Frenzied Fugue,FrenziedFugue,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Frontier Siege,FrontierSiege,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Full Throttle,FullThrottle,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+GO TO JAIL,GOTOJAIL,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Grand Moff Tarkin,GrandMoffTarkin,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Grell Philosopher,GrellPhilosopher,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Grinning Totem,GrinningTotem,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Guardian Angel,GuardianAngel,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Howling Mine,HowlingMine,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Karn Liberated,KarnLiberated,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Kav Landseeker,KavLandseeker,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+"Lara Croft, Tomb Raider",LaraCroftTombRaider,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Lingering Death,LingeringDeath,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Meandering Towershell,MeanderingTowershell,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Mindstorm Crown,MindstormCrown,805.4d custom step trigger,fixed,0006 watcher records each player of the active team,
+Misers' Cage,MisersCage,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Mnemonic Betrayal,MnemonicBetrayal,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Molten-Tail Masticore,MoltenTailMasticore,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+"Moraug, Fury of Akoum",MoraugFuryOfAkoum,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Noble Heritage,NobleHeritage,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+"Noctis, Heir Apparent",NoctisHeirApparent,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Numbing Dose,NumbingDose,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+"Obzedat, Ghost Council",ObzedatGhostCouncil,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Old Rutstein,OldRutstein,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Oracle en-Vec,OracleEnVec,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Paradox Haze,ParadoxHaze,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Plague Reaver,PlagueReaver,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Power Surge,PowerSurge,805.4d custom step trigger,fixed,0006 watcher records each player of the active team,
+Protean Hydra,ProteanHydra,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Providence,Providence,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Quakebringer,Quakebringer,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Quest for the Nihil Stone,QuestForTheNihilStone,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Rasputin Dreamweaver,RasputinDreamweaver,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Rescue from the Underworld,RescueFromTheUnderworld,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Rites of Flourishing,RitesOfFlourishing,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Rivalry,Rivalry,805.4d custom step trigger,fixed,"0006 triggersForEachTeamPlayer (each player's step and ""that player"")",
+Sarkhan's Scorn,SarkhansScorn,805.4d custom step trigger,fixed,0006 watcher records each player of the active team,
+Scute Mob,ScuteMob,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Season of the Witch,SeasonOfTheWitch,805.4d custom step trigger,fixed,0006 watcher records each player of the active team,
+"Sengir, the Dark Baron",SengirTheDarkBaron,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Sphinx of Foresight,SphinxOfForesight,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Sphinx of the Second Sun,SphinxOfTheSecondSun,805.4d custom step trigger,fixed,0004 TurnMods for the team (805.8),
+"Storrev, Devkarin Lich",StorrevDevkarinLich,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Sunseed Nurturer,SunseedNurturer,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Takklemaggot,Takklemaggot,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Territorial Hellkite,TerritorialHellkite,805.4d custom step trigger,still wrong,"805.10c, the turn's holder is the attacking player",
+The Rack,TheRack,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Thopter Spy Network,ThopterSpyNetwork,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
+Time Vault,TimeVault,805.4d custom step trigger,fixed,0004 TurnMods for the team (805.8),
+Tombstone Stairwell,TombstoneStairwell,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Triton Tactics,TritonTactics,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Undiscovered Paradise,UndiscoveredParadise,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+Unshakable Tail,UnshakableTail,805.4d custom step trigger,right,reads the team's turn (isActivePlayer),
+World at War,WorldAtWar,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Yavimaya Bloomsage,YavimayaBloomsage,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
+Abhorrent Oculus,AbhorrentOculus,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Academy Loremaster,AcademyLoremaster,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+"Akal Pakal, First Among Equals",AkalPakalFirstAmongEquals,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Alexios, Deimos of Kosmos",AlexiosDeimosOfKosmos,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Ancient Runes,AncientRunes,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Angel's Trumpet,AngelsTrumpet,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Antagonism,Antagonism,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Anvil of Bogardan,AnvilOfBogardan,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Archfiend of Depravity,ArchfiendOfDepravity,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Assault Suit,AssaultSuit,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Asylum Visitor,AsylumVisitor,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Bandit's Talent,BanditsTalent,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Barbed Wire,BarbedWire,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Belbe, Corrupted Observer",BelbeCorruptedObserver,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,worded for each player's (or the chosen player's) step but built as each step
+Blinkmoth Urn,BlinkmothUrn,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Blood Clock,BloodClock,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Bottled Cloister,BottledCloister,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Bottomless Pit,BottomlessPit,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Braids, Cabal Minion",BraidsCabalMinion,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Braids, Conjurer Adept",BraidsConjurerAdept,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Burning Cinder Fury of Crimson Chaos Fire,BurningCinderFuryOfCrimsonChaosFire,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,worded for each player's (or the chosen player's) step but built as each step
+Call to the Grave,CallToTheGrave,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Champions of Minas Tirith,ChampionsOfMinasTirith,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Cheering Crowd,CheeringCrowd,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Citadel Siege,CitadelSiege,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Citadel of Pain,CitadelOfPain,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Cold Snap,ColdSnap,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Collapsing Borders,CollapsingBorders,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Copper Tablet,CopperTablet,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Crimson Honor Guard,CrimsonHonorGuard,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Curse of the Cabal,CurseOfTheCabal,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Dark Suspicions,DarkSuspicions,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Davriel, Rogue Shadowmage",DavrielRogueShadowmage,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Defiler of Souls,DefilerOfSouls,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Destructive Flow,DestructiveFlow,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Dimir Strandcatcher,DimirStrandcatcher,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Discordant Spirit,DiscordantSpirit,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Doom Foretold,DoomForetold,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Dream Tides,DreamTides,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Dreamborn Muse,DreambornMuse,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Dystopia,Dystopia,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Eladamri's Vineyard,EladamrisVineyard,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Elkin Lair,ElkinLair,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Emberwilde Djinn,EmberwildeDjinn,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Energy Vortex,EnergyVortex,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,worded for each player's (or the chosen player's) step but built as each step
+Fatespinner,Fatespinner,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Fevered Visions,FeveredVisions,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Fight or Flight,FightOrFlight,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Forsaken Wastes,ForsakenWastes,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Fraying Line,FrayingLine,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Free-for-All,FreeForAll,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Furnace Punisher,FurnacePunisher,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Gate to the Aether,GateToTheAether,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Ghirapur Orrery,GhirapurOrrery,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Gibbering Descent,GibberingDescent,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Gibbering Fiend,GibberingFiend,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Goblin Spymaster,GoblinSpymaster,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Greener Pastures,GreenerPastures,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Hall of Gemstone,HallOfGemstone,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Havoc Festival,HavocFestival,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Hellfire Mongrel,HellfireMongrel,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Hokori, Dust Drinker",HokoriDustDrinker,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Hollowborn Barghest,HollowbornBarghest,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Impatience,Impatience,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,worded for each player's (or the chosen player's) step but built as each step
+Infernal Genesis,InfernalGenesis,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Invasion of Eldraine,InvasionOfEldraine,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Iron Maiden,IronMaiden,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Kami of the Crescent Moon,KamiOfTheCrescentMoon,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Karma,Karma,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Karona, False God",KaronaFalseGod,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Keeper of the Accord,KeeperOfTheAccord,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+"Kitt Kanto, Mayhem Diva",KittKantoMayhemDiva,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+"Kratos, God of War",KratosGodOfWar,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+"Kuon, Ogre Ascendant",KuonOgreAscendant,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,worded for each player's (or the chosen player's) step but built as each step
+"Kuon, Ogre Ascendant",KuonOgreAscendant,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,worded for each player's (or the chosen player's) step but built as each step
+Lavaborn Muse,LavabornMuse,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Lavabrink Floodgates,LavabrinkFloodgates,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Ley Line,LeyLine,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+"Ludevic, Necro-Alchemist",LudevicNecroAlchemist,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Luminarch Ascension,LuminarchAscension,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Magnetic Mountain,MagneticMountain,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Magus of the Abyss,MagusOfTheAbyss,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Magus of the Vineyard,MagusOfTheVineyard,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Malignant Growth,MalignantGrowth,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Mana Cache,ManaCache,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Mana Vortex,ManaVortex,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Manic Scribe,ManicScribe,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Maralen of the Mornsong,MaralenOfTheMornsong,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Mask of Intolerance,MaskOfIntolerance,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Miss Demeanor,MissDemeanor,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Mist of Stagnation,MistOfStagnation,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+"Mogis, God of Slaughter",MogisGodOfSlaughter,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Molder Slug,MolderSlug,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Monsoon,Monsoon,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Mornsong Aria,MornsongAria,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Mudslide,Mudslide,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Necrogen Mists,NecrogenMists,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Necrogoyf,Necrogoyf,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Nekusar, the Mindrazer",NekusarTheMindrazer,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Nezumi Shortfang,NezumiShortfang,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Noetic Scales,NoeticScales,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Oath of Druids,OathOfDruids,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Oath of Ghouls,OathOfGhouls,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Oath of Lieges,OathOfLieges,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Oath of Mages,OathOfMages,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Oath of Scholars,OathOfScholars,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Obsessive Skinner,ObsessiveSkinner,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Omen Machine,OmenMachine,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Paupers' Cage,PaupersCage,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Persistent Constrictor,PersistentConstrictor,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Pillar Tombs of Aku,PillarTombsOfAku,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Power Surge,PowerSurge,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Predatory Advantage,PredatoryAdvantage,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Price of Knowledge,PriceOfKnowledge,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Primal Order,PrimalOrder,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Psychic Allergy,PsychicAllergy,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Quicksilver Fountain,QuicksilverFountain,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Rackling,Rackling,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Razor Pendulum,RazorPendulum,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Rising Waters,RisingWaters,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Risky Move,RiskyMove,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Rite of the Raging Storm,RiteOfTheRagingStorm,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Roiling Vortex,RoilingVortex,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Ruthless Winnower,RuthlessWinnower,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Sands of Time,SandsOfTime,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Sarevok, Deathbringer",SarevokDeathbringer,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Seizan, Perverter of Truth",SeizanPerverterOfTruth,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Sentinel of the Eternal Watch,SentinelOfTheEternalWatch,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Shapeshifter's Marrow,ShapeshiftersMarrow,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Sheoldred, Whispering One",SheoldredWhisperingOne,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Shizuko, Caller of Autumn",ShizukoCallerOfAutumn,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Shrieking Affliction,ShriekingAffliction,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Skullcage,Skullcage,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Slicer, Hired Muscle",SlicerHiredMuscle,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Smokestack,Smokestack,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Smuggler's Share,SmugglersShare,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Spiritual Sanctuary,SpiritualSanctuary,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Spiteful Visions,SpitefulVisions,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Stoneshaker Shaman,StoneshakerShaman,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Storm World,StormWorld,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Sulfuric Vortex,SulfuricVortex,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Sunken Hope,SunkenHope,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Tangle Wire,TangleWire,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Teferi's Puzzle Box,TeferisPuzzleBox,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Teferi's Realm,TeferisRealm,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Temporal Distortion,TemporalDistortion,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+The Abyss,TheAbyss,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"The Theorist, Jace Beleren",TheTheoristJaceBeleren,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Thelon's Curse,ThelonsCurse,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Thieving Amalgam,ThievingAmalgam,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Titan Hunter,TitanHunter,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Tooth Collector,ToothCollector,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Topplegeist,Topplegeist,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Umbilicus,Umbilicus,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+"Urabrask, Heretic Praetor",UrabraskHereticPraetor,805.4d each player's step,fixed,0004 TeamStepEvent,the effect reads the active player: the player whose step it is (805.9)
+Urborg Stalker,UrborgStalker,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Verdant Kraken,VerdantKraken,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Viseling,Viseling,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Walking Archive,WalkingArchive,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Web of Inertia,WebOfInertia,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Well of Ideas,WellOfIdeas,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Wheel of Torture,WheelOfTorture,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+White Plume Adventurer,WhitePlumeAdventurer,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
+Wild Evocation,WildEvocation,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Woebringer Demon,WoebringerDemon,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Worry Beads,WorryBeads,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
+Admiral Ackbar,AdmiralAckbar,805.4d each step,right,,triggers once a team step
+"Akroma, Vision of Ixidor",AkromaVisionOfIxidor,805.4d each step,right,,triggers once a team step
+Angelic Accord,AngelicAccord,805.4d each step,right,,triggers once a team step
+Angelic Skirmisher,AngelicSkirmisher,805.4d each step,right,,triggers once a team step
+Arachnus Web,ArachnusWeb,805.4d each step,right,,triggers once a team step
+Arc Runner,ArcRunner,805.4d each step,right,,triggers once a team step
+Archfiend of Despair,ArchfiendOfDespair,805.4d each step,right,,triggers once a team step
+Archmage Ascension,ArchmageAscension,805.4d each step,right,,triggers once a team step
+Archwing Dragon,ArchwingDragon,805.4d each step,right,,triggers once a team step
+"Asmira, Holy Avenger",AsmiraHolyAvenger,805.4d each step,right,,triggers once a team step
+Avatar Aang,AvatarAang,805.4d each step,right,,triggers once a team step
+Avengers Assemble!,AvengersAssemble,805.4d each step,right,,triggers once a team step
+Awakening,Awakening,805.4d each step,right,,triggers once a team step
+Baleful Force,BalefulForce,805.4d each step,right,,triggers once a team step
+Ball Lightning,BallLightning,805.4d each step,right,,triggers once a team step
+Beledros Witherbloom,BeledrosWitherbloom,805.4d each step,right,,triggers once a team step
+"Bennie Bracks, Zoologist",BennieBracksZoologist,805.4d each step,right,,triggers once a team step
+Biovisionary,Biovisionary,805.4d each step,right,,triggers once a team step
+Blistering Firecat,BlisteringFirecat,805.4d each step,right,,triggers once a team step
+Blitz Hellion,BlitzHellion,805.4d each step,right,,triggers once a team step
+Bloodchief Ascension,BloodchiefAscension,805.4d each step,right,,triggers once a team step
+Bloodline Recollector,BloodlineRecollector,805.4d each step,right,,triggers once a team step
+Boarded Window,BoardedWindow,805.4d each step,right,,triggers once a team step
+"Bolg, Erebor's Reckoning",BolgEreborsReckoning,805.4d each step,right,,triggers once a team step
+Boros Battleshaper,BorosBattleshaper,805.4d each step,right,,triggers once a team step
+Briarbridge Patrol,BriarbridgePatrol,805.4d each step,right,,triggers once a team step
+"Brimaz, Blight of Oreskos",BrimazBlightOfOreskos,805.4d each step,right,,triggers once a team step
+Brooding Saurian,BroodingSaurian,805.4d each step,right,,triggers once a team step
+Budoka Pupil,BudokaPupil,805.4d each step,right,,triggers once a team step
+Call of the Full Moon,CallOfTheFullMoon,805.4d each step,right,,triggers once a team step
+Call to the Grave,CallToTheGrave,805.4d each step,right,,triggers once a team step
+Callow Jushi,CallowJushi,805.4d each step,right,,triggers once a team step
+Celestial Force,CelestialForce,805.4d each step,right,,triggers once a team step
+"Chandra, Flameshaper",ChandraFlameshaper,805.4d each step,right,,triggers once a team step
+Chaos Moon,ChaosMoon,805.4d each step,right,,triggers once a team step
+Charging Cinderhorn,ChargingCinderhorn,805.4d each step,right,,triggers once a team step
+Choreographed Sparks,ChoreographedSparks,805.4d each step,right,,triggers once a team step
+Colfenor's Urn,ColfenorsUrn,805.4d each step,right,,triggers once a team step
+Concerted Effort,ConcertedEffort,805.4d each step,right,,triggers once a team step
+Crescendo of War,CrescendoOfWar,805.4d each step,right,,triggers once a team step
+Crested Sunmare,CrestedSunmare,805.4d each step,right,,triggers once a team step
+Cunning Bandit,CunningBandit,805.4d each step,right,,triggers once a team step
+Curse of Chains,CurseOfChains,805.4d each step,right,,triggers once a team step
+Deathreap Ritual,DeathreapRitual,805.4d each step,right,,triggers once a team step
+Desecration Demon,DesecrationDemon,805.4d each step,right,,triggers once a team step
+Desolation,Desolation,805.4d each step,right,,triggers once a team step
+"Doctor Strange, Surgeon",DoctorStrangeSurgeon,805.4d each step,right,,triggers once a team step
+Dragon Broodmother,DragonBroodmother,805.4d each step,right,,triggers once a team step
+Dreampod Druid,DreampodDruid,805.4d each step,right,,triggers once a team step
+Dress Down,DressDown,805.4d each step,right,,triggers once a team step
+Dunerider Outlaw,DuneriderOutlaw,805.4d each step,right,,triggers once a team step
+Dust Stalker,DustStalker,805.4d each step,right,,triggers once a team step
+Eccentric Pestfinder,EccentricPestfinder,805.4d each step,right,,triggers once a team step
+Electroduplicate,Electroduplicate,805.4d each step,right,,triggers once a team step
+Elenda and Azor,ElendaAndAzor,805.4d each step,right,,triggers once a team step
+"Ephara, God of the Polis",EpharaGodOfThePolis,805.4d each step,right,,triggers once a team step
+Face Yourself,FaceYourself,805.4d each step,right,,triggers once a team step
+Fae Offering,FaeOffering,805.4d each step,right,,triggers once a team step
+Fairgrounds Trumpeter,FairgroundsTrumpeter,805.4d each step,right,,triggers once a team step
+Faithful Squire,FaithfulSquire,805.4d each step,right,,triggers once a team step
+Feast on the Fallen,FeastOnTheFallen,805.4d each step,right,,triggers once a team step
+First Response,FirstResponse,805.4d each step,right,,triggers once a team step
+Force Bubble,ForceBubble,805.4d each step,right,,triggers once a team step
+Form of the Dragon,FormOfTheDragon,805.4d each step,right,,triggers once a team step
+Fractal Tender,FractalTender,805.4d each step,right,,triggers once a team step
+Frostbite Pyromental,FrostbitePyromental,805.4d each step,right,,triggers once a team step
+"Gau, Feral Youth",GauFeralYouth,805.4d each step,right,,triggers once a team step
+"Ginger, Queen of Sweets",GingerQueenOfSweets,805.4d each step,right,,triggers once a team step
+Glimmervoid,Glimmervoid,805.4d each step,right,,triggers once a team step
+Glitterfang,Glitterfang,805.4d each step,right,,triggers once a team step
+Glorious Enforcer,GloriousEnforcer,805.4d each step,right,,triggers once a team step
+Goblin Flotilla,GoblinFlotilla,805.4d each step,right,,triggers once a team step
+Goblin Pyromancer,GoblinPyromancer,805.4d each step,right,,triggers once a team step
+Groundbreaker,Groundbreaker,805.4d each step,right,,triggers once a team step
+"Gwaihir, Greatest of the Eagles",GwaihirGreatestOfTheEagles,805.4d each step,right,,triggers once a team step
+"Halvar, God of Battle",HalvarGodOfBattle,805.4d each step,right,,triggers once a team step
+Han Solo,HanSolo,805.4d each step,right,,triggers once a team step
+Hell's Thunder,HellsThunder,805.4d each step,right,,triggers once a team step
+Hellspark Elemental,HellsparkElemental,805.4d each step,right,,triggers once a team step
+Hired Muscle,HiredMuscle,805.4d each step,right,,triggers once a team step
+Ichorid,Ichorid,805.4d each step,right,,triggers once a team step
+Illustrious Wanderglyph,IllustriousWanderglyph,805.4d each step,right,,triggers once a team step
+Impetuous Devils,ImpetuousDevils,805.4d each step,right,,triggers once a team step
+Inferno Hellion,InfernoHellion,805.4d each step,right,,triggers once a team step
+Intermediate Chirography,IntermediateChirography,805.4d each step,right,,triggers once a team step
+Iron Fist of the Empire,IronFistOfTheEmpire,805.4d each step,right,,triggers once a team step
+"Jyoti, Moag Ancient",JyotiMoagAncient,805.4d each step,right,,triggers once a team step
+Kami of Transience,KamiOfTransience,805.4d each step,right,,triggers once a team step
+Keldon Twilight,KeldonTwilight,805.4d each step,right,,triggers once a team step
+Khabal Ghoul,KhabalGhoul,805.4d each step,right,,triggers once a team step
+Kindle the Inner Flame,KindleTheInnerFlame,805.4d each step,right,,triggers once a team step
+Kitsune Mystic,KitsuneMystic,805.4d each step,right,,triggers once a team step
+"Koma, Cosmos Serpent",KomaCosmosSerpent,805.4d each step,right,,triggers once a team step
+Krovikan Horror,KrovikanHorror,805.4d each step,right,,triggers once a team step
+Krovikan Vampire,KrovikanVampire,805.4d each step,right,,triggers once a team step
+Laboratory Drudge,LaboratoryDrudge,805.4d each step,right,,triggers once a team step
+Lando Calrissian,LandoCalrissian,805.4d each step,right,,triggers once a team step
+Lasting Tarfire,LastingTarfire,805.4d each step,right,,triggers once a team step
+"Lathiel, the Bounteous Dawn",LathielTheBounteousDawn,805.4d each step,right,,triggers once a team step
+Lighthouse Chronologist,LighthouseChronologist,805.4d each step,right,,triggers once a team step
+Lightning Serpent,LightningSerpent,805.4d each step,right,,triggers once a team step
+Lightning Shrieker,LightningShrieker,805.4d each step,right,,triggers once a team step
+Lightning Skelemental,LightningSkelemental,805.4d each step,right,,triggers once a team step
+Liliana's Scrounger,LilianasScrounger,805.4d each step,right,,triggers once a team step
+Lone Rider,LoneRider,805.4d each step,right,,triggers once a team step
+Lord Jyscal Guado,LordJyscalGuado,805.4d each step,right,,triggers once a team step
+Lucky the Pizza Dog,LuckyThePizzaDog,805.4d each step,right,,triggers once a team step
+"Lyra, Tolarian Archangel",LyraTolarianArchangel,805.4d each step,right,,triggers once a team step
+Magmatic Force,MagmaticForce,805.4d each step,right,,triggers once a team step
+Majestic Myriarch,MajesticMyriarch,805.4d each step,right,,triggers once a team step
+Mark of Fury,MarkOfFury,805.4d each step,right,,triggers once a team step
+Mark of the Oni,MarkOfTheOni,805.4d each step,right,,triggers once a team step
+Midnight Clock,MidnightClock,805.4d each step,right,,triggers once a team step
+Minion Reflector,MinionReflector,805.4d each step,right,,triggers once a team step
+Nalfeshnee,Nalfeshnee,805.4d each step,right,,triggers once a team step
+Oath of Chandra,OathOfChandra,805.4d each step,right,,triggers once a team step
+Oath of Liliana,OathOfLiliana,805.4d each step,right,,triggers once a team step
+"Ob Nixilis, the Ascended",ObNixilisTheAscended,805.4d each step,right,,triggers once a team step
+Octomancer,Octomancer,805.4d each step,right,,triggers once a team step
+"Odric, Lunarch Marshal",OdricLunarchMarshal,805.4d each step,right,,triggers once a team step
+Old Flitterfang,OldFlitterfang,805.4d each step,right,,triggers once a team step
+Ophiomancer,Ophiomancer,805.4d each step,right,,triggers once a team step
+"Optimus Prime, Hero",OptimusPrimeHero,805.4d each step,right,,triggers once a team step
+Osai Vultures,OsaiVultures,805.4d each step,right,,triggers once a team step
+Paladin of Atonement,PaladinOfAtonement,805.4d each step,right,,triggers once a team step
+Pest Rescuer,PestRescuer,805.4d each step,right,,triggers once a team step
+Pestilence,Pestilence,805.4d each step,right,,triggers once a team step
+Possessed Portal,PossessedPortal,805.4d each step,right,,triggers once a team step
+Priest of the Crossing,PriestOfTheCrossing,805.4d each step,right,,triggers once a team step
+Promise of Tomorrow,PromiseOfTomorrow,805.4d each step,right,,triggers once a team step
+"Psemilla, Meletian Poet",PsemillaMeletianPoet,805.4d each step,right,,triggers once a team step
+Putrefax,Putrefax,805.4d each step,right,,triggers once a team step
+Pyrohemia,Pyrohemia,805.4d each step,right,,triggers once a team step
+Pyromancer's Swath,PyromancersSwath,805.4d each step,right,,triggers once a team step
+Quest for Ula's Temple,QuestForUlasTemple,805.4d each step,right,,triggers once a team step
+Quicksilver Fountain,QuicksilverFountain,805.4d each step,right,,triggers once a team step
+"Ragost, Deft Gastronaut",RagostDeftGastronaut,805.4d each step,right,,triggers once a team step
+"Raphael, Fiendish Savior",RaphaelFiendishSavior,805.4d each step,right,,triggers once a team step
+Reaper from the Abyss,ReaperFromTheAbyss,805.4d each step,right,,triggers once a team step
+Regal Bloodlord,RegalBloodlord,805.4d each step,right,,triggers once a team step
+"Regna, the Redeemer",RegnaTheRedeemer,805.4d each step,right,,triggers once a team step
+Relic Retriever,RelicRetriever,805.4d each step,right,,triggers once a team step
+Reservoir Kraken,ReservoirKraken,805.4d each step,right,,triggers once a team step
+Resplendent Angel,ResplendentAngel,805.4d each step,right,,triggers once a team step
+Reverberating Summons,ReverberatingSummons,805.4d each step,right,,triggers once a team step
+Scavenging Ghoul,ScavengingGhoul,805.4d each step,right,,triggers once a team step
+Seance,Seance,805.4d each step,right,,triggers once a team step
+Seance Board,SeanceBoard,805.4d each step,right,,triggers once a team step
+Season of the Witch,SeasonOfTheWitch,805.4d each step,right,,triggers once a team step
+Senator Onaconda Farr,SenatorOnacondaFarr,805.4d each step,right,,triggers once a team step
+Sire of Insanity,SireOfInsanity,805.4d each step,right,,triggers once a team step
+Sith Magic,SithMagic,805.4d each step,right,,triggers once a team step
+Skizzik,Skizzik,805.4d each step,right,,triggers once a team step
+Slumbering Cerberus,SlumberingCerberus,805.4d each step,right,,triggers once a team step
+Spark Elemental,SparkElemental,805.4d each step,right,,triggers once a team step
+Spark Trooper,SparkTrooper,805.4d each step,right,,triggers once a team step
+Spellpyre Phoenix,SpellpyrePhoenix,805.4d each step,right,,triggers once a team step
+Spiny Starfish,SpinyStarfish,805.4d each step,right,,triggers once a team step
+Stampede Rider,StampedeRider,805.4d each step,right,,triggers once a team step
+Stenchskipper,Stenchskipper,805.4d each step,right,,triggers once a team step
+"Sting, the Glinting Dagger",StingTheGlintingDagger,805.4d each step,right,,triggers once a team step
+Sun Droplet,SunDroplet,805.4d each step,right,,triggers once a team step
+"Sygg, River Cutthroat",SyggRiverCutthroat,805.4d each step,right,,triggers once a team step
+Syndicate Heavy,SyndicateHeavy,805.4d each step,right,,triggers once a team step
+"Syrix, Carrier of the Flame",SyrixCarrierOfTheFlame,805.4d each step,right,,triggers once a team step
+Tangletrove Kelp,TangletroveKelp,805.4d each step,right,,triggers once a team step
+Tendershoot Dryad,TendershootDryad,805.4d each step,right,,triggers once a team step
+"Thalisse, Reverent Medium",ThalisseReverentMedium,805.4d each step,right,,triggers once a team step
+The Gaffer,TheGaffer,805.4d each step,right,,triggers once a team step
+The Lady of Otaria,TheLadyOfOtaria,805.4d each step,right,,triggers once a team step
+The Raven Man,TheRavenMan,805.4d each step,right,,triggers once a team step
+Thran Quarry,ThranQuarry,805.4d each step,right,,triggers once a team step
+Tidal Force,TidalForce,805.4d each step,right,,triggers once a team step
+Timesifter,Timesifter,805.4d each step,right,,triggers once a team step
+"Timin, Youthful Geist",TiminYouthfulGeist,805.4d each step,right,,triggers once a team step
+"Tinybones, Trinket Thief",TinybonesTrinketThief,805.4d each step,right,,triggers once a team step
+Tombstone Stairwell,TombstoneStairwell,805.4d each step,right,,triggers once a team step
+"Toxrill, the Corrosive",ToxrillTheCorrosive,805.4d each step,right,,triggers once a team step
+Traveling Plague,TravelingPlague,805.4d each step,right,,triggers once a team step
+Underworld Breach,UnderworldBreach,805.4d each step,right,,triggers once a team step
+Unnatural Growth,UnnaturalGrowth,805.4d each step,right,,triggers once a team step
+Valkyrie Harbinger,ValkyrieHarbinger,805.4d each step,right,,triggers once a team step
+Vashta Nerada,VashtaNerada,805.4d each step,right,,triggers once a team step
+Verdant Embrace,VerdantEmbrace,805.4d each step,right,,triggers once a team step
+Verdant Force,VerdantForce,805.4d each step,right,,triggers once a team step
+Vesuvan Drifter,VesuvanDrifter,805.4d each step,right,,triggers once a team step
+Viashino Cutthroat,ViashinoCutthroat,805.4d each step,right,,triggers once a team step
+Viashino Sandscout,ViashinoSandscout,805.4d each step,right,,triggers once a team step
+Viashino Sandsprinter,ViashinoSandsprinter,805.4d each step,right,,triggers once a team step
+Viashino Sandstalker,ViashinoSandstalker,805.4d each step,right,,triggers once a team step
+"Vren, the Relentless",VrenTheRelentless,805.4d each step,right,,triggers once a team step
+Wall of Resistance,WallOfResistance,805.4d each step,right,,triggers once a team step
+Whirling Dervish,WhirlingDervish,805.4d each step,right,,triggers once a team step
+Withering Wisps,WitheringWisps,805.4d each step,right,,triggers once a team step
+Wolverine Riders,WolverineRiders,805.4d each step,right,,triggers once a team step
+"Wolverine, Best There Is",WolverineBestThereIs,805.4d each step,right,,triggers once a team step
+Worms of the Earth,WormsOfTheEarth,805.4d each step,right,,triggers once a team step
+Wound Reflection,WoundReflection,805.4d each step,right,,triggers once a team step
+"Y'shtola, Night's Blessed",YshtolaNightsBlessed,805.4d each step,right,,triggers once a team step
+"Zopandrel, Hunger Dominus",ZopandrelHungerDominus,805.4d each step,right,,triggers once a team step
+Avizoa,Avizoa,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Blinding Angel,BlindingAngel,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Brine Elemental,BrineElemental,805.8 skip,still wrong,0004 TurnMods,"each opponent's skip is a turn mod per player: the team skips two untap steps, not one"
+Chronatog,Chronatog,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Chronatog Totem,ChronatogTotem,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Chronosavant,Chronosavant,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Colfenor's Plans,ColfenorsPlans,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+"Damia, Sage of Stone",DamiaSageOfStone,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+"Dovin, Architect of Law",DovinArchitectOfLaw,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Dragon Appeasement,DragonAppeasement,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Eater of Days,EaterOfDays,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Elfhame Sanctuary,ElfhameSanctuary,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Empty City Ruse,EmptyCityRuse,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Eon Hub,EonHub,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+False Peace,FalsePeace,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Fatespinner,Fatespinner,805.8 skip,right,,the chosen step or phase is skipped by everyone this turn
+Fatigue,Fatigue,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Gibbering Descent,GibberingDescent,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Infernal Sovereign,InfernalSovereign,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Island Sanctuary,IslandSanctuary,805.8 skip,fixed,0006 isActivePlayer,"a draw replaced, not a skip"
+Ivory Gargoyle,IvoryGargoyle,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Lethal Vapors,LethalVapors,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+"Magosi, the Waterveil",MagosiTheWaterveil,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Meditate,Meditate,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Molten Firebird,MoltenFirebird,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Moment of Silence,MomentOfSilence,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Necrodominance,Necrodominance,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Necropotence,Necropotence,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Null Profusion,NullProfusion,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Psychic Possession,PsychicPossession,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+"Ral Zarek, Guest Lecturer",RalZarekGuestLecturer,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Recycle,Recycle,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Revenant Patriarch,RevenantPatriarch,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Sands of Time,SandsOfTime,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Savor the Moment,SavorTheMoment,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+"Shisato, Whispering Hunter",ShisatoWhisperingHunter,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Solitary Confinement,SolitaryConfinement,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Stasis,Stasis,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Stonehorn Dignitary,StonehornDignitary,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Symbiotic Deployment,SymbioticDeployment,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+"Taigam, Sidisi's Hand",TaigamSidisisHand,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Time Vault,TimeVault,805.8 skip,fixed,0004 GameImpl.isTeamTurnSkipped,the team skips its turn
+Unstable Hulk,UnstableHulk,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Waterspout Elemental,WaterspoutElemental,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Wild Wasteland,WildWasteland,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+Wormfang Manta,WormfangManta,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Yawgmoth's Bargain,YawgmothsBargain,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
+"Yosei, the Morning Star",YoseiTheMorningStar,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
+Construct a Cosmic Cube,ConstructACosmicCube,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+Cruel Entertainment,CruelEntertainment,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+"Emrakul, the Promised End",EmrakulThePromisedEnd,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+Jedi Mind Trick,JediMindTrick,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+Mindslaver,Mindslaver,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+Sorin Markov,SorinMarkov,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+The Dominion Bracelet,TheDominionBracelet,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+"Urza, Academy Headmaster",UrzaAcademyHeadmaster,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+Worst Fears,WorstFears,805.8 turn control,fixed,0004 Turn.checkTurnIsControlledByOtherPlayer,XMage gives control of the whole team; the engine does not hand a controlled player's prompts to the controlling seat (any format)
+Anoint with Affliction,AnointWithAffliction,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Apostle of Invasion,ApostleOfInvasion,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Bonepicker Skirge,BonepickerSkirge,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Bring the Ending,BringTheEnding,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Chained Throatseeker,ChainedThroatseeker,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Chittering Skitterling,ChitteringSkitterling,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Contaminant Grafter,ContaminantGrafter,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Corrupted Resolve,CorruptedResolve,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Distorted Curiosity,DistortedCuriosity,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Feed the Infection,FeedTheInfection,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Fleshless Gladiator,FleshlessGladiator,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Geth's Summons,GethsSummons,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Glissa's Retriever,GlissasRetriever,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Glistening Sphere,GlisteningSphere,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Goliath Hatchery,GoliathHatchery,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Incisor Glider,IncisorGlider,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+"Ixhel, Scion of Atraxa",IxhelScionOfAtraxa,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Leeches,Leeches,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Norn's Decree,NornsDecree,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Phyresis Outbreak,PhyresisOutbreak,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Phyrexian Atlas,PhyrexianAtlas,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Ravenous Necrotitan,RavenousNecrotitan,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Septic Rats,SepticRats,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Sinew Dancer,SinewDancer,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Skrelv's Hive,SkrelvsHive,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+The Seedcore,TheSeedcore,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Viral Spawning,ViralSpawning,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+Viridian Betrayers,ViridianBetrayers,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Vivisection Evangelist,VivisectionEvangelist,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+"Vraska, Betrayal's Sting",VraskaBetrayalsSting,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Whispering Specter,WhisperingSpecter,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Wurmquake,Wurmquake,810.10a poison check,fixed,0006 Game.getPoisonCounters,the team's counters
+Zealot's Conviction,ZealotsConviction,810.10a poison check,fixed,0004 CorruptedCondition,the opposing team's counters
+"Melira, Sylvok Outcast",MeliraSylvokOutcast,810.10c can't get poison,fixed,0006,no one on the team gets poison counters
+"Melira, the Living Cure",MeliraTheLivingCure,810.10c can't get poison,right,,"a replacement for its controller's counters, not a ""can't get"""
+Blood Tyrant,BloodTyrant,810.8a can't lose,right,,triggers when a player loses; both players of a team lose
+Cloudsteel Kirin,CloudsteelKirin,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,the team can't lose
+Darksteel Angel,DarksteelAngel,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,the team can't lose
+Exquisite Archangel,ExquisiteArchangel,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,"""if you would lose the game, instead"": applies when the teammate would lose (810.8a)"
+Herald of Eternal Dawn,HeraldOfEternalDawn,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,the team can't lose
+Lich,Lich,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Lich's Mirror,LichsMirror,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,"""if you would lose the game, instead"": applies when the teammate would lose (810.8a)"
+Lich's Tomb,LichsTomb,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Marina Vendrell's Grimoire,MarinaVendrellsGrimoire,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Pact Weapon,PactWeapon,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Phyrexian Unlife,PhyrexianUnlife,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Platinum Angel,PlatinumAngel,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,the team can't lose
+"Ramses, Assassin Lord",RamsesAssassinLord,810.8a can't lose,right,,triggers when a player loses; both players of a team lose
+Share the Spoils,ShareTheSpoils,810.8a can't lose,right,,triggers when a player loses; both players of a team lose
+Soul Echo,SoulEcho,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Stunning Reversal,StunningReversal,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,"""if you would lose the game, instead"": applies when the teammate would lose (810.8a)"
+The Book of Exalted Deeds,TheBookOfExaltedDeeds,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,the team can't lose
+The Golden Throne,TheGoldenThrone,810.8a can't lose,fixed,0004 PlayerImpl.teamAllowsResult,"""if you would lose the game, instead"": applies when the teammate would lose (810.8a)"
+Transcendence,Transcendence,810.8a can't lose,fixed,0004 GameImpl.losesForZeroOrLessLife,the team doesn't lose for having 0 or less life
+Abyssal Persecutor,AbyssalPersecutor,810.8a can't lose or win,fixed,0004 PlayerImpl.teamAllowsResult,a player's can't lose (or can't win) is the team's
+Angel's Grace,AngelsGrace,810.8a can't lose or win,fixed,0004 PlayerImpl.teamAllowsResult,a player's can't lose (or can't win) is the team's
+Courageous Resolve,CourageousResolve,810.8a can't lose or win,fixed,0004 PlayerImpl.teamAllowsResult,a player's can't lose (or can't win) is the team's
+Everybody Lives!,EverybodyLives,810.8a can't lose or win,fixed,0004 PlayerImpl.teamAllowsResult,a player's can't lose (or can't win) is the team's
+Lich's Mastery,LichsMastery,810.8a can't lose or win,fixed,0004 PlayerImpl.teamAllowsResult,a player's can't lose (or can't win) is the team's
+Angel of Grace,AngelOfGrace,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+"Aurra Sing, Bane of Jedi",AurraSingBaneOfJedi,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Blessed Wind,BlessedWind,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Captive Audience,CaptiveAudience,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+"Darth Tyranus, Count of Serenno",DarthTyranusCountOfSerenno,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Elderscale Wurm,ElderscaleWurm,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Enduring Angel,EnduringAngel,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Eternity Vessel,EternityVessel,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+"Evra, Halcyon Witness",EvraHalcyonWitness,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Exquisite Archangel,ExquisiteArchangel,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Form of the Dinosaur,FormOfTheDinosaur,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Form of the Dragon,FormOfTheDragon,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Invincible Hymn,InvincibleHymn,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Lich's Mirror,LichsMirror,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Long Rest,LongRest,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Loxodon Lifechanter,LoxodonLifechanter,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Magister Sphinx,MagisterSphinx,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Master of Cruelties,MasterOfCruelties,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Oketra's Last Mercy,OketrasLastMercy,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Providence,Providence,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Resolute Archangel,ResoluteArchangel,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Sorin Markov,SorinMarkov,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Stunning Reversal,StunningReversal,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+The Endstone,TheEndstone,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+The Golden Throne,TheGoldenThrone,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+"Torgaar, Famine Incarnate",TorgaarFamineIncarnate,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Touch of the Eternal,TouchOfTheEternal,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Tree of Perdition,TreeOfPerdition,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Tree of Redemption,TreeOfRedemption,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+"Urza, Academy Headmaster",UrzaAcademyHeadmaster,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+"Vraska, Relic Seeker",VraskaRelicSeeker,810.9c one player's life,right,,the player gains or loses the difference; the team's total follows
+Arbiter of Knollridge,ArbiterOfKnollridge,810.9d each player's life,right,,every player gets the same total
+Biorhythm,Biorhythm,810.9d each player's life,fixed,0004 Game.chooseLifeTotalsToSet,the team chooses whose
+Once More with Feeling,OnceMoreWithFeeling,810.9d each player's life,right,,every player gets the same total
+Repay in Kind,RepayInKind,810.9d each player's life,right,,every player gets the same total
+Shaman of Forgotten Ways,ShamanOfForgottenWays,810.9d each player's life,fixed,0004 Game.chooseLifeTotalsToSet,the team chooses whose
+Sway of the Stars,SwayOfTheStars,810.9d each player's life,right,,every player gets the same total
+Worldfire,Worldfire,810.9d each player's life,right,,every player gets the same total
+Mister Negative,MisterNegative,810.9e exchange,right,,with an opponent only
+Psychic Transfer,PsychicTransfer,810.9e exchange,fixed,0004 PlayerImpl.exchangeLife,no exchange with a teammate
+Reverse the Sands,ReverseTheSands,810.9f redistribute,fixed,0006,one player of each team
+Bloodborn Scoundrels,BloodbornScoundrels,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Bring Down,BringDown,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Charging Binox,ChargingBinox,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Dwarven Lightsmith,DwarvenLightsmith,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Fan Favorite,FanFavorite,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Game Plan,GamePlan,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Gang Up,GangUp,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Huddle Up,HuddleUp,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Lava-Field Overlord,LavaFieldOverlord,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Magma Hellion,MagmaHellion,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Out of Bounds,OutOfBounds,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Play of the Game,PlayOfTheGame,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Skystreamer,Skystreamer,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Spellweaver Duo,SpellweaverDuo,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+The Crowd Goes Wild,TheCrowdGoesWild,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Vampire Charmseeker,VampireCharmseeker,Assist,fixed,0004 AssistAbility,a teammate's mana counts; a bot teammate helps pay as much as it can
+Eddymurk Crab,EddymurkCrab,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Force of Despair,ForceOfDespair,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Force of Negation,ForceOfNegation,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Force of Rage,ForceOfRage,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Force of Vigor,ForceOfVigor,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Force of Virtue,ForceOfVirtue,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Geyser Drake,GeyserDrake,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Ghost Town,GhostTown,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Glory of Warfare,GloryOfWarfare,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Jeering Instigator,JeeringInstigator,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+"Lavinia, Foil to Conspiracy",LaviniaFoilToConspiracy,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Lighthouse Chronologist,LighthouseChronologist,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Mesa Lynx,MesaLynx,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Midnight Mangler,MidnightMangler,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Naiad of Hidden Coves,NaiadOfHiddenCoves,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Oak Street Innkeeper,OakStreetInnkeeper,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Vibrating Sphere,VibratingSphere,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Warden of the Wall,WardenOfTheWall,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Zealous Display,ZealousDisplay,not your turn,fixed,0004 NotMyTurnCondition,it is your turn while your teammate holds the team's turn (805.9)
+Academy Loremaster,AcademyLoremaster,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Aetherspouts,Aetherspouts,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+Angel's Trumpet,AngelsTrumpet,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Antagonism,Antagonism,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Apathy,Apathy,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
+Arboria,Arboria,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+Assault Suit,AssaultSuit,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"Belbe, Corrupted Observer",BelbeCorruptedObserver,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
+"Bello, Bard of the Brambles",BelloBardOfTheBrambles,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Blinkmoth Urn,BlinkmothUrn,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Boros Battleshaper,BorosBattleshaper,reads the active player,right,compares the active player with opponents: the team's turn either way,
+"Bumi, Unleashed",BumiUnleashed,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
+Burning Cinder Fury of Crimson Chaos Fire,BurningCinderFuryOfCrimsonChaosFire,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
+Citadel of Pain,CitadelOfPain,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Contested Game Ball,ContestedGameBall,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+"Coram, the Undertaker",CoramTheUndertaker,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Crimson Honor Guard,CrimsonHonorGuard,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+Curse of Surveillance,CurseOfSurveillance,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
+Curse of Unbinding,CurseOfUnbinding,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
+Curse of the Cabal,CurseOfTheCabal,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"Cyclonus, the Saboteur",CyclonusTheSaboteur,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
+Defense Grid,DefenseGrid,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Dimensional Breach,DimensionalBreach,reads the active player,fixed,0006 triggersForEachTeamPlayer,
+Doom Foretold,DoomForetold,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Dream Tides,DreamTides,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Ebony Owl Netsuke,EbonyOwlNetsuke,reads the active player,fixed,0006 triggersForEachTeamPlayer,
+Elkin Lair,ElkinLair,reads the active player,still wrong,"the card's delayed part (its next end step, the next draw) reads the turn's holder",
+"Ellie, Brick Master",EllieBrickMaster,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+Emberwilde Captain,EmberwildeCaptain,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+Emberwilde Djinn,EmberwildeDjinn,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Energy Vortex,EnergyVortex,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
+Eye of Doom,EyeOfDoom,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+"Fblthp, Impossibly Lost",FblthpImpossiblyLost,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Festival of Embers,FestivalOfEmbers,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Fevered Visions,FeveredVisions,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Fire and Brimstone,FireAndBrimstone,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Fires of Invention,FiresOfInvention,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Flamescroll Celebrant,FlamescrollCelebrant,reads the active player,right,message text only,
+Font of Mythos,FontOfMythos,reads the active player,fixed,0006 triggersForEachTeamPlayer,
+Forge Anew,ForgeAnew,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Fractured Powerstone,FracturedPowerstone,reads the active player,not applicable,Planechase,
+Fraying Line,FrayingLine,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Free-for-All,FreeForAll,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Furnace Punisher,FurnacePunisher,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Gandalf of the Secret Fire,GandalfOfTheSecretFire,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Gideon Jura,GideonJura,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
+Glademuse,Glademuse,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Goblin Rock Sled,GoblinRockSled,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Goblin Spymaster,GoblinSpymaster,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Greener Pastures,GreenerPastures,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Heroism,Heroism,reads the active player,fixed,0006 each attacking player of the active team (805.10a),
+"Hokori, Dust Drinker",HokoriDustDrinker,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Hylda's Crown of Winter,HyldasCrownOfWinter,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Illusionist's Gambit,IllusionistsGambit,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
+Impatience,Impatience,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
+Invasion of Fiora,InvasionOfFiora,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+Island Sanctuary,IslandSanctuary,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Keeper of the Accord,KeeperOfTheAccord,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"Ketramose, the New Dawn",KetramoseTheNewDawn,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+"Kratos, God of War",KratosGodOfWar,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Last Night Together,LastNightTogether,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
+Lavabrink Floodgates,LavabrinkFloodgates,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Ley Line,LeyLine,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"Ludevic, Necro-Alchemist",LudevicNecroAlchemist,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Maddening Imp,MaddeningImp,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+Magnetic Mountain,MagneticMountain,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Malignant Growth,MalignantGrowth,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Mana Cache,ManaCache,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+"Mangara, the Diplomat",MangaraTheDiplomat,reads the active player,right,compares the active player with opponents: the team's turn either way,
+Maralen of the Mornsong,MaralenOfTheMornsong,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Mindstorm Crown,MindstormCrown,reads the active player,fixed,0006 watcher records each player of the active team,
+Misers' Cage,MisersCage,reads the active player,fixed,0006 triggersForEachTeamPlayer,
+Miss Demeanor,MissDemeanor,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Mist of Stagnation,MistOfStagnation,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Monsoon,Monsoon,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Mornsong Aria,MornsongAria,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Mudslide,Mudslide,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"Muldrotha, the Gravetide",MuldrothaTheGravetide,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+"Neriv, Crackling Vanguard",NerivCracklingVanguard,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Noetic Scales,NoeticScales,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"O-Kagachi, Vengeful Kami",OKagachiVengefulKami,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+Oath of Druids,OathOfDruids,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Oath of Ghouls,OathOfGhouls,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Oath of Lieges,OathOfLieges,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Oath of Mages,OathOfMages,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Oath of Scholars,OathOfScholars,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+"Obeka, Brute Chronologist",ObekaBruteChronologist,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+Oracle en-Vec,OracleEnVec,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
+Persistent Constrictor,PersistentConstrictor,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Pillar Tombs of Aku,PillarTombsOfAku,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Power Leak,PowerLeak,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
+Power Surge,PowerSurge,reads the active player,fixed,0006 watcher records each player of the active team,
+Quicksilver Fountain,QuicksilverFountain,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Raiding Party,RaidingParty,reads the active player,right,as XMage: uses the active player for every player (upstream),
+"Ral, Monsoon Mage",RalMonsoonMage,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Return the Past,ReturnThePast,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Rising Waters,RisingWaters,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Rivalry,Rivalry,reads the active player,fixed,0006 triggersForEachTeamPlayer,
+Robber of the Rich,RobberOfTheRich,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Sarkhan's Scorn,SarkhansScorn,reads the active player,fixed,0006 watcher records each player of the active team,
+Scytheclaw Raptor,ScytheclawRaptor,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Season of the Witch,SeasonOfTheWitch,reads the active player,fixed,0006 watcher records each player of the active team,
+Seeker of Slaanesh,SeekerOfSlaanesh,reads the active player,right,compares the active player with opponents: the team's turn either way,
+Share the Spoils,ShareTheSpoils,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Siren's Call,SirensCall,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+Skyclave Shade,SkyclaveShade,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Souls of the Faultless,SoulsOfTheFaultless,reads the active player,right,life loss from a shared total: the team's either way,
+Sphinx of Foresight,SphinxOfForesight,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
+Stonebinder's Familiar,StonebindersFamiliar,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Storage Matrix,StorageMatrix,reads the active player,still wrong,a choice by the turn's holder for the whole team's permanents (each player chooses),
+Suppressor Skyguard,SuppressorSkyguard,reads the active player,right,compares the active player with opponents: the team's turn either way,
+Suspend Aggression,SuspendAggression,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
+"Tahngarth, First Mate",TahngarthFirstMate,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+Tangle Kelp,TangleKelp,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Tariff,Tariff,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+Temporal Distortion,TemporalDistortion,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Tempt with Reflections,TemptWithReflections,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+The Second Doctor,TheSecondDoctor,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
+Thelon's Curse,ThelonsCurse,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Thieving Amalgam,ThievingAmalgam,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
+Tidal Flats,TidalFlats,reads the active player,fixed,0006 each attacking player of the active team (805.10a),
+Tombstone Stairwell,TombstoneStairwell,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
+"Tomik, Wielder of Law",TomikWielderOfLaw,reads the active player,right,compares the active player with opponents: the team's turn either way,
+Total War,TotalWar,reads the active player,fixed,0006 each attacking player of the active team (805.10a),
+Trove of Temptation,TroveOfTemptation,reads the active player,right,compares the active player with opponents: the team's turn either way,
+"Urabrask, Heretic Praetor",UrabraskHereticPraetor,reads the active player,still wrong,"the card's delayed part (its next end step, the next draw) reads the turn's holder",
+Wall of Dust,WallOfDust,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
+War Room (Star Wars),WarRoomStarWars,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+War's Toll,WarsToll,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+Weathered Sentinels,WeatheredSentinels,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+Weftwalking,Weftwalking,reads the active player,fixed,0006 each player of the active team (805.4),
+Word of Command,WordOfCommand,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
+Y'shtola Rhul,YshtolaRhul,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
+"Zagorka, Mother of Sanctum",ZagorkaMotherOfSanctum,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),

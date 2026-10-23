@@ -44,7 +44,7 @@ It checks that `HEAD` equals the pinned SHA and that the root POM version equals
 
 ### Patches
 
-None are needed. `engine/xmage/patches/` holds `NNNN-*.patch` files that `git apply` applies in name order. A patch that no longer applies fails the build. Every v0.0.2 workaround lives in our own code; see "Driving XMage headless". (Since v0.5.0 three patches carry Two-Headed Giant: [Two-Headed Giant](two-headed-giant.md).)
+None are needed. `engine/xmage/patches/` holds `NNNN-*.patch` files that `git apply` applies in name order. A patch that no longer applies fails the build. Every v0.0.2 workaround lives in our own code; see "Driving XMage headless". (Since v0.5.0 patches carry Two-Headed Giant, six since v0.5.1's card audit: [Two-Headed Giant](two-headed-giant.md).)
 
 ## Modules built
 
