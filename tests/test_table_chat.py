@@ -94,7 +94,12 @@ def test_the_table_talks_and_allies_talk_apart(client, engine):
         }
         # A new connection is told the chat so far and the alliances.
         assert tabs["ada"].until("chat_history")["messages"] == []
-        assert alliances(tabs["ada"]) == {"type": "alliances", "alliances": [], "offers": []}
+        assert alliances(tabs["ada"]) == {
+            "type": "alliances",
+            "alliances": [],
+            "offers": [],
+            "fixed": False,
+        }
 
         # The whole table hears a message and an emote, with who sent them.
         client_id = say(tabs["ada"], "Good luck, everyone!")

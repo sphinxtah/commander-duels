@@ -393,6 +393,8 @@ export interface ChatLine {
 export interface Alliances {
   alliances: [Seat, Seat][];
   offers: { from: Seat; to: Seat }[];
+  /** Two-Headed Giant (v0.5.1): the alliances are the teams, fixed; none may be offered. */
+  fixed?: boolean;
 }
 
 export type AllianceAction =

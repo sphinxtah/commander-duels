@@ -557,7 +557,12 @@ export class GameConnection {
         break;
       case "alliances":
         this.update({
-          alliances: { alliances: message.alliances, offers: message.offers },
+          alliances: {
+            alliances: message.alliances,
+            offers: message.offers,
+            // Two-Headed Giant's teams (v0.5.1).
+            ...(message.fixed ? { fixed: true } : {}),
+          },
         });
         break;
       case "error": {

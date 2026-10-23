@@ -20,7 +20,8 @@ export function comingSoon(format: Format | undefined): boolean {
     format && !format.available && !(format.id in practiceFormats),
   );
 }
-/** A first playable version (v0.5.0: Two-Headed Giant against the bots), marked "Early". */
+/** A playable version with known gaps, marked "Early": Two-Headed Giant, against the bots since
+ * v0.5.0, and since v0.5.1 at tables and in the queue too. */
 export function early(format: Format | undefined): boolean {
   return Boolean(format?.early) && !comingSoon(format);
 }
@@ -89,8 +90,9 @@ export function PlayPage({
             </h1>
             <p>
               Find a game with other players in the queue, practice against the
-              bots in Legacy, Commander or, early, Two-Headed Giant with your
-              own decks, or sit down at a table with an invite.
+              bots in Legacy, Commander or Two-Headed Giant with your own decks,
+              or sit down at a table with an invite. In Two-Headed Giant, team
+              up with another player, or a friend.
             </p>
           </div>
           <div className={styles.playActions}>
@@ -205,7 +207,7 @@ export function PlayPage({
           {comingSoon(selected)
             ? `${selected?.name} is coming soon.`
             : early(selected)
-              ? `An early version of ${selected?.name}: you and a bot teammate against two bots, with Legacy decks, from the practice table. Your team takes its turns together and shares one life total.`
+              ? `Two teams of two, with Legacy decks: in the queue, alone or with a friend; at a table for four players, or players with bots as teammates or opponents; or with a bot teammate at the practice table. Your team takes its turns together, shares one life total and wins together. Early: a few cards that ask whose turn it is do not follow the team rules yet.`
               : "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables."}
         </p>
         <button

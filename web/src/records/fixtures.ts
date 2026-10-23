@@ -116,8 +116,22 @@ export function game(fields: Partial<HistoryEntry> = {}): HistoryEntry {
     revision: 2,
     colors: "R",
     opponents: [
-      { seat: 1, bot: true, player: null, bot_skill: 3, won: false },
-      { seat: 2, bot: true, player: null, bot_skill: 3, won: false },
+      {
+        seat: 1,
+        bot: true,
+        player: null,
+        bot_skill: 3,
+        won: false,
+        teammate: false,
+      },
+      {
+        seat: 2,
+        bot: true,
+        player: null,
+        bot_skill: 3,
+        won: false,
+        teammate: false,
+      },
     ],
     ...fields,
   };

@@ -12,6 +12,10 @@ describes them for players and staff.
 - **Allies only.** A player with allies may write to them alone: the message goes to the sender's
   allies at that moment, and to no other player, like a hand. SysOp watching or inspecting the
   game reads them all, its exception to SEC05 and NET14 (games.view_concealed).
+- **Teams** (v0.5.1). At a Two-Headed Giant table the allies-only channel is the team's: its two
+  players are allies from the start, for the whole game, whoever leaves it, and no other alliance
+  can be offered. The other team never receives a word of it. A player whose teammate is a bot has
+  no one to write to there.
 - **Kept.** Every line is stored (table_messages) as it is sent, for the history a tab gets when
   it connects (HISTORY lines it may see), for a report of a message, and for SysOp's reader; the
   worker's daily job deletes them after api/chat.py's TABLE_DAYS. Alliances live with the running
@@ -187,7 +191,8 @@ def recent(database: Engine, game_id: UUID) -> tuple[list[TableMessage], dict[UU
 
 
 def alliances_of(game: "LiveGame", connection: "Connection") -> dict[str, Any]:
-    """Every alliance, and the offers this connection's seat made or received (all, for SysOp)."""
+    """Every alliance, and the offers this connection's seat made or received (all, for SysOp).
+    At a Two-Headed Giant table (v0.5.1) the alliances are the teams, fixed."""
     everything = sees_everything(connection)
     return {
         "type": "alliances",
@@ -197,6 +202,7 @@ def alliances_of(game: "LiveGame", connection: "Connection") -> dict[str, Any]:
             for giver, taker in sorted(game.offers)
             if everything or connection.seat in (giver, taker)
         ],
+        "fixed": game.teams,
     }
 
 
@@ -301,7 +307,13 @@ async def receive(
     elif parsed.channel == "allies":
         allies = allies_of(game, connection.seat) if connection.seat is not None else []
         if not allies:
-            refuse("no_allies", "You have no allies at this table.", client_id=client_id)
+            refuse(
+                "no_allies",
+                "Your teammate is a bot: nobody reads your team's channel."
+                if game.teams and connection.seat is not None
+                else "You have no allies at this table.",
+                client_id=client_id,
+            )
             return
         row = line(
             game,
@@ -340,6 +352,13 @@ def alliance(
     other = game.seats.get(wanted.seat)
     if mine is None or seat is None:
         refuse("not_a_player", "Only the table's players make alliances.", seat=wanted.seat)
+        return
+    if game.teams:
+        refuse(
+            "fixed_teams",
+            "In Two-Headed Giant your team is your alliance, for the whole game.",
+            seat=wanted.seat,
+        )
         return
     if game.finished or mine.left is not None:
         refuse("not_in_game", "You are out of this game.", seat=wanted.seat)
@@ -402,7 +421,10 @@ def event(
 
 
 def seat_out(hub: "GameHub", game: "LiveGame", seat: "LiveSeat") -> None:
-    """A player out of the game: their alliances end and their offers go."""
+    """A player out of the game: their alliances end and their offers go. A Two-Headed Giant team
+    (v0.5.1) stays one: its channel is the team's for the whole game."""
+    if game.teams:
+        return
     changed = False
     for offer in [each for each in game.offers if seat.seat in each]:
         game.offers.discard(offer)

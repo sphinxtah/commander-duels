@@ -95,6 +95,7 @@ NotificationKind = Literal[
     "quest_completed",
     "achievement_earned",
     "rematch",
+    "team_invite",
 ]
 AwardKind = Literal["quest_completed", "achievement_earned"]
 SearchText = Annotated[
@@ -214,8 +215,9 @@ class NotificationItem(Contract):
     )
     request_pending: bool = Field(
         default=False,
-        description="For a friend request, or since v0.5.0 a rematch: whether it still waits for "
-        "your answer.",
+        description="For a friend request, since v0.5.0 a rematch, or since v0.5.1 an invitation "
+        "to the Two-Headed Giant queue as a friend's teammate: whether it still waits for your "
+        "answer.",
     )
     messages: int = Field(
         default=0,
@@ -402,10 +404,12 @@ def games_by_user(db: Session, ids: Iterable[UUID]) -> dict[UUID, tuple[str, str
 
 
 def queues_by_user(db: Session, ids: Iterable[UUID]) -> dict[UUID, str]:
-    """Each account waiting in a public queue (v0.5.0): the queue's format."""
+    """Each account waiting in a public queue (v0.5.0), or since v0.5.1 inviting a friend to wait
+    with it: the queue's format."""
     rows = db.execute(
         select(QueueEntry.user_id, QueueEntry.format).where(
-            QueueEntry.user_id.in_(list(ids)), QueueEntry.status.in_(("waiting", "starting"))
+            QueueEntry.user_id.in_(list(ids)),
+            QueueEntry.status.in_(("inviting", "waiting", "starting")),
         )
     )
     return {user_id: game_format for user_id, game_format in rows}
@@ -572,6 +576,22 @@ def rematches_waiting(db: Session, user_id: UUID, game_ids: list[UUID]) -> set[U
     )
 
 
+def invitations_waiting(db: Session, user_id: UUID, inviters: list[UUID]) -> set[UUID]:
+    """The friends among these whose invitation to the Two-Headed Giant queue (v0.5.1) still waits
+    for the account's answer."""
+    if not inviters:
+        return set()
+    return set(
+        db.scalars(
+            select(QueueEntry.user_id).where(
+                QueueEntry.user_id.in_(inviters),
+                QueueEntry.status == "inviting",
+                QueueEntry.partner_id == user_id,
+            )
+        )
+    )
+
+
 def notified_since(
     db: Session, user_id: UUID, kind: NotificationKind, actor_id: UUID, after: datetime
 ) -> bool:
@@ -629,6 +649,9 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
     waiting = rematches_waiting(
         db, viewer.id, [r.game_id for r in rows if r.kind == "rematch" and r.game_id]
     )
+    inviting = invitations_waiting(
+        db, viewer.id, [r.actor_id for r in rows if r.kind == "team_invite" and r.actor_id]
+    )
     actors = {
         user.id: user
         for user in db.scalars(
@@ -650,7 +673,8 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                     and actor is not None
                     and viewer.state_with(actor.id) == "requested_you"
                 )
-                or (row.kind == "rematch" and row.game_id in waiting),
+                or (row.kind == "rematch" and row.game_id in waiting)
+                or (row.kind == "team_invite" and row.actor_id in inviting),
                 messages=unread.get(row.actor_id, 0)
                 if row.kind == "message" and row.actor_id
                 else 0,

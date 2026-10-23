@@ -16,7 +16,22 @@ export const POLL_MS = 3000;
 export const formatNames: Record<TableFormat, string> = {
   legacy: "Legacy",
   commander: "Commander",
+  two_headed_giant: "Two-Headed Giant",
 };
+
+/** Two-Headed Giant (v0.5.1): four seats in two teams, seats 0 and 1 against 2 and 3. */
+export const TEAM_FORMAT = "two_headed_giant";
+
+/** The format a table's decks are built for, whose legality its rules follow: Two-Headed Giant
+ * plays Legacy decks. */
+export function deckFormat(format: TableFormat): "legacy" | "commander" {
+  return format === TEAM_FORMAT ? "legacy" : format;
+}
+
+/** A team's name as the lobby says it: "Team 1", "Team 2". */
+export function teamName(team: number): string {
+  return `Team ${team + 1}`;
+}
 
 /** A new table's rules, and a new practice game's (v0.4.5): every card, whatever its legality. */
 export const casualRules: TableRules = { banned: true, not_legal: true };
@@ -29,12 +44,12 @@ export function rulesTag(rules: TableRules, format: TableFormat): string {
   if (!rules.banned && !rules.not_legal) return "Tournament rules";
   return rules.banned
     ? "Banned cards allowed"
-    : `Cards not legal in ${formatNames[format]} allowed`;
+    : `Cards not legal in ${formatNames[deckFormat(format)]} allowed`;
 }
 
 /** A table's rules in a sentence, for its own page. */
 export function rulesSentence(rules: TableRules, format: TableFormat): string {
-  const name = formatNames[format];
+  const name = formatNames[deckFormat(format)];
   if (rules.banned && rules.not_legal)
     return `Casual: decks may hold banned cards and cards not legal in ${name}.`;
   if (!rules.banned && !rules.not_legal)
@@ -53,7 +68,7 @@ export function unfit(deck: OwnDeck, rules: TableRules): string | null {
       : "not playable yet";
   const refused = deck.needs.filter((need) => !rules[need]);
   if (refused.length === 0) return null;
-  const name = formatNames[deck.format];
+  const name = formatNames[deckFormat(deck.format)];
   return refused.length > 1
     ? `holds banned cards and cards not legal in ${name}`
     : refused[0] === "banned"

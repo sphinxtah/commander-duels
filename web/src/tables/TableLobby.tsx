@@ -10,10 +10,13 @@ import { exitTableFullscreen } from "../app/fullscreen";
 import { tableFullscreen } from "../game/PracticeTable";
 import { getSoundEngine } from "../game/sound/engine";
 import game from "../game/game.module.css";
-import { DeckChoices, Face, TableTags } from "./TableParts";
+import { DeckChoices, Face, TableTags, teamsOf } from "./TableParts";
 import {
+  TEAM_FORMAT,
+  deckFormat,
   formatNames,
   rulesSentence,
+  teamName,
   unfit,
   useOwnDecks,
   usePolled,
@@ -24,6 +27,8 @@ import styles from "./tables.module.css";
 
 // One human table (v0.4.0): its seats, its invite link, and for its players their deck, ready and
 // leave; the host starts. Every player's page follows the table and opens the game once it starts.
+// A Two-Headed Giant table (v0.5.1) shows its seats by team: a player joins a team, or moves to the
+// other one, and gets ready once their deck shares no card with their teammate's but basic lands.
 
 /** The table's own address: its invite link. */
 export function inviteLink(code: string): string {
@@ -91,7 +96,10 @@ export function TableLobby({
 
   const mine = table.players.find((player) => player.you);
   const host = mine?.host ?? false;
-  const here = (decks ?? []).filter((deck) => deck.format === table.format);
+  const teams = table.format === TEAM_FORMAT;
+  const here = (decks ?? []).filter(
+    (deck) => deck.format === deckFormat(table.format),
+  );
   const chosen =
     choice || here.find((deck) => unfit(deck, table.rules) === null)?.id || "";
   const free = table.players.some(
@@ -115,6 +123,21 @@ export function TableLobby({
     return data;
   }
   const path = { params: { path: { code } } };
+
+  /** Joins a team (v0.5.1), or moves to it when already seated. */
+  function joinTeam(team: number) {
+    void act(() =>
+      mine
+        ? client.PATCH("/api/v1/tables/{code}/seat", {
+            ...path,
+            body: { team },
+          })
+        : client.POST("/api/v1/tables/{code}/join", {
+            ...path,
+            body: { deck_id: chosen, team },
+          }),
+    );
+  }
 
   async function start() {
     // The host's click: the table fills the screen, and sound may start, as at the practice
@@ -163,8 +186,11 @@ export function TableLobby({
         {table.best_of === 3
           ? "A best-of-three match: players sideboard between its games. "
           : ""}
+        {teams
+          ? "Two teams of two take their turns together, 30 life a team; a team's decks may share only basic lands, checked as you get ready. "
+          : ""}
         {table.bots > 0
-          ? `${table.bots} ${table.bots === 1 ? "bot" : "bots"} at skill ${table.bot_skill} fill the last seats. `
+          ? `${table.bots} ${table.bots === 1 ? "bot" : "bots"} at skill ${table.bot_skill} ${teams ? "take the seats shown" : "fill the last seats"}. `
           : ""}
         Others see your handle and portrait, never your deck.{" "}
         <a href="#tables">Back to the lobby</a>
@@ -178,11 +204,68 @@ export function TableLobby({
         </p>
       )}
 
-      <ul className={styles.seats} aria-label="Seats">
-        {table.players.map((player) => (
-          <Seat key={player.seat} player={player} skill={table.bot_skill} />
-        ))}
-      </ul>
+      {teams ? (
+        <div className={styles.teamGroups}>
+          {teamsOf(table).map((players, team) => {
+            const yours = players.some((player) => player.you);
+            const room = players.some(
+              (player) => player.player === "human" && !player.taken,
+            );
+            return (
+              <section
+                key={team}
+                className={styles.team}
+                data-yours={yours}
+                aria-labelledby={`team-${team}`}
+              >
+                <h2 id={`team-${team}`}>
+                  <span>{teamName(team)}</span>{" "}
+                  {yours && (
+                    <span className={styles.badge} data-tone="gold">
+                      Your team
+                    </span>
+                  )}
+                </h2>
+                <ul
+                  className={styles.seats}
+                  aria-label={`${teamName(team)} seats`}
+                >
+                  {players.map((player) => (
+                    <Seat
+                      key={player.seat}
+                      player={player}
+                      skill={table.bot_skill}
+                    />
+                  ))}
+                </ul>
+                {table.status === "open" &&
+                  !yours &&
+                  room &&
+                  (mine || chosen) && (
+                    <p>
+                      <button
+                        type="button"
+                        className={
+                          mine ? game.secondaryButton : game.primaryButton
+                        }
+                        disabled={busy}
+                        onClick={() => joinTeam(team)}
+                      >
+                        {mine ? "Move to" : "Join"} {teamName(team)}
+                      </button>
+                    </p>
+                  )}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <ul className={styles.seats} aria-label="Seats">
+          {table.players.map((player) => (
+            <Seat key={player.seat} player={player} skill={table.bot_skill} />
+          ))}
+        </ul>
+      )}
 
       {table.status === "open" && mine && (
         <div className={styles.invite}>

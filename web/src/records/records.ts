@@ -22,6 +22,7 @@ export const PINS = 3;
 const formatNames: Record<string, string> = {
   commander: "Commander",
   legacy: "Legacy",
+  two_headed_giant: "Two-Headed Giant",
 };
 
 /** "Commander"; a format added later shows by its own name. */
@@ -54,8 +55,17 @@ export function opponentName(opponent: Opponent): string {
   return opponent.player?.handle ?? "a player who has left";
 }
 
-/** "bob and two skill-3 bots": the other seats, the bots counted together. */
+/** "bob and two skill-3 bots": the other seats, the bots counted together. A Two-Headed Giant
+ * teammate (v0.5.1) played beside the player: "bob and dan, with cara". */
 export function opponentsWords(opponents: Opponent[]): string {
+  const mates = opponents.filter((opponent) => opponent.teammate);
+  const against = sideWords(opponents.filter((opponent) => !opponent.teammate));
+  return mates.length
+    ? `${against}, with ${mates.map(opponentName).join(" and ")}`
+    : against;
+}
+
+function sideWords(opponents: Opponent[]): string {
   const players = opponents
     .filter((opponent) => !opponent.bot)
     .map(opponentName);

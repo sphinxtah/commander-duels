@@ -41,8 +41,11 @@ from api.decks import identity_of, revision_entries
 from api.identity import Active, ApiError, Db, Principal, utcnow
 from api.library import since_reset
 from api.models import DeckRevision, Game, GameSeat, Match, MatchPlayer, PlayerResult, User
+from api.progression import winning_seats
 from api.schemas import Contract, Error
 from api.social import PlayerRef, player_ref, visible_player
+from api.teams import FORMAT as TEAM_FORMAT
+from api.teams import teammate
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -151,6 +154,10 @@ class Opponent(Contract):
     )
     bot_skill: int | None
     won: bool = Field(description="Whether this seat won the game.")
+    teammate: bool = Field(
+        default=False,
+        description="Two-Headed Giant (v0.5.1): the player's teammate, who won or lost with them.",
+    )
 
 
 class HistoryEntry(Contract):
@@ -223,11 +230,19 @@ def record_results(db: Session, game: Game) -> list[PlayerResult]:
     result = game.result or {}
     turns = result.get("turns")
     finished = game.finished_at or utcnow()
-    bots = sum(1 for seat in seats if seat.player == "bot")
     rows: list[PlayerResult] = []
     for seat in seats:
         if seat.user_id is None or seat.seat in done:
             continue
+        # The other players and bots are the seat's opponents: in Two-Headed Giant (v0.5.1) the
+        # other team's, so a teammate, a player's or a bot's, is never one the seat beat.
+        others = [
+            other
+            for other in seats
+            if other is not seat
+            and not (game.format == TEAM_FORMAT and other.seat == teammate(seat.seat))
+        ]
+        bots = sum(1 for other in others if other.player == "bot")
         row = PlayerResult(
             game_id=game.id,
             seat=seat.seat,
@@ -236,7 +251,7 @@ def record_results(db: Session, game: Game) -> list[PlayerResult]:
             format=game.format,
             kind=game.kind,
             seats=len(seats),
-            players=sum(1 for other in seats if other.user_id is not None and other is not seat),
+            players=sum(1 for other in others if other.user_id is not None),
             bots=bots,
             bot_skill=game.bot_skill if bots else None,
             colors=deck_colors(db, game, seat),
@@ -378,7 +393,7 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
     items = []
     for row in rows:
         result = results.get(row.game_id) or {}
-        winner = result.get("winner_seat") if result.get("kind") == "completed" else None
+        won = winning_seats(result)
         mine = next((seat for seat in seats[row.game_id] if seat.seat == row.seat), None)
         items.append(
             HistoryEntry(
@@ -404,7 +419,8 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
                         if seat.user_id in players
                         else None,
                         bot_skill=row.bot_skill if seat.player == "bot" else None,
-                        won=seat.seat == winner,
+                        won=seat.seat in won,
+                        teammate=row.format == TEAM_FORMAT and seat.seat == teammate(row.seat),
                     )
                     for seat in seats[row.game_id]
                     if seat.seat != row.seat

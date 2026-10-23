@@ -14,12 +14,14 @@
 - **Free to play.** Offering or accepting needs room under the account's limit of running games,
   and no open table or queue of its own: the rematch is its one table.
 - One rematch a game: asking again answers with the first.
+- **Two-Headed Giant** (v0.5.1): the rematch keeps the teams. Every player keeps their seat, bots
+  take the seats bots or removed players held, and each team's decks are checked together again.
 """
 
 import secrets
 from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Request
@@ -29,9 +31,11 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.games import (
+    DECK_FORMATS,
     TABLE_IDLE_SECONDS,
     LiveGame,
     LiveSeat,
@@ -398,6 +402,7 @@ def plan_rematch(
         seat.seat: seat for seat in db.scalars(select(GameSeat).where(GameSeat.game_id == game.id))
     }
     roster = roster_of(request)
+    team = game.format == teams.FORMAT
     plans: list[SeatPlan] = []
     users: list[UUID | None] = []
     decks: list[UUID] = []
@@ -416,8 +421,17 @@ def plan_rematch(
                 raise ApiError(422, "invalid_deck", "That deck is gone.")
             library = library_of(db, user, permissions, roster)
             seat, bound, title = own_deck(
-                db, user, permissions, revision.deck_id, game.format, library, rules_of(table)
+                db,
+                user,
+                permissions,
+                revision.deck_id,
+                DECK_FORMATS.get(game.format, game.format),
+                library,
+                rules_of(table),
             )
+            if team:
+                # MTR 9.5: Two-Headed Giant Constructed has no sideboards.
+                cast(dict[str, object], seat["deck_list"]).pop("sideboard", None)
         except ApiError as refused:
             message = f"{user.handle or 'A player'}'s deck cannot be played now."
             db.rollback()
@@ -428,14 +442,60 @@ def plan_rematch(
         plans.append(SeatPlan({"player": "human", **seat}, bound, title))
         users.append(user.id)
         decks.append(revision.deck_id)
-    bots = table.seats - len(plans)
-    plans += bot_plans(db, request, game.format, bots)
-    users += [None] * bots
+    if team:
+        # Two-Headed Giant (v0.5.1): every player keeps their seat, so the teams stay; bots take
+        # the seats bots or removed players held.
+        kept = {row.seat: (plan, row.user_id) for row, plan in zip(rows, plans, strict=True)}
+        plans = [
+            kept[s][0] if s in kept else SeatPlan({"player": "bot"}) for s in range(teams.SEATS)
+        ]
+        users = [kept[s][1] if s in kept else None for s in range(teams.SEATS)]
+        check_teams(db, game, plans, users)
+    else:
+        bots = table.seats - len(plans)
+        plans += bot_plans(db, request, game.format, bots)
+        users += [None] * bots
     for index, held in custom_in_seats(db, [plan.engine for plan in plans]).items():
         plans[index].custom = held
     # Revisions made for the game are kept even if the engine refuses it.
     db.commit()
     return plans, users, decks
+
+
+def check_teams(db: Session, game: Game, plans: list[SeatPlan], users: list[UUID | None]) -> None:
+    """A Two-Headed Giant rematch's teams (v0.5.1): each team of two players' decks, as they stand
+    now, share no card but basic lands, and each bot gets a fixture deck its teammate's shares
+    none with. A failure names the players to everyone, never their cards."""
+    handles = dict(
+        db.execute(
+            select(User.id, User.handle).where(User.id.in_([u for u in users if u is not None]))
+        ).all()
+    )
+    for first, second in teams.TEAMS:
+        one, other = users[first], users[second]
+        if one is None or other is None:
+            continue
+        if teams.shared(
+            teams.cards_of(plans[first].engine) or set(),
+            teams.cards_of(plans[second].engine) or set(),
+        ):
+            message = (
+                f"{handles.get(one) or 'A player'}'s and {handles.get(other) or 'a player'}'s "
+                "decks now share a card, and Two-Headed Giant teammates' decks may share only "
+                "basic lands."
+            )
+            db.rollback()
+            fail(db, game.id, message)
+            raise ApiError(409, "team_decks", message)
+    try:
+        teams.assign_and_check([plan.engine for plan in plans], True)
+    except ApiError as refused:
+        message = (
+            "A player's deck shares a card with every bot deck, so no bot can be their teammate."
+        )
+        db.rollback()
+        fail(db, game.id, message)
+        raise ApiError(409, "team_decks", message) from refused
 
 
 def record_rematch(
@@ -462,6 +522,12 @@ def record_rematch(
         visibility=old.visibility,
         seats=old.seats,
         bots=old.seats - len(players),
+        # Two-Headed Giant's bots (v0.5.1) take the seats nobody kept.
+        bot_seats=(
+            [seat for seat, user in enumerate(users) if user is None]
+            if old.format == teams.FORMAT
+            else None
+        ),
         bot_skill=old.bot_skill,
         turn_cap=old.turn_cap,
         allow_banned=old.allow_banned,
@@ -474,7 +540,8 @@ def record_rematch(
     )
     db.add(table)
     db.flush()
-    for index, (user_id, deck_id) in enumerate(zip(players, decks, strict=True)):
+    seated = [seat for seat, user in enumerate(users) if user is not None]
+    for index, user_id, deck_id in zip(seated, players, decks, strict=True):
         db.add(
             TableSeat(
                 table_id=table.id,
@@ -562,6 +629,7 @@ async def start_table_rematch(
                             for seat, user_id in enumerate(users)
                             if user_id is not None
                         },
+                        teams=game.format == teams.FORMAT,
                     )
                 )
             finally:

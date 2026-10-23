@@ -9,7 +9,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 import type { OutgoingChat } from "../connection";
 import type { Alliances, ChatLine } from "../types";
-import { AllianceContext, type TableAlliances } from "./Alliance";
+import {
+  AllianceContext,
+  alliancePills,
+  type TableAlliances,
+} from "./Alliance";
 import type { Channel, ChatPeople } from "./chat";
 import { TableChat, useChatReading, type TableChatProps } from "./TableChat";
 
@@ -327,6 +331,90 @@ describe("the table's chat panel", () => {
       ["withdraw", 2],
       ["accept", 3],
       ["decline", 3],
+    ]);
+  });
+});
+
+describe("the team's channel at a Two-Headed Giant table (v0.5.1)", () => {
+  const fixed: Alliances = {
+    alliances: [
+      [0, 1],
+      [2, 3],
+    ],
+    offers: [],
+    fixed: true,
+  };
+
+  it("names the Team tab, writes to the teammate alone, and offers no alliance", () => {
+    const { onSend } = panel({
+      tab: "allies",
+      allowed: [1, 2, 3],
+      alliances: fixed,
+      unread: { table: 1, allies: 0 },
+      state: {
+        chat: [line({ channel: "allies", seats: [0], body: "Bolt the flyer" })],
+        outbox: [],
+        allianceRefusal: null,
+      },
+    });
+    expect(
+      screen.getByRole("tab", { name: "Team", selected: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("list", { name: "Messages to your team" }),
+    ).toHaveTextContent("bob to you: Bolt the flyer");
+    const box = screen.getByRole("textbox", { name: "Message to your team" });
+    expect(
+      screen.getByText("Only bob will read it. Enter sends."),
+    ).toBeInTheDocument();
+    fireEvent.change(box, { target: { value: "On it" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(onSend).toHaveBeenCalledWith("allies", "On it");
+    // The teams stand where the alliances would: nothing to offer, accept or end.
+    expect(screen.queryByRole("region", { name: "Alliances" })).toBeNull();
+    const team = screen.getByRole("region", { name: "Your team" });
+    expect(team).toHaveTextContent(
+      "You and bob: only the two of you read the Team tab, never the other team.",
+    );
+    expect(screen.queryByRole("button", { name: /alliance/i })).toBeNull();
+  });
+
+  it("says nobody reads the Team tab beside a bot teammate, and shows SysOp both teams", () => {
+    const { unmount } = panel({
+      mine: 2,
+      tab: "allies",
+      alliances: { alliances: [[0, 1]], offers: [], fixed: true },
+    });
+    expect(
+      screen.getByText("Your teammate is a bot, so nobody reads this tab."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("region", { name: "Your team" })).toHaveTextContent(
+      "You and a bot: nobody reads the Team tab.",
+    );
+    unmount();
+    panel({ mine: null, tab: "allies", alliances: fixed });
+    expect(
+      screen.getByText(/you read every team’s messages/),
+    ).toBeInTheDocument();
+    const teams = screen.getByRole("region", { name: "Teams" });
+    expect(teams).toHaveTextContent("ada and bob are a team.");
+    expect(teams).toHaveTextContent("cara and dan are a team.");
+  });
+
+  it("puts no alliance on the plates, which name the teammate already", () => {
+    const table: TableAlliances = {
+      mine: 0,
+      alliances: fixed,
+      open: new Set([1, 2, 3]),
+      handle: (s) => handles[s] ?? "",
+      act: vi.fn(),
+    };
+    expect([0, 1, 2, 3].map((seat) => alliancePills(table, seat))).toEqual([
+      [],
+      [],
+      [],
+      [],
     ]);
   });
 });
