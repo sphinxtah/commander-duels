@@ -120,7 +120,11 @@ test.describe("decks and the card catalog", () => {
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
     await expect(page).toHaveURL(/#play\?deck=/);
-    await expect(page.getByLabel("Your deck")).toHaveValue(`own:${deckId}`);
+    // The practice table's own choices: "Find a game" above it has its own (v0.5.0).
+    const practice = page.getByRole("region", {
+      name: "Sit down against the bots",
+    });
+    await expect(practice.getByLabel("Your deck")).toHaveValue(`own:${deckId}`);
 
     // From the list: archived, then back.
     await page.goto("/#decks");
@@ -182,8 +186,13 @@ test.describe("decks and the card catalog", () => {
     await page
       .getByRole("link", { name: "Play it at the practice table" })
       .click();
-    await expect(page.getByRole("radio", { name: /Commander/ })).toBeChecked();
-    await expect(page.getByLabel("Your deck")).toHaveValue(`own:${deckId}`);
+    const practice = page.getByRole("region", {
+      name: "Sit down against the bots",
+    });
+    await expect(
+      practice.getByRole("radio", { name: /Commander/ }),
+    ).toBeChecked();
+    await expect(practice.getByLabel("Your deck")).toHaveValue(`own:${deckId}`);
   });
 
   test("the card catalog: search syntax, a card's details and the administrators' view", async ({

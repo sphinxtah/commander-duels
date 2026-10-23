@@ -20,6 +20,11 @@ export function TableTags({ table }: { table: TableView }) {
   return (
     <span className={styles.tags}>
       <span className={styles.badge}>{table.seats} seats</span>
+      {table.best_of === 3 && (
+        <span className={styles.badge} data-tone="gold">
+          Best of three
+        </span>
+      )}
       <span className={styles.badge} data-tone="rules">
         {rulesTag(table.rules, table.format)}
         <span className={styles.visuallyHidden}>

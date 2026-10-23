@@ -862,6 +862,11 @@ def open_one(pack_id: UUID, request: Request, principal: Active, db: Db) -> Open
     opened = db.scalar(select(PackOpening).where(PackOpening.pack_id == pack.id))
     if opened is None:
         opened = open_pack(request, db, principal, pack)
+        # Packs opened earn achievements (v0.5.0). Imported here: api.achievements reaches
+        # api.social, which imports far.
+        from api.achievements import catch_up
+
+        catch_up(db, principal.user, opened.created_at)
         try:
             db.commit()
         except IntegrityError:

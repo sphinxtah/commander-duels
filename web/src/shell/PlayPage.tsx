@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Format, Me, PracticeFormat } from "../api";
 import { PracticeTable } from "../game/PracticeTable";
+import { FindGame } from "../queues/FindGame";
 import shell from "../App.module.css";
 import type { Connection } from "./TopBar";
 import { hoverSound, selectSound } from "./menuSound";
@@ -35,8 +36,9 @@ const players: Record<string, string> = {
 };
 
 /**
- * Play (v0.4.5; the first page until then): the owner's banner, the practice table against the
- * bots, and the formats, those not built yet marked "Coming soon".
+ * Play (v0.4.5; the first page until then): the owner's banner, since v0.5.0 "Find a game" in
+ * the public queues, the practice table against the bots, and the formats, those not built yet
+ * marked "Coming soon".
  */
 export function PlayPage({
   me,
@@ -86,21 +88,31 @@ export function PlayPage({
               Gather your cards. <em>Make your mark.</em>
             </h1>
             <p>
-              Practice against the bots in Legacy, Commander or, early,
-              Two-Headed Giant with your own decks, or sit down with other
-              players at a table.
+              Find a game with other players in the queue, practice against the
+              bots in Legacy, Commander or, early, Two-Headed Giant with your
+              own decks, or sit down at a table with an invite.
             </p>
           </div>
           <div className={styles.playActions}>
-            <a className={shell.primary} href="#practice" onClick={selectSound}>
-              Battle the bots <span aria-hidden="true">↓</span>
+            <a className={shell.primary} href="#find" onClick={selectSound}>
+              Find a game <span aria-hidden="true">↓</span>
+            </a>
+            <a
+              className={shell.secondary}
+              href="#practice"
+              onClick={selectSound}
+            >
+              Battle the bots
             </a>
             <a className={shell.secondary} href="#tables" onClick={selectSound}>
-              Play other players
+              Tables
             </a>
           </div>
         </div>
       </section>
+      <div id="find" className={styles.practice}>
+        <FindGame me={me} />
+      </div>
       <div id="practice" className={styles.practice}>
         <PracticeTable me={me} />
       </div>
@@ -194,7 +206,7 @@ export function PlayPage({
             ? `${selected?.name} is coming soon.`
             : early(selected)
               ? `An early version of ${selected?.name}: you and a bot teammate against two bots, with Legacy decks, from the practice table. Your team takes its turns together and shares one life total.`
-              : "Start a practice game against the bots from the practice table, or open a table for other players from Tables."}
+              : "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables."}
         </p>
         <button
           className={shell.primary}

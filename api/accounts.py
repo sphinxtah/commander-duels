@@ -12,11 +12,14 @@ games refer to it, and their records stay whole. What identifies the person goes
   notes; its deck stays only as the row the revision belongs to, emptied, private and in the
   trash. The game seats that played it name it "Deleted deck".
 - **Tables.** The account leaves every table still open, as leaving does: a host's table closes.
+  Since v0.5.0 it leaves its public queue too, and its last wait is forgotten.
 - **Each feature's own rows**, removed by the functions in CLEANUPS.
 
 Wins, tokens, packs, the library, game results and the audit trail stay: they are no contact
-data, and other players' records count them. While the account is seated in a running game,
-deleting it is refused; it can be deleted once the game ends or the seat concedes.
+data, and other players' records count them. While the account is seated in a running game, or
+since v0.5.0 plays a match (between its games too), deleting it is refused; it can be deleted once
+the game or the match ends, or the seat concedes. A match keeps its seats and game wins, as games
+keep theirs; the deck arrangements it holds are card IDs, no contact data.
 
 The worker's daily job (KIND) deletes accounts still pending or denied UNAPPROVED_DAYS after they
 were created, in one transaction, with one audit entry that counts them; since v0.4.4 it also
@@ -43,6 +46,8 @@ from api.models import (
     Game,
     GameSeat,
     GameTable,
+    Match,
+    MatchPlayer,
     RoleGrant,
     ScheduledJob,
     TableSeat,
@@ -116,8 +121,22 @@ class Removed:
 
 
 def running_games(db: Session, user_id: UUID) -> int:
-    """Running games where the account's seat is still in play (api/games.py, active_games_of)."""
-    return (
+    """Running games where the account's seat is still in play (api/games.py, active_games_of),
+    and since v0.5.0 the matches it still plays, between their games too."""
+    matches = (
+        db.scalar(
+            select(func.count())
+            .select_from(MatchPlayer)
+            .join(Match, Match.id == MatchPlayer.match_id)
+            .where(
+                MatchPlayer.user_id == user_id,
+                MatchPlayer.left_at.is_(None),
+                Match.status.in_(("playing", "sideboarding")),
+            )
+        )
+        or 0
+    )
+    return matches + (
         db.scalar(
             select(func.count(func.distinct(Game.id)))
             .select_from(Game)
@@ -227,6 +246,11 @@ def delete_account(db: Session, user: User, now: datetime) -> Removed:
         )
     removed = Removed(user.status)
     removed.tables_left = leave_open_tables(db, user.id, now)
+    # Imported here: api.queues imports api.games, which imports far. Before the decks go: a place
+    # in a queue names one.
+    from api.queues import remove_queue_of
+
+    remove_queue_of(db, user.id)
     user.status = "deleted"
     user.deleted_at = now
     user.handle = user.normalized_handle = None

@@ -38,6 +38,10 @@ export function presenceWords(presence: Presence | null | undefined): string {
       presence.game_kind === "table"
         ? `Playing ${name} at a table`
         : `Playing a ${name} practice game`;
+  } else if (presence.state === "in_queue") {
+    // Waiting in a public queue (v0.5.0).
+    const name = formatNames[presence.game_format ?? ""];
+    words = name ? `Looking for a ${name} game` : "Looking for a game";
   } else {
     words = { online: "Online", idle: "Idle", offline: "Offline" }[
       presence.state
@@ -46,10 +50,20 @@ export function presenceWords(presence: Presence | null | undefined): string {
   return presence.appears_offline ? `${words} (appears offline)` : words;
 }
 
-/** Friends first by what they are doing: in a game, online, idle, offline, then unknown. */
+/** Friends first by what they are doing: in a game (or, since v0.5.0, a queue), online, idle,
+ * offline, then unknown. */
 export function presenceRank(presence: Presence | null | undefined): number {
   if (!presence) return 4;
+  if (presence.state === "in_queue") return 0;
   return ["in_game", "online", "idle", "offline"].indexOf(presence.state);
+}
+
+/** Where a notification leads: a message to its conversation, a rematch (v0.5.0) to its
+ * game's result screen, anything else to the player's profile. Null without a player. */
+export function notificationLink(item: NotificationItem): string | null {
+  if (item.kind === "rematch" && item.game_id) return `#game/${item.game_id}`;
+  if (!item.actor) return null;
+  return playerLink(item.actor.id);
 }
 
 export function notificationWords(item: NotificationItem): string {
@@ -67,7 +81,26 @@ export function notificationWords(item: NotificationItem): string {
         : item.messages === 1
           ? `${who} sent you a message.`
           : `${who} sent you messages.`;
+    case "quest_completed":
+      return item.award
+        ? `Quest complete: ${item.award.name}. +${item.award.tokens.toLocaleString("en-US")} tokens.`
+        : "You completed a daily quest.";
+    case "achievement_earned":
+      return item.award
+        ? `Achievement earned: ${item.award.name}. +${item.award.tokens.toLocaleString("en-US")} tokens.`
+        : "You earned an achievement.";
+    case "rematch":
+      return item.request_pending
+        ? `${who} offers a rematch.`
+        : `${who} offered a rematch.`;
   }
+}
+
+/** Where a notification no player caused leads (v0.5.0): the quests' main menu, or Profile. */
+export function awardLink(item: NotificationItem): string | null {
+  if (item.kind === "quest_completed") return "#home";
+  if (item.kind === "achievement_earned") return "#profile";
+  return null;
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 days ago", then the date. */

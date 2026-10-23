@@ -1,6 +1,6 @@
 # Human tables (v0.4.0)
 
-Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Queues come later.
+Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Since v0.5.0 players also find each other through public queues, whose games of two players or more are table games, and a table's players may play their game again with Rematch ([queues and rematches](queues.md)).
 
 ## The lobby
 
@@ -9,11 +9,12 @@ Since v0.4.0 approved players play each other. A player opens a table in the lob
   - Legacy for two players, or Commander for two to four seats;
   - how many of the seats bots fill, after the players' seats, and their skill (1–6);
   - public (listed in the lobby) or private (reached by its invite link only);
-  - since v0.4.5, which cards its decks may hold ([the table's rules](#the-tables-rules-v045)).
+  - since v0.4.5, which cards its decks may hold ([the table's rules](#the-tables-rules-v045));
+  - since v0.5.0, in Legacy, one game or a best-of-three match with sideboards ([matches](matches.md)). The lobby tags a best-of-three table.
   The host takes the first seat with one of their decks.
 - **The invite link.** Every table has an unguessable code, and its page is `#tables/<code>`. A private table is never listed, so the link is the only way in. Its players see the link and can copy it. SysOp sees every table, private ones included.
 - **Seats.** A player joins with one of their own decks and takes the first free seat. They may change deck (which makes them not ready again), mark themselves ready, or leave. The host leaving closes the table for everyone.
-- **One table at a time.** A player sits at one open table at a time. Joining, or opening a table, also needs room under the account's limit of running games (`CD_GAMES_PER_ACCOUNT`, 1 by default; SysOp has none).
+- **One table at a time.** A player sits at one open table at a time, and since v0.5.0 not while waiting in a public queue (`409 in_queue`, [queues](queues.md#joining-and-waiting)). Joining, or opening a table, also needs room under the account's limit of running games (`CD_GAMES_PER_ACCOUNT`, 1 by default; SysOp has none).
 - **Starting.** The host starts once every player's seat is taken and every other player is ready. Each player's limit of running games is checked again then. The other players' pages follow the table into its game.
 
 ## The table's rules (v0.4.5)
@@ -59,7 +60,7 @@ There are no turn timers.
 | Route | What |
 | --- | --- |
 | `GET /api/v1/tables` | Open tables, newest first: the public ones and your own (SysOp: every one) |
-| `POST /api/v1/tables` | Open a table: `format`, `seats` (2 in Legacy, 2–4 in Commander), `bots`, `bot_skill`, `turn_cap`, `visibility`, `rules` (since v0.4.5: `{"banned": bool, "not_legal": bool}`, both true by default), `deck_id` |
+| `POST /api/v1/tables` | Open a table: `format`, `seats` (2 in Legacy, 2–4 in Commander), `bots`, `bot_skill`, `turn_cap`, `visibility`, `rules` (since v0.4.5: `{"banned": bool, "not_legal": bool}`, both true by default), `best_of` (since v0.5.0: 1, or 3 in Legacy), `deck_id` |
 | `GET /api/v1/tables/{code}` | A table by its invite code: its rules, its seats (handles, portraits, ready), your own deck, and its game once started (for its players and SysOp) |
 | `POST /api/v1/tables/{code}/join` | Take the first free seat with `deck_id` |
 | `PATCH /api/v1/tables/{code}/seat` | Change `deck_id`, or `ready` |
@@ -68,7 +69,7 @@ There are no turn timers.
 
 Every route needs `games.play`, and seats need `decks.edit`. Refusals:
 - 404 for a code no table has.
-- 409 `at_a_table` (another open table), `game_limit` (no room for another running game, naming the player at the start), `table_full`, `table_closed`, `already_seated`, `not_seated`, `not_ready`, `table_not_full`, `deck_not_playable` (another player's deck at the start), `player_unavailable`, `table_changed` (a player left as it started).
+- 409 `at_a_table` (another open table), `in_queue` (since v0.5.0: waiting in a public queue), `game_limit` (no room for another running game, naming the player at the start), `table_full`, `table_closed`, `already_seated`, `not_seated`, `not_ready`, `table_not_full`, `deck_not_playable` (another player's deck at the start), `player_unavailable`, `table_changed` (a player left as it started).
 - 403 `not_host` for a start by anyone but the host.
 - 422 `invalid_table`, the practice table's deck refusals (`invalid_deck`, `deck_not_playable`), and since v0.4.5 `deck_not_allowed`: your deck holds cards the table's rules do not allow, named in the message.
 - 429 `games_busy` and 503 as for practice games.
@@ -85,7 +86,11 @@ Migration `0009_tables` adds:
 
 Going back to 0008 keeps every game, with its wins and tokens, as a practice game, and drops the tables.
 
+Migration `0022_queues` (v0.5.0) marks the tables the public queue makes, and their rematches' (`game_tables.queued`), started at once and private, with every seat taken and ready ([queues](queues.md#data)).
+
 Migration `0019_table_rules` (v0.4.5) adds each table's rules, `game_tables.allow_banned` and `allow_not_legal`, true for the tables already there, and each deck's needs ([decks](decks.md#validation-deck08-t03t05)). Going back drops them: tables take legal decks only again.
+
+Migration `0023_matches` (v0.5.0) adds `game_tables.best_of`, 1 for the tables already there, and the matches a best-of-three table plays ([matches](matches.md#data)).
 
 ## Verification
 

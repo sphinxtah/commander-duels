@@ -9,6 +9,8 @@
   recorded with nothing paid. SysOp may set a daily cap on tokens from bots, off by default. A day
   is a calendar day in Arizona time.
 - **The welcome grant** of 1,000 tokens comes with every new account, once.
+- **Quests and achievements** (v0.5.0, api/quests.py, api/achievements.py) pay their rewards here,
+  each once under its own key, counted as earned.
 - **Grants.** SysOp gives (or takes back) tokens on any account, its own included, with a reason,
   audited, and kept apart from tokens earned. Administrators see balances and ledgers.
 - **Spending.** A purchase locks the account's row, so two purchases at once cannot spend the same
@@ -59,10 +61,12 @@ BOT_CAP = "economy.bot_daily_cap"
 MAX_GRANT = 100_000_000
 MAX_BOT_CAP = 100_000
 LEDGER_SHOWN = 50
-EARNED = ("bot_win", "human_win", "back_pay")
+EARNED = ("bot_win", "human_win", "back_pay", "quest", "achievement")
 GIVEN = ("welcome", "grant")
 
-TokenKind = Literal["bot_win", "human_win", "back_pay", "welcome", "grant", "pack"]
+TokenKind = Literal[
+    "bot_win", "human_win", "back_pay", "welcome", "grant", "pack", "quest", "achievement"
+]
 
 
 class TokenLine(Contract):
@@ -76,7 +80,9 @@ class TokenLine(Contract):
 
 class Tokens(Contract):
     balance: int
-    earned: int = Field(description="From wins, back pay included.")
+    earned: int = Field(
+        description="From wins, back pay included, and since v0.5.0 daily quests and achievements."
+    )
     given: int = Field(description="The welcome grant and SysOp's grants, less any taken back.")
     spent: int = Field(description="On packs, as a positive number.")
     entries: list[TokenLine] = Field(description="The latest entries, newest first.")
@@ -294,6 +300,35 @@ def grant(db: Session, user: User, amount: int, reason: str, actor: User) -> Tok
     db.add(entry)
     db.flush()
     return entry
+
+
+def reward(
+    db: Session,
+    user_id: UUID,
+    kind: Literal["quest", "achievement"],
+    amount: int,
+    key: str,
+    reason: str,
+    policy: str,
+) -> bool:
+    """A daily quest's or an achievement's reward (v0.5.0), in the caller's transaction, once per
+    key: a replayed end, a retry or a second look finds the key taken and pays nothing. The
+    reason names the quest or the achievement; the entry records the rule it was paid under."""
+    if db.scalar(select(TokenEntry.id).where(TokenEntry.key == key)) is not None:
+        return False
+    db.add(
+        TokenEntry(
+            user_id=user_id,
+            kind=kind,
+            amount=amount,
+            key=key,
+            policy=policy,
+            reason=reason,
+            created_at=utcnow(),
+        )
+    )
+    db.flush()
+    return True
 
 
 def tokens_of(db: Session, user_id: UUID) -> Tokens:

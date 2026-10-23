@@ -24,6 +24,10 @@ import mage.game.GameException;
  * then ignoring case, to XMage's preferred printing. No format rules are checked: a list may hold
  * any card in any number. Commander lists name one or two commanders, which XMage seats in the
  * command zone from the sideboard.
+ *
+ * <p>Since v0.5.0 a Legacy list may also name its {@code sideboard}: XMage keeps those cards outside
+ * the game, where only effects that reach for a card from outside it (Burning Wish, FMT07) find
+ * them. No view shows a sideboard; the API sends players' own decks with theirs.
  */
 final class DeckLists {
     static final int MAX_ENTRIES = 250;
@@ -34,18 +38,23 @@ final class DeckLists {
     static final int MAX_SEARCH = 50;
     /** XMage refuses a deck entry above 99 copies; larger counts become several entries. */
     private static final int XMAGE_MAX_PER_ENTRY = 99;
-    private static final Set<String> FIELDS = Set.of("cards", "commanders");
+    private static final Set<String> FIELDS = Set.of("cards", "commanders", "sideboard");
     private static final Set<String> ENTRY_FIELDS = Set.of("name", "count");
     /** Lower-case name to XMage's spelling, built from the database's names on first use. */
     private static volatile Map<String, String> namesIgnoringCase;
 
     record Entry(String name, int count) {}
 
-    /** A deck as named in a request, before resolution. */
-    record CustomDeck(List<Entry> cards, List<String> commanders) {
+    /** A deck as named in a request, before resolution; the sideboard is Legacy's only. */
+    record CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard) {
         CustomDeck {
             cards = List.copyOf(cards);
             commanders = List.copyOf(commanders);
+            sideboard = List.copyOf(sideboard);
+        }
+
+        CustomDeck(List<Entry> cards, List<String> commanders) {
+            this(cards, commanders, List.of());
         }
     }
 
@@ -74,25 +83,23 @@ final class DeckLists {
         JsonObject json = element.getAsJsonObject();
         JsonRequest.onlyFields(json, FIELDS, "seats[].deck_list.");
         JsonElement cards = json.get("cards");
-        if (cards == null || !cards.isJsonArray() || cards.getAsJsonArray().isEmpty()
-                || cards.getAsJsonArray().size() > MAX_ENTRIES) {
+        if (cards == null || !cards.isJsonArray() || cards.getAsJsonArray().isEmpty()) {
             throw new JsonRequest.Invalid("seats[].deck_list.cards must list 1 to " + MAX_ENTRIES + " entries");
         }
-        List<Entry> entries = new ArrayList<>();
+        List<Entry> entries = entries(cards, "cards");
+        List<Entry> sideboard = List.of();
+        if (json.has("sideboard")) {
+            if (format != GameFormat.LEGACY) {
+                throw new JsonRequest.Invalid("only Legacy deck lists have a sideboard");
+            }
+            sideboard = entries(json.get("sideboard"), "sideboard");
+        }
         int total = 0;
-        for (JsonElement item : cards.getAsJsonArray()) {
-            if (!item.isJsonObject()) {
-                throw new JsonRequest.Invalid("each deck_list entry must be an object");
-            }
-            JsonObject entry = item.getAsJsonObject();
-            JsonRequest.onlyFields(entry, ENTRY_FIELDS, "seats[].deck_list.cards[].");
-            String name = JsonRequest.string(entry, "name", MAX_NAME).strip();
-            BigDecimal count = entry.has("count") ? JsonRequest.integer(entry, "count") : BigDecimal.ONE;
-            if (name.isEmpty() || count.signum() <= 0 || count.compareTo(BigDecimal.valueOf(MAX_COUNT)) > 0) {
-                throw new JsonRequest.Invalid("each deck_list entry needs a name and a count from 1 to " + MAX_COUNT);
-            }
-            total += count.intValueExact();
-            entries.add(new Entry(name, count.intValueExact()));
+        for (Entry entry : entries) {
+            total += entry.count();
+        }
+        for (Entry entry : sideboard) {
+            total += entry.count();
         }
         if (total > MAX_CARDS) {
             throw new JsonRequest.Invalid("a deck_list holds at most " + MAX_CARDS + " cards");
@@ -115,7 +122,30 @@ final class DeckLists {
         if (format != GameFormat.COMMANDER && !commanders.isEmpty()) {
             throw new JsonRequest.Invalid("only Commander deck lists have commanders");
         }
-        return new CustomDeck(entries, commanders);
+        return new CustomDeck(entries, commanders, sideboard);
+    }
+
+    /** A list of {@code {"name", "count"}} entries: the main deck's ({@code cards}) or the sideboard's. */
+    private static List<Entry> entries(JsonElement list, String field) throws JsonRequest.Invalid {
+        if (list == null || !list.isJsonArray() || list.getAsJsonArray().size() > MAX_ENTRIES) {
+            throw new JsonRequest.Invalid("seats[].deck_list." + field + " must list at most " + MAX_ENTRIES
+                + " entries");
+        }
+        List<Entry> entries = new ArrayList<>();
+        for (JsonElement item : list.getAsJsonArray()) {
+            if (!item.isJsonObject()) {
+                throw new JsonRequest.Invalid("each deck_list entry must be an object");
+            }
+            JsonObject entry = item.getAsJsonObject();
+            JsonRequest.onlyFields(entry, ENTRY_FIELDS, "seats[].deck_list." + field + "[].");
+            String name = JsonRequest.string(entry, "name", MAX_NAME).strip();
+            BigDecimal count = entry.has("count") ? JsonRequest.integer(entry, "count") : BigDecimal.ONE;
+            if (name.isEmpty() || count.signum() <= 0 || count.compareTo(BigDecimal.valueOf(MAX_COUNT)) > 0) {
+                throw new JsonRequest.Invalid("each deck_list entry needs a name and a count from 1 to " + MAX_COUNT);
+            }
+            entries.add(new Entry(name, count.intValueExact()));
+        }
+        return entries;
     }
 
     /** The names in {@code deck} that the card database does not know, in list order. */
@@ -129,7 +159,10 @@ final class DeckLists {
         return List.copyOf(missing);
     }
 
-    /** The deck as XMage cards: the list as its main deck, the commanders as its sideboard. */
+    /**
+     * The deck as XMage cards: the list as its main deck, and as its sideboard the commanders (in
+     * Commander) or the sideboard's cards (in Legacy).
+     */
     static Deck load(CustomDeck deck) throws GameException, UnknownCards {
         List<String> missing = unknown(deck);
         if (!missing.isEmpty()) {
@@ -142,6 +175,9 @@ final class DeckLists {
         }
         for (String commander : deck.commanders()) {
             add(lists.getSideboard(), find(commander), 1);
+        }
+        for (Entry entry : deck.sideboard()) {
+            add(lists.getSideboard(), find(entry.name()), entry.count());
         }
         return Deck.load(lists, false, false);
     }
@@ -157,6 +193,7 @@ final class DeckLists {
         List<String> names = new ArrayList<>();
         deck.cards().forEach(entry -> names.add(entry.name()));
         names.addAll(deck.commanders());
+        deck.sideboard().forEach(entry -> names.add(entry.name()));
         return names;
     }
 

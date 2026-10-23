@@ -208,6 +208,7 @@ class Game(Base):
             "format IN ('legacy', 'commander', 'two_headed_giant')", name="ck_games_format"
         ),
         CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
+        CheckConstraint("(match_id IS NULL) = (match_game IS NULL)", name="ck_games_match"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
     kind: Mapped[str] = mapped_column(String(16), default="practice")
@@ -224,6 +225,12 @@ class Game(Base):
     # What the game started under: the catalog revision and the format's version (T17).
     catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
     format_version: Mapped[int | None]
+    # The best-of-three match it is a game of (v0.5.0, api/matches.py), and its number there.
+    match_id: Mapped[UUID | None] = mapped_column(ForeignKey("matches.id"), index=True)
+    match_game: Mapped[int | None]
+    # A practice game's request (v0.5.0, api/rematches.py), for its rematch: the same format, decks,
+    # bots, skill, turn cap and rules. Null for a table's game and for games before v0.5.0.
+    settings: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class GameSeat(Base):
@@ -270,6 +277,10 @@ class GameTable(Base):
         CheckConstraint(
             "seats BETWEEN 2 AND 4 AND bots >= 0 AND seats - bots >= 2", name="ck_game_tables_seats"
         ),
+        CheckConstraint(
+            "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
+            name="ck_game_tables_best_of",
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     # Unguessable: the invite link's code.
@@ -286,12 +297,17 @@ class GameTable(Base):
     # not legal in it. Both is casual, neither tournament rules.
     allow_banned: Mapped[bool] = mapped_column(default=True)
     allow_not_legal: Mapped[bool] = mapped_column(default=True)
+    # Best of one game, or (v0.5.0, Legacy only) of three: a match with sideboarding between games.
+    best_of: Mapped[int] = mapped_column(default=1)
     # open (the lobby), started (its game holds the rest) or closed (the host left).
     status: Mapped[str] = mapped_column(String(16), index=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Made by the public queue (v0.5.0, api/queues.py), or a rematch of such a table: started at
+    # once, never in the lobby, casual. Its players go back to the queue, not the lobby.
+    queued: Mapped[bool] = mapped_column(default=False)
 
 
 class TableSeat(Base):
@@ -306,6 +322,176 @@ class TableSeat(Base):
     deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
     ready: Mapped[bool] = mapped_column(default=False)
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class Match(Base):
+    """A best-of-three Legacy match (v0.5.0, api/matches.py): games of its own, each an engine game
+    linked here with its number, until a player has two game wins. Between games its players
+    sideboard; the loser of a game chooses to play or draw the next one."""
+
+    __tablename__ = "matches"
+    __table_args__ = (
+        CheckConstraint("kind IN ('practice', 'table')", name="ck_matches_kind"),
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_matches_format"),
+        CheckConstraint("best_of = 3", name="ck_matches_best_of"),
+        CheckConstraint(
+            "status IN ('playing', 'sideboarding', 'finished', 'closed')", name="ck_matches_status"
+        ),
+        CheckConstraint(
+            "end_reason IS NULL OR end_reason IN ('games', 'conceded', 'removed', 'closed', "
+            "'failed')",
+            name="ck_matches_end_reason",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    # The kind of its games: a practice match against a bot, or a human table's.
+    kind: Mapped[str] = mapped_column(String(16))
+    format: Mapped[str] = mapped_column(String(16))
+    best_of: Mapped[int] = mapped_column(default=3)
+    # playing (a game runs), sideboarding (between games), finished (a winner or a draw), or
+    # closed (ended without a result: a game closed or timed out, or the next could not start).
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    # What every game of the match starts with, as its first did. A table's match is the one of
+    # the game the table started (game_tables.game_id).
+    bot_skill: Mapped[int]
+    turn_cap: Mapped[int]
+    idle_timeout_seconds: Mapped[int | None]
+    # The game in play, or while sideboarding the next one.
+    game_number: Mapped[int] = mapped_column(default=1)
+    # Who chooses to play or draw the next game (the last game's loser), and the seat that plays
+    # first as chosen; both None for the first game, where the engine draws who chooses.
+    chooser_seat: Mapped[int | None]
+    starting_seat: Mapped[int | None]
+    # When sideboarding ends: the next game then starts with every deck as it is arranged.
+    sideboard_until: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    winner_seat: Mapped[int | None]
+    draw: Mapped[bool] = mapped_column(default=False)
+    # games (game wins decided it), conceded, removed (away), closed or failed.
+    end_reason: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class MatchPlayer(Base):
+    """A seat in a match (v0.5.0), the same in each of its games. A player's arrangement of their
+    bound deck revision between main deck and sideboard is theirs alone: no answer about the match
+    shows it to anyone else, SysOp apart."""
+
+    __tablename__ = "match_players"
+    __table_args__ = (
+        UniqueConstraint("match_id", "seat"),
+        CheckConstraint("player IN ('human', 'bot')", name="ck_match_players_player"),
+        CheckConstraint(
+            "(player = 'human') = (user_id IS NOT NULL)", name="ck_match_players_owner"
+        ),
+        CheckConstraint(
+            "left_reason IS NULL OR left_reason IN ('conceded', 'removed')",
+            name="ck_match_players_left",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), index=True)
+    seat: Mapped[int]
+    player: Mapped[str] = mapped_column(String(8))
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    # The player's deck revision bound at the match's start (DECK01): every game plays its cards.
+    deck_revision_id: Mapped[UUID | None] = mapped_column(ForeignKey("deck_revisions.id"))
+    # A seat that never sideboards (a bot, a fixture deck, SysOp's deck list): the deck as the
+    # engine took it for the first game, {"deck": name} or {"deck_list": ...}.
+    engine_deck: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The revision's main deck and sideboard as the player arranged them for the next game:
+    # {"main": [{card_id, printing_id, quantity}], "sideboard": [...]}.
+    arrangement: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    ready: Mapped[bool] = mapped_column(default=False)
+    game_wins: Mapped[int] = mapped_column(default=0)
+    # Out of the match: conceded it, or removed from one of its games while away.
+    left_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    left_reason: Mapped[str | None] = mapped_column(String(16))
+
+
+class QueueEntry(Base):
+    """A player's place in a public queue (v0.5.0, api/queues.py), one row per account: waiting
+    with one of their decks, or what became of their last wait (the game it found, or why they were
+    taken out). A queue is a format and a number of seats; it seats its players in the order they
+    joined. A row being made into a game is starting, which no other match may take."""
+
+    __tablename__ = "queue_entries"
+    __table_args__ = (
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_queue_entries_format"),
+        CheckConstraint("seats BETWEEN 2 AND 4", name="ck_queue_entries_seats"),
+        CheckConstraint(
+            "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
+            name="ck_queue_entries_best_of",
+        ),
+        CheckConstraint(
+            "status IN ('waiting', 'starting', 'matched', 'left', 'refused')",
+            name="ck_queue_entries_status",
+        ),
+        # One queue's waiting players, in the order they joined.
+        Index("ix_queue_entries_queue", "format", "seats", "status", "joined_at"),
+    )
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    format: Mapped[str] = mapped_column(String(16))
+    seats: Mapped[int]
+    # Legacy's best-of-three queue (v0.5.0, api/matches.py) is a queue of its own.
+    best_of: Mapped[int] = mapped_column(default=1)
+    deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
+    # Wait for players only: bots never fill this player's game.
+    humans_only: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[str] = mapped_column(String(16))
+    joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # When the player's app last asked about their place: one that stops asking has left.
+    seen_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    # Why the player was taken out (refused, left), or why their match waits (games_busy), with
+    # the words the player sees.
+    reason: Mapped[str | None] = mapped_column(String(32))
+    message: Mapped[str | None] = mapped_column(Text)
+
+
+class Rematch(Base):
+    """A rematch of a finished game (v0.5.0, api/rematches.py), at most one a game. A practice
+    game's starts at once. A table's is offered to its players still there, and starts when every
+    one of them accepts; one who declines, or an offer nobody finishes answering in time, ends
+    it."""
+
+    __tablename__ = "rematches"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('open', 'starting', 'started', 'declined', 'lapsed', 'failed')",
+            name="ck_rematches_status",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), unique=True)
+    proposed_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    next_game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    declined_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    # Why it failed, in words every player may see: whose deck or game stopped it, never a card.
+    message: Mapped[str | None] = mapped_column(Text)
+
+
+class RematchPlayer(Base):
+    """A player a table's rematch asks, by their seat in the finished game, and their answer."""
+
+    __tablename__ = "rematch_players"
+    __table_args__ = (
+        UniqueConstraint("rematch_id", "seat"),
+        UniqueConstraint("rematch_id", "user_id"),
+        CheckConstraint("answer IS NULL OR answer IN ('yes', 'no')", name="ck_rematch_players"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    rematch_id: Mapped[UUID] = mapped_column(ForeignKey("rematches.id"), index=True)
+    seat: Mapped[int]
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    answer: Mapped[str | None] = mapped_column(String(8))
+    answered_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 
 
 class CardImage(Base):
@@ -851,13 +1037,15 @@ class LibraryGrant(Base):
 
 class TokenEntry(Base):
     """The economy ledger (PROG03, v0.4.0): tokens paid for wins, each from a committed result,
-    the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought.
-    Append-only: PostgreSQL refuses updates and deletes. A balance is the sum of its entries."""
+    the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought; since
+    v0.5.0 the rewards of daily quests and achievements. Append-only: PostgreSQL refuses updates
+    and deletes. A balance is the sum of its entries."""
 
     __tablename__ = "token_ledger"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack')",
+            "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack', 'quest', "
+            "'achievement')",
             name="ck_token_ledger_kind",
         ),
         CheckConstraint(
@@ -873,7 +1061,8 @@ class TokenEntry(Base):
     # Tokens in (earned, given) or out (spent, taken back); 0 for a win past a limit.
     amount: Mapped[int] = mapped_column(BigInteger)
     # Unique per fact, so retries and replays write nothing twice: tokens:<game>:<seat>:<beaten
-    # seat>, welcome:<account>, grant:<id>, pack:<opening>.
+    # seat>, welcome:<account>, grant:<id>, pack:<opening>; since v0.5.0 quest:<account>:<day>:
+    # <quest> and achievement:<account>:<achievement>, each with a reset's time after one.
     key: Mapped[str] = mapped_column(String(128), unique=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"), index=True)
     # The seat beaten, and its player when a human sat there.
@@ -1202,14 +1391,17 @@ class PlayerBlock(Base):
 
 class Notification(Base):
     """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
-    come online, and since v0.4.4 new messages from a friend (one while unread, renewed by each
-    message). The actor is the other player. Kept NOTIFICATION_DAYS, at most a few hundred per
+    come online, since v0.4.4 new messages from a friend (one while unread, renewed by each
+    message), and since v0.5.0 a rematch offered (the game it would replay). The actor is the
+    other player. Since v0.5.0 also a daily quest completed and an achievement earned, which no
+    player caused: the subject names which. Kept NOTIFICATION_DAYS, at most a few hundred per
     account (api/social.py)."""
 
     __tablename__ = "notifications"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message')",
+            "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
+            "'quest_completed', 'achievement_earned', 'rematch')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1221,6 +1413,10 @@ class Notification(Base):
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # The quest or the achievement (v0.5.0), by its ID.
+    subject: Mapped[str | None] = mapped_column(String(48))
+    # A rematch's finished game (v0.5.0), whose result screen holds the offer.
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
 
 
 class Conversation(Base):
@@ -1291,3 +1487,98 @@ class WeeklySale(Base):
     product_ids: Mapped[list[str]] = mapped_column(JsonType)
     percent: Mapped[int] = mapped_column(SmallInteger)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+# Statistics, daily quests and achievements (v0.5.0, PROG04, PROG07, PROG08): api/stats.py,
+# api/quests.py and api/achievements.py. Every one is judged from the server's own record of a
+# finished game. A reset (users.reset_at) leaves their rows recorded, and they count only what
+# came after it; deleting an account keeps them, as it keeps the ledgers.
+
+
+class PlayerResult(Base):
+    """A player's result in a game that ended (v0.5.0, api/stats.py): one row per human seat,
+    written in the transaction that records the game's end, from the engine's result as the API
+    recorded it and the deck the seat played. Append-only: PostgreSQL refuses updates and deletes.
+    Opponents and the deck's title are read from the game's seats, which a deletion renames."""
+
+    __tablename__ = "player_results"
+    __table_args__ = (
+        UniqueConstraint("game_id", "seat"),
+        CheckConstraint(
+            "outcome IN ('win', 'loss', 'draw', 'no_result')", name="ck_player_results_outcome"
+        ),
+        # A player's totals and history, newest first.
+        Index("ix_player_results_user_id_finished_at", "user_id", "finished_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"))
+    seat: Mapped[int]
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    outcome: Mapped[str] = mapped_column(String(16))
+    # The game's, copied: no check, so a format or a kind of game added later counts as itself.
+    format: Mapped[str] = mapped_column(String(32))
+    kind: Mapped[str] = mapped_column(String(16))
+    # Every seat, the other players' and the bots' (with the game's bot skill when it had bots).
+    seats: Mapped[int] = mapped_column(SmallInteger)
+    players: Mapped[int] = mapped_column(SmallInteger)
+    bots: Mapped[int] = mapped_column(SmallInteger)
+    bot_skill: Mapped[int | None] = mapped_column(SmallInteger)
+    # The deck's colours, WUBRG letters: a Commander deck's commanders' color identity, a Legacy
+    # deck's cards' colors; empty for a colorless deck or a deck list typed by SysOp.
+    colors: Mapped[str] = mapped_column(String(8), default="")
+    turns: Mapped[int | None]
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    finished_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # The rule the outcome was judged under (PROG05).
+    policy: Mapped[str] = mapped_column(String(32))
+
+
+class DailyQuest(Base):
+    """One of an account's three quests of a day (v0.5.0, api/quests.py), drawn the first time
+    the account asks for its quests that day, Arizona time. A swap replaces a slot's quest once a
+    day; a quest completed is paid through the economy ledger (key quest:<account>:<day>:<quest>).
+    """
+
+    __tablename__ = "daily_quests"
+    __table_args__ = (
+        CheckConstraint("slot BETWEEN 0 AND 2", name="ck_daily_quests_slot"),
+        Index("ix_daily_quests_user_id_day", "user_id", "day"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    # The calendar day in Arizona.
+    day: Mapped[date] = mapped_column(Date)
+    slot: Mapped[int] = mapped_column(SmallInteger)
+    # Unique per slot and day: quest-slot:<account>:<day>:<slot>, with the time of a reset after
+    # one, so a reset draws the day's quests again.
+    key: Mapped[str] = mapped_column(String(128), unique=True)
+    quest: Mapped[str] = mapped_column(String(48))
+    # What it pays and how many wins it needs, as they were when it was drawn.
+    tokens: Mapped[int]
+    target: Mapped[int] = mapped_column(SmallInteger)
+    # Games finished from this time count: the day's start, or the swap's time.
+    counts_from: Mapped[datetime] = mapped_column(UtcDateTime())
+    swapped_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    policy: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class PlayerAchievement(Base):
+    """An achievement an account earned (v0.5.0, api/achievements.py), once, under the version of
+    its definition then; its reward is paid through the economy ledger under the same key. Never
+    removed by an update (PROG07). Up to three are pinned to the profile, in order."""
+
+    __tablename__ = "player_achievements"
+    __table_args__ = (
+        CheckConstraint("pin IS NULL OR pin BETWEEN 1 AND 3", name="ck_player_achievements_pin"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    achievement: Mapped[str] = mapped_column(String(48))
+    version: Mapped[int] = mapped_column(SmallInteger)
+    # achievement:<account>:<achievement>, with the time of a reset after one.
+    key: Mapped[str] = mapped_column(String(128), unique=True)
+    tokens: Mapped[int]
+    pin: Mapped[int | None] = mapped_column(SmallInteger)
+    earned_at: Mapped[datetime] = mapped_column(UtcDateTime())

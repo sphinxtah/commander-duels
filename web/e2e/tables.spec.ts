@@ -288,7 +288,9 @@ test.describe("a human table in two browsers", () => {
       await host.getByRole("button", { name: "Alliance with rival" }).click();
       await host.getByRole("menuitem", { name: "Offer an alliance" }).click();
       await guest.getByRole("button", { name: "Alliance with sysop" }).click();
-      await guest.getByRole("menuitem", { name: "Accept the alliance" }).click();
+      await guest
+        .getByRole("menuitem", { name: "Accept the alliance" })
+        .click();
       await guest.getByRole("button", { name: /^Table chat/ }).click();
       const guestTable = guest.getByRole("list", {
         name: "Messages to the table",

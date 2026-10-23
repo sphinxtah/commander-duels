@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { client, describe } from "../api";
 import { ManaCost } from "../game/Card";
+import { CardTile, ViewSwitch } from "./CardViews";
 import {
   sourceLabels,
   type CardSummary,
@@ -8,6 +9,7 @@ import {
   type LibraryView,
 } from "./catalog";
 import styles from "./catalog.module.css";
+import type { CardView } from "./cardView";
 
 type Source = LibraryCard["sources"][number];
 
@@ -27,9 +29,18 @@ const sourceNotes: [Source, string][] = [
 /**
  * The player's card library (v0.3.1): the cards they build from, each with its copies and where
  * they came from. Copies are a limit per deck, not spent: two decks may each hold every copy. An
- * account that builds from the whole catalog has no library, and is told so.
+ * account that builds from the whole catalog has no library, and is told so. Since v0.5.0 it shows
+ * the cards themselves, as the owner asked, with the list a switch away.
  */
-export function MyLibrary({ onOpen }: { onOpen: (card: CardSummary) => void }) {
+export function MyLibrary({
+  onOpen,
+  view,
+  onView,
+}: {
+  onOpen: (card: CardSummary) => void;
+  view: CardView;
+  onView: (view: CardView) => void;
+}) {
   const [library, setLibrary] = useState<LibraryView>();
   const [error, setError] = useState("");
   const [find, setFind] = useState("");
@@ -144,16 +155,36 @@ export function MyLibrary({ onOpen }: { onOpen: (card: CardSummary) => void }) {
           </select>
         </label>
       </div>
-      <p role="status" className={styles.resultLine}>
-        {shown.length === library.cards.length
-          ? `${library.cards.length.toLocaleString()} ${library.cards.length === 1 ? "card" : "cards"}, ${copies.toLocaleString()} ${copies === 1 ? "copy" : "copies"}`
-          : `${shown.length.toLocaleString()} of ${library.cards.length.toLocaleString()} cards`}
-      </p>
+      <div className={styles.resultRow}>
+        <p role="status" className={styles.resultLine}>
+          {shown.length === library.cards.length
+            ? `${library.cards.length.toLocaleString()} ${library.cards.length === 1 ? "card" : "cards"}, ${copies.toLocaleString()} ${copies === 1 ? "copy" : "copies"}`
+            : `${shown.length.toLocaleString()} of ${library.cards.length.toLocaleString()} cards`}
+        </p>
+        {library.cards.length > 0 && (
+          <ViewSwitch view={view} onChange={onView} />
+        )}
+      </div>
       {library.cards.length === 0 ? (
         <p className={styles.note}>
           Nothing yet beyond basic lands: your two starter decks and an alliance
           fill it.
         </p>
+      ) : view === "pictures" ? (
+        <ul className={styles.grid} aria-label="Your library">
+          {shown.map((item) => (
+            // The tile's own note says the copies; the line under it, where they came from.
+            <CardTile
+              key={item.card.id}
+              card={{ ...item.card, owned: item.copies }}
+              onOpen={onOpen}
+            >
+              <span className={styles.tileSources}>
+                {item.sources.map((from) => sourceLabels[from]).join(", ")}
+              </span>
+            </CardTile>
+          ))}
+        </ul>
       ) : (
         <div className={styles.libraryScroll}>
           <table className={styles.libraryTable} aria-label="Your library">

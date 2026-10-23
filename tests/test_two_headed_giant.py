@@ -8,19 +8,23 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from alembic import command
 from alembic.config import Config
+from catalog_fixtures import bulk, engine_list, import_bulk
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from jsonschema import ValidationError
-from sqlalchemy import select
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from test_contracts import card, snapshot, validator_for
-from test_games import Account, FakeEngine, build, connect, until_status
+from test_games import SERVICE_TOKEN, Account, FakeEngine, build, connect, until_status
 
 from api import games, teams
+from api.config import Settings
 from api.identity import ApiError
+from api.main import create_app
 from api.models import Game, ProgressEntry, TokenEntry
 
 
@@ -271,6 +275,71 @@ def test_the_seat_view_contract_shows_only_a_teammates_hand() -> None:
         with pytest.raises(ValidationError):
             validator.validate(leaked)
             pytest.fail(f"schema accepted {description}")
+
+
+def test_a_players_own_legacy_deck_plays_without_its_sideboard(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MTR 9.5: no sideboards in Two-Headed Giant. A Legacy game takes the deck's (v0.5.0)."""
+    from test_decks_api import Account as DeckAccount
+    from test_decks_api import entry
+
+    url = f"sqlite:///{tmp_path}/two-headed-giant-decks.db"
+    monkeypatch.setenv("CD_DATABASE_URL", url)
+    command.upgrade(Config("alembic.ini"), "head")
+    catalog = create_engine(url)
+    import_bulk(catalog, tmp_path / "files", bulk(), engine_list())
+    catalog.dispose()
+    fake = FakeEngine()
+    app = create_app(
+        Settings(database_url=url, engine_service_token=SERVICE_TOKEN, games_per_account=4)
+    )
+    app.state.engine_transport = httpx.MockTransport(fake)
+    with TestClient(app, base_url="https://testserver") as client:
+        ada = DeckAccount(client, "ada", admin=True)
+        entries = [
+            entry(client, "Lightning Bolt", 4),
+            entry(client, "Mountain", 56),
+            entry(client, "Brainstorm", 2, "sideboard"),
+        ]
+        deck = ada.send(
+            "POST", "/api/v1/decks", {"title": "Burn", "format": "legacy", "entries": entries}
+        ).json()
+        giant = ada.send(
+            "POST", "/api/v1/practice-games", {"format": "two_headed_giant", "deck_id": deck["id"]}
+        )
+        assert giant.status_code == 201, giant.json()
+        seats = fake.created[-1]["seats"]
+        assert "sideboard" not in seats[0]["deck_list"]
+        # Lightning Bolt is in the red fixture: the teammate plays the green one.
+        assert [seat.get("deck") for seat in seats[1:]] == [
+            "legacy-mono-green-creatures",
+            "legacy-mono-red-burn",
+            "legacy-mono-white-weenie",
+        ]
+        ada.send("POST", f"/api/v1/games/{giant.json()['id']}/close", {})
+        legacy = ada.send(
+            "POST", "/api/v1/practice-games", {"format": "legacy", "deck_id": deck["id"]}
+        )
+        assert legacy.status_code == 201, legacy.json()
+        assert fake.created[-1]["seats"][0]["deck_list"]["sideboard"] == [
+            {"name": "Brainstorm", "count": 2}
+        ]
+
+
+def test_a_team_wins_together_in_the_records() -> None:
+    from api.models import GameSeat
+    from api.stats import outcome_of
+
+    result = {"kind": "completed", "winner_seat": 0, "winner_seats": [0, 1], "draw": False}
+    assert [outcome_of(result, GameSeat(seat=seat)) for seat in range(4)] == [
+        "win",
+        "win",
+        "loss",
+        "loss",
+    ]
+    alone = {"kind": "completed", "winner_seat": 1, "draw": False}
+    assert [outcome_of(alone, GameSeat(seat=seat)) for seat in range(2)] == ["loss", "win"]
 
 
 def test_an_engine_without_teams_names_its_winner_alone() -> None:

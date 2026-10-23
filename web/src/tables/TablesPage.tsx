@@ -58,6 +58,8 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
   const [skill, setSkill] = useState(4);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [rules, setRules] = useState<TableRules>(casualRules);
+  // One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards.
+  const [bestOf, setBestOf] = useState<1 | 3>(1);
   const [deck, setDeck] = useState("");
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
@@ -89,6 +91,7 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
         turn_cap: 60,
         visibility,
         rules,
+        best_of: format === "legacy" ? bestOf : 1,
         deck_id: chosen,
       },
     });
@@ -210,6 +213,35 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
               <option value="private">Only players with the invite link</option>
             </select>
           </label>
+          {format === "legacy" && (
+            <fieldset>
+              <legend>Games</legend>
+              <label className={game.choice}>
+                <input
+                  type="radio"
+                  name="table-best-of"
+                  checked={bestOf === 1}
+                  onChange={() => setBestOf(1)}
+                />
+                <span>
+                  <strong>One game</strong>
+                  <small>The main deck alone</small>
+                </span>
+              </label>
+              <label className={game.choice}>
+                <input
+                  type="radio"
+                  name="table-best-of"
+                  checked={bestOf === 3}
+                  onChange={() => setBestOf(3)}
+                />
+                <span>
+                  <strong>Best of three</strong>
+                  <small>Sideboard between games; every game won counts</small>
+                </span>
+              </label>
+            </fieldset>
+          )}
           <RulesFields rules={rules} format={format} onChange={setRules} />
           {decks !== null && here.every((d) => !d.playable) ? (
             <div className={game.field} data-no-deck>

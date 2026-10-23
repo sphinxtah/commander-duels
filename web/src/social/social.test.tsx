@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
 import { client, type Me } from "../api";
+import { badges, stats } from "../records/fixtures";
 import { FriendsPage } from "./FriendsPage";
 import { NotificationBell, NotificationsPage, TOAST_MS } from "./Notifications";
 import { PlayerPage } from "./PlayerPage";
@@ -94,6 +95,11 @@ beforeEach(() => {
   queues.clear();
   for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"] as const)
     vi.spyOn(client, method).mockImplementation(serve(method));
+  // A profile's badges and record (v0.5.0, records/records.test.tsx).
+  on("GET /api/v1/players/{player_id}/stats", () => reply(200, stats()));
+  on("GET /api/v1/players/{player_id}/achievements", () =>
+    reply(200, badges()),
+  );
 });
 afterEach(() => {
   vi.restoreAllMocks();

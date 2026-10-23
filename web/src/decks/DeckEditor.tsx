@@ -857,10 +857,13 @@ function DeckSections({
       {locationsFor(format).map((location) => {
         const here = entries.filter((entry) => entry.location === location);
         const count = here.reduce((sum, entry) => sum + entry.quantity, 0);
+        // A Legacy deck's sideboard always shows (v0.5.0): best-of-three matches swap with it.
+        const sideboard = format === "legacy" && location === "sideboard";
         if (
           here.length === 0 &&
           location !== "main" &&
-          location !== "commander"
+          location !== "commander" &&
+          !sideboard
         )
           return null;
         const groups = new Map<string, DeckEntry[]>();
@@ -882,7 +885,15 @@ function DeckSections({
             <h2>
               {locationNames[location]} <small>{count}</small>
             </h2>
-            {here.length === 0 && (
+            {sideboard && (
+              <p className={styles.hint} data-sideboard-hint>
+                Up to 15 cards, from the search's "Add to sideboard". In a
+                best-of-three match you swap them with main-deck cards between
+                games; in one game they wait outside it, where a wish can fetch
+                them.
+              </p>
+            )}
+            {here.length === 0 && !sideboard && (
               <p className={styles.hint}>
                 {location === "commander"
                   ? "Choose a commander from the search: its button says Commander."

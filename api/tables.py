@@ -35,6 +35,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import matches
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import starters_of
@@ -75,7 +76,7 @@ from api.models import (
     User,
 )
 from api.roster import roster_of
-from api.schemas import Contract, Error, TableFormatId, TableRules, casual
+from api.schemas import BEST_OF_TEXT, BestOf, Contract, Error, TableFormatId, TableRules, casual
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -111,6 +112,7 @@ class TableRequest(Contract):
         description="Which cards its decks may hold by their legality; casual unless told "
         "otherwise.",
     )
+    best_of: BestOf = Field(default=1, description=BEST_OF_TEXT)
     deck_id: UUID = Field(description="The host's deck.")
 
 
@@ -146,6 +148,7 @@ class TableView(Contract):
     bot_skill: int
     turn_cap: int
     rules: TableRules
+    best_of: int = Field(default=1, description="Since v0.5.0: 3 for a best-of-three match.")
     host: str | None = Field(description="The host's handle.")
     players: list[TablePlayer] = Field(description="Every seat in turn order, bots last.")
     your_seat: int | None
@@ -258,6 +261,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         bot_skill=table.bot_skill,
         turn_cap=table.turn_cap,
         rules=rules_of(table),
+        best_of=table.best_of,
         host=found.get(table.host_id, (None, None))[0],
         players=players,
         your_seat=mine.seat if mine is not None else None,
@@ -290,6 +294,12 @@ def may_sit(db: Session, request: Request, principal: Principal) -> None:
     db.scalar(select(User.id).where(User.id == principal.user.id).with_for_update())
     if open_table_of(db, principal.user.id) is not None:
         raise ApiError(409, "at_a_table", "You are at another open table. Leave it first.")
+    # Imported here: api.queues imports this module. A player waits in a queue or sits at a table,
+    # not both (v0.5.0).
+    from api.queues import waiting_of
+
+    if waiting_of(db, principal.user.id) is not None:
+        raise ApiError(409, "in_queue", "You are waiting in a public queue. Leave it first.")
     limit = settings_of(request).games_per_account
     if not full_access(principal) and active_games_of(db, principal.user.id) >= limit:
         raise ApiError(
@@ -329,6 +339,8 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         )
     if body.bots > body.seats - 2:
         raise ApiError(422, "invalid_table", "A table needs at least two players' seats.")
+    if body.best_of != 1 and fmt != "legacy":
+        raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
     check_deck(db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules)
     may_sit(db, request, principal)
     now = utcnow()
@@ -343,6 +355,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         turn_cap=body.turn_cap,
         allow_banned=body.rules.banned,
         allow_not_legal=body.rules.not_legal,
+        best_of=body.best_of,
         status="open",
         created_at=now,
     )
@@ -546,6 +559,20 @@ def record_table_game(
         user for user in users if user is not None
     ]:
         raise ApiError(409, "table_changed", "A player left as the game started. Try again.")
+    game = add_table_game(db, table, created, plans, users)
+    db.commit()
+    return game
+
+
+def add_table_game(
+    db: Session,
+    table: GameTable,
+    created: dict[str, object],
+    plans: list[SeatPlan],
+    users: list[UUID | None],
+) -> Game:
+    """The table's game and its seats, and the table as started, in the caller's transaction:
+    the lobby's start, and since v0.5.0 the queue's and a rematch's (api/queues.py)."""
     now = utcnow()
     game = Game(
         id=UUID(str(created["game_id"])),
@@ -578,10 +605,12 @@ def record_table_game(
                 deck_revision_id=plan.revision,
             )
         )
+    # Best of three (v0.5.0): the first game of the table's match.
+    matches.begin(db, game, table.best_of, idle_timeout_seconds=TABLE_IDLE_SECONDS)
     table.status = "started"
     table.started_at = now
     table.game_id = game.id
-    db.commit()
+    db.flush()
     return game
 
 

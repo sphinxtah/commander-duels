@@ -354,6 +354,93 @@ describe("the practice table for a player (v0.3.1)", () => {
   });
 });
 
+describe("best of three at the practice table (v0.5.0)", () => {
+  it("offers Legacy a best-of-three match, and leads back to a running one", async () => {
+    await navigate("#play");
+    const api = mockApi();
+    api.on("GET /api/v1/practice-games/options", () =>
+      reply(200, {
+        ...structuredClone(options),
+        formats: options.formats.map((f) => ({
+          ...f,
+          best_of: f.id === "legacy" ? [1, 3] : [1],
+        })),
+      }),
+    );
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [summary({ id: "deck-r", title: "Red", format: "legacy" })]),
+    );
+    api.on("GET /api/v1/games", () => reply(200, []));
+    api.on("GET /api/v1/matches", () =>
+      reply(200, [
+        {
+          id: "00000000-0000-4000-8000-00000000aaaa",
+          kind: "practice",
+          format: "legacy",
+          best_of: 3,
+          status: "sideboarding",
+          game_number: 2,
+          players: [
+            { seat: 0, player: "human", handle: "root" },
+            { seat: 1, player: "bot", handle: null },
+          ].map((seat, index) => ({
+            ...seat,
+            portrait: null,
+            you: index === 0,
+            game_wins: index === 0 ? 1 : 0,
+            ready: index === 1,
+            left: null,
+            deck_cards: null,
+          })),
+          games: [],
+          your_seat: 0,
+          game_id: null,
+          chooser_seat: 1,
+          starting_seat: 1,
+          sideboard_until: null,
+          winner_seat: null,
+          draw: false,
+          end_reason: null,
+          waiting: null,
+          created_at: "2026-10-22T10:00:00Z",
+          finished_at: null,
+        },
+      ]),
+    );
+    api.on("POST /api/v1/practice-games", () =>
+      reply(503, { code: "games_busy", message: "Busy." }),
+    );
+    render(<PracticeTable me={sysop} />);
+    await settle();
+    const matches = screen.getByRole("list", { name: "Your matches" });
+    expect(matches).toHaveTextContent(
+      "Best of three · 1–0 · Sideboarding for game 2",
+    );
+    expect(
+      within(matches).getByRole("link", { name: "Resume" }),
+    ).toHaveAttribute("href", "#match/00000000-0000-4000-8000-00000000aaaa");
+    expect(screen.getByRole("radio", { name: /^One game/ })).toBeChecked();
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Best of three/ }).click(),
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Start the game" }).click(),
+    );
+    await settle();
+    const started = api.calls.find(
+      (c) => c.route === "POST /api/v1/practice-games",
+    )!;
+    expect(started.options).toMatchObject({
+      body: { format: "legacy", best_of: 3 },
+    });
+    // Commander plays one game.
+    await act(async () =>
+      screen.getByRole("radio", { name: /Commander/ }).click(),
+    );
+    expect(screen.queryByRole("radio", { name: /^Best of three/ })).toBeNull();
+  });
+});
+
 describe("Two-Headed Giant at the practice table (v0.5.0, early)", () => {
   const player = {
     ...sysop,
@@ -364,13 +451,14 @@ describe("Two-Headed Giant at the practice table (v0.5.0, early)", () => {
   } as unknown as Me;
   const giantOptions = {
     formats: [
-      ...options.formats.map((f) => ({ ...f, decks: [] })),
+      ...options.formats.map((f) => ({ ...f, decks: [], best_of: [1] })),
       {
         id: "two_headed_giant",
         name: "Two-Headed Giant",
         bots: [3],
         default_bots: 3,
         decks: [],
+        best_of: [1],
       },
     ],
     deck_lists: false,
@@ -418,6 +506,7 @@ describe("Two-Headed Giant at the practice table (v0.5.0, early)", () => {
     );
     api.on("GET /api/v1/decks", () => reply(200, [legacy, commander]));
     api.on("GET /api/v1/games", () => reply(200, [finished]));
+    api.on("GET /api/v1/matches", () => reply(200, []));
     api.on("POST /api/v1/practice-games", () =>
       reply(503, { code: "games_busy", message: "Busy." }),
     );

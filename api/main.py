@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from api import (
+    achievements,
     admin,
     auth,
     card_images,
@@ -23,10 +24,15 @@ from api import (
     economy,
     engine_cards,
     games,
+    matches,
     progression,
+    quests,
+    queues,
+    rematches,
     reports,
     shop,
     social,
+    stats,
     tables,
 )
 from api.config import Settings
@@ -155,6 +161,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 # Which custom cards the running engine has loaded (v0.4.0).
                 app.state.engine_cards = engine_cards.EngineCards(engine)
                 await app.state.games.start()
+                # Matches between games keep their sideboarding's clock (v0.5.0).
+                app.state.games.spawn(matches.resume(app.state.games))
+                # The public queues' matching (v0.5.0), on a tick among the games' tasks.
+                app.state.queues = queues.QueueHub(app)
+                app.state.queues.start()
                 try:
                     yield
                 finally:
@@ -324,6 +335,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(games.router)
     app.include_router(tables.router)
+    app.include_router(matches.router)
+    app.include_router(queues.router)
+    app.include_router(rematches.router)
     app.include_router(card_images.router)
     app.include_router(cards.router)
     app.include_router(decks.router)
@@ -334,4 +348,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(reports.router)
     app.include_router(social.router)
     app.include_router(chat.router)
+    # Statistics, daily quests and achievements (v0.5.0).
+    app.include_router(stats.router)
+    app.include_router(quests.router)
+    app.include_router(achievements.router)
     return app

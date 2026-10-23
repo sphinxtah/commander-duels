@@ -89,7 +89,9 @@ def at_godlike(db: Session, user_id: UUID) -> bool:
     return int(wins or 0) >= GODLIKE.wins
 
 
-def since_reset(user: User, created: InstrumentedAttribute[datetime]) -> ColumnElement[bool]:
+def since_reset(
+    user: User, created: InstrumentedAttribute[datetime] | InstrumentedAttribute[datetime | None]
+) -> ColumnElement[bool]:
     """The account's grants, packs or openings that count: those made since SysOp last reset it
     (v0.4.5), or all of them when it never was."""
     return created > user.reset_at if user.reset_at is not None else true()

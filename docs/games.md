@@ -52,6 +52,7 @@ POST /api/v1/practice-games
 | `bot_skill` | XMage's AI skill, 1–6 (default 4) |
 | `turn_cap` | 1–200 turns (default 60) |
 | `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)). Both true, casual, by default. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
+| `best_of` | Since v0.5.0: 1 (the default), or in Legacy 3 for a best-of-three match with sideboards ([matches](matches.md)) |
 
 The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
 
@@ -67,7 +68,7 @@ Refusals:
 ### Two-Headed Giant (v0.5.0, early)
 
 You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the engine's patched XMage ([Two-Headed Giant](engine/two-headed-giant.md)). The team takes its turns together and shares one life total of 30.
-- **Decks.** Legacy decks: your own Legacy deck (`deck_id`), and for SysOp a fixture or a deck list. They are checked as Legacy decks, by the game's `rules`, and the game records Legacy's format version.
+- **Decks.** Legacy decks: your own Legacy deck (`deck_id`), and for SysOp a fixture or a deck list. They are checked as Legacy decks, by the game's `rules`, and the game records Legacy's format version. A deck's sideboard stays out: Two-Headed Giant Constructed has none (MTR 9.5). One game only (`best_of` 1).
 - **Teams** (`api/teams.py`). The Magic Tournament Rules for Two-Headed Giant Constructed (effective 2026-02-27, sections 9.5 and 8.4) let no two decks on a team hold the same card, by English name, except cards with the basic supertype. A team whose decks share a card gets 422 `team_decks`, naming the cards. Section 9.5 also bans Erayo, Soratami Ascendant: a game whose rules refuse banned cards refuses it (`deck_not_allowed`); casual rules allow it.
 - **Bots.** A bot with no deck chosen plays one of the engine's four Legacy fixture decks (mono-red burn, mono-green creatures, mono-white weenie, mono-blue skies), which share no card. The API deals them in that order, giving the teammate the first one that shares no card with your deck. If every free fixture shares a card with it, the teammate's deck must be chosen (`team_decks`).
 - **Results.** The engine's result names the winning team (`winner_seats`); `winner_seat` is its first seat, which is yours when your team wins. Your win counts once, and the tokens pay for the two opponents, never for your teammate.
@@ -86,7 +87,7 @@ You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the 
 
 Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp. Since v0.4.0 a summary also gives the game's `kind` (`practice` or `table`), each seat's `left` (`conceded`, `removed` or `eliminated` while the game went on), and `tokens`, what the finished game paid you.
 
-The account's running games, for `CD_GAMES_PER_ACCOUNT`, are the active games where its seat is still in play (since v0.4.0): a seat out of a table's game that goes on no longer counts.
+The account's running games, for `CD_GAMES_PER_ACCOUNT`, are the active games where its seat is still in play (since v0.4.0): a seat out of a table's game that goes on no longer counts. Since v0.5.0 a best-of-three match counts as one running game, between its games too, and a summary gives a match's game its `match` ([matches](matches.md#routes)).
 
 Since v0.3.1 the transaction that records a finished game also counts its win, when a player's seat won it: one entry in the progression ledger, never two ([the Planeswalker Alliance](progression.md#wins-and-levels)).
 
@@ -184,7 +185,7 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 
 | Route | Purpose |
 | --- | --- |
-| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit. Unknown card names return 400 `unknown_cards` |
+| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit. Unknown card names return 400 `unknown_cards`. Since v0.5.0 a Legacy deck list may carry its `sideboard`, kept outside the game for wishes, and the request may name the `starting_seat` ([matches](matches.md#the-engine)) |
 | `GET` and `POST` under `/v1/service/games/{id}/` (`view`, `commands`) | As the development routes; the seat token still selects the seat |
 | `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices |
 | `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |
@@ -202,6 +203,8 @@ Migration `0003_games` adds two tables:
 Migration `0006_decks` (v0.2.0) adds the deck revision to each seat played with an own deck, and the catalog revision and format version to each game.
 
 Migration `0009_tables` (v0.4.0) adds the human tables and their seats, the `table` kind of game, and when and why a seat left a game that went on ([human tables](tables.md#data)).
+
+Migration `0022_queues` (v0.5.0) adds each practice game's request (`games.settings`, as `POST /api/v1/practice-games` took it), which its Rematch plays again, and the public queues and rematches ([queues and rematches](queues.md#data)). A public queue's game is a practice game for a player alone with bots, and a table's game for two players or more.
 
 Migration `0024_two_headed_giant` (v0.5.0) lets a game's format be `two_headed_giant`. Its downgrade turns those games into Legacy ones, which their decks are, keeping their wins and tokens. Since v0.5.0 a game's result also keeps `winner_seats`; a result from an older engine gets the winner alone.
 

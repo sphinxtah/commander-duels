@@ -27,18 +27,20 @@ On a phone (narrower than 820 px) the six pages move to a bar along the bottom o
 ## The main menu
 
 The app opens on the main menu (`#home`; any address that names no page, the old Campaign, Learn and Collection ones included, opens it too, and so does the installed app). As in Magic Duels, the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a link to choose an ally on Profile. Beside it, the tiles:
-- **Play**, the largest, over the owner's banner: practice games against the bots. When one of the account's games is still running, it says so and leads back to it.
+- **Play**, the largest, over the owner's banner: practice games against the bots, and since v0.5.0 the public queues. When one of the account's games is still running, it says so and leads back to it; while the account waits in a queue, it says "Looking for a Legacy game" and leads to the wait ([queues](queues.md)).
 - **Tables**, with the number of open tables.
 - **Leng's Card Shop**, over Leng's painting, with the week's sale.
 - **Decks**, with the number of the account's decks.
 - **Cards.**
 - **Friends**, with the number of friends online.
 
+Since v0.5.0, **Today's quests** runs across the main menu below them: the day's three quests, each with its reward and a bar of the wins counted so far, the time until the next day's quests, and Swap on each quest not done while the day's swap is unused ([quests](quests.md#daily-quests)).
+
 ## Every other page
 
 A title band runs across the top of every other page: **Main menu**, the way back, and the page's name engraved large across the band. The page's own title follows it. A new page opens at its top, its title focused for screen readers, as following a link does.
 
-**Play** keeps the owner's banner, now with the practice table below it and a button to the tables, and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon (since v0.5.0 marked "Early": a practice game with a bot teammate against two bots, [Two-Headed Giant](engine/two-headed-giant.md)). Each format's details say how many seats it takes.
+**Play** keeps the owner's banner, now with the practice table below it and a button to the tables (since v0.5.0 "Find a game" first, the public queues, with buttons to it, the practice table and the tables), and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon (since v0.5.0 marked "Early": a practice game with a bot teammate against two bots, [Two-Headed Giant](engine/two-headed-giant.md)). Each format's details say how many seats it takes.
 
 ## Gone in v0.4.5
 

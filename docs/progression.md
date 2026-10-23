@@ -10,6 +10,7 @@ Since v0.3.1 a player's game wins raise their level, each level opens more of th
 - **SysOp's settings.** SysOp starts at 100,000 wins, so every tier is open to it. In Administration it may set any account's wins, its own included: the API adds the difference as a `wins_set` entry with a required reason, and audits it (`progress.wins_set`, PROG03). Settings stay apart from counted wins, and the profile shows both. Administrators see each player's wins, level and alliance but cannot set them.
 - **A reset** (v0.4.5) sets an account's wins back to 0 the same way, with a `wins_set` entry whose reason is "Account reset by SysOp", audited with the reset ([resetting an account](identity.md#resetting-an-account-v045)).
 - **Games before v0.3.1 count.** Migration 0007 entered every finished game a player won, from the result the API had recorded.
+- **Quests, achievements and the record** (v0.5.0) count games won from the same record, and SysOp's settings never ([quests, achievements and statistics](quests.md)).
 
 | Tier | Reached at | Opens | Open in all |
 | --- | --- | --- | --- |

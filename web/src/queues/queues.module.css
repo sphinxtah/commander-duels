@@ -1,0 +1,120 @@
+/* The public queues (v0.5.0): "Find a game" on the Play page and its wait, in the practice
+   table's panel; and the rematch on a game's result screen. */
+.lead {
+  color: var(--cd-muted);
+  max-width: 70ch;
+  line-height: 1.6;
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+}
+.note {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid #c59b6566;
+  border-radius: 6px;
+  background: #c59b650e;
+  color: #e6dcc4;
+  font-size: 0.88rem;
+}
+.waiting {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #172522, #0e1716);
+}
+/* A gold ring turning while the queue looks: the reduced-motion settings stop it. */
+.ring {
+  width: 54px;
+  height: 54px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid #d5b77c33;
+  border-top-color: var(--cd-gold-hi);
+  box-shadow: 0 0 18px #e9b96033;
+  animation: turn 1.4s linear infinite;
+}
+@keyframes turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.words {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 320px;
+  color: var(--cd-muted);
+  font-size: 0.88rem;
+}
+.words strong {
+  font: 600 1.15rem var(--cd-display);
+  color: var(--cd-gold-hi);
+}
+.words small {
+  color: var(--cd-faint);
+}
+.clock {
+  color: var(--cd-text);
+  font-variant-numeric: tabular-nums;
+}
+.clock time {
+  font-weight: 600;
+  color: var(--cd-gold-hi);
+}
+
+/* The rematch on the result screen. */
+.rematch {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 0.88rem;
+}
+.rematch p {
+  margin: 0;
+}
+.answers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.answers li {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.answer {
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #ffffff22;
+  color: #b9c2b6;
+}
+.answer[data-answer="yes"] {
+  border-color: #84ac9388;
+  color: #a9cdb5;
+}
+.answer[data-answer="no"] {
+  border-color: #c5656588;
+  color: #e39393;
+}
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.refusal {
+  color: #f0a58e;
+}
+.link {
+  color: #e3c68f;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

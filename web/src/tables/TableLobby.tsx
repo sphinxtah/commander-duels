@@ -160,6 +160,9 @@ export function TableLobby({
       <p className={styles.lead}>
         Hosted by {table.host ?? "a player"}.{" "}
         {rulesSentence(table.rules, table.format)}{" "}
+        {table.best_of === 3
+          ? "A best-of-three match: players sideboard between its games. "
+          : ""}
         {table.bots > 0
           ? `${table.bots} ${table.bots === 1 ? "bot" : "bots"} at skill ${table.bot_skill} fill the last seats. `
           : ""}

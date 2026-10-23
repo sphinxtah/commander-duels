@@ -11,7 +11,7 @@ can return to its earlier form without deleting a game or the wins and tokens it
 from alembic import op
 
 revision = "0024_two_headed_giant"
-down_revision = "0020_account_reset"
+down_revision = "0023_matches"
 branch_labels = None
 depends_on = None
 

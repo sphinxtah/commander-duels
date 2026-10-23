@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { client, describe, type Tokens } from "../api";
 import account from "../Account.module.css";
-import { change, lineWords, tokens } from "./tokens";
+import { change, lineWords, namedByReason, tokens } from "./tokens";
 import styles from "./tokens.module.css";
 
 /** The newest entries shown before "Show more"; the server sends up to 50. */
@@ -69,7 +69,7 @@ export function TokensPanel({ refresh = 0 }: { refresh?: number }) {
                       </span>
                       <span>
                         {lineWords(line)}
-                        {line.reason && line.kind !== "pack" && (
+                        {line.reason && !namedByReason(line) && (
                           <small>{line.reason}</small>
                         )}
                       </span>

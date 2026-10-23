@@ -545,25 +545,29 @@ describe("a human table's game (v0.4.0)", () => {
       left: null,
     });
     let finished = false;
-    get.mockImplementation((async () => ({
-      data: {
-        game: {
-          id: "g1",
-          kind: "table",
-          format: "legacy",
-          status: finished ? "finished" : "active",
-          seats: [human(0, "alice"), human(1, "bob")],
-          your_seat: 0,
-          bot_skill: 4,
-          turn_cap: 60,
-          created_at: "2026-10-21T10:00:00Z",
-          finished_at: finished ? "2026-10-21T10:30:00Z" : null,
-          result: finished ? result : null,
-          tokens: finished ? 50 : null,
-        },
-        snapshot: null,
-      },
-    })) as never);
+    // The game's summary; its rematch (v0.5.0) has its own tests (queues/queues.test.tsx).
+    get.mockImplementation((async (path: string) =>
+      path.endsWith("/rematch")
+        ? { data: undefined }
+        : {
+            data: {
+              game: {
+                id: "g1",
+                kind: "table",
+                format: "legacy",
+                status: finished ? "finished" : "active",
+                seats: [human(0, "alice"), human(1, "bob")],
+                your_seat: 0,
+                bot_skill: 4,
+                turn_cap: 60,
+                created_at: "2026-10-21T10:00:00Z",
+                finished_at: finished ? "2026-10-21T10:30:00Z" : null,
+                result: finished ? result : null,
+                tokens: finished ? 50 : null,
+              },
+              snapshot: null,
+            },
+          }) as never);
     try {
       render(<GameScreen gameId="g1" me={null} />);
       const socket = FakeSocket.made[0];
@@ -644,6 +648,109 @@ describe("a human table's game (v0.4.0)", () => {
         name: "Back to the lobby",
       }))
         expect(link).toHaveAttribute("href", "#tables");
+    } finally {
+      get.mockImplementation(original);
+    }
+  });
+});
+
+describe("a best-of-three match's game (v0.5.0)", () => {
+  it("shows the score, concedes the match apart from the game, and leads to sideboarding", async () => {
+    const { client } = await import("../api");
+    const get = vi.mocked(client.GET);
+    const original = get.getMockImplementation()!;
+    const post = vi.fn(async () => ({
+      data: undefined,
+      error: { message: "No." },
+    }));
+    Object.assign(client, { POST: post });
+    const result = {
+      kind: "completed",
+      winner_seat: 1,
+      draw: false,
+      conceded_seats: [],
+      turns: 9,
+    };
+    let finished = false;
+    get.mockImplementation((async () => ({
+      data: {
+        game: {
+          id: "g1",
+          kind: "practice",
+          format: "legacy",
+          status: finished ? "finished" : "active",
+          seats: [
+            { seat: 0, player: "human", handle: "alice", deck: "Red" },
+            { seat: 1, player: "bot", handle: null, deck: null },
+          ],
+          your_seat: 0,
+          bot_skill: 4,
+          turn_cap: 60,
+          created_at: "2026-10-22T10:00:00Z",
+          finished_at: finished ? "2026-10-22T10:30:00Z" : null,
+          result: finished ? result : null,
+          tokens: finished ? 0 : null,
+          match: {
+            id: "m1",
+            best_of: 3,
+            game: 2,
+            status: finished ? "sideboarding" : "playing",
+            wins: finished ? [1, 1] : [1, 0],
+            winner_seat: null,
+            draw: false,
+          },
+        },
+        snapshot: null,
+      },
+    })) as never);
+    try {
+      playing(view);
+      expect(await screen.findByText("Game 2 · 1–0")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Game menu" }));
+      expect(
+        screen.getByRole("button", { name: "Concede the game" }),
+      ).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: "Concede the match" }),
+      );
+      expect(
+        screen.getByRole("heading", { name: "Concede the match?" }),
+      ).toBeInTheDocument();
+      fireEvent.click(
+        screen.getAllByRole("button", { name: "Concede the match" }).at(-1)!,
+      );
+      await waitFor(() =>
+        expect(post).toHaveBeenCalledWith(
+          "/api/v1/matches/{match_id}/concede",
+          { params: { path: { match_id: "m1" } } },
+        ),
+      );
+
+      finished = true;
+      const socket = FakeSocket.made[0];
+      act(() =>
+        socket.deliver({
+          type: "snapshot",
+          snapshot: {
+            ...snapshot(9, null),
+            status: "finished",
+            result: { ...result, error: null },
+          },
+        }),
+      );
+      await waitFor(() =>
+        expect(screen.getAllByText("Match 1–1.")).not.toHaveLength(0),
+      );
+      for (const link of screen.getAllByRole("link", {
+        name: "Sideboard for game 3",
+      }))
+        expect(link).toHaveAttribute("href", "#match/m1");
+      // The countdown starts in an effect after the result shows, so it is waited for.
+      await waitFor(() =>
+        expect(
+          screen.getAllByText(/Sideboarding opens in \d s/),
+        ).not.toHaveLength(0),
+      );
     } finally {
       get.mockImplementation(original);
     }
