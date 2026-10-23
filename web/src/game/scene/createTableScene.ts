@@ -32,12 +32,14 @@ import {
   stone,
   textFrame,
 } from "./art";
+import { roundCorners } from "./corners";
 import { drawPortrait } from "./drawPortrait";
 import { drawSigil } from "./drawSigil";
 import { diamondPath } from "./icons";
 import { BandNode } from "./nodes/BandNode";
 import {
   CardNode,
+  GLOW_CORNER,
   GLOW_REACH,
   restPose,
   type CardPlacement,
@@ -85,7 +87,8 @@ import {
 //
 // Pixi starts with `manageImports: false`, so its accessibility layer (which would take Tab), its
 // event system and its DOM pipe never load; the scene uses no filters and no masks, and card
-// images are only ever scaled evenly and turned.
+// images are only ever scaled evenly and turned, their corners cut once as they are decoded
+// (corners.ts, v0.5.1).
 
 export interface SceneArt {
   stone: Texture;
@@ -240,9 +243,18 @@ function makeArt(): { art: SceneArt; backCanvas: HTMLCanvasElement } {
       band: canvasTexture(bandStrip(88), 2),
       back: canvasTexture(backCanvas),
       blank: canvasTexture(blank),
-      glowOffered: canvasTexture(glow("#a86bff", GLOW_REACH * 2), 2),
-      glowPlayable: canvasTexture(glow("#ff6fb8", GLOW_REACH * 2), 2),
-      glowDamage: canvasTexture(glow("#ff2a2a", GLOW_REACH * 2), 2),
+      glowOffered: canvasTexture(
+        glow("#a86bff", GLOW_REACH * 2, GLOW_CORNER * 2),
+        2,
+      ),
+      glowPlayable: canvasTexture(
+        glow("#ff6fb8", GLOW_REACH * 2, GLOW_CORNER * 2),
+        2,
+      ),
+      glowDamage: canvasTexture(
+        glow("#ff2a2a", GLOW_REACH * 2, GLOW_CORNER * 2),
+        2,
+      ),
       shadow: canvasTexture(glow("#000000", GLOW_REACH * 2), 2),
       crack: canvasTexture(crack(256)),
       // Ropes take their width from their texture's height: 10 su of glow, a 4 su core.
@@ -412,8 +424,14 @@ class PixiTableScene implements TableScene {
     this.backCanvas = made.backCanvas;
     const webgl2 = this.webgl2;
     const adapter: TextureAdapter<Texture, ImageBitmap> = {
-      decode: (blob, width) =>
-        createImageBitmap(blob, { resizeWidth: width, resizeQuality: "high" }),
+      // Cut to the card's rounded corners once, here (v0.5.1): the JPEGs fill them in.
+      decode: async (blob, width) =>
+        roundCorners(
+          await createImageBitmap(blob, {
+            resizeWidth: width,
+            resizeQuality: "high",
+          }),
+        ),
       create: (bitmap) =>
         new Texture({
           source: new ImageSource({
