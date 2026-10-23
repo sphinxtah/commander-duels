@@ -3,7 +3,8 @@ taught that a concession is the team's (810.8b): tables with teams (choosing a t
 Unified Deck Construction by team, bots in either team, the start), both winners counted and paid
 once whatever replays, the fixed team channel that the other team never reads, the queue whose
 teams form alone or with a friend (pairing, invitations, a team never split, bots after a minute),
-a rematch that keeps the teams, and the migration going back."""
+a rematch that keeps the teams and checks the format's banned card again, and the migration going
+back."""
 
 import json
 import os
@@ -702,6 +703,39 @@ def test_a_rematch_keeps_the_teams(client, engine):
     assert [seat.user_id for seat in seats_of(client, new_id)] == [ada.id, None, bob.id, None]
     table = queues_table(client, new_id)
     assert (table.format, table.bots, table.bot_seats) == (TEAM, 2, [1, 3])
+
+
+def test_a_rematch_refuses_two_headed_giants_banned_card_again(client, engine, monkeypatch):
+    """At a table refusing banned cards, the rematch checks each deck for the card banned in
+    Two-Headed Giant itself (MTR 9.5), as the table's start does: a deck that took it in after
+    the game stops the rematch, its player named and the card not."""
+    # The test catalog has no Erayo: Lightning Bolt, legal in Legacy, stands in for it.
+    monkeypatch.setattr(teams, "BANNED", frozenset({"Lightning Bolt"}))
+    ada, bob, cara = (Account(client, n, admin=True) for n in ("ada", "bob", "cara"))
+    strict = {"banned": False, "not_legal": False}
+    code = team_table(ada, deck(ada, client), bots=1, rules=strict)["code"]
+    bob_deck = deck(bob, client, title="Bob's")
+    sit(bob, code, bob_deck, team=1)
+    sit(cara, code, deck(cara, client))
+    ready(bob, code), ready(cara, code)
+    game_id = ada.send("POST", f"/api/v1/tables/{code}/start").json()["game_id"]
+    engine.win(game_id, 0)
+    until_finished(ada, game_id)
+    # Bob puts the card in his deck in the builder after the game.
+    entries = [
+        {"card_id": card(client, "Lightning Bolt"), "quantity": 4, "location": "main"},
+        {"card_id": card(client, "Mountain"), "quantity": 56, "location": "main"},
+    ]
+    saved = bob.send("PUT", f"/api/v1/decks/{bob_deck}/draft", {"version": 1, "entries": entries})
+    assert saved.status_code == 200, saved.text
+    ada.send("POST", f"/api/v1/games/{game_id}/rematch")
+    bob.send("POST", f"/api/v1/games/{game_id}/rematch")
+    refused = cara.send("POST", f"/api/v1/games/{game_id}/rematch")
+    assert (refused.status_code, refused.json()["code"]) == (409, "deck_not_playable")
+    assert refused.json()["message"] == "bob's deck cannot be played now."
+    view = ada.get(f"/api/v1/games/{game_id}/rematch").json()
+    assert (view["status"], view["message"]) == ("failed", "bob's deck cannot be played now.")
+    assert len(engine.created) == 1
 
 
 def test_deleting_an_account_ends_its_team_and_invitations(client):
