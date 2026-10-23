@@ -249,6 +249,15 @@
   gap: 10px;
   pointer-events: none;
 }
+/* Put away at the table, after it was brought out: kept, with what was being written. */
+.bar[hidden] {
+  display: none;
+}
+/* Brought out at the table, it stays in the lower half, below the band across the middle. */
+.bar[data-table] .window:not([data-folded]),
+.bar[data-table] .friends[data-open] {
+  height: min(400px, calc(50vh - 24px));
+}
 .windows {
   min-width: 0;
   display: flex;

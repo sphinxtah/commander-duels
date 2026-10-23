@@ -373,13 +373,14 @@ let shown: Chat | null = null;
 function Probe({
   me,
   checkedIn = null,
-  atTable = false,
+  table = null,
 }: {
   me: Me;
   checkedIn?: number | null;
-  atTable?: boolean;
+  /** The game whose table is shown. */
+  table?: string | null;
 }) {
-  shown = useChat(me, checkedIn, atTable);
+  shown = useChat(me, checkedIn, table);
   return (
     <ChatContext.Provider value={shown}>
       <ChatBar chat={shown} />
@@ -755,7 +756,7 @@ describe("the chat bar (v0.5.1)", () => {
       "cd.chat.windows",
       JSON.stringify([{ playerId: ADA, folded: false }]),
     );
-    const { rerender } = render(<Probe me={me} atTable />);
+    const { rerender } = render(<Probe me={me} table="g1" />);
     await settle();
     // Folded away: nothing over the table, and nothing asked of the API.
     expect(
@@ -791,18 +792,18 @@ describe("the chat bar (v0.5.1)", () => {
     ).toBeInTheDocument();
     expect(within(bar).queryByRole("link")).toBeNull();
     expect(sent("POST /api/v1/conversations/{player_id}/read")).toHaveLength(1);
-    // Escape, anywhere in it, puts it away.
-    fireEvent.keyDown(within(bar).getByLabelText("Write to ada"), {
-      key: "Escape",
-    });
+    // Escape, anywhere in it, puts it away; what was being written waits for its return.
+    const box = within(bar).getByLabelText("Write to ada");
+    fireEvent.change(box, { target: { value: "One moment" } });
+    fireEvent.keyDown(box, { key: "Escape" });
     expect(shown!.tableOpen).toBe(false);
     expect(
       screen.queryByRole("complementary", { name: "Friends and messages" }),
     ).toBeNull();
-    // Each table starts with it folded away.
     act(() => shown!.setTableOpen(true));
-    rerender(<Probe me={me} />);
-    rerender(<Probe me={me} atTable />);
+    expect(screen.getByLabelText("Write to ada")).toHaveValue("One moment");
+    // The next table starts with it folded away.
+    rerender(<Probe me={me} table="g2" />);
     expect(shown!.tableOpen).toBe(false);
   });
 

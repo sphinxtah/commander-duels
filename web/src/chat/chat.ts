@@ -351,13 +351,14 @@ export class ChatSocket {
 }
 
 /** The account's chat: its socket while the account is active, the windows, the bar's friends
- * list and the pop-ups. */
+ * list and the pop-ups. `table` is the game whose table is shown, if one is. */
 export function useChat(
   me: Me | null | undefined,
   checkedIn: number | null,
-  atTable = false,
+  table: string | null = null,
 ): Chat {
   const account = me?.status === "active" ? me.id : null;
+  const atTable = table !== null;
   const [unread, setUnread] = useState(0);
   const [live, setLive] = useState(false);
   const [windows, setWindows] = useState<ChatWindow[]>(savedWindows);
@@ -388,10 +389,11 @@ export function useChat(
 
   useEffect(() => saveWindows(windows), [windows]);
   useEffect(() => savePanel(panel), [panel]);
-  // Each table starts with the bar folded away, so it covers nothing of the table.
+  // Each table starts with the bar folded away, so it covers nothing of the table; the next
+  // game's too, a rematch's straight after.
   useEffect(() => {
-    if (atTable) setTableOpen(false);
-  }, [atTable]);
+    setTableOpen(false);
+  }, [table]);
   useEffect(() => {
     setUnread(0);
     setToasts([]);

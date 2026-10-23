@@ -201,7 +201,11 @@ export function App() {
   // and friends list (v0.5.1), on every screen, the table's too, and the messages that pop up
   // beside the bell. A message from a friend is also a notification, so the bell asks for its
   // count at once.
-  const chat = useChat(me, social.messagesUnread, atTable);
+  const chat = useChat(
+    me,
+    social.messagesUnread,
+    atTable ? (game ?? null) : null,
+  );
   const { checkIn } = social;
   useEffect(
     () =>
@@ -507,7 +511,7 @@ export function App() {
     return (
       <ChatContext.Provider value={chat}>
         <GameScreen key={game} gameId={game} me={me} />
-        <ChatBar chat={chat} />
+        <ChatBar key={`chat-${game}`} chat={chat} />
       </ChatContext.Provider>
     );
 

@@ -56,6 +56,13 @@ test.describe("the table at every size", () => {
         quality: 80,
       });
       expect(await occluded(page)).toEqual([]);
+      // The chat bar (v0.5.1) waits folded away into its diamond on the band.
+      await expect(
+        page.getByRole("button", { name: /^Friends and messages/ }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("complementary", { name: "Friends and messages" }),
+      ).toHaveCount(0);
       expect(await table.problems()).toEqual([]);
       await page.context().close();
     });
@@ -759,4 +766,136 @@ test.describe("Two-Headed Giant at the table (v0.5.1)", () => {
     expect(await table.problems()).toEqual([]);
     await page.context().close();
   });
+});
+
+test.describe("the chat bar at the table (v0.5.1)", () => {
+  const ADA = "00000000-0000-4000-8000-0000000000a1";
+  const ada = {
+    id: ADA,
+    handle: "ada",
+    alliance: "jaya",
+    avatar: "moon",
+    tier: { id: "silver", name: "Silver", wins: 3 },
+    presence: {
+      state: "online",
+      game_kind: null,
+      game_format: null,
+      appears_offline: false,
+    },
+    friendship: "friends",
+  };
+  const hello = {
+    id: "00000000-0000-4000-9000-000000000001",
+    sender_id: ADA,
+    body: "Good luck out there!",
+    created_at: "2026-10-23T10:00:00Z",
+    client_id: "00000000-0000-4000-a000-000000000001",
+  };
+
+  /** The friends list and Ada's conversation, as the API would answer them. */
+  async function friends(page: Page) {
+    await page.route(/\/api\/v1\/(friends|conversations)(\/|$|\?)/, (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === "/api/v1/friends")
+        return route.fulfill({
+          json: { friends: [ada], incoming: [], outgoing: [] },
+        });
+      if (pathname === "/api/v1/conversations")
+        return route.fulfill({
+          json: {
+            conversations: [
+              { player: ada, friends: true, last_message: hello, unread: 0 },
+            ],
+            unread: 0,
+          },
+        });
+      if (pathname.endsWith("/read"))
+        return route.fulfill({ json: { unread: 0 } });
+      return route.fulfill({
+        json: {
+          player: ada,
+          friends: true,
+          messages: [hello],
+          next: null,
+          unread: 0,
+        },
+      });
+    });
+  }
+
+  /** Whether the element at a control's centre is that control. */
+  const reachable = (control: Locator) =>
+    control.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2,
+      );
+      return hit === element || element.contains(hit);
+    });
+
+  for (const size of [SIZES[0], SIZES[3]])
+    test(`folds away into the band at ${size.width} × ${size.height}, comes out on demand, and keeps its keys`, async ({
+      browser,
+    }, testInfo) => {
+      const page = await tablePage(browser, size);
+      await friends(page);
+      const table = await openTable(page, { fixture: "duel" });
+      await sizeChecks(page, size);
+      const diamond = page.getByRole("button", {
+        name: /^Friends and messages/,
+      });
+      expect(await reachable(diamond)).toBe(true);
+      await expect(diamond).toHaveAttribute("aria-expanded", "false");
+      expect(await occluded(page)).toEqual([]);
+
+      // Brought out: the bar floats over the table's lower right, with focus in it.
+      await diamond.click();
+      const bar = page.getByRole("complementary", {
+        name: "Friends and messages",
+      });
+      await expect(bar).toBeVisible();
+      await expect(diamond).toHaveAttribute("aria-expanded", "true");
+      const list = bar.getByRole("button", { name: /^Friends/ });
+      await expect(list).toBeFocused();
+      await list.click();
+      await bar.getByRole("button", { name: /^Chat with ada/ }).click();
+      const ada = bar.getByRole("region", { name: "Chat with ada" });
+      const box = ada.getByLabel("Write to ada");
+      await expect(box).toBeFocused();
+      await expect(
+        ada.getByRole("list", { name: "Messages with ada" }),
+      ).toContainText("Good luck out there!");
+      // It stays below the band, and nothing in it leaves the game.
+      const band = (await diamond.boundingBox())!;
+      for (const part of [ada, bar.getByRole("region", { name: "Friends" })])
+        expect((await part.boundingBox())!.y).toBeGreaterThanOrEqual(
+          band.y + band.height,
+        );
+      await expect(bar.getByRole("link")).toHaveCount(0);
+      // P, F, T and Space typed in it are letters: no pass, no full screen, no timer.
+      await box.pressSequentially("Pass the salt, Frank, then tap");
+      await expect(box).toHaveValue("Pass the salt, Frank, then tap");
+      expect(table.commands).toEqual([]);
+      expect(
+        await page.evaluate(() => document.fullscreenElement === null),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`chatbar-table-${size.width}.png`),
+      });
+
+      // Escape puts it away, back to the diamond, and the table is clear again; brought out
+      // again, what was being written is still there.
+      await box.press("Escape");
+      await expect(bar).toHaveCount(0);
+      await expect(diamond).toBeFocused();
+      await expect(diamond).toHaveAttribute("aria-expanded", "false");
+      expect(await occluded(page)).toEqual([]);
+      await diamond.click();
+      await expect(box).toHaveValue("Pass the salt, Frank, then tap");
+      await diamond.click();
+      await expect(bar).toHaveCount(0);
+      expect(await table.problems()).toEqual([]);
+      await page.context().close();
+    });
 });

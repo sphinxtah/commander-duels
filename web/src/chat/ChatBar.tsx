@@ -317,17 +317,25 @@ function FriendsList({
 /** The band's diamond at the table, which brings the bar out (game/table/BandHud.tsx). */
 export const CHAT_TOGGLE = "[data-chat-toggle]";
 
+/** The bar; at the table, App gives it the game's key, so each table starts afresh. */
 export function ChatBar({ chat }: { chat: Chat }) {
   const { atTable, tableOpen, setTableOpen } = chat;
   // At the table, folded away, it asks the API for nothing.
   const out = !atTable || tableOpen;
   const people = useBarPeople(chat, out);
   const toggle = useRef<HTMLButtonElement>(null);
+  // Once brought out at this table, it stays drawn, hidden while put away, so what was being
+  // written waits for its return. Before, nothing of it is drawn.
+  const [used, setUsed] = useState(false);
   // Brought out at the table, focus moves into it.
   const before = useRef(tableOpen);
   useEffect(() => {
-    if (atTable && tableOpen && !before.current && !chat.focusing)
-      toggle.current?.focus();
+    if (!atTable || !tableOpen) {
+      before.current = tableOpen;
+      return;
+    }
+    setUsed(true);
+    if (!before.current && !chat.focusing) toggle.current?.focus();
     before.current = tableOpen;
   }, [atTable, tableOpen, chat.focusing]);
   // A friend's message: in a window shown, which does not pop up beside the bell; at the table,
@@ -337,13 +345,14 @@ export function ChatBar({ chat }: { chat: Chat }) {
       {chat.said && <span key={chat.said.id}>{chat.said.words}</span>}
     </p>
   );
-  if (!out) return said;
+  if (!out && !used) return said;
   return (
     <>
       {/* Room at the foot of the page, so its end scrolls clear of the bar. */}
       {!atTable && <div className={styles.barRoom} aria-hidden="true" />}
       <aside
         id="chat-bar"
+        hidden={!out}
         className={styles.bar}
         aria-label="Friends and messages"
         data-panel={chat.panel || undefined}

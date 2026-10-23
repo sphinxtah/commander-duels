@@ -285,7 +285,8 @@ test("the chat bar: friends online, their conversations from page to page, and o
   await expect(
     page.getByRole("button", { name: /Deal\. Bring the dragons\./ }),
   ).toHaveCount(0);
-  // Bob's conversation beside it; a click outside the bar folds the list.
+  // Bob's conversation beside it. The list stays open until its title bar folds it, a click
+  // elsewhere on the page included.
   await bar
     .getByRole("list", { name: "Your friends" })
     .getByRole("button", { name: /^Chat with bob/ })
@@ -294,10 +295,15 @@ test("the chat bar: friends online, their conversations from page to page, and o
     bar.getByRole("region", { name: "Chat with bob" }),
   ).toBeVisible();
   await page.getByRole("heading", { name: "Make yourself at home." }).click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await page.screenshot({
+    path: testInfo.outputPath("chatbar-desktop-open.png"),
+  });
+  await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await page.screenshot({ path: testInfo.outputPath("chatbar-desktop.png") });
 
-  // From page to page, and after a reload: the same windows, Bob's folded.
+  // From page to page, and after a reload: the same windows, Bob's folded, and the list folded.
   await bar
     .getByRole("region", { name: "Chat with bob" })
     .getByRole("button", { expanded: true })
@@ -314,6 +320,7 @@ test("the chat bar: friends online, their conversations from page to page, and o
       .getByRole("region", { name: "Chat with bob" })
       .getByRole("button", { expanded: false }),
   ).toBeVisible();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
   // A message to a folded window pops up beside the bell and counts on the bar.
   chat.say(BOB, "Are you around?");
   await expect(
@@ -351,6 +358,9 @@ test("the chat bar: friends online, their conversations from page to page, and o
   await expect(
     page.getByRole("heading", { name: "Welcome back, stand-in" }),
   ).toBeVisible();
+  // Left open, the list is open again after a reload.
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(errors).toEqual([]);
 });
 

@@ -26,7 +26,7 @@ On a phone (narrower than 820 px) the six pages move to a bar along the bottom o
 
 ## The chat bar (v0.5.1)
 
-Along the bottom of every page but the table's: the friends list at the right end, "Friends · 3 online" with the count of unread messages, and friends' conversations docked beside it, each folded to a tab or open above it. They take the look of the menus' panels: dark glass in a gold hairline, the list's title in Cinzel. On a phone the bar is one round button above the bar of pages, and the list or one conversation opens the whole width of the screen. The page keeps room at its foot so its end scrolls clear of the bar. [Chat](chat.md#friends-messages) says what it does.
+Along the bottom of every page: the friends list at the right end, "Friends · 3 online" with the count of unread messages, folded to a tab or open as the player left it, and friends' conversations docked beside it, each folded to a tab or open above it. At the game's table it folds away into a diamond on the band ([the game screen](game-screen.md#friends-chat-at-the-table-v051)). They take the look of the menus' panels: dark glass in a gold hairline, the list's title in Cinzel. On a phone the bar is one round button above the bar of pages, and the list or one conversation opens the whole width of the screen. The page keeps room at its foot so its end scrolls clear of the bar. [Chat](chat.md#friends-messages) says what it does.
 
 ## The main menu
 
