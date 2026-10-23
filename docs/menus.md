@@ -38,7 +38,7 @@ The app opens on the main menu (`#home`; any address that names no page, the old
 
 A title band runs across the top of every other page: **Main menu**, the way back, and the page's name engraved large across the band. The page's own title follows it. A new page opens at its top, its title focused for screen readers, as following a link does.
 
-**Play** keeps the owner's banner, now with the practice table below it and a button to the tables, and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon. Each format's details say how many seats it takes.
+**Play** keeps the owner's banner, now with the practice table below it and a button to the tables, and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon (since v0.5.0 marked "Early": a practice game with a bot teammate against two bots, [Two-Headed Giant](engine/two-headed-giant.md)). Each format's details say how many seats it takes.
 
 ## Gone in v0.4.5
 

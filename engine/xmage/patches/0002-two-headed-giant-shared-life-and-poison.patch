@@ -11,10 +11,10 @@ Upstream: none yet; to be offered to magefree/mage with part 1.
 Remove when: XMage upstream implements Two-Headed Giant's life and poison, or the format is dropped.
 
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
-index 2b6dbb6..85fe129 100644
+index 2b6dbb6..24eee39 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
-@@ -2467,6 +2477,19 @@ public abstract class GameImpl implements Game {
+@@ -2467,6 +2480,19 @@ public abstract class GameImpl implements Game {
          return played;
      }
  
@@ -34,7 +34,7 @@ index 2b6dbb6..85fe129 100644
      /**
       * 117.5. Each time a player would get priority, the game first performs all
       * applicable state-based actions as a single event (see rule 704,
-@@ -2489,8 +2512,8 @@ public abstract class GameImpl implements Game {
+@@ -2489,8 +2515,8 @@ public abstract class GameImpl implements Game {
                  if (player.getLibrary().isEmptyDraw()) {
                      lostReason = "drawing from an empty library";
                  }

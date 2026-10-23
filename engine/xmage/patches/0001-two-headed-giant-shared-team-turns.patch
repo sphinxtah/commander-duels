@@ -155,7 +155,7 @@ index 651a572..7c3754e 100644
  
      Turn getTurn();
 diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
-index 2b6dbb6..85fe129 100644
+index 2b6dbb6..24eee39 100644
 --- a/Mage/src/main/java/mage/game/GameImpl.java
 +++ b/Mage/src/main/java/mage/game/GameImpl.java
 @@ -1112,7 +1112,7 @@ public abstract class GameImpl implements Game {
@@ -167,18 +167,21 @@ index 2b6dbb6..85fe129 100644
                      if (!playTurn(playerByOrder)) {
                          break;
                      }
-@@ -1149,6 +1149,16 @@ public abstract class GameImpl implements Game {
+@@ -1149,6 +1149,19 @@ public abstract class GameImpl implements Game {
          }
      }
  
 +    /**
 +     * 805.4: with shared team turns, teams take turns rather than players. The player whose turn
-+     * comes next in turn order takes none of their own when a teammate took the turn just played:
-+     * the team has had its turn, which passes to the next team. Extra turns are not affected.
++     * comes next in turn order takes none of their own when their team took the turn just played
++     * (a teammate's turn, or their own extra turn): the team has had its turn, which passes to the
++     * next team. Extra turns themselves are not affected (805.8: they are the team's).
 +     */
 +    private boolean isTeamTurnTaken(UUID playerId) {
 +        UUID lastActivePlayerId = state.getActivePlayerId();
-+        return lastActivePlayerId != null && getTeammates(playerId).contains(lastActivePlayerId);
++        Set<UUID> teammates = getTeammates(playerId);
++        return lastActivePlayerId != null && !teammates.isEmpty()
++                && (lastActivePlayerId.equals(playerId) || teammates.contains(lastActivePlayerId));
 +    }
 +
      private boolean playExtraTurns() {

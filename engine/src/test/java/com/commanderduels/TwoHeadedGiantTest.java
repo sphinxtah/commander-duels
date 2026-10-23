@@ -27,6 +27,7 @@ import mage.game.combat.CombatGroup;
 import mage.game.match.Match;
 import mage.game.permanent.Permanent;
 import mage.game.stack.StackObject;
+import mage.game.turn.TurnMod;
 import mage.players.Player;
 import mage.target.Target;
 import mage.util.RandomUtil;
@@ -81,6 +82,8 @@ class TwoHeadedGiantTest {
         /** Team B's life totals, as both of its players showed them, in order. */
         final List<String> teamLife = new CopyOnWriteArrayList<>();
         volatile int[] poison;
+        /** Gives seat 1 an extra turn during team A's first turn (test only). */
+        volatile boolean extraTurn;
 
         Arranged(HumanGameRequest request) throws Exception {
             super(request);
@@ -138,6 +141,10 @@ class TwoHeadedGiantTest {
             String life = two + "/" + three;
             if (teamLife.isEmpty() || !teamLife.get(teamLife.size() - 1).equals(life)) {
                 teamLife.add(life);
+            }
+            if (extraTurn && view.turn() == 1 && seat == 0) {
+                extraTurn = false;
+                game.getState().getTurnMods().add(new TurnMod(seatIds.get(1)).withExtraTurn());
             }
             if (poison != null && view.turn() == 2 && seat == 2) {
                 // Team poison: counters given to each player (test only), on the game thread while
@@ -347,6 +354,45 @@ class TwoHeadedGiantTest {
                 assertTrue(player.counters().getOrDefault("poison", 0) < 10, "neither player had ten poison counters");
             }
         }
+    }
+
+    @Test
+    void anExtraTurnIsTheTeamsAndThenTheOtherTeamPlays() throws Exception {
+        // 805.8: seat 1's extra turn, after team A's first turn, is team A's; then team B plays,
+        // and seat 1 takes no turn of its own after its extra one.
+        var request = fourHumans(5008L, 6);
+        var check = new Arranged(request);
+        check.extraTurn = true;
+        HumanGame game = Tables.start(request, check);
+        Tables.Played played = Tables.play(game, new Plan(), 4, new Tables.Coverage());
+
+        check.settle();
+        assertTrue(check.failures.isEmpty(), "leaks or wrong views: " + check.failures);
+        assertEquals(Map.of(1, Set.of(0), 2, Set.of(1), 3, Set.of(2), 4, Set.of(0), 5, Set.of(2), 6, Set.of(0)),
+            new TreeMap<>(check.activeSeats).headMap(7), "the active seat by turn");
+        assertTrue(wholeLog(game).stream().anyMatch(line -> line.startsWith("Human 2 takes an extra turn")));
+        assertEquals("turn_limit", played.last().result().kind());
+    }
+
+    @Test
+    void aConcessionLosesTheWholeTeam() throws Exception {
+        // 810.8b: seat 1 concedes at its first priority; its team (seats 0 and 1) leaves and loses.
+        var request = fourHumans(5009L, 10);
+        var check = new Arranged(request);
+        var plan = new Plan();
+        HumanGame game = Tables.start(request, check);
+        Tables.Played played = Tables.play(game, (seat, prompt, view) ->
+            seat == 1 && prompt.kind().equals("priority") ? null : plan.choose(seat, prompt, view), 4,
+            new Tables.Coverage());
+
+        check.settle();
+        assertTrue(check.failures.isEmpty(), "leaks or wrong views: " + check.failures);
+        HumanGame.Result result = played.last().result();
+        assertEquals("completed", result.kind(), "the other team won: " + result);
+        assertEquals(List.of(1), result.concededSeats());
+        assertEquals(List.of(2, 3), result.winnerSeats());
+        assertEquals(2, result.winnerSeat());
+        assertTrue(played.last().view().you().lost(), "seat 0 lost with its teammate");
     }
 
     /** What a game of four bots did, and what a team's player did to its teammate (nothing, we hope). */
