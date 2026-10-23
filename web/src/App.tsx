@@ -17,9 +17,8 @@ import { SetupWizard } from "./app/SetupWizard";
 import { leaveTable } from "./app/serviceWorker";
 import { Settings } from "./app/Settings";
 import { SiteLinks } from "./app/SiteLinks";
-import { ChatContext, MESSAGES_ROUTE, useChat } from "./chat/chat";
-import { ChatDock } from "./chat/ChatDock";
-import { MessagesPage } from "./chat/MessagesPage";
+import { ChatContext, oldMessagesRoute, useChat } from "./chat/chat";
+import { ChatBar } from "./chat/ChatBar";
 import { FriendsPage } from "./social/FriendsPage";
 import { NotificationsPage } from "./social/Notifications";
 import { PlayerPage } from "./social/PlayerPage";
@@ -94,9 +93,10 @@ function currentTable(): string | undefined {
 function currentMatch(): string | undefined {
   return MATCH_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
 }
-/** #messages/<id> opens a conversation with a friend (v0.4.4) on the Messages page. */
+/** The Messages page's old addresses (v0.4.4): since v0.5.1 #messages/<id> opens that player's
+ * window on the chat bar, and #messages its friends list, over the page the player was on. */
 function currentMessages(): string | undefined {
-  return MESSAGES_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
+  return oldMessagesRoute(window.location.hash);
 }
 /** #player/<id> opens a player's profile (v0.4.3), under Friends. */
 function currentPlayer(): string | undefined {
@@ -107,7 +107,6 @@ function currentPage(): Page {
   if (path === "sysop") return "SysOp";
   if (path === "notifications") return "Notifications";
   if (path.startsWith("player/")) return "Friends";
-  if (path.startsWith("messages/")) return "Messages";
   if (path.startsWith("tables/")) return "Tables";
   if (path.startsWith("match/")) return "Play";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
@@ -198,9 +197,9 @@ export function App() {
   // for friends, and the bell's count. Unread notifications join the tab title's count.
   const social = useSocial(me);
   useCountTitle(waiting + social.unread);
-  // Chat between friends (v0.4.4): its live connection, the unread count on Messages, the docked
-  // windows and the messages that pop up beside the bell. A message from a friend is also a
-  // notification, so the bell asks for its count at once.
+  // Chat between friends (v0.4.4): its live connection, the unread count, the chat bar's windows
+  // and friends list (v0.5.1), and the messages that pop up beside the bell. A message from a
+  // friend is also a notification, so the bell asks for its count at once.
   const chat = useChat(me, social.messagesUnread);
   const { checkIn } = social;
   useEffect(
@@ -214,13 +213,39 @@ export function App() {
       }),
     [chat.listen, checkIn],
   );
+  // An old Messages address, once the app shows (v0.5.1): the window or the friends list opens
+  // on the chat bar. When the app opened at the address, it becomes the main menu's.
+  useEffect(() => {
+    if (!admitted || messagesRoute === undefined) return;
+    if (messagesRoute) chat.open(messagesRoute);
+    else chat.setPanel(true);
+    setMessagesRoute(undefined);
+    if (currentMessages() !== undefined)
+      history.replaceState(history.state, "", "#home");
+  }, [admitted, messagesRoute, chat.open, chat.setPanel]);
+  const admittedNow = useRef(admitted);
+  admittedNow.current = admitted;
 
   useEffect(() => {
     const change = (event: HashChangeEvent) => {
       // A live game keeps its address unless an in-game link meant to leave (v0.3.0): the
       // browser's Back, or the installed app opening #home in this window, changes nothing.
       if (guardLiveGame(event.oldURL)) return;
-      if (GAME_ROUTE.test(hashOf(event.oldURL)) && !currentGame()) {
+      const before = hashOf(event.oldURL);
+      // An old Messages address opens the chat bar over the page the player was on, whose
+      // address comes back (v0.5.1). Before the app shows, it waits for the sign-in as any
+      // address does.
+      const messages = currentMessages();
+      if (
+        messages !== undefined &&
+        admittedNow.current &&
+        !GAME_ROUTE.test(before)
+      ) {
+        history.replaceState(history.state, "", before || "#home");
+        setMessagesRoute(messages);
+        return;
+      }
+      if (GAME_ROUTE.test(before) && !currentGame()) {
         // Leaving the table: its full screen ends, and the update the game screen said was
         // ready applies now. One that took over during the game loads at once instead of
         // drawing the next page with the old code.
@@ -498,7 +523,6 @@ export function App() {
           shown={shown}
           hud={hud}
           social={social}
-          messagesUnread={chat.unread}
           counts={counts}
           connection={connection}
           online={online}
@@ -573,12 +597,6 @@ export function App() {
               />
             ) : page === "Friends" ? (
               <FriendsPage heading={heading} />
-            ) : page === "Messages" ? (
-              <MessagesPage
-                chat={chat}
-                playerId={messagesRoute}
-                heading={heading}
-              />
             ) : page === "Notifications" ? (
               <NotificationsPage social={social} heading={heading} />
             ) : page === "Tables" ? (
@@ -636,7 +654,8 @@ export function App() {
           open={setup}
           onClose={() => setSetup(null)}
         />
-        <ChatDock chat={chat} />
+        {/* Friends and their conversations, on every page but the table (v0.5.1). */}
+        <ChatBar chat={chat} />
         {/* A game the public queue finds opens from any page (v0.5.0). */}
         {me.permissions.includes("games.play") && <QueueFollower />}
       </div>

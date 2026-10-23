@@ -20,9 +20,13 @@ At the top of every page, and staying there as the page scrolls:
 - **The mark and the wordmark**, which lead to the main menu.
 - **The main menu's six pages:** Home, Play, Tables, Decks, Cards and Shop, each with its icon. The page shown is marked by a gold flare under it.
 - **The player search** ([finding players](social.md)).
-- **The account's corner:** its tokens (a gold coin and the balance, leading to the shop), Friends, Messages with its unread count, the notification bell, and the account's own button: its portrait (its ally's, else its avatar), its handle and its tier with its wins, and a dot for the connection to the service. The button opens a menu of Profile, Settings, Administration (for administrators and SysOp, with what waits there counted on the button and on the item) and Report a problem, with the connection and the version.
+- **The account's corner:** its tokens (a gold coin and the balance, leading to the shop), Friends, the notification bell, and the account's own button: its portrait (its ally's, else its avatar), its handle and its tier with its wins, and a dot for the connection to the service. The button opens a menu of Profile, Settings, Administration (for administrators and SysOp, with what waits there counted on the button and on the item) and Report a problem, with the connection and the version. Messages, with its unread count, sat between Friends and the bell until v0.5.1; the count is now on the chat bar.
 
 On a phone (narrower than 820 px) the six pages move to a bar along the bottom of the window, the search takes a row of its own, and the handle and tier give way to the portrait.
+
+## The chat bar (v0.5.1)
+
+Along the bottom of every page but the table's: the friends list at the right end, "Friends · 3 online" with the count of unread messages, and friends' conversations docked beside it, each folded to a tab or open above it. They take the look of the menus' panels: dark glass in a gold hairline, the list's title in Cinzel. On a phone the bar is one round button above the bar of pages, and the list or one conversation opens the whole width of the screen. The page keeps room at its foot so its end scrolls clear of the bar. [Chat](chat.md#friends-messages) says what it does.
 
 ## The main menu
 

@@ -6,15 +6,17 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { client, currentCsrfToken, loadMe, type Me } from "../api";
 import type { components } from "../generated/api";
 import type { PlayerRef } from "../social/social";
 
-// Chat between friends (v0.4.4): the account's live connection, the unread count, the docked
-// windows and the messages that pop up beside the bell. The chat's WebSocket (/api/v1/chat/events)
-// only tells this page what happened: a message stored, a conversation read in some tab. Messages
-// are sent and pages read over HTTP. docs/chat.md describes it all.
+// Chat between friends (v0.4.4): the account's live connection, the unread count, the windows
+// docked on the chat bar and its friends list (v0.5.1), and the messages that pop up beside the
+// bell. The chat's WebSocket (/api/v1/chat/events) only tells this page what happened: a message
+// stored, a conversation read in some tab. Messages are sent and pages read over HTTP.
+// docs/chat.md describes it all.
 
 export type ChatMessage = components["schemas"]["ChatMessage"];
 export type ConversationItem = components["schemas"]["ConversationItem"];
@@ -50,11 +52,58 @@ export const TOAST_MS = 8000;
 const WINDOWS_KEY = "cd.chat.windows";
 const PING_MS = 25_000;
 
-/** #messages/<id> opens one conversation on the Messages page. */
-export const MESSAGES_ROUTE = /^#messages\/([0-9a-f-]{36})$/i;
+/** The Messages page's old addresses (v0.4.4). The page is gone since v0.5.1: #messages opens the
+ * chat bar's friends list, and #messages/<id> that player's window. */
+export const MESSAGES_ROUTE = /^#messages(?:\/([0-9a-f-]{36}))?$/i;
 
+/** What an old Messages address opens: a player's window (their ID), the friends list (""), or
+ * nothing (undefined) for any other address. */
+export function oldMessagesRoute(hash: string): string | undefined {
+  const found = MESSAGES_ROUTE.exec(hash);
+  if (!found) return undefined;
+  return found[1]?.toLowerCase() ?? "";
+}
+
+/** A link's address for a player's window: followed in another tab, the app opens it there. A
+ * click in this tab opens the window itself (chat.open). */
 export function messagesLink(playerId?: string): string {
   return playerId ? `#messages/${playerId}` : "#messages";
+}
+
+/** Narrower than this, as for the shell's bar of pages (shell.module.css), the screen is a phone's:
+ * the chat bar folds to one button and shows one conversation at a time. */
+export const PHONE_WIDTH = 820;
+// The chat bar's measures on a wider screen (chat.module.css): a window, the friends list, the
+// gap between them, and the room left at the screen's edges.
+const WINDOW_WIDTH = 300;
+const FRIENDS_WIDTH = 280;
+const GAP = 10;
+const EDGES = 30;
+
+/** How many windows fit beside the friends list on a screen this wide: at most WINDOWS, and one
+ * on a phone. The others stay open, waiting their turn, and come back as the screen widens. */
+export function roomFor(width: number): number {
+  if (width <= PHONE_WIDTH) return 1;
+  const fits = Math.floor(
+    (width - EDGES - FRIENDS_WIDTH) / (WINDOW_WIDTH + GAP),
+  );
+  return Math.max(1, Math.min(WINDOWS, fits));
+}
+
+function onResize(change: () => void) {
+  window.addEventListener("resize", change);
+  return () => window.removeEventListener("resize", change);
+}
+
+/** How the screen's width shapes the bar: its room for windows, and whether it is a phone's. Each
+ * changes only at its own widths, so resizing the window draws the app again only there. */
+function useScreen(): { room: number; phone: boolean } {
+  const room = useSyncExternalStore(onResize, () => roomFor(window.innerWidth));
+  const phone = useSyncExternalStore(
+    onResize,
+    () => window.innerWidth <= PHONE_WIDTH,
+  );
+  return { room, phone };
 }
 
 /** A message's own ID, so a resend lands once. randomUUID needs a secure page (HTTPS or this
@@ -98,6 +147,13 @@ function saveWindows(windows: ChatWindow[]) {
   }
 }
 
+/** A friend's message said to screen readers: one that arrived in a window shown, which does not
+ * pop up. */
+export interface ChatSaid {
+  id: string;
+  words: string;
+}
+
 /** The chat as the app shares it: the count, the windows and the live events. */
 export interface Chat {
   /** Unread messages in every conversation. */
@@ -105,15 +161,30 @@ export interface Chat {
   setUnread: (count: number) => void;
   /** Whether the live connection is up: while it is not, conversations ask again now and then. */
   live: boolean;
+  /** Every open window, the oldest first. */
   windows: ChatWindow[];
-  /** Opens a friend's window, unfolded, or unfolds it; the oldest of more than WINDOWS goes. */
+  /** The windows on the bar: the newest that fit the screen (one on a phone). */
+  docked: ChatWindow[];
+  /** A phone's screen: the bar is one button, and one thing shows at a time. */
+  phone: boolean;
+  /** Opens a friend's window, unfolded, or unfolds it, and gives it focus; the oldest of more
+   * than WINDOWS goes. On a phone it closes the friends list. */
   open: (playerId: string) => void;
   close: (playerId: string) => void;
   fold: (playerId: string, folded: boolean) => void;
-  /** The conversation shown on the Messages page, whose messages do not pop up. */
-  setShown: (playerId: string | null) => void;
+  /** Whether a window's conversation is shown: on the bar, unfolded, and not under the friends
+   * list on a phone. */
+  shows: (window: ChatWindow) => boolean;
+  /** The window just opened, which takes focus once it is drawn. */
+  focusing: string | null;
+  focused: () => void;
+  /** The bar's friends list (v0.5.1): open or not. */
+  panel: boolean;
+  setPanel: (open: boolean) => void;
   toasts: MessageToast[];
   dismiss: (messageId: string) => void;
+  /** The last message said to screen readers from a window shown. */
+  said: ChatSaid | null;
   /** Follows the socket's events; returns the way to stop. */
   listen: (listener: (event: ChatEvent) => void) => () => void;
   /** Marks a friend's messages read up to a time, in every tab. */
@@ -254,7 +325,8 @@ export class ChatSocket {
   }
 }
 
-/** The account's chat: its socket while the account is active, the windows and the pop-ups. */
+/** The account's chat: its socket while the account is active, the windows, the bar's friends
+ * list and the pop-ups. */
 export function useChat(
   me: Me | null | undefined,
   checkedIn: number | null,
@@ -264,18 +336,33 @@ export function useChat(
   const [live, setLive] = useState(false);
   const [windows, setWindows] = useState<ChatWindow[]>(savedWindows);
   const [toasts, setToasts] = useState<MessageToast[]>([]);
+  const [panel, setPanel] = useState(false);
+  const [focusing, setFocusing] = useState<string | null>(null);
+  const [said, setSaid] = useState<ChatSaid | null>(null);
   const listeners = useRef(new Set<(event: ChatEvent) => void>());
-  // What is shown and in use, so its messages do not pop up: the open, unfolded windows and the
-  // Messages page's conversation.
-  const shown = useRef<string | null>(null);
-  const windowsNow = useRef(windows);
-  windowsNow.current = windows;
+  const { room, phone } = useScreen();
+  const docked = useMemo(() => windows.slice(-room), [windows, room]);
+  // What is shown, so its messages do not pop up: the windows on the bar, unfolded, and on a
+  // phone not under the friends list.
+  const shows = useCallback(
+    (shown: ChatWindow) =>
+      !shown.folded &&
+      !(phone && panel) &&
+      docked.some((each) => each.playerId === shown.playerId),
+    [docked, phone, panel],
+  );
+  const showing = useRef(new Set<string>());
+  showing.current = new Set(docked.filter(shows).map((each) => each.playerId));
+  const phoneNow = useRef(phone);
+  phoneNow.current = phone;
 
   useEffect(() => saveWindows(windows), [windows]);
   useEffect(() => {
     setUnread(0);
     setToasts([]);
     setLive(false);
+    setPanel(false);
+    setSaid(null);
     if (!account) return;
     const socket = new ChatSocket(
       (event) => {
@@ -283,11 +370,15 @@ export function useChat(
         for (const listener of listeners.current) listener(event);
         if (event.type !== "message" || event.message.sender_id === account)
           return;
-        const open = windowsNow.current.some(
-          (each) => each.playerId === event.player_id && !each.folded,
-        );
         const visible = document.visibilityState !== "hidden";
-        if (visible && (open || shown.current === event.player_id)) return;
+        if (visible && showing.current.has(event.player_id)) {
+          // Shown, it does not pop up: screen readers hear it from the bar instead.
+          setSaid({
+            id: event.message.id,
+            words: `${event.player.handle}: ${event.message.body}`,
+          });
+          return;
+        }
         setToasts((before) => [
           { player: event.player, message: event.message },
           ...before.filter((each) => each.player.id !== event.player_id),
@@ -314,7 +405,11 @@ export function useChat(
       return [...others, { playerId, folded: false }].slice(-WINDOWS);
     });
     setToasts((before) => before.filter((each) => each.player.id !== playerId));
+    setFocusing(playerId);
+    // A phone shows one thing at a time: the conversation, not the list it was chosen from.
+    if (phoneNow.current) setPanel(false);
   }, []);
+  const focused = useCallback(() => setFocusing(null), []);
   const close = useCallback(
     (playerId: string) =>
       setWindows((before) =>
@@ -331,13 +426,6 @@ export function useChat(
       ),
     [],
   );
-  const setShown = useCallback((playerId: string | null) => {
-    shown.current = playerId;
-    if (playerId)
-      setToasts((before) =>
-        before.filter((each) => each.player.id !== playerId),
-      );
-  }, []);
   const dismiss = useCallback(
     (messageId: string) =>
       setToasts((before) =>
@@ -369,12 +457,19 @@ export function useChat(
       setUnread,
       live,
       windows: account ? windows : [],
+      docked: account ? docked : [],
+      phone,
       open,
       close,
       fold,
-      setShown,
+      shows,
+      focusing,
+      focused,
+      panel: account ? panel : false,
+      setPanel,
       toasts: account ? toasts : [],
       dismiss,
+      said: account ? said : null,
       listen,
       markRead,
     }),
@@ -383,12 +478,18 @@ export function useChat(
       unread,
       live,
       windows,
-      toasts,
+      docked,
+      phone,
       open,
       close,
       fold,
-      setShown,
+      shows,
+      focusing,
+      focused,
+      panel,
+      toasts,
       dismiss,
+      said,
       listen,
       markRead,
     ],

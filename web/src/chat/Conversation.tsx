@@ -19,9 +19,8 @@ import {
 import { ReportMessageDialog, type ReportedMessage } from "./ReportMessage";
 import styles from "./chat.module.css";
 
-// One conversation with a friend (v0.4.4), the same in a docked window and on the Messages page:
-// its messages, the older ones a page at a time, the box to write in, and what the socket says
-// as it happens. A message waits greyed until the server has it; one that fails says so and can
+// One conversation with a friend (v0.4.4), in a window on the chat bar (v0.5.1): its messages,
+// the older ones a page at a time, the box to write in, and what the socket says as it happens. A message waits greyed until the server has it; one that fails says so and can
 // be sent again under the same client_id, so it lands once. A conversation that is shown, in a
 // tab in use, is read: the page tells the server up to the newest message of the friend's.
 
@@ -229,13 +228,15 @@ function Message({
   );
 }
 
-/** The messages and the box to write in; the header is the window's or the page's. */
+/** The messages and the box to write in; the header is the window's. */
 export function ConversationView({
   playerId,
   chat,
   visible,
   compact = false,
   onPlayer,
+  focus = false,
+  onFocused,
 }: {
   playerId: string;
   chat: Chat | null;
@@ -245,6 +246,10 @@ export function ConversationView({
   compact?: boolean;
   /** Who the friend is, once known, for the header. */
   onPlayer?: (player: PlayerSummary, unread: number) => void;
+  /** Just opened (v0.5.1): once loaded, focus moves to the box to write in, or to the messages
+   * when the two are no longer friends. */
+  focus?: boolean;
+  onFocused?: () => void;
 }) {
   const inUse = useTabInUse();
   const conversation = useConversation(playerId, chat, visible && inUse);
@@ -253,6 +258,7 @@ export function ConversationView({
   const [text, setText] = useState("");
   const [reported, setReported] = useState<ReportedMessage | null>(null);
   const list = useRef<HTMLOListElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
   const atBottom = useRef(true);
   const heightBefore = useRef<number | null>(null);
   const handle = player?.handle ?? "your friend";
@@ -260,6 +266,11 @@ export function ConversationView({
   useEffect(() => {
     if (player) onPlayer?.(player, conversation.unread);
   }, [player, conversation.unread, onPlayer]);
+  useEffect(() => {
+    if (!focus || state === "loading") return;
+    (box.current ?? list.current)?.focus();
+    onFocused?.();
+  }, [focus, state, onFocused]);
   // New messages keep the newest in view when it was; older ones keep the reader's place.
   useLayoutEffect(() => {
     const element = list.current;
@@ -384,6 +395,7 @@ export function ConversationView({
             Write to {handle}
           </label>
           <textarea
+            ref={box}
             id={`write-${playerId}`}
             value={text}
             rows={compact ? 1 : 2}

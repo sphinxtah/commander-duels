@@ -32,15 +32,15 @@ function badge(count: number) {
 
 /**
  * The top bar (v0.4.5), as in Magic Duels' menus: the mark that leads home, the main menu's six
- * pages, the player search, and the account's corner (its tokens, Friends, Messages, the bell and
- * its own menu). On a phone the six pages move to a bar at the bottom of the window.
+ * pages, the player search, and the account's corner (its tokens, Friends, the bell and its own
+ * menu). On a phone the six pages move to a bar at the bottom of the window. Messages, beside
+ * Friends until v0.5.1, are on the chat bar along the bottom of every page (chat/ChatBar.tsx).
  */
 export function TopBar({
   me,
   shown,
   hud,
   social,
-  messagesUnread,
   counts,
   connection,
   online,
@@ -49,7 +49,6 @@ export function TopBar({
   shown: Page;
   hud: Hud;
   social: Social;
-  messagesUnread: number;
   counts: AdminCounts | null;
   connection: Connection;
   online: boolean;
@@ -110,24 +109,6 @@ export function TopBar({
           title="Friends"
         >
           <Icon name="friends" />
-        </a>
-        <a
-          href="#messages"
-          className={styles.iconLink}
-          aria-current={shown === "Messages" ? "page" : undefined}
-          aria-label={
-            messagesUnread > 0
-              ? `Messages, ${messagesUnread} unread`
-              : "Messages"
-          }
-          title="Messages"
-        >
-          <Icon name="messages" />
-          {messagesUnread > 0 && (
-            <span className={styles.badge} aria-hidden="true">
-              {badge(messagesUnread)}
-            </span>
-          )}
         </a>
         <NotificationBell social={social} className={styles.bell} />
         <AccountMenu

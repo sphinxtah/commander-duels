@@ -1,19 +1,8 @@
-/* Chat between friends (v0.4.4): the docked windows, the Messages page and the conversation they
-   share, in the app's colours: dark green panels, the gold of its buttons, quiet grey-green text.
-   A friend's messages sit on the left, yours on the right in gold. */
+/* Chat between friends (v0.4.4): the chat bar (v0.5.1), its friends list and the conversations
+   docked on it, in the app's colours: dark green panels in a gold hairline, the gold of its
+   buttons, quiet grey-green text. A friend's messages sit on the left, yours on the right in
+   gold. */
 
-.eyebrow {
-  color: #bdab80;
-  font-size: 0.6rem;
-  letter-spacing: 2.1px;
-  font-weight: 600;
-}
-.lead {
-  color: #aeb8ac;
-  font-size: 0.86rem;
-  line-height: 1.8;
-  max-width: 46rem;
-}
 .quiet {
   color: #a5b0a3;
   font-size: 0.8rem;
@@ -239,27 +228,46 @@
   font-size: 0.76rem;
 }
 
-/* The docked windows: fixed at the bottom right, side by side; on a phone, the newest alone. */
-.dock {
+/* The chat bar (v0.5.1): fixed along the bottom of the window, the friends list at its right end
+   and the conversations beside it, each standing on the window's bottom edge. Folded, a window
+   or the list is its title bar, a tab on the bar. On a phone the bar is one round button above
+   the bar of pages, and the list or one conversation opens the whole width of the screen. */
+.barRoom {
+  height: 52px;
+}
+.bar {
   position: fixed;
   z-index: 40;
+  left: 8px;
   right: 18px;
   bottom: 0;
   display: flex;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: 10px;
   pointer-events: none;
 }
-.window {
+.windows {
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.window,
+.friends {
   pointer-events: auto;
-  width: 300px;
   display: flex;
   flex-direction: column;
   background: var(--cd-panel-bg);
-  border: 1px solid #ffffff22;
+  border: 1px solid var(--cd-gold-line);
   border-bottom: none;
   border-radius: 8px 8px 0 0;
-  box-shadow: 0 -8px 30px #0009;
+  box-shadow:
+    inset 0 1px 0 #ffffff14,
+    0 -8px 30px #0009;
+}
+.window {
+  width: 300px;
 }
 .window:not([data-folded]) {
   height: min(440px, calc(100vh - 120px));
@@ -282,6 +290,7 @@
   gap: 8px;
   background: transparent;
   border: none;
+  border-radius: 4px;
   color: #ebece6;
   font-size: 0.8rem;
   font-weight: 600;
@@ -289,7 +298,12 @@
   padding: 4px;
   min-height: 40px;
 }
-.windowTitle > span:not(.unread) {
+.windowTitle:hover,
+.friendsTitle:hover {
+  background: #d5b77c10;
+}
+.windowTitle > span:not(.unread, .chevron) {
+  flex: 1;
   min-width: 0;
   display: grid;
 }
@@ -303,6 +317,19 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Which way the title bar folds: down while open, up while folded. */
+.chevron {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 6px 0 4px;
+  border: solid #a5b0a3;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-2px) rotate(45deg);
+}
+[aria-expanded="false"] > .chevron {
+  transform: translateY(2px) rotate(-135deg);
 }
 .windowAction {
   display: grid;
@@ -336,125 +363,222 @@
   font-size: 0.68rem;
   padding: 4px 2px 0;
 }
-@media (max-width: 760px) {
-  .dock {
-    left: 8px;
-    right: 8px;
-  }
-  .window {
-    width: 100%;
-  }
-  .window:not(:last-child) {
-    display: none;
-  }
-}
 
-/* The Messages page: the list beside the conversation; on a phone, one or the other. */
-.page {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) 1fr;
-  gap: 22px;
-  align-items: start;
+/* The friends list. */
+.friends {
+  width: 280px;
 }
-.page:not([data-open]) {
-  grid-template-columns: minmax(260px, 560px);
+.friends[data-open] {
+  height: min(480px, calc(100vh - 120px));
 }
-.list {
-  list-style: none;
-  margin: 18px 0 0;
-  padding: 0;
-  border: 1px solid var(--cd-gold-line);
-  border-radius: 6px;
-  background: var(--cd-panel-bg);
-  box-shadow: var(--cd-frame);
-}
-.list li + li {
-  border-top: 1px solid #ffffff10;
-}
-.listItem {
+.friendsTitle {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 11px 13px;
-  color: #ebece6;
-  text-decoration: none;
+  gap: 9px;
+  min-height: 49px;
+  padding: 6px 8px 6px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  color: var(--cd-gold-hi);
+  text-align: left;
 }
-.listItem:hover,
-.listItem[aria-current="page"] {
+.friends[data-open] .friendsTitle {
+  border-bottom: 1px solid #ffffff14;
+}
+.friendsIcon,
+.chatIcon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--cd-gold);
+}
+.chatIcon {
+  display: none;
+}
+.friendsWords {
+  flex: 1;
+  min-width: 0;
+  font: 600 0.74rem/1.2 var(--cd-display);
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.friendsWords small {
+  margin-left: 4px;
+  color: #b9c3b6;
+  font:
+    400 0.74rem/1.2 system-ui,
+    sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.friendsBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 6px 8px;
+}
+.friendsBody[hidden] {
+  display: none;
+}
+.friendsBody > .quiet,
+.friendsBody > .error {
+  padding: 4px 6px;
+}
+.peopleTitle {
+  margin: 12px 6px 4px;
+  color: var(--cd-gold);
+  font: 600 0.6rem/1.4 var(--cd-display);
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+}
+.people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.person {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #ebece6;
+  text-align: left;
+}
+.person:hover {
   background: #d5b77c14;
 }
-.listText {
+/* A conversation open on the bar. */
+.person[data-open] {
+  box-shadow: inset 2px 0 0 var(--cd-gold);
+}
+.personText {
   flex: 1;
   min-width: 0;
   display: grid;
   gap: 2px;
 }
-.listText strong {
-  font-size: 0.86rem;
-}
-.listText small {
-  color: #a5b0a3;
-  font-size: 0.74rem;
+.personText strong {
+  font-size: 0.84rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.listEnd {
-  display: grid;
-  justify-items: end;
-  gap: 4px;
+.personText > span,
+.personText small {
+  min-width: 0;
   color: #a5b0a3;
-  font-size: 0.66rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.pageConversation {
-  position: sticky;
-  top: 12px;
-  height: min(640px, calc(100vh - 140px));
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--cd-gold-line);
-  border-radius: 6px;
-  background: var(--cd-panel-bg);
-  padding: 0 12px 10px;
-  box-shadow: var(--cd-frame);
-}
-.pageBar {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 0;
-  border-bottom: 1px solid #ffffff14;
-}
-.pageWho {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  color: #ebece6;
+/* The Friends page, for requests and the rest: at the list's foot. */
+.friendsLink {
+  margin-top: auto;
+  padding: 12px 8px 2px;
+  border-top: 1px solid #ffffff10;
+  color: var(--cd-gold-hi);
+  font-size: 0.74rem;
   text-decoration: none;
 }
-.pageWho span {
-  display: grid;
-  font-size: 0.86rem;
+.friendsLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
-.back {
-  color: #a5b0a3;
-  font-size: 0.74rem;
-  display: none;
+.people {
+  margin-bottom: 10px;
 }
-@media (max-width: 860px) {
-  .page,
-  .page:not([data-open]) {
-    grid-template-columns: 1fr;
+
+/* A phone: one round button above the bar of pages; the list, or the newest conversation, the
+   whole width of the screen. */
+@media (max-width: 820px) {
+  .barRoom {
+    height: 64px;
   }
-  .page[data-open] .listSide {
+  .bar {
+    left: 8px;
+    right: 10px;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+  .windows {
+    flex: 1;
+  }
+  .window {
+    width: 100%;
+    border-radius: 8px;
+    border-bottom: 1px solid var(--cd-gold-line);
+  }
+  .window:not([data-folded]),
+  .friends[data-open] {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: min(560px, calc(100vh - 64px));
+    height: min(560px, calc(100dvh - 64px));
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
+  }
+  .window:not([data-folded]) {
+    z-index: 2;
+  }
+  .friends[data-open] {
+    z-index: 3;
+  }
+  /* The list covers the conversation, which waits under it. */
+  .bar[data-panel] .window {
     display: none;
   }
-  .back {
-    display: inline;
+  .friends:not([data-open]) {
+    flex: none;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border-bottom: 1px solid var(--cd-gold-line);
+    box-shadow:
+      inset 0 1px 0 #ffffff1f,
+      0 8px 24px #000a;
   }
-  .pageConversation {
-    position: static;
-    height: calc(100vh - 170px);
+  .friends:not([data-open]) .friendsTitle {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+  }
+  .friends:not([data-open]) .friendsIcon,
+  .friends:not([data-open]) .friendsWords,
+  .friends:not([data-open]) .chevron {
+    display: none;
+  }
+  .friends:not([data-open]) .chatIcon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    color: var(--cd-gold-hi);
+  }
+  .friends:not([data-open]) .unread {
+    position: absolute;
+    top: -3px;
+    right: -3px;
   }
 }
 

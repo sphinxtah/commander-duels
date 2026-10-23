@@ -1,5 +1,11 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { createRef } from "react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import {
   afterEach,
   beforeAll,
@@ -14,18 +20,20 @@ import { notificationWords, type NotificationItem } from "../social/social";
 import {
   ChatContext,
   newClientId,
+  oldMessagesRoute,
+  roomFor,
   savedWindows,
   useChat,
   WINDOWS,
   type Chat,
   type ChatMessage,
 } from "./chat";
-import { ChatDock } from "./ChatDock";
+import { ChatBar } from "./ChatBar";
 import { ConversationView } from "./Conversation";
-import { MessagesPage } from "./MessagesPage";
 
 // Chat between friends (v0.4.4): a conversation's sending, failures and reports; the live
-// connection's count, pop-ups and windows; and the Messages page.
+// connection's count, pop-ups and windows; and the chat bar (v0.5.1) with its friends list, which
+// replaced the Messages page.
 
 type Call = { route: string; init?: Record<string, unknown> };
 type Answer = (init?: Record<string, unknown>) => unknown;
@@ -57,6 +65,8 @@ async function settle() {
 const ME = "00000000-0000-4000-8000-0000000000e1";
 const ADA = "00000000-0000-4000-8000-0000000000a1";
 const BOB = "00000000-0000-4000-8000-0000000000b2";
+const CAL = "00000000-0000-4000-8000-0000000000c3";
+const DEE = "00000000-0000-4000-8000-0000000000d4";
 const ada = {
   id: ADA,
   handle: "ada",
@@ -71,6 +81,24 @@ const ada = {
   },
   friendship: "friends",
 } as const;
+interface Presence {
+  state: string;
+  game_kind: string | null;
+  game_format: string | null;
+  appears_offline: boolean;
+}
+type Friend = Omit<typeof ada, "id" | "handle" | "presence" | "friendship"> & {
+  id: string;
+  handle: string;
+  presence: Presence | null;
+  friendship: string;
+};
+function friend(id: string, handle: string, changes: Partial<Friend> = {}) {
+  return { ...ada, id, handle, ...changes } as Friend;
+}
+function presence(state: string): Presence {
+  return { ...ada.presence, state };
+}
 
 function message(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -127,6 +155,17 @@ beforeAll(() => {
     this.dispatchEvent(new Event("close"));
   };
 });
+/** The window's width, as a resize tells the page. */
+function screenWidth(width: number) {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: width,
+  });
+  act(() => {
+    window.dispatchEvent(new Event("resize"));
+  });
+}
+
 beforeEach(() => {
   calls = [];
   queues.clear();
@@ -134,6 +173,15 @@ beforeEach(() => {
   vi.stubGlobal("WebSocket", FakeSocket);
   for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"] as const)
     vi.spyOn(client, method).mockImplementation(serve(method));
+  // The chat bar's friends list, empty unless a test says otherwise; a screen wide enough for
+  // three windows.
+  on("GET /api/v1/friends", () =>
+    reply(200, { friends: [], incoming: [], outgoing: [] }),
+  );
+  on("GET /api/v1/conversations", () =>
+    reply(200, { conversations: [], unread: 0 }),
+  );
+  screenWidth(1400);
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -319,7 +367,7 @@ describe("a conversation", () => {
   });
 });
 
-/** Mounts useChat and hands its result out. */
+/** Mounts useChat and hands its result out, with the chat bar. */
 let shown: Chat | null = null;
 function Probe({
   me,
@@ -331,7 +379,7 @@ function Probe({
   shown = useChat(me, checkedIn);
   return (
     <ChatContext.Provider value={shown}>
-      <ChatDock chat={shown} />
+      <ChatBar chat={shown} />
     </ChatContext.Provider>
   );
 }
@@ -363,7 +411,8 @@ describe("the live connection", () => {
     });
     expect(shown!.unread).toBe(4);
     expect(shown!.toasts.map((each) => each.player.handle)).toEqual(["ada"]);
-    // Opening the conversation takes its pop-up away; its messages no longer pop up.
+    // Opening the conversation takes its pop-up away; its messages no longer pop up, and screen
+    // readers hear them from the bar instead.
     act(() => shown!.open(ADA));
     expect(shown!.toasts).toEqual([]);
     await settle();
@@ -375,6 +424,12 @@ describe("the live connection", () => {
       unread: 4,
     });
     expect(shown!.toasts).toEqual([]);
+    const bar = screen.getByRole("complementary", {
+      name: "Friends and messages",
+    });
+    expect(within(bar).getByRole("status")).toHaveTextContent(
+      "ada: Hello there",
+    );
     // The open window shows it, so it is read at once.
     await settle();
     expect(
@@ -391,6 +446,18 @@ describe("the live connection", () => {
     expect(shown!.toasts).toEqual([]);
     socket!.tell({ type: "read", player_id: ADA, unread: 0 });
     expect(shown!.unread).toBe(0);
+    // Folded, its messages pop up again.
+    act(() => shown!.fold(ADA, true));
+    socket!.tell({
+      type: "message",
+      player_id: ADA,
+      player: ada,
+      message: message({ id: "m11", body: "Still there?" }),
+      unread: 1,
+    });
+    expect(shown!.toasts.map((each) => each.message.body)).toEqual([
+      "Still there?",
+    ]);
   });
 
   it("keeps at most three windows, and remembers which", async () => {
@@ -411,7 +478,9 @@ describe("the live connection", () => {
       { playerId: ids[2], folded: false },
       { playerId: ids[3], folded: false },
     ]);
-    expect(screen.getAllByRole("region")).toHaveLength(3);
+    expect(screen.getAllByRole("region", { name: /^Chat with/ })).toHaveLength(
+      3,
+    );
     fireEvent.click(
       screen.getAllByRole("button", { name: /Close the chat with/ })[0]!,
     );
@@ -425,27 +494,248 @@ describe("the live connection", () => {
   });
 });
 
-describe("the Messages page", () => {
-  it("lists the conversations and shows one beside them", async () => {
+describe("the chat bar (v0.5.1)", () => {
+  /** Ada online with 2 unread, Bob offline, Cal at a table, and Dee no longer a friend. */
+  function people() {
+    on("GET /api/v1/friends", () =>
+      reply(200, {
+        friends: [
+          friend(BOB, "bob", { presence: presence("offline") }),
+          ada,
+          friend(CAL, "cal", {
+            presence: {
+              ...presence("in_game"),
+              game_kind: "table",
+              game_format: "commander",
+            },
+          }),
+        ],
+        incoming: [friend(BOB, "eve")],
+        outgoing: [],
+      }),
+    );
     on("GET /api/v1/conversations", () =>
       reply(200, {
         conversations: [
+          {
+            player: friend(DEE, "dee", {
+              presence: null,
+              friendship: "none",
+            }),
+            friends: false,
+            last_message: message({ sender_id: DEE }),
+            unread: 1,
+          },
           { player: ada, friends: true, last_message: message(), unread: 2 },
         ],
-        unread: 2,
+        unread: 3,
       }),
     );
-    on("GET /api/v1/conversations/{player_id}", () => reply(200, page()));
-    render(<MessagesPage chat={null} playerId={ADA} heading={createRef()} />);
+    on("GET /api/v1/conversations/{player_id}", (init) => {
+      const id = (init!.params as { path: { player_id: string } }).path
+        .player_id;
+      // The conversation's presence is older than the friends list's.
+      return reply(
+        200,
+        page({
+          player:
+            id === DEE
+              ? friend(DEE, "dee")
+              : friend(ADA, "ada", { presence: presence("offline") }),
+          friends: id !== DEE,
+        }),
+      );
+    });
+  }
+  function toggle() {
+    return screen.getByRole("button", { name: /^Friends/ });
+  }
+
+  it("lists the friends online first with what is unread, and old conversations under their own heading", async () => {
+    people();
+    render(<Probe me={me} checkedIn={3} />);
     await settle();
-    const list = screen.getByRole("list", { name: "Conversations" });
-    const link = within(list).getByRole("link", { name: /ada/ });
-    expect(link).toHaveAttribute("href", `#messages/${ADA}`);
-    expect(link).toHaveAttribute("aria-current", "page");
-    expect(within(list).getByLabelText("2 unread")).toBeInTheDocument();
+    // The bar's button: the friends online (Ada, and Cal at a table) and the unread messages.
+    expect(toggle()).toHaveAccessibleName(
+      "Friends, 2 online, 3 unread messages",
+    );
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(toggle()).toHaveTextContent("Friends· 2 online3");
+    fireEvent.click(toggle());
+    await settle();
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    const friends = screen.getByRole("list", { name: "Your friends" });
     expect(
-      screen.getByRole("region", { name: "Conversation with ada" }),
+      within(friends)
+        .getAllByRole("button")
+        .map((each) => each.getAttribute("aria-label")),
+    ).toEqual([
+      "Chat with cal, Playing Commander at a table",
+      "Chat with ada, Online, 2 unread",
+      "Chat with bob, Offline",
+    ]);
+    const earlier = screen.getByRole("list", { name: "Earlier conversations" });
+    expect(within(earlier).getByRole("button")).toHaveAccessibleName(
+      "Chat with dee, No longer friends, 1 unread",
+    );
+    expect(
+      screen.getByRole("link", { name: /1 friend request waiting/ }),
+    ).toHaveAttribute("href", "#friends");
+    // A friend's conversation opens on the bar, with focus in the box to write in.
+    fireEvent.click(
+      within(friends).getByRole("button", { name: /^Chat with ada/ }),
+    );
+    const window = await screen.findByRole("region", { name: "Chat with ada" });
+    await waitFor(() =>
+      expect(within(window).getByLabelText("Write to ada")).toHaveFocus(),
+    );
+    expect(
+      within(friends).getByRole("button", { name: /^Chat with ada/ }),
+    ).toHaveAttribute("data-open");
+    // A player no longer a friend: the history, read only, with focus on it.
+    fireEvent.click(within(earlier).getByRole("button"));
+    const old = await screen.findByRole("region", { name: "Chat with dee" });
+    await waitFor(() =>
+      expect(
+        within(old).getByRole("list", { name: "Messages with dee" }),
+      ).toHaveFocus(),
+    );
+    expect(within(old).queryByLabelText("Write to dee")).toBeNull();
+  });
+
+  it("folds with Escape, follows the socket while open, and asks again for presence", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    people();
+    render(<Probe me={me} />);
+    await settle();
+    const [socket] = FakeSocket.all;
+    act(() => socket!.onopen?.());
+    socket!.tell({ type: "welcome", unread: 0 });
+    fireEvent.click(toggle());
+    await settle();
+    const lists = sent("GET /api/v1/conversations").length;
+    // A message and its read mark: the list asks once for the new counts.
+    socket!.tell({
+      type: "message",
+      player_id: ADA,
+      player: ada,
+      message: message({ id: "m5" }),
+      unread: 3,
+    });
+    socket!.tell({ type: "read", player_id: ADA, unread: 0 });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(sent("GET /api/v1/conversations")).toHaveLength(lists + 1);
+    // Presence, every 30 seconds, as on the Friends page.
+    const friends = sent("GET /api/v1/friends").length;
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    expect(sent("GET /api/v1/friends")).toHaveLength(friends + 1);
+    // Escape folds the list, with focus on its button.
+    fireEvent.keyDown(screen.getByRole("button", { name: /^Chat with bob/ }), {
+      key: "Escape",
+    });
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(toggle()).toHaveFocus();
+    // Folded, it no longer follows the socket.
+    socket!.tell({
+      type: "message",
+      player_id: ADA,
+      player: ada,
+      message: message({ id: "m6" }),
+      unread: 1,
+    });
+    await act(() => vi.advanceTimersByTimeAsync(300));
+    expect(sent("GET /api/v1/conversations")).toHaveLength(lists + 1);
+  });
+
+  it("closes a conversation, and opens it again from the list", async () => {
+    people();
+    render(<Probe me={me} />);
+    await settle();
+    fireEvent.click(toggle());
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: /^Chat with ada/ }));
+    await screen.findByRole("region", { name: "Chat with ada" });
+    // A click elsewhere on the bar, in the window, keeps the list; outside it, folds it.
+    fireEvent.pointerDown(screen.getByLabelText("Write to ada"));
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    fireEvent.pointerDown(document.body);
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close the chat with ada" }),
+    );
+    expect(screen.queryByRole("region", { name: "Chat with ada" })).toBeNull();
+    expect(toggle()).toHaveFocus();
+    fireEvent.click(toggle());
+    fireEvent.click(screen.getByRole("button", { name: /^Chat with ada/ }));
+    expect(
+      await screen.findByRole("region", { name: "Chat with ada" }),
     ).toBeInTheDocument();
+    // The window's title bar shows the list's newer presence.
+    expect(
+      screen.getByRole("button", { expanded: true, name: /^ada/ }),
+    ).toHaveTextContent("Online");
+  });
+
+  it("fits the windows to the screen; the others wait their turn", async () => {
+    on("GET /api/v1/conversations/{player_id}", () =>
+      reply(200, page({ messages: [] })),
+    );
+    expect([1400, 1280, 1024, 900, 820, 390].map(roomFor)).toEqual([
+      3, 3, 2, 1, 1, 1,
+    ]);
+    render(<Probe me={me} />);
+    for (const id of [ADA, BOB, CAL]) act(() => shown!.open(id));
+    await settle();
+    const windows = () =>
+      screen.getAllByRole("region", { name: /^Chat with/ }).length;
+    expect(windows()).toBe(3);
+    screenWidth(1024);
+    expect(windows()).toBe(2);
+    expect(shown!.docked.map((each) => each.playerId)).toEqual([BOB, CAL]);
+    expect(shown!.windows).toHaveLength(3);
+    // Ada's window, waiting, opens again as the newest.
+    act(() => shown!.open(ADA));
+    expect(shown!.docked.map((each) => each.playerId)).toEqual([CAL, ADA]);
+    screenWidth(1400);
+    expect(windows()).toBe(3);
+  });
+
+  it("on a phone, is one button, and shows the list or one conversation", async () => {
+    people();
+    screenWidth(390);
+    localStorage.setItem(
+      "cd.chat.windows",
+      JSON.stringify([
+        { playerId: BOB, folded: false },
+        { playerId: CAL, folded: false },
+      ]),
+    );
+    render(<Probe me={me} checkedIn={1} />);
+    await settle();
+    expect(shown!.phone).toBe(true);
+    // The newest conversation alone.
+    expect(screen.getAllByRole("region", { name: /^Chat with/ })).toHaveLength(
+      1,
+    );
+    expect(shown!.shows(shown!.docked[0]!)).toBe(true);
+    expect(toggle()).toHaveAccessibleName(
+      "Friends, 2 online, 1 unread message",
+    );
+    // The list covers it: it is not shown meanwhile, so its messages are not read.
+    fireEvent.click(toggle());
+    expect(shown!.shows(shown!.docked[0]!)).toBe(false);
+    // Choosing a friend shows their conversation instead of the list.
+    fireEvent.click(screen.getByRole("button", { name: /^Chat with ada/ }));
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(shown!.docked.map((each) => each.playerId)).toEqual([ADA]);
+    expect(shown!.shows(shown!.docked[0]!)).toBe(true);
+  });
+
+  it("knows the Messages page's old addresses", () => {
+    expect(oldMessagesRoute("#messages")).toBe("");
+    expect(oldMessagesRoute(`#messages/${ADA.toUpperCase()}`)).toBe(ADA);
+    expect(oldMessagesRoute("#messages/nobody")).toBeUndefined();
+    expect(oldMessagesRoute("#friends")).toBeUndefined();
   });
 });
 

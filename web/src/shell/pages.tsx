@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 
 // The menus' pages (v0.4.5). The top bar holds the main six, as Magic Duels' main menu did; the
-// account's menu opens Profile, Settings and Administration, and Friends and Messages have their
-// icons beside the bell. SysOp's entrance has no link: it opens only from the SysOp networks. The
-// notifications' history opens from the bell. Campaign, Learn and Collection, placeholders since
-// v0.0.1, are gone: their old addresses open the main menu.
+// account's menu opens Profile, Settings and Administration, and Friends has its icon beside the
+// bell. SysOp's entrance has no link: it opens only from the SysOp networks. The notifications'
+// history opens from the bell. Campaign, Learn and Collection, placeholders since v0.0.1, are
+// gone: their old addresses open the main menu. Messages, a page until v0.5.1, are on the chat
+// bar; its old addresses open the bar (App.tsx).
 
 export const pages = [
   "Home",
@@ -14,7 +15,6 @@ export const pages = [
   "Cards",
   "Shop",
   "Friends",
-  "Messages",
   "Profile",
   "Settings",
   "Admin",
@@ -38,7 +38,6 @@ export const pageNames: Record<Page, string> = {
   Cards: "Cards",
   Shop: "Shop",
   Friends: "Friends",
-  Messages: "Messages",
   Profile: "Profile",
   Settings: "Settings",
   Admin: "Administration",

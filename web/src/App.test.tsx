@@ -269,6 +269,10 @@ beforeEach(() => {
   on("GET /api/v1/friends", () =>
     reply(200, { friends: [], incoming: [], outgoing: [] }),
   );
+  // The chat bar's conversations (v0.5.1), when its friends list opens.
+  on("GET /api/v1/conversations", () =>
+    reply(200, { conversations: [], unread: 0 }),
+  );
   // The main menu's quests, and Profile's record and achievements (v0.5.0).
   on("GET /api/v1/me/quests", () => reply(200, dailyQuests()));
   on("GET /api/v1/me/stats", () => reply(200, stats({ history: true })));
@@ -1186,6 +1190,102 @@ describe("the main menu (v0.4.5)", () => {
       "href",
       "#home",
     );
+  });
+});
+
+describe("the chat bar (v0.5.1)", () => {
+  const ada = {
+    id: "00000000-0000-4000-8000-0000000000a1",
+    handle: "ada",
+    avatar: "sigil",
+    alliance: null,
+    tier: { id: "bronze", name: "Bronze", wins: 0 },
+    presence: {
+      state: "online",
+      game_kind: null,
+      game_format: null,
+      appears_offline: false,
+    },
+    friendship: "friends",
+  };
+  beforeEach(() => {
+    on("GET /api/v1/me", () => reply(200, alice));
+    on("GET /api/v1/friends", () =>
+      reply(200, { friends: [ada], incoming: [], outgoing: [] }),
+    );
+    on("GET /api/v1/conversations/{player_id}", () =>
+      reply(200, {
+        player: ada,
+        friends: true,
+        messages: [],
+        next: null,
+        unread: 0,
+      }),
+    );
+  });
+  function bar() {
+    return screen.getByRole("complementary", { name: "Friends and messages" });
+  }
+
+  it("is on every page but the table, and counts what the top bar's Messages did", async () => {
+    on("POST /api/v1/presence", () =>
+      reply(200, { unread: 0, messages_unread: 3, newest: null, fresh: [] }),
+    );
+    window.location.hash = "#settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    expect(
+      await within(bar()).findByRole("button", {
+        name: "Friends, 1 online, 3 unread messages",
+      }),
+    ).toHaveAttribute("aria-expanded", "false");
+    // Messages is no longer a page, nor in the top bar; Friends is.
+    const top = screen.getByRole("banner");
+    expect(within(top).queryByRole("link", { name: /Messages/ })).toBeNull();
+    expect(within(top).getByRole("link", { name: "Friends" })).toHaveAttribute(
+      "href",
+      "#friends",
+    );
+    // The table shows no bar.
+    window.location.hash = `#game/${gameId}`;
+    await screen.findByRole("link", { name: "Back to the table" });
+    expect(
+      screen.queryByRole("complementary", { name: "Friends and messages" }),
+    ).toBeNull();
+  });
+
+  it("opens an old #messages/<id> address's window over the main menu, with focus in it", async () => {
+    window.location.hash = `#messages/${ada.id}`;
+    render(<App />);
+    const window_ = await screen.findByRole("region", {
+      name: "Chat with ada",
+    });
+    await screen.findByRole("heading", { name: "Welcome back, alice" });
+    expect(window.location.hash).toBe("#home");
+    await waitFor(() =>
+      expect(within(window_).getByLabelText("Write to ada")).toHaveFocus(),
+    );
+  });
+
+  it("opens the friends list for #messages followed in the app, over the page the player was on", async () => {
+    window.location.hash = "#settings";
+    render(<App />);
+    await screen.findByRole("heading", { name: "Make yourself at home." });
+    window.location.hash = "#messages";
+    await waitFor(() =>
+      expect(
+        within(bar()).getByRole("button", { name: /^Friends/ }),
+      ).toHaveAttribute("aria-expanded", "true"),
+    );
+    expect(window.location.hash).toBe("#settings");
+    expect(
+      screen.getByRole("heading", { name: "Make yourself at home." }),
+    ).toBeInTheDocument();
+    expect(
+      await within(bar()).findByRole("button", {
+        name: "Chat with ada, Online",
+      }),
+    ).toBeInTheDocument();
   });
 });
 
