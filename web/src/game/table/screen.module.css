@@ -109,6 +109,11 @@
   line-height: 22px;
   text-align: center;
 }
+/* The friends' messages on the chat bar's diamond (v0.5.1), in the bar's own colour. */
+.hudCount[data-tone="friends"] {
+  background: #d9714f;
+  color: #fff;
+}
 .turnLine {
   margin: 0;
   pointer-events: none;

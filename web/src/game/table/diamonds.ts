@@ -23,7 +23,8 @@ export type IconName =
   | "priority"
   | "fullscreen"
   | "inspect"
-  | "chat";
+  | "chat"
+  | "friends";
 
 /** Each icon as stroked SVG path data in a 24 × 24 box. */
 export const ICONS: Record<IconName, string> = {
@@ -48,6 +49,8 @@ export const ICONS: Record<IconName, string> = {
   inspect:
     "M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 1 0 0-5",
   chat: "M4 5h16v11h-9l-5 4v-4H4zM8 9h8M8 12h5",
+  friends:
+    "M9 11a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM3 20a6 6 0 0 1 12 0M16.5 11.6a2.6 2.6 0 1 0 0-5.2M15.5 14.2A5 5 0 0 1 21 19",
 };
 
 export interface DuelsLabel {

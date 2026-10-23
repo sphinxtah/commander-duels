@@ -18,13 +18,18 @@ import { ConversationView } from "./Conversation";
 import { useBarPeople, type BarPeople, type BarPerson } from "./friends";
 import styles from "./chat.module.css";
 
-// The chat bar (v0.5.1, the owner's request), along the bottom of every page of the app but the
-// table: the friends list at its right end, with who is online and what is unread, and the
-// conversations with friends docked beside it, each folded to its title bar or open. They stay
-// open from page to page and, which ones, when the page reloads (chat.ts); a closed one opens
-// again from the list. On a phone the bar is one button, which opens the list, and one
-// conversation shows at a time, the whole width of the screen. It replaced the Messages page and
-// the windows docked at the bottom right (v0.4.4).
+// The chat bar (v0.5.1, the owner's request), along the bottom of every page of the app: the
+// friends list at its right end, with who is online and what is unread, and the conversations
+// with friends docked beside it, each folded to its title bar or open. They stay open from page
+// to page and, which ones, when the page reloads (chat.ts), as does the list's own fold; a closed
+// conversation opens again from the list. On a phone the bar is one button, which opens the list,
+// and one conversation shows at a time, the whole width of the screen. It replaced the Messages
+// page and the windows docked at the bottom right (v0.4.4).
+//
+// At the game's table the bar folds away into a diamond on the band (game/table/BandHud.tsx), so
+// it covers nothing there; the diamond brings it out, floating over the table's lower right, and
+// it or Escape puts it away again. The table's keys leave alone every key pressed in the bar
+// (game/table/keys.ts, data-chat-bar).
 
 function badge(count: number) {
   return count > 99 ? "99+" : String(count);
@@ -42,6 +47,8 @@ function DockedWindow({
   known: PlayerSummary | undefined;
   onClosed: () => void;
 }) {
+  // A live game keeps its address, so at the table nothing here leads to another page.
+  const links = !chat.atTable;
   const [player, setPlayer] = useState<PlayerSummary | null>(null);
   const [unread, setUnread] = useState(0);
   const learned = useCallback((who: PlayerSummary, count: number) => {
@@ -98,7 +105,7 @@ function DockedWindow({
       </header>
       {/* Folded, the conversation stays mounted: it keeps following, and counts what is new. */}
       <div id={id} className={styles.windowBody} hidden={shown.folded}>
-        {who && (
+        {who && links && (
           <a className={styles.profileLink} href={playerLink(who.id)}>
             Profile
           </a>
@@ -193,7 +200,9 @@ function FriendsPanel({
       data-open={open || undefined}
       aria-label="Friends"
       onKeyDown={(event) => {
-        if (event.key !== "Escape" || !open) return;
+        // At the table Escape puts the whole bar away (ChatBar).
+        if (event.key !== "Escape" || !open || chat.atTable) return;
+        event.preventDefault();
         event.stopPropagation();
         chat.setPanel(false);
         toggle.current?.focus();
@@ -289,43 +298,65 @@ function FriendsList({
           </ul>
         </>
       )}
-      <a
-        href="#friends"
-        className={styles.friendsLink}
-        onClick={() => chat.setPanel(false)}
-      >
-        {people.requests > 0
-          ? `${people.requests} friend ${people.requests === 1 ? "request" : "requests"} waiting`
-          : "Friends and requests"}{" "}
-        <span aria-hidden="true">→</span>
-      </a>
+      {!chat.atTable && (
+        <a
+          href="#friends"
+          className={styles.friendsLink}
+          onClick={() => chat.setPanel(false)}
+        >
+          {people.requests > 0
+            ? `${people.requests} friend ${people.requests === 1 ? "request" : "requests"} waiting`
+            : "Friends and requests"}{" "}
+          <span aria-hidden="true">→</span>
+        </a>
+      )}
     </>
   );
 }
 
+/** The band's diamond at the table, which brings the bar out (game/table/BandHud.tsx). */
+export const CHAT_TOGGLE = "[data-chat-toggle]";
+
 export function ChatBar({ chat }: { chat: Chat }) {
-  const people = useBarPeople(chat);
-  const bar = useRef<HTMLElement>(null);
+  const { atTable, tableOpen, setTableOpen } = chat;
+  // At the table, folded away, it asks the API for nothing.
+  const out = !atTable || tableOpen;
+  const people = useBarPeople(chat, out);
   const toggle = useRef<HTMLButtonElement>(null);
-  const { panel, setPanel } = chat;
-  // A click elsewhere folds the list, as for the bell's bubble; the windows are part of the bar.
+  // Brought out at the table, focus moves into it.
+  const before = useRef(tableOpen);
   useEffect(() => {
-    if (!panel) return;
-    const away = (event: PointerEvent) => {
-      if (!bar.current?.contains(event.target as Node)) setPanel(false);
-    };
-    document.addEventListener("pointerdown", away);
-    return () => document.removeEventListener("pointerdown", away);
-  }, [panel, setPanel]);
+    if (atTable && tableOpen && !before.current && !chat.focusing)
+      toggle.current?.focus();
+    before.current = tableOpen;
+  }, [atTable, tableOpen, chat.focusing]);
+  // A friend's message: in a window shown, which does not pop up beside the bell; at the table,
+  // every one.
+  const said = (
+    <p className={styles.visuallyHidden} role="status" data-chat-bar="">
+      {chat.said && <span key={chat.said.id}>{chat.said.words}</span>}
+    </p>
+  );
+  if (!out) return said;
   return (
     <>
       {/* Room at the foot of the page, so its end scrolls clear of the bar. */}
-      <div className={styles.barRoom} aria-hidden="true" />
+      {!atTable && <div className={styles.barRoom} aria-hidden="true" />}
       <aside
-        ref={bar}
+        id="chat-bar"
         className={styles.bar}
         aria-label="Friends and messages"
-        data-panel={panel || undefined}
+        data-panel={chat.panel || undefined}
+        data-table={atTable || undefined}
+        data-chat-bar=""
+        onKeyDown={(event) => {
+          // At the table Escape puts the bar away, one layer as the table's Escape closes one.
+          if (event.key !== "Escape" || !atTable) return;
+          event.preventDefault();
+          event.stopPropagation();
+          setTableOpen(false);
+          document.querySelector<HTMLElement>(CHAT_TOGGLE)?.focus();
+        }}
       >
         <div className={styles.windows}>
           {chat.docked.map((window) => (
@@ -339,11 +370,8 @@ export function ChatBar({ chat }: { chat: Chat }) {
           ))}
         </div>
         <FriendsPanel chat={chat} people={people} toggle={toggle} />
-        {/* A friend's message in a window shown, which does not pop up beside the bell. */}
-        <p className={styles.visuallyHidden} role="status">
-          {chat.said && <span key={chat.said.id}>{chat.said.words}</span>}
-        </p>
       </aside>
+      {said}
     </>
   );
 }

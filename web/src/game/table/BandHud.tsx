@@ -16,9 +16,9 @@ import gameStyles from "../game.module.css";
 import styles from "./screen.module.css";
 
 // The band's HUD (design §8.2, §9.1): the diamond buttons at its left (the Game menu, the log,
-// the priority controls, full screen, SysOp's inspection and, at a human table, the chat), the
-// turn and step line, and the connection's status chip. The scene draws the band itself, its
-// step icons and phase pips.
+// the priority controls, full screen, SysOp's inspection, at a human table the chat and, since
+// v0.5.1, at every table the chat bar's friends and messages), the turn and step line, and the
+// connection's status chip. The scene draws the band itself, its step icons and phase pips.
 
 /** The step's caption on the band; the live turn line says the step in the site's own words. */
 const CAPTIONS: Record<string, string> = {
@@ -85,6 +85,7 @@ export function BandHud({
   statusText,
   statusPhase,
   chat = null,
+  friends = null,
 }: {
   layout: TableLayout | null;
   sysop: boolean;
@@ -98,15 +99,21 @@ export function BandHud({
   statusPhase: GameState["phase"];
   /** At a human table (v0.4.4): the chat's diamond, with the lines not read yet. */
   chat?: { unread: number } | null;
+  /** At every table (v0.5.1): the diamond that brings out the chat bar (chat/ChatBar.tsx), with
+   * the friends' messages not read yet. */
+  friends?: { unread: number; open: boolean; onToggle(): void } | null;
 }) {
   const band = layout?.band ?? null;
   const hud = band?.hud ?? HUD;
-  // The chat takes the inspection's slot, which only SysOp uses; beside SysOp's inspection it
-  // takes the next one, and the turn line moves over by one.
+  // The chat and the chat bar take the inspection's slot, which only SysOp uses, and the ones
+  // after it, in turn; the turn line moves over by each slot taken past the inspection's.
   const step = BAND.hud.inspection - BAND.hud.fullscreen;
-  const chatAt =
-    chat &&
-    diamond(BAND.hud.inspection + (sysop ? step : 0), BAND.y, BAND.hud.side);
+  let slots = sysop ? 1 : 0;
+  const slot = () =>
+    diamond(BAND.hud.inspection + slots++ * step, BAND.y, BAND.hud.side);
+  const chatAt = chat ? slot() : null;
+  const friendsAt = friends ? slot() : null;
+  const shift = Math.max(0, slots - 1) * step;
   // While connected the status chip is hidden, and the turn line takes its place too (v0.5.1): a
   // long line ("Turn 12 · Your team’s turn") stays whole.
   const connected = statusText === "Connected";
@@ -116,8 +123,8 @@ export function BandHud({
     w: connected ? status.x + status.w - band.turnText.x : band.turnText.w,
   };
   const turnText =
-    shown && chat && sysop
-      ? { ...shown, x: shown.x + step, w: shown.w - step }
+    shown && shift > 0
+      ? { ...shown, x: shown.x + shift, w: shown.w - shift }
       : shown;
   const toggle = (id: DrawerId) => ({
     "aria-expanded": drawer === id,
@@ -176,6 +183,31 @@ export function BandHud({
           {chat.unread > 0 && (
             <span className={styles.hudCount} aria-hidden="true">
               {chat.unread > 99 ? "99+" : chat.unread}
+            </span>
+          )}
+        </HudButton>
+      )}
+      {friends && friendsAt && (
+        <HudButton
+          at={friendsAt}
+          icon="friends"
+          label={
+            friends.unread > 0
+              ? `Friends and messages, ${friends.unread} unread`
+              : "Friends and messages"
+          }
+          aria-expanded={friends.open}
+          aria-controls="chat-bar"
+          data-chat-toggle=""
+          onClick={friends.onToggle}
+        >
+          {friends.unread > 0 && (
+            <span
+              className={styles.hudCount}
+              data-tone="friends"
+              aria-hidden="true"
+            >
+              {friends.unread > 99 ? "99+" : friends.unread}
             </span>
           )}
         </HudButton>

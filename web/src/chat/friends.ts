@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { client, describe } from "../api";
 import { FRIENDS_REFRESH_MS } from "../social/FriendsPage";
 import {
@@ -13,7 +13,7 @@ import type { Chat, ConversationItem } from "./chat";
 // which stay readable. Friends are asked for again every 30 seconds while the tab is shown, as
 // the Friends page does, so the bar's "3 online" stays true; the conversations, for the unread
 // counts, when the list opens and, while it is open, whenever the chat's socket tells of a message
-// or a read mark.
+// or a read mark. At the game's table, while the bar is folded away, it asks for nothing.
 
 /** A player on the list, and what is unread from them. */
 export interface BarPerson {
@@ -40,7 +40,7 @@ export interface BarPeople {
 // While the list is open, a burst of events asks once.
 const SETTLE_MS = 250;
 
-export function useBarPeople(chat: Chat): BarPeople {
+export function useBarPeople(chat: Chat, enabled = true): BarPeople {
   const [list, setList] = useState<FriendList | null>(null);
   const [conversations, setConversations] = useState<ConversationItem[] | null>(
     null,
@@ -68,21 +68,30 @@ export function useBarPeople(chat: Chat): BarPeople {
     }
   }, []);
 
+  // Whether the list has been open since the bar last asked for the friends.
+  const asked = useRef(false);
   useEffect(() => {
+    if (!enabled) return;
     void loadFriends();
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "hidden") void loadFriends();
     }, FRIENDS_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, [loadFriends]);
-  // Opening the list asks again at once; the socket coming back too, since it resends nothing.
+    return () => {
+      window.clearInterval(timer);
+      asked.current = false;
+    };
+  }, [enabled, loadFriends]);
+  // Opening the list asks again at once (the friends too, unless the bar just did); the socket
+  // coming back too, since it resends nothing.
+  const listing = enabled && panel;
   useEffect(() => {
-    if (!panel) return;
-    void loadFriends();
+    if (!listing) return;
     void loadConversations();
-  }, [panel, live, loadFriends, loadConversations]);
+    if (asked.current) void loadFriends();
+    asked.current = true;
+  }, [listing, live, loadFriends, loadConversations]);
   useEffect(() => {
-    if (!panel) return;
+    if (!listing) return;
     let timer: number | undefined;
     const stop = listen(() => {
       window.clearTimeout(timer);
@@ -92,7 +101,7 @@ export function useBarPeople(chat: Chat): BarPeople {
       stop();
       window.clearTimeout(timer);
     };
-  }, [panel, listen, loadConversations]);
+  }, [listing, listen, loadConversations]);
 
   return useMemo(() => {
     const unread = new Map(

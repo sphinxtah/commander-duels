@@ -198,9 +198,10 @@ export function App() {
   const social = useSocial(me);
   useCountTitle(waiting + social.unread);
   // Chat between friends (v0.4.4): its live connection, the unread count, the chat bar's windows
-  // and friends list (v0.5.1), and the messages that pop up beside the bell. A message from a
-  // friend is also a notification, so the bell asks for its count at once.
-  const chat = useChat(me, social.messagesUnread);
+  // and friends list (v0.5.1), on every screen, the table's too, and the messages that pop up
+  // beside the bell. A message from a friend is also a notification, so the bell asks for its
+  // count at once.
+  const chat = useChat(me, social.messagesUnread, atTable);
   const { checkIn } = social;
   useEffect(
     () =>
@@ -500,8 +501,15 @@ export function App() {
     );
   }
 
-  // The account is known by now, with the CSRF token that the game's WebSocket needs.
-  if (game) return <GameScreen key={game} gameId={game} me={me} />;
+  // The account is known by now, with the CSRF token that the game's WebSocket needs. The chat bar
+  // (v0.5.1) is there too, folded away into the band's diamond until the player brings it out.
+  if (game)
+    return (
+      <ChatContext.Provider value={chat}>
+        <GameScreen key={game} gameId={game} me={me} />
+        <ChatBar chat={chat} />
+      </ChatContext.Provider>
+    );
 
   return (
     <ChatContext.Provider value={chat}>
@@ -654,7 +662,7 @@ export function App() {
           open={setup}
           onClose={() => setSetup(null)}
         />
-        {/* Friends and their conversations, on every page but the table (v0.5.1). */}
+        {/* Friends and their conversations, on every page (v0.5.1). */}
         <ChatBar chat={chat} />
         {/* A game the public queue finds opens from any page (v0.5.0). */}
         {me.permissions.includes("games.play") && <QueueFollower />}

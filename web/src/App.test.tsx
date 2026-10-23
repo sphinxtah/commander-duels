@@ -1231,7 +1231,7 @@ describe("the chat bar (v0.5.1)", () => {
     return screen.getByRole("complementary", { name: "Friends and messages" });
   }
 
-  it("is on every page but the table, and counts what the top bar's Messages did", async () => {
+  it("is on every page, folded away at the table, and counts what the top bar's Messages did", async () => {
     on("POST /api/v1/presence", () =>
       reply(200, { unread: 0, messages_unread: 3, newest: null, fresh: [] }),
     );
@@ -1250,12 +1250,14 @@ describe("the chat bar (v0.5.1)", () => {
       "href",
       "#friends",
     );
-    // The table shows no bar.
+    // At the table it is folded away into the band's diamond (the game screen's own tests), with
+    // only its voice for screen readers there.
     window.location.hash = `#game/${gameId}`;
     await screen.findByRole("link", { name: "Back to the table" });
     expect(
       screen.queryByRole("complementary", { name: "Friends and messages" }),
     ).toBeNull();
+    expect(screen.getByRole("status")).toHaveAttribute("data-chat-bar");
   });
 
   it("opens an old #messages/<id> address's window over the main menu, with focus in it", async () => {

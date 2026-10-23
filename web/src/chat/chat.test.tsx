@@ -22,6 +22,7 @@ import {
   newClientId,
   oldMessagesRoute,
   roomFor,
+  savedPanel,
   savedWindows,
   useChat,
   WINDOWS,
@@ -372,11 +373,13 @@ let shown: Chat | null = null;
 function Probe({
   me,
   checkedIn = null,
+  atTable = false,
 }: {
   me: Me;
   checkedIn?: number | null;
+  atTable?: boolean;
 }) {
-  shown = useChat(me, checkedIn);
+  shown = useChat(me, checkedIn, atTable);
   return (
     <ChatContext.Provider value={shown}>
       <ChatBar chat={shown} />
@@ -424,12 +427,7 @@ describe("the live connection", () => {
       unread: 4,
     });
     expect(shown!.toasts).toEqual([]);
-    const bar = screen.getByRole("complementary", {
-      name: "Friends and messages",
-    });
-    expect(within(bar).getByRole("status")).toHaveTextContent(
-      "ada: Hello there",
-    );
+    expect(screen.getByRole("status")).toHaveTextContent("ada: Hello there");
     // The open window shows it, so it is read at once.
     await settle();
     expect(
@@ -655,11 +653,14 @@ describe("the chat bar (v0.5.1)", () => {
     await settle();
     fireEvent.click(screen.getByRole("button", { name: /^Chat with ada/ }));
     await screen.findByRole("region", { name: "Chat with ada" });
-    // A click elsewhere on the bar, in the window, keeps the list; outside it, folds it.
-    fireEvent.pointerDown(screen.getByLabelText("Write to ada"));
-    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    // The list stays open until it is folded, a click elsewhere included, and the browser
+    // remembers which.
     fireEvent.pointerDown(document.body);
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    expect(localStorage.getItem("cd.chat.friends")).toBe("open");
+    fireEvent.click(toggle());
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(savedPanel()).toBe(false);
     fireEvent.click(
       screen.getByRole("button", { name: "Close the chat with ada" }),
     );
@@ -729,6 +730,80 @@ describe("the chat bar (v0.5.1)", () => {
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
     expect(shown!.docked.map((each) => each.playerId)).toEqual([ADA]);
     expect(shown!.shows(shown!.docked[0]!)).toBe(true);
+  });
+
+  it("opens the friends list as the browser remembers it", async () => {
+    people();
+    localStorage.setItem("cd.chat.friends", "open");
+    render(<Probe me={me} />);
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    expect(
+      await screen.findByRole("button", { name: /^Chat with ada/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("at the table, folds away until brought out, and puts itself away with Escape", async () => {
+    people();
+    on("GET /api/v1/conversations/{player_id}", () =>
+      reply(200, page({ unread: 1 })),
+    );
+    on("POST /api/v1/conversations/{player_id}/read", () =>
+      reply(200, { unread: 0 }),
+    );
+    localStorage.setItem("cd.chat.friends", "open");
+    localStorage.setItem(
+      "cd.chat.windows",
+      JSON.stringify([{ playerId: ADA, folded: false }]),
+    );
+    const { rerender } = render(<Probe me={me} atTable />);
+    await settle();
+    // Folded away: nothing over the table, and nothing asked of the API.
+    expect(
+      screen.queryByRole("complementary", { name: "Friends and messages" }),
+    ).toBeNull();
+    expect(sent("GET /api/v1/friends")).toHaveLength(0);
+    expect(sent("GET /api/v1/conversations/{player_id}")).toHaveLength(0);
+    // A friend's message counts, and is said, since the table has no bell; it is not read.
+    const [socket] = FakeSocket.all;
+    act(() => socket!.onopen?.());
+    socket!.tell({ type: "welcome", unread: 0 });
+    socket!.tell({
+      type: "message",
+      player_id: ADA,
+      player: ada,
+      message: message({ id: "m7", body: "Good luck!" }),
+      unread: 1,
+    });
+    expect(shown!.unread).toBe(1);
+    expect(screen.getByRole("status")).toHaveTextContent("ada: Good luck!");
+    expect(shown!.shows(shown!.windows[0]!)).toBe(false);
+    // Brought out (the band's diamond does this): the bar as on the pages, focus in it, and no
+    // link that would leave the game.
+    act(() => shown!.setTableOpen(true));
+    const bar = await screen.findByRole("complementary", {
+      name: "Friends and messages",
+    });
+    expect(bar).toHaveAttribute("data-table");
+    expect(toggle()).toHaveFocus();
+    await settle();
+    expect(
+      within(bar).getByRole("region", { name: "Chat with ada" }),
+    ).toBeInTheDocument();
+    expect(within(bar).queryByRole("link")).toBeNull();
+    expect(sent("POST /api/v1/conversations/{player_id}/read")).toHaveLength(1);
+    // Escape, anywhere in it, puts it away.
+    fireEvent.keyDown(within(bar).getByLabelText("Write to ada"), {
+      key: "Escape",
+    });
+    expect(shown!.tableOpen).toBe(false);
+    expect(
+      screen.queryByRole("complementary", { name: "Friends and messages" }),
+    ).toBeNull();
+    // Each table starts with it folded away.
+    act(() => shown!.setTableOpen(true));
+    rerender(<Probe me={me} />);
+    rerender(<Probe me={me} atTable />);
+    expect(shown!.tableOpen).toBe(false);
   });
 
   it("knows the Messages page's old addresses", () => {

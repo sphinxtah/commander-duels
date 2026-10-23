@@ -23,6 +23,7 @@ import { ReportDialog } from "../app/ReportProblem";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
+import { useChatContext } from "../chat/chat";
 import {
   ConcedeMatchDialog,
   MatchChip,
@@ -372,7 +373,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       )
         return;
       const target = event.target as HTMLElement;
-      if (target.closest("input, textarea, select, dialog[open]")) return;
+      // Nor in the chat bar (v0.5.1), whose keys are its own.
+      if (
+        target.closest("input, textarea, select, dialog[open], [data-chat-bar]")
+      )
+        return;
       const shown = onScreen.current;
       const primary = primaryOption(shown.prompt);
       if (primary && shown.canAnswer) {
@@ -524,6 +529,9 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   // band's diamond, and the alliances on the plates. The history the server sends a table's
   // connection says it is one before the summary does; a practice game has neither.
   const chatting = atTable || state.chat !== null;
+  // Friends' chat (v0.5.1): the chat bar, folded away into its own diamond on the band at every
+  // table, and brought out over the table on demand (chat/ChatBar.tsx).
+  const friendsChat = useChatContext();
   const people = useMemo<ChatPeople>(
     () => ({
       seat: state.seat,
@@ -709,6 +717,14 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 statusPhase={state.phase}
                 chat={
                   chatting ? { unread: unread.table + unread.allies } : null
+                }
+                friends={
+                  friendsChat && {
+                    unread: friendsChat.unread,
+                    open: friendsChat.tableOpen,
+                    onToggle: () =>
+                      friendsChat.setTableOpen(!friendsChat.tableOpen),
+                  }
                 }
               />
               <div className={screen.notes} aria-label="Table notices">

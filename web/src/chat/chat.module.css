@@ -231,7 +231,9 @@
 /* The chat bar (v0.5.1): fixed along the bottom of the window, the friends list at its right end
    and the conversations beside it, each standing on the window's bottom edge. Folded, a window
    or the list is its title bar, a tab on the bar. On a phone the bar is one round button above
-   the bar of pages, and the list or one conversation opens the whole width of the screen. */
+   the bar of pages, and the list or one conversation opens the whole width of the screen. At the
+   table it is drawn only when brought out from the band's diamond, above the table (whose stage
+   is a stacking context of its own, so z-index 40 is enough). */
 .barRoom {
   height: 52px;
 }
@@ -514,6 +516,10 @@
     right: 10px;
     bottom: calc(66px + env(safe-area-inset-bottom));
     gap: 8px;
+  }
+  /* The table has no bar of pages to stand above. */
+  .bar[data-table] {
+    bottom: calc(8px + env(safe-area-inset-bottom));
   }
   .windows {
     flex: 1;
