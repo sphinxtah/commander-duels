@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { client, describe, type Tokens } from "../api";
 import account from "../Account.module.css";
 import shell from "../App.module.css";
+import { hudChanged } from "../shell/hud";
 import { tokens } from "./tokens";
 import styles from "./tokens.module.css";
 
@@ -59,6 +60,8 @@ export function GiveTokens({
         },
       );
       if (!data) return setError(describe(refused));
+      // SysOp's own balance is in the top bar.
+      if (own) hudChanged();
       setAmount("");
       setReason("");
       setSaved(

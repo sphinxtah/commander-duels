@@ -8,6 +8,7 @@ import {
 } from "react";
 import { client, describe, type Me } from "../api";
 import shell from "../App.module.css";
+import { hudChanged } from "../shell/hud";
 import { DeckShelf } from "./DeckShelf";
 import { Leng } from "./Leng";
 import { PackArt } from "./PackArt";
@@ -130,6 +131,7 @@ export function ShopPage({
         { body: { product: buying.id, key: key.current } },
       );
       if (!data) return setBuyError(describe(refused));
+      hudChanged();
       setMessage(
         `You bought a ${buying.name} for ${tokens(data.tokens)}. It waits in your packs below.`,
       );
@@ -257,6 +259,7 @@ export function ShopPage({
           balance={balance}
           onSetup={onSetup}
           onBought={async (said) => {
+            hudChanged();
             setMessage(said);
             await load();
           }}

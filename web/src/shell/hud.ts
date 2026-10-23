@@ -7,16 +7,33 @@ export interface Hud {
   progress?: Progress;
 }
 
+const HUD_CHANGED = "cd:hud-changed";
+
 /**
- * The top bar's tokens and tier, asked for when the menus open and again on every change of page,
- * since a game, a purchase or SysOp's grant may have changed them. An answer that fails keeps
- * what was shown; only the newest question may answer.
+ * Tells the top bar that the account's tokens or tier changed on the page it is showing (a pack
+ * or deck bought, SysOp's grant), so it asks again at once rather than at the next change of page
+ * (v0.5.0: the owner's report that the tokens stayed the same after buying a pack).
+ */
+export function hudChanged(): void {
+  window.dispatchEvent(new Event(HUD_CHANGED));
+}
+
+/**
+ * The top bar's tokens and tier, asked for when the menus open, again on every change of page,
+ * since a game may have changed them, and whenever a page says it changed them (`hudChanged`).
+ * An answer that fails keeps what was shown; only the newest question may answer.
  */
 export function useHud(me: Me | null | undefined, page: string): Hud {
   const [hud, setHud] = useState<Hud>({});
+  const [changes, setChanges] = useState(0);
   const latest = useRef(0);
   const account = me?.status === "active" ? me.id : null;
   const alliance = me?.alliance;
+  useEffect(() => {
+    const again = () => setChanges((count) => count + 1);
+    window.addEventListener(HUD_CHANGED, again);
+    return () => window.removeEventListener(HUD_CHANGED, again);
+  }, []);
   useEffect(() => {
     const ticket = ++latest.current;
     if (!account) return setHud({});
@@ -36,7 +53,7 @@ export function useHud(me: Me | null | undefined, page: string): Hud {
             : current.progress,
       }));
     });
-  }, [account, alliance, page]);
+  }, [account, alliance, page, changes]);
   useEffect(
     () => () => {
       // Nothing answers into a shell that has gone.
