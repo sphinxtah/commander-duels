@@ -51,7 +51,9 @@ import org.junit.jupiter.api.Test;
  * </ul>
  */
 class TwoHeadedGiantTest {
-    private static final List<String> DECKS = GameFormat.TWO_HEADED_GIANT.decks();
+    /** The seats' decks in these games (the scripts below name their cards): red and green against white and blue. */
+    private static final List<String> DECKS = List.of("legacy-mono-red-burn", "legacy-mono-green-creatures",
+        "legacy-mono-white-weenie", "legacy-mono-blue-skies");
     /** The top of each seat's library (its opening hand first), before the basic lands it draws. */
     private static final List<List<String>> TOPS = List.of(
         List.of("Mountain", "Monastery Swiftspear", "Lightning Bolt", "Lightning Bolt", "Chain Lightning",
@@ -562,7 +564,10 @@ class TwoHeadedGiantTest {
         assertEquals(GameFormat.TWO_HEADED_GIANT, request.format());
         assertEquals(List.of("human", "bot", "bot", "bot"),
             request.seats().stream().map(HumanGameRequest.Seat::player).toList());
-        assertEquals(DECKS, request.seats().stream().map(HumanGameRequest.Seat::deck).toList());
+        // v0.5.1: the fixtures paired red and white against green and blue, the most even pairing
+        assertEquals(List.of("legacy-mono-red-burn", "legacy-mono-white-weenie", "legacy-mono-green-creatures",
+            "legacy-mono-blue-skies"), request.seats().stream().map(HumanGameRequest.Seat::deck).toList());
+        assertEquals(Set.copyOf(DECKS), Set.copyOf(GameFormat.TWO_HEADED_GIANT.decks()));
         assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(
             "{\"format\":\"two_headed_giant\",\"seats\":[{\"player\":\"human\"},{\"player\":\"bot\"}]}", () -> 0L));
         assertEquals(0, GameFormat.TWO_HEADED_GIANT.teamOf(1));

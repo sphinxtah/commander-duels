@@ -39,14 +39,15 @@ import mage.game.mulligan.MulliganType;
  * <p>Two-Headed Giant (since v0.5.0, early) seats four players in turn order, seats 0 and 1 against
  * seats 2 and 3, with Legacy-legal decks: see {@link TwoHeadedGiant}. Each deck is checked here on
  * its own; the team's deck rule (no card in both teammates' decks) is the API's, which builds the
- * teams.
+ * teams. Its fixtures are paired red and white against green and blue (v0.5.1): the most even of
+ * the three pairings in bot-versus-bot games (docs/engine/two-headed-giant.md).
  */
 enum GameFormat {
     LEGACY("legacy", "Legacy", 2, 2, LegacyDuel.DECKS, Legacy::new),
     COMMANDER("commander", "Commander", 2, 4, List.of("commander-mono-white-soldiers", "commander-mono-blue-flyers",
         "commander-mono-red-raiders", "commander-mono-green-stompers"), Commander::new),
     TWO_HEADED_GIANT("two_headed_giant", "Two-Headed Giant", 4, 4, List.of("legacy-mono-red-burn",
-        "legacy-mono-green-creatures", "legacy-mono-white-weenie", "legacy-mono-blue-skies"), Legacy::new);
+        "legacy-mono-white-weenie", "legacy-mono-green-creatures", "legacy-mono-blue-skies"), Legacy::new);
 
     static final int COMMANDER_START_LIFE = 40;
     private static final int START_HAND = 7;

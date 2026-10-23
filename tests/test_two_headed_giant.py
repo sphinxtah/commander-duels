@@ -79,28 +79,31 @@ def seated(player: dict[str, object], *bots: dict[str, object]) -> list[dict[str
 
 
 def test_bots_get_fixture_decks_their_teammates_share_no_card_with() -> None:
-    # The player's own deck holds Lightning Bolt: the teammate cannot play the red fixture.
+    # The player's own deck holds Lightning Bolt: the teammate cannot play the red fixture. The
+    # two opponents play a measured pair (v0.5.1): green and blue.
     seats = seated(listing("Lightning Bolt", "Snow-Covered Mountain"), {}, {}, {})
     teams.assign_and_check(seats, banned_allowed=True)
     assert [seat.get("deck") for seat in seats] == [
         None,
-        "legacy-mono-green-creatures",
-        "legacy-mono-red-burn",
         "legacy-mono-white-weenie",
+        "legacy-mono-green-creatures",
+        "legacy-mono-blue-skies",
     ]
-    # A fixture chosen for the player is not dealt again.
+    # A fixture chosen for the player is not dealt again: the opponents play the other pair.
     seats = seated({"deck": "legacy-mono-green-creatures"}, {}, {}, {})
     teams.assign_and_check(seats, banned_allowed=True)
     assert [seat["deck"] for seat in seats] == [
         "legacy-mono-green-creatures",
+        "legacy-mono-blue-skies",
         "legacy-mono-red-burn",
         "legacy-mono-white-weenie",
-        "legacy-mono-blue-skies",
     ]
-    # Every seat may leave its deck to the table, the player's too.
+    # Every seat may leave its deck to the table, the player's too: red and white against green
+    # and blue, the engine's own order.
     seats = seated({}, {}, {}, {})
     teams.assign_and_check(seats, banned_allowed=True)
-    assert [seat["deck"] for seat in seats] == games.FIXTURE_DECKS["two_headed_giant"]
+    assert [seat["deck"] for seat in seats] == [deck for pair in teams.PAIRS for deck in pair]
+    assert sorted(deck for pair in teams.PAIRS for deck in pair) == sorted(teams.FIXTURES)
 
 
 def refusal(seats: list[dict[str, object]], banned_allowed: bool = True) -> ApiError:
@@ -196,8 +199,8 @@ def test_a_practice_game_seats_a_teammate_and_two_opponents(
     assert sent["format"] == "two_headed_giant"
     assert [seat.get("deck") for seat in sent["seats"]] == [
         "legacy-mono-blue-skies",
-        "legacy-mono-red-burn",
         "legacy-mono-green-creatures",
+        "legacy-mono-red-burn",
         "legacy-mono-white-weenie",
     ]
     with Session(app.state.database) as db:
@@ -311,11 +314,12 @@ def test_a_players_own_legacy_deck_plays_without_its_sideboard(
         assert giant.status_code == 201, giant.json()
         seats = fake.created[-1]["seats"]
         assert "sideboard" not in seats[0]["deck_list"]
-        # Lightning Bolt is in the red fixture: the teammate plays the green one.
+        # Lightning Bolt is in the red fixture: the teammate plays the white one, and the opponents
+        # green and blue.
         assert [seat.get("deck") for seat in seats[1:]] == [
-            "legacy-mono-green-creatures",
-            "legacy-mono-red-burn",
             "legacy-mono-white-weenie",
+            "legacy-mono-green-creatures",
+            "legacy-mono-blue-skies",
         ]
         ada.send("POST", f"/api/v1/games/{giant.json()['id']}/close", {})
         legacy = ada.send(
