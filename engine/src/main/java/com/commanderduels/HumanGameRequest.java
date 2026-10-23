@@ -2,6 +2,7 @@ package com.commanderduels;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,9 +18,13 @@ import java.util.function.LongSupplier;
  * for SysOp. Spectators see the game {@code spectatorDelaySeconds} late (default 0). Numbers outside
  * the safe range are clamped. The seed exists for reproducible tests and is never shown to a seat:
  * it determines every shuffle.
+ *
+ * <p>Since v0.5.0 a request may name {@code starting_seat}, the seat that takes the first turn: the
+ * API's best-of-three matches let the loser of a game choose to play or draw the next one (FMT06).
+ * Without it a seat drawn at random chooses, in the game, who starts, as before.
  */
 public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
-                               int idleTimeoutSeconds, int spectatorDelaySeconds) {
+                               int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat) {
     public static final int DEFAULT_SKILL = 4;
     public static final int MAX_SKILL = 6;
     public static final int DEFAULT_TURN_CAP = 60;
@@ -30,8 +35,8 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
     public static final int MAX_SPECTATOR_DELAY_SECONDS = 300;
     public static final String HUMAN = "human";
     public static final String BOT = "bot";
-    private static final Set<String> FIELDS =
-        Set.of("seed", "format", "seats", "skill", "turn_cap", "idle_timeout_seconds", "spectator_delay_seconds");
+    private static final Set<String> FIELDS = Set.of("seed", "format", "seats", "skill", "turn_cap",
+        "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat");
     private static final Set<String> SEAT_FIELDS = Set.of("player", "deck");
     private static final Set<String> SERVICE_SEAT_FIELDS = Set.of("player", "deck", "deck_list");
     /** What a seat's settings call a deck from a deck list. */
@@ -53,6 +58,12 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
 
     public HumanGameRequest {
         seats = List.copyOf(seats);
+    }
+
+    /** A request where the game chooses who starts. */
+    public HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
+                            int idleTimeoutSeconds, int spectatorDelaySeconds) {
+        this(seed, format, seats, skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds, null);
     }
 
     /** A request with no spectator delay. */
@@ -153,6 +164,14 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
             }
             seats.add(new Seat(players.get(i), deck, customs.get(i)));
         }
+        Integer startingSeat = null;
+        if (json.has("starting_seat")) {
+            BigDecimal value = JsonRequest.integer(json, "starting_seat");
+            if (value.signum() < 0 || value.compareTo(BigDecimal.valueOf(seats.size() - 1L)) > 0) {
+                throw new JsonRequest.Invalid("starting_seat must be a seat of the game, 0 to " + (seats.size() - 1));
+            }
+            startingSeat = value.intValueExact();
+        }
         return new HumanGameRequest(
             seed,
             format,
@@ -161,7 +180,8 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
             JsonRequest.clamped(json, "turn_cap", DEFAULT_TURN_CAP, 1, MAX_TURN_CAP),
             JsonRequest.clamped(json, "idle_timeout_seconds", DEFAULT_IDLE_TIMEOUT_SECONDS, MIN_IDLE_TIMEOUT_SECONDS,
                 MAX_IDLE_TIMEOUT_SECONDS),
-            JsonRequest.clamped(json, "spectator_delay_seconds", 0, 0, MAX_SPECTATOR_DELAY_SECONDS));
+            JsonRequest.clamped(json, "spectator_delay_seconds", 0, 0, MAX_SPECTATOR_DELAY_SECONDS),
+            startingSeat);
     }
 
     private static String deck(JsonObject seat, GameFormat format) throws JsonRequest.Invalid {
