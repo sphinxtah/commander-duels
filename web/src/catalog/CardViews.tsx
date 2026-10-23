@@ -4,6 +4,7 @@ import { ManaCost } from "../game/Card";
 import { useImageRetry } from "../game/RetryingImage";
 import {
   colorWords,
+  editionName,
   formatLabels,
   legalityLabels,
   ownedWords,
@@ -12,6 +13,7 @@ import {
   type CardDetail,
   type CardSummary,
   type PrintingSummary,
+  type PrintingsShown,
 } from "./catalog";
 import styles from "./catalog.module.css";
 import type { CardView } from "./cardView";
@@ -124,14 +126,17 @@ export function OwnedNote({ card }: { card: CardSummary }) {
 }
 
 /** A card in a grid of results: its image and name, and for a player who builds from a library,
- * the copies it holds. */
+ * the copies it holds; in the library (v0.5.0), the edition the copies are. */
 export function CardTile({
   card,
   onOpen,
+  edition,
   children,
 }: {
   card: CardSummary;
   onOpen: (card: CardSummary) => void;
+  /** The edition the tile shows, in words. */
+  edition?: string;
   children?: ReactNode;
 }) {
   const owned = ownedWords(card);
@@ -141,7 +146,7 @@ export function CardTile({
         type="button"
         className={styles.tileButton}
         onClick={() => onOpen(card)}
-        aria-label={`${card.name}, ${card.type_line}${card.playable ? "" : `, ${statusLabel(card)}`}${owned ? `, ${owned.toLowerCase()}` : ""}`}
+        aria-label={`${card.name}${edition ? ` from ${edition}` : ""}, ${card.type_line}${card.playable ? "" : `, ${statusLabel(card)}`}${owned ? `, ${owned.toLowerCase()}` : ""}`}
       >
         <CardImage card={card} />
       </button>
@@ -151,6 +156,11 @@ export function CardTile({
         </span>
         <StatusBadge card={card} />
       </div>
+      {edition && (
+        <span className={styles.tileEdition} title={edition}>
+          {edition}
+        </span>
+      )}
       <OwnedNote card={card} />
       {children}
     </li>
@@ -232,17 +242,22 @@ export function CardTable({
   );
 }
 
-/** Everything about a card: its text, status, legality, printings, rulings and tags. */
+/** Everything about a card: its text, status, legality, printings, rulings and tags. Since v0.5.0
+ * `printings` says which printings it lists: every one (the catalog), the editions the player's
+ * library holds (opened from the library, or a deck entry's choice), or only the chosen one (a
+ * card pulled from a pack). The server decides which those are. */
 export function CardDetails({
   cardId,
   chosenPrinting,
   onChoosePrinting,
   actions,
+  printings: shownPrintings = "all",
 }: {
   cardId: string;
   chosenPrinting?: string | null;
   onChoosePrinting?: (printingId: string | null) => void;
   actions?: ReactNode;
+  printings?: PrintingsShown;
 }) {
   const [card, setCard] = useState<CardDetail>();
   // A card the game cannot play is not in the game (v0.4.5): a version of a deck that games
@@ -260,11 +275,15 @@ export function CardDetails({
     // artist) even when it is older than the printings the card lists first. Choosing another
     // printing later picks one from that list, so it needs no new request.
     const printing = chosenPrinting ?? undefined;
+    const query = {
+      ...(printing ? { printing } : {}),
+      ...(shownPrintings !== "all" ? { printings: shownPrintings } : {}),
+    };
     void client
       .GET("/api/v1/cards/{card_id}", {
         params: {
           path: { card_id: cardId },
-          query: printing ? { printing } : undefined,
+          query: Object.keys(query).length ? query : undefined,
         },
       })
       .then(({ data, response }) => {
@@ -299,6 +318,12 @@ export function CardDetails({
   const shownArtist = preview
     ? (printings.find((item) => item.id === preview)?.artist ?? null)
     : (card.image?.artist ?? null);
+  // The editions the player's library holds of it, when the library limits it (v0.5.0).
+  const held = card.editions
+    ? new Map(
+        card.editions.map((edition) => [edition.printing_id, edition.copies]),
+      )
+    : null;
   return (
     <div className={styles.detail}>
       <div className={styles.detailImage}>
@@ -369,9 +394,21 @@ export function CardDetails({
               <dt>Your library</dt>
               <dd>
                 {ownedWords(card)}
+                {card.editions && card.editions.length > 0 && (
+                  <ul
+                    className={styles.ownedEditions}
+                    aria-label="Your editions"
+                  >
+                    {card.editions.map((edition) => (
+                      <li key={edition.printing_id}>
+                        {editionName(edition)}: {edition.copies}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <span className={styles.note}>
                   {(card.owned ?? 0) > 0
-                    ? "A deck may hold as many copies as your library does."
+                    ? "A deck may hold the editions your library holds, as many copies of each as it does."
                     : "A deck may still hold it, but cannot start a game until your library does."}
                 </span>
               </dd>
@@ -415,10 +452,22 @@ export function CardDetails({
         {actions}
         <section aria-labelledby={`printings-${card.id}`}>
           <h3 id={`printings-${card.id}`}>
-            Printings <small>({card.printing_count})</small>
+            {shownPrintings === "chosen"
+              ? "Edition"
+              : shownPrintings === "owned" && held
+                ? "Your editions"
+                : "Printings"}{" "}
+            <small>({card.printing_count})</small>
           </h3>
+          {shownPrintings === "owned" && held && held.size === 0 && (
+            <p className={styles.note}>
+              Your library holds no edition of this card yet.
+            </p>
+          )}
           <ul className={styles.printings}>
-            {onChoosePrinting && (
+            {/* A player's deck holds an edition of their own (v0.5.0); a basic land, or an
+                account that builds from the whole catalog, may leave it to the default. */}
+            {onChoosePrinting && !held && (
               <li>
                 <button
                   type="button"
@@ -450,6 +499,11 @@ export function CardDetails({
                     : ""}
                   {printing.lang !== "en" ? ` · ${printing.lang}` : ""}
                   {printing.promo ? " · promo" : ""}
+                  {held &&
+                    shownPrintings !== "chosen" &&
+                    (held.has(printing.id)
+                      ? ` · ${held.get(printing.id)} in your library`
+                      : " · not in your library")}
                 </button>
               </li>
             ))}

@@ -15,7 +15,7 @@
   both become decks of their own, and every copy of their cards joins the library for good.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
@@ -26,7 +26,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.auth import INPUT_ERRORS
-from api.cards import CardSummary, mark_owned, summaries_by_id
+from api.cards import CardSummary, image_of, mark_owned, summaries_by_id
 from api.decks import create_deck, refresh_decks, starters_of
 from api.identity import (
     Active,
@@ -42,7 +42,7 @@ from api.identity import (
     utcnow,
 )
 from api.library import CurrentLibrary, grant_starter, library_of, starter_entries
-from api.models import CardConcept, Game, GameSeat, ProgressEntry, User
+from api.models import CardConcept, CardPrinting, Game, GameSeat, ProgressEntry, User
 from api.roster import (
     GODLIKE,
     TIERS,
@@ -111,10 +111,27 @@ class StarterResult(Contract):
     decks: list[UUID] = Field(description="The two new decks.")
 
 
+class LibraryEdition(Contract):
+    """The edition (printing) a library item holds (v0.5.0)."""
+
+    printing_id: UUID
+    set_code: str
+    set_name: str
+    collector_number: str
+    released_at: date | None
+    rarity: str
+
+
 class LibraryCard(Contract):
-    card: CardSummary
-    copies: int | None = Field(description="Copies owned; null for basic lands.")
-    sources: list[Literal["starter", "grandfathered", "alliance", "pack"]]
+    card: CardSummary = Field(
+        description="The card, its image that of the edition (v0.5.0); owned counts every "
+        "edition of it."
+    )
+    edition: LibraryEdition = Field(description="The edition these copies are (v0.5.0).")
+    copies: int | None = Field(description="Copies owned of this edition.")
+    sources: list[Literal["starter", "grandfathered", "alliance", "pack"]] = Field(
+        description="Where this edition's copies came from."
+    )
 
 
 class LibraryView(Contract):
@@ -398,33 +415,57 @@ def choose_starters(
 
 @router.get("/library", response_model=LibraryView)
 def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryView:
-    """The cards in the account's library, with their copies and where they came from. An
-    account that builds from the whole catalog has no list here. Copies of a card the game cannot
-    play stay recorded but are not shown (v0.4.5): they come back if the engine learns it."""
+    """The cards in the account's library, one item per card and edition (v0.5.0), each with the
+    edition's image, its copies and where they came from. An account that builds from the whole
+    catalog has no list here. Copies of a card the game cannot play stay recorded but are not
+    shown (v0.4.5): they come back if the engine learns it."""
     if library.unlimited:
         return LibraryView(unlimited=True, alliance=library.alliance, cards=[])
-    keys = [key for key, copies in library.copies.items() if copies > 0]
-    # One card per construction key: the one with a default printing, else any.
-    concepts = db.execute(
-        select(CardConcept.id, CardConcept.construction_key)
-        .where(CardConcept.construction_key.in_(keys), playable())
-        .order_by(CardConcept.default_printing_id.is_(None), CardConcept.normalized_name)
-    ).all()
-    chosen: dict[str, UUID] = {}
-    for card_id, key in concepts:
-        chosen.setdefault(key, card_id)
-    summaries = summaries_by_id(db, set(chosen.values()))
-    mark_owned(db, summaries.values(), library)
-    cards = [
-        LibraryCard(
-            card=summaries[card_id],
-            copies=library.copies.get(key),
-            sources=sorted(library.sources.get(key, set())),  # type: ignore[arg-type]
+    held = {printing_id for printing_id, edition in library.editions.items() if edition.copies}
+    printings = {
+        printing.id: printing
+        for printing in db.scalars(
+            select(CardPrinting)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardPrinting.id.in_(held), playable())
         )
-        for key, card_id in chosen.items()
-        if card_id in summaries
-    ]
-    cards.sort(key=lambda item: item.card.name.casefold())
+    }
+    summaries = summaries_by_id(db, {printing.concept_id for printing in printings.values()})
+    mark_owned(db, summaries.values(), library)
+    cards = []
+    for printing in printings.values():
+        edition = library.editions[printing.id]
+        card = summaries[printing.concept_id].model_copy(
+            update={
+                "image": image_of(printing),
+                "rarity": printing.rarity,
+                "set_code": printing.set_code,
+            }
+        )
+        cards.append(
+            LibraryCard(
+                card=card,
+                edition=LibraryEdition(
+                    printing_id=printing.id,
+                    set_code=printing.set_code,
+                    set_name=printing.set_name,
+                    collector_number=printing.collector_number,
+                    released_at=printing.released_at,
+                    rarity=printing.rarity,
+                ),
+                copies=edition.copies,
+                sources=sorted(edition.sources),  # type: ignore[arg-type]
+            )
+        )
+    # By name, and a card's editions newest first.
+    cards.sort(
+        key=lambda item: (
+            item.card.name.casefold(),
+            -(item.edition.released_at or date.min).toordinal(),
+            item.edition.set_code,
+            item.edition.collector_number,
+        )
+    )
     return LibraryView(unlimited=False, alliance=library.alliance, cards=cards)
 
 

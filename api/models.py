@@ -924,6 +924,9 @@ class Deck(Base):
     # Cards that left the draft because the game cannot play them (v0.4.5), until the owner
     # dismisses the note: [{card_id, name, quantity, reason, removed_at}].
     removed_cards: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
+    # Copies switched to an edition the owner's library holds when v0.5.0 deployed, until the
+    # owner dismisses the note: [{card_id, name, quantity, from, to, switched_at}].
+    switched_editions: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
@@ -1010,11 +1013,12 @@ class LibraryGrant(Base):
     """Copies of a card granted into an account's library for good: a starter deck's cards, or
     the cards of decks saved before libraries existed. An alliance's cards are not granted: they
     are in the library while the alliance lasts. Append-only, like the ledger: a reset (v0.4.5)
-    leaves the grants before it recorded, and the library counts only those after it."""
+    leaves the grants before it recorded, and the library counts only those after it. Since
+    v0.5.0 every grant names the edition (printing) it gives, and one grant gives one edition."""
 
     __tablename__ = "library_grants"
     __table_args__ = (
-        UniqueConstraint("user_id", "grant_key", "concept_id"),
+        UniqueConstraint("user_id", "grant_key", "printing_id", name="uq_library_grants_edition"),
         CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
         CheckConstraint(
             "source IN ('starter', 'grandfathered', 'pack')", name="ck_library_grants_source"
@@ -1023,6 +1027,9 @@ class LibraryGrant(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    # The edition given (v0.5.0): a pack's pulled printing, a starter deck's own, a grandfathered
+    # deck's, or else the card's default printing.
+    printing_id: Mapped[UUID] = mapped_column(ForeignKey("card_printings.id"))
     quantity: Mapped[int]
     source: Mapped[str] = mapped_column(String(16))
     # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,

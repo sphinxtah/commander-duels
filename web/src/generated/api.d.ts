@@ -1024,8 +1024,8 @@ export interface paths {
         put?: never;
         /**
          * Guided Deck
-         * @description A proposed starting deck (DECK06), from the cards the player's library holds. Nothing is
-         *     saved: create a deck from its entries.
+         * @description A proposed starting deck (DECK06), from the cards the player's library holds, in the
+         *     editions it holds (v0.5.0). Nothing is saved: create a deck from its entries.
          */
         post: operations["guided_deck_api_v1_decks_guided_post"];
         delete?: never;
@@ -1045,7 +1045,10 @@ export interface paths {
         put?: never;
         /**
          * Import Preview
-         * @description Reads a text list or a deck file and shows how each line resolves. Saves nothing.
+         * @description Reads a text list or a deck file and shows how each line resolves. Saves nothing. Since
+         *     v0.5.0 a player's copies naming no edition take the editions their library holds, as the deck
+         *     made from them will; a line naming an edition it does not hold keeps it, and the validation
+         *     says which to switch to.
          */
         post: operations["import_preview_api_v1_decks_import_preview_post"];
         delete?: never;
@@ -1238,6 +1241,26 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/switched-editions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Dismiss Switched
+         * @description Dismisses the deck's note of the copies switched to editions the library holds (v0.5.0).
+         */
+        delete: operations["dismiss_switched_api_v1_decks__deck_id__switched_editions_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1512,9 +1535,10 @@ export interface paths {
         };
         /**
          * My Library
-         * @description The cards in the account's library, with their copies and where they came from. An
-         *     account that builds from the whole catalog has no list here. Copies of a card the game cannot
-         *     play stay recorded but are not shown (v0.4.5): they come back if the engine learns it.
+         * @description The cards in the account's library, one item per card and edition (v0.5.0), each with the
+         *     edition's image, its copies and where they came from. An account that builds from the whole
+         *     catalog has no list here. Copies of a card the game cannot play stay recorded but are not
+         *     shown (v0.4.5): they come back if the engine learns it.
          */
         get: operations["my_library_api_v1_library_get"];
         put?: never;
@@ -3064,6 +3088,11 @@ export interface components {
             defense: string | null;
             /** Edhrec Rank */
             edhrec_rank: number | null;
+            /**
+             * Editions
+             * @description The editions of the card the player's library holds, the most copies first (v0.5.0): a deck may hold only those, copy by copy. Null when not limited, as owned is.
+             */
+            editions?: components["schemas"]["EditionCopies"][] | null;
             /** Engine Name */
             engine_name: string | null;
             /** Faces */
@@ -3103,7 +3132,10 @@ export interface components {
             playable: boolean;
             /** Power */
             power: string | null;
-            /** Printing Count */
+            /**
+             * Printing Count
+             * @description How many printings the card has; when only the owned or the chosen ones are asked for (v0.5.0), how many are listed.
+             */
             printing_count: number;
             /** Printings */
             printings: components["schemas"]["PrintingSummary"][];
@@ -3221,6 +3253,11 @@ export interface components {
             defense: string | null;
             /** Edhrec Rank */
             edhrec_rank: number | null;
+            /**
+             * Editions
+             * @description The editions of the card the player's library holds, the most copies first (v0.5.0): a deck may hold only those, copy by copy. Null when not limited, as owned is.
+             */
+            editions?: components["schemas"]["EditionCopies"][] | null;
             /** Faces */
             faces: components["schemas"]["FaceSummary"][];
             /**
@@ -3687,6 +3724,11 @@ export interface components {
             share_code: string | null;
             /** Source */
             source: string;
+            /**
+             * Switched Editions
+             * @description Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.
+             */
+            switched_editions?: components["schemas"]["SwitchedEdition"][] | null;
             /** Title */
             title: string;
             /**
@@ -3841,6 +3883,11 @@ export interface components {
             removed_cards: components["schemas"]["RemovedCard"][];
             /** Source */
             source: string;
+            /**
+             * Switched Editions
+             * @description Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.
+             */
+            switched_editions?: components["schemas"]["SwitchedEdition"][] | null;
             /** Title */
             title: string;
             /**
@@ -3883,6 +3930,11 @@ export interface components {
             cards: {
                 [key: string]: components["schemas"]["CardSummary"];
             };
+            /**
+             * Entries
+             * @description The draft as saved: since v0.5.0 a copy naming no edition takes one the player's library holds.
+             */
+            entries: components["schemas"]["DeckEntry"][];
             /**
              * Updated At
              * Format: date-time
@@ -3928,6 +3980,27 @@ export interface components {
              * @description The most tokens bots pay one account in a day; null for no cap.
              */
             bot_daily_cap: number | null;
+        };
+        /**
+         * EditionCopies
+         * @description An edition (printing) of a card the player's library holds, with its copies (v0.5.0).
+         */
+        EditionCopies: {
+            /** Collector Number */
+            collector_number: string;
+            /** Copies */
+            copies: number;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Released At */
+            released_at: string | null;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
         };
         /**
          * EngineStatus
@@ -4461,14 +4534,41 @@ export interface components {
         };
         /** LibraryCard */
         LibraryCard: {
+            /** @description The card, its image that of the edition (v0.5.0); owned counts every edition of it. */
             card: components["schemas"]["CardSummary"];
             /**
              * Copies
-             * @description Copies owned; null for basic lands.
+             * @description Copies owned of this edition.
              */
             copies: number | null;
-            /** Sources */
+            /** @description The edition these copies are (v0.5.0). */
+            edition: components["schemas"]["LibraryEdition"];
+            /**
+             * Sources
+             * @description Where this edition's copies came from.
+             */
             sources: ("starter" | "grandfathered" | "alliance" | "pack")[];
+        };
+        /**
+         * LibraryEdition
+         * @description The edition (printing) a library item holds (v0.5.0).
+         */
+        LibraryEdition: {
+            /** Collector Number */
+            collector_number: string;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Rarity */
+            rarity: string;
+            /** Released At */
+            released_at: string | null;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
         };
         /** LibraryView */
         LibraryView: {
@@ -5424,7 +5524,7 @@ export interface components {
             name: string;
             /**
              * New
-             * @description No copy of it was in the library for good before.
+             * @description No copy of its edition was in the library for good before (by edition since v0.5.0).
              */
             new: boolean;
             /** Position */
@@ -6563,6 +6663,31 @@ export interface components {
             quantity: number;
             /** Reason */
             reason: string;
+        };
+        /**
+         * SwitchedEdition
+         * @description Copies of a card the draft moved to an edition the library holds, when v0.5.0 deployed.
+         */
+        SwitchedEdition: {
+            /**
+             * After
+             * @description The edition of the library's they name now.
+             */
+            after: string;
+            /**
+             * Before
+             * @description The edition the copies named: "Seventh Edition (7ED #200)".
+             */
+            before: string;
+            /** Name */
+            name: string;
+            /** Quantity */
+            quantity: number;
+            /**
+             * Switched At
+             * Format: date-time
+             */
+            switched_at: string;
         };
         /** SyncQueued */
         SyncQueued: {
@@ -11262,6 +11387,8 @@ export interface operations {
         parameters: {
             query?: {
                 printing?: string | null;
+                /** @description Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is. */
+                printings?: "all" | "owned" | "chosen";
             };
             header?: never;
             path: {
@@ -13651,6 +13778,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionDetail"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    dismiss_switched_api_v1_decks__deck_id__switched_editions_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSummary"];
                 };
             };
             /** @description Bad Request */

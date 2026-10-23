@@ -912,12 +912,13 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
     assert [(item["id"], item["cards"]) for item in history] == [(opening["id"], 15)]
     assert history[0]["new_cards"] == sum(1 for card in cards if card["new"])
     assert ada.get("/api/v1/shop").json()["inventory"] == []
-    # A second pack: cards the first pack brought are no longer new.
+    # A second pack: the editions the first pack brought are no longer new (by edition since
+    # v0.5.0).
     second = buy(ada, fixture_product(client).id).json()["pack"]
     more = ada.send("POST", f"/api/v1/shop/packs/{second}/open").json()["cards"]
-    before = {card["card_id"] for card in cards if card["sheet"] != "land"}
+    before = {card["printing_id"] for card in cards if card["sheet"] != "land"}
     for card in more:
-        if card["card_id"] in before:
+        if card["printing_id"] in before:
             assert not card["new"]
 
 

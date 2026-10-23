@@ -266,6 +266,7 @@ export function PackOpening({
                   {card.replaced &&
                     " · In place of a card the game cannot play"}
                 </span>
+                {/* New: the library held no copy of this edition before (v0.5.0). */}
                 {card.new && <span className={styles.newMark}>New</span>}
                 <button
                   type="button"
@@ -306,10 +307,12 @@ export function PackOpening({
           >
             ×
           </button>
+          {/* Only the edition the pack held (v0.5.0, the owner's request): not every printing. */}
           {details && (
             <CardDetails
               cardId={details.card_id}
               chosenPrinting={details.printing_id}
+              printings="chosen"
             />
           )}
         </dialog>

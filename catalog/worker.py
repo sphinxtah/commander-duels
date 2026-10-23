@@ -6,6 +6,7 @@ from uuid import UUID
 
 import httpx
 from sqlalchemy import Engine, and_, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api import accounts, decks, roster
@@ -70,12 +71,26 @@ def withdraw_unplayable(engine: Engine, config: Settings) -> None:
         logger.info("Cards the game cannot play left the drafts of %s decks", changed)
 
 
+def switch_editions(engine: Engine, config: Settings) -> None:
+    """Once, on v0.5.0's first start: the players' drafts in the editions their libraries hold
+    (api/decks.py). A second worker starting at the same time finds it done."""
+    try:
+        with Session(engine) as session, session.begin():
+            changed = decks.switch_editions(session, roster.load(config.content_dir))
+    except IntegrityError:
+        return
+    if changed is not None:
+        logger.info("Decks switched to the editions their owners' libraries hold: %s", changed)
+
+
 def start(engine: Engine, config: Settings) -> None:
     """Once each time the worker starts, which is each deploy: a version that learned a layout
     imports its cards again at once, and the decks' drafts lose what the game cannot play when
-    that import ends; otherwise they lose it now."""
+    that import ends; otherwise they lose it now. On v0.5.0's first start the drafts take the
+    editions their owners' libraries hold."""
     if not sync.ensure_relearned(engine, config, datetime.now(UTC)):
         withdraw_unplayable(engine, config)
+    switch_editions(engine, config)
 
 
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:

@@ -15,6 +15,14 @@ Since v0.4.5 SysOp may reset an account to a new one's state (api/resets.py). Gr
 append-only, so those before the reset stay recorded, and the library counts only those made
 after it (since_reset), as the shop does the account's packs.
 
+Since v0.5.0 the library holds cards by edition (printing), as the owner asked on 2026-10-22: a
+grant names the edition it gives (a pack's pulled printing, a starter deck's own), the alliance's
+playset is in each card's default printing, and a deck may hold only editions the library holds,
+copy by copy (api/validation.py). A deck's copies naming no edition take the editions the library
+holds when the draft is saved (with_owned_editions); once, when v0.5.0 deployed, every player's
+drafts were also switched to the editions their library holds where it held enough
+(api/decks.py switch_editions). Basic lands stay unlimited in every edition.
+
 The Godlike tier's custom cards (v0.4.0) are open only to an account at that tier: an alliance
 with their Planeswalker then holds a playset of each, kept apart from the catalog's copies, and
 administrators and SysOp build with them as with any card. Below Godlike the account's library
@@ -29,14 +37,14 @@ import json
 from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Request
-from sqlalchemy import ColumnElement, func, select, true
+from sqlalchemy import ColumnElement, func, not_, select, true
 from sqlalchemy.orm import InstrumentedAttribute, Session
 from starlette.concurrency import run_in_threadpool
 
@@ -44,18 +52,27 @@ from api.engine_cards import engine_cards_of
 from api.identity import Active, Db, utcnow
 from api.models import CardConcept, CardPrinting, CustomCard, LibraryGrant, ProgressEntry, User
 from api.roster import ALLIANCE_COPIES, GODLIKE, Planeswalker, alliance_cards, roster_of
-from api.validation import CUSTOM_KEY, Collection, DeckEntry, custom_key
+from api.validation import (
+    CUSTOM_KEY,
+    Collection,
+    DeckEntry,
+    Edition,
+    custom_key,
+    edition_label,
+)
 from catalog.text import normalize
 
 UNLIMITED = "library.unlimited"
+# The order in which a deck's copies are given editions: the commander first, then the deck.
+LOCATION_ORDER = ("commander", "companion", "main", "sideboard")
 
 
 @dataclass
 class Library:
-    """An account's library: owned copies by construction key, and where each came from; the
-    custom cards' copies by their own keys (custom:<id>), whether the account is at the Godlike
-    tier, and which custom cards the running engine has loaded (by name, case aside; None when
-    not asked)."""
+    """An account's library: owned copies by construction key, and where each came from; since
+    v0.5.0 the same by edition (printing); the custom cards' copies by their own keys
+    (custom:<id>), whether the account is at the Godlike tier, and which custom cards the running
+    engine has loaded (by name, case aside; None when not asked)."""
 
     unlimited: bool
     copies: dict[str, int] = field(default_factory=dict)
@@ -64,12 +81,16 @@ class Library:
     godlike: bool = False
     custom: dict[str, int] = field(default_factory=dict)
     loaded: Mapping[str, bool] | None = None
+    editions: dict[UUID, Edition] = field(default_factory=dict)
+    # The editions by card, made the first time they are asked for.
+    by_card: dict[UUID, list[Edition]] | None = field(default=None, repr=False, compare=False)
 
     def collection(self) -> Collection:
         return Collection(
             None if self.unlimited else {**self.copies, **self.custom},
             godlike=self.godlike,
             loaded=self.loaded,
+            editions=None if self.unlimited else self.editions,
         )
 
     def owned(self, key: str) -> int | None:
@@ -77,6 +98,44 @@ class Library:
         if self.unlimited:
             return None
         return self.custom.get(key, 0) if key.startswith(CUSTOM_KEY) else self.copies.get(key, 0)
+
+    def editions_of(self, card_id: UUID) -> list[Edition]:
+        """The editions of a card the library holds, the most copies first."""
+        if self.by_card is None:
+            self.by_card = defaultdict(list)
+            for edition in sorted(
+                self.editions.values(), key=lambda found: (-found.copies, found.label)
+            ):
+                self.by_card[edition.card_id].append(edition)
+        return list(self.by_card.get(card_id, []))
+
+
+def default_printings(db: Session, ids: set[UUID]) -> dict[UUID, UUID]:
+    """Each card's default printing, the one shown when a deck names none, else its newest: the
+    edition of an alliance's playset, and of a grant whose own printing the catalog lacks."""
+    if not ids:
+        return {}
+    found = {
+        card_id: printing_id
+        for card_id, printing_id in db.execute(
+            select(CardConcept.id, CardConcept.default_printing_id).where(
+                CardConcept.id.in_(ids), CardConcept.default_printing_id.is_not(None)
+            )
+        )
+        if printing_id is not None
+    }
+    if ids - found.keys():
+        for card_id, printing_id in db.execute(
+            select(CardPrinting.concept_id, CardPrinting.id)
+            .where(CardPrinting.concept_id.in_(ids - found.keys()))
+            .order_by(
+                CardPrinting.released_at.desc().nulls_last(),
+                CardPrinting.set_code,
+                CardPrinting.collector_number,
+            )
+        ):
+            found.setdefault(card_id, printing_id)
+    return found
 
 
 def at_godlike(db: Session, user_id: UUID) -> bool:
@@ -114,20 +173,66 @@ def library_of(
     library = Library(unlimited=False, alliance=user.alliance, godlike=godlike)
     copies: dict[str, int] = defaultdict(int)
     sources: dict[str, set[str]] = defaultdict(set)
-    granted = db.execute(
-        select(CardConcept.construction_key, LibraryGrant.source, func.sum(LibraryGrant.quantity))
-        .join(CardConcept, CardConcept.id == LibraryGrant.concept_id)
-        .where(LibraryGrant.user_id == user.id, since_reset(user, LibraryGrant.created_at))
-        .group_by(CardConcept.construction_key, LibraryGrant.source)
+    # By edition: each printing's copies and sources, and the printing as validation names it.
+    held: dict[UUID, int] = defaultdict(int)
+    came: dict[UUID, set[str]] = defaultdict(set)
+    printings: dict[UUID, tuple[UUID, str, str, str, str, date | None]] = {}
+    columns = (
+        CardPrinting.id,
+        CardPrinting.concept_id,
+        CardConcept.construction_key,
+        CardPrinting.set_name,
+        CardPrinting.set_code,
+        CardPrinting.collector_number,
+        CardPrinting.released_at,
     )
-    for key, source, quantity in granted:
+    # A printing's card is the card it is now (a catalog sync may move one to another).
+    granted = db.execute(
+        select(*columns, LibraryGrant.source, func.sum(LibraryGrant.quantity))
+        .select_from(LibraryGrant)
+        .join(CardPrinting, CardPrinting.id == LibraryGrant.printing_id)
+        .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+        .where(LibraryGrant.user_id == user.id, since_reset(user, LibraryGrant.created_at))
+        .group_by(*columns, LibraryGrant.source)
+    )
+    for (
+        printing_id,
+        card_id,
+        key,
+        set_name,
+        set_code,
+        number,
+        released,
+        source,
+        quantity,
+    ) in granted:
         copies[key] += int(quantity)
         sources[key].add(source)
+        held[printing_id] += int(quantity)
+        came[printing_id].add(source)
+        printings[printing_id] = (card_id, key, set_name, set_code, number, released)
     planeswalker = roster.get(user.alliance) if user.alliance else None
     if planeswalker is not None and not planeswalker.custom:
         ids = alliance_cards(db, roster).get(planeswalker.id, [])
-        keys = set(db.scalars(select(CardConcept.construction_key).where(CardConcept.id.in_(ids))))
-        for key in keys:
+        # A playset per card (one per construction key), in its default printing.
+        cards: dict[str, UUID] = {}
+        for card_id, key in db.execute(
+            select(CardConcept.id, CardConcept.construction_key)
+            .where(CardConcept.id.in_(ids))
+            .order_by(CardConcept.default_printing_id.is_(None), CardConcept.normalized_name)
+        ):
+            cards.setdefault(key, card_id)
+        chosen = default_printings(db, set(cards.values()))
+        for printing_id, card_id, key, set_name, set_code, number, released in db.execute(
+            select(*columns)
+            .select_from(CardPrinting)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardPrinting.id.in_(set(chosen.values())))
+        ):
+            held[printing_id] += ALLIANCE_COPIES
+            came[printing_id].add("alliance")
+            printings[printing_id] = (card_id, key, set_name, set_code, number, released)
+        for key in cards:
             copies[key] += ALLIANCE_COPIES
             sources[key].add("alliance")
     elif planeswalker is not None and godlike:
@@ -140,6 +245,20 @@ def library_of(
         dict(copies),
         {key: set(found) for key, found in sources.items()},
     )
+    library.editions = {
+        printing_id: Edition(
+            printing_id=printing_id,
+            card_id=card_id,
+            key=key,
+            copies=held[printing_id],
+            set_name=set_name,
+            set_code=set_code,
+            collector_number=number,
+            released_at=released,
+            sources=frozenset(came[printing_id]),
+        )
+        for printing_id, (card_id, key, set_name, set_code, number, released) in printings.items()
+    }
     return library
 
 
@@ -299,15 +418,15 @@ def owned_starters(db: Session, user: User) -> set[str]:
 
 
 def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckEntry]) -> None:
-    """Every copy of the deck's cards, for good; the grant is keyed by the deck, so it is made
-    once whatever retries (once more after a reset). Basic lands need no grant."""
-    quantities: dict[UUID, int] = defaultdict(int)
-    for entry in entries:
-        quantities[entry.card_id] += entry.quantity
+    """Every copy of the deck's cards, for good, each in the edition the deck holds (v0.5.0; the
+    card's default printing where the catalog lacks the owner's choice), so the deck plays at once;
+    the grant is keyed by the deck, so it is made once whatever retries (once more after a reset).
+    Basic lands need no grant."""
+    cards = {entry.card_id for entry in entries}
     basics = set(
         db.scalars(
             select(CardConcept.id).where(
-                CardConcept.id.in_(quantities), CardConcept.type_line.startswith("Basic ")
+                CardConcept.id.in_(cards), CardConcept.type_line.startswith("Basic ")
             )
         )
     )
@@ -319,17 +438,162 @@ def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckE
     )
     if done is not None:
         return
-    now = utcnow()
-    for card_id, quantity in quantities.items():
-        if card_id in basics:
+    fallback = default_printings(
+        db, {entry.card_id for entry in entries if entry.printing_id is None} - basics
+    )
+    quantities: dict[tuple[UUID, UUID], int] = defaultdict(int)
+    for entry in entries:
+        printing_id = entry.printing_id or fallback.get(entry.card_id)
+        if entry.card_id in basics or printing_id is None:
             continue
+        quantities[(entry.card_id, printing_id)] += entry.quantity
+    now = utcnow()
+    for (card_id, printing_id), quantity in quantities.items():
         db.add(
             LibraryGrant(
                 user_id=user.id,
                 concept_id=card_id,
+                printing_id=printing_id,
                 quantity=quantity,
                 source="starter",
                 grant_key=key,
                 created_at=now,
             )
         )
+
+
+# Decks in the editions the library holds (v0.5.0).
+
+
+@dataclass(frozen=True)
+class Switch:
+    """Copies of a card a deck's draft moved from an edition the library does not hold to one it
+    does, when v0.5.0 deployed: the deck's note names them (Deck.switched_editions)."""
+
+    card_id: UUID
+    name: str
+    quantity: int
+    before: str
+    after: str
+
+
+def with_owned_editions(
+    db: Session, entries: list[DeckEntry], library: Library, *, switch: bool = False
+) -> tuple[list[DeckEntry], list[Switch]]:
+    """The entries with the editions the library holds, for an account that builds from one.
+
+    A copy naming no edition takes one the library holds that the deck's other copies leave over:
+    the edition with the most copies first, an entry split where one edition is not enough;
+    what no edition is left for still names none, and validation says so. With switch (once, when
+    v0.5.0 deployed), a copy naming an edition the library holds too few of moves the same way, to
+    another of that card's editions; what cannot move stays. Only the card's own printings are
+    chosen. The maybeboard, basic lands and the custom cards keep what they name. The order is the
+    commander first, then the deck; the result is one entry per card, printing and location."""
+    if library.unlimited or not entries:
+        return entries, []
+    ids = {entry.card_id for entry in entries}
+    concepts = dict(
+        db.execute(
+            select(CardConcept.id, CardConcept.name).where(
+                CardConcept.id.in_(ids), not_(CardConcept.type_line.startswith("Basic "))
+            )
+        ).all()
+    )
+    if not concepts:
+        return entries, []
+    spare = {
+        printing_id: edition.copies
+        for printing_id, edition in library.editions.items()
+        if edition.card_id in concepts
+    }
+
+    def counted(entry: DeckEntry) -> bool:
+        return entry.card_id in concepts and entry.location != "maybeboard"
+
+    ordered = sorted(
+        entries,
+        key=lambda entry: (
+            LOCATION_ORDER.index(entry.location) if entry.location in LOCATION_ORDER else 9
+        ),
+    )
+    # The copies that name an edition the library holds keep it first.
+    beyond: dict[int, int] = {}
+    for index, entry in enumerate(ordered):
+        if counted(entry) and entry.printing_id is not None:
+            kept = min(entry.quantity, spare.get(entry.printing_id, 0))
+            if entry.printing_id in spare:
+                spare[entry.printing_id] -= kept
+            beyond[index] = entry.quantity - kept
+    result: list[DeckEntry] = []
+    moved: dict[tuple[UUID, UUID, UUID], int] = defaultdict(int)
+    for index, entry in enumerate(ordered):
+        wanting = (
+            entry.quantity if entry.printing_id is None else beyond.get(index, 0) if switch else 0
+        )
+        if not counted(entry) or wanting == 0:
+            result.append(entry)
+            continue
+        if entry.printing_id is not None and entry.quantity > wanting:
+            result.append(entry.model_copy(update={"quantity": entry.quantity - wanting}))
+        for edition in library.editions_of(entry.card_id):
+            if wanting == 0:
+                break
+            taken = min(wanting, spare.get(edition.printing_id, 0))
+            if taken <= 0:
+                continue
+            spare[edition.printing_id] -= taken
+            wanting -= taken
+            result.append(
+                entry.model_copy(update={"printing_id": edition.printing_id, "quantity": taken})
+            )
+            if entry.printing_id is not None:
+                moved[(entry.card_id, entry.printing_id, edition.printing_id)] += taken
+        if wanting:
+            result.append(entry.model_copy(update={"quantity": wanting}))
+    return merged_entries(result), switches(db, moved, concepts, library)
+
+
+def merged_entries(entries: list[DeckEntry]) -> list[DeckEntry]:
+    """One entry per card, printing and location, in their first order."""
+    totals: dict[tuple[UUID, UUID | None, str], DeckEntry] = {}
+    for entry in entries:
+        key = (entry.card_id, entry.printing_id, entry.location)
+        found = totals.get(key)
+        totals[key] = (
+            entry
+            if found is None
+            else found.model_copy(update={"quantity": min(found.quantity + entry.quantity, 250)})
+        )
+    return list(totals.values())
+
+
+def switches(
+    db: Session,
+    moved: Mapping[tuple[UUID, UUID, UUID], int],
+    names: Mapping[UUID, str],
+    library: Library,
+) -> list[Switch]:
+    """The copies moved to another edition, with both editions named."""
+    if not moved:
+        return []
+    labels = {
+        printing_id: edition_label(set_name, set_code, number)
+        for printing_id, set_name, set_code, number in db.execute(
+            select(
+                CardPrinting.id,
+                CardPrinting.set_name,
+                CardPrinting.set_code,
+                CardPrinting.collector_number,
+            ).where(CardPrinting.id.in_({printing for _, printing, _ in moved}))
+        )
+    }
+    return [
+        Switch(
+            card_id=card_id,
+            name=names[card_id],
+            quantity=quantity,
+            before=labels.get(printing, ""),
+            after=library.editions[target].label,
+        )
+        for (card_id, printing, target), quantity in moved.items()
+    ]

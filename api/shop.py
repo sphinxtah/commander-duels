@@ -10,9 +10,10 @@ the Magic Duels style, their cards the player's for good.
 - **Opening** a pack, in one transaction, draws its contents from the product's current collation
   with the operating system's secure randomness (nothing the client sends reaches it), records the
   opening (the collation revision, each card's printing, finish and sheet), grants the cards to the
-  library for good (library_grants, source pack, key pack:<opening id>), and revalidates the
-  account's decks. A pack opens once: asking again returns the same cards. The account's row is
-  locked, so two requests at once open it once. Since v0.4.5 a card the game cannot play gives
+  library for good (library_grants, source pack, key pack:<opening id>), since v0.5.0 each in the
+  edition pulled, and revalidates the account's decks. A card is new when its edition is. A pack
+  opens once: asking again returns the same cards. The account's row is locked, so two requests
+  at once open it once. Since v0.4.5 a card the game cannot play gives
   way to another from its sheet (api/collation.py), and the opening records the card it replaced;
   the history shows only cards the game can play.
 - **SysOp gives packs** to any account, its own included, with a reason, audited
@@ -272,7 +273,10 @@ class PulledCard(Contract):
     collector_number: str
     finish: Finish
     sheet: str
-    new: bool = Field(description="No copy of it was in the library for good before.")
+    new: bool = Field(
+        description="No copy of its edition was in the library for good before (by edition "
+        "since v0.5.0)."
+    )
     faces: int = Field(description="Faces with images of their own; 0 for one image.")
     replaced: bool = Field(
         default=False,
@@ -737,17 +741,17 @@ def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
     )
 
 
-def granted_keys(db: Session, user: User, keys: set[str]) -> set[str]:
-    """The construction keys among these that the account holds copies of for good."""
-    if not keys:
+def granted_editions(db: Session, user: User, printings: set[UUID]) -> set[UUID]:
+    """The editions (printings) among these that the account holds copies of for good (v0.5.0:
+    a card is new to the library when its edition is)."""
+    if not printings:
         return set()
     return set(
         db.scalars(
-            select(CardConcept.construction_key)
-            .join(LibraryGrant, LibraryGrant.concept_id == CardConcept.id)
+            select(LibraryGrant.printing_id)
             .where(
                 LibraryGrant.user_id == user.id,
-                CardConcept.construction_key.in_(keys),
+                LibraryGrant.printing_id.in_(printings),
                 since_reset(user, LibraryGrant.created_at),
             )
             .distinct()
@@ -792,9 +796,7 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
         key=lambda card: reveal_order(printings[card.printing_id].rarity, card.finish),
     )
     user_id = principal.user.id
-    owned = granted_keys(
-        db, principal.user, {concept.construction_key for concept in concepts.values()}
-    )
+    owned = granted_editions(db, principal.user, set(printings))
     opening = PackOpening(
         id=uuid4(),
         pack_id=pack.id,
@@ -806,15 +808,16 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
     )
     db.add(opening)
     db.flush()
-    quantities: dict[UUID, int] = defaultdict(int)
+    # By edition (v0.5.0): each pulled printing is granted as it is.
+    quantities: dict[tuple[UUID, UUID], int] = defaultdict(int)
     for position, card in enumerate(ordered):
         concept = concepts[printings[card.printing_id].concept_id]
         # Basic lands are in every library already.
         kept = not concept.type_line.startswith("Basic ")
-        new = kept and concept.construction_key not in owned
+        new = kept and card.printing_id not in owned
         if kept:
-            quantities[concept.id] += 1
-            owned.add(concept.construction_key)
+            quantities[(concept.id, card.printing_id)] += 1
+            owned.add(card.printing_id)
         db.add(
             PackCard(
                 opening_id=opening.id,
@@ -827,11 +830,12 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
                 replaced_printing_id=card.replaced,
             )
         )
-    for concept_id, quantity in quantities.items():
+    for (concept_id, printing_id), quantity in quantities.items():
         db.add(
             LibraryGrant(
                 user_id=user_id,
                 concept_id=concept_id,
+                printing_id=printing_id,
                 quantity=quantity,
                 source="pack",
                 grant_key=f"pack:{opening.id}",

@@ -1298,6 +1298,21 @@
             ],
             "title": "Edhrec Rank"
           },
+          "editions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditionCopies"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The editions of the card the player's library holds, the most copies first (v0.5.0): a deck may hold only those, copy by copy. Null when not limited, as owned is.",
+            "title": "Editions"
+          },
           "engine_name": {
             "anyOf": [
               {
@@ -1422,6 +1437,7 @@
             "title": "Power"
           },
           "printing_count": {
+            "description": "How many printings the card has; when only the owned or the chosen ones are asked for (v0.5.0), how many are listed.",
             "title": "Printing Count",
             "type": "integer"
           },
@@ -1815,6 +1831,21 @@
               }
             ],
             "title": "Edhrec Rank"
+          },
+          "editions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EditionCopies"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The editions of the card the player's library holds, the most copies first (v0.5.0): a deck may hold only those, copy by copy. Null when not limited, as owned is.",
+            "title": "Editions"
           },
           "faces": {
             "items": {
@@ -3060,6 +3091,21 @@
             "title": "Source",
             "type": "string"
           },
+          "switched_editions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SwitchedEdition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.",
+            "title": "Switched Editions"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -3445,6 +3491,21 @@
             "title": "Source",
             "type": "string"
           },
+          "switched_editions": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SwitchedEdition"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Copies switched to editions the library holds when v0.5.0 deployed, until the owner dismisses the note; null or empty: none.",
+            "title": "Switched Editions"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -3591,6 +3652,14 @@
             "title": "Cards",
             "type": "object"
           },
+          "entries": {
+            "description": "The draft as saved: since v0.5.0 a copy naming no edition takes one the player's library holds.",
+            "items": {
+              "$ref": "#/components/schemas/DeckEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -3607,6 +3676,7 @@
         "required": [
           "version",
           "updated_at",
+          "entries",
           "validation",
           "cards"
         ],
@@ -3693,6 +3763,55 @@
           "bot_daily_cap"
         ],
         "title": "EconomySettings",
+        "type": "object"
+      },
+      "EditionCopies": {
+        "additionalProperties": false,
+        "description": "An edition (printing) of a card the player's library holds, with its copies (v0.5.0).",
+        "properties": {
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "copies": {
+            "title": "Copies",
+            "type": "integer"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "title": "Set Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "printing_id",
+          "set_code",
+          "set_name",
+          "collector_number",
+          "released_at",
+          "copies"
+        ],
+        "title": "EditionCopies",
         "type": "object"
       },
       "EngineStatus": {
@@ -5023,7 +5142,8 @@
         "additionalProperties": false,
         "properties": {
           "card": {
-            "$ref": "#/components/schemas/CardSummary"
+            "$ref": "#/components/schemas/CardSummary",
+            "description": "The card, its image that of the edition (v0.5.0); owned counts every edition of it."
           },
           "copies": {
             "anyOf": [
@@ -5034,10 +5154,15 @@
                 "type": "null"
               }
             ],
-            "description": "Copies owned; null for basic lands.",
+            "description": "Copies owned of this edition.",
             "title": "Copies"
           },
+          "edition": {
+            "$ref": "#/components/schemas/LibraryEdition",
+            "description": "The edition these copies are (v0.5.0)."
+          },
           "sources": {
+            "description": "Where this edition's copies came from.",
             "items": {
               "enum": [
                 "starter",
@@ -5053,10 +5178,60 @@
         },
         "required": [
           "card",
+          "edition",
           "copies",
           "sources"
         ],
         "title": "LibraryCard",
+        "type": "object"
+      },
+      "LibraryEdition": {
+        "additionalProperties": false,
+        "description": "The edition (printing) a library item holds (v0.5.0).",
+        "properties": {
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "rarity": {
+            "title": "Rarity",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "title": "Set Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "printing_id",
+          "set_code",
+          "set_name",
+          "collector_number",
+          "released_at",
+          "rarity"
+        ],
+        "title": "LibraryEdition",
         "type": "object"
       },
       "LibraryView": {
@@ -7491,7 +7666,7 @@
             "type": "string"
           },
           "new": {
-            "description": "No copy of it was in the library for good before.",
+            "description": "No copy of its edition was in the library for good before (by edition since v0.5.0).",
             "title": "New",
             "type": "boolean"
           },
@@ -10236,6 +10411,44 @@
           "reason"
         ],
         "title": "Suggestion",
+        "type": "object"
+      },
+      "SwitchedEdition": {
+        "additionalProperties": false,
+        "description": "Copies of a card the draft moved to an edition the library holds, when v0.5.0 deployed.",
+        "properties": {
+          "after": {
+            "description": "The edition of the library's they name now.",
+            "title": "After",
+            "type": "string"
+          },
+          "before": {
+            "description": "The edition the copies named: \"Seventh Edition (7ED #200)\".",
+            "title": "Before",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "switched_at": {
+            "format": "date-time",
+            "title": "Switched At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "quantity",
+          "before",
+          "after",
+          "switched_at"
+        ],
+        "title": "SwitchedEdition",
         "type": "object"
       },
       "SyncQueued": {
@@ -16673,6 +16886,23 @@
               ],
               "title": "Printing"
             }
+          },
+          {
+            "description": "Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is.",
+            "in": "query",
+            "name": "printings",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "description": "Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is.",
+              "enum": [
+                "all",
+                "owned",
+                "chosen"
+              ],
+              "title": "Printings",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -18024,7 +18254,7 @@
     },
     "/api/v1/decks/guided": {
       "post": {
-        "description": "A proposed starting deck (DECK06), from the cards the player's library holds. Nothing is\nsaved: create a deck from its entries.",
+        "description": "A proposed starting deck (DECK06), from the cards the player's library holds, in the\neditions it holds (v0.5.0). Nothing is saved: create a deck from its entries.",
         "operationId": "guided_deck_api_v1_decks_guided_post",
         "requestBody": {
           "content": {
@@ -18133,7 +18363,7 @@
     },
     "/api/v1/decks/import/preview": {
       "post": {
-        "description": "Reads a text list or a deck file and shows how each line resolves. Saves nothing.",
+        "description": "Reads a text list or a deck file and shows how each line resolves. Saves nothing. Since\nv0.5.0 a player's copies naming no edition take the editions their library holds, as the deck\nmade from them will; a line naming an edition it does not hold keeps it, and the validation\nsays which to switch to.",
         "operationId": "import_preview_api_v1_decks_import_preview_post",
         "requestBody": {
           "content": {
@@ -19587,6 +19817,117 @@
         "summary": "Read Revision"
       }
     },
+    "/api/v1/decks/{deck_id}/switched-editions": {
+      "delete": {
+        "description": "Dismisses the deck's note of the copies switched to editions the library holds (v0.5.0).",
+        "operationId": "dismiss_switched_api_v1_decks__deck_id__switched_editions_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Dismiss Switched"
+      }
+    },
     "/api/v1/decks/{deck_id}/unarchive": {
       "post": {
         "operationId": "unarchive_api_v1_decks__deck_id__unarchive_post",
@@ -21014,7 +21355,7 @@
     },
     "/api/v1/library": {
       "get": {
-        "description": "The cards in the account's library, with their copies and where they came from. An\naccount that builds from the whole catalog has no list here. Copies of a card the game cannot\nplay stay recorded but are not shown (v0.4.5): they come back if the engine learns it.",
+        "description": "The cards in the account's library, one item per card and edition (v0.5.0), each with the\nedition's image, its copies and where they came from. An account that builds from the whole\ncatalog has no list here. Copies of a card the game cannot play stay recorded but are not\nshown (v0.4.5): they come back if the engine learns it.",
         "operationId": "my_library_api_v1_library_get",
         "responses": {
           "200": {

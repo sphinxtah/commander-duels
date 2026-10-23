@@ -221,6 +221,7 @@ def remove_decks(db: Session, user_id: UUID, now: datetime, removed: Removed) ->
             playable=False,
             collection_locked=False,
             identity="",
+            switched_editions=[],
             deleted_at=now,
             updated_at=now,
         ),

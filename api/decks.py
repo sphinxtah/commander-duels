@@ -27,6 +27,13 @@ Since v0.4.5 a draft holds only cards the game can play. A card the engine canno
 every draft when it becomes unplayable (a catalog sync, a staff suspension; withdraw_unplayable)
 and whenever a save names it, and the deck notes what left and why until its owner dismisses the
 note. Revisions keep their cards: games played them.
+
+Since v0.5.0 a player's deck may hold only the editions their library holds, copy by copy
+(api/validation.py). Every save gives the copies that name no edition one the library holds
+(library.with_owned_editions); once, when v0.5.0 deployed, the worker switched every player's
+drafts to the editions their library holds where it held enough (switch_editions), and the deck
+notes what moved until its owner dismisses the note. What could not move stays, and the deck is
+collection-locked until it is fixed. Revisions keep their editions.
 """
 
 import hashlib
@@ -64,11 +71,13 @@ from api.library import (
     CurrentLibrary,
     Library,
     Starter,
+    Switch,
     at_godlike,
     commander_printing,
     library_of,
     starter_entries,
     starters_in,
+    with_owned_editions,
 )
 from api.models import (
     CardConcept,
@@ -78,6 +87,7 @@ from api.models import (
     Deck,
     DeckEntryRow,
     DeckRevision,
+    SiteSetting,
     User,
 )
 from api.roster import Planeswalker, roster_of
@@ -101,6 +111,8 @@ MAX_DECKS = 250
 MAX_NOTES = 10_000
 Title = Annotated[StoredText, Field(min_length=1, max_length=80)]
 ShareCode = Annotated[str, PathParam(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")]
+# The site setting that says the drafts were switched to owned editions (v0.5.0), once.
+SWITCHED = "decks.editions_switched"
 
 
 class RemovedCard(Contract):
@@ -110,6 +122,16 @@ class RemovedCard(Contract):
     quantity: int = Field(description="The copies the draft held, every location together.")
     reason: str = Field(description="Why the game cannot play it, in a sentence.")
     removed_at: datetime
+
+
+class SwitchedEdition(Contract):
+    """Copies of a card the draft moved to an edition the library holds, when v0.5.0 deployed."""
+
+    name: str
+    quantity: int
+    before: str = Field(description='The edition the copies named: "Seventh Edition (7ED #200)".')
+    after: str = Field(description="The edition of the library's they name now.")
+    switched_at: datetime
 
 
 class DeckSummary(Contract):
@@ -138,6 +160,11 @@ class DeckSummary(Contract):
     removed_cards: list[RemovedCard] = Field(
         description="Cards that left the draft because the game cannot play them (v0.4.5), "
         "until the owner dismisses the note."
+    )
+    switched_editions: list[SwitchedEdition] | None = Field(
+        default=None,
+        description="Copies switched to editions the library holds when v0.5.0 deployed, until "
+        "the owner dismisses the note; null or empty: none.",
     )
 
 
@@ -194,6 +221,10 @@ class DraftSave(Contract):
 class DraftSaved(Contract):
     version: int
     updated_at: datetime
+    entries: list[DeckEntry] = Field(
+        description="The draft as saved: since v0.5.0 a copy naming no edition takes one the "
+        "player's library holds."
+    )
     validation: Validation
     cards: dict[UUID, CardSummary]
 
@@ -397,10 +428,42 @@ def without_unplayable(db: Session, deck: Deck, entries: list[DeckEntry]) -> lis
     return [entry for entry in entries if entry.card_id not in gone]
 
 
+def note_switched(deck: Deck, moved: list[Switch]) -> None:
+    """The deck's note of copies switched to an edition the library holds (v0.5.0)."""
+    stamp = now().isoformat()
+    deck.switched_editions = [
+        *(deck.switched_editions or []),
+        *(
+            {
+                "card_id": str(item.card_id),
+                "name": item.name,
+                "quantity": item.quantity,
+                "before": item.before,
+                "after": item.after,
+                "switched_at": stamp,
+            }
+            for item in moved
+        ),
+    ]
+
+
 def store_draft(
-    db: Session, deck: Deck, entries: list[DeckEntry], library: Library | None
+    db: Session,
+    deck: Deck,
+    entries: list[DeckEntry],
+    library: Library | None,
+    *,
+    switch: bool = False,
 ) -> Validation:
+    """Saves the draft: only cards the game can play (v0.4.5), and for a player's deck the
+    editions their library holds where a copy names none (v0.5.0); switch also moves copies of an
+    edition the library holds too few of, and notes it (switch_editions)."""
     clean = without_unplayable(db, deck, normalized(entries))
+    if library is not None:
+        owned, moved = with_owned_editions(db, clean, library, switch=switch)
+        clean = normalized(owned)
+        if moved:
+            note_switched(deck, moved)
     validation = validate_deck(
         db,
         DeckContent(format=deck.format, entries=clean),  # type: ignore[arg-type]
@@ -447,6 +510,12 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
         removed_cards=[
             RemovedCard.model_validate({key: item.get(key) for key in RemovedCard.model_fields})
             for item in deck.removed_cards or []
+        ],
+        switched_editions=[
+            SwitchedEdition.model_validate(
+                {key: item.get(key) for key in SwitchedEdition.model_fields}
+            )
+            for item in deck.switched_editions or []
         ],
     )
 
@@ -582,6 +651,43 @@ def withdraw_unplayable(db: Session, roster: dict[str, Planeswalker]) -> int:
         deck.draft_version += 1
     db.flush()
     return len(holding)
+
+
+def switch_editions(db: Session, roster: dict[str, Planeswalker]) -> int | None:
+    """Once, when v0.5.0 deployed (the worker's start): every deck draft of an account that builds
+    from a library, the archived and trashed ones too, in the editions the library holds where it
+    holds enough copies (library.with_owned_editions with switch). A deck that changes notes what
+    moved, gets a new draft version, as withdraw_unplayable's do, and its flags; one that does not
+    has its flags refreshed, so a deck that keeps an edition the library lacks shows as
+    collection-locked. Revisions keep their editions. The site setting SWITCHED records that it ran,
+    in the same transaction: a second worker starting at once waits on it, then fails to write it
+    and changes nothing. Returns how many decks changed, or None when it ran before."""
+    if db.get(SiteSetting, SWITCHED) is not None:
+        return None
+    marker = SiteSetting(key=SWITCHED, value={"at": now().isoformat()}, updated_at=now())
+    db.add(marker)
+    db.flush()
+    libraries: dict[UUID, Library] = {}
+    changed = 0
+    for deck in db.scalars(select(Deck).order_by(Deck.created_at).with_for_update()):
+        if deck.owner_id not in libraries:
+            owner = db.get_one(User, deck.owner_id)
+            permissions = permissions_for(owner, roles_of(db, owner))
+            libraries[deck.owner_id] = library_of(db, owner, permissions, roster)
+        library = libraries[deck.owner_id]
+        if library.unlimited:
+            continue
+        entries = entries_of(deck)
+        owned, _ = with_owned_editions(db, normalized(entries), library, switch=True)
+        if content_hash(deck.format, owned) == content_hash(deck.format, entries):
+            revalidate(db, [deck], library)
+            continue
+        store_draft(db, deck, entries, library, switch=True)
+        deck.draft_version += 1
+        changed += 1
+    marker.value = {"at": now().isoformat(), "decks": changed}
+    db.flush()
+    return changed
 
 
 def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
@@ -808,6 +914,7 @@ def save_draft(
     return DraftSaved(
         version=deck.draft_version,
         updated_at=deck.updated_at,
+        entries=entries_of(deck),
         validation=validation,
         cards=cards,
     )
@@ -887,6 +994,15 @@ def dismiss_removed(deck_id: UUID, principal: Builder, db: Db) -> DeckSummary:
     return deck_summary(db, deck)
 
 
+@router.delete("/decks/{deck_id}/switched-editions", response_model=DeckSummary)
+def dismiss_switched(deck_id: UUID, principal: Builder, db: Db) -> DeckSummary:
+    """Dismisses the deck's note of the copies switched to editions the library holds (v0.5.0)."""
+    deck = owned(db, principal, deck_id)
+    deck.switched_editions = []
+    db.commit()
+    return deck_summary(db, deck)
+
+
 @router.post("/decks/validate", response_model=Validation)
 def validate_entries(
     body: ValidateRequest, principal: Builder, library: CurrentLibrary, db: Db
@@ -903,9 +1019,10 @@ def validate_entries(
 def guided_deck(
     body: guided.GuidedRequest, principal: Builder, library: CurrentLibrary, db: Db
 ) -> GuidedResult:
-    """A proposed starting deck (DECK06), from the cards the player's library holds. Nothing is
-    saved: create a deck from its entries."""
+    """A proposed starting deck (DECK06), from the cards the player's library holds, in the
+    editions it holds (v0.5.0). Nothing is saved: create a deck from its entries."""
     proposal = guided.propose(db, body, library)
+    proposal.entries, _ = with_owned_editions(db, proposal.entries, library)
     validation = validate_deck(
         db,
         DeckContent(format=body.format, entries=proposal.entries),
@@ -921,7 +1038,10 @@ def guided_deck(
 def import_preview(
     body: deckio.ImportRequest, principal: Builder, library: CurrentLibrary, db: Db
 ) -> ImportPreview:
-    """Reads a text list or a deck file and shows how each line resolves. Saves nothing."""
+    """Reads a text list or a deck file and shows how each line resolves. Saves nothing. Since
+    v0.5.0 a player's copies naming no edition take the editions their library holds, as the deck
+    made from them will; a line naming an edition it does not hold keeps it, and the validation
+    says which to switch to."""
     if bool(body.text.strip()) == bool(body.json_text.strip()):
         raise ApiError(422, "invalid_deck_list", "Send a text list or a deck file.")
     parsed = (
@@ -934,7 +1054,7 @@ def import_preview(
         fmt = cast(GameFormatName, parsed.game_format)
     # A Godlike owner's list may name custom cards; nobody else's ever matches one.
     lines = deckio.resolve(db, parsed, custom_by_name(db) if library.godlike else None)
-    entries = deckio.merged(lines)
+    entries, _ = with_owned_editions(db, deckio.merged(lines), library)
     validation = validate_deck(
         db, DeckContent(format=fmt, entries=entries), today(), library.collection()
     )

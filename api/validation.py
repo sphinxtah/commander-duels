@@ -7,7 +7,8 @@ location), an explanation and a remedy, and its kind:
 - not_released: the card is not out yet;
 - not_implemented: the game engine cannot play the card (its catalog status says why);
 - collection_locked: the deck holds more copies of a card than the player owns (v0.3.1: players
-  build from their own library; administrators and SysOp from the whole catalog);
+  build from their own library; administrators and SysOp from the whole catalog), or since v0.5.0
+  more copies of an edition than the library holds of that edition;
 - structure: the deck itself is malformed (a printing of another card, a sideboard in Commander);
 - banned, not_legal: notes, not errors (v0.4.5): a card banned in the format, or not legal in it.
 
@@ -145,6 +146,10 @@ class Card:
     activated: bool
     keywords: tuple[str, ...]
     printings: frozenset[UUID] = frozenset()
+    # Each printing's set name, set code and collector number (v0.5.0), which messages name.
+    editions: Mapping[UUID, tuple[str, str, str]] = field(
+        default_factory=dict, compare=False, hash=False
+    )
 
     @property
     def front_types(self) -> tuple[list[str], list[str], list[str]]:
@@ -160,12 +165,39 @@ class Card:
 
 
 @dataclass(frozen=True)
+class Edition:
+    """An edition (printing) of a card a library holds (v0.5.0), with its copies and where they
+    came from: what validation names when a deck holds an edition the library does not."""
+
+    printing_id: UUID
+    card_id: UUID
+    key: str
+    copies: int
+    set_name: str
+    set_code: str
+    collector_number: str
+    released_at: date | None = None
+    sources: frozenset[str] = frozenset()
+
+    @property
+    def label(self) -> str:
+        return edition_label(self.set_name, self.set_code, self.collector_number)
+
+
+def edition_label(set_name: str, set_code: str, number: str) -> str:
+    """An edition as the deck's notes name it: "Revised Edition (3ED #150)"."""
+    return f"{set_name} ({set_code.upper()} #{number})"
+
+
+@dataclass(frozen=True)
 class Collection:
     """What a deck's owner may build with.
 
     - copies: the copies of each card they own, by construction key, so another printing or
       Oracle version of a card counts as that card; basic lands are never limited. None for
       administrators and SysOp, who build from the whole catalog.
+    - editions: since v0.5.0, the copies of each edition they own, by printing: a deck may hold
+      only those, copy by copy. None counts copies by card alone (a list checked without them).
     - godlike: the owner is at the Godlike tier, which opens the custom cards to them (v0.4.0).
     - loaded: by custom card name, case aside, whether the running engine has loaded it; None
       when the engine was not asked."""
@@ -173,6 +205,7 @@ class Collection:
     copies: Mapping[str, int] | None
     godlike: bool = False
     loaded: Mapping[str, bool] | None = None
+    editions: Mapping[UUID, Edition] | None = None
 
 
 @dataclass(frozen=True)
@@ -240,11 +273,17 @@ def number(rules: "Rules", key: str, default: int) -> int:
 
 def cards_of(session: Session, ids: set[UUID]) -> dict[UUID, Card]:
     rows = session.scalars(select(CardConcept).where(CardConcept.id.in_(ids))).all()
-    printings: dict[UUID, set[UUID]] = defaultdict(set)
-    for concept_id, printing_id in session.execute(
-        select(CardPrinting.concept_id, CardPrinting.id).where(CardPrinting.concept_id.in_(ids))
+    printings: dict[UUID, dict[UUID, tuple[str, str, str]]] = defaultdict(dict)
+    for concept_id, printing_id, set_name, set_code, number in session.execute(
+        select(
+            CardPrinting.concept_id,
+            CardPrinting.id,
+            CardPrinting.set_name,
+            CardPrinting.set_code,
+            CardPrinting.collector_number,
+        ).where(CardPrinting.concept_id.in_(ids))
     ):
-        printings[concept_id].add(printing_id)
+        printings[concept_id][printing_id] = (set_name, set_code, number)
     return {
         row.id: Card(
             id=row.id,
@@ -267,6 +306,7 @@ def cards_of(session: Session, ids: set[UUID]) -> dict[UUID, Card]:
             activated=row.activated,
             keywords=tuple(row.keywords or ()),
             printings=frozenset(printings[row.id]),
+            editions=printings[row.id],
         )
         for row in rows
     }
@@ -431,7 +471,7 @@ def validate(
         card_problems(report, cards[card_id], rules, today)
     copies(report, playing, cards, rules)
     if collection is not None and collection.copies is not None:
-        owned_copies(report, playing, cards, collection.copies)
+        owned_copies(report, playing, cards, collection)
     if rules.format == "legacy":
         legacy(report, playing, cards, rules, counts)
     else:
@@ -560,13 +600,37 @@ def basic_land(card: Card) -> bool:
     return "Basic" in supertypes and "Land" in types
 
 
+def copies_words(count: int) -> str:
+    return f"{count} {'copy' if count == 1 else 'copies'}"
+
+
+def edition_names(
+    editions: list[tuple[str, str, str]], beside: list[tuple[str, str, str]] | None = None
+) -> str:
+    """Editions by set name, "Revised Edition and Fourth Edition"; two of one set, here or among
+    those named beside them, by number too."""
+    names = [name for name, _, _ in [*editions, *(beside or [])]]
+    shown = [
+        name if names.count(name) == 1 else f"{name} #{number}" for name, _, number in editions
+    ]
+    return shown[0] if len(shown) == 1 else ", ".join(shown[:-1]) + " and " + shown[-1]
+
+
 def owned_copies(
-    report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], copies: Mapping[str, int]
+    report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], collection: Collection
 ) -> None:
     """Copies the player owns, per construction key, outside the maybeboard (DECK08). Copies are a
-    limit per deck: two decks may each hold the same owned card."""
+    limit per deck: two decks may each hold the same owned card.
+
+    Since v0.5.0 they are a limit per edition too, when the collection knows its editions: each
+    copy naming an edition counts against that edition's copies, and a copy naming none takes one
+    the deck's other copies leave over (a save gives it one, api/decks.py). Too many copies in all
+    says what the library holds; enough in all but of other editions names those it holds, to
+    switch to. The custom cards have no editions."""
+    copies = collection.copies or {}
     counted: dict[str, int] = defaultdict(int)
     holders: dict[str, list[UUID]] = defaultdict(list)
+    named: dict[str, dict[UUID, int]] = defaultdict(lambda: defaultdict(int))
     for entry in entries:
         card = cards[entry.card_id]
         if basic_land(card):
@@ -574,22 +638,78 @@ def owned_copies(
         counted[card.construction_key] += entry.quantity
         if card.id not in holders[card.construction_key]:
             holders[card.construction_key].append(card.id)
+        if entry.printing_id is not None:
+            named[card.construction_key][entry.printing_id] += entry.quantity
+    owned: dict[str, list[Edition]] = defaultdict(list)
+    if collection.editions is not None:
+        for edition in collection.editions.values():
+            if edition.key in counted:
+                owned[edition.key].append(edition)
     for key, count in counted.items():
-        have = copies.get(key, 0)
-        if count <= have:
-            continue
         card = cards[holders[key][0]]
-        owned = "none" if have == 0 else f"{have} {'copy' if have == 1 else 'copies'}"
-        report.error(
-            "collection.locked",
-            f"This deck holds {count} {'copy' if count == 1 else 'copies'} of {card.name}; your "
-            f"library has {owned}.",
-            f"Remove {count - have}, or wait until your library holds more: starter decks, "
-            "your alliance and packs add cards to it.",
-            kind="collection_locked",
-            card_ids=holders[key],
-            quantity=count,
+        have = copies.get(key, 0)
+        tracked = collection.editions is not None and not key.startswith(CUSTOM_KEY)
+        editions = sorted(owned[key], key=lambda found: (-found.copies, found.label))
+        held = {edition.printing_id: edition.copies for edition in editions}
+        short = (
+            {printing: n for printing, n in named[key].items() if n > held.get(printing, 0)}
+            if tracked
+            else {}
         )
+        holdings = [(found.set_name, found.set_code, found.collector_number) for found in editions]
+        if count > have:
+            where = f" ({edition_names(holdings)})" if tracked and holdings else ""
+            report.error(
+                "collection.locked",
+                f"This deck holds {copies_words(count)} of {card.name}; your library has "
+                f"{'none' if have == 0 else copies_words(have)}{where}.",
+                f"Remove {count - have}, or wait until your library holds more: starter decks, "
+                "your alliance and packs add cards to it."
+                + (
+                    f" Keep the rest to the editions you own: {edition_names(holdings)}."
+                    if short and holdings
+                    else ""
+                ),
+                kind="collection_locked",
+                card_ids=holders[key],
+                quantity=count,
+            )
+            continue
+        # Enough copies in all: the editions the deck leaves copies of are the ones to switch to.
+        spare = [
+            (found.set_name, found.set_code, found.collector_number)
+            for found in editions
+            if found.copies > named[key].get(found.printing_id, 0)
+        ]
+        for printing, holding in short.items():
+            mine = held.get(printing, 0)
+            extra = holding - mine
+            chosen = next(
+                (item.editions[printing] for item in cards.values() if printing in item.editions),
+                None,
+            )
+            them = (
+                "this copy"
+                if holding == 1
+                else f"these {holding} copies"
+                if extra == holding
+                else f"{extra} of them"
+            )
+            report.error(
+                "collection.locked",
+                f"This deck holds {copies_words(holding)} of {card.name}"
+                + (f" from {edition_names([chosen], spare)}" if chosen else " in an edition")
+                + f"; your library has {copies_words(mine) if mine else 'none'} of that edition.",
+                f"You own {card.name} from "
+                + edition_names(spare, [chosen] if chosen else None)
+                + f": switch {them} to "
+                + ("it." if len(spare) == 1 else "them.")
+                if spare
+                else f"Switch {them} to an edition your library holds.",
+                kind="collection_locked",
+                card_ids=holders[key],
+                quantity=holding,
+            )
 
 
 def legacy(

@@ -13,6 +13,7 @@ import {
   emptySearch,
   type CatalogStatus,
   type CardSummary,
+  type PrintingsShown,
   type Search,
 } from "./catalog";
 import { useCardSearch } from "./SearchControls";
@@ -94,7 +95,14 @@ function Browser({
   const [view, setView] = useState<View>("catalog");
   const [search, setSearch] = useState<Search>({ ...emptySearch });
   const [page, setPage] = useState(1);
-  const [open, setOpen] = useState<CardSummary>();
+  // The card open, and which of its printings its details list (v0.5.0): from the library only
+  // the editions it holds, starting at the one opened.
+  const [open, setOpen] = useState<{
+    card: CardSummary;
+    printing?: string;
+    printings: PrintingsShown;
+  }>();
+  const openCard = (card: CardSummary) => setOpen({ card, printings: "all" });
   // Pictures or a list (v0.5.0), the same on every tab and remembered in this browser.
   const [shownAs, setShownAs] = useCardView();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -140,14 +148,20 @@ function Browser({
         ))}
       </div>
       {view === "library" && (
-        <MyLibrary onOpen={setOpen} view={shownAs} onView={setShownAs} />
+        <MyLibrary
+          onOpen={(card, printing) =>
+            setOpen({ card, printing, printings: "owned" })
+          }
+          view={shownAs}
+          onView={setShownAs}
+        />
       )}
       {view === "alliance" && (
         <AllianceCardsView
           cards={alliance.cards}
           error={alliance.error}
           custom={custom}
-          onOpen={setOpen}
+          onOpen={openCard}
           view={shownAs}
           onView={setShownAs}
         />
@@ -180,11 +194,15 @@ function Browser({
             (shownAs === "pictures" ? (
               <ul className={styles.grid} aria-label="Cards">
                 {results.items.map((card) => (
-                  <CardTile key={card.id} card={card} onOpen={setOpen} />
+                  <CardTile key={card.id} card={card} onOpen={openCard} />
                 ))}
               </ul>
             ) : (
-              <CardTable cards={results.items} label="Cards" onOpen={setOpen} />
+              <CardTable
+                cards={results.items}
+                label="Cards"
+                onOpen={openCard}
+              />
             ))}
           {results && results.total > PAGE_SIZE && (
             <nav className={styles.pager} aria-label="Result pages">
@@ -214,7 +232,7 @@ function Browser({
       <dialog
         ref={dialog}
         className={styles.cardDialog}
-        aria-label={open?.name ?? "Card"}
+        aria-label={open?.card.name ?? "Card"}
         onClose={() => setOpen(undefined)}
       >
         <button
@@ -225,7 +243,13 @@ function Browser({
         >
           ×
         </button>
-        {open && <CardDetails cardId={open.id} />}
+        {open && (
+          <CardDetails
+            cardId={open.card.id}
+            chosenPrinting={open.printing}
+            printings={open.printings}
+          />
+        )}
       </dialog>
     </>
   );

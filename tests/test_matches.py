@@ -26,7 +26,7 @@ from test_tables import Account, TableEngine, card, opened, served
 
 from api import accounts, economy, games, matches
 from api.identity import utcnow
-from api.models import Game, LibraryGrant, Match, MatchPlayer, TokenEntry, User
+from api.models import CardConcept, Game, LibraryGrant, Match, MatchPlayer, TokenEntry, User
 
 content = test_progression.content
 url = test_tables.url
@@ -493,10 +493,12 @@ def test_the_library_holds_every_card_of_the_arrangement(client, engine):
     cara = Account(client, "cara")
     with Session(client.app.state.database) as db:
         for name, quantity in (("Lightning Bolt", 4), ("Hill Giant", 2)):
+            concept = db.get_one(CardConcept, uuid.UUID(card(client, name)))
             db.add(
                 LibraryGrant(
                     user_id=cara.id,
-                    concept_id=uuid.UUID(card(client, name)),
+                    concept_id=concept.id,
+                    printing_id=concept.default_printing_id,
                     quantity=quantity,
                     source="pack",
                     grant_key="pack:test",
