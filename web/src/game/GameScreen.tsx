@@ -36,6 +36,7 @@ import {
   players,
   primaryOption,
   resultText,
+  teammateOf,
   words,
   type Located,
 } from "./model";
@@ -610,7 +611,10 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
         ? null
         : view.active_seat === view.seat && !observing
           ? "Your turn"
-          : `${seatName(view.active_seat)}’s turn`,
+          : // Two-Headed Giant (v0.5.0): a team takes its turn together.
+            view.active_seat === teammateOf(view) && !observing
+            ? "Your team’s turn"
+            : `${seatName(view.active_seat)}’s turn`,
     ]
       .filter(Boolean)
       .join(" · "),
@@ -645,7 +649,11 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               canvas={canvas}
             >
               <h1 ref={heading} tabIndex={-1} className={styles.visuallyHidden}>
-                {format === "commander" ? "Commander" : "Legacy"}
+                {format === "commander"
+                  ? "Commander"
+                  : format === "two_headed_giant"
+                    ? "Two-Headed Giant"
+                    : "Legacy"}
                 <span>{atTable ? " · Table game" : " · Practice game"}</span>
               </h1>
 

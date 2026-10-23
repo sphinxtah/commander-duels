@@ -431,3 +431,49 @@ describe("the table model", () => {
     );
   });
 });
+
+describe("Two-Headed Giant (v0.5.0)", () => {
+  /** The four-seat table as Two-Headed Giant: seats 0 and 1 against 2 and 3, one life a team. */
+  function giant(): TableFixture {
+    const f = tableFixture("four");
+    f.snapshot.settings.format = "two_headed_giant";
+    const view = f.snapshot.view!;
+    for (const p of [view.you!, ...view.opponents]) {
+      p.team = Math.floor(p.seat / 2);
+      p.life = p.seat < 2 ? 24 : 17;
+    }
+    return f;
+  }
+
+  it("marks the teammate and speaks of the team's life", () => {
+    const m = model(giant());
+    expect(m.teammateSeat).toBe(1);
+    const [mate, ...others] = m.opponents;
+    expect(mate).toMatchObject({
+      seat: 1,
+      team: 0,
+      teammate: true,
+      title: "Your teammate",
+      articleLabel: "Bot 2, seat 2, your teammate",
+    });
+    expect(mate.targetLabel).toMatch(/^Bot 2: 24 team life\. /);
+    expect(m.anchored!.targetLabel).toMatch(/^You: 24 team life\. /);
+    for (const other of others) {
+      expect(other.teammate).toBe(false);
+      expect(other.team).toBe(1);
+      expect(other.articleLabel).toMatch(/, the other team$/);
+    }
+    // The layout seats four as at any four-player table.
+    const l = layoutTable(m, { expandedSeat: null, textScale: 1 });
+    expect(validateHits(l, m)).toEqual([]);
+  });
+
+  it("has no teams at other tables", () => {
+    const m = fixtureModel("four");
+    expect(m.teammateSeat).toBeNull();
+    expect(m.opponents.every((p) => !p.teammate && p.team === null)).toBe(
+      true,
+    );
+    expect(m.opponents[0].title).not.toBe("Your teammate");
+  });
+});

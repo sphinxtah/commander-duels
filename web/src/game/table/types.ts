@@ -86,6 +86,8 @@ export interface TablePlayer {
   name: string; // "You" or the name (P1, L7 observer wording)
   title: string | null; // your deck name for yourself; "Bot"/"Player" otherwise; deck name only for SysOp
   kind: "human" | "bot" | null;
+  team: number | null; // Two-Headed Giant (v0.5.0): 0 or 1; null in other games
+  teammate: boolean; // the viewer's teammate, who shares the viewer's life total
   sigil: { seed: string; grey: boolean }; // seed: `handle:<h>` | `bot:<seat>` | `seat:<seat>`
   portrait: string | null; // a human's allied Planeswalker (v0.3.1), shown instead of the sigil
   active: boolean;
@@ -136,6 +138,7 @@ export interface TableModel {
   viewSeat: Seat | null;
   observing: boolean;
   canAnswer: boolean;
+  teammateSeat: Seat | null; // Two-Headed Giant (v0.5.0); null in other games and when observing
   turn: number;
   phase: string | null;
   step: string | null;

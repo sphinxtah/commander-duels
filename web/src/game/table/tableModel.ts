@@ -3,6 +3,7 @@ import {
   objectName,
   optionText,
   playerName,
+  teammateOf,
   type Located,
   type Zone,
 } from "../model";
@@ -90,6 +91,7 @@ export const buildTableModel: BuildTableModel = (input) => {
     viewSeat,
     observing,
     canAnswer: context.canAnswer,
+    teammateSeat: observing ? null : teammateOf(view),
   };
   if (!view)
     return {
@@ -374,16 +376,22 @@ export const buildTableModel: BuildTableModel = (input) => {
     const summary = summaryOf(seat);
     const kind = summary?.player ?? null;
     const self = viewSeat !== null && seat === viewSeat;
+    // Two-Headed Giant (v0.5.0): your teammate is marked as such, and life is the team's.
+    const team = player.team ?? null;
+    const teammate = seat === base.teammateSeat;
     // Other seats' decks are private: only SysOp sees their names (design §23.4).
     const title = self
       ? deckTitle(summary?.deck)
-      : sysop && summary?.deck
-        ? deckTitle(summary.deck)
-        : kind === "bot"
-          ? "Bot"
-          : kind === "human"
-            ? "Player"
-            : null;
+      : teammate
+        ? "Your teammate"
+        : sysop && summary?.deck
+          ? deckTitle(summary.deck)
+          : kind === "bot"
+            ? "Bot"
+            : kind === "human"
+              ? "Player"
+              : null;
+    const life = `${player.life} ${team === null ? "life" : "team life"}`;
     const handle = summary?.handle ?? (self ? selfHandle : null);
     const seed =
       kind === "bot"
@@ -418,6 +426,8 @@ export const buildTableModel: BuildTableModel = (input) => {
       name,
       title,
       kind,
+      team,
+      teammate,
       sigil: { seed, grey: !anchored },
       portrait,
       active: view.active_seat === seat,
@@ -427,15 +437,15 @@ export const buildTableModel: BuildTableModel = (input) => {
       offered,
       mark: markOf(offered, false),
       targetLabel:
-        offered.length > 0
-          ? `${name}: ${player.life} life. ${optionWords(offered)}`
-          : `${player.life} life`,
+        offered.length > 0 ? `${name}: ${life}. ${optionWords(offered)}` : life,
       sideLabel: anchored
         ? seat === youSeat
           ? "Your side of the table"
           : `${player.name}'s side of the table`
         : null,
-      articleLabel: anchored ? null : `${player.name}, seat ${seat + 1}`,
+      articleLabel: anchored
+        ? null
+        : `${player.name}, seat ${seat + 1}${teammate ? ", your teammate" : team !== null ? ", the other team" : ""}`,
       battlefieldLabel:
         seat === youSeat ? "Your battlefield" : `${player.name}'s battlefield`,
       units,

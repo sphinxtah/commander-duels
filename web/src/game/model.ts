@@ -52,6 +52,14 @@ export function playerName(
   );
 }
 
+/** The viewer's teammate's seat in Two-Headed Giant (v0.5.0); null in other games and for
+ * spectators. Teammates take their turns together and share one life total. */
+export function teammateOf(view: GameView | null): Seat | null {
+  const team = view?.you?.team;
+  if (team === undefined || team === null) return null;
+  return view?.opponents.find((p) => p.team === team)?.seat ?? null;
+}
+
 /** Every object the seat can see, by its opaque id. */
 export function objectIndex(view: GameView | null): Map<ObjectId, Located> {
   const index = new Map<ObjectId, Located>();
@@ -251,6 +259,8 @@ export function resultText(
   result: {
     kind: string;
     winner_seat: Seat | null;
+    /** The winning team in Two-Headed Giant (v0.5.0). */
+    winner_seats?: Seat[];
     draw: boolean;
     turns: number;
   },
@@ -265,9 +275,21 @@ export function resultText(
       detail: `The game ended in a draw after ${turns}.`,
     };
   if (result.winner_seat !== null) {
-    if (result.winner_seat === seat)
-      return { title: "Victory", detail: `You won in ${turns}.` };
-    const winner = nameOf(result.winner_seat);
+    // A team wins together (Two-Headed Giant): either teammate's seat is a victory.
+    const seats = result.winner_seats ?? [];
+    const team = seats.length > 1 ? seats : [];
+    if (result.winner_seat === seat || (seat !== null && team.includes(seat)))
+      return {
+        title: "Victory",
+        detail:
+          team.length > 1
+            ? `Your team won in ${turns}.`
+            : `You won in ${turns}.`,
+      };
+    const winner =
+      team.length > 1
+        ? team.map(nameOf).join(" and ")
+        : nameOf(result.winner_seat);
     return {
       title: seat === null ? "Game over" : "Defeat",
       detail: `${winner} won in ${turns}.`,

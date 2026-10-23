@@ -72,8 +72,10 @@ function outcome(game: GameSummary): string {
   if (!result) return "Finished";
   const turns = `${result.turns} turn${result.turns === 1 ? "" : "s"}`;
   if (result.draw) return `Draw after ${turns}`;
+  // In Two-Headed Giant (v0.5.0) a team wins together.
   if (result.winner_seat !== null && game.your_seat !== null)
-    return result.winner_seat === game.your_seat
+    return result.winner_seat === game.your_seat ||
+      (result.winner_seats ?? []).includes(game.your_seat)
       ? `Won in ${turns}`
       : `Lost in ${turns}`;
   const kinds: Record<string, string> = {
@@ -155,6 +157,31 @@ function plainClick(event: MouseEvent): boolean {
   );
 }
 
+const formatNames: Record<GameSummary["format"], string> = {
+  legacy: "Legacy",
+  commander: "Commander",
+  two_headed_giant: "Two-Headed Giant",
+};
+
+/** What each format's choice says: the bots and life, and an early format's mark (v0.5.0). */
+const formatLines: Record<Request["format"], string> = {
+  legacy: "One bot, 20 life",
+  commander: "One to three bots, 40 life",
+  two_headed_giant: "Early · a bot teammate against two bots, 30 life a team",
+};
+
+/** The format a game's decks are built for: Two-Headed Giant plays Legacy decks (v0.5.0). */
+export function deckFormat(format: Request["format"]): "legacy" | "commander" {
+  return format === "two_headed_giant" ? "legacy" : format;
+}
+
+/** A bot seat's deck choice, by its place at the table. */
+function botLabel(format: Request["format"], bots: number, index: number) {
+  if (format === "two_headed_giant")
+    return index === 0 ? "Teammate's deck" : `Opponent ${index}'s deck`;
+  return bots === 1 ? "Bot's deck" : `Bot ${index + 1}'s deck`;
+}
+
 const refusals: Record<string, string> = {
   deck_not_playable:
     "That deck has problems to fix first: open it in the deck builder to see them.",
@@ -163,6 +190,7 @@ const refusals: Record<string, string> = {
     "You already have a game running. Resume it or close it below first.",
   games_busy: "Every table is busy right now. Try again in half a minute.",
   games_unavailable: "Games are switched off on this server.",
+  // team_decks keeps the server's message: it names the cards teammates' decks share.
   engine_unavailable: "The rules engine is not answering. Try again shortly.",
 };
 
@@ -204,7 +232,7 @@ function Table({ me }: { me: Me }) {
   const [everyone, setEveryone] = useState(false);
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
-  const [format, setFormat] = useState<"legacy" | "commander">("legacy");
+  const [format, setFormat] = useState<Request["format"]>("legacy");
   const [deck, setDeck] = useState<string>("");
   const [bots, setBots] = useState(1);
   const [botDecks, setBotDecks] = useState<string[]>(["", "", ""]);
@@ -308,7 +336,9 @@ function Table({ me }: { me: Me }) {
 
   const chosenFormat = options?.formats.find((f) => f.id === format);
   const fixtures = chosenFormat?.decks ?? [];
-  const ownHere = (ownDecks ?? []).filter((d) => d.format === format);
+  const ownHere = (ownDecks ?? []).filter(
+    (d) => d.format === deckFormat(format),
+  );
   /** A seat's choice while the game's rules take it (v0.4.5); else none. */
   const allowed = (value: string): string =>
     !value.startsWith(OWN) ||
@@ -404,16 +434,16 @@ function Table({ me }: { me: Me }) {
               />
               <span>
                 <strong>{f.name}</strong>
-                <small>
-                  {f.id === "legacy"
-                    ? "One bot, 20 life"
-                    : "One to three bots, 40 life"}
-                </small>
+                <small>{formatLines[f.id]}</small>
               </span>
             </label>
           ))}
         </fieldset>
-        <RulesFields rules={rules} format={format} onChange={setRules} />
+        <RulesFields
+          rules={rules}
+          format={deckFormat(format)}
+          onChange={setRules}
+        />
         {noDeck ? (
           <div className={styles.field} data-no-deck>
             <span>Your deck</span>
@@ -461,9 +491,9 @@ function Table({ me }: { me: Me }) {
         )}
         {Array.from({ length: bots }, (_, i) => (
           <label key={i} className={styles.field}>
-            <span>{bots === 1 ? "Bot's deck" : `Bot ${i + 1}'s deck`}</span>
+            <span>{botLabel(format, bots, i)}</span>
             <select
-              aria-label={bots === 1 ? "Bot's deck" : `Bot ${i + 1}'s deck`}
+              aria-label={botLabel(format, bots, i)}
               value={allowed(botDecks[i] ?? "")}
               onChange={(event) =>
                 setBotDecks((current) =>
@@ -474,7 +504,8 @@ function Table({ me }: { me: Me }) {
               }
             >
               {/* Left to the server: Commander bots play the starter decks, Legacy bots the
-                  engine's fixture decks. */}
+                  engine's fixture decks, and Two-Headed Giant bots fixture decks that share no
+                  card with their teammate's. */}
               <option value="">Chosen by the table</option>
               <DeckOptions fixtures={fixtures} own={ownHere} rules={rules} />
             </select>
@@ -610,7 +641,7 @@ function Table({ me }: { me: Me }) {
               <li key={game.id} data-status={game.status}>
                 <div>
                   <strong>
-                    {game.format === "commander" ? "Commander" : "Legacy"}
+                    {formatNames[game.format]}
                     {game.kind === "table" ? " table" : ""}
                   </strong>{" "}
                   <span>{players}</span>
