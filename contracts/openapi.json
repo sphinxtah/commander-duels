@@ -7166,6 +7166,18 @@
             ],
             "title": "Message"
           },
+          "offered_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The handle of who asked for it.",
+            "title": "Offered By"
+          },
           "origin": {
             "description": "Where the game came from, and so where its players go back to.",
             "enum": [
@@ -7223,6 +7235,7 @@
           "expires_at",
           "expires_in",
           "game_id",
+          "offered_by",
           "declined_by",
           "message"
         ],

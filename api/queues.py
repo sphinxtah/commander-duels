@@ -119,6 +119,7 @@ TURN_CAP = 60
 WAITING = ("waiting", "starting")
 GONE = "You left the queue: your app stopped asking about your place."
 BUSY = "Every game slot is in use. Your game starts as soon as one frees up."
+SILENT = "The rules engine is not answering. Your game starts once it does."
 
 
 class QueueRequest(Contract):
@@ -441,7 +442,7 @@ def plan_group(database: Engine, request: Request, group: Group) -> list[SeatPla
             if "games.view_concealed" not in permissions and active_games_of(db, user_id) >= limit:
                 refused[user_id] = (
                     "game_limit",
-                    "You started another game, so you left the queue. Join again once it ends.",
+                    "You started another game. Join the queue again once it ends.",
                 )
                 continue
             library = library_of(db, user, permissions, roster)
@@ -620,9 +621,12 @@ class QueueHub:
                 log.exception("The queues' tick failed")
 
     async def tick(self) -> None:
+        """Takes out the places nobody asks about, then matches each queue with players waiting:
+        without games set up, nothing starts."""
+        keys = await run_in_threadpool(waiting_queues, self.database, self.clock())
         if self.games.engine is None:
             return
-        for key in await run_in_threadpool(waiting_queues, self.database, self.clock()):
+        for key in keys:
             await self.match(key)
 
     async def match(self, key: QueueKey) -> None:
@@ -659,7 +663,7 @@ class QueueHub:
             except ApiError as error:
                 if error.code != "custom_not_loaded":
                     await run_in_threadpool(
-                        put_back, self.database, group.users, now, None, error.code, BUSY
+                        put_back, self.database, group.users, now, None, error.code, SILENT
                     )
                     return False
                 # Only a Godlike player's deck holds custom cards: those players are taken out.
@@ -691,9 +695,15 @@ class QueueHub:
                         await run_in_threadpool(put_back, self.database, group.users, now, out)
                         return True
                     log.warning("The engine refused a queue's game: %s", error.code)
-                    reason = "games_busy" if error.status == 429 else error.code
+                    busy = error.status == 429
                     await run_in_threadpool(
-                        put_back, self.database, group.users, now, None, reason, BUSY
+                        put_back,
+                        self.database,
+                        group.users,
+                        now,
+                        None,
+                        "games_busy" if busy else error.code,
+                        BUSY if busy else SILENT,
                     )
                     return False
                 try:
@@ -829,7 +839,11 @@ async def join_queue(
             f"{FORMAT_NAMES[body.format]} has no queue for {body.seats} players.",
         )
     await run_in_threadpool(enter, db, request, principal, body, queues.clock())
-    await queues.match(key)
+    try:
+        await queues.match(key)
+    except SQLAlchemyError:
+        # The place is taken; the tick matches it once the database answers again.
+        log.warning("Could not match the %s queue on a join", queue_name(key), exc_info=True)
     return await run_in_threadpool(status_of, db, principal.user.id, queues.clock())
 
 

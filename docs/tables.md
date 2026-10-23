@@ -1,6 +1,6 @@
 # Human tables (v0.4.0)
 
-Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Queues come later.
+Since v0.4.0 approved players play each other. A player opens a table in the lobby, others join it, and the host starts one game with a seat for every player. Bots may fill the seats the players leave. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). Since v0.4.4 the players talk at the table, make alliances and write to their allies alone ([chat](chat.md#the-tables-chat)). Since v0.5.0 players also find each other through public queues, whose games of two players or more are table games, and a table's players may play their game again with Rematch ([queues and rematches](queues.md)).
 
 ## The lobby
 
@@ -13,7 +13,7 @@ Since v0.4.0 approved players play each other. A player opens a table in the lob
   The host takes the first seat with one of their decks.
 - **The invite link.** Every table has an unguessable code, and its page is `#tables/<code>`. A private table is never listed, so the link is the only way in. Its players see the link and can copy it. SysOp sees every table, private ones included.
 - **Seats.** A player joins with one of their own decks and takes the first free seat. They may change deck (which makes them not ready again), mark themselves ready, or leave. The host leaving closes the table for everyone.
-- **One table at a time.** A player sits at one open table at a time. Joining, or opening a table, also needs room under the account's limit of running games (`CD_GAMES_PER_ACCOUNT`, 1 by default; SysOp has none).
+- **One table at a time.** A player sits at one open table at a time, and since v0.5.0 not while waiting in a public queue (`409 in_queue`, [queues](queues.md#joining-and-waiting)). Joining, or opening a table, also needs room under the account's limit of running games (`CD_GAMES_PER_ACCOUNT`, 1 by default; SysOp has none).
 - **Starting.** The host starts once every player's seat is taken and every other player is ready. Each player's limit of running games is checked again then. The other players' pages follow the table into its game.
 
 ## The table's rules (v0.4.5)
@@ -68,7 +68,7 @@ There are no turn timers.
 
 Every route needs `games.play`, and seats need `decks.edit`. Refusals:
 - 404 for a code no table has.
-- 409 `at_a_table` (another open table), `game_limit` (no room for another running game, naming the player at the start), `table_full`, `table_closed`, `already_seated`, `not_seated`, `not_ready`, `table_not_full`, `deck_not_playable` (another player's deck at the start), `player_unavailable`, `table_changed` (a player left as it started).
+- 409 `at_a_table` (another open table), `in_queue` (since v0.5.0: waiting in a public queue), `game_limit` (no room for another running game, naming the player at the start), `table_full`, `table_closed`, `already_seated`, `not_seated`, `not_ready`, `table_not_full`, `deck_not_playable` (another player's deck at the start), `player_unavailable`, `table_changed` (a player left as it started).
 - 403 `not_host` for a start by anyone but the host.
 - 422 `invalid_table`, the practice table's deck refusals (`invalid_deck`, `deck_not_playable`), and since v0.4.5 `deck_not_allowed`: your deck holds cards the table's rules do not allow, named in the message.
 - 429 `games_busy` and 503 as for practice games.
@@ -84,6 +84,8 @@ Migration `0009_tables` adds:
 - **`game_seats.left_at` and `left_reason`.** A seat out of a game that went on without it: `conceded`, `removed` or `eliminated`.
 
 Going back to 0008 keeps every game, with its wins and tokens, as a practice game, and drops the tables.
+
+Migration `0022_queues` (v0.5.0) marks the tables the public queue makes, and their rematches' (`game_tables.queued`), started at once and private, with every seat taken and ready ([queues](queues.md#data)).
 
 Migration `0019_table_rules` (v0.4.5) adds each table's rules, `game_tables.allow_banned` and `allow_not_legal`, true for the tables already there, and each deck's needs ([decks](decks.md#validation-deck08-t03t05)). Going back drops them: tables take legal decks only again.
 

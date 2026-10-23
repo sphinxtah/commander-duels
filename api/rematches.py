@@ -105,6 +105,7 @@ class RematchView(Contract):
     expires_at: datetime | None
     expires_in: int | None = Field(description="While open: seconds left.")
     game_id: UUID | None = Field(description="The new game, once started.")
+    offered_by: str | None = Field(description="The handle of who asked for it.")
     declined_by: str | None = Field(description="The handle of who declined.")
     message: str | None
 
@@ -201,6 +202,7 @@ def view_of(db: Session, game: Game, principal: Principal) -> RematchView:
         and (game.settings is not None if game.kind == "practice" else asked and len(seated) > 1)
     )
     declined = db.get(User, rematch.declined_by) if rematch and rematch.declined_by else None
+    offered = db.get(User, rematch.proposed_by) if rematch else None
     open_ = rematch is not None and rematch.status in ("open", "starting")
     return RematchView(
         status=(
@@ -225,6 +227,7 @@ def view_of(db: Session, game: Game, principal: Principal) -> RematchView:
             max(0, int((rematch.expires_at - now).total_seconds())) if open_ and rematch else None
         ),
         game_id=rematch.next_game_id if rematch else None,
+        offered_by=offered.handle if offered else None,
         declined_by=declined.handle if declined else None,
         message=rematch.message if rematch else None,
     )

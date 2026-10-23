@@ -5026,6 +5026,11 @@ export interface components {
             /** Message */
             message: string | null;
             /**
+             * Offered By
+             * @description The handle of who asked for it.
+             */
+            offered_by: string | null;
+            /**
              * Origin
              * @description Where the game came from, and so where its players go back to.
              * @enum {string}

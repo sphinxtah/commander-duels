@@ -80,7 +80,7 @@ def no_background_tick(monkeypatch: pytest.MonkeyPatch) -> None:
 def queued(
     url: str, content: Path, engine: TableEngine | None, **settings: Any
 ) -> Iterator[TestClient]:
-    with served(url, content, engine, games_max=8, **settings) as client:
+    with served(url, content, engine, **({"games_max": 8} | settings)) as client:
         try:
             yield client
         finally:
@@ -506,6 +506,28 @@ def test_concurrent_matches_seat_each_player_once(client, engine, clock):
     # In the order they joined.
     assert place(players[0])["game_id"] == place(players[1])["game_id"]
     assert place(players[2])["game_id"] == place(players[3])["game_id"]
+
+
+def test_with_every_game_slot_busy_the_players_wait_on(url, content, engine):
+    with queued(url, content, engine, games_max=1) as client:
+        ada, bob, cara = Account(client, "ada"), Account(client, "bob"), Account(client, "cara")
+        running = ada.send(
+            "POST", "/api/v1/practice-games", {"format": "legacy", "deck_id": deck(ada, client)}
+        )
+        assert running.status_code == 201
+        join(bob, deck(bob, client), humans_only=True)
+        busy = join(cara, deck(cara, client), humans_only=True).json()
+        assert (busy["status"], busy["reason"], busy["message"]) == (
+            "waiting",
+            "games_busy",
+            queues.BUSY,
+        )
+        assert place(bob)["position"] == 1 and len(engine.created) == 1
+        # A slot frees up: the next tick starts their game.
+        ada.send("POST", f"/api/v1/games/{running.json()['id']}/close")
+        tick(client)
+        assert place(cara)["status"] == "matched"
+        assert place(bob)["game_id"] == place(cara)["game_id"]
 
 
 def test_without_games_players_wait(url, content):

@@ -23,6 +23,7 @@ import { ReportDialog } from "../app/ReportProblem";
 import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
+import { RematchPanel, useRematch } from "../queues/Rematch";
 import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
@@ -541,6 +542,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     [view],
   );
   const over = Boolean(snapshot?.result) || state.ended !== null;
+  // The result screen's Rematch (v0.5.0), once the game's end is recorded.
+  const rematch = useRematch(gameId, summary, over);
   const alliances = useMemo<TableAlliances | null>(
     () =>
       chatting
@@ -576,9 +579,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     ? resultText(view, state.seat, result, seatName)
     : null;
   const format = snapshot?.settings.format ?? summary?.format;
-  const back = atTable
-    ? { href: "#tables", text: "Back to the lobby" }
-    : { href: "#play", text: "Back to the table" };
+  // A public queue's game (v0.5.0) leads back to the queue, as its rematch does.
+  const back =
+    rematch.view?.origin === "queue"
+      ? { href: "#find", text: "Find another game" }
+      : atTable
+        ? { href: "#tables", text: "Back to the lobby" }
+        : { href: "#play", text: "Back to the table" };
   const paid =
     summary?.status === "finished" && summary.tokens ? summary.tokens : null;
   const tokensLine =
@@ -800,6 +807,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                       <h2 id="result-side-title">{outcome.title}</h2>
                       <p>{outcome.detail}</p>
                       {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+                      <RematchPanel rematch={rematch} />
                       <a
                         href={back.href}
                         className={styles.secondaryButton}
@@ -1002,6 +1010,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               <h2 id="result-title">{outcome?.title}</h2>
               <p>{outcome?.detail}</p>
               {tokensLine && <p data-tokens={paid}>{tokensLine}</p>}
+              <RematchPanel rematch={rematch} />
               <form method="dialog" className={styles.confirmButtons}>
                 <button type="submit" className={styles.secondaryButton}>
                   Review the board

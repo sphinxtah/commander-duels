@@ -153,7 +153,7 @@ Since v0.3.1 the bots plan only with what their seat may see ([fair bots](engine
 
 ## Human tables (v0.4.0)
 
-A table's game ([human tables](tables.md)) uses the same screen. The other players go by their handles, on the board, in the turn line, the result and the log. Above the prompt, a Players panel says who is away and for how long, and once they may be voted out offers "Vote to remove" and "Keep waiting" with the votes so far. It also says who conceded or was removed, and tells a removed player so when they come back. Conceding says the other players play on; the result and its dialog lead back to the lobby. Every finished game's result, practice or table, shows the tokens it paid you.
+A table's game ([human tables](tables.md)) uses the same screen. The other players go by their handles, on the board, in the turn line, the result and the log. Above the prompt, a Players panel says who is away and for how long, and once they may be voted out offers "Vote to remove" and "Keep waiting" with the votes so far. It also says who conceded or was removed, and tells a removed player so when they come back. Conceding says the other players play on; the result and its dialog lead back to the lobby. Every finished game's result, practice or table, shows the tokens it paid you. Since v0.5.0 the result and its dialog offer Rematch to the game's players: a practice game starts again at once, and a table's asks its other players, with their answers shown as they come ([rematches](queues.md#rematches)).
 
 Since v0.4.4 a table's game has its chat: a diamond on the band opens it as a drawer at the right, with the Table and Allies tabs, the emotes and the alliances, and each other player's plate has an Alliance menu ([chat](chat.md#the-tables-chat)).
 

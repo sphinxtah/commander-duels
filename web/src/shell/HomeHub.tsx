@@ -11,6 +11,8 @@ import styles from "./shell.module.css";
 interface HubData {
   /** A game of the account's still running, to resume. */
   game?: string;
+  /** The format whose public queue the account waits in (v0.5.0). */
+  queue?: string;
   tables?: number;
   decks?: number;
   online?: number;
@@ -28,6 +30,11 @@ function useHubData(me: Me): HubData {
       if (data)
         merge({ game: data.find((game) => game.status === "active")?.id });
     });
+    if (me.permissions.includes("games.play"))
+      void client.GET("/api/v1/queue").then(({ data }) => {
+        if (data?.status === "waiting" && data.format)
+          merge({ queue: data.format === "legacy" ? "Legacy" : "Commander" });
+      });
     void client.GET("/api/v1/tables").then(({ data }) => {
       if (data)
         merge({
@@ -156,13 +163,27 @@ export function HomeHub({
       </section>
       <section className={styles.tiles} aria-label="Main menu">
         <Tile
-          href={data.game ? `#game/${data.game}` : "#play"}
+          href={
+            data.game ? `#game/${data.game}` : data.queue ? "#find" : "#play"
+          }
           className={styles.playTile}
           icon="play"
           title="Play"
-          lead="Battle the bots in Legacy or Commander."
-          meta={data.game ? "A game is waiting for you" : undefined}
-          action={data.game ? "Resume your game" : "Play now"}
+          lead="Find a game, or battle the bots in Legacy or Commander."
+          meta={
+            data.game
+              ? "A game is waiting for you"
+              : data.queue
+                ? `Looking for a ${data.queue} game`
+                : undefined
+          }
+          action={
+            data.game
+              ? "Resume your game"
+              : data.queue
+                ? "See your place"
+                : "Play now"
+          }
           index={0}
         />
         <Tile

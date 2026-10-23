@@ -104,6 +104,7 @@ def test_a_practice_game_plays_again_with_the_same_settings(client, engine):
         "expires_at": None,
         "expires_in": None,
         "game_id": None,
+        "offered_by": None,
         "declined_by": None,
         "message": None,
     }

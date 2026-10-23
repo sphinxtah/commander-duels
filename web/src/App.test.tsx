@@ -264,6 +264,8 @@ beforeEach(() => {
   on("GET /api/v1/friends", () =>
     reply(200, { friends: [], incoming: [], outgoing: [] }),
   );
+  // The account's place in a public queue (v0.5.0): none.
+  on("GET /api/v1/queue", () => reply(200, { status: "none" }));
 });
 afterEach(() => {
   vi.restoreAllMocks();

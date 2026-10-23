@@ -43,6 +43,7 @@ import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
 import { GameScreen } from "./game/GameScreen";
+import { QueueFollower } from "./queues/FindGame";
 import { TablesPage } from "./tables/TablesPage";
 import { HomeHub } from "./shell/HomeHub";
 import { useHud } from "./shell/hud";
@@ -103,8 +104,9 @@ function currentPage(): Page {
   if (path.startsWith("messages/")) return "Messages";
   if (path.startsWith("tables/")) return "Tables";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
-  // The Play page's own anchors: its practice table and its formats.
-  if (path === "practice" || path === "formats") return "Play";
+  // The Play page's own anchors: "Find a game" (v0.5.0), its practice table and its formats.
+  if (path === "find" || path === "practice" || path === "formats")
+    return "Play";
   // Any other address, Campaign, Learn and Collection's old ones included, is the main menu.
   return pages.find((page) => page.toLowerCase() === path) ?? "Home";
 }
@@ -620,6 +622,8 @@ export function App() {
           onClose={() => setSetup(null)}
         />
         <ChatDock chat={chat} />
+        {/* A game the public queue finds opens from any page (v0.5.0). */}
+        {me.permissions.includes("games.play") && <QueueFollower />}
       </div>
     </ChatContext.Provider>
   );
