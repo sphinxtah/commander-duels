@@ -1,13 +1,20 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { client } from "../api";
 import game from "../game/game.module.css";
 import { opponentOf, running, score, type MatchView } from "./matches";
 
 // The account's running best-of-three matches on the Play page (v0.5.0): a match holds its
-// player's running game between its games too, so the page leads back to it.
+// player's running game between its games too, so the page leads back to it. Conceding one asks
+// first (v0.5.1, the owner's change), as the match's own page does.
 
 export function RunningMatches({ refreshKey }: { refreshKey?: unknown }) {
   const [matches, setMatches] = useState<MatchView[]>([]);
+  // The match "Concede the match" was pressed for, while its confirmation is open.
+  const [conceding, setConceding] = useState<MatchView>();
+  const confirm = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (conceding) confirm.current?.showModal();
+  }, [conceding]);
   const load = useCallback(async () => {
     const answer = await client.GET("/api/v1/matches").catch(() => undefined);
     setMatches(answer?.data ?? []);
@@ -55,13 +62,7 @@ export function RunningMatches({ refreshKey }: { refreshKey?: unknown }) {
                 <button
                   type="button"
                   className={game.secondaryButton}
-                  onClick={() =>
-                    void client
-                      .POST("/api/v1/matches/{match_id}/concede", {
-                        params: { path: { match_id: match.id } },
-                      })
-                      .then(() => load())
-                  }
+                  onClick={() => setConceding(match)}
                 >
                   Concede the match
                 </button>
@@ -70,6 +71,39 @@ export function RunningMatches({ refreshKey }: { refreshKey?: unknown }) {
           );
         })}
       </ul>
+      <dialog
+        ref={confirm}
+        className={game.confirm}
+        aria-labelledby="concede-running-title"
+        onClose={() => setConceding(undefined)}
+      >
+        <h2 id="concede-running-title">Concede the match?</h2>
+        <p>
+          {conceding?.status === "playing"
+            ? "You lose the game in play, and the match."
+            : "You lose the match."}{" "}
+          The games you won still count.
+        </p>
+        <form method="dialog" className={game.confirmButtons}>
+          <button type="submit" className={game.secondaryButton} autoFocus>
+            Keep playing
+          </button>
+          <button
+            type="submit"
+            className={game.dangerButton}
+            onClick={() => {
+              if (!conceding) return;
+              void client
+                .POST("/api/v1/matches/{match_id}/concede", {
+                  params: { path: { match_id: conceding.id } },
+                })
+                .then(() => load());
+            }}
+          >
+            Concede the match
+          </button>
+        </form>
+      </dialog>
     </>
   );
 }
