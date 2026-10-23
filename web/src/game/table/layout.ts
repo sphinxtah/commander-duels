@@ -1355,7 +1355,10 @@ export const layoutTable: LayoutTable = (model, options) => {
         label: player.battlefieldLabel,
         nodes: [more.key],
       });
-    drops.push({ kind: "attack", rect: target, seat: player.seat });
+    // Nobody attacks their teammate, chipped or not (v0.5.1): a drop on their chip falls to the
+    // expanded board's half around it, and never names the teammate as the defender.
+    if (!player.teammate)
+      drops.push({ kind: "attack", rect: target, seat: player.seat });
   });
 
   /* --- the anchored player: plate, zones, command cards, hand --- */
