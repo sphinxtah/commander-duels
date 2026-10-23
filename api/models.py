@@ -848,13 +848,15 @@ class LibraryGrant(Base):
 
 class TokenEntry(Base):
     """The economy ledger (PROG03, v0.4.0): tokens paid for wins, each from a committed result,
-    the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought.
-    Append-only: PostgreSQL refuses updates and deletes. A balance is the sum of its entries."""
+    the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought; since
+    v0.5.0 the rewards of daily quests and achievements. Append-only: PostgreSQL refuses updates
+    and deletes. A balance is the sum of its entries."""
 
     __tablename__ = "token_ledger"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack')",
+            "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack', 'quest', "
+            "'achievement')",
             name="ck_token_ledger_kind",
         ),
         CheckConstraint(
@@ -870,7 +872,8 @@ class TokenEntry(Base):
     # Tokens in (earned, given) or out (spent, taken back); 0 for a win past a limit.
     amount: Mapped[int] = mapped_column(BigInteger)
     # Unique per fact, so retries and replays write nothing twice: tokens:<game>:<seat>:<beaten
-    # seat>, welcome:<account>, grant:<id>, pack:<opening>.
+    # seat>, welcome:<account>, grant:<id>, pack:<opening>; since v0.5.0 quest:<account>:<day>:
+    # <quest> and achievement:<account>:<achievement>, each with a reset's time after one.
     key: Mapped[str] = mapped_column(String(128), unique=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"), index=True)
     # The seat beaten, and its player when a human sat there.
@@ -1200,13 +1203,15 @@ class PlayerBlock(Base):
 class Notification(Base):
     """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
     come online, and since v0.4.4 new messages from a friend (one while unread, renewed by each
-    message). The actor is the other player. Kept NOTIFICATION_DAYS, at most a few hundred per
-    account (api/social.py)."""
+    message). The actor is the other player. Since v0.5.0 a daily quest completed and an
+    achievement earned, which no player caused: the subject names which. Kept NOTIFICATION_DAYS,
+    at most a few hundred per account (api/social.py)."""
 
     __tablename__ = "notifications"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message')",
+            "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
+            "'quest_completed', 'achievement_earned')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1218,6 +1223,8 @@ class Notification(Base):
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # The quest or the achievement (v0.5.0), by its ID.
+    subject: Mapped[str | None] = mapped_column(String(48))
 
 
 class Conversation(Base):
@@ -1288,3 +1295,98 @@ class WeeklySale(Base):
     product_ids: Mapped[list[str]] = mapped_column(JsonType)
     percent: Mapped[int] = mapped_column(SmallInteger)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+# Statistics, daily quests and achievements (v0.5.0, PROG04, PROG07, PROG08): api/stats.py,
+# api/quests.py and api/achievements.py. Every one is judged from the server's own record of a
+# finished game. A reset (users.reset_at) leaves their rows recorded, and they count only what
+# came after it; deleting an account keeps them, as it keeps the ledgers.
+
+
+class PlayerResult(Base):
+    """A player's result in a game that ended (v0.5.0, api/stats.py): one row per human seat,
+    written in the transaction that records the game's end, from the engine's result as the API
+    recorded it and the deck the seat played. Append-only: PostgreSQL refuses updates and deletes.
+    Opponents and the deck's title are read from the game's seats, which a deletion renames."""
+
+    __tablename__ = "player_results"
+    __table_args__ = (
+        UniqueConstraint("game_id", "seat"),
+        CheckConstraint(
+            "outcome IN ('win', 'loss', 'draw', 'no_result')", name="ck_player_results_outcome"
+        ),
+        # A player's totals and history, newest first.
+        Index("ix_player_results_user_id_finished_at", "user_id", "finished_at"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"))
+    seat: Mapped[int]
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    outcome: Mapped[str] = mapped_column(String(16))
+    # The game's, copied: no check, so a format or a kind of game added later counts as itself.
+    format: Mapped[str] = mapped_column(String(32))
+    kind: Mapped[str] = mapped_column(String(16))
+    # Every seat, the other players' and the bots' (with the game's bot skill when it had bots).
+    seats: Mapped[int] = mapped_column(SmallInteger)
+    players: Mapped[int] = mapped_column(SmallInteger)
+    bots: Mapped[int] = mapped_column(SmallInteger)
+    bot_skill: Mapped[int | None] = mapped_column(SmallInteger)
+    # The deck's colours, WUBRG letters: a Commander deck's commanders' color identity, a Legacy
+    # deck's cards' colors; empty for a colorless deck or a deck list typed by SysOp.
+    colors: Mapped[str] = mapped_column(String(8), default="")
+    turns: Mapped[int | None]
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    finished_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # The rule the outcome was judged under (PROG05).
+    policy: Mapped[str] = mapped_column(String(32))
+
+
+class DailyQuest(Base):
+    """One of an account's three quests of a day (v0.5.0, api/quests.py), drawn the first time
+    the account asks for its quests that day, Arizona time. A swap replaces a slot's quest once a
+    day; a quest completed is paid through the economy ledger (key quest:<account>:<day>:<quest>).
+    """
+
+    __tablename__ = "daily_quests"
+    __table_args__ = (
+        CheckConstraint("slot BETWEEN 0 AND 2", name="ck_daily_quests_slot"),
+        Index("ix_daily_quests_user_id_day", "user_id", "day"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    # The calendar day in Arizona.
+    day: Mapped[date] = mapped_column(Date)
+    slot: Mapped[int] = mapped_column(SmallInteger)
+    # Unique per slot and day: quest-slot:<account>:<day>:<slot>, with the time of a reset after
+    # one, so a reset draws the day's quests again.
+    key: Mapped[str] = mapped_column(String(128), unique=True)
+    quest: Mapped[str] = mapped_column(String(48))
+    # What it pays and how many wins it needs, as they were when it was drawn.
+    tokens: Mapped[int]
+    target: Mapped[int] = mapped_column(SmallInteger)
+    # Games finished from this time count: the day's start, or the swap's time.
+    counts_from: Mapped[datetime] = mapped_column(UtcDateTime())
+    swapped_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    completed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    policy: Mapped[str] = mapped_column(String(32))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class PlayerAchievement(Base):
+    """An achievement an account earned (v0.5.0, api/achievements.py), once, under the version of
+    its definition then; its reward is paid through the economy ledger under the same key. Never
+    removed by an update (PROG07). Up to three are pinned to the profile, in order."""
+
+    __tablename__ = "player_achievements"
+    __table_args__ = (
+        CheckConstraint("pin IS NULL OR pin BETWEEN 1 AND 3", name="ck_player_achievements_pin"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    achievement: Mapped[str] = mapped_column(String(48))
+    version: Mapped[int] = mapped_column(SmallInteger)
+    # achievement:<account>:<achievement>, with the time of a reset after one.
+    key: Mapped[str] = mapped_column(String(128), unique=True)
+    tokens: Mapped[int]
+    pin: Mapped[int | None] = mapped_column(SmallInteger)
+    earned_at: Mapped[datetime] = mapped_column(UtcDateTime())

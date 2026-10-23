@@ -66,8 +66,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
 # concealed information in a running game (SysOp's exception to SEC05 and NET14, accepted on
 # 2026-10-18), putting any card in the engine's database into its own library, setting any
 # account's wins (v0.3.1), uploading the Godlike tier's custom cards, giving tokens and setting
-# the economy's limits (v0.4.0), reading any chat (v0.4.4), and resetting an account to a new
-# one's state (v0.4.5).
+# the economy's limits (v0.4.0), reading any chat (v0.4.4), resetting an account to a new one's
+# state (v0.4.5), and reading any player's match history (v0.5.0).
 SYSOP_ONLY = ALL_PERMISSIONS - frozenset().union(*ROLE_PERMISSIONS.values())
 
 

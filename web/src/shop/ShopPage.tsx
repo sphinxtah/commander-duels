@@ -153,6 +153,8 @@ export function ShopPage({
         { params: { path: { pack_id: packId } } },
       );
       if (!data) return setMessage(describe(refused));
+      // An achievement for packs opened may have paid (v0.5.0).
+      hudChanged();
       setOpening({ opening: data, startOpen: false });
       void load();
     } finally {

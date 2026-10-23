@@ -1,0 +1,141 @@
+/* Today's quests (v0.5.0): a panel across the main menu, under the ally and the tiles. */
+
+.panel {
+  grid-column: 1 / -1;
+  padding: 20px 24px 14px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse at 90% 0%, #e9893a1f, transparent 55%),
+    linear-gradient(160deg, #1b2b28, #0e1716);
+  box-shadow: var(--cd-frame);
+  animation: questsIn 520ms cubic-bezier(0.2, 0.8, 0.25, 1) 420ms both;
+}
+@keyframes questsIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+.head h2 {
+  margin: 0;
+  color: var(--cd-gold-hi);
+  font: 600 1.3rem var(--cd-display);
+  letter-spacing: 1.5px;
+}
+.resets {
+  color: var(--cd-ember);
+  font: 700 0.64rem/1.3 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 14px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.quest {
+  display: grid;
+  gap: 9px;
+  padding: 14px 16px;
+  border: 1px solid #ffffff14;
+  border-radius: 8px;
+  background: #0b1312b3;
+}
+.quest[data-done] {
+  border-color: #9fd9a466;
+  background: radial-gradient(ellipse at 0% 0%, #9fd9a41a, transparent 70%), #0b1312b3;
+}
+.questTop {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.questName {
+  color: #ebece6;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.reward {
+  flex: none;
+  color: var(--cd-gold-hi);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: #00000080;
+  box-shadow: inset 0 0 0 1px #d5b77c33;
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #a7773a, #f4dca6);
+  box-shadow: 0 0 10px #f0c977;
+}
+.quest[data-done] .bar > span {
+  background: linear-gradient(90deg, #4f9a5b, #9fd9a4);
+  box-shadow: 0 0 10px #9fd9a480;
+}
+.questFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 28px;
+  color: #a3aea7;
+  font-size: 0.76rem;
+}
+.quest[data-done] .questFoot {
+  color: #9fd9a4;
+}
+.swap {
+  padding: 5px 12px;
+  border: 1px solid #d5b77c80;
+  border-radius: 4px;
+  background: transparent;
+  color: #ebece6;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.swap:hover:not(:disabled) {
+  background: #d5b77c1a;
+}
+.fine {
+  margin: 8px 0 0;
+  color: #a5b0a3;
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+.error {
+  margin: 10px 0;
+  color: #f0b4a0;
+  font-size: 0.8rem;
+}
+.said {
+  min-height: 1em;
+  margin: 4px 0 0;
+  color: #c9d0c6;
+  font-size: 0.76rem;
+}
+
+@media (max-width: 960px) {
+  .list {
+    grid-template-columns: 1fr;
+  }
+}

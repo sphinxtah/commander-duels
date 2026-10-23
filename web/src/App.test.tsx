@@ -27,6 +27,12 @@ import {
   type Me,
 } from "./api";
 import { progress, roster, starterDecks } from "./alliance/fixtures";
+import {
+  achievements,
+  dailyQuests,
+  history,
+  stats,
+} from "./records/fixtures";
 import { exitTableFullscreen } from "./app/fullscreen";
 import { initInstall } from "./app/install";
 import { holdLiveGame, markIntendedLeave } from "./app/liveGame";
@@ -264,6 +270,11 @@ beforeEach(() => {
   on("GET /api/v1/friends", () =>
     reply(200, { friends: [], incoming: [], outgoing: [] }),
   );
+  // The main menu's quests, and Profile's record and achievements (v0.5.0).
+  on("GET /api/v1/me/quests", () => reply(200, dailyQuests()));
+  on("GET /api/v1/me/stats", () => reply(200, stats({ history: true })));
+  on("GET /api/v1/me/achievements", () => reply(200, achievements()));
+  on("GET /api/v1/me/history", () => reply(200, history()));
 });
 afterEach(() => {
   vi.restoreAllMocks();

@@ -28,6 +28,7 @@ import {
 } from "./api";
 import { progress, roster, starterDecks } from "./alliance/fixtures";
 import { loadGoogle, type GoogleId } from "./google";
+import { achievements, history, stats } from "./records/fixtures";
 
 vi.mock("./google", () => ({ loadGoogle: vi.fn() }));
 
@@ -212,6 +213,10 @@ beforeEach(() => {
       entries: [],
     }),
   );
+  // Profile's record, achievements and games (v0.5.0).
+  on("GET /api/v1/me/stats", () => reply(200, stats({ history: true })));
+  on("GET /api/v1/me/achievements", () => reply(200, achievements()));
+  on("GET /api/v1/me/history", () => reply(200, history()));
   setCsrfToken("token-1");
   // Google's script stays away unless a test brings its own.
   vi.mocked(loadGoogle).mockReturnValue(new Promise(() => {}));

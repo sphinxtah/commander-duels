@@ -13,6 +13,7 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from api import (
+    achievements,
     admin,
     auth,
     card_images,
@@ -24,9 +25,11 @@ from api import (
     engine_cards,
     games,
     progression,
+    quests,
     reports,
     shop,
     social,
+    stats,
     tables,
 )
 from api.config import Settings
@@ -331,4 +334,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(reports.router)
     app.include_router(social.router)
     app.include_router(chat.router)
+    # Statistics, daily quests and achievements (v0.5.0).
+    app.include_router(stats.router)
+    app.include_router(quests.router)
+    app.include_router(achievements.router)
     return app

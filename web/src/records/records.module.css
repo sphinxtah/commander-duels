@@ -1,0 +1,287 @@
+/* Statistics, match history and achievements (v0.5.0): Profile's panels and a player's page. */
+
+.badge {
+  flex: none;
+  filter: drop-shadow(0 3px 6px #000000a6);
+}
+.badge:not([data-earned]) {
+  opacity: 0.72;
+}
+
+/* A player's page: framed sections like Profile's panels. */
+.section {
+  margin: 25px 0;
+  padding: 22px 25px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 6px;
+  background: var(--cd-panel-bg);
+  box-shadow: var(--cd-frame);
+}
+.section > h2 {
+  margin-bottom: 12px;
+  font: 600 1.35rem var(--cd-display);
+}
+.fine {
+  margin: 10px 0;
+  color: #a5b0a3;
+  font-size: 0.78rem;
+  line-height: 1.7;
+}
+.error {
+  margin: 10px 0;
+  color: #f0b4a0;
+  font-size: 0.8rem;
+}
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* The record: a line of the main numbers, then the table. */
+.headline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.headline li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: #c9d0c6;
+  font-size: 0.86rem;
+}
+.headline strong {
+  color: var(--cd-gold-hi);
+  font: 600 1.6rem var(--cd-display);
+  font-variant-numeric: tabular-nums;
+}
+.tableWrap {
+  overflow-x: auto;
+  margin: 12px 0 4px;
+}
+.record {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+.record th,
+.record td {
+  padding: 8px 12px 8px 0;
+  border-top: 1px solid #ffffff12;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.record th:first-child,
+.record td:first-child {
+  text-align: left;
+}
+.record thead th {
+  color: #8d9b95;
+  font-weight: 600;
+}
+.record tbody th {
+  color: #ebece6;
+  font-weight: 500;
+}
+.record td {
+  color: #c9d0c6;
+}
+
+/* Achievements on Profile: a group's badges in a grid of cards. */
+.group {
+  margin: 18px 0 6px;
+  color: var(--cd-gold);
+  font: 600 0.72rem/1.4 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.achievements {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.achievement {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid #ffffff12;
+  border-radius: 6px;
+  background: #0b131299;
+}
+.achievement[data-earned] {
+  border-color: #d5b77c4d;
+  background: radial-gradient(ellipse at 0% 0%, #d5b77c1f, transparent 70%), #0b131299;
+}
+.achievement[data-pinned] {
+  border-color: #f4dca6b3;
+  box-shadow: 0 0 18px #e9b96033;
+}
+.achievementWords {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.achievementWords strong {
+  color: #ebece6;
+  font-size: 0.86rem;
+}
+.achievement[data-earned] .achievementWords strong {
+  color: var(--cd-gold-hi);
+}
+.achievementWords small {
+  color: #a3aea7;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+.addition {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 1px 6px;
+  border: 1px solid #e9893a80;
+  border-radius: 3px;
+  color: #f2b98a;
+  font-size: 0.64rem;
+  letter-spacing: 0.4px;
+}
+.progress {
+  display: block;
+  height: 5px;
+  margin-top: 4px;
+  border-radius: 3px;
+  background: #00000080;
+  box-shadow: inset 0 0 0 1px #d5b77c26;
+  overflow: hidden;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #a7773a, #f4dca6);
+}
+.pin {
+  grid-column: 2;
+  justify-self: start;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid #d5b77c80;
+  border-radius: 4px;
+  background: transparent;
+  color: #ebece6;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.pin:hover:not(:disabled) {
+  background: #d5b77c1a;
+}
+.pin[aria-pressed="true"] {
+  border-color: #f4dca6;
+  color: var(--cd-gold-hi);
+}
+.pin:disabled {
+  opacity: 0.5;
+}
+
+/* A player's badges: the pinned ones large, then every one earned. */
+.pinned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.pinned li {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: 112px;
+  text-align: center;
+}
+.pinned strong {
+  color: var(--cd-gold-hi);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+.earned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The games one by one. */
+.history {
+  display: grid;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.history li {
+  display: grid;
+  grid-template-columns: 6.5em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #ffffff12;
+  font-size: 0.84rem;
+}
+.outcome {
+  font: 600 0.74rem var(--cd-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #8d9b95;
+}
+.history li[data-outcome="win"] .outcome {
+  color: #9fd9a4;
+}
+.history li[data-outcome="loss"] .outcome {
+  color: #e9a08c;
+}
+.gameWords {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.gameWords small,
+.history time {
+  color: #8d9b95;
+  font-size: 0.74rem;
+}
+.more {
+  margin-top: 8px;
+  padding: 9px 14px;
+  border: 1px solid #d5b77c;
+  border-radius: 4px;
+  background: transparent;
+  color: #ebece6;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.more:hover:not(:disabled) {
+  background: #d5b77c1a;
+}
+
+@media (max-width: 600px) {
+  .section {
+    padding: 18px;
+  }
+  .history li {
+    grid-template-columns: 5em minmax(0, 1fr);
+  }
+  .history time {
+    grid-column: 2;
+  }
+}

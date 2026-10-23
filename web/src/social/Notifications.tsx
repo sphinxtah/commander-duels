@@ -9,6 +9,7 @@ import chatStyles from "../chat/chat.module.css";
 import { PlayerPicture } from "./PlayerBits";
 import type { Social } from "./presence";
 import {
+  awardLink,
   notificationWords,
   playerLink,
   timeAgo,
@@ -100,9 +101,25 @@ export function NotificationRow({
   const actor = shown.actor;
   // New messages open the conversation: its docked window, or the Messages page.
   const message = shown.kind === "message" && actor;
+  // A quest completed opens the main menu, an achievement Profile (v0.5.0).
+  const award = awardLink(shown);
   return (
     <li className={styles.note} data-unread={wasUnread || undefined}>
-      {actor ? (
+      {award ? (
+        <a href={award} className={styles.noteLink} onClick={() => onFollow?.()}>
+          <span className={styles.noteText}>
+            {notificationWords(shown)}
+            <small>
+              {wasUnread && (
+                <span className={styles.visuallyHidden}>New. </span>
+              )}
+              <time dateTime={shown.created_at}>
+                {timeAgo(shown.created_at)}
+              </time>
+            </small>
+          </span>
+        </a>
+      ) : actor ? (
         <a
           href={message ? messagesLink(actor.id) : playerLink(actor.id)}
           className={styles.noteLink}
@@ -304,8 +321,8 @@ export function NotificationBell({
           {items === null && !error && <p className={styles.quiet}>Loading…</p>}
           {items?.length === 0 && (
             <p className={styles.quiet}>
-              Nothing yet. Friend requests, friends coming online and new
-              messages show here.
+              Nothing yet. Friend requests, friends coming online, new
+              messages, quests completed and achievements earned show here.
             </p>
           )}
           {items && items.length > 0 && (
@@ -355,7 +372,11 @@ export function NotificationBell({
           ))}
         {toasts.map((item) => (
           <div key={item.id} className={styles.toast}>
-            {item.actor ? (
+            {awardLink(item) ? (
+              <a href={awardLink(item)!} onClick={() => dismiss(item.id)}>
+                <span>{notificationWords(item)}</span>
+              </a>
+            ) : item.actor ? (
               <a
                 href={playerLink(item.actor.id)}
                 onClick={() => dismiss(item.id)}
@@ -430,8 +451,9 @@ export function NotificationsPage({
         Notifications
       </h1>
       <p className={styles.lead}>
-        Friend requests, answers to yours, friends coming online and new
-        messages, kept for 90 days.
+        Friend requests, answers to yours, friends coming online, new
+        messages, and your quests completed and achievements earned, kept for
+        90 days.
       </p>
       {state === "error" && (
         <p className={styles.rowError} role="alert">
