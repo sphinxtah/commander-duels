@@ -745,9 +745,12 @@ describe("a best-of-three match's game (v0.5.0)", () => {
         name: "Sideboard for game 3",
       }))
         expect(link).toHaveAttribute("href", "#match/m1");
-      expect(
-        screen.getAllByText(/Sideboarding opens in \d s/),
-      ).not.toHaveLength(0);
+      // The countdown starts in an effect after the result shows, so it is waited for.
+      await waitFor(() =>
+        expect(
+          screen.getAllByText(/Sideboarding opens in \d s/),
+        ).not.toHaveLength(0),
+      );
     } finally {
       get.mockImplementation(original);
     }
