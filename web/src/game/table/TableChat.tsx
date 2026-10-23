@@ -23,6 +23,7 @@ import {
   actionTarget,
   allianceActions,
   alliesOf,
+  channelName,
   eventText,
   lineBody,
   lineText,
@@ -41,7 +42,9 @@ import styles from "./chat.module.css";
 // Table and Allies tabs with their lines, the box to write in, the emotes and the alliances. A
 // line is always shown as text, never as HTML or a link. A message sent waits greyed until the
 // server sends it back; one refused says why, with Try again. The list is no live region: new
-// lines from the other players are said through the table's own polite voice, folded or not.
+// lines from the other players are said through the table's own polite voice, folded or not. At a
+// Two-Headed Giant table (v0.5.1) the Allies tab is the Team tab, the team's fixed channel, and
+// the teams stand where the alliances would.
 
 const CHANNELS: Channel[] = ["table", "allies"];
 
@@ -181,6 +184,8 @@ export function TableChat({
       ? alliesOf(alliances?.alliances ?? null, people.seat)
       : [];
   const watching = people.seat === null;
+  // Two-Headed Giant (v0.5.1): the allies are the team, fixed.
+  const teams = alliances?.alliances?.fixed ?? false;
   // Everyone writes to the table; to allies, a player who has some (SysOp watching has none).
   const writable = tab === "table" || allies.length > 0;
 
@@ -227,10 +232,14 @@ export function TableChat({
 
   const note = watching
     ? tab === "allies"
-      ? "You are watching: you read every message to allies, and write to the table only."
+      ? teams
+        ? "You are watching: you read every team’s messages, and write to the table only."
+        : "You are watching: you read every message to allies, and write to the table only."
       : null
     : tab === "allies" && allies.length === 0
-      ? "Only your allies read what you write here. You have no allies yet: offer an alliance from another player’s plate, or from the list below."
+      ? teams
+        ? "Your teammate is a bot, so nobody reads this tab."
+        : "Only your allies read what you write here. You have no allies yet: offer an alliance from another player’s plate, or from the list below."
       : null;
 
   return (
@@ -257,7 +266,7 @@ export function TableChat({
               className={styles.tab}
               onClick={() => onTab(channel)}
             >
-              {channel === "table" ? "Table" : "Allies"}
+              {channelName(channel, teams)}
               {count > 0 && " "}
               {count > 0 && (
                 <span className={styles.count}>
@@ -280,7 +289,11 @@ export function TableChat({
           ref={list}
           className={styles.lines}
           aria-label={
-            tab === "table" ? "Messages to the table" : "Messages to allies"
+            tab === "table"
+              ? "Messages to the table"
+              : teams
+                ? "Messages to your team"
+                : "Messages to allies"
           }
           tabIndex={0}
           onScroll={(event) => {
@@ -294,7 +307,9 @@ export function TableChat({
             <li className={styles.empty}>
               {tab === "table"
                 ? "No messages yet."
-                : "No messages to allies yet."}
+                : teams
+                  ? "No messages to your team yet."
+                  : "No messages to allies yet."}
             </li>
           )}
           {lines.map((line) => (
@@ -327,6 +342,7 @@ export function TableChat({
               setDrafts((current) => ({ ...current, [tab]: text }))
             }
             to={tab === "allies" ? listed(allies.map(people.handle)) : null}
+            teams={teams}
             connected={connected}
             onSend={(text) => {
               onSend(tab, text);
@@ -360,7 +376,7 @@ export function TableChat({
         )}
       </div>
 
-      <AllianceList refusal={state.allianceRefusal} />
+      {teams ? <TeamList /> : <AllianceList refusal={state.allianceRefusal} />}
     </div>
   );
 }
@@ -535,6 +551,7 @@ function Composer({
   text,
   onText,
   to,
+  teams,
   connected,
   onSend,
 }: {
@@ -544,6 +561,8 @@ function Composer({
   onText(text: string): void;
   /** Allies only: whom it goes to. */
   to: string | null;
+  /** Two-Headed Giant (v0.5.1): the allies are the team. */
+  teams: boolean;
   connected: boolean;
   onSend(text: string): void;
 }) {
@@ -555,7 +574,11 @@ function Composer({
     if (sendable) onSend(trimmed);
   };
   const label =
-    channel === "table" ? "Message to the table" : "Message to your allies";
+    channel === "table"
+      ? "Message to the table"
+      : teams
+        ? "Message to your team"
+        : "Message to your allies";
   return (
     <form
       className={styles.compose}
@@ -612,6 +635,38 @@ function Composer({
         </button>
       </div>
     </form>
+  );
+}
+
+/** Two-Headed Giant's teams in words (v0.5.1), where the alliances would be: the viewer's own,
+ * and who reads its tab; for SysOp watching, each team of two players. */
+function TeamList() {
+  const table = useContext(AllianceContext);
+  if (!table) return null;
+  const { mine, alliances, handle } = table;
+  const pairs = alliances?.alliances ?? [];
+  const mates = mine !== null ? alliesOf(alliances, mine) : [];
+  return (
+    <section className={styles.alliances} aria-labelledby="chat-teams">
+      <h3 id="chat-teams">{mine === null ? "Teams" : "Your team"}</h3>
+      {mine !== null ? (
+        <p className={styles.hint} data-team="">
+          {mates.length > 0
+            ? `You and ${listed(mates.map(handle))}: only the two of you read the Team tab, never the other team.`
+            : "You and a bot: nobody reads the Team tab."}
+        </p>
+      ) : pairs.length === 0 ? (
+        <p className={styles.hint}>No team at this table has two players.</p>
+      ) : (
+        <ul>
+          {pairs.map(([a, b]) => (
+            <li key={`${a}:${b}`}>
+              {handle(a)} and {handle(b)} are a team.
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

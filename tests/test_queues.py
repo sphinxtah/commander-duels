@@ -168,6 +168,8 @@ def test_joining_leaving_and_the_queues(client, clock):
         "game_id": None,
         "reason": None,
         "message": None,
+        "partner": None,
+        "invites": [],
     }
     joined = join(ada, ada_deck, humans_only=True)
     assert joined.status_code == 201, joined.text
@@ -182,8 +184,10 @@ def test_joining_leaving_and_the_queues(client, clock):
         ("commander", 2, 1, 0),
         ("commander", 3, 1, 0),
         ("commander", 4, 1, 0),
+        ("two_headed_giant", 4, 1, 0),
     ]
     assert listed[0]["name"] == "Legacy · 2 players"
+    assert listed[5]["name"] == "Two-Headed Giant · two teams of two"
     assert listed[1]["name"] == "Legacy · 2 players · best of three"
     # No deck of anyone else's in any answer.
     assert ada_deck not in json.dumps(listed)

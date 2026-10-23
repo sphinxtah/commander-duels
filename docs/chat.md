@@ -64,6 +64,16 @@ At a human table's game ([human tables](tables.md)) the band has a chat diamond,
 - **History.** A tab that connects (or reconnects) is sent the latest 200 lines it may see, then each new one.
 - **Reporting.** As for friends' messages, from a line's menu; the report keeps the 20 lines before it that the reporter saw.
 
+### The team's channel (v0.5.1)
+
+The owner's decision at the start of v0.5.1 ([plan](plans/0.5.1.md#decisions-at-the-start-of-v051)): at a Two-Headed Giant table ([tables](tables.md#two-headed-giant-v051)) the allies-only channel is the team's, fixed (FMT10's team chat).
+
+- **Fixed from the start.** A team of two players is allied when the game starts, for the whole game, whoever concedes or is removed. No alliance can be offered, accepted or ended (`fixed_teams`), and the plates show no alliance and no Alliance button: they name the teammate already ([the game screen](game-screen.md)).
+- **The Team tab.** The drawer's Allies tab is called **Team**; its box says "Message to your team" and "Only bob will read it". Where the alliances would be, the panel says "You and bob: only the two of you read the Team tab, never the other team." A player whose teammate is a bot has nobody to write to there ("Your teammate is a bot, so nobody reads this tab."; the server answers `no_allies` with the same reason).
+- **The other team never reads it.** A team line goes to its sender's teammate's connections and to SysOp's (watching, or inspecting), and to no connection of the other team, live or in the history a tab is sent. The table's own lines and emotes reach everyone, as at any table. SysOp's reader keeps every line, team lines included.
+
+At a four-player Commander table, the Alliance button on a plate stands left of the plate's count diamonds since v0.5.1, where it no longer covers them.
+
 ### On the game's WebSocket
 
 Sent by the page:
@@ -80,8 +90,8 @@ Sent by the API, to a table's connections only:
 | --- | --- |
 | `{"type": "chat_history", "messages": [line, ...]}` | On connecting: the latest lines the connection may see, oldest first |
 | `{"type": "chat", "message": line}` | A new line the connection may see |
-| `{"type": "alliances", "alliances": [[0, 1]], "offers": [{"from": 0, "to": 2}]}` | On connecting and after every change: every alliance (pairs of seats), and the offers its own seat made or received |
-| `{"type": "error", "code": "...", "message": "...", "client_id": "...", "seat": 2}` | A refusal: `no_chat` (a practice game), `invalid_message` (text that breaks the rules, an unknown emote), `chat_limited` (with `retry_after` in seconds), `no_allies`; for alliances `not_a_player`, `not_in_game`, `invalid_alliance` (no such player, yourself, or a bot), `already_allied`, `no_offer`, `not_allied` |
+| `{"type": "alliances", "alliances": [[0, 1]], "offers": [{"from": 0, "to": 2}], "fixed": false}` | On connecting and after every change: every alliance (pairs of seats), and the offers its own seat made or received; since v0.5.1 `fixed`, true at a Two-Headed Giant table, whose alliances are its teams of two players |
+| `{"type": "error", "code": "...", "message": "...", "client_id": "...", "seat": 2}` | A refusal: `no_chat` (a practice game), `invalid_message` (text that breaks the rules, an unknown emote), `chat_limited` (with `retry_after` in seconds), `no_allies`; for alliances `not_a_player`, `not_in_game`, `invalid_alliance` (no such player, yourself, or a bot), `already_allied`, `no_offer`, `not_allied`, and since v0.5.1 `fixed_teams` (a Two-Headed Giant table) |
 
 A line: `{"id", "channel": "table" or "allies", "kind": "text", "emote" or "event", "seat" (the sender's; null for SysOp watching), "sender": {"id", "handle"} or null, "body", "seats", "client_id", "created_at"}`. For a text, `body` is the text; for an emote, its name; for an event, `allied` or `alliance_ended`, with `seats` the two allies and `sender` and `seat` whoever ended it (null when leaving the game ended it). An allies-only line's `seats` are those it went to besides the sender.
 
@@ -118,4 +128,4 @@ Migration `0017_chat`: `conversations` (one row a pair, `user_low` the lower ID,
 
 ## Tests
 
-`tests/test_chat.py` (friends' messages, the socket, reports, SysOp's reader, deletion and the daily job; SQLite, and PostgreSQL when `CD_TEST_POSTGRES_URL` is set), `tests/test_table_chat.py` (the table's chat, alliances and the allies-only leak check on the fake engine of the table tests), the web app's tests in `web/src/chat/` and `web/src/game/`, and the browser journeys `web/e2e/social.spec.ts` (two friends write to each other) and `web/e2e/tables.spec.ts` (the table's chat).
+`tests/test_chat.py` (friends' messages, the socket, reports, SysOp's reader, deletion and the daily job; SQLite, and PostgreSQL when `CD_TEST_POSTGRES_URL` is set), `tests/test_table_chat.py` (the table's chat, alliances and the allies-only leak check on the fake engine of the table tests), `tests/test_team_play.py` (since v0.5.1 the team's channel: the teams as fixed alliances, alliance actions refused, each team's lines in no frame of the other team's connections, live or in a late tab's history, SysOp watching and its reader reading both, and the channel refused beside a bot teammate), `web/src/game/table/TableChat.test.tsx` and `Alliance.test.ts` (the Team tab, the team in words, no alliance on the plates, and the Alliance button's place), the web app's tests in `web/src/chat/` and `web/src/game/`, and the browser journeys `web/e2e/social.spec.ts` (two friends write to each other) and `web/e2e/tables.spec.ts` (the table's chat).

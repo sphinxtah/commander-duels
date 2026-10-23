@@ -12,6 +12,7 @@ A game pays only its winner, and only for a game the engine reports as `complete
 | A player with *w* wins | 50 + 90 × log₁₀(1 + *w*), rounded, at most 500 |
 
 - **Several at once.** A Commander win over three skill-4 bots pays 3 × 14 = 42 tokens. A table with players and bots pays each seat its own amount.
+- **A team wins together** (Two-Headed Giant). Every player of the winning team is paid for each seat of the other team, never for their teammate, each under their own limits below; since v0.5.1 at tables and in the queue, where both winners may be players. Two players beating two new players earn 100 tokens each. Each entry is keyed by its own winning seat, so each winner is paid once.
 - **The player curve** pays 50 for a new player, 144 at 10 wins, 204 at 50, 230 at 100, 320 at 1,000, 410 at 10,000 and 500 from 100,000. A player's wins are the profile's, SysOp's settings included.
 - **Three a day per opponent.** Wins over the same player pay tokens for the first 3 each day; later ones still count as wins and are recorded with nothing paid, and the entry says why.
 - **A daily cap on bots.** SysOp may cap the tokens bots pay one account in a day, in Administration, under Tokens. It is off unless SysOp sets it; a win past the cap is recorded with what was left of it.

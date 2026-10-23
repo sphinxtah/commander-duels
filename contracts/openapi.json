@@ -4068,7 +4068,7 @@
           },
           "early": {
             "default": false,
-            "description": "A first playable version, against the bots only (v0.5.0: Two-Headed Giant).",
+            "description": "A first playable version, with known gaps (Two-Headed Giant: since v0.5.0, and since v0.5.1 at tables and in the queue too).",
             "title": "Early",
             "type": "boolean"
           },
@@ -4141,6 +4141,40 @@
           "format"
         ],
         "title": "FormatTotals",
+        "type": "object"
+      },
+      "Friend": {
+        "additionalProperties": false,
+        "description": "A friend in the Two-Headed Giant queue (v0.5.1), as the queue names them: never an email.",
+        "properties": {
+          "handle": {
+            "title": "Handle",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "portrait": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Their allied Planeswalker.",
+            "title": "Portrait"
+          }
+        },
+        "required": [
+          "id",
+          "handle",
+          "portrait"
+        ],
+        "title": "Friend",
         "type": "object"
       },
       "FriendList": {
@@ -5956,7 +5990,8 @@
               "message",
               "quest_completed",
               "achievement_earned",
-              "rematch"
+              "rematch",
+              "team_invite"
             ],
             "title": "Kind",
             "type": "string"
@@ -5973,7 +6008,7 @@
           },
           "request_pending": {
             "default": false,
-            "description": "For a friend request, or since v0.5.0 a rematch: whether it still waits for your answer.",
+            "description": "For a friend request, since v0.5.0 a rematch, or since v0.5.1 an invitation to the Two-Headed Giant queue as a friend's teammate: whether it still waits for your answer.",
             "title": "Request Pending",
             "type": "boolean"
           }
@@ -6170,6 +6205,12 @@
           "seat": {
             "title": "Seat",
             "type": "integer"
+          },
+          "teammate": {
+            "default": false,
+            "description": "Two-Headed Giant (v0.5.1): the player's teammate, who won or lost with them.",
+            "title": "Teammate",
+            "type": "boolean"
           },
           "won": {
             "description": "Whether this seat won the game.",
@@ -7892,7 +7933,8 @@
           "format": {
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Format",
             "type": "string"
@@ -7945,7 +7987,8 @@
             "default": "legacy",
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Format",
             "type": "string"
@@ -7956,9 +7999,22 @@
             "title": "Humans Only",
             "type": "boolean"
           },
+          "partner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Two-Headed Giant (v0.5.1): a friend you invite to wait with you as a team. You are inviting until they accept; left out, the queue pairs you with another player.",
+            "title": "Partner Id"
+          },
           "seats": {
             "default": 2,
-            "description": "2 in Legacy; 2, 3 or 4 in Commander, each size its own queue.",
+            "description": "2 in Legacy; 2, 3 or 4 in Commander, each size its own queue; 4 in Two-Headed Giant.",
             "maximum": 4.0,
             "minimum": 2.0,
             "title": "Seats",
@@ -8022,7 +8078,8 @@
               {
                 "enum": [
                   "legacy",
-                  "commander"
+                  "commander",
+                  "two_headed_giant"
                 ],
                 "type": "string"
               },
@@ -8049,6 +8106,14 @@
             "title": "Humans Only",
             "type": "boolean"
           },
+          "invites": {
+            "description": "Two-Headed Giant (v0.5.1): friends inviting you to wait with them as a team.",
+            "items": {
+              "$ref": "#/components/schemas/TeamInvite"
+            },
+            "title": "Invites",
+            "type": "array"
+          },
           "joined_at": {
             "anyOf": [
               {
@@ -8071,6 +8136,17 @@
               }
             ],
             "title": "Message"
+          },
+          "partner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Friend"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Two-Headed Giant (v0.5.1): the friend you invited, or wait with as a team."
           },
           "position": {
             "anyOf": [
@@ -8108,9 +8184,10 @@
             "title": "Seats"
           },
           "status": {
-            "description": "none (never queued), waiting, matched (game_id names the game), left (you left, or your app stopped asking), or refused (taken out as the game started: reason and message say why).",
+            "description": "none (never queued), inviting (since v0.5.1: waiting for the friend you invited to accept), waiting, matched (game_id names the game), left (you left, your app stopped asking, or your friend declined or left), or refused (taken out as the game started: reason and message say why).",
             "enum": [
               "none",
+              "inviting",
               "waiting",
               "matched",
               "left",
@@ -9611,6 +9688,20 @@
               }
             ],
             "title": "Ready"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Moves you to a free seat of that team; unreadies you, and the teammate you then have.",
+            "title": "Team"
           }
         },
         "title": "SeatChange",
@@ -9679,6 +9770,20 @@
             "format": "uuid",
             "title": "Deck Id",
             "type": "string"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. The team to join; the first free seat when left out.",
+            "title": "Team"
           }
         },
         "required": [
@@ -10692,6 +10797,18 @@
             "title": "Taken",
             "type": "boolean"
           },
+          "team": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Null in other formats.",
+            "title": "Team"
+          },
           "you": {
             "title": "You",
             "type": "boolean"
@@ -10733,9 +10850,15 @@
             "title": "Bot Skill",
             "type": "integer"
           },
+          "bot_teammate": {
+            "default": false,
+            "description": "Two-Headed Giant (v0.5.1): a bot is your teammate, in seat 1; one of bots.",
+            "title": "Bot Teammate",
+            "type": "boolean"
+          },
           "bots": {
             "default": 0,
-            "description": "Seats bots fill, after the players'; Commander only.",
+            "description": "Seats bots fill: in Commander after the players'; in Two-Headed Giant (since v0.5.1) your teammate's when bot_teammate, the rest the other team's.",
             "maximum": 2.0,
             "minimum": 0.0,
             "title": "Bots",
@@ -10751,7 +10874,8 @@
             "default": "legacy",
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Format",
             "type": "string"
@@ -10762,7 +10886,7 @@
           },
           "seats": {
             "default": 2,
-            "description": "Every seat, bots included: 2 in Legacy, 2-4 in Commander.",
+            "description": "Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in Two-Headed Giant.",
             "maximum": 4.0,
             "minimum": 2.0,
             "title": "Seats",
@@ -10849,7 +10973,8 @@
           "format": {
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Format",
             "type": "string"
@@ -10945,6 +11070,48 @@
           "created_at"
         ],
         "title": "TableView",
+        "type": "object"
+      },
+      "TeamDeck": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "description": "One of your Legacy decks, for your friend's team.",
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "deck_id"
+        ],
+        "title": "TeamDeck",
+        "type": "object"
+      },
+      "TeamInvite": {
+        "additionalProperties": false,
+        "description": "A friend's invitation to wait in the Two-Headed Giant queue as their teammate (v0.5.1).",
+        "properties": {
+          "humans_only": {
+            "description": "Whether they wait for players only.",
+            "title": "Humans Only",
+            "type": "boolean"
+          },
+          "invited_at": {
+            "format": "date-time",
+            "title": "Invited At",
+            "type": "string"
+          },
+          "player": {
+            "$ref": "#/components/schemas/Friend"
+          }
+        },
+        "required": [
+          "player",
+          "humans_only",
+          "invited_at"
+        ],
+        "title": "TeamInvite",
         "type": "object"
       },
       "TierInfo": {
@@ -25530,7 +25697,7 @@
     },
     "/api/v1/queue": {
       "delete": {
-        "description": "Leaves the queue. A game found a moment before stays: the answer names it.",
+        "description": "Leaves the queue, or withdraws your invitation to a friend. A game found a moment before\nstays: the answer names it. Your team (v0.5.1) leaves with you.",
         "operationId": "leave_queue_api_v1_queue_delete",
         "responses": {
           "200": {
@@ -25829,6 +25996,238 @@
           }
         },
         "summary": "Join Queue"
+      }
+    },
+    "/api/v1/queue/invites/{player_id}": {
+      "post": {
+        "description": "Accepts a friend's invitation to the Two-Headed Giant queue (v0.5.1) with one of your Legacy\ndecks: the two of you wait as one team. The answer is your place, or the game found at once.",
+        "operationId": "accept_invite_api_v1_queue_invites__player_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamDeck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Accept Invite"
+      }
+    },
+    "/api/v1/queue/invites/{player_id}/decline": {
+      "post": {
+        "description": "Declines a friend's invitation (v0.5.1); they are told.",
+        "operationId": "decline_invite_api_v1_queue_invites__player_id__decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Decline Invite"
       }
     },
     "/api/v1/queues": {
@@ -27752,7 +28151,7 @@
     },
     "/api/v1/tables/{code}/seat": {
       "patch": {
-        "description": "Changes your deck (which makes you not ready), or whether you are ready.",
+        "description": "Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed\nGiant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready\ntoo, and you are ready only once your deck and your teammate's share no card but basic lands.",
         "operationId": "change_seat_api_v1_tables__code__seat_patch",
         "parameters": [
           {

@@ -267,11 +267,14 @@ class GameSeat(Base):
 class GameTable(Base):
     """A human table (v0.4.0): the lobby where players take seats with their own decks, then the
     game it started. It is reached by its code: listed in the lobby when public, by its invite link
-    alone when private. Bots fill the seats after the players'."""
+    alone when private. Bots fill the seats after the players', or since v0.5.1 at a Two-Headed
+    Giant table the seats its teams leave them (bot_seats)."""
 
     __tablename__ = "game_tables"
     __table_args__ = (
-        CheckConstraint("format IN ('legacy', 'commander')", name="ck_game_tables_format"),
+        CheckConstraint(
+            "format IN ('legacy', 'commander', 'two_headed_giant')", name="ck_game_tables_format"
+        ),
         CheckConstraint("visibility IN ('public', 'private')", name="ck_game_tables_visibility"),
         CheckConstraint("status IN ('open', 'started', 'closed')", name="ck_game_tables_status"),
         CheckConstraint(
@@ -288,9 +291,12 @@ class GameTable(Base):
     host_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     format: Mapped[str] = mapped_column(String(16))
     visibility: Mapped[str] = mapped_column(String(16))
-    # Every seat, bots included; the players' seats come first.
+    # Every seat, bots included; the players' seats come first, unless bot_seats says otherwise.
     seats: Mapped[int]
     bots: Mapped[int]
+    # The seats bots fill (v0.5.1), when they are not the last ones: at a Two-Headed Giant table,
+    # where seats 0 and 1 play seats 2 and 3, a bot may be either team's. Null: the last bots seats.
+    bot_seats: Mapped[list[int] | None] = mapped_column(JsonType)
     bot_skill: Mapped[int]
     turn_cap: Mapped[int]
     # The host's rules (v0.4.5): whether its decks may hold cards banned in the format, and cards
@@ -414,18 +420,23 @@ class QueueEntry(Base):
     """A player's place in a public queue (v0.5.0, api/queues.py), one row per account: waiting
     with one of their decks, or what became of their last wait (the game it found, or why they were
     taken out). A queue is a format and a number of seats; it seats its players in the order they
-    joined. A row being made into a game is starting, which no other match may take."""
+    joined. A row being made into a game is starting, which no other match may take. Since v0.5.1
+    two friends wait in the Two-Headed Giant queue as a team: the one who invites is inviting until
+    the other accepts, then each row names the other (partner_id), and the two are never split."""
 
     __tablename__ = "queue_entries"
     __table_args__ = (
-        CheckConstraint("format IN ('legacy', 'commander')", name="ck_queue_entries_format"),
+        CheckConstraint(
+            "format IN ('legacy', 'commander', 'two_headed_giant')",
+            name="ck_queue_entries_format",
+        ),
         CheckConstraint("seats BETWEEN 2 AND 4", name="ck_queue_entries_seats"),
         CheckConstraint(
             "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
             name="ck_queue_entries_best_of",
         ),
         CheckConstraint(
-            "status IN ('waiting', 'starting', 'matched', 'left', 'refused')",
+            "status IN ('inviting', 'waiting', 'starting', 'matched', 'left', 'refused')",
             name="ck_queue_entries_status",
         ),
         # One queue's waiting players, in the order they joined.
@@ -439,6 +450,9 @@ class QueueEntry(Base):
     deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
     # Wait for players only: bots never fill this player's game.
     humans_only: Mapped[bool] = mapped_column(default=False)
+    # The friend this player waits with as a team (v0.5.1, Two-Headed Giant): the one invited
+    # while inviting, then each of the two rows names the other.
+    partner_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     status: Mapped[str] = mapped_column(String(16))
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
     # When the player's app last asked about their place: one that stops asking has left.
@@ -1399,16 +1413,17 @@ class PlayerBlock(Base):
 class Notification(Base):
     """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
     come online, since v0.4.4 new messages from a friend (one while unread, renewed by each
-    message), and since v0.5.0 a rematch offered (the game it would replay). The actor is the
-    other player. Since v0.5.0 also a daily quest completed and an achievement earned, which no
-    player caused: the subject names which. Kept NOTIFICATION_DAYS, at most a few hundred per
-    account (api/social.py)."""
+    message), and since v0.5.0 a rematch offered (the game it would replay), since v0.5.1 an
+    invitation to the Two-Headed Giant queue as a friend's teammate. The actor is the other player.
+    Since v0.5.0 also a daily quest completed and an achievement earned, which no player caused:
+    the subject names which. Kept NOTIFICATION_DAYS, at most a few hundred per account
+    (api/social.py)."""
 
     __tablename__ = "notifications"
     __table_args__ = (
         CheckConstraint(
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
-            "'quest_completed', 'achievement_earned', 'rematch')",
+            "'quest_completed', 'achievement_earned', 'rematch', 'team_invite')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.

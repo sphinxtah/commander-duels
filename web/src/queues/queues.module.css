@@ -118,3 +118,36 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+/* Friends' invitations to the Two-Headed Giant queue (v0.5.1), above the form. */
+.invites {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 8px;
+  background: #d4b47a0a;
+}
+.invites h3 {
+  margin: 0 0 10px;
+  font: 600 1rem var(--cd-display);
+  color: var(--cd-gold-hi);
+}
+.invites ul {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.invites li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: var(--cd-text);
+  font-size: 0.9rem;
+}
+.inviteActions {
+  display: flex;
+  gap: 8px;
+}

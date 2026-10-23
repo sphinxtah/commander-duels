@@ -9,7 +9,7 @@ import {
   listed,
   standing,
 } from "./chat";
-import { ALLIANCE_BUTTON, MENU } from "./geometry";
+import { ALLIANCE_BUTTON, MENU, diamondBox, overlaps } from "./geometry";
 import { STAGE_W, type PlayerNode, type Rect } from "./types";
 import gameStyles from "../game.module.css";
 import styles from "./table.module.css";
@@ -17,7 +17,9 @@ import styles from "./table.module.css";
 // Alliances on the plates at a human table (v0.4.4, docs/chat.md): each plate says whom its
 // player is allied with, and an offer the viewer made or received; another human player still in
 // the game has an Alliance button whose menu offers, accepts, declines, withdraws or ends one.
-// Outside a human table's game there is no context, and the plates show none of it.
+// Outside a human table's game there is no context, and the plates show none of it. At a
+// Two-Headed Giant table (v0.5.1) the alliances are the teams, fixed: the plates say who is whose
+// teammate already, so they show no alliance and no Alliance button.
 
 export interface TableAlliances {
   /** The viewer's seat; null for SysOp watching. */
@@ -38,6 +40,7 @@ export function alliancePills(
   seat: Seat,
 ): { text: string; tone: "ally" | "offer" }[] {
   const { mine, alliances } = table;
+  if (alliances?.fixed) return [];
   const allies = alliesOf(alliances, seat);
   const names = (seats: Seat[]) => listed(seats.map(table.handle));
   if (seat === mine)
@@ -68,15 +71,25 @@ export function AlliancePills({ seat }: { seat: Seat }) {
 
 /** Where a plate's Alliance button sits. */
 export function allianceBox(node: PlayerNode): Rect {
-  const top =
-    Math.max(node.pills.y + node.pills.h, node.statusRow.y + node.statusRow.h) +
-    ALLIANCE_BUTTON.drop;
-  return {
+  const box = {
     x: node.target.x - ALLIANCE_BUTTON.gap - ALLIANCE_BUTTON.w,
-    y: top,
+    y:
+      Math.max(
+        node.pills.y + node.pills.h,
+        node.statusRow.y + node.statusRow.h,
+      ) + ALLIANCE_BUTTON.drop,
     w: ALLIANCE_BUTTON.w,
     h: ALLIANCE_BUTTON.h,
   };
+  // Left of the count diamonds it would cover (v0.5.1): three- and four-player tables set them
+  // beside the player button, on the button's row.
+  const diamonds = [...Object.values(node.counts), node.expand].map(diamondBox);
+  for (let moved = true; moved;) {
+    const hit = diamonds.find((other) => overlaps(box, other));
+    moved = hit !== undefined;
+    if (hit) box.x = hit.x - ALLIANCE_BUTTON.gap - ALLIANCE_BUTTON.w;
+  }
+  return box;
 }
 
 /** Another player's Alliance button and its menu, while the viewer may make one with them. */
@@ -88,7 +101,7 @@ export function AllianceControl({
   node: PlayerNode;
 }) {
   const table = useContext(AllianceContext);
-  const allowed = table?.open.has(seat) ?? false;
+  const allowed = (table?.open.has(seat) ?? false) && !table?.alliances?.fixed;
   const now = table ? standing(table.alliances, table.mine, seat) : "none";
   const actions = allowed ? allianceActions(now) : [];
   const menu = useOptionMenu(`alliance:${seat}`, actions.length);

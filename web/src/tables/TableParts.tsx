@@ -1,14 +1,18 @@
 import { Portrait } from "../alliance/Portrait";
 import game from "../game/game.module.css";
 import {
+  TEAM_FORMAT,
   casualRules,
+  deckFormat,
   formatNames,
   rulesSentence,
   rulesTag,
+  teamName,
   tournamentRules,
   unfit,
   type OwnDeck,
   type TableFormat,
+  type TablePlayer,
   type TableRules,
   type TableView,
 } from "./tables";
@@ -19,7 +23,11 @@ import styles from "./tables.module.css";
 export function TableTags({ table }: { table: TableView }) {
   return (
     <span className={styles.tags}>
-      <span className={styles.badge}>{table.seats} seats</span>
+      <span className={styles.badge}>
+        {table.format === TEAM_FORMAT
+          ? "Two teams of two"
+          : `${table.seats} seats`}
+      </span>
       {table.best_of === 3 && (
         <span className={styles.badge} data-tone="gold">
           Best of three
@@ -32,6 +40,39 @@ export function TableTags({ table }: { table: TableView }) {
           ({rulesSentence(table.rules, table.format)})
         </span>
       </span>
+    </span>
+  );
+}
+
+/** A Two-Headed Giant table's seats by team (v0.5.1): seats 0 and 1, then 2 and 3. */
+export function teamsOf(table: TableView): TablePlayer[][] {
+  return [0, 1].map((team) =>
+    table.players.filter((player) => player.team === team),
+  );
+}
+
+/** Who sits in a team, in words: "ada and a bot", "bob and an open seat". */
+export function teamWords(players: TablePlayer[]): string {
+  return players
+    .map((player) =>
+      player.player === "bot"
+        ? "a bot"
+        : player.taken
+          ? (player.handle ?? "a player")
+          : "an open seat",
+    )
+    .join(" and ");
+}
+
+/** The lobby's line for a Two-Headed Giant table's teams. */
+export function TeamsLine({ table }: { table: TableView }) {
+  return (
+    <span className={styles.teams} aria-label="Teams">
+      {teamsOf(table).map((players, team) => (
+        <span key={team} data-team={team}>
+          <strong>{teamName(team)}:</strong> {teamWords(players)}
+        </span>
+      ))}
     </span>
   );
 }
@@ -94,7 +135,7 @@ export function RulesFields({
   format: TableFormat;
   onChange: (rules: TableRules) => void;
 }) {
-  const name = formatNames[format];
+  const name = formatNames[deckFormat(format)];
   const tournament = !rules.banned && !rules.not_legal;
   return (
     <fieldset>

@@ -308,7 +308,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 description="Two players. Deep card history. Your next decisive play.",
                 available=True,
             ),
-            # Early (v0.5.0): you and a bot teammate against two bots, on a patched XMage.
+            # Early (v0.5.0), on a patched XMage: at the practice table, and since v0.5.1 at human
+            # tables and in the public queue (alone or with a friend); some cards still misbehave.
             Format(
                 id="two_headed_giant",
                 name="Two-Headed Giant",

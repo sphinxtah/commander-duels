@@ -5,12 +5,18 @@ import type { components } from "../generated/api";
 // The public queues (v0.5.0, docs/queues.md): the account's place in one, shared by the Play
 // page's "Find a game", the main menu's Play tile and the follower in the app's shell. While the
 // account waits, the place is asked for every QUEUE_POLL_MS (which also keeps it: a place nobody
-// asks about goes after a while), and once the queue finds a game the page opens it.
+// asks about goes after a while), and once the queue finds a game the page opens it. Since v0.5.1
+// the same goes while the account invites a friend to the Two-Headed Giant queue, or a friend's
+// invitation waits for its answer.
 
 export type QueueStatus = components["schemas"]["QueueStatus"];
 export type QueueInfo = components["schemas"]["QueueInfo"];
 export type QueueRequest = components["schemas"]["QueueRequest"];
 export type QueueFormat = QueueRequest["format"];
+export type TeamInvite = components["schemas"]["TeamInvite"];
+
+/** Two-Headed Giant's queue (v0.5.1): two teams of two, formed alone or with a friend. */
+export const TEAM_QUEUE = "two_headed_giant";
 
 /** How often a waiting account's place is asked for. */
 export const QUEUE_POLL_MS = 2000;
@@ -51,8 +57,20 @@ let asking = false;
 let sawWaiting = false;
 const followed = new Set<string>();
 
+/** Whether the place is worth asking about again soon: waiting, inviting a friend, or answering a
+ * friend's invitation. */
+function pending(status: QueueStatus | null): boolean {
+  return (
+    status !== null &&
+    (status.status === "waiting" ||
+      status.status === "inviting" ||
+      Boolean(status.invites?.length))
+  );
+}
+
 function publish(status: QueueStatus) {
-  if (status.status === "waiting") sawWaiting = true;
+  if (status.status === "waiting" || status.status === "inviting")
+    sawWaiting = true;
   state = { status, answeredAt: Date.now() };
   follow(status);
   schedule();
@@ -73,7 +91,7 @@ function follow(status: QueueStatus) {
 function schedule() {
   clearTimeout(timer);
   timer = undefined;
-  if (listeners.size > 0 && state.status?.status === "waiting")
+  if (listeners.size > 0 && pending(state.status))
     timer = setTimeout(() => void ask(), QUEUE_POLL_MS);
 }
 
@@ -120,6 +138,41 @@ export async function joinQueue(body: QueueRequest): Promise<string | null> {
     return null;
   }
   sawWaiting = false;
+  return describe(answer?.error);
+}
+
+/** Accepts a friend's invitation to the Two-Headed Giant queue (v0.5.1) with one of your decks:
+ * the two of you wait as a team. Returns an error's words. */
+export async function acceptInvite(
+  playerId: string,
+  deckId: string,
+): Promise<string | null> {
+  sawWaiting = true;
+  const answer = await client
+    .POST("/api/v1/queue/invites/{player_id}", {
+      params: { path: { player_id: playerId } },
+      body: { deck_id: deckId },
+    })
+    .catch(() => undefined);
+  if (answer?.data) {
+    publish(answer.data);
+    return null;
+  }
+  sawWaiting = false;
+  return describe(answer?.error);
+}
+
+/** Declines a friend's invitation (v0.5.1); they are told. */
+export async function declineInvite(playerId: string): Promise<string | null> {
+  const answer = await client
+    .POST("/api/v1/queue/invites/{player_id}/decline", {
+      params: { path: { player_id: playerId } },
+    })
+    .catch(() => undefined);
+  if (answer?.data) {
+    publish(answer.data);
+    return null;
+  }
   return describe(answer?.error);
 }
 

@@ -48,13 +48,28 @@ describe("the words for a record (v0.5.0)", () => {
           player: { id: ADA, handle: "bob", avatar: "moon", alliance: null },
           bot_skill: null,
           won: true,
+          teammate: false,
         },
-        { seat: 2, bot: true, player: null, bot_skill: 5, won: false },
+        {
+          seat: 2,
+          bot: true,
+          player: null,
+          bot_skill: 5,
+          won: false,
+          teammate: false,
+        },
       ]),
     ).toBe("bob and a skill-5 bot");
     expect(
       opponentsWords([
-        { seat: 1, bot: false, player: null, bot_skill: null, won: false },
+        {
+          seat: 1,
+          bot: false,
+          player: null,
+          bot_skill: null,
+          won: false,
+          teammate: false,
+        },
       ]),
     ).toBe("a player who has left");
     expect([duration(30), duration(24 * 60), duration(65 * 60)]).toEqual([
@@ -64,10 +79,40 @@ describe("the words for a record (v0.5.0)", () => {
     ]);
     expect(winRate(totals({ games: 8, wins: 5 }))).toBe("63%");
     expect(winRate(totals())).toBe("–");
-    expect([formatName("commander"), formatName("two_headed_giant")]).toEqual([
+    expect([formatName("commander"), formatName("some_new_format")]).toEqual([
       "Commander",
-      "two headed giant",
+      "some new format",
     ]);
+    // A Two-Headed Giant teammate (v0.5.1) played beside the player, not against them.
+    expect(formatName("two_headed_giant")).toBe("Two-Headed Giant");
+    expect(
+      opponentsWords([
+        {
+          seat: 0,
+          bot: true,
+          player: null,
+          bot_skill: 4,
+          won: true,
+          teammate: true,
+        },
+        {
+          seat: 2,
+          bot: true,
+          player: null,
+          bot_skill: 4,
+          won: false,
+          teammate: false,
+        },
+        {
+          seat: 3,
+          bot: true,
+          player: null,
+          bot_skill: 4,
+          won: false,
+          teammate: false,
+        },
+      ]),
+    ).toBe("two skill-4 bots, with a skill-4 bot");
   });
 
   it("draw each group's badge, labelled when asked", () => {
@@ -242,6 +287,7 @@ describe("the games one by one (v0.5.0)", () => {
           player: { id: ADA, handle: "bob", avatar: "moon", alliance: null },
           bot_skill: null,
           won: true,
+          teammate: false,
         },
       ],
     });

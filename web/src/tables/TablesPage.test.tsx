@@ -125,7 +125,7 @@ describe("the lobby", () => {
     expect(screen.getByLabelText("Your deck")).toHaveValue("deck-2");
     expect(screen.getByLabelText("Seats")).toHaveValue("4");
     await act(async () =>
-      screen.getByRole("radio", { name: /Legacy/ }).click(),
+      screen.getByRole("radio", { name: /^Legacy/ }).click(),
     );
     expect(screen.queryByLabelText("Seats")).toBeNull();
     await act(async () =>
@@ -449,5 +449,155 @@ describe("best of three at a table (v0.5.0)", () => {
     expect(opened.options).toMatchObject({
       body: { format: "legacy", best_of: 3 },
     });
+  });
+});
+
+describe("Two-Headed Giant at a table (v0.5.1)", () => {
+  function teams(fields: Partial<TableView> = {}): TableView {
+    return table({
+      format: "two_headed_giant",
+      seats: 4,
+      bots: 1,
+      players: [
+        seat({
+          seat: 0,
+          team: 0,
+          taken: true,
+          handle: "bob",
+          host: true,
+          ready: true,
+        }),
+        seat({ seat: 1, team: 0 }),
+        seat({ seat: 2, team: 1, taken: true, handle: "cara" }),
+        seat({ seat: 3, team: 1, player: "bot", taken: true, ready: true }),
+      ],
+      ...fields,
+    });
+  }
+
+  it("lists a table's teams, and opens one with a bot teammate", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/tables", () => reply(200, [teams()]));
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [
+        deck(),
+        deck({ id: "deck-2", title: "Elves", format: "commander" }),
+      ]),
+    );
+    api.on("POST /api/v1/tables", () =>
+      reply(201, teams({ host: "ada", your_seat: 0 })),
+    );
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    const listed = screen.getByRole("listitem");
+    expect(listed).toHaveTextContent("Two teams of two");
+    expect(within(listed).getByLabelText("Teams")).toHaveTextContent(
+      "Team 1: bob and an open seat",
+    );
+    expect(within(listed).getByLabelText("Teams")).toHaveTextContent(
+      "Team 2: cara and a bot",
+    );
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Two-Headed Giant/ }).click(),
+    );
+    // Legacy decks, and the rules are Legacy's.
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-1");
+    expect(
+      screen.getByRole("checkbox", { name: /^Cards not legal in Legacy/ }),
+    ).toBeChecked();
+    await act(async () =>
+      screen.getByRole("radio", { name: /^A bot/ }).click(),
+    );
+    const other = screen.getByLabelText("The other team");
+    expect(
+      within(other).getByRole("option", { name: "Two bots" }),
+    ).toBeDisabled();
+    await act(async () => {
+      (other as HTMLSelectElement).value = "1";
+      other.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () =>
+      screen.getByRole("button", { name: "Open the table" }).click(),
+    );
+    await settle();
+    const opened = api.calls.find((c) => c.route === "POST /api/v1/tables")!;
+    expect(opened.options).toMatchObject({
+      body: {
+        format: "two_headed_giant",
+        seats: 4,
+        bots: 2,
+        bot_teammate: true,
+        best_of: 1,
+        deck_id: "deck-1",
+      },
+    });
+  });
+
+  it("seats a player in the team they choose, moves them, and says why they are not ready", async () => {
+    const api = mockApi();
+    const joined = teams({
+      your_seat: 1,
+      players: [
+        seat({
+          seat: 0,
+          team: 0,
+          taken: true,
+          handle: "bob",
+          host: true,
+          ready: true,
+        }),
+        seat({
+          seat: 1,
+          team: 0,
+          taken: true,
+          handle: "ada",
+          you: true,
+          deck: "Red deck",
+          deck_id: "deck-1",
+        }),
+        seat({ seat: 2, team: 1, taken: true, handle: "cara" }),
+        seat({ seat: 3, team: 1, player: "bot", taken: true, ready: true }),
+      ],
+    });
+    api.on("GET /api/v1/tables/{code}", () => reply(200, teams()));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    api.on("POST /api/v1/tables/{code}/join", () => reply(200, joined));
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    expect(
+      screen.getByRole("heading", { name: "Two-Headed Giant table" }),
+    ).toBeInTheDocument();
+    const first = screen.getByRole("region", { name: "Team 1" });
+    expect(within(first).getByText("bob")).toBeInTheDocument();
+    const second = screen.getByRole("region", { name: "Team 2" });
+    expect(within(second).getByText("Bot")).toBeInTheDocument();
+    // Team 2 is full of a player and a bot: only Team 1 can be joined.
+    expect(within(second).queryByRole("button", { name: /Join/ })).toBeNull();
+    api.on("GET /api/v1/tables/{code}", () => reply(200, joined));
+    await act(async () =>
+      within(first).getByRole("button", { name: "Join Team 1" }).click(),
+    );
+    await settle();
+    expect(
+      api.calls.find((c) => c.route === "POST /api/v1/tables/{code}/join")!
+        .options,
+    ).toMatchObject({ body: { deck_id: "deck-1", team: 0 } });
+    expect(
+      screen.getByRole("region", { name: "Team 1 Your team" }),
+    ).toBeInTheDocument();
+    api.on("PATCH /api/v1/tables/{code}/seat", () =>
+      reply(422, {
+        code: "team_decks",
+        message:
+          "Your deck and bob's share Lightning Bolt. In Two-Headed Giant teammates' decks may share only basic lands: one of you needs another deck.",
+      }),
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Ready" }).click(),
+    );
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Your deck and bob's share Lightning Bolt.",
+    );
   });
 });

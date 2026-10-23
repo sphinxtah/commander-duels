@@ -2223,9 +2223,51 @@ export interface paths {
         post: operations["join_queue_api_v1_queue_post"];
         /**
          * Leave Queue
-         * @description Leaves the queue. A game found a moment before stays: the answer names it.
+         * @description Leaves the queue, or withdraws your invitation to a friend. A game found a moment before
+         *     stays: the answer names it. Your team (v0.5.1) leaves with you.
          */
         delete: operations["leave_queue_api_v1_queue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/invites/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Invite
+         * @description Accepts a friend's invitation to the Two-Headed Giant queue (v0.5.1) with one of your Legacy
+         *     decks: the two of you wait as one team. The answer is your place, or the game found at once.
+         */
+        post: operations["accept_invite_api_v1_queue_invites__player_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/invites/{player_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline Invite
+         * @description Declines a friend's invitation (v0.5.1); they are told.
+         */
+        post: operations["decline_invite_api_v1_queue_invites__player_id__decline_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2584,7 +2626,9 @@ export interface paths {
         head?: never;
         /**
          * Change Seat
-         * @description Changes your deck (which makes you not ready), or whether you are ready.
+         * @description Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed
+         *     Giant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready
+         *     too, and you are ready only once your deck and your teammate's share no card but basic lands.
          */
         patch: operations["change_seat_api_v1_tables__code__seat_patch"];
         trace?: never;
@@ -4124,7 +4168,7 @@ export interface components {
             description: string;
             /**
              * Early
-             * @description A first playable version, against the bots only (v0.5.0: Two-Headed Giant).
+             * @description A first playable version, with known gaps (Two-Headed Giant: since v0.5.0, and since v0.5.1 at tables and in the queue too).
              * @default false
              */
             early: boolean;
@@ -4155,6 +4199,24 @@ export interface components {
             no_result: number;
             /** Wins */
             wins: number;
+        };
+        /**
+         * Friend
+         * @description A friend in the Two-Headed Giant queue (v0.5.1), as the queue names them: never an email.
+         */
+        Friend: {
+            /** Handle */
+            handle: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Portrait
+             * @description Their allied Planeswalker.
+             */
+            portrait: string | null;
         };
         /** FriendList */
         FriendList: {
@@ -4869,7 +4931,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -4880,7 +4942,7 @@ export interface components {
             read: boolean;
             /**
              * Request Pending
-             * @description For a friend request, or since v0.5.0 a rematch: whether it still waits for your answer.
+             * @description For a friend request, since v0.5.0 a rematch, or since v0.5.1 an invitation to the Two-Headed Giant queue as a friend's teammate: whether it still waits for your answer.
              * @default false
              */
             request_pending: boolean;
@@ -4965,6 +5027,12 @@ export interface components {
             player: components["schemas"]["PlayerRef"] | null;
             /** Seat */
             seat: number;
+            /**
+             * Teammate
+             * @description Two-Headed Giant (v0.5.1): the player's teammate, who won or lost with them.
+             * @default false
+             */
+            teammate: boolean;
             /**
              * Won
              * @description Whether this seat won the game.
@@ -5663,7 +5731,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /** Name */
             name: string;
             /** Seats */
@@ -5697,7 +5765,7 @@ export interface components {
              * @default legacy
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /**
              * Humans Only
              * @description Wait for players only: bots never fill your game.
@@ -5705,8 +5773,13 @@ export interface components {
              */
             humans_only: boolean;
             /**
+             * Partner Id
+             * @description Two-Headed Giant (v0.5.1): a friend you invite to wait with you as a team. You are inviting until they accept; left out, the queue pairs you with another player.
+             */
+            partner_id?: string | null;
+            /**
              * Seats
-             * @description 2 in Legacy; 2, 3 or 4 in Commander, each size its own queue.
+             * @description 2 in Legacy; 2, 3 or 4 in Commander, each size its own queue; 4 in Two-Headed Giant.
              * @default 2
              */
             seats: number;
@@ -5735,7 +5808,7 @@ export interface components {
             /** Deck Id */
             deck_id: string | null;
             /** Format */
-            format: ("legacy" | "commander") | null;
+            format: ("legacy" | "commander" | "two_headed_giant") | null;
             /**
              * Game Id
              * @description The game your wait found.
@@ -5743,10 +5816,17 @@ export interface components {
             game_id: string | null;
             /** Humans Only */
             humans_only: boolean;
+            /**
+             * Invites
+             * @description Two-Headed Giant (v0.5.1): friends inviting you to wait with them as a team.
+             */
+            invites?: components["schemas"]["TeamInvite"][];
             /** Joined At */
             joined_at: string | null;
             /** Message */
             message: string | null;
+            /** @description Two-Headed Giant (v0.5.1): the friend you invited, or wait with as a team. */
+            partner?: components["schemas"]["Friend"] | null;
             /**
              * Position
              * @description While waiting: your place in line; 1 is next.
@@ -5761,10 +5841,10 @@ export interface components {
             seats: number | null;
             /**
              * Status
-             * @description none (never queued), waiting, matched (game_id names the game), left (you left, or your app stopped asking), or refused (taken out as the game started: reason and message say why).
+             * @description none (never queued), inviting (since v0.5.1: waiting for the friend you invited to accept), waiting, matched (game_id names the game), left (you left, your app stopped asking, or your friend declined or left), or refused (taken out as the game started: reason and message say why).
              * @enum {string}
              */
-            status: "none" | "waiting" | "matched" | "left" | "refused";
+            status: "none" | "inviting" | "waiting" | "matched" | "left" | "refused";
             /**
              * Waited Seconds
              * @description While waiting: how long, in seconds.
@@ -6365,6 +6445,11 @@ export interface components {
             deck_id?: string | null;
             /** Ready */
             ready?: boolean | null;
+            /**
+             * Team
+             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Moves you to a free seat of that team; unreadies you, and the teammate you then have.
+             */
+            team?: number | null;
         };
         /**
          * SeatChoice
@@ -6390,6 +6475,11 @@ export interface components {
              * @description One of your decks, in the table's format.
              */
             deck_id: string;
+            /**
+             * Team
+             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. The team to join; the first free seat when left out.
+             */
+            team?: number | null;
         };
         /** SessionInfo */
         SessionInfo: {
@@ -6815,6 +6905,11 @@ export interface components {
              * @description Whether a player sits there; bots' seats always are.
              */
             taken: boolean;
+            /**
+             * Team
+             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Null in other formats.
+             */
+            team?: number | null;
             /** You */
             you: boolean;
         };
@@ -6836,8 +6931,14 @@ export interface components {
              */
             bot_skill: number;
             /**
+             * Bot Teammate
+             * @description Two-Headed Giant (v0.5.1): a bot is your teammate, in seat 1; one of bots.
+             * @default false
+             */
+            bot_teammate: boolean;
+            /**
              * Bots
-             * @description Seats bots fill, after the players'; Commander only.
+             * @description Seats bots fill: in Commander after the players'; in Two-Headed Giant (since v0.5.1) your teammate's when bot_teammate, the rest the other team's.
              * @default 0
              */
             bots: number;
@@ -6852,12 +6953,12 @@ export interface components {
              * @default legacy
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /** @description Which cards its decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
             /**
              * Seats
-             * @description Every seat, bots included: 2 in Legacy, 2-4 in Commander.
+             * @description Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in Two-Headed Giant.
              * @default 2
              */
             seats: number;
@@ -6922,7 +7023,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander";
+            format: "legacy" | "commander" | "two_headed_giant";
             /**
              * Game Id
              * @description Its game, once started; for its players and SysOp.
@@ -6955,6 +7056,32 @@ export interface components {
             visibility: "public" | "private";
             /** Your Seat */
             your_seat: number | null;
+        };
+        /** TeamDeck */
+        TeamDeck: {
+            /**
+             * Deck Id
+             * Format: uuid
+             * @description One of your Legacy decks, for your friend's team.
+             */
+            deck_id: string;
+        };
+        /**
+         * TeamInvite
+         * @description A friend's invitation to wait in the Two-Headed Giant queue as their teammate (v0.5.1).
+         */
+        TeamInvite: {
+            /**
+             * Humans Only
+             * @description Whether they wait for players only.
+             */
+            humans_only: boolean;
+            /**
+             * Invited At
+             * Format: date-time
+             */
+            invited_at: string;
+            player: components["schemas"]["Friend"];
         };
         /** TierInfo */
         TierInfo: {
@@ -18987,6 +19114,198 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    accept_invite_api_v1_queue_invites__player_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TeamDeck"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decline_invite_api_v1_queue_invites__player_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

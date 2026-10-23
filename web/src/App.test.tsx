@@ -1098,8 +1098,12 @@ describe("what this version offers", () => {
     fireEvent.click(about("two_headed_giant"));
     await waitFor(() => expect(dialog).toHaveTextContent("EARLY"));
     expect(dialog).toHaveTextContent("4 seats. Default table: 4 players.");
+    // Since v0.5.1 at tables and in the queue too; early for the cards still misbehaving.
     expect(dialog).toHaveTextContent(
-      "An early version of Two-Headed Giant: you and a bot teammate against two bots",
+      "Two teams of two, with Legacy decks: in the queue, alone or with a friend",
+    );
+    expect(dialog).toHaveTextContent(
+      "Early: a few cards that ask whose turn it is do not follow the team rules yet.",
     );
     expect(dialog).not.toHaveTextContent(/coming soon|planned/i);
   });

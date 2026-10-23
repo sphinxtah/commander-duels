@@ -392,6 +392,7 @@ def test_a_table_from_the_lobby_to_the_result(client, engine):
         "you": True,
         "deck": "Burn",
         "deck_id": ada_deck,
+        "team": None,
     }
     assert table["players"][1]["taken"] is False and table["can_start"] is False
     listed = bob.get("/api/v1/tables").json()

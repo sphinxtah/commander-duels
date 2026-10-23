@@ -143,6 +143,13 @@ const queues: QueueInfo[] = [
     name: "Commander · 4 players",
     waiting: 0,
   },
+  {
+    format: "two_headed_giant",
+    seats: 4,
+    best_of: 1,
+    name: "Two-Headed Giant · two teams of two",
+    waiting: 5,
+  },
 ];
 
 async function settle() {
@@ -274,6 +281,7 @@ describe("finding a game", () => {
         deck_id: "deck-2",
         humans_only: true,
         best_of: 1,
+        partner_id: null,
       },
     });
     // Only Legacy offers best of three.
@@ -341,6 +349,7 @@ describe("finding a game", () => {
         deck_id: "deck-1",
         humans_only: false,
         best_of: 3,
+        partner_id: null,
       },
     });
     expect(screen.getByRole("status")).toHaveTextContent(
@@ -675,6 +684,231 @@ describe("the rematch", () => {
     await settle();
     expect(screen.getByRole("status")).toHaveTextContent(
       "The rematch offer ran out of time.",
+    );
+  });
+});
+
+describe("Two-Headed Giant's queue (v0.5.1)", () => {
+  const bob = { id: "u-bob", handle: "bob", portrait: null };
+
+  it("invites a friend as a teammate and waits for their answer", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/queue", () => reply(200, place()));
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [
+        deck(),
+        deck({ id: "deck-2", title: "Kenrith", format: "commander" }),
+      ]),
+    );
+    api.on("GET /api/v1/friends", () =>
+      reply(200, {
+        friends: [
+          { id: "u-bob", handle: "bob", avatar: "sigil", alliance: null },
+          { id: "u-cara", handle: "cara", avatar: "sigil", alliance: null },
+        ],
+        incoming: [],
+        outgoing: [],
+      }),
+    );
+    api.on("POST /api/v1/queue", () =>
+      reply(
+        201,
+        place({
+          status: "inviting",
+          format: "two_headed_giant",
+          seats: 4,
+          deck_id: "deck-1",
+          deck: "Red deck",
+          partner: bob,
+        }),
+      ),
+    );
+    api.on("DELETE /api/v1/queue", () =>
+      reply(200, place({ status: "left", reason: "left" })),
+    );
+    render(<FindGame me={ada} />);
+    await settle();
+    await act(async () =>
+      screen
+        .getByRole("radio", { name: /Two-Headed Giant.*5 waiting/ })
+        .click(),
+    );
+    // Legacy decks only, paired with another player unless a friend is chosen.
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-1");
+    expect(screen.getByRole("radio", { name: /Another player/ })).toBeChecked();
+    expect(api.calls.some((c) => c.route === "GET /api/v1/friends")).toBe(
+      false,
+    );
+    await act(async () =>
+      screen.getByRole("radio", { name: /A friend/ }).click(),
+    );
+    await settle();
+    const friend = screen.getByLabelText("Your friend");
+    expect(friend).toHaveValue("u-bob");
+    await act(async () =>
+      screen.getByRole("button", { name: "Invite bob" }).click(),
+    );
+    await settle();
+    expect(
+      api.calls.find((c) => c.route === "POST /api/v1/queue")!.options,
+    ).toEqual({
+      body: {
+        format: "two_headed_giant",
+        seats: 4,
+        deck_id: "deck-1",
+        humans_only: false,
+        best_of: 1,
+        partner_id: "u-bob",
+      },
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Waiting for bob to join your team…",
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Withdraw the invitation" }).click(),
+    );
+    await settle();
+    expect(api.calls.some((c) => c.route === "DELETE /api/v1/queue")).toBe(
+      true,
+    );
+  });
+
+  it("accepts a friend's invitation with a deck, or declines it", async () => {
+    const api = mockApi();
+    const invited = place({
+      invites: [
+        {
+          player: { id: "u-cara", handle: "cara", portrait: null },
+          humans_only: true,
+          invited_at: "2026-10-23T10:00:00Z",
+        },
+      ],
+    });
+    api.on("GET /api/v1/queue", () => reply(200, invited));
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () =>
+      reply(200, [deck(), deck({ id: "deck-9", title: "Blue deck" })]),
+    );
+    api.on(
+      "POST /api/v1/queue/invites/{player_id}",
+      () =>
+        reply(422, {
+          code: "team_decks",
+          message:
+            "Your deck and cara's share Lightning Bolt. In Two-Headed Giant teammates' decks may share only basic lands: one of you needs another deck.",
+        }),
+      () =>
+        reply(
+          200,
+          waitingPlace({
+            format: "two_headed_giant",
+            seats: 4,
+            deck_id: "deck-9",
+            deck: "Blue deck",
+            partner: { id: "u-cara", handle: "cara", portrait: null },
+          }),
+        ),
+    );
+    render(<FindGame me={ada} />);
+    await settle();
+    const invitation = screen.getByRole("region", { name: "Invitations" });
+    expect(invitation).toHaveTextContent(
+      "cara invites you to play Two-Headed Giant as their teammate, against players only.",
+    );
+    await act(async () =>
+      within(invitation)
+        .getByRole("button", { name: "Accept cara's invitation" })
+        .click(),
+    );
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Your deck and cara's share Lightning Bolt.",
+    );
+    const choice = within(invitation).getByLabelText(
+      "Your deck for your friend's team",
+    );
+    await act(async () => {
+      (choice as HTMLSelectElement).value = "deck-9";
+      choice.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await act(async () =>
+      within(invitation)
+        .getByRole("button", { name: "Accept cara's invitation" })
+        .click(),
+    );
+    await settle();
+    const accepted = api.calls.filter(
+      (c) => c.route === "POST /api/v1/queue/invites/{player_id}",
+    );
+    expect(accepted[1]!.options).toEqual({
+      params: { path: { player_id: "u-cara" } },
+      body: { deck_id: "deck-9" },
+    });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Looking for a Two-Headed Giant game with cara…",
+    );
+  });
+
+  it("declines, and says why a team's wait ended", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/queue", () =>
+      reply(
+        200,
+        place({
+          status: "left",
+          reason: "partner_left",
+          message:
+            "bob left the queue, so your team did too. Find a game again, together or alone.",
+          invites: [
+            {
+              player: { id: "u-cara", handle: "cara", portrait: null },
+              humans_only: false,
+              invited_at: "2026-10-23T10:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    api.on("POST /api/v1/queue/invites/{player_id}/decline", () =>
+      reply(200, place({ status: "left", reason: "partner_left" })),
+    );
+    render(<FindGame me={ada} />);
+    await settle();
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent(
+      "bob left the queue, so your team did too.",
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Decline cara's invitation" }).click(),
+    );
+    await settle();
+    expect(
+      api.calls.find(
+        (c) => c.route === "POST /api/v1/queue/invites/{player_id}/decline",
+      )!.options,
+    ).toEqual({ params: { path: { player_id: "u-cara" } } });
+    expect(screen.queryByRole("region", { name: "Invitations" })).toBeNull();
+  });
+
+  it("names the invitation in the bell, and leads to Find a game", () => {
+    const bell = {
+      id: "n2",
+      kind: "team_invite",
+      created_at: "2026-10-23T10:00:00Z",
+      read: false,
+      actor: { id: "u-bob", handle: "bob", avatar: "sigil", alliance: null },
+      request_pending: true,
+      messages: 0,
+      game_id: null,
+    } as NotificationItem;
+    expect(notificationWords(bell)).toBe(
+      "bob invites you to play Two-Headed Giant as their teammate.",
+    );
+    expect(notificationLink(bell)).toBe("#find");
+    expect(notificationWords({ ...bell, request_pending: false })).toBe(
+      "bob invited you to play Two-Headed Giant as their teammate.",
     );
   });
 });

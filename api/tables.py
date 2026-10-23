@@ -19,13 +19,23 @@
   other (api/games.py): each player's seat has its own token, lease, views and concession, and
   away players may be voted out.
 - **Privacy.** Others see a seat's handle and portrait (its alliance), never its deck.
+- **Two-Headed Giant** (v0.5.1, FMT10). A table of four seats in two teams, seats 0 and 1 against
+  2 and 3 (api/teams.py): four players, or players with bots as teammates or opponents (the host
+  chooses whether their teammate is a bot, and how many of the other team's seats bots fill), at
+  least two players in all. Players choose a team or take the first free seat, and may move to a
+  free seat of the other team. Each deck is a Legacy deck checked by the table's rules, and a
+  team's two decks follow Unified Deck Construction: checked when a player gets ready, against
+  their teammate's deck, and again at the start, the shared cards named to the team itself only.
+  Changing deck or team makes the player and their teammate not ready again. Bots get fixture
+  decks their teammate's deck shares no card with. A player's concession is their team's (810.8b),
+  as the engine plays it.
 """
 
 import random
 import secrets
 from contextlib import AsyncExitStack
 from datetime import datetime, timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Path, Request
@@ -35,11 +45,12 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import matches
+from api import matches, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
-from api.decks import starters_of
+from api.decks import entries_of, starters_of
 from api.games import (
+    DECK_FORMATS,
     FORMAT_NAMES,
     TABLE_IDLE_SECONDS,
     LiveGame,
@@ -48,6 +59,7 @@ from api.games import (
     SeatPlan,
     active_games_of,
     engine_game,
+    engine_names,
     full_access,
     hub_of,
     own_deck,
@@ -83,7 +95,8 @@ router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 # A table nobody started is closed after this long, so the lobby holds no forgotten tables.
 OPEN_HOURS = 3
 LISTED = 50
-SEATS = {"legacy": [2], "commander": [2, 3, 4]}
+TEAM_FORMAT = teams.FORMAT
+SEATS = {"legacy": [2], "commander": [2, 3, 4], TEAM_FORMAT: [teams.SEATS]}
 Code = Annotated[str, Path(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")]
 Visibility = Literal["public", "private"]
 
@@ -96,10 +109,19 @@ class TableRequest(Contract):
         default=2,
         ge=2,
         le=4,
-        description="Every seat, bots included: 2 in Legacy, 2-4 in Commander.",
+        description="Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in "
+        "Two-Headed Giant.",
     )
     bots: int = Field(
-        default=0, ge=0, le=2, description="Seats bots fill, after the players'; Commander only."
+        default=0,
+        ge=0,
+        le=2,
+        description="Seats bots fill: in Commander after the players'; in Two-Headed Giant (since "
+        "v0.5.1) your teammate's when bot_teammate, the rest the other team's.",
+    )
+    bot_teammate: bool = Field(
+        default=False,
+        description="Two-Headed Giant (v0.5.1): a bot is your teammate, in seat 1; one of bots.",
     )
     bot_skill: int = Field(default=4, ge=1, le=6)
     turn_cap: int = Field(default=60, ge=1, le=200)
@@ -116,13 +138,26 @@ class TableRequest(Contract):
     deck_id: UUID = Field(description="The host's deck.")
 
 
+Team = Annotated[int, Field(ge=0, le=1)]
+TEAM_TEXT = "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3."
+
+
 class SeatTaking(Contract):
     deck_id: UUID = Field(description="One of your decks, in the table's format.")
+    team: Team | None = Field(
+        default=None,
+        description=f"{TEAM_TEXT} The team to join; the first free seat when left out.",
+    )
 
 
 class SeatChange(Contract):
     deck_id: UUID | None = Field(default=None, description="Another of your decks; unreadies.")
     ready: bool | None = None
+    team: Team | None = Field(
+        default=None,
+        description=f"{TEAM_TEXT} Moves you to a free seat of that team; unreadies you, and the "
+        "teammate you then have.",
+    )
 
 
 class TablePlayer(Contract):
@@ -136,6 +171,7 @@ class TablePlayer(Contract):
     you: bool
     deck: str | None = Field(description="Your own seat's deck title; others' decks are private.")
     deck_id: UUID | None = Field(description="Your own seat's deck.")
+    team: int | None = Field(default=None, description=f"{TEAM_TEXT} Null in other formats.")
 
 
 class TableView(Contract):
@@ -170,6 +206,63 @@ def status_of(table: GameTable) -> str:
 
 def rules_of(table: GameTable) -> TableRules:
     return TableRules(banned=table.allow_banned, not_legal=table.allow_not_legal)
+
+
+def team_bot_seats(bots: int, teammate: bool) -> list[int]:
+    """A Two-Headed Giant table's bots (v0.5.1): the host's teammate's seat when a bot is their
+    teammate, then the other team's seats from its last."""
+    others = bots - teammate
+    return sorted(([1] if teammate else []) + list(range(teams.SEATS - others, teams.SEATS)))
+
+
+def bot_seats_of(table: GameTable) -> list[int]:
+    """The seats bots fill: the last ones, or (v0.5.1) those the table names."""
+    if table.bot_seats is not None:
+        return sorted(table.bot_seats)
+    return list(range(table.seats - table.bots, table.seats))
+
+
+def player_seats_of(table: GameTable) -> list[int]:
+    """The seats players take, in turn order."""
+    bots = bot_seats_of(table)
+    return [seat for seat in range(table.seats) if seat not in bots]
+
+
+def team_of(table: GameTable, seat: int) -> int | None:
+    return seat // 2 if table.format == TEAM_FORMAT else None
+
+
+def team_cards(db: Session, deck_id: UUID) -> set[str]:
+    """A deck's cards as Unified Deck Construction compares a team's (api/teams.py): the engine's
+    names of its main deck's cards as the deck stands now, basic lands aside."""
+    deck = db.get(Deck, deck_id)
+    if deck is None:
+        return set()
+    entries = [entry for entry in entries_of(deck) if entry.location == "main"]
+    return {name for name in engine_names(db, entries, True).values() if name} - teams.BASICS
+
+
+def shared_with(mate: str | None, both: list[str]) -> str:
+    """The remedy for two teammates' decks that share cards, as the team itself is told."""
+    return (
+        f"Your deck and {mate or 'your teammate'}'s share {teams.listed(both)}. In Two-Headed "
+        "Giant teammates' decks may share only basic lands: one of you needs another deck."
+    )
+
+
+def team_banned(names: set[str], rules: TableRules, permissions: frozenset[str]) -> ApiError | None:
+    """A deck holding a card banned in Two-Headed Giant itself (MTR 9.5) at a table refusing
+    banned cards; SysOp's decks play whatever the table's rules say."""
+    held = sorted(names & teams.BANNED)
+    if rules.banned or not held or "cards.any" in permissions:
+        return None
+    return ApiError(
+        422,
+        "deck_not_allowed",
+        f"This table does not allow banned cards: {teams.listed(held)} "
+        f"{'is' if len(held) == 1 else 'are'} banned in Two-Headed Giant. Choose another deck, "
+        "or take it out of this one.",
+    )
 
 
 def find(db: Session, code: str, *, lock: bool = False) -> GameTable:
@@ -212,11 +305,11 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
     you = principal.user.id
     mine = next((row for row in rows if row.user_id == you), None)
     deck = db.get(Deck, mine.deck_id) if mine is not None else None
-    humans = table.seats - table.bots
+    bots = bot_seats_of(table)
     players: list[TablePlayer] = []
     for index in range(table.seats):
         row = by_seat.get(index)
-        if index >= humans:
+        if index in bots:
             players.append(
                 TablePlayer(
                     seat=index,
@@ -229,6 +322,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
                     you=False,
                     deck=None,
                     deck_id=None,
+                    team=team_of(table, index),
                 )
             )
             continue
@@ -247,6 +341,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
                 you=own,
                 deck=deck.title if own and deck is not None else None,
                 deck_id=row.deck_id if own and row is not None else None,
+                team=team_of(table, index),
             )
         )
     status = status_of(table)
@@ -281,11 +376,18 @@ def check_deck(
     rules: TableRules,
 ) -> None:
     """A deck the player may sit down with: theirs, of the table's format, playable with their
-    library now (as at the practice table), and holding no card the table's rules do not allow."""
+    library now (as at the practice table), and holding no card the table's rules do not allow.
+    Two-Headed Giant (v0.5.1) takes a Legacy deck, and refuses its own banned card where banned
+    cards are refused."""
     if "decks.edit" not in permissions:
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
-    own_deck(db, user, permissions, deck_id, fmt, library, rules)
+    deck_format = DECK_FORMATS.get(fmt, fmt)
+    seat, _, _ = own_deck(db, user, permissions, deck_id, deck_format, library, rules)
+    if fmt == TEAM_FORMAT:
+        refused = team_banned(teams.cards_of(seat) or set(), rules, permissions)
+        if refused is not None:
+            raise refused
 
 
 def may_sit(db: Session, request: Request, principal: Principal) -> None:
@@ -341,6 +443,10 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         raise ApiError(422, "invalid_table", "A table needs at least two players' seats.")
     if body.best_of != 1 and fmt != "legacy":
         raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
+    if body.bot_teammate and (fmt != TEAM_FORMAT or body.bots < 1):
+        raise ApiError(
+            422, "invalid_table", "A bot teammate is one of a Two-Headed Giant table's bots."
+        )
     check_deck(db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules)
     may_sit(db, request, principal)
     now = utcnow()
@@ -351,6 +457,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         visibility=body.visibility,
         seats=body.seats,
         bots=body.bots,
+        bot_seats=team_bot_seats(body.bots, body.bot_teammate) if fmt == TEAM_FORMAT else None,
         bot_skill=body.bot_skill,
         turn_cap=body.turn_cap,
         allow_banned=body.rules.banned,
@@ -392,9 +499,11 @@ def join_table(
     rows = seats_of(db, table)
     if any(row.user_id == principal.user.id for row in rows):
         raise ApiError(409, "already_seated", "You already sit at this table.")
-    free = [seat for seat in range(table.seats - table.bots) if seat not in {r.seat for r in rows}]
+    free = [seat for seat in player_seats_of(table) if seat not in {r.seat for r in rows}]
     if not free:
         raise ApiError(409, "table_full", "Every player's seat at this table is taken.")
+    if body.team is not None:
+        free = free_in_team(table, free, body.team)
     check_deck(
         db,
         request,
@@ -423,6 +532,17 @@ def join_table(
     return view_of(db, table, principal)
 
 
+def free_in_team(table: GameTable, free: list[int], team: int) -> list[int]:
+    """The free players' seats of a team (v0.5.1); refused outside Two-Headed Giant, or when that
+    team has none."""
+    if table.format != TEAM_FORMAT:
+        raise ApiError(422, "invalid_table", "Only Two-Headed Giant tables have teams.")
+    seats = [seat for seat in free if seat // 2 == team]
+    if not seats:
+        raise ApiError(409, "team_full", "That team has no free seat.")
+    return seats
+
+
 def seat_at(db: Session, table: GameTable, principal: Principal) -> TableSeat:
     row = db.scalar(
         select(TableSeat).where(
@@ -440,9 +560,22 @@ def seat_at(db: Session, table: GameTable, principal: Principal) -> TableSeat:
 def change_seat(
     code: Code, body: SeatChange, request: Request, principal: Player, db: Db
 ) -> TableView:
-    """Changes your deck (which makes you not ready), or whether you are ready."""
+    """Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed
+    Giant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready
+    too, and you are ready only once your deck and your teammate's share no card but basic lands."""
     table = find(db, code)
     row = seat_at(db, table, principal)
+    if body.team is not None and team_of(table, row.seat) != body.team:
+        taken = {other.seat for other in seats_of(db, table)}
+        free = [seat for seat in player_seats_of(table) if seat not in taken]
+        row.seat = free_in_team(table, free, body.team)[0]
+        row.ready = False
+        try:
+            db.flush()
+        except IntegrityError:
+            db.rollback()
+            raise ApiError(409, "team_full", "That seat was just taken. Try again.") from None
+        unready_teammate(db, table, row)
     if body.deck_id is not None and body.deck_id != row.deck_id:
         check_deck(
             db,
@@ -455,10 +588,43 @@ def change_seat(
         )
         row.deck_id = body.deck_id
         row.ready = False
+        unready_teammate(db, table, row)
     if body.ready is not None:
+        if body.ready and table.format == TEAM_FORMAT:
+            check_team(db, table, row)
         row.ready = body.ready
     db.commit()
     return view_of(db, table, principal)
+
+
+def teammate_row(db: Session, table: GameTable, row: TableSeat) -> TableSeat | None:
+    """The player beside a seat in its Two-Headed Giant team, if one sits there."""
+    if table.format != TEAM_FORMAT:
+        return None
+    return db.scalar(
+        select(TableSeat).where(
+            TableSeat.table_id == table.id, TableSeat.seat == teams.teammate(row.seat)
+        )
+    )
+
+
+def unready_teammate(db: Session, table: GameTable, row: TableSeat) -> None:
+    """A team's decks changed: the teammate must get ready again, which checks the two."""
+    mate = teammate_row(db, table, row)
+    if mate is not None:
+        mate.ready = False
+
+
+def check_team(db: Session, table: GameTable, row: TableSeat) -> None:
+    """Unified Deck Construction (MTR 8.4, 9.5) as a player gets ready: their deck and their
+    teammate's share no card but basic lands. The shared cards are named to the team only."""
+    mate = teammate_row(db, table, row)
+    if mate is None:
+        return
+    both = teams.shared(team_cards(db, row.deck_id), team_cards(db, mate.deck_id))
+    if both:
+        handle = db.scalar(select(User.handle).where(User.id == mate.user_id))
+        raise ApiError(422, "team_decks", shared_with(handle, both))
 
 
 @router.post("/tables/{code}/leave", response_model=TableView, responses={409: {"model": Error}})
@@ -489,16 +655,32 @@ def plan_table(
     if status_of(table) != "open":
         raise ApiError(409, "table_closed", "This table is no longer open.")
     rows = seats_of(db, table)
-    humans = table.seats - table.bots
-    if len(rows) < humans:
+    if len(rows) < len(player_seats_of(table)):
         raise ApiError(409, "table_not_full", "Wait until every player's seat is taken.")
     waiting = [row for row in rows if not row.ready and row.user_id != table.host_id]
     if waiting:
         raise ApiError(409, "not_ready", "Wait until every player is ready.")
     roster = roster_of(request)
+    by_seat = {row.seat: row for row in rows}
+    bots = bot_seats_of(table)
+    # Bots with no deck chosen play the starter decks in Commander, a different one each, unless
+    # the site keeps them on the engine's fixture decks. In Two-Headed Giant the team rules deal
+    # them fixture decks (check_teams).
+    starters = (
+        list(starters_of(request).values())
+        if settings_of(request).bot_decks == "starters" and table.format == "commander"
+        else []
+    )
+    random.shuffle(starters)
     plans: list[SeatPlan] = []
     users: list[UUID | None] = []
-    for row in rows:
+    for index in range(table.seats):
+        if index in bots:
+            planned = starter_seat(db, starters.pop()) if starters else None
+            plans.append(planned or SeatPlan({"player": "bot"}))
+            users.append(None)
+            continue
+        row = by_seat[index]
         user = db.get(User, row.user_id)
         assert user is not None
         permissions = permissions_for(user, roles_of(db, user))
@@ -507,8 +689,20 @@ def plan_table(
         library = library_of(db, user, permissions, roster)
         try:
             seat, revision, title = own_deck(
-                db, user, permissions, row.deck_id, table.format, library, rules_of(table)
+                db,
+                user,
+                permissions,
+                row.deck_id,
+                DECK_FORMATS.get(table.format, table.format),
+                library,
+                rules_of(table),
             )
+            if table.format == TEAM_FORMAT:
+                # MTR 9.5: Two-Headed Giant Constructed has no sideboards; a deck's stays home.
+                cast(dict[str, object], seat["deck_list"]).pop("sideboard", None)
+                banned = team_banned(teams.cards_of(seat) or set(), rules_of(table), permissions)
+                if banned is not None:
+                    raise banned
         except ApiError as refused:
             if user.id == principal.user.id:
                 raise
@@ -523,16 +717,8 @@ def plan_table(
             ) from refused
         plans.append(SeatPlan({"player": "human", **seat}, revision, title))
         users.append(user.id)
-    # Bots with no deck chosen play the starter decks in Commander, a different one each, unless
-    # the site keeps them on the engine's fixture decks.
-    starters = (
-        list(starters_of(request).values()) if settings_of(request).bot_decks == "starters" else []
-    )
-    random.shuffle(starters)
-    for _ in range(table.bots):
-        planned = starter_seat(db, starters.pop()) if starters else None
-        plans.append(planned or SeatPlan({"player": "bot"}))
-        users.append(None)
+    if table.format == TEAM_FORMAT:
+        check_teams(db, table, plans, users, principal)
     # A Godlike player's custom cards (v0.4.0) are checked against the running engine before the
     # game starts; bots here play starter or fixture decks, never them.
     for index, held in custom_in_seats(db, [plan.engine for plan in plans]).items():
@@ -541,6 +727,59 @@ def plan_table(
     # goes back before the engine is asked.
     db.commit()
     return plans, users
+
+
+def check_teams(
+    db: Session,
+    table: GameTable,
+    plans: list[SeatPlan],
+    users: list[UUID | None],
+    principal: Principal,
+) -> None:
+    """Two-Headed Giant's teams at the start (v0.5.1): each team of two players' decks, bound now,
+    share no card but basic lands (Unified Deck Construction, MTR 8.4 and 9.5), and each bot gets
+    a fixture deck its teammate's shares no card with (api/teams.py). The host's own team is told
+    the cards; another team's players are named, never their cards, and made not ready."""
+    players = [user for user in users if user is not None]
+    handles = dict(db.execute(select(User.id, User.handle).where(User.id.in_(players))).all())
+    for first, second in teams.TEAMS:
+        one, other = users[first], users[second]
+        if one is None or other is None:
+            continue
+        both = teams.shared(
+            teams.cards_of(plans[first].engine) or set(),
+            teams.cards_of(plans[second].engine) or set(),
+        )
+        if not both:
+            continue
+        for row in db.scalars(
+            select(TableSeat).where(
+                TableSeat.table_id == table.id, TableSeat.seat.in_((first, second))
+            )
+        ):
+            row.ready = False
+        db.commit()
+        if principal.user.id in (one, other):
+            mate = other if principal.user.id == one else one
+            raise ApiError(409, "team_decks", shared_with(handles.get(mate), both))
+        raise ApiError(
+            409,
+            "team_decks",
+            f"{handles.get(one) or 'A player'}'s and {handles.get(other) or 'a player'}'s decks "
+            "share a card, and Two-Headed Giant teammates' decks may share only basic lands: "
+            "they need to choose again.",
+        )
+    try:
+        teams.assign_and_check([plan.engine for plan in plans], True)
+    except ApiError as refused:
+        # Only a bot's deck is left to refuse now: every fixture deck shares a card with its
+        # teammate's.
+        raise ApiError(
+            409,
+            "team_decks",
+            "A player's deck shares a card with every bot deck, so no bot can be their teammate: "
+            "they need another deck.",
+        ) from refused
 
 
 def record_table_game(
@@ -555,9 +794,9 @@ def record_table_game(
     table = db.scalar(select(GameTable).where(GameTable.id == table_id).with_for_update())
     assert table is not None
     seated = {row.seat: row.user_id for row in seats_of(db, table)}
-    if status_of(table) != "open" or [seated.get(i) for i in range(len(seated))] != [
-        user for user in users if user is not None
-    ]:
+    if status_of(table) != "open" or seated != {
+        seat: user for seat, user in enumerate(users) if user is not None
+    }:
         raise ApiError(409, "table_changed", "A player left as the game started. Try again.")
     game = add_table_game(db, table, created, plans, users)
     db.commit()
@@ -584,8 +823,11 @@ def add_table_game(
         bot_skill=table.bot_skill,
         turn_cap=table.turn_cap,
         catalog_revision_id=db.scalar(select(func.max(CatalogRevision.id))),
+        # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.1).
         format_version=db.scalar(
-            select(func.max(FormatVersion.version)).where(FormatVersion.format == table.format)
+            select(func.max(FormatVersion.version)).where(
+                FormatVersion.format == DECK_FORMATS.get(table.format, table.format)
+            )
         ),
     )
     db.add(game)
@@ -667,6 +909,7 @@ async def start_table(code: Code, request: Request, principal: Player, db: Db) -
                             for seat, user_id in enumerate(users)
                             if user_id is not None
                         },
+                        teams=table.format == TEAM_FORMAT,
                     )
                 )
             finally:
