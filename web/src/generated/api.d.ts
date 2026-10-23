@@ -1355,6 +1355,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/friends/waiting/{player_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Ask Unnamed
+         * @description Add friend to a player an email search found with no handle yet (v0.5.1): the request
+         *     waits, unseen, until they choose one.
+         */
+        put: operations["ask_unnamed_api_v1_friends_waiting__player_id__put"];
+        post?: never;
+        /**
+         * Withdraw Unnamed
+         * @description Withdraws a request that waits for a player to choose a handle (v0.5.1), or ends what is
+         *     between the two accounts while they have none.
+         */
+        delete: operations["withdraw_unnamed_api_v1_friends_waiting__player_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/friends/{player_id}": {
         parameters: {
             query?: never;
@@ -4144,6 +4170,11 @@ export interface components {
              * @description Your requests, waiting for theirs.
              */
             outgoing: components["schemas"]["PlayerSummary"][];
+            /**
+             * Waiting
+             * @description Your requests to players found by email who have not chosen a handle yet (v0.5.1): each reaches its player once they choose one.
+             */
+            waiting?: components["schemas"]["WaitingRequest"][];
         };
         /**
          * GameMatch
@@ -5134,6 +5165,8 @@ export interface components {
             by_email: boolean;
             /** Players */
             players: components["schemas"]["PlayerSummary"][];
+            /** @description By email, when no player with a handle matched (v0.5.1): an active player who lets themselves be found by email but has not chosen a handle yet. A friend request to them waits until they do. */
+            unnamed?: components["schemas"]["UnnamedPlayer"] | null;
         };
         /** PlayerSummary */
         PlayerSummary: {
@@ -7013,6 +7046,24 @@ export interface components {
             /** Wins */
             wins: number;
         };
+        /**
+         * UnnamedPlayer
+         * @description A player found by email who has not chosen a handle yet (v0.5.1): nothing about them but
+         *     what is between the two accounts.
+         */
+        UnnamedPlayer: {
+            /**
+             * Friendship
+             * @description requested when your friend request waits for them to choose a handle.
+             * @enum {string}
+             */
+            friendship: "none" | "friends" | "requested" | "requested_you";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
         /** Unread */
         Unread: {
             /** Unread */
@@ -7082,6 +7133,22 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * WaitingRequest
+         * @description Your friend request to a player who has not chosen a handle yet (v0.5.1).
+         */
+        WaitingRequest: {
+            /**
+             * Player Id
+             * Format: uuid
+             */
+            player_id: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
         };
         /** WinsChange */
         WinsChange: {
@@ -14222,6 +14289,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FriendList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ask_unnamed_api_v1_friends_waiting__player_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnnamedPlayer"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    withdraw_unnamed_api_v1_friends_waiting__player_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                player_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnnamedPlayer"];
                 };
             };
             /** @description Bad Request */

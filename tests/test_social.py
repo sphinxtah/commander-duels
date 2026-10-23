@@ -193,6 +193,116 @@ def test_search_by_email_matches_only_in_full_and_never_shows_one(client):
     assert "example.com" not in profile.text.lower()
 
 
+def test_an_email_search_finds_a_player_with_no_handle_yet(client):
+    """The owner's report (v0.5.1): a whole gmail.com address found no one, because its player was
+    approved but had not chosen a handle yet. The search says so, and a friend request to them
+    waits, unseen, until they choose one."""
+    me = player(client, "seeker")
+    newcomer = player(
+        client,
+        "newcomer",
+        email="new.comer@gmail.com",
+        handle=None,
+        normalized_handle=None,
+        onboarding="handle",
+    )
+    player(
+        client,
+        "shy",
+        email="shy@gmail.com",
+        handle=None,
+        normalized_handle=None,
+        onboarding="handle",
+        email_searchable=False,
+    )
+    answer = me.get("/api/v1/players", q="New.Comer@gmail.com")
+    assert answer.json()["players"] == []
+    assert answer.json()["unnamed"] == {"id": str(newcomer.id), "friendship": "none"}
+    assert "gmail" not in answer.text.lower()
+    # Never by handle, nor one who does not allow it, and still no profile.
+    assert me.get("/api/v1/players", q="newcomer").json()["unnamed"] is None
+    assert me.get("/api/v1/players", q="shy@gmail.com").json()["unnamed"] is None
+    assert me.get(f"/api/v1/players/{newcomer.id}").status_code == 404
+    # Add friend: the request waits, and the newcomer hears nothing yet.
+    asked = me.send("PUT", f"/api/v1/friends/waiting/{newcomer.id}")
+    assert asked.status_code == 200 and asked.json()["friendship"] == "requested"
+    found = me.get("/api/v1/players", q="new.comer@gmail.com").json()
+    assert found["unnamed"]["friendship"] == "requested"
+    lists = me.get("/api/v1/friends").json()
+    assert [waiting["player_id"] for waiting in lists["waiting"]] == [str(newcomer.id)]
+    assert lists["outgoing"] == []
+    assert notifications(newcomer)["items"] == []
+    # Withdrawn, then asked again.
+    withdrawn = me.send("DELETE", f"/api/v1/friends/waiting/{newcomer.id}")
+    assert withdrawn.json()["friendship"] == "none"
+    assert me.get("/api/v1/friends").json()["waiting"] == []
+    me.send("PUT", f"/api/v1/friends/waiting/{newcomer.id}")
+    # They choose a handle: the request reaches them as any request does.
+    chose = newcomer.send("PATCH", "/api/v1/me", {"handle": "Newcomer"})
+    assert chose.status_code == 200, chose.text
+    [told] = notifications(newcomer)["items"]
+    assert told["kind"] == "friend_request" and told["request_pending"] is True
+    assert told["actor"]["handle"] == "seeker"
+    incoming = newcomer.get("/api/v1/friends").json()["incoming"]
+    assert [found["handle"] for found in incoming] == ["seeker"]
+    lists = me.get("/api/v1/friends").json()
+    assert lists["waiting"] == []
+    assert [found["handle"] for found in lists["outgoing"]] == ["Newcomer"]
+    # Named now: the search lists them, and the waiting route no longer applies.
+    assert search(me, "new.comer@gmail.com") == ["Newcomer"]
+    assert me.send("PUT", f"/api/v1/friends/waiting/{newcomer.id}").status_code == 404
+
+
+def test_a_waiting_request_needs_a_player_the_email_search_finds(client):
+    me = player(client, "seeker")
+    unnamed = {"handle": None, "normalized_handle": None, "onboarding": "handle"}
+    shy = player(client, "shy", email_searchable=False, **unnamed)
+    blocker = player(client, "blocker", **unnamed)
+    waiting = player(client, "waiting", status="pending", **unnamed)
+    named = player(client, "ada")
+    with database(client) as db:
+        db.add(PlayerBlock(blocker_id=blocker.id, blocked_id=me.id, created_at=utcnow()))
+        db.commit()
+    assert me.get("/api/v1/players", q="blocker@example.com").json()["unnamed"] is None
+    for other in (shy, blocker, waiting, named):
+        assert me.send("PUT", f"/api/v1/friends/waiting/{other.id}").status_code == 404
+    assert me.send("PUT", f"/api/v1/friends/waiting/{uuid4()}").status_code == 404
+    # An account must choose its own handle first.
+    newcomer = player(client, "newcomer", **unnamed)
+    refused = newcomer.send("PUT", f"/api/v1/friends/waiting/{shy.id}")
+    assert refused.status_code == 409 and refused.json()["code"] == "handle_required"
+    # A player who stops being found by email can still be left alone: the request is withdrawn.
+    later = player(client, "later", **unnamed)
+    me.send("PUT", f"/api/v1/friends/waiting/{later.id}")
+    with database(client) as db:
+        db.execute(update(User).where(User.id == later.id).values(email_searchable=False))
+        db.commit()
+    assert me.send("DELETE", f"/api/v1/friends/waiting/{later.id}").status_code == 200
+    assert me.get("/api/v1/friends").json()["waiting"] == []
+    # With no request between the two, withdrawing tells nothing about an ID.
+    assert me.send("DELETE", f"/api/v1/friends/waiting/{later.id}").status_code == 404
+    # A player this account blocked (before a reset took their handle) stays out of sight.
+    blocked = player(client, "blocked", email="blocked@example.com", **unnamed)
+    with database(client) as db:
+        db.add(PlayerBlock(blocker_id=me.id, blocked_id=blocked.id, created_at=utcnow()))
+        db.commit()
+    assert me.get("/api/v1/players", q="blocked@example.com").json()["unnamed"] is None
+    assert me.send("PUT", f"/api/v1/friends/waiting/{blocked.id}").status_code == 404
+
+
+def test_choosing_a_handle_hears_only_from_active_players(client):
+    newcomer = player(client, "newcomer", handle=None, normalized_handle=None, onboarding="handle")
+    ada, gone = player(client, "ada"), player(client, "gone")
+    for asker in (ada, gone):
+        assert asker.send("PUT", f"/api/v1/friends/waiting/{newcomer.id}").status_code == 200
+    with database(client) as db:
+        db.execute(update(User).where(User.id == gone.id).values(status="disabled"))
+        db.commit()
+    assert newcomer.send("PATCH", "/api/v1/me", {"handle": "Newcomer"}).status_code == 200
+    told = notifications(newcomer)["items"]
+    assert [(item["kind"], item["actor"]["handle"]) for item in told] == [("friend_request", "ada")]
+
+
 def test_search_limits(client):
     limits = SearchLimits()
     someone = uuid4()

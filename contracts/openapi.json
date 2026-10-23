@@ -4168,6 +4168,14 @@
             },
             "title": "Outgoing",
             "type": "array"
+          },
+          "waiting": {
+            "description": "Your requests to players found by email who have not chosen a handle yet (v0.5.1): each reaches its player once they choose one.",
+            "items": {
+              "$ref": "#/components/schemas/WaitingRequest"
+            },
+            "title": "Waiting",
+            "type": "array"
           }
         },
         "required": [
@@ -6592,6 +6600,17 @@
             },
             "title": "Players",
             "type": "array"
+          },
+          "unnamed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnnamedPlayer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "By email, when no player with a handle matched (v0.5.1): an active player who lets themselves be found by email but has not chosen a handle yet. A friend request to them waits until they do."
           }
         },
         "required": [
@@ -11134,6 +11153,34 @@
         "title": "Totals",
         "type": "object"
       },
+      "UnnamedPlayer": {
+        "additionalProperties": false,
+        "description": "A player found by email who has not chosen a handle yet (v0.5.1): nothing about them but\nwhat is between the two accounts.",
+        "properties": {
+          "friendship": {
+            "description": "requested when your friend request waits for them to choose a handle.",
+            "enum": [
+              "none",
+              "friends",
+              "requested",
+              "requested_you"
+            ],
+            "title": "Friendship",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "friendship"
+        ],
+        "title": "UnnamedPlayer",
+        "type": "object"
+      },
       "Unread": {
         "additionalProperties": false,
         "properties": {
@@ -11365,6 +11412,28 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WaitingRequest": {
+        "additionalProperties": false,
+        "description": "Your friend request to a player who has not chosen a handle yet (v0.5.1).",
+        "properties": {
+          "player_id": {
+            "format": "uuid",
+            "title": "Player Id",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "player_id",
+          "requested_at"
+        ],
+        "title": "WaitingRequest",
         "type": "object"
       },
       "WinsChange": {
@@ -20343,6 +20412,226 @@
           }
         },
         "summary": "Friend List"
+      }
+    },
+    "/api/v1/friends/waiting/{player_id}": {
+      "delete": {
+        "description": "Withdraws a request that waits for a player to choose a handle (v0.5.1), or ends what is\nbetween the two accounts while they have none.",
+        "operationId": "withdraw_unnamed_api_v1_friends_waiting__player_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnnamedPlayer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Withdraw Unnamed"
+      },
+      "put": {
+        "description": "Add friend to a player an email search found with no handle yet (v0.5.1): the request\nwaits, unseen, until they choose one.",
+        "operationId": "ask_unnamed_api_v1_friends_waiting__player_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "player_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Player Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnnamedPlayer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ask Unnamed"
       }
     },
     "/api/v1/friends/{player_id}": {

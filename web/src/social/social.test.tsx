@@ -231,6 +231,65 @@ describe("the player search (v0.4.3)", () => {
     expect(box).toHaveValue("");
   });
 
+  it("says when the address's player has no name yet, and sends a request that waits (v0.5.1)", async () => {
+    vi.useFakeTimers();
+    on("GET /api/v1/players", () =>
+      reply(200, {
+        players: [],
+        by_email: true,
+        unnamed: { id: BOB, friendship: "none" },
+      }),
+    );
+    on("PUT /api/v1/friends/waiting/{player_id}", () =>
+      reply(200, { id: BOB, friendship: "requested" }),
+    );
+    on("DELETE /api/v1/friends/waiting/{player_id}", () =>
+      reply(200, { id: BOB, friendship: "none" }),
+    );
+    render(<PlayerSearch />);
+    const box = screen.getByRole("combobox");
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: "new.comer@gmail.com" } });
+    fireEvent.submit(box.closest("form")!);
+    await later(0);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "That player hasn't chosen a player name yet.",
+    );
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Add friend" }));
+    await later(0);
+    expect(
+      sent("PUT /api/v1/friends/waiting/{player_id}")[0]!.init,
+    ).toMatchObject({ params: { path: { player_id: BOB } } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Your friend request waits for this player to choose a player name.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw request" }));
+    await later(0);
+    expect(sent("DELETE /api/v1/friends/waiting/{player_id}")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Add friend" })).toBeEnabled();
+  });
+
+  it("says when the address's player, with no name yet, asked first (v0.5.1)", async () => {
+    vi.useFakeTimers();
+    on("GET /api/v1/players", () =>
+      reply(200, {
+        players: [],
+        by_email: true,
+        unnamed: { id: BOB, friendship: "requested_you" },
+      }),
+    );
+    render(<PlayerSearch />);
+    const box = screen.getByRole("combobox");
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: "new.comer@gmail.com" } });
+    fireEvent.submit(box.closest("form")!);
+    await later(0);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "That player asked to be your friend and hasn't chosen a player name yet. Add friend to accept.",
+    );
+  });
+
   it("says when searching is limited", async () => {
     vi.useFakeTimers();
     on("GET /api/v1/players", () =>
@@ -599,6 +658,46 @@ describe("friends (v0.4.3)", () => {
         screen.getByRole("region", { name: "Requests you sent" }),
       ).getByRole("button", { name: "Withdraw your request to cy" }),
     ).toBeInTheDocument();
+  });
+
+  it("lists requests waiting for a player name, and withdraws one (v0.5.1)", async () => {
+    const asked = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    on(
+      "GET /api/v1/friends",
+      () =>
+        reply(200, {
+          friends: [],
+          incoming: [],
+          outgoing: [],
+          waiting: [{ player_id: BOB, requested_at: asked }],
+        }),
+      () =>
+        reply(200, { friends: [], incoming: [], outgoing: [], waiting: [] }),
+    );
+    on("DELETE /api/v1/friends/waiting/{player_id}", () =>
+      reply(200, { id: BOB, friendship: "none" }),
+    );
+    render(<FriendsPage heading={createRef()} />);
+    await settle();
+    const waiting = screen.getByRole("region", {
+      name: "Waiting for a player name",
+    });
+    expect(
+      within(waiting).getByText("A player still choosing a name"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(waiting).getByRole("button", {
+        name: "Withdraw your request asked 2 days ago",
+      }),
+    );
+    await settle();
+    expect(
+      sent("DELETE /api/v1/friends/waiting/{player_id}")[0]!.init,
+    ).toMatchObject({ params: { path: { player_id: BOB } } });
+    expect(screen.getByRole("status")).toHaveTextContent("Request withdrawn.");
+    expect(
+      screen.queryByRole("region", { name: "Waiting for a player name" }),
+    ).not.toBeInTheDocument();
   });
 });
 

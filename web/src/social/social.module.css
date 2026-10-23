@@ -290,6 +290,10 @@ button:disabled {
 .searchStatus:empty {
   display: none;
 }
+/* Add friend to a player found by email who has no handle yet (v0.5.1). */
+.unnamed {
+  margin: 0 8px 8px;
+}
 
 /* The bell, in the top bar's right-hand corner. */
 .bell {
