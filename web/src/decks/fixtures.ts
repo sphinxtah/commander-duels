@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import { client } from "../api";
-import type { CardSummary } from "../catalog/catalog";
+import type { CardSummary, EditionCopies } from "../catalog/catalog";
 import type {
   DeckDetail,
   DeckEntry,
@@ -50,6 +50,22 @@ export function card(
     owned: null,
     custom: false,
     ...fields,
+  };
+}
+
+/** An edition a player's library holds of a card (v0.5.0), with its copies. */
+export function edition(
+  printingId: string,
+  setName: string,
+  copies: number,
+): EditionCopies {
+  return {
+    printing_id: printingId,
+    set_code: setName.slice(0, 3).toLowerCase(),
+    set_name: setName,
+    collector_number: "1",
+    released_at: null,
+    copies,
   };
 }
 
@@ -171,9 +187,10 @@ export function deckDetail(fields: Partial<DeckDetail> = {}): DeckDetail {
 }
 
 /** The API answered route by route, as "METHOD /path"; each route takes its answers in order
- * and keeps the last. `calls` records each request with its options. */
+ * and keeps the last, each given the request's options. `calls` records each request with its
+ * options. */
 export function mockApi() {
-  const queues = new Map<string, (() => unknown)[]>();
+  const queues = new Map<string, ((options: unknown) => unknown)[]>();
   const calls: { route: string; options: unknown }[] = [];
   const serve = (method: string) =>
     (async (path: string, options: unknown) => {
@@ -181,13 +198,13 @@ export function mockApi() {
       calls.push({ route, options });
       const queue = queues.get(route);
       if (!queue?.length) throw new Error(`No answer for ${route}`);
-      return (queue.length > 1 ? queue.shift()! : queue[0]!)();
+      return (queue.length > 1 ? queue.shift()! : queue[0]!)(options);
     }) as never;
   for (const method of ["GET", "POST", "PUT", "PATCH", "DELETE"] as const)
     vi.spyOn(client, method).mockImplementation(serve(method));
   return {
     calls,
-    on(route: string, ...answers: (() => unknown)[]) {
+    on(route: string, ...answers: ((options: unknown) => unknown)[]) {
       queues.set(route, answers);
     },
   };

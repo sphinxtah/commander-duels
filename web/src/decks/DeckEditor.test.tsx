@@ -10,10 +10,12 @@ import { createRef, StrictMode } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { customCard } from "../alliance/fixtures";
 import { DeckEditor } from "./DeckEditor";
+import type { DeckEntry } from "./decks";
 import {
   card,
   customSummary,
   deckDetail,
+  edition,
   entry,
   mockApi,
   openDialogs,
@@ -53,13 +55,17 @@ function deck(version: number, entries = [entry(bolt, 4)]) {
     validation: validation({ legal: false, playable: false }),
   });
 }
-function saved(version: number) {
-  return reply(200, {
-    version,
-    updated_at: "2026-10-20T10:00:00Z",
-    validation: validation(),
-    cards: {},
-  });
+/** A saved draft: the entries as sent, unless the server gave them editions (v0.5.0). */
+function saved(version: number, entries?: DeckEntry[]) {
+  return (options: unknown) =>
+    reply(200, {
+      version,
+      updated_at: "2026-10-20T10:00:00Z",
+      entries:
+        entries ?? (options as { body: { entries: DeckEntry[] } }).body.entries,
+      validation: validation(),
+      cards: {},
+    });
 }
 function finding(api: ReturnType<typeof mockApi>) {
   api.on("GET /api/v1/cards", () =>
@@ -99,7 +105,7 @@ describe("the deck editor", { timeout: 15_000 }, () => {
   it("saves a change on its own, with the version it was based on", async () => {
     const api = mockApi();
     api.on(DECK, () => reply(200, deck(3)));
-    api.on(DRAFT, () => saved(4));
+    api.on(DRAFT, saved(4));
     finding(api);
     render(<DeckEditor deckId="deck-1" heading={createRef()} />);
     await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
@@ -130,7 +136,7 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     api.on(
       DRAFT,
       () => reply(409, { code: "draft_conflict", message: "Changed." }),
-      () => saved(5),
+      saved(5),
     );
     finding(api);
     render(<DeckEditor deckId="deck-1" heading={createRef()} />);
@@ -189,7 +195,7 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     });
     const opened = () => reply(200, deck(1, [entry(bolt, 5)]));
     api.on(DECK, () => held.then(opened), opened);
-    api.on(DRAFT, () => saved(2));
+    api.on(DRAFT, saved(2));
     finding(api);
     render(
       <StrictMode>
@@ -411,6 +417,155 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
+  it("offers a player only the editions their library holds, and adds one (v0.5.0)", async () => {
+    const api = mockApi();
+    const revised = edition("p-revised", "Revised Edition", 2);
+    const fourth = edition("p-fourth", "Fourth Edition", 1);
+    const king = card("Goblin King", {
+      owned: 3,
+      editions: [revised, fourth],
+    });
+    const seventh: DeckEntry = { ...entry(king, 1), printing_id: "p-seventh" };
+    api.on(DECK, () =>
+      reply(
+        200,
+        deckDetail({
+          draft: { version: 1, entries: [seventh, entry(mountain, 59)] },
+          cards: { [king.id]: king, [mountain.id]: mountain },
+          validation: validation({
+            playable: false,
+            errors: [
+              problem({
+                message:
+                  "This deck holds 1 copy of Goblin King from Seventh Edition; your library has none of that edition.",
+                remedy:
+                  "You own Goblin King from Revised Edition and Fourth Edition: switch this copy to them.",
+                card_ids: [king.id],
+                quantity: 1,
+              }),
+            ],
+          }),
+          switched_editions: [
+            {
+              name: "Goblin King",
+              quantity: 2,
+              before: "Fifth Edition (5ED #1)",
+              after: "Revised Edition (3ED #1)",
+              switched_at: "2026-10-23T10:00:00Z",
+            },
+          ],
+        }),
+      ),
+    );
+    api.on("GET /api/v1/cards", () =>
+      reply(200, { items: [king], total: 1, page: 1, page_size: 24 }),
+    );
+    api.on("GET /api/v1/cards/{card_id}", () => new Promise(() => {}));
+    api.on(DRAFT, saved(2));
+    api.on("DELETE /api/v1/decks/{deck_id}/switched-editions", () =>
+      reply(200, { ...deckDetail(), switched_editions: [] }),
+    );
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    // The deploy's note: what moved to the editions the library holds.
+    const note = await screen.findByRole("region", {
+      name: "Editions switched to the ones you own",
+    });
+    expect(note).toHaveTextContent(
+      "2 Goblin King: from Fifth Edition (5ED #1) to Revised Edition (3ED #1)",
+    );
+    fireEvent.click(within(note).getByRole("button", { name: "Dismiss" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", {
+          name: "Editions switched to the ones you own",
+        }),
+      ).toBeNull(),
+    );
+    // The row names an edition the library lacks, and holds it back.
+    const row = screen
+      .getByRole("button", { name: "Remove Goblin King" })
+      .closest("li")!;
+    expect(row).toHaveTextContent("an edition not in your library");
+    expect(row).toHaveTextContent("You don't own this edition");
+    expect(row).toHaveAttribute("data-locked", "true");
+    // Its details list only the library's editions (the server's choice).
+    fireEvent.click(within(row).getByRole("button", { name: /^Goblin King/ }));
+    await screen.findByRole("dialog", { name: "Goblin King" });
+    const asked = api.calls.find(
+      (call) => call.route === "GET /api/v1/cards/{card_id}",
+    )!.options as { params: { query: Record<string, unknown> } };
+    expect(asked.params.query).toEqual({
+      printing: "p-seventh",
+      printings: "owned",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Close the card" }));
+
+    // A copy added from the finder takes an edition the library holds and the deck leaves.
+    const finder = await screen.findByRole("region", { name: "Add cards" });
+    const found = await within(finder).findByRole(
+      "button",
+      { name: /^Goblin King/ },
+      FOUND,
+    );
+    fireEvent.click(
+      within(found.closest("li")!).getByRole("button", { name: "Add" }),
+    );
+    await waitFor(() => expect(drafts(api)).toHaveLength(1), SAVED);
+    expect(drafts(api)[0]).toEqual({
+      version: 1,
+      entries: [
+        seventh,
+        entry(mountain, 59),
+        { ...entry(king, 1), printing_id: "p-revised" },
+      ],
+    });
+    expect(
+      await screen.findByText("All changes saved", undefined, SAVED),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("button", { name: /^Goblin King/ })
+        .some((button) => button.textContent?.includes("Revised Edition")),
+    ).toBe(true);
+  });
+
+  it("takes the editions the server gave a save (v0.5.0)", async () => {
+    const api = mockApi();
+    const king = card("Goblin King", {
+      owned: 2,
+      editions: [edition("p-revised", "Revised Edition", 2)],
+    });
+    api.on(DECK, () =>
+      reply(
+        200,
+        deckDetail({
+          draft: { version: 1, entries: [] },
+          cards: { [king.id]: king, [mountain.id]: mountain },
+        }),
+      ),
+    );
+    api.on("GET /api/v1/cards", () =>
+      reply(200, { items: [mountain], total: 1, page: 1, page_size: 24 }),
+    );
+    // The server named an edition for the copies the save named none for.
+    api.on(
+      DRAFT,
+      saved(2, [
+        entry(mountain, 1),
+        { ...entry(king, 1), printing_id: "p-revised" },
+      ]),
+    );
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    addMountain();
+    expect(
+      await screen.findByText("All changes saved", undefined, SAVED),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Goblin King/ }),
+    ).toHaveTextContent("Revised Edition");
+  });
+
   it("says when the deck is not there", async () => {
     const api = mockApi();
     api.on(DECK, () => reply(404, { code: "not_found", message: "No." }));
@@ -442,7 +597,7 @@ describe("Godlike cards in the deck editor", { timeout: 15_000 }, () => {
   it("offers a Godlike account its custom cards with their images, and adds them", async () => {
     const api = mockApi();
     api.on(DECK, () => reply(200, deck(3)));
-    api.on(DRAFT, () => saved(4));
+    api.on(DRAFT, saved(4));
     api.on("GET /api/v1/custom-cards", () =>
       reply(200, [
         customCard("Stand-in Sigil", { card: sigil }),

@@ -38,7 +38,6 @@ from api.models import (
     CardConcept,
     CardPrinting,
     Deck,
-    DeckRevision,
     LibraryGrant,
     PackOpening,
     SiteSetting,
@@ -579,6 +578,7 @@ def grants_of(engine_: Any) -> Counter[tuple[UUID, str, UUID, UUID | None]]:
 def round_trip(database_url: str, folder: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Grants made at head, back to 0024 and up again: each grant gets back its editions,
     a grandfathered one those of the deck that held the most copies."""
+    (folder / "content").mkdir()
     content = write_content(folder / "content")
     monkeypatch.setenv("CD_DATABASE_URL", database_url)
     monkeypatch.setenv("CD_CONTENT_DIR", str(content))

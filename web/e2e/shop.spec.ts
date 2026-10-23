@@ -145,6 +145,10 @@ test.describe("Leng's card shop", () => {
     await expect(details.getByRole("heading", { level: 2 })).toContainText(
       name,
     );
+    // Only the edition the pack held (v0.5.0), not every printing of the card.
+    await expect(
+      details.getByRole("heading", { name: "Edition (1)" }),
+    ).toBeVisible();
     await details
       .getByRole("button", { name: "Close the card's details" })
       .click();

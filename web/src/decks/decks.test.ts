@@ -5,14 +5,17 @@ import {
   collectionLocked,
   combine,
   differences,
+  editionFor,
+  entryKey,
   exactly,
   locationsFor,
   merge,
   sampleHand,
   stats,
   typeGroup,
+  type DeckEntry,
 } from "./decks";
-import { card, entry, problem, validation } from "./fixtures";
+import { card, edition, entry, problem, validation } from "./fixtures";
 import { verdict } from "./ProblemList";
 
 const bolt = card("Lightning Bolt", {
@@ -174,7 +177,69 @@ describe("the player's library", () => {
           owned,
         ),
       ].sort(),
-    ).toEqual([bolt.id, giant.id].sort());
+    ).toEqual(
+      [
+        [entryKey(entry(bolt, 1)), "card"],
+        [entryKey(entry(giant, 1)), "card"],
+      ].sort(),
+    );
+  });
+
+  it("marks the editions the library holds too few of (v0.5.0)", () => {
+    const revised = edition("p-revised", "Revised Edition", 2);
+    const fourth = edition("p-fourth", "Fourth Edition", 1);
+    const king = card("Goblin King", { owned: 3, editions: [revised, fourth] });
+    const cards = { [king.id]: king };
+    const named = (printing: string, quantity: number): DeckEntry => ({
+      ...entry(king, quantity),
+      printing_id: printing,
+    });
+    // Each edition within its copies, and a copy naming none in what they leave: nothing held.
+    expect(
+      beyondLibrary([named("p-revised", 2), entry(king, 1)], cards).size,
+    ).toBe(0);
+    // Three of an edition the library holds two of, though three copies in all.
+    expect([
+      ...beyondLibrary([named("p-revised", 3)], cards).entries(),
+    ]).toEqual([["card-goblin-king|p-revised", "edition"]]);
+    // More copies in all than the library holds: every row of the card.
+    expect([
+      ...beyondLibrary(
+        [named("p-seventh", 1), named("p-revised", 2), named("p-fourth", 1)],
+        cards,
+      ).entries(),
+    ]).toEqual([
+      ["card-goblin-king|p-seventh", "card"],
+      ["card-goblin-king|p-revised", "card"],
+      ["card-goblin-king|p-fourth", "card"],
+    ]);
+    // An edition it does not hold, though the copies in all are enough.
+    expect([
+      ...beyondLibrary(
+        [named("p-seventh", 1), named("p-revised", 1), entry(king, 1)],
+        cards,
+      ).entries(),
+    ]).toEqual([["card-goblin-king|p-seventh", "edition"]]);
+  });
+
+  it("adds a copy in an edition the library holds and the deck leaves (v0.5.0)", () => {
+    const revised = edition("p-revised", "Revised Edition", 2);
+    const fourth = edition("p-fourth", "Fourth Edition", 1);
+    const king = card("Goblin King", { owned: 3, editions: [revised, fourth] });
+    const named = (printing: string, quantity: number): DeckEntry => ({
+      ...entry(king, quantity),
+      printing_id: printing,
+    });
+    expect(editionFor(king, [])).toBe("p-revised");
+    expect(editionFor(king, [named("p-revised", 2)])).toBe("p-fourth");
+    expect(
+      editionFor(king, [named("p-revised", 2), named("p-fourth", 1)]),
+    ).toBeNull();
+    // The maybeboard holds no copies back; a card the library does not limit names none.
+    expect(
+      editionFor(king, [{ ...named("p-revised", 2), location: "maybeboard" }]),
+    ).toBe("p-revised");
+    expect(editionFor(bolt, [])).toBeNull();
   });
 
   it("says what keeps a deck from playing, the library apart from the engine", () => {

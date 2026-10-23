@@ -80,15 +80,10 @@ def guarded(enabled: bool) -> None:
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("library_grants") as table:
-        table.add_column(sa.Column("printing_id", sa.Uuid()))
     with op.batch_alter_table("decks") as decks:
         decks.add_column(
             sa.Column("switched_editions", JSON, nullable=False, server_default=sa.text("'[]'"))
         )
-    guarded(False)
-    give_editions()
-    guarded(True)
     old = next(
         (
             found["name"]
@@ -97,11 +92,17 @@ def upgrade() -> None:
         ),
         None,
     )
-    # SQLite reflects 0007's constraint without a name: a naming convention gives it one to drop.
+    # The old uniqueness goes first, so a card's grant can become a row per edition. SQLite
+    # reflects 0007's constraint without a name: a naming convention gives it one to drop.
     convention = {"uq": "uq_%(table_name)s_%(column_0_N_name)s"}
     with op.batch_alter_table("library_grants", naming_convention=convention) as table:
-        table.alter_column("printing_id", existing_type=sa.Uuid(), nullable=False)
+        table.add_column(sa.Column("printing_id", sa.Uuid()))
         table.drop_constraint(old or "uq_library_grants_user_id_grant_key_concept_id", "unique")
+    guarded(False)
+    give_editions()
+    guarded(True)
+    with op.batch_alter_table("library_grants") as table:
+        table.alter_column("printing_id", existing_type=sa.Uuid(), nullable=False)
         table.create_unique_constraint(NEW_UNIQUE, ["user_id", "grant_key", "printing_id"])
         table.create_foreign_key(FOREIGN_KEY, "card_printings", ["printing_id"], ["id"])
 

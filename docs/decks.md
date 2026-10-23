@@ -2,7 +2,7 @@
 
 Since v0.2.0 approved players build their own Legacy and Commander decks from [the card catalog](catalog.md), check them against the format's rules, and play them at the practice table (the scope's DECK01–DECK11; languages other than English are later work). The Decks page needs the `decks.edit` permission, which every approved player, and SysOp, holds.
 
-Since v0.3.1 players build from their own **card library**: two starter decks chosen at onboarding, their alliance's Planeswalker cards, cards of decks saved before v0.3.1, and basic lands; packs follow in v0.4.0. Copies count, and a deck holding more copies than the library is collection-locked. Administrators and SysOp build from the whole catalog. See [the Planeswalker Alliance](progression.md#the-library).
+Since v0.3.1 players build from their own **card library**: two starter decks chosen at onboarding, their alliance's Planeswalker cards, cards of decks saved before v0.3.1, and basic lands; packs follow in v0.4.0. Copies count, and a deck holding more copies than the library is collection-locked. Since v0.5.0 the library holds cards by edition, and a deck may hold only the editions it holds, copy by copy. Administrators and SysOp build from the whole catalog. See [the Planeswalker Alliance](progression.md#the-library).
 
 ## A deck and its versions (DECK01, DECK02)
 
@@ -23,6 +23,7 @@ Your decks show their format, color identity, card count, commanders and state: 
 
 - **Finding cards.** The editor's card finder uses the catalog's search syntax and filters ([search](catalog.md#search-deck03-deck04)), and since v0.4.5 finds only cards the game can play, whatever its settings. "Only cards this deck can use", on by default, limits it to cards legal in the format and, in Commander, within the commanders' color identity; since v0.4.5, unticking it also finds banned cards and cards not legal in the format, for casual tables. Since v0.3.1 a player's finder starts on their library (`owned=true`), and every card says how many copies the library holds; "All cards" browses the rest.
 - **Choosing printings.** A card's details list its English printings; choosing one sets the entry's printing, which the deck's images use (in games too, for your own seat). Copies count across printings.
+- **Editions a library holds** (v0.5.0). For a player who builds from a library, a deck entry's details list only the editions the library holds (every edition of a basic land), each with its copies, and the entry's own edition marked "not in your library" when the library lacks it; there is no "Any printing" for them. A card added from the finder takes the first edition the library holds (the most copies first) that the deck leaves a copy of. Each row names its edition ("Revised Edition", or "an edition not in your library"), and a row the library holds back says why: "You own 1", "You own 2 of this edition", "You don't own this edition". Every save answers with the draft as saved, which the editor takes when nothing changed meanwhile, so a copy the server gave an edition shows it.
 - **Statistics.** Counts per location, lands, average mana value, the mana curve, colored symbols in costs against the lands that make each color, card types, and opening-hand odds: the chance of each number of lands in seven cards (the hypergeometric distribution), plus a sample hand to draw again and again. The page says that numbers describe the cards, not how well the deck plays.
 
 ## Validation (DECK08, T03–T05)
@@ -38,6 +39,8 @@ The server validates every save, preview and revision, and each problem says wha
 - **Companions.** The ten companion conditions (Gyruda, Jegantha, Kaheera, Keruga, Lurrus, Lutri, Obosh, Umori, Yorion, Zirda) are checked against the deck; Lutri may not be a Commander companion. A companion the rules do not know yet is a warning.
 - **Not playable yet.** A legal card the engine cannot play is listed as "Not playable here yet", with its status reason; it makes the deck legal but not playable. Since v0.4.5 a draft never holds such a card ([below](#cards-that-leave-the-game-v045)), so this concerns a version that games played, a list sent to `POST /decks/validate`, and a Godlike card the running engine has not loaded.
 - **Collection-locked** (v0.3.1). More copies of a card than the player's library holds, counting every printing and Oracle version together, outside the maybeboard (`collection.locked`, kind `collection_locked`). The message says what the library holds; the deck stays legal and saved but is not playable. A game revalidates its deck against the library as it is then, and each deck's stored flags are refreshed whenever its owner's library changes (an alliance joined or left, starter decks chosen). Administrators and SysOp are never limited.
+- **By edition** (v0.5.0, [the library by edition](progression.md#the-library-by-edition-v050)). For a player, each entry's copies also count against the copies of the edition it names, outside the maybeboard; the format's limit (four in Legacy, one in Commander) still counts every edition together, and basic lands are exempt. An entry naming no edition is given one when the draft is saved (below); validation counts any copy still naming none against the copies the deck's named editions leave over. Too many copies in all keeps the message above, now naming the editions held ("This deck holds 4 copies of Lightning Bolt; your library has 3 copies (Magic 2010 and Unlimited Edition)."). Enough copies, but more of an edition than the library holds of it, is collection-locked with the editions to switch to: "This deck holds 1 copy of Goblin King from Seventh Edition; your library has none of that edition." and "You own Goblin King from Revised Edition: switch this copy to it." Two editions of one set are told apart by number. The kind stays `collection_locked`, so tables, queues, the practice table and matches refuse such a deck as before.
+- **Saves give editions** (v0.5.0). Every save of a player's draft (the editor, a new deck from a starter, a duplicate, an import, a guided proposal or a shared deck's copy) gives each copy naming no edition one the library holds that the deck's other copies leave over: the edition with the most copies first, an entry split where one is not enough; what no edition is left for still names none. A copy naming an edition the library lacks keeps it: the player switches it. The maybeboard, basic lands and the custom cards keep what they name.
 
 `POST /api/v1/decks/validate` validates a list without saving it.
 
@@ -52,12 +55,22 @@ A card the game cannot play is out of the game ([catalog](catalog.md#only-playab
 - **A card that comes back** (a newer engine, an administrator's acceptance or restoration) is in the game again, but goes back into no draft by itself: its owner adds it again.
 - **SysOp too.** Until v0.4.5 SysOp's own decks, like its deck lists, could hold any card the engine implements; now they hold cards in the game, as everyone's do ([games](games.md)).
 
+## Editions switched at deploy (v0.5.0)
+
+When v0.5.0 deployed, decks became limited to the editions their owner's library holds ([validation](#validation-deck08-t03t05)), and the owner chose that existing decks "be switched to owned editions where possible, and otherwise become collection-locked until fixed".
+
+- **Once.** The worker does it on its first start on v0.5.0 (`catalog/worker.py`, `api/decks.py` `switch_editions`), in one transaction, and records that it did in the site setting `decks.editions_switched` (with the time and how many decks changed), so later starts change nothing; a second worker starting at the same time waits on that row, fails to write it, and changes nothing. The migration's downgrade forgets the setting, so upgrading again switches again.
+- **Which decks.** Every deck draft of an account that builds from a library, archived and trashed ones too; administrators' and SysOp's decks are left as they are.
+- **How.** Copies naming an edition the library holds keep it, as many as it holds; the rest of them move to the card's other editions the library holds that the deck leaves copies of, the most copies first; copies naming no edition take one the same way. What cannot move stays, and the deck is collection-locked until fixed. A deck that changes gets a new draft version, as when cards leave the game, so an editor open elsewhere shows the change; every deck's stored flags are refreshed.
+- **The note.** The deck names what moved, "Editions switched to the ones you own" in the editor, each card with its copies and both editions ("2 Goblin King: from Fifth Edition (5ED #1) to Revised Edition (3ED #1)"), and the list says "3 copies switched to your editions", until the owner dismisses it (`DELETE /decks/{id}/switched-editions`). Copies that named no edition are not in the note.
+- **Versions keep their editions.** A version a game played, or one saved before, is the history it is.
+
 ## Guided creation (DECK06)
 
 "Build one with help" asks for the format, a commander (and partner) or colors, a theme (aggro, midrange, control, tokens, +1/+1 counters, graveyard, spells, ramp, tribal with a creature type, artifacts, enchantments, life gain) and the player's experience. It proposes a whole deck of playable cards, each with the reason it was picked:
 - **Commander:** 37 lands, 10 ramp, 10 card draw, 8 removal, 2 sweepers, and the theme's cards for the rest.
 - **Legacy:** 20 lands for aggro, 24 for control, 22 otherwise, and four copies of the theme's best cards.
-- **From the library** (v0.3.1). A player's proposal uses only cards their library holds, at most the copies it holds.
+- **From the library** (v0.3.1). A player's proposal uses only cards their library holds, at most the copies it holds, and since v0.5.0 in the editions it holds.
 - **Size.** Basic lands fill whatever the spells leave, so a proposal always has 100 cards with its commanders, or 60.
 - **Order.** Roles come from Scryfall Tagger's tags and the cards' text; popularity on EDHREC orders the candidates, and for a new player shorter, simpler cards come first. The basic lands follow the colors the spells ask for.
 
@@ -68,6 +81,7 @@ The rules are written down and deterministic, no language model or paid service 
 - **Text.** One card per line (`4 Lightning Bolt`, `4x Lightning Bolt`, or a name alone for one copy), with optional `Commander`, `Deck`, `Sideboard`, `Companion` and `Maybeboard` headings, `SB:` prefixes, `*CMDR*` or `[Commander]` marks, and set annotations (`Lightning Bolt (M10) 146`) that choose the printing. Without headings, a blank line starts the sideboard in Legacy. At most 64 KB and 600 lines.
 - **Deck files.** JSON, `{"format": "commander-duels-deck", "version": 1, ...}`, with card and printing IDs, so a file always resolves to the same cards.
 - **Resolving names.** Exact names, face names, aliases and the "Fire/Ice" spelling resolve to cards, only cards the game can play since v0.4.5. A line that matches several cards, or none, is listed in the preview with suggestions to choose from, or to leave out. A line naming a card the game cannot play (a token, a card the engine lacks, one Scryfall no longer lists) is "not in the game": left out, with the reason. The preview validates the result before anything is saved.
+- **Editions** (v0.5.0). For a player, a line naming no edition takes one the library holds, in the preview as in the deck; a line naming an edition the library does not hold keeps it, and the preview's validation says the deck is collection-locked and which editions to switch to.
 - **Export** as text (Commander and Deck sections, or main deck and `SB:` lines) or as a deck file.
 
 ## Sharing (DECK11)
@@ -105,6 +119,7 @@ All under `/api/v1`, for the signed-in owner only; another account's deck answer
 | `POST /decks/{id}/revisions`, `GET /decks/{id}/revisions/{n}` | Save a version; read one |
 | `POST /decks/{id}/archive`, `/unarchive`, `DELETE /decks/{id}`, `POST /decks/{id}/restore` | Archive, trash and restore |
 | `DELETE /decks/{id}/removed-cards` | Dismiss the note of cards that left the game (v0.4.5) |
+| `DELETE /decks/{id}/switched-editions` | Dismiss the note of copies switched to owned editions (v0.5.0) |
 | `GET /decks/{id}/export?kind=text\|json` | Export |
 | `POST /decks/import/preview`, `POST /decks/validate`, `POST /decks/guided` | Preview an import, validate a list, propose a guided deck |
 | `GET /shared-decks/{code}`, `/export`, `POST /shared-decks/{code}/copy` | A shared deck |

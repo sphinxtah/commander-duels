@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { card, mockApi, reply } from "../decks/fixtures";
+import { card, edition, mockApi, reply } from "../decks/fixtures";
 import type { CardDetail, PrintingSummary } from "./catalog";
 import { CardDetails } from "./CardViews";
 
@@ -89,7 +89,7 @@ describe("a card's details", () => {
     const owned = (await screen.findByText("Your library")).closest("div")!;
     expect(owned).toHaveTextContent("In your library: 3");
     expect(owned).toHaveTextContent(
-      "A deck may hold as many copies as your library does.",
+      "A deck may hold the editions your library holds, as many copies of each as it does.",
     );
     unmount();
     render(<CardDetails cardId="card-lightning-bolt" />);
@@ -141,6 +141,87 @@ describe("a card's details", () => {
     expect(
       screen.queryByRole("button", { name: /^Show the newest/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows only the edition a pack held, opened from the pack (v0.5.0)", async () => {
+    const api = mockApi();
+    const pulled = printing("p-revised", "Revised Artist", {
+      set_name: "Revised Edition",
+      set_code: "3ed",
+    });
+    api.on("GET /api/v1/cards/{card_id}", () =>
+      reply(200, {
+        ...detail([pulled], 1),
+        owned: 2,
+        editions: [edition("p-revised", "Revised Edition", 2)],
+      }),
+    );
+    render(
+      <CardDetails
+        cardId="card-goblin-king"
+        chosenPrinting="p-revised"
+        printings="chosen"
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Edition (1)" }),
+    ).toBeVisible();
+    expect(api.calls[0]?.options).toEqual({
+      params: {
+        path: { card_id: "card-goblin-king" },
+        query: { printing: "p-revised", printings: "chosen" },
+      },
+    });
+    expect(
+      screen
+        .getAllByRole("button", { name: /3ED #1/ })
+        .map((item) => item.textContent),
+    ).toEqual(["Revised Edition 3ED #1 · common · 2026"]);
+    expect(screen.queryByRole("button", { name: /^Show all/ })).toBeNull();
+    expect(screen.getByText(/^Illustrated by Revised Artist\./)).toBeVisible();
+  });
+
+  it("lists the editions the library holds, opened from the library or a deck (v0.5.0)", async () => {
+    const api = mockApi();
+    const revised = printing("p-revised", "A", { set_name: "Revised Edition" });
+    const seventh = printing("p-seventh", "B", { set_name: "Seventh Edition" });
+    api.on("GET /api/v1/cards/{card_id}", () =>
+      reply(200, {
+        ...detail([seventh, revised], 2),
+        owned: 2,
+        editions: [edition("p-revised", "Revised Edition", 2)],
+      }),
+    );
+    const chosen: (string | null)[] = [];
+    render(
+      <CardDetails
+        cardId="card-goblin-king"
+        chosenPrinting="p-seventh"
+        printings="owned"
+        onChoosePrinting={(id) => chosen.push(id)}
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Your editions (2)" }),
+    ).toBeVisible();
+    expect(api.calls[0]?.options).toMatchObject({
+      params: { query: { printing: "p-seventh", printings: "owned" } },
+    });
+    // The library line names each edition and its copies.
+    expect(
+      screen.getByRole("list", { name: "Your editions" }),
+    ).toHaveTextContent("Revised Edition (REV #1): 2");
+    // A deck's copy may name only an edition the library holds: no "any printing", and the
+    // entry's own edition, which the library lacks, says so.
+    expect(screen.queryByRole("button", { name: /^Any printing/ })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /^Seventh Edition/ }),
+    ).toHaveTextContent("not in your library");
+    fireEvent.click(screen.getByRole("button", { name: /^Revised Edition/ }));
+    expect(chosen).toEqual(["p-revised"]);
+    expect(
+      screen.getByRole("button", { name: /^Revised Edition/ }),
+    ).toHaveTextContent("2 in your library");
   });
 
   it("says a card is not in the game, as a version a game played may still name one (v0.4.5)", async () => {

@@ -48,6 +48,18 @@ const sigil: CustomCard = {
   card: card("Stand-in Sigil", { custom: true }),
 };
 
+/** The edition a library item holds (v0.5.0). */
+function libraryEdition(printingId: string, setName: string, code: string) {
+  return {
+    printing_id: printingId,
+    set_code: code,
+    set_name: setName,
+    collector_number: "1",
+    released_at: null,
+    rarity: "common",
+  };
+}
+
 function page(items: ReturnType<typeof card>[]) {
   return {
     items,
@@ -202,7 +214,7 @@ describe("the Cards page", () => {
     expect(screen.queryByRole("table")).toBeNull();
   });
 
-  it("shows the player's library, with copies and where they came from", async () => {
+  it("shows the player's library by edition, with copies and where they came from", async () => {
     const api = pageApi();
     api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
     api.on("GET /api/v1/library", () =>
@@ -211,16 +223,32 @@ describe("the Cards page", () => {
         alliance: "stand-in",
         cards: [
           {
-            card: card("Arcane Signet", { owned: 1 }),
+            card: card("Arcane Signet", {
+              owned: 1,
+              image: { printing_id: "p-signet", faces: 0 },
+            }),
+            edition: libraryEdition("p-signet", "Commander Legends", "cmr"),
             copies: 1,
             sources: ["starter"],
           },
-          { card: ownedBolt, copies: 2, sources: ["grandfathered", "starter"] },
+          {
+            card: { ...ownedBolt, owned: 3 },
+            edition: libraryEdition("p-bolt-m10", "Magic 2010", "m10"),
+            copies: 2,
+            sources: ["grandfathered", "starter"],
+          },
+          {
+            card: { ...ownedBolt, owned: 3 },
+            edition: libraryEdition("p-bolt-2ed", "Unlimited Edition", "2ed"),
+            copies: 1,
+            sources: ["pack"],
+          },
           {
             card: card("Stand-in Walker", {
               type_line: "Legendary Planeswalker — Stand-in",
               owned: 4,
             }),
+            edition: libraryEdition("p-walker", "Stand-in Set", "sis"),
             copies: 4,
             sources: ["alliance"],
           },
@@ -232,20 +260,35 @@ describe("the Cards page", () => {
     const tab = screen.getByRole("tab", { name: "My library" });
     fireEvent.click(tab);
     expect(tab).toHaveAttribute("aria-selected", "true");
-    // The cards themselves first (v0.5.0, the owner's request): each with its copies and sources.
+    // The cards themselves first (v0.5.0, the owner's request), one per edition (v0.5.0): each
+    // with that edition's picture, name, copies and sources.
     const tiles = await screen.findByRole("list", { name: "Your library" });
-    expect(screen.getByText("3 cards, 7 copies")).toHaveAttribute(
+    expect(screen.getByText("3 cards in 4 editions, 8 copies")).toHaveAttribute(
       "role",
       "status",
     );
     expect(screen.queryByRole("table")).toBeNull();
     const tile = within(tiles)
       .getByRole("button", {
-        name: "Lightning Bolt, Artifact, in your library: 2",
+        name: "Lightning Bolt from Magic 2010 (M10 #1), Artifact, in your library: 2",
       })
       .closest("li")!;
+    expect(tile).toHaveTextContent("Magic 2010 (M10 #1)");
     expect(tile).toHaveTextContent("In your library: 2");
     expect(tile).toHaveTextContent("Your earlier decks, Starter decks");
+    expect(
+      within(tiles).getByRole("button", {
+        name: "Lightning Bolt from Unlimited Edition (2ED #1), Artifact, in your library: 1",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(tiles)
+        .getByRole("button", { name: /^Arcane Signet/ })
+        .querySelector("img"),
+    ).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/p-signet?size=normal",
+    );
     fireEvent.change(screen.getByLabelText("From"), {
       target: { value: "alliance" },
     });
@@ -261,19 +304,30 @@ describe("the Cards page", () => {
     expect(localStorage.getItem("cd.cards.view.v1")).toBe("list");
     const table = screen.getByRole("table", { name: "Your library" });
     expect(screen.queryByRole("list", { name: "Your library" })).toBeNull();
-    const row = screen
-      .getByRole("button", { name: "Lightning Bolt" })
+    expect(
+      within(table)
+        .getAllByRole("columnheader")
+        .map((cell) => cell.textContent),
+    ).toEqual(["Card", "Edition", "Type", "Copies", "From"]);
+    const row = within(table)
+      .getAllByRole("button", { name: "Lightning Bolt" })[0]!
       .closest("tr")!;
     expect(
       within(row)
         .getAllByRole("cell")
         .map((cell) => cell.textContent),
-    ).toEqual(["Artifact", "2", "Your earlier decks, Starter decks"]);
-    // Each source with its count and what it gives.
+    ).toEqual([
+      "Magic 2010 (M10 #1)",
+      "Artifact",
+      "2",
+      "Your earlier decks, Starter decks",
+    ]);
+    // Each source with the cards it gave, and what it gives.
     expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(
       [
         "Starter decks 2 cards",
         "Your alliance 1 card",
+        "Packs you opened 1 card",
         "Your earlier decks 1 card",
       ],
     );
@@ -287,13 +341,63 @@ describe("the Cards page", () => {
     });
     expect(within(table).getAllByRole("row")).toHaveLength(2);
     expect(within(table).getByText("Stand-in Walker")).toBeInTheDocument();
-    expect(screen.getByText("1 of 3 cards")).toBeInTheDocument();
+    expect(screen.getByText("1 of 4 editions")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "" } });
     fireEvent.change(screen.getByLabelText("Find in your library"), {
       target: { value: "signet" },
     });
     expect(within(table).getAllByRole("row")).toHaveLength(2);
     expect(within(table).getByText("Arcane Signet")).toBeInTheDocument();
+    // A set's name finds its cards too.
+    fireEvent.change(screen.getByLabelText("Find in your library"), {
+      target: { value: "unlimited" },
+    });
+    expect(within(table).getAllByRole("row")).toHaveLength(2);
+    expect(within(table).getByText("Unlimited Edition (2ED #1)")).toBeVisible();
+  });
+
+  it("opens a card from the library with only the editions it holds (v0.5.0)", async () => {
+    const api = pageApi();
+    api.on("GET /api/v1/cards", () => reply(200, page([bolt])));
+    api.on("GET /api/v1/library", () =>
+      reply(200, {
+        unlimited: false,
+        alliance: null,
+        cards: [
+          {
+            card: { ...ownedBolt, owned: 2 },
+            edition: libraryEdition("p-bolt-m10", "Magic 2010", "m10"),
+            copies: 2,
+            sources: ["pack"],
+          },
+        ],
+      }),
+    );
+    api.on("GET /api/v1/cards/{card_id}", () => new Promise(() => {}));
+    render(<CardsPage me={player} heading={createRef()} />);
+    await screen.findByText("1 card");
+    fireEvent.click(screen.getByRole("tab", { name: "My library" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Lightning Bolt from/ }),
+    );
+    await screen.findByRole("dialog", { name: "Lightning Bolt" });
+    const asked = api.calls.find(
+      (call) => call.route === "GET /api/v1/cards/{card_id}",
+    )!.options as { params: { query: Record<string, unknown> } };
+    expect(asked.params.query).toEqual({
+      printing: "p-bolt-m10",
+      printings: "owned",
+    });
+    // From All cards, every printing.
+    fireEvent.click(screen.getByRole("button", { name: "Close the card" }));
+    fireEvent.click(screen.getByRole("tab", { name: "All cards" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Lightning Bolt, Artifact" }),
+    );
+    const again = api.calls.filter(
+      (call) => call.route === "GET /api/v1/cards/{card_id}",
+    )[1]!.options as { params: { query?: Record<string, unknown> } };
+    expect(again.params.query).toBeUndefined();
   });
 
   it("shows every tab as pictures or as a list, the same on each and remembered (v0.5.0)", async () => {
