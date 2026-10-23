@@ -405,6 +405,32 @@ def test_bots_take_either_teams_seats(client, engine):
         assert {(row.outcome, row.players, row.bots) for row in rows} == {("win", 0, 2)}
 
 
+def test_the_history_gives_a_bot_teammate_its_skill(client, engine):
+    """A bot teammate beside the host, two players opposite: the host's result counts no bot, as
+    the bot is no opponent, and the history still names the bot by its skill, the game's."""
+    ada, bob, dan = (Account(client, n, admin=True) for n in ("ada", "bob", "dan"))
+    code = team_table(ada, deck(ada, client), bots=1, bot_teammate=True, bot_skill=5)["code"]
+    for account in (bob, dan):
+        assert sit(account, code, deck(account, client)).json()["your_seat"] in (2, 3)
+        assert ready(account, code).status_code == 200
+    game_id = ada.send("POST", f"/api/v1/tables/{code}/start").json()["game_id"]
+    engine.win(game_id, 0)
+    until_finished(ada, game_id)
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        row = db.scalar(
+            select(PlayerResult).where(
+                PlayerResult.game_id == uuid.UUID(game_id), PlayerResult.seat == 0
+            )
+        )
+        assert row is not None and (row.players, row.bots, row.bot_skill) == (2, 0, None)
+    history = ada.get("/api/v1/me/history").json()["items"][0]
+    assert [(o["seat"], o["bot"], o["bot_skill"], o["teammate"]) for o in history["opponents"]] == [
+        (1, True, 5, True),
+        (2, False, None, False),
+        (3, False, None, False),
+    ]
+
+
 def test_the_start_checks_each_team_again(client, engine):
     ada, bob, cara, dan = (Account(client, n, admin=True) for n in ("ada", "bob", "cara", "dan"))
     code = team_table(ada, deck(ada, client))["code"]

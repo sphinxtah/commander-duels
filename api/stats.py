@@ -366,7 +366,13 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
         select(GameSeat).where(GameSeat.game_id.in_(games)).order_by(GameSeat.seat)
     ):
         seats[seat.game_id].append(seat)
-    results = dict(db.execute(select(Game.id, Game.result).where(Game.id.in_(games))).all())
+    recorded = db.execute(
+        select(Game.id, Game.result, Game.bot_skill).where(Game.id.in_(games))
+    ).all()
+    results = {game_id: result for game_id, result, _ in recorded}
+    # Every bot plays at the game's skill. A row keeps it only when its opponents held a bot, so
+    # a Two-Headed Giant bot teammate's (v0.5.1) beside two players comes from the game.
+    skills = {game_id: skill for game_id, _, skill in recorded}
     others = {
         seat.user_id
         for found in seats.values()
@@ -418,7 +424,7 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
                         player=player_ref(players[seat.user_id])
                         if seat.user_id in players
                         else None,
-                        bot_skill=row.bot_skill if seat.player == "bot" else None,
+                        bot_skill=skills.get(row.game_id) if seat.player == "bot" else None,
                         won=seat.seat in won,
                         teammate=row.format == TEAM_FORMAT and seat.seat == teammate(row.seat),
                     )
