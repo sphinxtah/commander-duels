@@ -1441,6 +1441,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/rematch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Rematch
+         * @description The game's rematch as it stands, for its players (and SysOp).
+         */
+        get: operations["get_rematch_api_v1_games__game_id__rematch_get"];
+        put?: never;
+        /**
+         * Rematch
+         * @description Rematch: a practice game starts again at once; at a table this offers the rematch, or
+         *     accepts the one offered, and the last player to accept starts it.
+         */
+        post: operations["rematch_api_v1_games__game_id__rematch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/games/{game_id}/rematch/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline Rematch
+         * @description Declines the rematch offered (or withdraws your own): it ends for every player.
+         */
+        post: operations["decline_rematch_api_v1_games__game_id__rematch_decline_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health": {
         parameters: {
             query?: never;
@@ -1820,6 +1865,56 @@ export interface paths {
          *     holds off the session's idle limit (identity.BACKGROUND_PATHS).
          */
         post: operations["check_in_api_v1_presence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Queue
+         * @description Your place in a queue, or what became of your last wait. Asking keeps the place: the app
+         *     asks every few seconds while it waits, and a place nobody asks about for STALE_AFTER goes.
+         */
+        get: operations["my_queue_api_v1_queue_get"];
+        put?: never;
+        /**
+         * Join Queue
+         * @description Joins a public queue with one of your decks. The answer is your place, or the game the
+         *     queue found at once.
+         */
+        post: operations["join_queue_api_v1_queue_post"];
+        /**
+         * Leave Queue
+         * @description Leaves the queue. A game found a moment before stays: the answer names it.
+         */
+        delete: operations["leave_queue_api_v1_queue_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Queues
+         * @description The public queues, with how many players wait in each.
+         */
+        get: operations["list_queues_api_v1_queues_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3948,6 +4043,11 @@ export interface components {
              */
             created_at: string;
             /**
+             * Game Id
+             * @description For a rematch (v0.5.0): the finished game, whose result screen holds the offer.
+             */
+            game_id?: string | null;
+            /**
              * Id
              * Format: uuid
              */
@@ -3956,7 +4056,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "rematch";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -3967,7 +4067,7 @@ export interface components {
             read: boolean;
             /**
              * Request Pending
-             * @description For a friend request: whether it still waits for your answer.
+             * @description For a friend request, or since v0.5.0 a rematch: whether it still waits for your answer.
              * @default false
              */
             request_pending: boolean;
@@ -4334,7 +4434,10 @@ export interface components {
              * @default false
              */
             appears_offline: boolean;
-            /** Game Format */
+            /**
+             * Game Format
+             * @description In a game, or since v0.5.0 in a public queue: its format.
+             */
             game_format?: ("legacy" | "commander") | null;
             /**
              * Game Kind
@@ -4345,7 +4448,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "in_game" | "online" | "idle" | "offline";
+            state: "in_game" | "in_queue" | "online" | "idle" | "offline";
         };
         /** PriceChange */
         PriceChange: {
@@ -4655,6 +4758,112 @@ export interface components {
              */
             product: string;
         };
+        /** QueueInfo */
+        QueueInfo: {
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /** Name */
+            name: string;
+            /** Seats */
+            seats: number;
+            /**
+             * Waiting
+             * @description Players waiting in this queue now.
+             */
+            waiting: number;
+        };
+        /**
+         * QueueRequest
+         * @description A place in a queue, with one of your decks.
+         */
+        QueueRequest: {
+            /**
+             * Deck Id
+             * Format: uuid
+             * @description One of your decks, in the queue's format.
+             */
+            deck_id: string;
+            /**
+             * Format
+             * @default legacy
+             * @enum {string}
+             */
+            format: "legacy" | "commander";
+            /**
+             * Humans Only
+             * @description Wait for players only: bots never fill your game.
+             * @default false
+             */
+            humans_only: boolean;
+            /**
+             * Seats
+             * @description 2 in Legacy; 2, 3 or 4 in Commander, each size its own queue.
+             * @default 2
+             */
+            seats: number;
+        };
+        /**
+         * QueueStatus
+         * @description Your place in a queue, or what became of your last wait.
+         */
+        QueueStatus: {
+            /**
+             * Bots In Seconds
+             * @description While waiting with bots allowed: seconds until bots may fill the empty seats (0 once they may); null for players only.
+             */
+            bots_in_seconds: number | null;
+            /**
+             * Deck
+             * @description Your deck's title.
+             */
+            deck: string | null;
+            /** Deck Id */
+            deck_id: string | null;
+            /** Format */
+            format: ("legacy" | "commander") | null;
+            /**
+             * Game Id
+             * @description The game your wait found.
+             */
+            game_id: string | null;
+            /** Humans Only */
+            humans_only: boolean;
+            /** Joined At */
+            joined_at: string | null;
+            /** Message */
+            message: string | null;
+            /**
+             * Position
+             * @description While waiting: your place in line; 1 is next.
+             */
+            position: number | null;
+            /**
+             * Reason
+             * @description Why you were taken out (an error code, or gone), or why your match waits (games_busy).
+             */
+            reason: string | null;
+            /** Seats */
+            seats: number | null;
+            /**
+             * Status
+             * @description none (never queued), waiting, matched (game_id names the game), left (you left, or your app stopped asking), or refused (taken out as the game started: reason and message say why).
+             * @enum {string}
+             */
+            status: "none" | "waiting" | "matched" | "left" | "refused";
+            /**
+             * Waited Seconds
+             * @description While waiting: how long, in seconds.
+             */
+            waited_seconds: number;
+            /**
+             * Waiting
+             * @description While waiting: players in your queue, you too.
+             */
+            waiting: number;
+        };
         /**
          * ReaderChat
          * @description A chat SysOp's reader lists: a conversation or a table's game.
@@ -4758,6 +4967,83 @@ export interface components {
             name: string;
             /** Type Line */
             type_line: string | null;
+        };
+        /** RematchPlayerView */
+        RematchPlayerView: {
+            /**
+             * Answer
+             * @description Null while they have not answered.
+             */
+            answer: ("yes" | "no") | null;
+            /** Handle */
+            handle: string | null;
+            /**
+             * Portrait
+             * @description A player's allied Planeswalker.
+             */
+            portrait: string | null;
+            /**
+             * Seat
+             * @description Their seat in the finished game.
+             */
+            seat: number;
+            /** You */
+            you: boolean;
+        };
+        /**
+         * RematchView
+         * @description A finished game's rematch, as its players see it on the result screen.
+         */
+        RematchView: {
+            /**
+             * Can Offer
+             * @description Whether you may ask for a rematch now.
+             */
+            can_offer: boolean;
+            /**
+             * Declined By
+             * @description The handle of who declined.
+             */
+            declined_by: string | null;
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Expires In
+             * @description While open: seconds left.
+             */
+            expires_in: number | null;
+            /**
+             * Game Id
+             * @description The new game, once started.
+             */
+            game_id: string | null;
+            /**
+             * Kind
+             * @description practice starts at once; a table's asks every player.
+             * @enum {string}
+             */
+            kind: "practice" | "table";
+            /** Message */
+            message: string | null;
+            /**
+             * Origin
+             * @description Where the game came from, and so where its players go back to.
+             * @enum {string}
+             */
+            origin: "practice" | "lobby" | "queue";
+            /**
+             * Players
+             * @description At a table: the players it asks, by their seats in the finished game.
+             */
+            players: components["schemas"]["RematchPlayerView"][];
+            /**
+             * Status
+             * @description none (nobody asked yet), open (waiting for answers), started (game_id names the new game), declined, lapsed (not every answer came in time) or failed (message says whose deck or game stopped it).
+             * @enum {string}
+             */
+            status: "none" | "open" | "started" | "declined" | "lapsed" | "failed";
+            /** Your Answer */
+            your_answer: ("yes" | "no") | null;
         };
         /**
          * RemovedCard
@@ -13460,6 +13746,288 @@ export interface operations {
             };
         };
     };
+    get_rematch_api_v1_games__game_id__rematch_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RematchView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    rematch_api_v1_games__game_id__rematch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RematchView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    decline_rematch_api_v1_games__game_id__rematch_decline_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RematchView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     health_api_v1_health_get: {
         parameters: {
             query?: never;
@@ -15455,6 +16023,378 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckedIn"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_queue_api_v1_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    join_queue_api_v1_queue_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    leave_queue_api_v1_queue_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueStatus"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    list_queues_api_v1_queues_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueInfo"][];
                 };
             };
             /** @description Bad Request */

@@ -4806,6 +4806,19 @@
             "title": "Created At",
             "type": "string"
           },
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a rematch (v0.5.0): the finished game, whose result screen holds the offer.",
+            "title": "Game Id"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -4816,7 +4829,8 @@
               "friend_request",
               "friend_accepted",
               "friend_online",
-              "message"
+              "message",
+              "rematch"
             ],
             "title": "Kind",
             "type": "string"
@@ -4833,7 +4847,7 @@
           },
           "request_pending": {
             "default": false,
-            "description": "For a friend request: whether it still waits for your answer.",
+            "description": "For a friend request, or since v0.5.0 a rematch: whether it still waits for your answer.",
             "title": "Request Pending",
             "type": "boolean"
           }
@@ -5660,6 +5674,7 @@
                 "type": "null"
               }
             ],
+            "description": "In a game, or since v0.5.0 in a public queue: its format.",
             "title": "Game Format"
           },
           "game_kind": {
@@ -5681,6 +5696,7 @@
           "state": {
             "enum": [
               "in_game",
+              "in_queue",
               "online",
               "idle",
               "offline"
@@ -6541,6 +6557,252 @@
         "title": "PurchaseRequest",
         "type": "object"
       },
+      "QueueInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "seats": {
+            "title": "Seats",
+            "type": "integer"
+          },
+          "waiting": {
+            "description": "Players waiting in this queue now.",
+            "title": "Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "format",
+          "seats",
+          "name",
+          "waiting"
+        ],
+        "title": "QueueInfo",
+        "type": "object"
+      },
+      "QueueRequest": {
+        "additionalProperties": false,
+        "description": "A place in a queue, with one of your decks.",
+        "properties": {
+          "deck_id": {
+            "description": "One of your decks, in the queue's format.",
+            "format": "uuid",
+            "title": "Deck Id",
+            "type": "string"
+          },
+          "format": {
+            "default": "legacy",
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "humans_only": {
+            "default": false,
+            "description": "Wait for players only: bots never fill your game.",
+            "title": "Humans Only",
+            "type": "boolean"
+          },
+          "seats": {
+            "default": 2,
+            "description": "2 in Legacy; 2, 3 or 4 in Commander, each size its own queue.",
+            "maximum": 4.0,
+            "minimum": 2.0,
+            "title": "Seats",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "deck_id"
+        ],
+        "title": "QueueRequest",
+        "type": "object"
+      },
+      "QueueStatus": {
+        "additionalProperties": false,
+        "description": "Your place in a queue, or what became of your last wait.",
+        "properties": {
+          "bots_in_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "While waiting with bots allowed: seconds until bots may fill the empty seats (0 once they may); null for players only.",
+            "title": "Bots In Seconds"
+          },
+          "deck": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your deck's title.",
+            "title": "Deck"
+          },
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Id"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy",
+                  "commander"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The game your wait found.",
+            "title": "Game Id"
+          },
+          "humans_only": {
+            "title": "Humans Only",
+            "type": "boolean"
+          },
+          "joined_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joined At"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "While waiting: your place in line; 1 is next.",
+            "title": "Position"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why you were taken out (an error code, or gone), or why your match waits (games_busy).",
+            "title": "Reason"
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats"
+          },
+          "status": {
+            "description": "none (never queued), waiting, matched (game_id names the game), left (you left, or your app stopped asking), or refused (taken out as the game started: reason and message say why).",
+            "enum": [
+              "none",
+              "waiting",
+              "matched",
+              "left",
+              "refused"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "waited_seconds": {
+            "description": "While waiting: how long, in seconds.",
+            "title": "Waited Seconds",
+            "type": "integer"
+          },
+          "waiting": {
+            "description": "While waiting: players in your queue, you too.",
+            "title": "Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "format",
+          "seats",
+          "humans_only",
+          "deck_id",
+          "deck",
+          "joined_at",
+          "waited_seconds",
+          "position",
+          "waiting",
+          "bots_in_seconds",
+          "game_id",
+          "reason",
+          "message"
+        ],
+        "title": "QueueStatus",
+        "type": "object"
+      },
       "ReaderChat": {
         "additionalProperties": false,
         "description": "A chat SysOp's reader lists: a conversation or a table's game.",
@@ -6762,6 +7024,209 @@
           "type_line"
         ],
         "title": "Related",
+        "type": "object"
+      },
+      "RematchPlayerView": {
+        "additionalProperties": false,
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null while they have not answered.",
+            "title": "Answer"
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handle"
+          },
+          "portrait": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A player's allied Planeswalker.",
+            "title": "Portrait"
+          },
+          "seat": {
+            "description": "Their seat in the finished game.",
+            "title": "Seat",
+            "type": "integer"
+          },
+          "you": {
+            "title": "You",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "seat",
+          "handle",
+          "portrait",
+          "answer",
+          "you"
+        ],
+        "title": "RematchPlayerView",
+        "type": "object"
+      },
+      "RematchView": {
+        "additionalProperties": false,
+        "description": "A finished game's rematch, as its players see it on the result screen.",
+        "properties": {
+          "can_offer": {
+            "description": "Whether you may ask for a rematch now.",
+            "title": "Can Offer",
+            "type": "boolean"
+          },
+          "declined_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The handle of who declined.",
+            "title": "Declined By"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "expires_in": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "While open: seconds left.",
+            "title": "Expires In"
+          },
+          "game_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new game, once started.",
+            "title": "Game Id"
+          },
+          "kind": {
+            "description": "practice starts at once; a table's asks every player.",
+            "enum": [
+              "practice",
+              "table"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "origin": {
+            "description": "Where the game came from, and so where its players go back to.",
+            "enum": [
+              "practice",
+              "lobby",
+              "queue"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "players": {
+            "description": "At a table: the players it asks, by their seats in the finished game.",
+            "items": {
+              "$ref": "#/components/schemas/RematchPlayerView"
+            },
+            "title": "Players",
+            "type": "array"
+          },
+          "status": {
+            "description": "none (nobody asked yet), open (waiting for answers), started (game_id names the new game), declined, lapsed (not every answer came in time) or failed (message says whose deck or game stopped it).",
+            "enum": [
+              "none",
+              "open",
+              "started",
+              "declined",
+              "lapsed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "your_answer": {
+            "anyOf": [
+              {
+                "enum": [
+                  "yes",
+                  "no"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Your Answer"
+          }
+        },
+        "required": [
+          "status",
+          "kind",
+          "origin",
+          "can_offer",
+          "players",
+          "your_answer",
+          "expires_at",
+          "expires_in",
+          "game_id",
+          "declined_by",
+          "message"
+        ],
+        "title": "RematchView",
         "type": "object"
       },
       "RemovedCard": {
@@ -18816,6 +19281,337 @@
         "summary": "Inspect Game"
       }
     },
+    "/api/v1/games/{game_id}/rematch": {
+      "get": {
+        "description": "The game's rematch as it stands, for its players (and SysOp).",
+        "operationId": "get_rematch_api_v1_games__game_id__rematch_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RematchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Rematch"
+      },
+      "post": {
+        "description": "Rematch: a practice game starts again at once; at a table this offers the rematch, or\naccepts the one offered, and the last player to accept starts it.",
+        "operationId": "rematch_api_v1_games__game_id__rematch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RematchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Rematch"
+      }
+    },
+    "/api/v1/games/{game_id}/rematch/decline": {
+      "post": {
+        "description": "Declines the rematch offered (or withdraws your own): it ends for every player.",
+        "operationId": "decline_rematch_api_v1_games__game_id__rematch_decline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RematchView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Decline Rematch"
+      }
+    },
     "/api/v1/health": {
       "get": {
         "operationId": "health_api_v1_health_get",
@@ -21128,6 +21924,412 @@
           }
         },
         "summary": "Check In"
+      }
+    },
+    "/api/v1/queue": {
+      "delete": {
+        "description": "Leaves the queue. A game found a moment before stays: the answer names it.",
+        "operationId": "leave_queue_api_v1_queue_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Leave Queue"
+      },
+      "get": {
+        "description": "Your place in a queue, or what became of your last wait. Asking keeps the place: the app\nasks every few seconds while it waits, and a place nobody asks about for STALE_AFTER goes.",
+        "operationId": "my_queue_api_v1_queue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Queue"
+      },
+      "post": {
+        "description": "Joins a public queue with one of your decks. The answer is your place, or the game the\nqueue found at once.",
+        "operationId": "join_queue_api_v1_queue_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Join Queue"
+      }
+    },
+    "/api/v1/queues": {
+      "get": {
+        "description": "The public queues, with how many players wait in each.",
+        "operationId": "list_queues_api_v1_queues_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/QueueInfo"
+                  },
+                  "title": "Response List Queues Api V1 Queues Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Queues"
       }
     },
     "/api/v1/ready": {

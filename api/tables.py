@@ -290,6 +290,12 @@ def may_sit(db: Session, request: Request, principal: Principal) -> None:
     db.scalar(select(User.id).where(User.id == principal.user.id).with_for_update())
     if open_table_of(db, principal.user.id) is not None:
         raise ApiError(409, "at_a_table", "You are at another open table. Leave it first.")
+    # Imported here: api.queues imports this module. A player waits in a queue or sits at a table,
+    # not both (v0.5.0).
+    from api.queues import waiting_of
+
+    if waiting_of(db, principal.user.id) is not None:
+        raise ApiError(409, "in_queue", "You are waiting in a public queue. Leave it first.")
     limit = settings_of(request).games_per_account
     if not full_access(principal) and active_games_of(db, principal.user.id) >= limit:
         raise ApiError(
@@ -546,6 +552,20 @@ def record_table_game(
         user for user in users if user is not None
     ]:
         raise ApiError(409, "table_changed", "A player left as the game started. Try again.")
+    game = add_table_game(db, table, created, plans, users)
+    db.commit()
+    return game
+
+
+def add_table_game(
+    db: Session,
+    table: GameTable,
+    created: dict[str, object],
+    plans: list[SeatPlan],
+    users: list[UUID | None],
+) -> Game:
+    """The table's game and its seats, and the table as started, in the caller's transaction:
+    the lobby's start, and since v0.5.0 the queue's and a rematch's (api/queues.py)."""
     now = utcnow()
     game = Game(
         id=UUID(str(created["game_id"])),
@@ -581,7 +601,7 @@ def record_table_game(
     table.status = "started"
     table.started_at = now
     table.game_id = game.id
-    db.commit()
+    db.flush()
     return game
 
 

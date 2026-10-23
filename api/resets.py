@@ -16,7 +16,8 @@ In one transaction, with the account's row locked:
 
 Friends, blocks, conversations and messages, table chats, problem reports, notifications, privacy
 settings and preferences stay, and so do the account's sessions: its app sees the change at its
-next account check. While the account plays a game or sits at an open table, a reset is refused.
+next account check. While the account plays a game or sits at an open table, a reset is refused;
+since v0.5.0 an account waiting in a public queue leaves it, as its decks go.
 """
 
 from dataclasses import dataclass, field
@@ -31,6 +32,7 @@ from api.identity import ApiError, permissions_for, refuse_deleted, roles_of, ut
 from api.library import library_of, since_reset
 from api.models import Deck, LibraryGrant, Pack, PackOpening, User
 from api.progression import set_wins, total_wins
+from api.queues import remove_queue_of
 from api.roster import Planeswalker
 from api.tables import open_table_of
 
@@ -87,6 +89,7 @@ def reset_account(db: Session, user: User, actor: User, roster: dict[str, Planes
             "This account is seated at an open table. Reset it once it leaves the table, or the "
             "table starts or closes.",
         )
+    remove_queue_of(db, user.id)
     now = utcnow()
     cleared = Cleared(
         wins=total_wins(db, user.id),
