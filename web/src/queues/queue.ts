@@ -7,7 +7,8 @@ import type { components } from "../generated/api";
 // account waits, the place is asked for every QUEUE_POLL_MS (which also keeps it: a place nobody
 // asks about goes after a while), and once the queue finds a game the page opens it. Since v0.5.1
 // the same goes while the account invites a friend to the Two-Headed Giant queue, or a friend's
-// invitation waits for its answer.
+// invitation waits for its answer; and while "Find a game" is shown the place is asked for when it
+// opens and slowly after that, so a friend's invitation that comes meanwhile shows on it.
 
 export type QueueStatus = components["schemas"]["QueueStatus"];
 export type QueueInfo = components["schemas"]["QueueInfo"];
@@ -20,6 +21,9 @@ export const TEAM_QUEUE = "two_headed_giant";
 
 /** How often a waiting account's place is asked for. */
 export const QUEUE_POLL_MS = 2000;
+/** How often a free account's place is asked for while "Find a game" is shown (v0.5.1): only to
+ * see a friend's invitation that comes while the page is open. */
+export const QUEUE_IDLE_POLL_MS = 15_000;
 
 /** A queue's seats as the choices say them: "2 players". */
 export function players(seats: number): string {
@@ -56,6 +60,9 @@ let asking = false;
 // Whether this page saw the account wait (or join): only then does a game found open by itself.
 let sawWaiting = false;
 const followed = new Set<string>();
+// The "Find a game" sections on screen (v0.5.1), each its own token, so a test's reset that forgets
+// them is not undone by a section unmounted after it.
+const watchers = new Set<object>();
 
 /** Whether the place is worth asking about again soon: waiting, inviting a friend, or answering a
  * friend's invitation. */
@@ -91,8 +98,12 @@ function follow(status: QueueStatus) {
 function schedule() {
   clearTimeout(timer);
   timer = undefined;
-  if (listeners.size > 0 && pending(state.status))
+  if (listeners.size === 0) return;
+  if (pending(state.status))
     timer = setTimeout(() => void ask(), QUEUE_POLL_MS);
+  // Nothing else asks for a free account's place: an invitation would wait unseen (v0.5.1).
+  else if (watchers.size > 0)
+    timer = setTimeout(() => void ask(), QUEUE_IDLE_POLL_MS);
 }
 
 /** Asks for the place now. An answer that fails keeps the one shown, and asks again later. */
@@ -125,6 +136,19 @@ function subscribe(listener: () => void): () => void {
 /** The account's place, kept up to date while anything shows it. */
 export function useQueue(): QueueState {
   return useSyncExternalStore(subscribe, () => state);
+}
+
+/** "Find a game" is shown (v0.5.1): asks for the place at once, since the follower in the app's
+ * shell may have asked long before, and every QUEUE_IDLE_POLL_MS while the account is free, so a
+ * friend's invitation shows with its Accept and Decline. Returns the way to stop; an effect. */
+export function watchQueue(): () => void {
+  const watcher = {};
+  watchers.add(watcher);
+  void ask();
+  return () => {
+    watchers.delete(watcher);
+    schedule();
+  };
 }
 
 /** Joins a queue; the answer is the place, or the game found at once. Returns an error's words. */
@@ -192,6 +216,7 @@ export function resetQueue() {
   timer = undefined;
   state = { status: null, answeredAt: 0 };
   listeners.clear();
+  watchers.clear();
   followed.clear();
   sawWaiting = false;
   asking = false;

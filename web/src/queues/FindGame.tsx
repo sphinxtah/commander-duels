@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { client, type Me } from "../api";
+import { client, describe, type Me } from "../api";
 import game from "../game/game.module.css";
 import { getSoundEngine } from "../game/sound/engine";
 import { DeckChoices } from "../tables/TableParts";
@@ -21,6 +21,7 @@ import {
   players,
   useQueue,
   waited,
+  watchQueue,
   type QueueFormat,
   type QueueInfo,
   type QueueStatus,
@@ -50,9 +51,16 @@ const FORMAT_WORDS: Record<QueueFormat, string> = {
 type Friend = { id: string; handle: string };
 
 /** The account's friends, to invite to the Two-Headed Giant queue, asked for once wanted; null
- * until they arrive. */
-function useFriends(wanted: boolean): Friend[] | null {
+ * until they arrive. A request that failed is no empty list (v0.5.1): its error says why, and it
+ * is asked again on `again` or when the friends are wanted again. */
+function useFriends(wanted: boolean): {
+  friends: Friend[] | null;
+  error: string;
+  again: () => void;
+} {
   const [friends, setFriends] = useState<Friend[] | null>(null);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const asked = friends !== null;
   useEffect(() => {
     if (!wanted || asked) return;
@@ -60,22 +68,26 @@ function useFriends(wanted: boolean): Friend[] | null {
     void client
       .GET("/api/v1/friends")
       .then((answer) => {
-        if (active)
+        if (!active) return;
+        if (answer?.data) {
+          setError("");
           setFriends(
-            (answer?.data?.friends ?? []).map(({ id, handle }) => ({
-              id,
-              handle,
-            })),
+            answer.data.friends.map(({ id, handle }) => ({ id, handle })),
           );
+        } else setError(describe(answer?.error));
       })
       .catch(() => {
-        if (active) setFriends([]);
+        if (active) setError(describe(undefined));
       });
     return () => {
       active = false;
     };
-  }, [wanted, asked]);
-  return friends;
+  }, [wanted, asked, attempt]);
+  const again = useCallback(() => {
+    setError("");
+    setAttempt((n) => n + 1);
+  }, []);
+  return { friends, error, again };
 }
 
 export function FindGame({ me }: { me: Me }) {
@@ -89,6 +101,8 @@ export function FindGame({ me }: { me: Me }) {
 
 function Finder() {
   const { status, answeredAt } = useQueue();
+  // Asked for again while shown (v0.5.1): the shell's follower asked once, before any invitation.
+  useEffect(watchQueue, []);
   const load = useCallback(
     async () => (await client.GET("/api/v1/queues")).data,
     [],
@@ -281,7 +295,11 @@ function JoinForm({
   const [friend, setFriend] = useState("");
   const [withFriend, setWithFriend] = useState(false);
   const teams = format === TEAM_QUEUE;
-  const friends = useFriends(teams && withFriend);
+  const {
+    friends,
+    error: friendsError,
+    again: askFriends,
+  } = useFriends(teams && withFriend);
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
 
@@ -397,7 +415,24 @@ function JoinForm({
             </label>
           </fieldset>
         )}
-        {teams && withFriend && (
+        {teams && withFriend && friends === null && friendsError ? (
+          // No label here: a label would press Try again when its words are clicked.
+          <div className={game.field} data-friends-failed>
+            <span>Your friend</span>
+            <p role="alert" className={game.refusal}>
+              {friendsError}
+            </p>
+            <span>
+              <button
+                type="button"
+                className={game.secondaryButton}
+                onClick={askFriends}
+              >
+                Try again
+              </button>
+            </span>
+          </div>
+        ) : teams && withFriend ? (
           <label className={game.field}>
             <span>Your friend</span>
             {friends !== null && friends.length === 0 ? (
@@ -417,7 +452,7 @@ function JoinForm({
               </select>
             )}
           </label>
-        )}
+        ) : null}
         {format === "commander" && (
           <label className={game.field}>
             <span>Players</span>

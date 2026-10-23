@@ -15,6 +15,7 @@ import type { OwnDeck } from "../tables/tables";
 import { FindGame, QueueFollower } from "./FindGame";
 import {
   ordinal,
+  QUEUE_IDLE_POLL_MS,
   QUEUE_POLL_MS,
   resetQueue,
   waited,
@@ -890,6 +891,135 @@ describe("Two-Headed Giant's queue (v0.5.1)", () => {
       )!.options,
     ).toEqual({ params: { path: { player_id: "u-cara" } } });
     expect(screen.queryByRole("region", { name: "Invitations" })).toBeNull();
+  });
+
+  const fromCara = place({
+    invites: [
+      {
+        player: { id: "u-cara", handle: "cara", portrait: null },
+        humans_only: false,
+        invited_at: "2026-10-23T10:00:00Z",
+      },
+    ],
+  });
+  const asked = (api: ReturnType<typeof mockApi>, route: string) =>
+    api.calls.filter((c) => c.route === route).length;
+
+  it("asks for the place when Find a game opens, so the bell's invitation is there", async () => {
+    const api = mockApi();
+    api.on(
+      "GET /api/v1/queue",
+      () => reply(200, place()),
+      () => reply(200, fromCara),
+    );
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    // The shell's follower asked on the app's first page, before cara invited.
+    render(<QueueFollower />);
+    await settle();
+    // The bell then leads to Find a game.
+    render(<FindGame me={ada} />);
+    await settle();
+    expect(asked(api, "GET /api/v1/queue")).toBe(2);
+    const invitation = screen.getByRole("region", { name: "Invitations" });
+    expect(invitation).toHaveTextContent(
+      "cara invites you to play Two-Headed Giant as their teammate.",
+    );
+    expect(
+      within(invitation).getByRole("button", {
+        name: "Accept cara's invitation",
+      }),
+    ).toBeEnabled();
+  });
+
+  it("keeps asking slowly while Find a game is shown and the account is free", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const api = mockApi();
+    api.on(
+      "GET /api/v1/queue",
+      () => reply(200, place()),
+      () => reply(200, place()),
+      () => reply(200, fromCara),
+      () => reply(200, place()),
+    );
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    render(<QueueFollower />);
+    await settle();
+    // On another page, nothing asks about a free account's place again.
+    await act(() => vi.advanceTimersByTimeAsync(QUEUE_IDLE_POLL_MS));
+    expect(asked(api, "GET /api/v1/queue")).toBe(1);
+    const { unmount } = render(<FindGame me={ada} />);
+    await settle();
+    expect(asked(api, "GET /api/v1/queue")).toBe(2);
+    expect(screen.queryByRole("region", { name: "Invitations" })).toBeNull();
+    // cara invites while the page is open: it shows at the next slow ask.
+    await act(() => vi.advanceTimersByTimeAsync(QUEUE_IDLE_POLL_MS));
+    expect(asked(api, "GET /api/v1/queue")).toBe(3);
+    expect(
+      screen.getByRole("region", { name: "Invitations" }),
+    ).toHaveTextContent("cara invites you");
+    // An invitation is asked about every QUEUE_POLL_MS, and goes once withdrawn.
+    await act(() => vi.advanceTimersByTimeAsync(QUEUE_POLL_MS));
+    expect(asked(api, "GET /api/v1/queue")).toBe(4);
+    expect(screen.queryByRole("region", { name: "Invitations" })).toBeNull();
+    // Once the page closes, the follower alone asks no more.
+    unmount();
+    await act(() => vi.advanceTimersByTimeAsync(QUEUE_IDLE_POLL_MS * 2));
+    expect(asked(api, "GET /api/v1/queue")).toBe(4);
+  });
+
+  it("says why the friends did not come, and asks again", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/queue", () => reply(200, place()));
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    const down = () =>
+      reply(503, {
+        code: "service_unavailable",
+        message: "The application service is unavailable. Try again.",
+      });
+    api.on("GET /api/v1/friends", down, down, () =>
+      reply(200, {
+        friends: [
+          { id: "u-bob", handle: "bob", avatar: "sigil", alliance: null },
+        ],
+        incoming: [],
+        outgoing: [],
+      }),
+    );
+    render(<FindGame me={ada} />);
+    await settle();
+    await act(async () =>
+      screen.getByRole("radio", { name: /Two-Headed Giant/ }).click(),
+    );
+    await act(async () =>
+      screen.getByRole("radio", { name: /A friend/ }).click(),
+    );
+    await settle();
+    // A request that failed is no empty list of friends.
+    expect(screen.queryByText(/You have no friends to invite yet/)).toBeNull();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The application service is unavailable. Try again.",
+    );
+    expect(screen.getByRole("button", { name: "Find a game" })).toBeDisabled();
+    // Wanted again, the friends are asked for again.
+    await act(async () =>
+      screen.getByRole("radio", { name: /Another player/ }).click(),
+    );
+    await act(async () =>
+      screen.getByRole("radio", { name: /A friend/ }).click(),
+    );
+    await settle();
+    expect(asked(api, "GET /api/v1/friends")).toBe(2);
+    await act(async () =>
+      screen.getByRole("button", { name: "Try again" }).click(),
+    );
+    await settle();
+    expect(asked(api, "GET /api/v1/friends")).toBe(3);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByLabelText("Your friend")).toHaveValue("u-bob");
+    expect(screen.getByRole("button", { name: "Invite bob" })).toBeEnabled();
   });
 
   it("names the invitation in the bell, and leads to Find a game", () => {
