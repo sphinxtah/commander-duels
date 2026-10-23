@@ -320,6 +320,14 @@ def casual() -> TableRules:
     return TableRules(banned=True, not_legal=True)
 
 
+# One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards (api/matches.py).
+BestOf = Literal[1, 3]
+BEST_OF_TEXT = (
+    "Since v0.5.0, Legacy only: 3 plays a best-of-three match, with sideboarding between its "
+    "games (docs/matches.md)."
+)
+
+
 class SeatChoice(Contract):
     """A bot seat's deck: a fixture deck of the game's format, one of your own decks, or a deck
     list (SysOp)."""
@@ -351,6 +359,7 @@ class PracticeGameRequest(Contract):
         description="Which cards the game's own decks may hold by their legality; casual unless "
         "told otherwise.",
     )
+    best_of: BestOf = Field(default=1, description=BEST_OF_TEXT)
 
 
 class PracticeFormat(Contract):
@@ -359,6 +368,10 @@ class PracticeFormat(Contract):
     bots: list[int]
     default_bots: int
     decks: list[FixtureDeck]
+    best_of: list[int] = Field(
+        default_factory=lambda: [1],
+        description="Since v0.5.0: 1, and 3 in Legacy for a best-of-three match.",
+    )
 
 
 class PracticeOptions(Contract):
@@ -397,6 +410,21 @@ class GameResult(Contract):
     conceded_seats: list[int]
 
 
+MatchStatus = Literal["playing", "sideboarding", "finished", "closed"]
+
+
+class GameMatch(Contract):
+    """The best-of-three match a game is part of (v0.5.0), as it stands now."""
+
+    id: UUID
+    best_of: int
+    game: int = Field(description="This game's number in the match, from 1.")
+    status: MatchStatus
+    wins: list[int] = Field(description="Each seat's game wins so far, by seat.")
+    winner_seat: int | None
+    draw: bool
+
+
 class GameSummary(Contract):
     id: UUID
     kind: Literal["practice", "table"] = Field(
@@ -415,6 +443,9 @@ class GameSummary(Contract):
     tokens: int | None = Field(
         default=None,
         description="Tokens the game paid you (v0.4.0); null while it runs or without a seat.",
+    )
+    match: GameMatch | None = Field(
+        default=None, description="Its best-of-three match (v0.5.0); null for a single game."
     )
 
 

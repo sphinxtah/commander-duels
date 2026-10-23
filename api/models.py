@@ -206,6 +206,7 @@ class Game(Base):
         CheckConstraint("kind IN ('practice', 'table')", name="ck_games_kind"),
         CheckConstraint("format IN ('legacy', 'commander')", name="ck_games_format"),
         CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
+        CheckConstraint("(match_id IS NULL) = (match_game IS NULL)", name="ck_games_match"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
     kind: Mapped[str] = mapped_column(String(16), default="practice")
@@ -221,6 +222,9 @@ class Game(Base):
     # What the game started under: the catalog revision and the format's version (T17).
     catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))
     format_version: Mapped[int | None]
+    # The best-of-three match it is a game of (v0.5.0, api/matches.py), and its number there.
+    match_id: Mapped[UUID | None] = mapped_column(ForeignKey("matches.id"), index=True)
+    match_game: Mapped[int | None]
 
 
 class GameSeat(Base):
@@ -267,6 +271,10 @@ class GameTable(Base):
         CheckConstraint(
             "seats BETWEEN 2 AND 4 AND bots >= 0 AND seats - bots >= 2", name="ck_game_tables_seats"
         ),
+        CheckConstraint(
+            "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
+            name="ck_game_tables_best_of",
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     # Unguessable: the invite link's code.
@@ -283,6 +291,8 @@ class GameTable(Base):
     # not legal in it. Both is casual, neither tournament rules.
     allow_banned: Mapped[bool] = mapped_column(default=True)
     allow_not_legal: Mapped[bool] = mapped_column(default=True)
+    # Best of one game, or (v0.5.0, Legacy only) of three: a match with sideboarding between games.
+    best_of: Mapped[int] = mapped_column(default=1)
     # open (the lobby), started (its game holds the rest) or closed (the host left).
     status: Mapped[str] = mapped_column(String(16), index=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
@@ -303,6 +313,92 @@ class TableSeat(Base):
     deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
     ready: Mapped[bool] = mapped_column(default=False)
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class Match(Base):
+    """A best-of-three Legacy match (v0.5.0, api/matches.py): games of its own, each an engine game
+    linked here with its number, until a player has two game wins. Between games its players
+    sideboard; the loser of a game chooses to play or draw the next one."""
+
+    __tablename__ = "matches"
+    __table_args__ = (
+        CheckConstraint("kind IN ('practice', 'table')", name="ck_matches_kind"),
+        CheckConstraint("format IN ('legacy', 'commander')", name="ck_matches_format"),
+        CheckConstraint("best_of = 3", name="ck_matches_best_of"),
+        CheckConstraint(
+            "status IN ('playing', 'sideboarding', 'finished', 'closed')", name="ck_matches_status"
+        ),
+        CheckConstraint(
+            "end_reason IS NULL OR end_reason IN ('games', 'conceded', 'removed', 'closed', "
+            "'failed')",
+            name="ck_matches_end_reason",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    # The kind of its games: a practice match against a bot, or a human table's.
+    kind: Mapped[str] = mapped_column(String(16))
+    format: Mapped[str] = mapped_column(String(16))
+    best_of: Mapped[int] = mapped_column(default=3)
+    # playing (a game runs), sideboarding (between games), finished (a winner or a draw), or
+    # closed (ended without a result: a game closed or timed out, or the next could not start).
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    # What every game of the match starts with, as its first did. A table's match is the one of
+    # the game the table started (game_tables.game_id).
+    bot_skill: Mapped[int]
+    turn_cap: Mapped[int]
+    idle_timeout_seconds: Mapped[int | None]
+    # The game in play, or while sideboarding the next one.
+    game_number: Mapped[int] = mapped_column(default=1)
+    # Who chooses to play or draw the next game (the last game's loser), and the seat that plays
+    # first as chosen; both None for the first game, where the engine draws who chooses.
+    chooser_seat: Mapped[int | None]
+    starting_seat: Mapped[int | None]
+    # When sideboarding ends: the next game then starts with every deck as it is arranged.
+    sideboard_until: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    winner_seat: Mapped[int | None]
+    draw: Mapped[bool] = mapped_column(default=False)
+    # games (game wins decided it), conceded, removed (away), closed or failed.
+    end_reason: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class MatchPlayer(Base):
+    """A seat in a match (v0.5.0), the same in each of its games. A player's arrangement of their
+    bound deck revision between main deck and sideboard is theirs alone: no answer about the match
+    shows it to anyone else, SysOp apart."""
+
+    __tablename__ = "match_players"
+    __table_args__ = (
+        UniqueConstraint("match_id", "seat"),
+        CheckConstraint("player IN ('human', 'bot')", name="ck_match_players_player"),
+        CheckConstraint(
+            "(player = 'human') = (user_id IS NOT NULL)", name="ck_match_players_owner"
+        ),
+        CheckConstraint(
+            "left_reason IS NULL OR left_reason IN ('conceded', 'removed')",
+            name="ck_match_players_left",
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    match_id: Mapped[UUID] = mapped_column(ForeignKey("matches.id"), index=True)
+    seat: Mapped[int]
+    player: Mapped[str] = mapped_column(String(8))
+    user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    # The player's deck revision bound at the match's start (DECK01): every game plays its cards.
+    deck_revision_id: Mapped[UUID | None] = mapped_column(ForeignKey("deck_revisions.id"))
+    # A seat that never sideboards (a bot, a fixture deck, SysOp's deck list): the deck as the
+    # engine took it for the first game, {"deck": name} or {"deck_list": ...}.
+    engine_deck: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # The revision's main deck and sideboard as the player arranged them for the next game:
+    # {"main": [{card_id, printing_id, quantity}], "sideboard": [...]}.
+    arrangement: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    ready: Mapped[bool] = mapped_column(default=False)
+    game_wins: Mapped[int] = mapped_column(default=0)
+    # Out of the match: conceded it, or removed from one of its games while away.
+    left_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    left_reason: Mapped[str | None] = mapped_column(String(16))
 
 
 class CardImage(Base):

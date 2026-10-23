@@ -9,7 +9,8 @@ Since v0.4.0 approved players play each other. A player opens a table in the lob
   - Legacy for two players, or Commander for two to four seats;
   - how many of the seats bots fill, after the players' seats, and their skill (1–6);
   - public (listed in the lobby) or private (reached by its invite link only);
-  - since v0.4.5, which cards its decks may hold ([the table's rules](#the-tables-rules-v045)).
+  - since v0.4.5, which cards its decks may hold ([the table's rules](#the-tables-rules-v045));
+  - since v0.5.0, in Legacy, one game or a best-of-three match with sideboards ([matches](matches.md)). The lobby tags a best-of-three table.
   The host takes the first seat with one of their decks.
 - **The invite link.** Every table has an unguessable code, and its page is `#tables/<code>`. A private table is never listed, so the link is the only way in. Its players see the link and can copy it. SysOp sees every table, private ones included.
 - **Seats.** A player joins with one of their own decks and takes the first free seat. They may change deck (which makes them not ready again), mark themselves ready, or leave. The host leaving closes the table for everyone.
@@ -59,7 +60,7 @@ There are no turn timers.
 | Route | What |
 | --- | --- |
 | `GET /api/v1/tables` | Open tables, newest first: the public ones and your own (SysOp: every one) |
-| `POST /api/v1/tables` | Open a table: `format`, `seats` (2 in Legacy, 2–4 in Commander), `bots`, `bot_skill`, `turn_cap`, `visibility`, `rules` (since v0.4.5: `{"banned": bool, "not_legal": bool}`, both true by default), `deck_id` |
+| `POST /api/v1/tables` | Open a table: `format`, `seats` (2 in Legacy, 2–4 in Commander), `bots`, `bot_skill`, `turn_cap`, `visibility`, `rules` (since v0.4.5: `{"banned": bool, "not_legal": bool}`, both true by default), `best_of` (since v0.5.0: 1, or 3 in Legacy), `deck_id` |
 | `GET /api/v1/tables/{code}` | A table by its invite code: its rules, its seats (handles, portraits, ready), your own deck, and its game once started (for its players and SysOp) |
 | `POST /api/v1/tables/{code}/join` | Take the first free seat with `deck_id` |
 | `PATCH /api/v1/tables/{code}/seat` | Change `deck_id`, or `ready` |
@@ -86,6 +87,8 @@ Migration `0009_tables` adds:
 Going back to 0008 keeps every game, with its wins and tokens, as a practice game, and drops the tables.
 
 Migration `0019_table_rules` (v0.4.5) adds each table's rules, `game_tables.allow_banned` and `allow_not_legal`, true for the tables already there, and each deck's needs ([decks](decks.md#validation-deck08-t03t05)). Going back drops them: tables take legal decks only again.
+
+Migration `0023_matches` (v0.5.0) adds `game_tables.best_of`, 1 for the tables already there, and the matches a best-of-three table plays ([matches](matches.md#data)).
 
 ## Verification
 

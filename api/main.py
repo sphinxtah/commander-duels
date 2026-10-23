@@ -23,6 +23,7 @@ from api import (
     economy,
     engine_cards,
     games,
+    matches,
     progression,
     reports,
     shop,
@@ -155,6 +156,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 # Which custom cards the running engine has loaded (v0.4.0).
                 app.state.engine_cards = engine_cards.EngineCards(engine)
                 await app.state.games.start()
+                # Matches between games keep their sideboarding's clock (v0.5.0).
+                app.state.games.spawn(matches.resume(app.state.games))
                 try:
                     yield
                 finally:
@@ -321,6 +324,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(admin.router)
     app.include_router(games.router)
     app.include_router(tables.router)
+    app.include_router(matches.router)
     app.include_router(card_images.router)
     app.include_router(cards.router)
     app.include_router(decks.router)
