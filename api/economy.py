@@ -145,11 +145,14 @@ def bot_cap(db: Session) -> int | None:
 
 def pay_game(db: Session, game: Game) -> None:
     """Pays the game's winner, if a player's seat won it, for every seat it beat: in the caller's
-    transaction, after the game's result is recorded."""
+    transaction, after the game's result is recorded. In Two-Headed Giant (v0.5.0) the winner's
+    teammate won with it, so it is not a seat the winner beat."""
     result = game.result or {}
     winner = result.get("winner_seat")
     if result.get("kind") != "completed" or not isinstance(winner, int):
         return
+    team = result.get("winner_seats")
+    winners = set(team) if isinstance(team, list) and team else {winner}
     seats = list(
         db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     )
@@ -176,7 +179,7 @@ def pay_game(db: Session, game: Game) -> None:
     )
     for seat in seats:
         key = f"tokens:{game.id}:{winner}:{seat.seat}"
-        if seat.seat == winner or db.scalar(select(TokenEntry.id).where(TokenEntry.key == key)):
+        if seat.seat in winners or db.scalar(select(TokenEntry.id).where(TokenEntry.key == key)):
             continue
         reason = None
         if seat.player == "bot":

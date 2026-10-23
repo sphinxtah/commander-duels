@@ -204,7 +204,9 @@ class Game(Base):
     __tablename__ = "games"
     __table_args__ = (
         CheckConstraint("kind IN ('practice', 'table')", name="ck_games_kind"),
-        CheckConstraint("format IN ('legacy', 'commander')", name="ck_games_format"),
+        CheckConstraint(
+            "format IN ('legacy', 'commander', 'two_headed_giant')", name="ck_games_format"
+        ),
         CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True)
@@ -216,7 +218,8 @@ class Game(Base):
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     bot_skill: Mapped[int]
     turn_cap: Mapped[int]
-    # The engine's result, when the game finished: kind, winner_seat, draw, turns, conceded_seats.
+    # The engine's result, when the game finished: kind, winner_seat, winner_seats (v0.5.0: the
+    # winning team in Two-Headed Giant), draw, turns, conceded_seats.
     result: Mapped[dict[str, object] | None] = mapped_column(JsonType)
     # What the game started under: the catalog revision and the format's version (T17).
     catalog_revision_id: Mapped[int | None] = mapped_column(ForeignKey("catalog_revisions.id"))

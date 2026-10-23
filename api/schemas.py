@@ -76,6 +76,10 @@ class Format(Contract):
     default_seats: int
     description: str
     available: bool = False
+    early: bool = Field(
+        default=False,
+        description="A first playable version, against the bots only (v0.5.0: Two-Headed Giant).",
+    )
 
 
 class XmageBuild(Contract):
@@ -286,10 +290,15 @@ class AuditPage(Contract):
     next_cursor: str | None
 
 
-GameFormatId = Literal["legacy", "commander"]
+# A game's format. Two-Headed Giant (v0.5.0, early) is a practice game against bots with Legacy
+# decks; decks, human tables and format versions keep Legacy and Commander (TableFormatId).
+GameFormatId = Literal["legacy", "commander", "two_headed_giant"]
+TableFormatId = Literal["legacy", "commander"]
 FixtureDeck = Literal[
     "legacy-mono-red-burn",
     "legacy-mono-green-creatures",
+    "legacy-mono-white-weenie",
+    "legacy-mono-blue-skies",
     "commander-mono-white-soldiers",
     "commander-mono-blue-flyers",
     "commander-mono-red-raiders",
@@ -342,7 +351,8 @@ class PracticeGameRequest(Contract):
         default=None,
         min_length=1,
         max_length=3,
-        description="One bot in Legacy; one to three in Commander (default three).",
+        description="One bot in Legacy; one to three in Commander (default three); three in "
+        "Two-Headed Giant: your teammate, then the two opponents.",
     )
     bot_skill: int = Field(default=4, ge=1, le=6)
     turn_cap: int = Field(default=60, ge=1, le=200)
@@ -392,6 +402,11 @@ class GameResult(Contract):
         description="completed, turn_limit, closed, idle_timeout, humans_eliminated or error"
     )
     winner_seat: int | None
+    winner_seats: list[int] = Field(
+        default_factory=list,
+        description="Every winning seat (v0.5.0): the winner, or in Two-Headed Giant the winning "
+        "team, whose first seat is winner_seat.",
+    )
     draw: bool
     turns: int
     conceded_seats: list[int]

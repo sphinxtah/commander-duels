@@ -3643,6 +3643,12 @@
             "title": "Description",
             "type": "string"
           },
+          "early": {
+            "default": false,
+            "description": "A first playable version, against the bots only (v0.5.0: Two-Headed Giant).",
+            "title": "Early",
+            "type": "boolean"
+          },
           "id": {
             "enum": [
               "commander",
@@ -3742,6 +3748,14 @@
               }
             ],
             "title": "Winner Seat"
+          },
+          "winner_seats": {
+            "description": "Every winning seat (v0.5.0): the winner, or in Two-Headed Giant the winning team, whose first seat is winner_seat.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Winner Seats",
+            "type": "array"
           }
         },
         "required": [
@@ -3885,7 +3899,8 @@
           "format": {
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Format",
             "type": "string"
@@ -5457,6 +5472,8 @@
               "enum": [
                 "legacy-mono-red-burn",
                 "legacy-mono-green-creatures",
+                "legacy-mono-white-weenie",
+                "legacy-mono-blue-skies",
                 "commander-mono-white-soldiers",
                 "commander-mono-blue-flyers",
                 "commander-mono-red-raiders",
@@ -5474,7 +5491,8 @@
           "id": {
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Id",
             "type": "string"
@@ -5519,7 +5537,7 @@
                 "type": "null"
               }
             ],
-            "description": "One bot in Legacy; one to three in Commander (default three).",
+            "description": "One bot in Legacy; one to three in Commander (default three); three in Two-Headed Giant: your teammate, then the two opponents.",
             "title": "Bots"
           },
           "deck": {
@@ -5528,6 +5546,8 @@
                 "enum": [
                   "legacy-mono-red-burn",
                   "legacy-mono-green-creatures",
+                  "legacy-mono-white-weenie",
+                  "legacy-mono-blue-skies",
                   "commander-mono-white-soldiers",
                   "commander-mono-blue-flyers",
                   "commander-mono-red-raiders",
@@ -5572,7 +5592,8 @@
             "default": "legacy",
             "enum": [
               "legacy",
-              "commander"
+              "commander",
+              "two_headed_giant"
             ],
             "title": "Format",
             "type": "string"
@@ -5652,7 +5673,8 @@
               {
                 "enum": [
                   "legacy",
-                  "commander"
+                  "commander",
+                  "two_headed_giant"
                 ],
                 "type": "string"
               },
@@ -7778,6 +7800,8 @@
                 "enum": [
                   "legacy-mono-red-burn",
                   "legacy-mono-green-creatures",
+                  "legacy-mono-white-weenie",
+                  "legacy-mono-blue-skies",
                   "commander-mono-white-soldiers",
                   "commander-mono-blue-flyers",
                   "commander-mono-red-raiders",

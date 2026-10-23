@@ -98,6 +98,7 @@ from api.schemas import (
     TableRules,
 )
 from api.schemas import GameSeat as SeatSummary
+from api.teams import assign_and_check
 from api.validation import DeckContent, Problem, not_allowed, validate_deck
 from catalog.statuses import playable
 from catalog.text import normalize
@@ -116,10 +117,24 @@ FIXTURE_DECKS: dict[str, list[FixtureDeck]] = {
         "commander-mono-red-raiders",
         "commander-mono-green-stompers",
     ],
+    # Two-Headed Giant (v0.5.0, early, api/teams.py): the four Legacy fixtures.
+    "two_headed_giant": [
+        "legacy-mono-red-burn",
+        "legacy-mono-green-creatures",
+        "legacy-mono-white-weenie",
+        "legacy-mono-blue-skies",
+    ],
 }
-BOTS = {"legacy": [1], "commander": [1, 2, 3]}
-DEFAULT_BOTS = {"legacy": 1, "commander": 3}
-FORMAT_NAMES = {"legacy": "Legacy", "commander": "Commander"}
+BOTS = {"legacy": [1], "commander": [1, 2, 3], "two_headed_giant": [3]}
+DEFAULT_BOTS = {"legacy": 1, "commander": 3, "two_headed_giant": 3}
+FORMAT_NAMES = {
+    "legacy": "Legacy",
+    "commander": "Commander",
+    "two_headed_giant": "Two-Headed Giant",
+}
+# The format a game's decks are built for, when it is not the game's own: Two-Headed Giant plays
+# Legacy decks, under Legacy's legality and format versions.
+DECK_FORMATS = {"two_headed_giant": "legacy"}
 SERVICE_HEADER = "X-Service-Token"
 LONG_POLL_MS = 25_000
 INSPECTION_WAIT_MS = 3_000
@@ -136,7 +151,7 @@ QUEUE_LIMIT = 512
 CONNECTIONS_PER_ACCOUNT = 4
 # For each player's seat: a four-player table may hold four times as many.
 CONNECTIONS_PER_GAME = 8
-RESULT_FIELDS = ("kind", "winner_seat", "draw", "turns", "conceded_seats")
+RESULT_FIELDS = ("kind", "winner_seat", "winner_seats", "draw", "turns", "conceded_seats")
 # At a table, a seat with no connected tab for this long is away, and may be voted out.
 AWAY_SECONDS = 120.0
 # The engine closes a game in which nothing has happened for this long (idle_timeout). A table
@@ -917,11 +932,20 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             game.status = status
             game.finished_at = utcnow()
             # Engine error details stay in the engine's log.
-            game.result = {key: result.get(key) for key in RESULT_FIELDS} if result else None
+            game.result = recorded(result) if result else None
             db.flush()
             count_win(db, game)
             pay_game(db, game)
             db.commit()
+
+
+def recorded(result: dict[str, Any]) -> dict[str, Any]:
+    """The engine's result as the game keeps it. An engine before v0.5.0 names no winning team:
+    its winning seats are the winner alone."""
+    kept = {key: result.get(key) for key in RESULT_FIELDS}
+    if kept["winner_seats"] is None:
+        kept["winner_seats"] = [] if kept["winner_seat"] is None else [kept["winner_seat"]]
+    return kept
 
 
 def record_left(database: Engine, game_id: UUID, seat: int, reason: str) -> None:
@@ -1267,6 +1291,7 @@ def plan_seats(
     bots: list[SeatChoice | None],
 ) -> list[SeatPlan]:
     fmt = body.format
+    deck_format = DECK_FORMATS.get(fmt, fmt)
     settings = settings_of(request)
     library = library_of(db, principal.user, principal.permissions, roster_of(request))
     # Commander bots with no deck chosen play the starter decks, each a different one, unless the
@@ -1296,7 +1321,7 @@ def plan_seats(
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
             seat, revision, title = own_deck(
-                db, principal.user, principal.permissions, deck_id, fmt, library, body.rules
+                db, principal.user, principal.permissions, deck_id, deck_format, library, body.rules
             )
             plans.append(SeatPlan({"player": player, **seat}, revision, title))
             continue
@@ -1311,6 +1336,10 @@ def plan_seats(
             # SysOp's lists hold only cards in the game, as every deck does (v0.4.5).
             refuse_unplayable(db, cast(dict[str, object], seat["deck_list"]))
         plans.append(SeatPlan(seat))
+    if fmt == "two_headed_giant":
+        # Teams (v0.5.0): seats 0 and 1 against 2 and 3. The API gives each bot without a deck
+        # its fixture deck and checks each team's decks together (api/teams.py).
+        assign_and_check([plan.engine for plan in plans], body.rules.banned)
     # Bots never play the Godlike tier's custom cards (v0.4.0). The other seats holding them are
     # checked against the running engine before the game starts (require_loaded).
     for index, held in custom_in_seats(db, [plan.engine for plan in plans]).items():
@@ -1372,8 +1401,11 @@ def record_game(
         bot_skill=body.bot_skill,
         turn_cap=body.turn_cap,
         catalog_revision_id=db.scalar(select(func.max(CatalogRevision.id))),
+        # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.0).
         format_version=db.scalar(
-            select(func.max(FormatVersion.version)).where(FormatVersion.format == body.format)
+            select(func.max(FormatVersion.version)).where(
+                FormatVersion.format == DECK_FORMATS.get(body.format, body.format)
+            )
         ),
     )
     db.add(game)
