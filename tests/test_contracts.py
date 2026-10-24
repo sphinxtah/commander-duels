@@ -218,6 +218,58 @@ def test_seat_view_contract_cannot_carry_concealed_information():
             pytest.fail(f"schema accepted {description}")
 
 
+def controlling() -> dict[str, Any]:
+    """Seat 0's snapshot while it controls seat 2's turn (723, v0.5.1): seat 2's hand, and a prompt
+    made for seat 2."""
+    view = snapshot()
+    view["view"]["opponents"][1].update(
+        controlled_by=0, hand=[card("o2222222222222222", "Lightning Bolt")]
+    )
+    view["prompt"]["for_seat"] = 2
+    return view
+
+
+def test_seat_view_contract_carries_a_controlled_players_hand_only_with_its_controller():
+    validator = validator_for("contracts/engine-seat-view.schema.json")
+    validator.validate(controlling())
+    # The controlled player's own view says who controls its turn; its prompts are its own.
+    controlled = snapshot()
+    controlled["view"]["you"]["controlled_by"] = 3
+    controlled["prompt"]["for_seat"] = None
+    validator.validate(controlled)
+
+    secret = card("o3333333333333333", "Giant Growth")
+    leaks: list[tuple[str, Any]] = [
+        (
+            "a hand without a controller",
+            lambda view: view["view"]["opponents"][1].pop("controlled_by"),
+        ),
+        (
+            "a hand with a null controller",
+            lambda v: v["view"]["opponents"][1].update(controlled_by=None),
+        ),
+        (
+            "another uncontrolled hand",
+            lambda view: view["view"]["opponents"][2].update(hand=[secret]),
+        ),
+        ("a controller out of range", lambda v: v["view"]["opponents"][1].update(controlled_by=4)),
+        ("a prompt for a fifth seat", lambda view: view["prompt"].update(for_seat=4)),
+    ]
+    for description, mutate in leaks:
+        leaked = copy.deepcopy(controlling())
+        mutate(leaked)
+        with pytest.raises(ValidationError):
+            validator.validate(leaked)
+            pytest.fail(f"schema accepted {description}")
+    # A spectator controls nobody's turn: it sees the controller's name, never a hand.
+    watched = spectator()
+    watched["view"]["opponents"][2]["controlled_by"] = 0
+    validator.validate(watched)
+    watched["view"]["opponents"][2]["hand"] = [secret]
+    with pytest.raises(ValidationError):
+        validator.validate(watched)
+
+
 def spectator() -> dict[str, Any]:
     watched = snapshot()
     watched.update(seat=None, status="spectating", prompt=None)

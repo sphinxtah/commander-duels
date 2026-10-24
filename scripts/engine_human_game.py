@@ -75,6 +75,8 @@ class Checks:
         view = snapshot.get("view") or {}
         if snapshot.get("prompt") is not None or view.get("you") is not None or view.get("hand"):
             self.problem("a spectator was sent a prompt, a seat's state or a hand")
+        if any(player.get("hand") is not None for player in view.get("opponents") or []):
+            self.problem("a spectator was sent a player's hand")
         self.snapshot(None, snapshot)
 
     def snapshot(self, seat: int | None, snapshot: dict[str, Any]) -> None:
@@ -98,14 +100,42 @@ class Checks:
                 self.problem(f"seat {seat} was told seat {entry.get('seat')}'s deck")
         view = snapshot.get("view") or {}
         you = view.get("you") or {}
-        for player in [you, *(view.get("opponents") or [])]:
+        opponents = view.get("opponents") or []
+        # Since v0.5.1 a seat controlling another player's turn (rule 723) sees what that player
+        # may see while the control lasts: the player's entry names the seat in controlled_by.
+        controlled = {
+            player.get("seat")
+            for player in opponents
+            if seat is not None and player.get("controlled_by") == seat
+        }
+        teams = {player.get("team") for player in opponents if player.get("seat") in controlled}
+        for player in [you, *opponents]:
             # Since v0.5.0 a player carries `hand`, null but for a Two-Headed Giant teammate's,
-            # whose hand is the seat's to see (rule 810.5).
-            teammate = player is not you and player.get("team") is not None
-            teammate = teammate and player.get("team") == you.get("team")
+            # whose hand is the seat's to see (rule 810.5), and since v0.5.1 for a player whose
+            # turn the seat controls, or that player's teammate (723.4).
+            team = player.get("team")
+            teammate = player is not you and team is not None and team == you.get("team")
+            shown = player is not you and (
+                teammate or player.get("seat") in controlled or (team is not None and team in teams)
+            )
             for key in ("hand", "library"):
-                if player.get(key) is not None and not (key == "hand" and teammate):
+                if player.get(key) is not None and not (key == "hand" and shown):
                     self.problem(f"seat {player.get('seat')}'s {key} contents reached seat {seat}")
+        prompt = snapshot.get("prompt") or {}
+        for_seat = prompt.get("for_seat")
+        if for_seat is not None and for_seat not in controlled:
+            self.problem(
+                f"seat {seat} was asked for seat {for_seat}, whose turn it does not control"
+            )
+        controller = you.get("controlled_by")
+        seats = (snapshot.get("settings") or {}).get("seats", [])
+        human_controller = any(
+            entry.get("seat") == controller and entry.get("player") == "human" for entry in seats
+        )
+        if prompt and for_seat is None and controller is not None and human_controller:
+            self.problem(
+                f"seat {seat} was asked for itself while seat {controller} controls its turn"
+            )
         if you and len(view.get("hand", [])) != you.get("hand_count"):
             self.problem(f"seat {seat}'s hand size disagrees with its count")
         for card in view.get("hand", []):

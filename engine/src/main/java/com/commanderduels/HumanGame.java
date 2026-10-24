@@ -42,6 +42,15 @@ import mage.util.ThreadUtils;
  * <p>A service game can also be inspected ({@link #inspect}): every hand and library, in order,
  * for SysOp. That view is built only while XMage is waiting for a human seat's answer, when the
  * game thread is parked and XMage's state holds still.
+ *
+ * <p>Turn control (723, v0.5.1): while a player's turn is controlled by a human seat, XMage's
+ * requests for that player (for a bot, through the stand-in its controller makes for it, see
+ * {@link HumanSeatPlayer}) open a prompt on the controlling seat, marked with the controlled
+ * player's seat and built from what that player may see, and its answer goes to that player. The
+ * controlling seat's view shows what the controlled player may see while the control lasts
+ * ({@link Visibility}). The controlled player still concedes for themselves (723.6). Control ends
+ * when its controller leaves the game (800.4a); a request already open then goes to the
+ * controlled player's own seat, or a bot's gets the answer that does the least.
  */
 final class HumanGame {
     static final long CLOSE_GRACE_MILLIS = 5_000;
@@ -155,6 +164,11 @@ final class HumanGame {
         long revision;
         String status = "starting";
         Prompts.Prompt prompt;
+        /**
+         * Whose request the open prompt answers: this seat's, or (v0.5.1) that of the seat whose
+         * turn this seat controls. XMage waits for that player's answer.
+         */
+        int promptFor;
         SeatView view;
         /** The log entries that existed when {@code view} was built: the seat's log stops there. */
         int logEntries;
@@ -173,6 +187,7 @@ final class HumanGame {
             this.index = index;
             this.id = player.getId();
             this.player = player;
+            this.promptFor = index;
         }
     }
 
@@ -226,7 +241,7 @@ final class HumanGame {
             HumanGameRequest.Seat seat = request.seats().get(index);
             seatSettings.add(new SeatSettings(index, seat.player(), seat.deck()));
             if (seat.human()) {
-                var human = new HumanPlayer(name(seat, index), format.range(), 0);
+                var human = new HumanSeatPlayer(name(seat, index), format.range());
                 // XMage's server sets each human's preferences on connect; these are its defaults (stop in
                 // both main phases, at declare attackers and blockers, and whenever something new is on
                 // the stack).
@@ -363,31 +378,37 @@ final class HumanGame {
         return order;
     }
 
-    /** Game thread: XMage is about to wait for a human seat's answer. */
+    /**
+     * Game thread: XMage is about to wait for a human seat's answer, or (v0.5.1) for the answer of a
+     * player whose turn a human seat controls, which that seat gives.
+     */
     private void onQuery(PlayerQueryEvent event) {
-        Seat seat = humanSeat(event.getPlayerId());
-        if (seat == null) {
-            return;
-        }
         if (event.getQueryType() == PlayerQueryEvent.QueryType.PERSONAL_MESSAGE) {
-            String text = SeatViews.plain(event.getMessage());
-            if (!text.isEmpty()) {
-                seat.messages.addLast(text);
-                while (seat.messages.size() > MAX_MESSAGES) {
-                    seat.messages.removeFirst();
-                }
-            }
-            refresh();
+            message(event);
             return;
         }
+        UUID asking = asking(event);
+        endLostControl();
+        Seat askingSeat = humanSeat(asking);
+        Seat seat = decider(asking, askingSeat);
+        if (seat == null) {
+            if (askingSeat == null) {
+                answerForBot(event, asking);
+            }
+            return;
+        }
+        // The seat answers for another player whose turn it controls (723.5).
+        Integer forSeat = seat == askingSeat ? null : seatIds.indexOf(asking);
         String attacker;
         boolean leaving;
         synchronized (this) {
             attacker = seat.lastAttacker;
-            leaving = seat.concedeRequested || endRequest != null;
+            leaving = (askingSeat != null && askingSeat.concedeRequested) || endRequest != null;
         }
-        HumanPlayer human = current(seat);
-        Prompts.Prompt next = Prompts.build(event, game, human, views, UUID.randomUUID().toString(), attacker);
+        // The object XMage waits on: a human seat's player, or the bot whose stand-in asks.
+        Player human = askingSeat != null ? current(askingSeat) : game.getPlayer(asking);
+        Prompts.Prompt next = Prompts.build(event, game, human, views, UUID.randomUUID().toString(), attacker,
+            forSeat);
         SeatView seatView = views.build(seat.index, List.copyOf(seat.messages));
         int logged = log.size();
         // Every other seat sees the game as it is while XMage waits. Their views go out before the
@@ -402,13 +423,14 @@ final class HumanGame {
         boolean concede;
         boolean closing;
         synchronized (this) {
-            concede = seat.concedeRequested;
+            concede = askingSeat != null && askingSeat.concedeRequested;
             closing = endRequest != null;
             // A seat that has conceded, or any seat of a game being closed, is not asked: the
             // concession below makes XMage drop this request, and the seat leaves the game.
             boolean ask = !concede && !closing;
             seat.revision++;
             seat.prompt = ask ? next : null;
+            seat.promptFor = seatIds.indexOf(asking);
             seat.view = seatView;
             seat.logEntries = logged;
             seat.status = !ask ? "waiting" : next.supported() ? "your_prompt" : "unsupported_prompt";
@@ -428,11 +450,112 @@ final class HumanGame {
             human.signalPlayerConcede(true);
         } else if (concede) {
             // A concession that arrived before the game had started is applied here, on the game thread.
-            game.setConcedingPlayer(seat.id);
+            game.setConcedingPlayer(askingSeat.id);
             human.signalPlayerConcede(true);
             // XMage has removed the seat: its view now says it is out.
-            publish(seat);
+            publish(askingSeat);
         }
+    }
+
+    /**
+     * The player XMage asks. Its requests name that player, but for a priority request, which names
+     * the player controlling its turn (XMage's own server shows it to that player's client). XMage
+     * makes the player it asks the priority player before every human player's request.
+     */
+    private UUID asking(PlayerQueryEvent event) {
+        UUID named = event.getPlayerId();
+        UUID priority = game.getState().getPriorityPlayerId();
+        Player prioritised = priority == null || priority.equals(named) ? null : game.getPlayer(priority);
+        if (prioritised != null && !prioritised.isGameUnderControl()
+                && named.equals(prioritised.getTurnControlledBy())) {
+            return priority;
+        }
+        return named;
+    }
+
+    /**
+     * The human seat that answers the asked player's request: the seat controlling its turn (723.5),
+     * else its own; null for a bot whose controller has left or is leaving. A player controlled by a
+     * bot answers for itself (XMage lets no computer player control a turn).
+     */
+    private Seat decider(UUID asking, Seat askingSeat) {
+        Seat controller = humanSeat(Visibility.controllerOf(game, asking));
+        if (controller == null) {
+            return askingSeat;
+        }
+        synchronized (this) {
+            return controller.concedeRequested ? askingSeat : controller;
+        }
+    }
+
+    /**
+     * Game thread: XMage's stand-in for a bot whose turn a human seat controlled asks, but that seat
+     * has left the game or is leaving it: the request gets the answer that does the least, and the
+     * bot makes its own decisions once XMage has let it go (800.4a, see {@link #endLostControl}).
+     */
+    private void answerForBot(PlayerQueryEvent event, UUID botId) {
+        Player bot = game.getPlayer(botId);
+        if (bot == null) {
+            return;
+        }
+        Prompts.Answer answer = Prompts.build(event, game, bot, views, UUID.randomUUID().toString(), null,
+            seatIds.indexOf(botId)).fallback();
+        if (answer != null) {
+            // From another thread, as any answer: XMage listens only once this request has been fired.
+            Thread.ofVirtual().name("human-game-fallback").start(() -> answer.apply(bot));
+        }
+    }
+
+    /**
+     * Game thread: control of a turn ends when its controller leaves the game (800.4a). XMage keeps
+     * it until the next turn begins, still asking the player who left; the engine hands it back at
+     * once. Without turn control this changes nothing.
+     */
+    private void endLostControl() {
+        Game current = game;
+        if (current == null) {
+            return;
+        }
+        for (Player player : current.getPlayers().values()) {
+            if (player.isGameUnderControl()) {
+                continue;
+            }
+            Player controller = current.getPlayer(player.getTurnControlledBy());
+            if (controller == null || !controller.isInGame()) {
+                player.setGameUnderYourControl(current, true);
+            }
+        }
+    }
+
+    /**
+     * Game thread: one of XMage's personal messages ("You have to attack with..."), for the seat it
+     * names and, while another seat controls that player's turn, for that seat too (723.4); a bot's
+     * reach only the seat controlling its turn.
+     */
+    private void message(PlayerQueryEvent event) {
+        UUID named = event.getPlayerId();
+        List<Seat> to = new ArrayList<>();
+        Seat own = humanSeat(named);
+        if (own != null) {
+            to.add(own);
+        }
+        Seat controller = humanSeat(Visibility.controllerOf(game, named));
+        if (controller != null && controller != own) {
+            to.add(controller);
+        }
+        if (to.isEmpty()) {
+            return;
+        }
+        String text = SeatViews.plain(event.getMessage());
+        if (!text.isEmpty()) {
+            for (Seat seat : to) {
+                seat.messages.addLast(text);
+                while (seat.messages.size() > MAX_MESSAGES) {
+                    seat.messages.removeFirst();
+                }
+            }
+        }
+        refresh();
     }
 
     /** Game thread: the state changed without a request to a human seat. */
@@ -440,6 +563,7 @@ final class HumanGame {
         if (views == null) {
             return;
         }
+        endLostControl();
         for (Seat seat : humans) {
             publish(seat);
         }
@@ -636,6 +760,7 @@ final class HumanGame {
         Seat seat = seats.get(seatIndex);
         Prompts.Answer answer;
         Reply reply;
+        int promptFor;
         synchronized (this) {
             Reply earlier = replay(seat, command);
             if (earlier != null) {
@@ -683,6 +808,7 @@ final class HumanGame {
                 seat.lastAttacker = option == null ? null
                     : option.action().equals("all_attack") ? "all attackers" : option.label();
             }
+            promptFor = seat.promptFor;
             seat.prompt = null;
             seat.revision++;
             seat.status = "waiting";
@@ -690,9 +816,26 @@ final class HumanGame {
             reply = accepted(seat, command);
             notifyAll();
         }
-        // Outside the lock: XMage hands the answer to the waiting game thread.
-        answer.apply(current(seat));
+        // Outside the lock: XMage hands the answer to the waiting game thread. A prompt made for a
+        // player whose turn this seat controls is that player's to receive (723.5).
+        Player answering = answering(promptFor);
+        if (answering != null) {
+            answer.apply(answering);
+        }
         return reply;
+    }
+
+    /**
+     * The object XMage waits on for the answer of the player in a seat: a human seat's current player,
+     * or a bot, which hands it to the stand-in its controller made for it.
+     */
+    private Player answering(int seatIndex) {
+        Seat seat = seats.get(seatIndex);
+        if (seat != null) {
+            return current(seat);
+        }
+        Game current = game;
+        return current == null ? null : current.getPlayer(seatIds.get(seatIndex));
     }
 
     /**
@@ -726,6 +869,7 @@ final class HumanGame {
         Seat seat = seats.get(seatIndex);
         Reply reply;
         boolean promptOpen;
+        Runnable handover;
         synchronized (this) {
             Reply earlier = replay(seat, command);
             if (earlier != null) {
@@ -738,12 +882,50 @@ final class HumanGame {
             if (seat.concedeRequested || human.hasLost() || human.hasLeft()) {
                 return reject(seat, 409, "eliminated", "This seat is already out of the game");
             }
+            handover = handOver(seat);
             promptOpen = markConcession(seat);
             conceded.add(seat.index);
             reply = accepted(seat, command);
         }
         applyConcession(seat.id, promptOpen);
+        if (handover != null) {
+            // Not on the request thread: if the concession ended the game, nobody listens any more.
+            Thread.ofVirtual().name("human-game-handover").start(handover);
+        }
         return reply;
+    }
+
+    /**
+     * Caller holds the lock. A request the seat answers for a player whose turn it controls is that
+     * player's once the seat leaves the game (800.4a): a human seat gets the same prompt as its own;
+     * a bot's stand-in gets the answer that does the least, returned to apply once the concession is
+     * on its way. Null if there is nothing to apply.
+     */
+    private Runnable handOver(Seat seat) {
+        Prompts.Prompt prompt = seat.prompt;
+        if (prompt == null || seat.promptFor == seat.index) {
+            return null;
+        }
+        Seat owner = seats.get(seat.promptFor);
+        if (owner != null) {
+            if (!owner.concedeRequested && endRequest == null) {
+                owner.prompt = new Prompts.Prompt(prompt.view().madeFor(null), prompt.answers(), prompt.names());
+                owner.promptFor = owner.index;
+                owner.revision++;
+                owner.status = prompt.supported() ? "your_prompt" : "unsupported_prompt";
+                touch();
+                notifyAll();
+            }
+            return null;
+        }
+        Prompts.Answer answer = prompt.fallback();
+        int botSeat = seat.promptFor;
+        return answer == null ? null : () -> {
+            Player bot = answering(botSeat);
+            if (bot != null) {
+                answer.apply(bot);
+            }
+        };
     }
 
     /**
@@ -763,15 +945,17 @@ final class HumanGame {
             for (int index = 0; index < seatIds.size(); index++) {
                 if (seats.get(index) == null) {
                     conceding.add(seatIds.get(index));
-                    promptsOpen.add(false);
+                    promptsOpen.add(awaited(index));
                 }
             }
-            for (Seat seat : humans) {
-                if (!seat.concedeRequested) {
-                    conceding.add(seat.id);
-                    promptsOpen.add(markConcession(seat));
-                }
+            // Whose answers XMage waits for is read before any prompt closes: a seat controlling
+            // another's turn may hold that player's prompt.
+            List<Seat> leaving = humans.stream().filter(seat -> !seat.concedeRequested).toList();
+            for (Seat seat : leaving) {
+                conceding.add(seat.id);
+                promptsOpen.add(awaited(seat.index));
             }
+            leaving.forEach(this::markConcession);
         }
         Game current = game;
         for (int i = 0; i < conceding.size(); i++) {
@@ -807,9 +991,19 @@ final class HumanGame {
         return body;
     }
 
-    /** Caller holds the lock. Closes any open prompt; returns whether one was open. */
+    /**
+     * Caller holds the lock. Closes the seat's open prompt, and any prompt the seat controlling its
+     * turn holds for it; returns whether XMage was waiting for this seat's answer.
+     */
     private boolean markConcession(Seat seat) {
-        boolean promptOpen = seat.prompt != null;
+        boolean promptOpen = awaited(seat.index);
+        for (Seat holder : humans) {
+            if (holder != seat && holder.prompt != null && holder.promptFor == seat.index) {
+                holder.prompt = null;
+                holder.status = "waiting";
+                holder.revision++;
+            }
+        }
         seat.concedeRequested = true;
         seat.prompt = null;
         seat.status = "waiting";
@@ -817,6 +1011,14 @@ final class HumanGame {
         touch();
         notifyAll();
         return promptOpen;
+    }
+
+    /**
+     * Caller holds the lock. Whether XMage waits for the answer of the player in this seat: a prompt
+     * for it is open, on its own seat or (v0.5.1) on the seat controlling its turn.
+     */
+    private boolean awaited(int seatIndex) {
+        return humans.stream().anyMatch(holder -> holder.prompt != null && holder.promptFor == seatIndex);
     }
 
     private void applyConcession(UUID playerId, boolean promptOpen) {

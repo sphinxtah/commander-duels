@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:commander-duels:engine-seat-view:v1",
   "title": "EngineSeatSnapshot",
-  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat, or to a spectator: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand (but a Two-Headed Giant teammate's, since v0.5.0), library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players. A spectator's snapshot has no seat, no prompt and no \"you\", and shows public information only, possibly delayed.",
+  "description": "What the engine's development game endpoint (GET /v1/games/{id}/view) returns to one seat, or to a spectator: the authorized view, the open prompt and the public log. Built field by field; every object is closed, so the contract cannot carry another player's hand (but a Two-Headed Giant teammate's, since v0.5.0, and since v0.5.1 that of a player whose turn the seat controls, while the control lasts), library contents, another seat's deck, XMage identifiers or the shuffle seed. Object ids are opaque and change when an object changes zones. Tables seat two to four players. A spectator's snapshot has no seat, no prompt and no \"you\", and shows public information only, possibly delayed.",
   "type": "object",
   "additionalProperties": false,
   "required": ["game_id", "revision", "status", "seat", "settings", "prompt", "view", "result", "log_count", "log_from", "log"],
@@ -63,6 +63,7 @@
                 "type": "object",
                 "properties": {
                   "you": {"type": "null"},
+                  "opponents": {"items": {"properties": {"hand": {"type": "null"}}}},
                   "hand": {"maxItems": 0},
                   "looked_at": {"maxItems": 0},
                   "messages": {"maxItems": 0},
@@ -75,7 +76,7 @@
       }
     },
     {
-      "description": "Two-Headed Giant (since v0.5.0): a seat sees its teammate's hand (810.5, FMT10), so one opponent at most carries one. Every other game, and every spectator, shows no player's hand. A seat's own hand is the view's hand.",
+      "description": "Two-Headed Giant (since v0.5.0): a seat sees its teammate's hand (810.5, FMT10), so one opponent at most carries one without a controller. Since v0.5.1 a seat also sees the hand of each player whose turn it controls (723.4), while the control lasts: such a player's entry names its controller in controlled_by (the engine and the leak checks verify that it is this seat). Every other game shows no other player's hand but those, and a spectator none. A seat's own hand is the view's hand.",
       "if": {
         "properties": {
           "seat": {"not": {"type": "null"}},
@@ -92,7 +93,11 @@
                 "properties": {
                   "you": {"oneOf": [{"type": "null"}, {"type": "object", "properties": {"hand": {"type": "null"}}}]},
                   "opponents": {
-                    "contains": {"type": "object", "required": ["hand"], "properties": {"hand": {"type": "array"}}},
+                    "contains": {
+                      "type": "object",
+                      "required": ["hand"],
+                      "properties": {"hand": {"type": "array"}, "controlled_by": {"type": "null"}}
+                    },
                     "minContains": 0,
                     "maxContains": 1
                   }
@@ -111,7 +116,14 @@
                 "type": "object",
                 "properties": {
                   "you": {"oneOf": [{"type": "null"}, {"type": "object", "properties": {"hand": {"type": "null"}}}]},
-                  "opponents": {"items": {"properties": {"hand": {"type": "null"}}}}
+                  "opponents": {
+                    "items": {
+                      "anyOf": [
+                        {"properties": {"hand": {"type": "null"}}},
+                        {"required": ["controlled_by"], "properties": {"controlled_by": {"$ref": "#/$defs/seat"}}}
+                      ]
+                    }
+                  }
                 }
               }
             ]
@@ -151,7 +163,11 @@
             }
           ]
         },
-        "xmage_query": {"$ref": "#/$defs/nullableString"}
+        "xmage_query": {"$ref": "#/$defs/nullableString"},
+        "for_seat": {
+          "description": "Since v0.5.1: the seat whose decision this is when the seat answering controls that player's turn (723.5); the prompt is built from what that player may see, and the answer is theirs. Null (or absent) for the seat's own decisions.",
+          "$ref": "#/$defs/nullableSeat"
+        }
       }
     },
     "option": {
@@ -239,7 +255,7 @@
       }
     },
     "player": {
-      "description": "A player's public state. The hand and library appear only as counts, except that in Two-Headed Giant (since v0.5.0) a player's hand is shown to their teammate. Commander fields are null or empty outside Commander.",
+      "description": "A player's public state. The hand and library appear only as counts, except that in Two-Headed Giant (since v0.5.0) a player's hand is shown to their teammate, and (since v0.5.1) a player's hand is shown to the player controlling their turn while the control lasts. Commander fields are null or empty outside Commander.",
       "type": "object",
       "additionalProperties": false,
       "required": ["seat", "name", "life", "counters", "library_count", "hand_count", "graveyard", "exile", "mana_pool", "lost", "won", "color_identity", "command_zone", "commanders"],
@@ -254,8 +270,12 @@
         "counters": {"$ref": "#/$defs/counts"},
         "library_count": {"type": "integer", "minimum": 0},
         "hand_count": {"type": "integer", "minimum": 0},
+        "controlled_by": {
+          "description": "Since v0.5.1: the seat controlling this player's turn (723: Mindslaver, Emrakul, Sorin Markov and the like), shown to everyone; null while the player controls it themselves.",
+          "$ref": "#/$defs/nullableSeat"
+        },
         "hand": {
-          "description": "The player's hand, shown only to their teammate in Two-Headed Giant (810.5, FMT10); null for everyone else.",
+          "description": "The player's hand, shown only to their teammate in Two-Headed Giant (810.5, FMT10) and, since v0.5.1, to the player controlling their turn (or their teammate's) while the control lasts (723.4); null for everyone else.",
           "oneOf": [{"type": "null"}, {"type": "array", "items": {"$ref": "#/$defs/card"}}]
         },
         "graveyard": {"type": "array", "items": {"$ref": "#/$defs/card"}},

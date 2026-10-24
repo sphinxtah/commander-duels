@@ -352,6 +352,20 @@ def test_the_seat_view_contract_shows_only_a_teammates_hand() -> None:
             pytest.fail(f"schema accepted {description}")
 
 
+def test_controlling_the_other_team_shows_its_hands_with_the_teammates() -> None:
+    """805.8, 723.4 (v0.5.1): seat 0 controlling team B's turn sees both of its hands, as well as
+    its teammate's; only the teammate's may come without a controller."""
+    validator = validator_for("contracts/engine-seat-view.schema.json")
+    view = two_headed_giant_view()
+    for opponent in view["view"]["opponents"][1:]:
+        opponent.update(controlled_by=0, hand=[card(f"o{opponent['seat']:016x}", "Forest")])
+    validator.validate(view)
+    uncontrolled = copy.deepcopy(view)
+    uncontrolled["view"]["opponents"][2]["controlled_by"] = None
+    with pytest.raises(ValidationError):
+        validator.validate(uncontrolled)
+
+
 def test_a_players_own_legacy_deck_plays_without_its_sideboard(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
