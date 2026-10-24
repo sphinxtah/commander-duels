@@ -490,6 +490,16 @@ button.life[data-selected] {
   font-size: 0.8rem;
   color: var(--muted);
 }
+/* Turn control (v0.5.1): a choice made for the player whose turn you control is marked as theirs,
+   in the violet of the controlled player's plate pill. */
+.forSeat {
+  margin: 0 0 6px;
+  padding: 4px 8px;
+  border-left: 3px solid #c8a8ff;
+  background: #c8a8ff1a;
+  color: var(--cd-text);
+  font-size: 0.85rem;
+}
 .prompt .primaryButton {
   width: 100%;
   margin: 6px 0 10px;
@@ -645,6 +655,7 @@ button.life[data-selected] {
   font-size: 1.25rem;
 }
 .screen .promptDetail,
+.screen .forSeat,
 .screen .hint,
 .screen .lease,
 .screen .amounts label,

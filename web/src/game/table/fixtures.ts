@@ -1089,6 +1089,119 @@ function giantSysop(): TableFixture {
   };
 }
 
+/** Turn control (rule 723, v0.5.1): Alice controls Bot 2's turn 8, as Mindslaver lets her. Bot 2's
+ * hand lies face up by its plate, its cards hers to play, and its decision is in her prompt
+ * column, marked as Bot 2's. */
+function controlling(): TableFixture {
+  const o = new Objects("c");
+  const hand = [
+    o.card(CARDS.forest),
+    o.card(CARDS.grizzlyBears),
+    o.card(CARDS.giantGrowth),
+  ];
+  const theirs = [
+    o.card(CARDS.island),
+    o.card(CARDS.counterspell),
+    o.card(CARDS.brainstorm),
+    o.card(CARDS.airElemental),
+  ];
+  const islands = o.many(4, 1, CARDS.island);
+  const you = player(0, "Alice", {
+    life: 16,
+    library_count: 44,
+    hand_count: hand.length,
+  });
+  const opponent = player(1, "Bot 2", {
+    controlled_by: 0,
+    life: 15,
+    library_count: 47,
+    hand_count: theirs.length,
+    hand: theirs,
+  });
+  const [island, , brainstorm] = theirs;
+  return fixture({
+    name: "controlling",
+    description:
+      "Turn control: you control Bot 2's turn (Mindslaver); its hand face up by its plate, its choice in your prompt column.",
+    format: "legacy",
+    seats: [alice("legacy-mono-green-creatures"), bot(1)],
+    view: view({
+      turn: 8,
+      active_seat: 1,
+      priority_seat: 1,
+      you,
+      opponents: [opponent],
+      hand,
+      battlefield: [
+        ...o.many(3, 0, CARDS.forest),
+        o.permanent(0, CARDS.grizzlyBears),
+        ...islands,
+        o.permanent(1, CARDS.airElemental),
+      ],
+    }),
+    prompt: {
+      ...prompt("p-controlling", "priority", "Play spells and abilities.", [
+        () => option("pass"),
+        () => option("cast", { object_id: brainstorm.id }),
+        () => option("play_land", { object_id: island.id }),
+        ...islands.map(
+          (p) => () => option("activate_mana", { object_id: p.id }),
+        ),
+      ]),
+      for_seat: 1,
+    },
+    log: log(8, 1, [
+      "Turn 8: Bot 2.",
+      "Alice taken turn control of Bot 2.",
+      "Bot 2 draws a card.",
+    ]),
+  });
+}
+
+/** Turn control (rule 723, v0.5.1): Bot 2 controls Alice's turn 8. She sees her own hand and
+ * board as ever, and her prompt column says who makes her choices. */
+function controlled(): TableFixture {
+  const o = new Objects("x");
+  const hand = [
+    o.card(CARDS.forest),
+    o.card(CARDS.lightningBolt),
+    o.card(CARDS.grizzlyBears),
+  ];
+  const you = player(0, "Alice", {
+    controlled_by: 1,
+    life: 17,
+    library_count: 45,
+    hand_count: hand.length,
+  });
+  const opponent = player(1, "Bot 2", { life: 18, hand_count: 5 });
+  return fixture({
+    name: "controlled",
+    description:
+      "Turn control: Bot 2 controls your turn; you watch it make your choices.",
+    format: "legacy",
+    seats: [alice("legacy-mono-green-creatures"), bot(1)],
+    view: view({
+      turn: 8,
+      active_seat: 0,
+      priority_seat: 0,
+      you,
+      opponents: [opponent],
+      hand,
+      battlefield: [
+        ...o.many(3, 0, CARDS.forest),
+        o.permanent(0, CARDS.grizzlyBears),
+        ...o.many(3, 1, CARDS.island),
+      ],
+    }),
+    prompt: null,
+    log: log(8, 0, [
+      "Turn 8: Alice.",
+      "Bot 2 taken turn control of Alice.",
+      "Alice draws a card.",
+    ]),
+  });
+}
+
 function tokens(): TableFixture {
   const o = new Objects("k");
   const treasures = o.many(3, 0, CARDS.treasure);
@@ -1951,7 +2064,9 @@ export type FixtureName =
   | "stress"
   | "starting"
   | "giant"
-  | "giantSysop";
+  | "giantSysop"
+  | "controlling"
+  | "controlled";
 
 const makers: Record<FixtureName, () => TableFixture> = {
   duel,
@@ -1961,6 +2076,8 @@ const makers: Record<FixtureName, () => TableFixture> = {
   sysop,
   giant,
   giantSysop,
+  controlling,
+  controlled,
   tokens,
   attachments,
   stack,

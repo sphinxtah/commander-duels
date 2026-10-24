@@ -161,8 +161,11 @@ export const buildTableModel: BuildTableModel = (input) => {
   ): DragKind | null => {
     if (!context.canAnswer || !prompt) return null;
     const open = offered.filter((option) => !option.selected);
+    // Your own hand only: the cards of a player whose turn you control (v0.5.1) are played by a
+    // press or their menu, as a drop on your side would read as yours.
     if (
       zone === "hand" &&
+      controller === youSeat &&
       prompt.kind === "priority" &&
       open.some((o) => o.action === "cast" || o.action === "play_land")
     )
@@ -227,10 +230,14 @@ export const buildTableModel: BuildTableModel = (input) => {
     : [];
   // A teammate's hand (Two-Headed Giant, 810.5; v0.5.1): the view carries it to the teammate
   // alone, and SysOp observing sees what the watched seat sees. Its cards are shown, never
-  // played: they carry no options, whatever a prompt names.
+  // played: they carry no options, whatever a prompt names. The hand of a player whose turn the
+  // seat controls (723.4, v0.5.1) is the seat's to play while the control lasts: its cards carry
+  // their options, made for that player.
   const shownHands = new Map<Seat, string[]>();
   for (const player of view.opponents)
-    if (player.hand && player !== anchoredView)
+    if (player.hand && player !== anchoredView) {
+      const controlled =
+        view.seat !== null && player.controlled_by === view.seat;
       shownHands.set(
         player.seat,
         player.hand.map((card) =>
@@ -240,10 +247,11 @@ export const buildTableModel: BuildTableModel = (input) => {
             { id: card.id, zone: "hand", seat: player.seat, card },
             player.seat,
             player.seat,
-            [],
+            controlled ? offeredFor(card.id) : [],
           ),
         ),
       );
+    }
   const permanentKey = new Map<PermanentView, string>();
   for (const permanent of view.battlefield)
     permanentKey.set(
@@ -424,6 +432,14 @@ export const buildTableModel: BuildTableModel = (input) => {
         : everyone
             .filter((p) => p.team === team)
             .reduce((n, p) => n + (p.counters.poison ?? 0), 0);
+    // Turn control (rule 723, v0.5.1): whoever controls this player's turn, on every plate.
+    const controlledBy = player.controlled_by ?? null;
+    const controllerName =
+      controlledBy === null
+        ? null
+        : controlledBy === youSeat
+          ? "you"
+          : playerName(view, controlledBy, observing);
     // Other seats' decks are private: only SysOp sees their names (design §23.4).
     const title = self
       ? deckTitle(summary?.deck)
@@ -475,6 +491,11 @@ export const buildTableModel: BuildTableModel = (input) => {
       teammate,
       teamPill,
       teamPoison,
+      controlledBy,
+      controlPill:
+        controllerName === null
+          ? null
+          : { text: `Controlled by ${controllerName}`, tone: "control" },
       hand: anchored ? null : (shownHands.get(seat) ?? null),
       sigil: { seed, grey: !ours },
       portrait,
@@ -501,6 +522,12 @@ export const buildTableModel: BuildTableModel = (input) => {
                 : teammate
                   ? ", your teammate"
                   : ", the other team"
+          }${
+            controllerName === null
+              ? ""
+              : controlledBy === youSeat
+                ? ", whose turn you control"
+                : `, turn controlled by ${controllerName}`
           }`,
       battlefieldLabel:
         seat === youSeat ? "Your battlefield" : `${player.name}'s battlefield`,

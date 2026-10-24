@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { objectIndex, playerName, resultText, teammateOf } from "./model";
+import {
+  objectIndex,
+  playerName,
+  resultText,
+  teammateOf,
+  turnHolder,
+} from "./model";
 import type { GameView, PlayerView } from "./types";
 
 function player(seat: number, name: string): PlayerView {
@@ -156,5 +162,90 @@ describe("Two-Headed Giant (v0.5.0)", () => {
       title: "Game over",
       detail: "Team 1 won in 12 turns: Alice and Bot 2.",
     });
+  });
+});
+
+describe("whose turn it is", () => {
+  const name = (seat: number) => ["ada", "bob", "cara", "dan"][seat];
+  const team = (seat: number, controlledBy: number | null = null) => ({
+    ...player(seat, name(seat)),
+    team: Math.floor(seat / 2),
+    controlled_by: controlledBy,
+  });
+
+  it("says yours, a team's or the holder's, as before", () => {
+    expect(turnHolder(view, false, name)).toBe("Your turn");
+    expect(turnHolder({ ...view, active_seat: 1 }, false, name)).toBe(
+      "bob’s turn",
+    );
+    expect(turnHolder({ ...view, active_seat: null }, false, name)).toBeNull();
+    const giant: GameView = {
+      ...view,
+      you: team(0),
+      opponents: [team(1), team(2), team(3)],
+    };
+    expect(turnHolder({ ...giant, active_seat: 1 }, false, name)).toBe(
+      "Your team’s turn",
+    );
+    expect(turnHolder({ ...giant, active_seat: 2 }, false, name)).toBe(
+      "Other team’s turn",
+    );
+    expect(turnHolder({ ...giant, active_seat: 2 }, true, name)).toBe(
+      "Team 2’s turn",
+    );
+  });
+
+  it("says who controls a controlled turn (rule 723, v0.5.1)", () => {
+    // Ada controls bob's turn; bob's view of it; a third player's and SysOp's.
+    const controlling: GameView = {
+      ...view,
+      active_seat: 1,
+      you: { ...player(0, "ada") },
+      opponents: [{ ...player(1, "bob"), controlled_by: 0 }],
+    };
+    expect(turnHolder(controlling, false, name)).toBe("You control bob’s turn");
+    expect(turnHolder(controlling, true, name)).toBe("ada controls bob’s turn");
+    const controlled: GameView = {
+      ...view,
+      seat: 1,
+      active_seat: 1,
+      you: { ...player(1, "bob"), controlled_by: 0 },
+      opponents: [player(0, "ada"), player(2, "cara")],
+    };
+    expect(turnHolder(controlled, false, name)).toBe("ada controls your turn");
+    const third: GameView = {
+      ...view,
+      seat: 2,
+      active_seat: 1,
+      you: player(2, "cara"),
+      opponents: [player(0, "ada"), { ...player(1, "bob"), controlled_by: 0 }],
+    };
+    expect(turnHolder(third, false, name)).toBe("ada controls bob’s turn");
+    // 805.8: controlling a player of a team controls the team's turn.
+    const giant: GameView = {
+      ...view,
+      active_seat: 2,
+      you: team(0),
+      opponents: [team(1), team(2, 0), team(3, 0)],
+    };
+    expect(turnHolder(giant, false, name)).toBe(
+      "You control the other team’s turn",
+    );
+    expect(turnHolder(giant, true, name)).toBe("ada controls Team 2’s turn");
+    const theirs: GameView = {
+      ...view,
+      seat: 2,
+      active_seat: 2,
+      you: team(2, 0),
+      opponents: [team(0), team(1), team(3, 0)],
+    };
+    expect(turnHolder(theirs, false, name)).toBe("ada controls your turn");
+    const mate: GameView = {
+      ...theirs,
+      seat: 3,
+      you: team(3, 0),
+      opponents: [team(0), team(1), team(2, 0)],
+    };
+    expect(turnHolder(mate, false, name)).toBe("ada controls your team’s turn");
   });
 });

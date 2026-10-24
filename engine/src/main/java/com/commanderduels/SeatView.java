@@ -5,7 +5,8 @@ import java.util.Map;
 
 /**
  * What one seat is authorized to see, built field by field from the game state rather than by
- * filtering a full snapshot. Every other player's hand, and every library, appear only as counts.
+ * filtering a full snapshot. Every other player's hand, and every library, appear only as counts
+ * (but a teammate's hand, and since v0.5.1 that of a player whose turn the seat controls).
  * Object ids are opaque {@link ObjectRefs}; players are referred to by seat. {@code opponents} lists
  * every other player in seat order, including eliminated ones. A spectator's view has no seat and
  * no {@code you}, its {@code opponents} lists every player, and it shows public information only.
@@ -47,17 +48,21 @@ public record SeatView(
      * @param team          the player's team in a team game (Two-Headed Giant, since v0.5.0): 0 for
      *                      seats 0 and 1, 1 for seats 2 and 3; null in other games. Teammates share
      *                      one life total, so both show the team's
-     * @param hand          the player's hand, shown only to their teammate (810.5, FMT10); null for
-     *                      everyone else, whose hand appears only as a count
+     * @param controlledBy  the seat controlling this player's turn (723, since v0.5.1), shown to
+     *                      everyone, as XMage's log announces it; null while the player controls it
+     * @param hand          the player's hand, shown only to their teammate (810.5, FMT10) and, since
+     *                      v0.5.1, to the player controlling their turn while the control lasts (723.4);
+     *                      null for everyone else, whose hand appears only as a count
      * @param colorIdentity the combined colour identity of the player's commanders in WUBRG order
      *                      ("" for colourless); null outside Commander and before the game starts
      * @param commandZone   the objects in the command zone that the player owns or controls
      * @param commanders    one entry per commander the player owns; empty outside Commander
      */
-    public record PlayerState(int seat, String name, Integer team, int life, Map<String, Integer> counters,
-                              int libraryCount, int handCount, List<CardInfo> hand, List<CardInfo> graveyard,
-                              List<CardInfo> exile, ManaPoolInfo manaPool, boolean lost, boolean won,
-                              String colorIdentity, List<CardInfo> commandZone, List<CommanderState> commanders) {}
+    public record PlayerState(int seat, String name, Integer team, Integer controlledBy, int life,
+                              Map<String, Integer> counters, int libraryCount, int handCount, List<CardInfo> hand,
+                              List<CardInfo> graveyard, List<CardInfo> exile, ManaPoolInfo manaPool, boolean lost,
+                              boolean won, String colorIdentity, List<CardInfo> commandZone,
+                              List<CommanderState> commanders) {}
 
     /**
      * One commander (FMT01). Its identity is public from the start of the game; its current object and

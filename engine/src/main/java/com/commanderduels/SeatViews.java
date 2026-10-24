@@ -101,8 +101,9 @@ final class SeatViews {
         List<SeatView.CardGroup> revealed = new ArrayList<>();
         state.getRevealed().forEach((name, cards) -> revealed.add(group(name, cards)));
         List<SeatView.CardGroup> lookedAt = new ArrayList<>();
-        if (viewer != null) {
-            state.getLookedAt(viewer).forEach((name, cards) -> lookedAt.add(group(name, cards)));
+        // The viewer's own, and (723.4, v0.5.1) those of each player whose turn the viewer controls.
+        for (UUID player : Visibility.seesFor(game, viewer)) {
+            state.getLookedAt(player).forEach((name, cards) -> lookedAt.add(group(name, cards)));
         }
 
         return new SeatView(
@@ -146,12 +147,13 @@ final class SeatViews {
         }
         boolean commanderGame = game instanceof GameCommanderImpl;
         ManaPool pool = player.getManaPool();
-        // 810.5: teammates may look at each other's hands (FMT10's authorized teammate view).
-        List<SeatView.CardInfo> teammateHand = null;
-        if (viewer != null && game.getTeammates(viewer).contains(player.getId())) {
-            teammateHand = new ArrayList<>();
+        // 810.5: teammates may look at each other's hands (FMT10's authorized teammate view); since
+        // v0.5.1 so may the player controlling this player's turn, while the control lasts (723.4).
+        List<SeatView.CardInfo> shownHand = null;
+        if (!player.getId().equals(viewer) && Visibility.handVisible(game, player.getId(), viewer)) {
+            shownHand = new ArrayList<>();
             for (Card card : player.getHand().getCards(game)) {
-                teammateHand.add(card(card, true));
+                shownHand.add(card(card, true));
             }
         }
         int seat = seatIds.indexOf(player.getId());
@@ -159,11 +161,12 @@ final class SeatViews {
             seat,
             player.getName(),
             game instanceof TwoHeadedGiant giant ? Integer.valueOf(giant.teamOf(player.getId())) : null,
+            seatOrNull(Visibility.controllerOf(game, player.getId())),
             player.getLife(),
             counters(player.getCountersAsCopy()),
             player.getLibrary().size(),
             player.getHand().size(),
-            teammateHand,
+            shownHand,
             graveyard,
             exile,
             new SeatView.ManaPoolInfo(pool.getWhite(), pool.getBlue(), pool.getBlack(), pool.getRed(), pool.getGreen(),
@@ -227,7 +230,9 @@ final class SeatViews {
         List<SeatView.CommanderState> commanders = new ArrayList<>();
         for (UUID id : ids) {
             String zone = commanderZone(id);
-            if ((zone.equals("hand") || zone.equals("library")) && !owner.getId().equals(viewer)) {
+            // The player controlling the owner's turn knows what the owner knows (723.4).
+            if ((zone.equals("hand") || zone.equals("library"))
+                    && !Visibility.seesFor(game, viewer).contains(owner.getId())) {
                 zone = "hidden";
             }
             String objectId = null;
@@ -291,7 +296,8 @@ final class SeatViews {
     }
 
     private SeatView.PermanentInfo permanent(Permanent permanent, UUID viewer) {
-        boolean visible = !permanent.isFaceDown(game) || permanent.getControllerId().equals(viewer);
+        boolean visible = !permanent.isFaceDown(game)
+            || Visibility.seesFor(game, viewer).contains(permanent.getControllerId());
         UUID attachedTo = permanent.getAttachedTo();
         return new SeatView.PermanentInfo(
             ref(permanent),
@@ -321,7 +327,7 @@ final class SeatViews {
             kind = "ability";
             MageObject source = game.getObject(stackObject.getSourceId());
             if (source instanceof Permanent permanent && permanent.isFaceDown(game)
-                    && !permanent.getControllerId().equals(viewer)) {
+                    && !Visibility.seesFor(game, viewer).contains(permanent.getControllerId())) {
                 visible = false;
             }
             name = source == null ? stackObject.getName() : source.getName();

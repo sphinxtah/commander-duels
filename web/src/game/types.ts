@@ -87,6 +87,10 @@ export interface Prompt {
   } | null;
   piles: [ObjectId[], ObjectId[]] | null;
   xmage_query: string | null;
+  /** Turn control (rule 723, v0.5.1): the seat whose decision this is when the viewer controls
+   * that player's turn; the prompt is built from what that player may see. Null or missing for
+   * the viewer's own decisions. */
+  for_seat?: Seat | null;
 }
 
 /** A card face. A hidden card (face down, for instance) carries its id and nothing else. */
@@ -177,11 +181,15 @@ export interface PlayerView {
   /** Two-Headed Giant (v0.5.0): 0 for seats 0 and 1, 1 for seats 2 and 3; teammates share one
    * life total, so both show the team's. Null or missing in other games. */
   team?: number | null;
+  /** Turn control (rule 723, v0.5.1): the seat controlling this player's turn, shown to everyone;
+   * null or missing while the player controls it themselves. */
+  controlled_by?: Seat | null;
   life: number;
   counters: Record<string, number>;
   library_count: number;
   hand_count: number;
-  /** A teammate's hand, shown to its teammate only (Two-Headed Giant); null for everyone else. */
+  /** A teammate's hand, shown to its teammate only (Two-Headed Giant), and since v0.5.1 the hand of
+   * a player whose turn the viewer controls, while the control lasts; null for everyone else. */
   hand?: CardView[] | null;
   graveyard: CardView[];
   exile: CardView[];

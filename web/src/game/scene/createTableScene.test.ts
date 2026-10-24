@@ -651,6 +651,28 @@ describe("animation", () => {
     watched.scene.destroy();
   });
 
+  it("says a controlled turn is the controller's to play (rule 723, v0.5.1)", async () => {
+    const table = new Table("duel");
+    await table.start();
+    // Alice controls Bot 2's next turn, then Bot 2 controls hers.
+    table.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 1;
+      s.view!.priority_seat = 1;
+      s.view!.opponents[0].controlled_by = 0;
+    });
+    expect(table.internals.emblem.caption.text).toBe("You Control This Turn");
+    table.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 0;
+      s.view!.priority_seat = 0;
+      s.view!.opponents[0].controlled_by = null;
+      s.view!.you!.controlled_by = 1;
+    });
+    expect(table.internals.emblem.caption.text).toBe("Controlled Turn");
+    table.scene.destroy();
+  });
+
   it("plays a diff's events once, however many frames carry it", async () => {
     const table = new Table("duel");
     await table.start();

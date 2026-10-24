@@ -71,18 +71,18 @@ Since v0.2.0 (UI07), on XMage's own human player, so XMage's rules for when a pa
 
 `SeatView` is built field by field from the game state; nothing is a filtered copy of a full snapshot. [The contract](../../contracts/engine-seat-view.schema.json) closes every object, so it cannot carry these:
 
-- another player's hand, or any library: each player shows counts only;
+- another player's hand (but a Two-Headed Giant teammate's since v0.5.0, and since v0.5.1 that of a player whose turn the seat controls, while the control lasts), or any library: each player shows counts only;
 - the shuffle seed;
 - XMage identifiers.
 
 | Shown | Rule |
 | --- | --- |
 | Your hand | Full cards |
-| Battlefield, stack, graveyards | Public, except face-down objects, which only their controller sees (none in the fixture decks) |
+| Battlefield, stack, graveyards | Public, except face-down objects, which only their controller sees (none in the fixture decks), and since v0.5.1 the player controlling that player's turn |
 | Exile | Face-up cards; face-down exiled cards are hidden |
 | Revealed cards | Everyone, while XMage keeps them revealed (it clears them at each human priority prompt) |
-| Looked-at cards | Only the player who looked |
-| Players | Life, counters, library and hand counts, mana pool, lost/won |
+| Looked-at cards | Only the player who looked, and since v0.5.1 the player controlling their turn |
+| Players | Life, counters, library and hand counts, mana pool, lost/won; since v0.5.1 `controlled_by`, the seat controlling the player's turn, for everyone to see |
 | Combat | Attackers, the defender and blockers |
 | Log | XMage's public log, with HTML and XMage's short object IDs removed, up to the entries that existed when the seat's current view was built (since v0.1.1), so it does not arrive with an older view. In the browser a line can still name a bot's card one view before the board shows it (CI run #30), which the browser check allows as the engine's does. The finished game's snapshot carries the whole log. Engine error lines stay in the engine's own log, because their details are not seat-safe. XMage's own recovery lines ("Auto-restored to … due game error: …" and "Game stopped due critical error …") are replaced by "The rules engine hit an internal error and rolled the game back" and "The rules engine stopped the game after an internal error"; the details stay in the engine's ERROR entries and in XMage's console log |
 
@@ -92,6 +92,33 @@ Two deliberate differences from XMage's own client views:
 
 - XMage's `PlayerView` shows a computer opponent's sideboard to the human. The seat view never shows a sideboard.
 - XMage's `GameView` carries raw object UUIDs. The seat view never does.
+
+## Turn control (v0.5.1)
+
+Some cards let a player control another player's turn (rule 723): Mindslaver, Emrakul, the Promised End, Sorin Markov's −7, Cruel Entertainment, Word of Command for one spell, and the like. Until v0.5.1 such a game hung: XMage asks the controlling player to decide (its server hands a controlled player's requests to the controller's client), but the engine sent each prompt to the seat the request named and gave the answer to that seat's player, so nobody answered. The owner's decision (2026-10-23): show the controller what the controlled player sees, as the rules allow, and route the prompts to the controller so the game never hangs.
+
+**Who decides.** While a human seat controls a player's turn, XMage's every request for that player opens a prompt on the controlling seat (`HumanGame.onQuery`):
+- **The asked player.** XMage names the asked player in its requests, but names a controlled player's priority request after the controller; before every human player's request it makes the asked player the priority player, which is how the engine tells them apart. Without turn control every request goes to the seat it names, as before.
+- **The prompt** is the controlled player's: built from what they may see (their cards, their library when they search it, their choices), with `for_seat` naming their seat and XMage's " (as …)" hint removed from its text. Its priority prompts offer no pass modes: XMage asks a controlled player at every priority, and a pass mode would stay with that player after the control ends.
+- **The answer** goes to the controlled player's object (`HumanGame.submit`): a human seat's own player, or for a bot the stand-in below. The controlling seat's revision, the stale-answer refusals and the action ids work as for its own prompts, and so does the API's controller lease.
+- **A bot's turn.** XMage's bot hands each decision of a controlled turn to a human stand-in that its controller makes. XMage's stand-in is a copy of the bot, so what it records on itself is lost: a land it plays was never counted, and the controller could play one at every priority (`TurnControlTest` sees the second land offered with it). The human seat's player (`HumanSeatPlayer`) copies XMage's stand-in into its own, which keeps the bot's hand, library, graveyard, mana pool, life and land count on the bot itself. Like XMage's it shares the seat's answer channel: XMage clears a concession it has handled only on its players' channels, and a first version with a channel of its own spun forever after its controller conceded (seen once under load, in `TurnControlTest`).
+- **The controller's own decisions** stay its own (723.8): its own prompts, with pass modes, come as ever.
+- **Concession.** The controlled player still concedes for themselves (723.6): their concession closes the prompt their controller holds for them, and the game goes on without them.
+- **When control ends.** XMage starts and ends control as turns begin (723.1); Word of Command's control ends with its resolution. Control also ends when its controller leaves the game (800.4a): XMage would keep asking a player who has left until the turn ends, so the engine hands the control back at once. A prompt the controller held then goes to the controlled player's own seat, or a bot's stand-in gets the answer that does the least (pass, keep, no, done, cancel, the suggestion), and the bot decides for itself from then on.
+- **A bot controller.** XMage lets no computer player control a turn at this pin ("is AI and can't take control" in the log): the effect is lost, and the player plays their own turn. No bot deck holds such a card.
+
+**What each seat sees** (723.4, `Visibility`, `SeatViews`). The controller sees what the controlled player may see, for exactly as long as the control lasts: their hand (`PlayerState.hand`, which the table draws face up by their board), their face-down permanents and spells, the cards they look at, their teammate's hand in Two-Headed Giant (805.8: the controller controls the whole team then), and their commander's zone in a hand or library. Information about cards outside the game stays the controlled player's: their deck's name is not in the controller's settings, and no view carries a sideboard. The controlled player keeps their own view, with `you.controlled_by` naming the controller, and is asked nothing while their turn is controlled. Every other seat, and every spectator, sees `controlled_by` and nothing more: no hand, ever.
+
+**How it was checked.** `TurnControlTest` (JUnit, 8 games, each to its end, every view and prompt through the leak checks of `SeatChecks`, which allow the controller's view only while the control lasts and check `controlled_by` against XMage):
+- A Legacy duel: seat 0 activates Mindslaver on the bot in turn 1 and plays the bot's turn 2 (a land, Llanowar Elves), with one land only; the bot's hand is shown to seat 0 in turn 2 and in no other.
+- Two humans: seat 0 controls seat 1's turn 2. Seat 1 is asked nothing that turn and sees who controls it; its answer to seat 0's prompt is refused (`stale_prompt`), and so is seat 0's at an old revision; seat 1's hand is shown to seat 0 in turn 2 only, and seat 0's never to seat 1.
+- The controlled player concedes while the controller holds their prompt, and the controller wins.
+- Three players: the controller concedes while it holds the controlled human's prompt, which goes to that seat; and again holding a bot's, whose stand-in gets the least answer, and the bot plays on.
+- A bot given control of a human's turn does not take it.
+- Two-Headed Giant: seat 0 controls team B's turn, answering for a human seat and a bot, seeing both hands and its teammate's that turn; its teammate and the other team see no more than before.
+- A game without turn control shows no controller, no prompt for another seat and no hand.
+
+The engine's suite then has 142 tests (one skipped, as before) and passes in the engine image's build; no test that predates turn control changed but for the leak checks' new rules and one comment. The scripted clients' checks (`scripts/engine_human_game.py`, which `scripts/api_practice_game.py` uses) allow another player's hand only while that player's entry names the seat in `controlled_by`, and a prompt for another seat only for such a player (`tests/test_turn_control.py`).
 
 ## Engine endpoints
 

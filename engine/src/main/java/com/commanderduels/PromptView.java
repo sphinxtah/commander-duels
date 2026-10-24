@@ -19,9 +19,17 @@ import java.util.List;
  * @param amounts    the split or number to choose, for assign_amounts and choose_amount only
  * @param piles      the two piles' objects, for choose_pile only; objects the seat may not see are left out
  * @param xmageQuery the XMage query type, for unsupported prompts only
+ * @param forSeat    since v0.5.1: the seat whose decision this is when the seat answering controls
+ *                   that player's turn (723.5); null for the seat's own decisions. The prompt is
+ *                   built from that player's point of view: their cards, their choices
  */
 public record PromptView(String id, String kind, String message, String detail, List<Option> options,
-                         Amounts amounts, List<List<String>> piles, String xmageQuery) {
+                         Amounts amounts, List<List<String>> piles, String xmageQuery, Integer forSeat) {
+
+    /** The same prompt as the decision of another seat, or (with null) as the seat's own. */
+    PromptView madeFor(Integer seat) {
+        return new PromptView(id, kind, message, detail, options, amounts, piles, xmageQuery, seat);
+    }
 
     /**
      * @param action   what choosing the option does, for example cast, play_land, pass, choose,

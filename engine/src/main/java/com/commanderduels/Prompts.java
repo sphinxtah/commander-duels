@@ -35,16 +35,18 @@ import mage.constants.Zone;
 import mage.game.Game;
 import mage.game.events.PlayerQueryEvent;
 import mage.game.permanent.Permanent;
-import mage.player.human.HumanPlayer;
 import mage.players.ManaPool;
 import mage.players.Player;
+import mage.players.PlayerImpl;
 import mage.util.MultiAmountMessage;
 
 /**
  * Turns XMage's {@link PlayerQueryEvent}s for a human seat into typed prompts. Each option maps to
  * the answer XMage's {@code HumanPlayer} expects (a UUID, boolean or string), so the seat never
  * sends XMage identifiers itself. XMage validates the answer again and asks again if it rejects it.
- * Runs on the game thread, while XMage is about to wait for the answer.
+ * Runs on the game thread, while XMage is about to wait for the answer. Since v0.5.1 the player
+ * asked may be one whose turn the seat controls (723): the prompt is then that player's, built from
+ * what they may see, and the answer goes to them.
  */
 final class Prompts {
     private static final String LEFT_BUTTON = "UI.left.btn.text";
@@ -103,6 +105,32 @@ final class Prompts {
             return view.kind().equals("choose_amount") ? new IntegerAnswer(values.get(0))
                 : new StringAnswer(encode(values));
         }
+
+        /**
+         * The answer that does the least, for a decision nobody is left to make (v0.5.1: the seat
+         * answering for a player whose turn it controlled left the game while XMage waited): pass,
+         * keep, no, done, cancel, the suggestion, or else the first choice. Null for an unsupported
+         * request.
+         */
+        Answer fallback() {
+            List<String> order = switch (view.kind()) {
+                case "priority" -> List.of("pass");
+                case "mulligan" -> List.of("keep");
+                case "yes_no" -> List.of("no");
+                case "declare_attackers", "declare_blockers" -> List.of("done");
+                case "assign_amounts", "choose_amount" -> List.of("suggested");
+                default -> List.of("done", "cancel", "suggested");
+            };
+            for (String action : order) {
+                for (PromptView.Option option : view.options()) {
+                    if (option.action().equals(action)) {
+                        return answers.get(option.id());
+                    }
+                }
+            }
+            return view.options().stream().filter(option -> !option.selected()).findFirst()
+                .or(() -> view.options().stream().findFirst()).map(option -> answers.get(option.id())).orElse(null);
+        }
     }
 
     /** One way to answer XMage's waiting {@code HumanPlayer}. Called from a request thread. */
@@ -154,28 +182,46 @@ final class Prompts {
     }
 
     private final Game game;
-    private final HumanPlayer human;
+    /** The player whose decision it is: the seat's own, or one whose turn the seat controls. */
+    private final Player player;
     private final SeatViews views;
+    /** The decision is made for a player whose turn the answering seat controls (723.5). */
+    private final boolean controlled;
     private final List<PromptView.Option> options = new ArrayList<>();
     private final Map<String, Answer> answers = new LinkedHashMap<>();
 
-    private Prompts(Game game, HumanPlayer human, SeatViews views) {
+    private Prompts(Game game, Player player, SeatViews views, boolean controlled) {
         this.game = game;
-        this.human = human;
+        this.player = player;
         this.views = views;
+        this.controlled = controlled;
     }
 
     /**
+     * @param player   the player XMage asks: the seat's own, or (since v0.5.1) a player whose turn
+     *                 the seat controls, from whose point of view the prompt is built (723.4)
      * @param attacker the attacker the seat last toggled, which a defender choice is about; XMage's
      *                 request does not name it
+     * @param forSeat  the asked player's seat when another seat answers for them, else null
      */
-    static Prompt build(PlayerQueryEvent event, Game game, HumanPlayer human, SeatViews views, String promptId,
-                        String attacker) {
-        Prompt prompt = new Prompts(game, human, views).from(event, promptId);
+    static Prompt build(PlayerQueryEvent event, Game game, Player player, SeatViews views, String promptId,
+                        String attacker, Integer forSeat) {
+        Prompt prompt = new Prompts(game, player, views, forSeat != null).from(event, promptId);
         if (prompt.view().kind().equals("choose_defender") && prompt.view().detail() == null && attacker != null) {
             PromptView view = prompt.view();
             prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message(), "Attacker: " + attacker,
-                view.options(), view.amounts(), view.piles(), view.xmageQuery()), prompt.answers(), prompt.names());
+                view.options(), view.amounts(), view.piles(), view.xmageQuery(), null), prompt.answers(),
+                prompt.names());
+        }
+        if (forSeat != null) {
+            // XMage adds " (as <player>)" to a controlled player's requests; the prompt says whose
+            // decision it is in its own field, by seat, and the engine's player names are not the
+            // table's.
+            PromptView view = prompt.view();
+            String hint = " (as " + SeatViews.plain(player.getLogName()) + ")";
+            prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message().replace(hint, ""),
+                view.detail() == null ? null : view.detail().replace(hint, ""), view.options(), view.amounts(),
+                view.piles(), view.xmageQuery(), forSeat), prompt.answers(), prompt.names());
         }
         return prompt;
     }
@@ -280,14 +326,14 @@ final class Prompts {
                 return unsupported(event, promptId, message, detail);
         }
         return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, piles,
-            null), Map.copyOf(answers), names);
+            null, null), Map.copyOf(answers), names);
     }
 
     private Prompt unsupported(PlayerQueryEvent event, String promptId, String message, String detail) {
         options.clear();
         answers.clear();
         return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null, null,
-            event.getQueryType().name()), Map.of(), null);
+            event.getQueryType().name(), null), Map.of(), null);
     }
 
     /** A name as the seat may type it: case, surrounding spaces and curly apostrophes do not matter. */
@@ -322,7 +368,7 @@ final class Prompts {
         List<? extends Ability> abilities = event.getAbilities() == null ? List.of() : event.getAbilities();
         for (Ability ability : abilities) {
             MageObject source = game.getObject(ability.getSourceId());
-            boolean visible = Visibility.identityVisible(game, ability.getSourceId(), human.getId());
+            boolean visible = Visibility.identityVisible(game, ability.getSourceId(), player.getId());
             String rule = SeatViews.plain(ability.getRule(source == null ? null : source.getName()));
             add("put_first", rule.isEmpty() ? ability.toString() : rule,
                 visible ? views.objectRef(ability.getSourceId()) : null, null, false, new UuidAnswer(ability.getId()));
@@ -339,7 +385,7 @@ final class Prompts {
             List<String> ids = new ArrayList<>();
             List<String> names = new ArrayList<>();
             for (Card card : sources.get(pile)) {
-                if (Visibility.identityVisible(game, card.getId(), human.getId())) {
+                if (Visibility.identityVisible(game, card.getId(), player.getId())) {
                     ids.add(views.ref(card));
                     names.add(card.getName());
                 }
@@ -408,7 +454,7 @@ final class Prompts {
         }
         Set<String> seen = new TreeSet<>();
         for (Card card : game.getCards()) {
-            if (accepted.contains(card.getName()) && Visibility.identityVisible(game, card.getId(), human.getId())) {
+            if (accepted.contains(card.getName()) && Visibility.identityVisible(game, card.getId(), player.getId())) {
                 seen.add(card.getName());
             }
         }
@@ -422,13 +468,17 @@ final class Prompts {
 
     private void priority() {
         add("pass", "Pass priority", null, null, false, new BooleanAnswer(true));
-        for (Priority.Mode mode : Priority.MODES) {
+        // A controlled player is asked at every priority (XMage skips nothing for a player whose turn
+        // another controls), and a pass mode would stay with that player after the control ends, so
+        // the seat answering for them passes once at a time.
+        for (Priority.Mode mode : controlled ? List.<Priority.Mode>of() : Priority.MODES) {
             if (mode.xmage() != PlayerAction.PASS_PRIORITY_UNTIL_STACK_RESOLVED || !game.getStack().isEmpty()) {
                 add(mode.action(), mode.label(), null, null, false, new PassAnswer(mode.xmage(), game));
             }
         }
         Map<UUID, List<ActivatedAbility>> byObject = new LinkedHashMap<>();
-        for (ActivatedAbility ability : human.getPlayable(game, true, Zone.ALL, false)) {
+        // Every seat's player, human or bot, is one of XMage's PlayerImpl.
+        for (ActivatedAbility ability : ((PlayerImpl) player).getPlayable(game, true, Zone.ALL, false)) {
             byObject.computeIfAbsent(clickTarget(ability.getSourceId()), id -> new ArrayList<>()).add(ability);
         }
         List<UUID> objects = new ArrayList<>(byObject.keySet());
@@ -520,7 +570,7 @@ final class Prompts {
      */
     private void payMana(ManaCost unpaid) {
         List<Permanent> sources = new ArrayList<>();
-        for (Permanent permanent : game.getBattlefield().getAllActivePermanents(human.getId())) {
+        for (Permanent permanent : game.getBattlefield().getAllActivePermanents(player.getId())) {
             if (canProduceMana(permanent, unpaid)) {
                 sources.add(permanent);
             }
@@ -533,7 +583,7 @@ final class Prompts {
         // XMage takes a hand card's id as it takes a permanent's, and uses its mana ability. The
         // label is the ability ("Exile Simian Spirit Guide from your hand: Add {R}."): it costs a card.
         List<Card> handSources = new ArrayList<>();
-        for (Card card : human.getHand().getCards(game)) {
+        for (Card card : player.getHand().getCards(game)) {
             if (handManaAbilities(card).stream().anyMatch(ability -> pays(ability, unpaid))) {
                 handSources.add(card);
             }
@@ -544,17 +594,17 @@ final class Prompts {
             add("tap_source", rule.isEmpty() ? card.getName() : rule, views.ref(card), null, false,
                 new UuidAnswer(card.getId()));
         }
-        ManaPool pool = human.getManaPool();
+        ManaPool pool = player.getManaPool();
         for (ManaType type : ManaType.values()) {
             int amount = pool.get(type);
             if (amount > 0 && (unpaid == null || one(type) == null || unpaid.testPay(one(type)))) {
                 add("use_pool", amount + " " + type + " mana in pool", null, null, false,
-                    new ManaAnswer(human.getId(), type));
+                    new ManaAnswer(player.getId(), type));
             }
         }
         // XMage's own condition for its Special button. XMage then asks which special payment, and
         // which creatures, cards or artifacts it uses.
-        if (!game.getState().getSpecialActions().getControlledBy(human.getId(), true).isEmpty()) {
+        if (!game.getState().getSpecialActions().getControlledBy(player.getId(), true).isEmpty()) {
             add("special_payment", "Special payment (convoke, delve, improvise)", null, null, false,
                 new StringAnswer("special"));
         }
@@ -588,7 +638,7 @@ final class Prompts {
 
     /** The mana abilities the seat can use from its hand, as XMage counts them for castable spells. */
     private Abilities<ActivatedManaAbilityImpl> handManaAbilities(Card card) {
-        return card.getAbilities(game).getAvailableActivatedManaAbilities(Zone.HAND, human.getId(), game);
+        return card.getAbilities(game).getAvailableActivatedManaAbilities(Zone.HAND, player.getId(), game);
     }
 
     /**
@@ -652,7 +702,7 @@ final class Prompts {
             return false;
         }
         for (ActivatedManaAbilityImpl ability : permanent.getAbilities().getActivatedManaAbilities(Zone.BATTLEFIELD)) {
-            if (ability.canActivate(human.getId(), game).canActivate() && pays(ability, unpaid)) {
+            if (ability.canActivate(player.getId(), game).canActivate() && pays(ability, unpaid)) {
                 return true;
             }
         }
@@ -664,7 +714,7 @@ final class Prompts {
         Set<UUID> creatures = new LinkedHashSet<>(possible);
         for (UUID id : declared) {
             Permanent permanent = game.getPermanent(id);
-            if (permanent != null && human.getId().equals(permanent.getControllerId())) {
+            if (permanent != null && player.getId().equals(permanent.getControllerId())) {
                 creatures.add(id);
             }
         }
@@ -677,7 +727,7 @@ final class Prompts {
     }
 
     private String visibleLabel(UUID id, boolean shownByRequest) {
-        return shownByRequest || Visibility.identityVisible(game, id, human.getId()) ? label(id) : null;
+        return shownByRequest || Visibility.identityVisible(game, id, player.getId()) ? label(id) : null;
     }
 
     private String label(UUID id) {

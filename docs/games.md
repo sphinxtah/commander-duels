@@ -137,7 +137,7 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 
 | Message | Contents |
 | --- | --- |
-| `snapshot` | The seat's engine snapshot, unchanged ([seat-view contract](../contracts/engine-seat-view.schema.json)). Each new revision carries only the log lines since the last one, with their indexes; the first snapshot carries the latest page. Older revisions than one already sent are never sent |
+| `snapshot` | The seat's engine snapshot, unchanged ([seat-view contract](../contracts/engine-seat-view.schema.json)). Each new revision carries only the log lines since the last one, with their indexes; the first snapshot carries the latest page. Older revisions than one already sent are never sent. Since v0.5.1 it may hold a prompt made for a player whose turn the seat controls ([turn control](#turn-control-v051)) |
 | `command_result` | `action_id`, the engine's HTTP `status` and `body`, unchanged: `accepted` with the new revision, or a refusal such as `stale_prompt`, `stale_revision`, `invalid_option` or `game_over`. The API's own refusals are `not_controller` (409), `invalid_command` (400) and `engine_unavailable` (503) |
 | `lease` | `role` (`controller` or `observer`), `controlled` (whether any tab holds the lease) and `reason`: `granted`, `taken_over`, `released` or `disconnected` |
 | `inspection` | SysOp's inspection view, after each new revision, only to connections that asked to inspect |
@@ -156,6 +156,15 @@ Since v0.3.1 the transaction that records a finished game also counts its win, w
 ### Resends run once (T14)
 
 The engine remembers each seat's last 512 action IDs with their results. A command resent with the same `action_id` and content returns its first result and changes nothing; with different content it is refused as `action_id_reused`. So a client whose connection drops before the reply arrives reconnects, takes control again and resends the same command. It then learns the result without applying it twice. The API forwards resends unchanged.
+
+### Turn control (v0.5.1)
+
+When a player controls another player's turn (rule 723: Mindslaver, Emrakul, the Promised End, Sorin Markov's −7 and the like), the engine routes the controlled player's decisions to the controlling seat ([the human seat](engine/human-seat.md#turn-control-v051)). Nothing changes in the API, which relays each seat's own snapshots and forwards each command with the sending seat's own token:
+- **The controller's tabs** receive the controlled player's prompts in their own seat's snapshots, marked `for_seat`, and the controlled player's hand while the control lasts. The tab holding that seat's lease answers them like any prompt, so the lease, stale-answer refusals and resends work as ever.
+- **The controlled player's tabs** receive their own seat's snapshots: no prompt while their turn is controlled, `you.controlled_by` naming the controller, and their own hand as ever. Their tab may still concede (723.6), and an answer it sends for a prompt it does not hold is refused as `stale_prompt`.
+- **Tables, queues and matches** play their games through the same seats, so they behave the same, and the result, the wins and the tokens are recorded from the engine's own record as for any game.
+
+`tests/test_turn_control.py` plays this through the API with a fake engine: the controller's tab gets the prompt for the controlled seat and its hand, the controlled tab is told who controls its turn and its answer is refused, the controller's answer goes to the engine with the controller's token, the hand goes when the control ends, and the winner is paid as usual. It also checks the scripted clients' leak checks.
 
 ### Sessions
 

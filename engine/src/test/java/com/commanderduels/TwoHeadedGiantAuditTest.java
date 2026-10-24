@@ -371,9 +371,9 @@ class TwoHeadedGiantAuditTest {
     @Test
     void controllingAPlayerControlsTheirTeam() throws Exception {
         // 805.8: seat 0 controlling seat 3's next turn controls team B's turn 2: both seat 2, who holds
-        // it, and seat 3; then the control ends. Played by XMage's own bots on the game thread: the
-        // engine does not hand a controlled player's decisions to the controlling seat (in any format;
-        // see docs/engine/two-headed-giant.md), so human seats are not used here.
+        // it, and seat 3; then the control ends. Played by XMage's own bots on the game thread, which
+        // record who controls each seat; TurnControlTest plays the same with human seats (v0.5.1),
+        // whose controller the engine asks for the controlled players' decisions.
         Map<String, Integer> controller = controlled(5105L,
             ids -> List.of(new TurnMod(ids.get(3)).withNewController(ids.get(0))));
         assertEquals(0, controller.get("2:2"), "seat 0 controlled seat 2 in turn 2: " + controller);

@@ -159,7 +159,7 @@ class SeatInputTest {
 
     @Test
     void aRefusedNameNeverSuggestsAHiddenCard() {
-        var view = new PromptView(PROMPT, "choose_name", "Choose a card name", null, List.of(), null, null, null);
+        var view = new PromptView(PROMPT, "choose_name", "Choose a card name", null, List.of(), null, null, null, null);
         var names = java.util.Map.of("black lotus", "Black Lotus", "black knight", "Black Knight",
             "black vise", "Black Vise");
         var prompt = new Prompts.Prompt(view, java.util.Map.of(), names);
