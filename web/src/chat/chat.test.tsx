@@ -27,6 +27,7 @@ import {
   useChat,
   WINDOWS,
   type Chat,
+  type ChatEvent,
   type ChatMessage,
 } from "./chat";
 import { ChatBar } from "./ChatBar";
@@ -64,6 +65,7 @@ async function settle() {
 }
 
 const ME = "00000000-0000-4000-8000-0000000000e1";
+const OTHER = "00000000-0000-4000-8000-0000000000f5";
 const ADA = "00000000-0000-4000-8000-0000000000a1";
 const BOB = "00000000-0000-4000-8000-0000000000b2";
 const CAL = "00000000-0000-4000-8000-0000000000c3";
@@ -120,6 +122,17 @@ function page(overrides: Record<string, unknown> = {}) {
     unread: 0,
     ...overrides,
   };
+}
+/** The chat, for a conversation alone: live, following nothing, keeping no draft. */
+function fakeChat(changes: Record<string, unknown> = {}): Chat {
+  return {
+    live: true,
+    listen: () => () => undefined,
+    markRead: async () => undefined,
+    draft: () => "",
+    setDraft: () => undefined,
+    ...changes,
+  } as unknown as Chat;
 }
 
 /** A WebSocket the test drives. */
@@ -356,26 +369,140 @@ describe("a conversation", () => {
       ),
     );
     const markRead = vi.fn(async () => undefined);
-    const chat = {
-      live: true,
-      listen: () => () => undefined,
-      markRead,
-    } as unknown as Chat;
+    const chat = fakeChat({ markRead });
     render(<ConversationView playerId={ADA} chat={chat} visible />);
     await settle();
     expect(markRead).toHaveBeenCalledWith(ADA, "2026-10-22T10:00:00Z");
     expect(markRead).toHaveBeenCalledTimes(1);
   });
+
+  it("asks once on opening, and again when the socket comes back; still unread, it marks again (v0.5.1)", async () => {
+    const unread = page({ unread: 2 });
+    on("GET /api/v1/conversations/{player_id}", () => reply(200, unread));
+    const markRead = vi.fn(async () => undefined);
+    const { rerender } = render(
+      <ConversationView playerId={ADA} chat={fakeChat({ markRead })} visible />,
+    );
+    await settle();
+    // One question with the socket up, not one for opening and one for the socket.
+    const asked = sent("GET /api/v1/conversations/{player_id}");
+    expect(asked).toHaveLength(1);
+    expect(asked[0]!.init?.headers).toBeUndefined();
+    expect(markRead).toHaveBeenCalledTimes(1);
+    // The socket drops and comes back: the page asks on its own, and the answer, still unread
+    // (it crossed the mark, or the mark failed), is marked again.
+    rerender(
+      <ConversationView
+        playerId={ADA}
+        chat={fakeChat({ markRead, live: false })}
+        visible
+      />,
+    );
+    rerender(
+      <ConversationView playerId={ADA} chat={fakeChat({ markRead })} visible />,
+    );
+    await settle();
+    const again = sent("GET /api/v1/conversations/{player_id}");
+    expect(again).toHaveLength(2);
+    expect(again[1]!.init?.headers).toEqual({ "X-Background": "1" });
+    expect(markRead).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears its count when read in another tab, whatever the account's total (v0.5.1)", async () => {
+    on(
+      "GET /api/v1/conversations/{player_id}",
+      () => reply(200, page({ unread: 2 })),
+      () => reply(200, page({ unread: 0 })),
+    );
+    let tell: (event: ChatEvent) => void = () => undefined;
+    const chat = fakeChat({
+      listen: (listener: (event: ChatEvent) => void) => {
+        tell = listener;
+        return () => undefined;
+      },
+    });
+    const counts: number[] = [];
+    render(
+      <ConversationView
+        playerId={ADA}
+        chat={chat}
+        visible={false}
+        onPlayer={(_, count) => counts.push(count)}
+      />,
+    );
+    await settle();
+    expect(counts.at(-1)).toBe(2);
+    // Bob still has one unread elsewhere: the event's count is the account's, 1. The window asks
+    // for its own.
+    act(() => tell({ type: "read", player_id: ADA, unread: 1 }));
+    await settle();
+    expect(sent("GET /api/v1/conversations/{player_id}")).toHaveLength(2);
+    expect(counts.at(-1)).toBe(0);
+    // Nothing unread here: a read asks nothing.
+    act(() => tell({ type: "read", player_id: ADA, unread: 1 }));
+    await settle();
+    expect(sent("GET /api/v1/conversations/{player_id}")).toHaveLength(2);
+  });
+
+  it("asks again when the friends list's friendship changes, and offers no Try again to an ex-friend (v0.5.1)", async () => {
+    on(
+      "GET /api/v1/conversations/{player_id}",
+      () => reply(200, page()),
+      () => reply(200, page({ friends: false })),
+      () => reply(200, page()),
+    );
+    on("POST /api/v1/conversations/{player_id}/messages", () => ({
+      error: {
+        code: "not_friends",
+        message: "You can write only to your friends.",
+      },
+      response: new Response(null, { status: 409 }),
+    }));
+    const chat = fakeChat();
+    const view = (friend: boolean) => (
+      <ConversationView playerId={ADA} chat={chat} visible friend={friend} />
+    );
+    const { rerender } = render(view(true));
+    await settle();
+    // The two still agree: nothing more is asked.
+    expect(sent("GET /api/v1/conversations/{player_id}")).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText("Write to ada"), {
+      target: { value: "Still there?" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await settle();
+    // Refused, as no longer friends: the box closes, and trying again could only fail. The list,
+    // which still counts ada a friend, has the conversation ask once, which agrees.
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "You can write only to your friends.",
+    );
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(screen.queryByLabelText("Write to ada")).toBeNull();
+    expect(sent("GET /api/v1/conversations/{player_id}")).toHaveLength(2);
+    // The list catches up: nothing more is asked.
+    rerender(view(false));
+    await settle();
+    expect(sent("GET /api/v1/conversations/{player_id}")).toHaveLength(2);
+    // They make up, and the list counts ada a friend again: the conversation asks on its own, and
+    // its box opens.
+    rerender(view(true));
+    await settle();
+    const asked = sent("GET /api/v1/conversations/{player_id}");
+    expect(asked).toHaveLength(3);
+    expect(asked[2]!.init?.headers).toEqual({ "X-Background": "1" });
+    expect(screen.getByLabelText("Write to ada")).toBeInTheDocument();
+  });
 });
 
-/** Mounts useChat and hands its result out, with the chat bar. */
+/** Mounts useChat and hands its result out, with the chat bar: as App does, a table's own, drawn
+ * afresh for each game and apart from the pages'. */
 let shown: Chat | null = null;
 function Probe({
   me,
   checkedIn = null,
   table = null,
 }: {
-  me: Me;
+  me: Me | null;
   checkedIn?: number | null;
   /** The game whose table is shown. */
   table?: string | null;
@@ -383,11 +510,14 @@ function Probe({
   shown = useChat(me, checkedIn, table);
   return (
     <ChatContext.Provider value={shown}>
-      <ChatBar chat={shown} />
+      <ChatBar key={table ? `chat-${table}` : "pages"} chat={shown} />
     </ChatContext.Provider>
   );
 }
 const me = { id: ME, status: "active" } as Me;
+/** Where the browser keeps the account's windows and list (v0.5.1). */
+const WINDOWS_KEY = `cd.chat.windows.${ME}`;
+const PANEL_KEY = `cd.chat.friends.${ME}`;
 
 describe("the live connection", () => {
   it("says hello, counts what is unread, and pops up a friend's message", async () => {
@@ -472,7 +602,7 @@ describe("the live connection", () => {
     expect(shown!.windows.map((each) => each.playerId)).toEqual(ids.slice(1));
     expect(WINDOWS).toBe(3);
     act(() => shown!.fold(ids[1]!, true));
-    expect(savedWindows()).toEqual([
+    expect(savedWindows(ME)).toEqual([
       { playerId: ids[1], folded: true },
       { playerId: ids[2], folded: false },
       { playerId: ids[3], folded: false },
@@ -484,6 +614,51 @@ describe("the live connection", () => {
       screen.getAllByRole("button", { name: /Close the chat with/ })[0]!,
     );
     expect(shown!.windows).toHaveLength(2);
+  });
+
+  it("keeps each account's windows, list and drafts to itself, and forgets them on sign-out (v0.5.1)", async () => {
+    on("GET /api/v1/conversations/{player_id}", () =>
+      reply(200, page({ messages: [] })),
+    );
+    // Kept before v0.5.1 for whoever used the browser: they go, unread.
+    localStorage.setItem(
+      "cd.chat.windows",
+      JSON.stringify([{ playerId: CAL, folded: false }]),
+    );
+    localStorage.setItem("cd.chat.friends", "open");
+    const { rerender } = render(<Probe me={me} />);
+    expect(shown!.windows).toEqual([]);
+    expect(shown!.panel).toBe(false);
+    expect(localStorage.getItem("cd.chat.windows")).toBeNull();
+    expect(localStorage.getItem("cd.chat.friends")).toBeNull();
+    act(() => shown!.open(ADA));
+    act(() => shown!.setPanel(true));
+    fireEvent.change(await screen.findByLabelText("Write to ada"), {
+      target: { value: "See you at the table" },
+    });
+    expect(savedWindows(ME)).toEqual([{ playerId: ADA, folded: false }]);
+    expect(savedPanel(ME)).toBe(true);
+    // Another account signs in on this browser: nothing of the last one's, and the browser
+    // forgets what it kept for it.
+    const other = { id: OTHER, status: "active" } as Me;
+    rerender(<Probe me={other} />);
+    expect(shown!.windows).toEqual([]);
+    expect(shown!.panel).toBe(false);
+    expect(screen.queryByRole("region", { name: /^Chat with/ })).toBeNull();
+    expect(localStorage.getItem(WINDOWS_KEY)).toBeNull();
+    expect(localStorage.getItem(PANEL_KEY)).toBeNull();
+    act(() => shown!.open(BOB));
+    expect(savedWindows(OTHER)).toEqual([{ playerId: BOB, folded: false }]);
+    // Signing out forgets that account's too.
+    rerender(<Probe me={null} />);
+    expect(shown!.windows).toEqual([]);
+    expect(savedWindows(OTHER)).toEqual([]);
+    expect(localStorage.getItem(`cd.chat.windows.${OTHER}`)).toBeNull();
+    // The first account back: a fresh start, its draft gone with the sign-out.
+    rerender(<Probe me={me} />);
+    expect(shown!.windows).toEqual([]);
+    act(() => shown!.open(ADA));
+    expect(await screen.findByLabelText("Write to ada")).toHaveValue("");
   });
 
   it("starts nothing for an account that is not active", () => {
@@ -658,10 +833,10 @@ describe("the chat bar (v0.5.1)", () => {
     // remembers which.
     fireEvent.pointerDown(document.body);
     expect(toggle()).toHaveAttribute("aria-expanded", "true");
-    expect(localStorage.getItem("cd.chat.friends")).toBe("open");
+    expect(localStorage.getItem(PANEL_KEY)).toBe("open");
     fireEvent.click(toggle());
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
-    expect(savedPanel()).toBe(false);
+    expect(savedPanel(ME)).toBe(false);
     fireEvent.click(
       screen.getByRole("button", { name: "Close the chat with ada" }),
     );
@@ -706,7 +881,7 @@ describe("the chat bar (v0.5.1)", () => {
     people();
     screenWidth(390);
     localStorage.setItem(
-      "cd.chat.windows",
+      WINDOWS_KEY,
       JSON.stringify([
         { playerId: BOB, folded: false },
         { playerId: CAL, folded: false },
@@ -735,7 +910,7 @@ describe("the chat bar (v0.5.1)", () => {
 
   it("opens the friends list as the browser remembers it", async () => {
     people();
-    localStorage.setItem("cd.chat.friends", "open");
+    localStorage.setItem(PANEL_KEY, "open");
     render(<Probe me={me} />);
     expect(toggle()).toHaveAttribute("aria-expanded", "true");
     expect(
@@ -751,9 +926,9 @@ describe("the chat bar (v0.5.1)", () => {
     on("POST /api/v1/conversations/{player_id}/read", () =>
       reply(200, { unread: 0 }),
     );
-    localStorage.setItem("cd.chat.friends", "open");
+    localStorage.setItem(PANEL_KEY, "open");
     localStorage.setItem(
-      "cd.chat.windows",
+      WINDOWS_KEY,
       JSON.stringify([{ playerId: ADA, folded: false }]),
     );
     const { rerender } = render(<Probe me={me} table="g1" />);
@@ -805,6 +980,206 @@ describe("the chat bar (v0.5.1)", () => {
     // The next table starts with it folded away.
     rerender(<Probe me={me} table="g2" />);
     expect(shown!.tableOpen).toBe(false);
+  });
+
+  it("takes a friendship that ended off the list and the window, whatever older conversations said (v0.5.1)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const dee = friend(DEE, "dee", { presence: presence("online") });
+    let ended = false;
+    on("GET /api/v1/friends", () =>
+      reply(200, {
+        friends: ended ? [ada] : [ada, dee],
+        incoming: [],
+        outgoing: [],
+      }),
+    );
+    on("GET /api/v1/conversations", () =>
+      reply(200, {
+        conversations: [
+          {
+            player: dee,
+            friends: true,
+            last_message: message({ sender_id: DEE }),
+            unread: 0,
+          },
+        ],
+        unread: 0,
+      }),
+    );
+    on("GET /api/v1/conversations/{player_id}", () =>
+      reply(
+        200,
+        page({
+          player: friend(DEE, "dee", { presence: null }),
+          friends: !ended,
+        }),
+      ),
+    );
+    localStorage.setItem(PANEL_KEY, "open");
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([{ playerId: DEE, folded: false }]),
+    );
+    render(<Probe me={me} />);
+    // The socket is up, so the window does not ask now and then on its own.
+    const [socket] = FakeSocket.all;
+    act(() => socket!.onopen?.());
+    socket!.tell({ type: "welcome", unread: 0 });
+    await settle();
+    expect(toggle()).toHaveAccessibleName("Friends, 2 online");
+    const friends = () => screen.getByRole("list", { name: "Your friends" });
+    expect(
+      within(friends()).getByRole("button", { name: /^Chat with dee/ }),
+    ).toHaveAccessibleName("Chat with dee, Online");
+    const window = screen.getByRole("region", { name: "Chat with dee" });
+    expect(within(window).getByLabelText("Write to dee")).toBeInTheDocument();
+    // Dee ends the friendship, or blocks: the friends asked for again no longer list dee, and the
+    // older conversations' word does not bring dee back, nor the presence the two shared.
+    ended = true;
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    expect(toggle()).toHaveAccessibleName("Friends, 1 online");
+    expect(
+      within(friends()).queryByRole("button", { name: /^Chat with dee/ }),
+    ).toBeNull();
+    expect(
+      within(
+        screen.getByRole("list", { name: "Earlier conversations" }),
+      ).getByRole("button"),
+    ).toHaveAccessibleName("Chat with dee, No longer friends");
+    expect(
+      within(window).getByRole("button", { expanded: true, name: /^dee/ }),
+    ).not.toHaveTextContent("Online");
+    // The window asks again on its own, and its box closes.
+    await settle();
+    expect(within(window).queryByLabelText("Write to dee")).toBeNull();
+    expect(window).toHaveTextContent("You and dee are not friends");
+  });
+
+  it("drops a pop-up waiting at the table once its conversation is read or shown (v0.5.1)", async () => {
+    people();
+    on("GET /api/v1/conversations/{player_id}", () =>
+      reply(200, page({ unread: 1 })),
+    );
+    on("POST /api/v1/conversations/{player_id}/read", () =>
+      reply(200, { unread: 0 }),
+    );
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([{ playerId: ADA, folded: false }]),
+    );
+    render(<Probe me={me} table="g1" />);
+    const [socket] = FakeSocket.all;
+    act(() => socket!.onopen?.());
+    socket!.tell({ type: "welcome", unread: 0 });
+    const bob = { ...ada, id: BOB, handle: "bob" };
+    for (const [who, id] of [
+      [ada, "m7"],
+      [bob, "m8"],
+    ] as const)
+      socket!.tell({
+        type: "message",
+        player_id: who.id,
+        player: who,
+        message: message({ id, sender_id: who.id }),
+        unread: 2,
+      });
+    // Put away, the table has no bell: the pop-ups wait for the pages.
+    const waiting = () => shown!.toasts.map((each) => each.player.handle);
+    expect(waiting()).toEqual(["bob", "ada"]);
+    // Bob's conversation is read on the phone meanwhile: it would pop up as new after the game.
+    socket!.tell({ type: "read", player_id: BOB, unread: 1 });
+    expect(waiting()).toEqual(["ada"]);
+    // The bar brought out shows Ada's window, which reads her message: hers goes too.
+    act(() => shown!.setTableOpen(true));
+    await settle();
+    expect(waiting()).toEqual([]);
+    expect(sent("POST /api/v1/conversations/{player_id}/read")).toHaveLength(1);
+  });
+
+  it("starts the next table's bar put away from its first drawing, asking nothing (v0.5.1)", async () => {
+    people();
+    on("GET /api/v1/conversations/{player_id}", () => reply(200, page()));
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([{ playerId: ADA, folded: false }]),
+    );
+    const { rerender } = render(<Probe me={me} table="g1" />);
+    act(() => shown!.setTableOpen(true));
+    await settle();
+    expect(document.getElementById("chat-bar")).not.toBeNull();
+    const asked = calls.length;
+    // A rematch, straight from one table to the next, with the bar out at the first.
+    rerender(<Probe me={me} table="g2" />);
+    await settle();
+    expect(shown!.tableOpen).toBe(false);
+    // Never drawn there, not even hidden, and nothing asked of the API.
+    expect(document.getElementById("chat-bar")).toBeNull();
+    expect(calls.slice(asked).map((each) => each.route)).toEqual([]);
+  });
+
+  it("keeps what is being written from the pages to the table and back, in memory only (v0.5.1)", async () => {
+    people();
+    on("GET /api/v1/conversations/{player_id}", () => reply(200, page()));
+    on("POST /api/v1/conversations/{player_id}/messages", (init) => {
+      const body = init!.body as { text: string; client_id: string };
+      return reply(
+        201,
+        message({
+          id: "m2",
+          sender_id: ME,
+          body: body.text,
+          client_id: body.client_id,
+        }),
+      );
+    });
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([{ playerId: ADA, folded: false }]),
+    );
+    const { rerender } = render(<Probe me={me} />);
+    fireEvent.change(await screen.findByLabelText("Write to ada"), {
+      target: { value: "Half a rep" },
+    });
+    // The queue finds a game: the table's own bar, brought out, has it still.
+    rerender(<Probe me={me} table="g1" />);
+    act(() => shown!.setTableOpen(true));
+    const box = await screen.findByLabelText("Write to ada");
+    expect(box).toHaveValue("Half a rep");
+    fireEvent.change(box, { target: { value: "Half a reply" } });
+    // Back on the pages after the game, it is there; the browser's storage never had it.
+    rerender(<Probe me={me} />);
+    expect(await screen.findByLabelText("Write to ada")).toHaveValue(
+      "Half a reply",
+    );
+    const stored = Array.from({ length: localStorage.length }, (_, index) =>
+      localStorage.getItem(localStorage.key(index)!),
+    ).join();
+    expect(stored).not.toContain("Half a");
+    // Sent, it is gone.
+    fireEvent.keyDown(screen.getByLabelText("Write to ada"), { key: "Enter" });
+    await settle();
+    expect(shown!.draft(ADA)).toBe("");
+  });
+
+  it("marks the reads it makes on its own, never the player's or the page's first (v0.5.1)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    people();
+    render(<Probe me={me} />);
+    await settle();
+    const [socket] = FakeSocket.all;
+    act(() => socket!.onopen?.());
+    socket!.tell({ type: "welcome", unread: 0 });
+    // The player opens the list; then the socket tells of a read mark, and the friends' 30
+    // seconds pass.
+    fireEvent.click(toggle());
+    await settle();
+    socket!.tell({ type: "read", player_id: ADA, unread: 0 });
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    const headers = (route: string) =>
+      sent(route).map((each) => each.init?.headers ?? null);
+    const marked = { "X-Background": "1" };
+    expect(headers("GET /api/v1/friends")).toEqual([null, marked]);
+    expect(headers("GET /api/v1/conversations")).toEqual([null, marked]);
   });
 
   it("knows the Messages page's old addresses", () => {

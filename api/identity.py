@@ -36,6 +36,10 @@ ROTATION_GRACE = timedelta(seconds=60)
 # check-in, v0.4.3): they are not activity, so a tab left open does not keep its session from
 # reaching its idle limit.
 BACKGROUND_PATHS = frozenset({"/api/v1/admin/counts", "/api/v1/presence"})
+# Since v0.5.1 a read the page makes on its own, on a timer or after the chat's socket told it
+# something (the chat bar's friends and conversations, the Friends page's refresh), carries this
+# header, and is not activity either. Only a GET may: a change is always the person's doing.
+BACKGROUND_HEADER = "x-background"
 
 ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
@@ -352,7 +356,7 @@ def optional_principal(request: Request, db: Db) -> Principal | None:
         cookie = Response()
         set_session_cookie(cookie, request, token, session)
         request.state.rotated_cookie = cookie.headers["set-cookie"]
-    elif request.url.path not in BACKGROUND_PATHS:
+    elif not asked_on_its_own(request):
         keep_alive(request, db, session, user)
     roles = roles_of(db, user)
     # End the read transaction: the pooled connection goes back now, not when the request ends,
@@ -360,6 +364,14 @@ def optional_principal(request: Request, db: Db) -> Principal | None:
     # commit (get_db), so the principal's rows stay loaded and a route's changes still flush.
     db.commit()
     return Principal(user, session, roles, permissions_for(user, roles))
+
+
+def asked_on_its_own(request: Request) -> bool:
+    """Whether the page asked without the person: a background path, or a GET marked with
+    BACKGROUND_HEADER. Neither extends the session's idle limit."""
+    if request.url.path in BACKGROUND_PATHS:
+        return True
+    return request.method == "GET" and request.headers.get(BACKGROUND_HEADER) == "1"
 
 
 def keep_alive(conn: HTTPConnection, db: Session, session: UserSession, user: User) -> None:

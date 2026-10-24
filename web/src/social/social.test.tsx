@@ -660,6 +660,19 @@ describe("friends (v0.4.3)", () => {
     ).toBeInTheDocument();
   });
 
+  it("marks its 30 seconds' refresh as the page's own, never its first load (v0.5.1)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    on("GET /api/v1/friends", () =>
+      reply(200, { friends: [], incoming: [], outgoing: [] }),
+    );
+    render(<FriendsPage heading={createRef()} />);
+    await settle();
+    await later(30_000);
+    const [first, refresh] = sent("GET /api/v1/friends");
+    expect(first!.init?.headers).toBeUndefined();
+    expect(refresh!.init?.headers).toEqual({ "X-Background": "1" });
+  });
+
   it("lists requests waiting for a player name, and withdraws one (v0.5.1)", async () => {
     const asked = new Date(Date.now() - 2 * 86_400_000).toISOString();
     on(

@@ -5,7 +5,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import { client, describe } from "../api";
+import { backgroundRead, client, describe } from "../api";
 import { useChatContext } from "../chat/chat";
 import { tierNames } from "../alliance/alliance";
 import { PlayerPicture, PresenceLine } from "./PlayerBits";
@@ -60,8 +60,13 @@ export function FriendsPage({
   // Friends write to each other (v0.4.4): Message opens a docked window.
   const chat = useChatContext();
 
-  const load = useCallback(async () => {
-    const { data, error } = await client.GET("/api/v1/friends");
+  // The 30 seconds' refresh is the page's own doing, not the player's (v0.5.1): it is marked, so
+  // a tab left open still reaches its idle limit.
+  const load = useCallback(async (background = false) => {
+    const { data, error } = await client.GET(
+      "/api/v1/friends",
+      backgroundRead(background),
+    );
     if (data) {
       setList(data);
       setError("");
@@ -71,7 +76,7 @@ export function FriendsPage({
   useEffect(() => {
     void load();
     const timer = window.setInterval(() => {
-      if (document.visibilityState !== "hidden") void load();
+      if (document.visibilityState !== "hidden") void load(true);
     }, FRIENDS_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [load]);

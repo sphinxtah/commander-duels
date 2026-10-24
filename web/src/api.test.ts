@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   RECENT_REQUESTS,
   answered,
+  backgroundRead,
   forgetRequests,
   onboarding,
   recentRequests,
@@ -86,6 +87,26 @@ describe("the latest requests, for a problem report (v0.4.1)", () => {
     expect(kept.at(-1)!.path).toBe(`/api/v1/decks/${RECENT_REQUESTS + 4}`);
     kept[0]!.path = "/changed";
     expect(recentRequests()[0]!.path).toBe("/api/v1/decks/5");
+  });
+
+  it("leaves out a read the page made on its own (v0.5.1)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 200 })),
+    );
+    await answered(
+      new Request("http://localhost/api/v1/friends", backgroundRead(true)),
+    );
+    await answered(
+      new Request(
+        "http://localhost/api/v1/conversations",
+        backgroundRead(false),
+      ),
+    );
+    expect(backgroundRead(true)).toEqual({ headers: { "X-Background": "1" } });
+    expect(recentRequests().map((each) => each.path)).toEqual([
+      "/api/v1/conversations",
+    ]);
   });
 });
 

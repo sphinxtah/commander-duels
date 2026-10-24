@@ -41,10 +41,24 @@ const METHODS = new Set<string>([
 const UNRECORDED = new Set(["/api/v1/admin/counts", "/api/v1/presence"]);
 const REQUEST_ID = /^[A-Za-z0-9-]{1,64}$/;
 
+/** Marks a read the page makes on its own (v0.5.1), on a timer or after the chat's socket told it
+ * something: the API does not count it as activity, so a tab left open still reaches its idle
+ * limit (identity.BACKGROUND_HEADER, honoured for GET only), and a problem report leaves it out.
+ * The person's own clicks and a page's first load go unmarked. */
+export const BACKGROUND_HEADER = "X-Background";
+
+/** A GET's options, marked as the page's own when `background` is true. */
+export function backgroundRead(background: boolean): {
+  headers?: Record<string, string>;
+} {
+  return background ? { headers: { [BACKGROUND_HEADER]: "1" } } : {};
+}
+
 /**
  * Notes an API request for a problem report: its method, its path without the query, the
  * answer's status (0 when none came), its X-Request-ID and the time. Never a body, a query or
- * another header. Only the latest RECENT_REQUESTS are kept, in this page's memory.
+ * another header. Only the latest RECENT_REQUESTS are kept, in this page's memory; a read the
+ * page made on its own (BACKGROUND_HEADER) is not noted.
  */
 export function recordRequest(request: Request, response: Response | null) {
   let path: string;
@@ -54,6 +68,7 @@ export function recordRequest(request: Request, response: Response | null) {
     return;
   }
   if (!path.startsWith("/api/") || UNRECORDED.has(path)) return;
+  if (request.headers.get(BACKGROUND_HEADER) === "1") return;
   if (!METHODS.has(request.method)) return;
   const id = response?.headers.get("X-Request-ID") ?? null;
   recent.push({

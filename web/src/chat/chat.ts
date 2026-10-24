@@ -49,6 +49,10 @@ export interface MessageToast {
 export const MESSAGE_LENGTH = 500;
 export const WINDOWS = 3;
 export const TOAST_MS = 8000;
+// The windows and the list's fold, as each account left them in this browser: one key each per
+// account since v0.5.1 (cd.chat.windows.<account id>), so the next account to sign in here never
+// sees whom the last one wrote to, and signing out forgets them. The keys before had no account,
+// so whoever they were for, they go.
 const WINDOWS_KEY = "cd.chat.windows";
 const PANEL_KEY = "cd.chat.friends";
 const PING_MS = 25_000;
@@ -120,11 +124,12 @@ export function newClientId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** The windows open when the page last closed: which, and folded or not; never what was written. */
-export function savedWindows(): ChatWindow[] {
+/** The account's windows open when the page last closed: which, and folded or not; never what
+ * was written. */
+export function savedWindows(account: string): ChatWindow[] {
   try {
     const saved = JSON.parse(
-      localStorage.getItem(WINDOWS_KEY) ?? "[]",
+      localStorage.getItem(`${WINDOWS_KEY}.${account}`) ?? "[]",
     ) as unknown;
     if (!Array.isArray(saved)) return [];
     return saved
@@ -140,26 +145,38 @@ export function savedWindows(): ChatWindow[] {
   }
 }
 
-function saveWindows(windows: ChatWindow[]) {
+function saveWindows(account: string, windows: ChatWindow[]) {
   try {
-    localStorage.setItem(WINDOWS_KEY, JSON.stringify(windows));
+    localStorage.setItem(`${WINDOWS_KEY}.${account}`, JSON.stringify(windows));
   } catch {
     // A private window, or storage turned off: the windows last only this visit.
   }
 }
 
-/** Whether the bar's friends list was open when the page last closed (v0.5.1). */
-export function savedPanel(): boolean {
+/** Whether the account's friends list on the bar was open when the page last closed (v0.5.1). */
+export function savedPanel(account: string): boolean {
   try {
-    return localStorage.getItem(PANEL_KEY) === "open";
+    return localStorage.getItem(`${PANEL_KEY}.${account}`) === "open";
   } catch {
     return false;
   }
 }
 
-function savePanel(open: boolean) {
+function savePanel(account: string, open: boolean) {
   try {
-    localStorage.setItem(PANEL_KEY, open ? "open" : "folded");
+    localStorage.setItem(`${PANEL_KEY}.${account}`, open ? "open" : "folded");
+  } catch {
+    // As for the windows.
+  }
+}
+
+/** Forgets what the browser remembers of an account's bar, or the keys without one (before
+ * v0.5.1) when there is no account. */
+function forgetSaved(account: string | null) {
+  const suffix = account ? `.${account}` : "";
+  try {
+    localStorage.removeItem(`${WINDOWS_KEY}${suffix}`);
+    localStorage.removeItem(`${PANEL_KEY}${suffix}`);
   } catch {
     // As for the windows.
   }
@@ -197,7 +214,7 @@ export interface Chat {
   focusing: string | null;
   focused: () => void;
   /** The bar's friends list (v0.5.1): open or folded to its title bar, as the browser
-   * remembers. */
+   * remembers for the account. */
   panel: boolean;
   setPanel: (open: boolean) => void;
   /** The game's table is shown: the bar folds away into the band's diamond until asked for. */
@@ -205,6 +222,10 @@ export interface Chat {
   /** At the table, whether the bar is out, floating over the table. Each table starts without. */
   tableOpen: boolean;
   setTableOpen: (open: boolean) => void;
+  /** What is being written to a player, not sent yet (v0.5.1): kept here, in memory only, so it
+   * outlasts the bar's move between the pages and the table. Never stored. */
+  draft: (playerId: string) => string;
+  setDraft: (playerId: string, text: string) => void;
   toasts: MessageToast[];
   dismiss: (messageId: string) => void;
   /** The last message said to screen readers from the bar: one in a window shown, and at the
@@ -361,12 +382,37 @@ export function useChat(
   const atTable = table !== null;
   const [unread, setUnread] = useState(0);
   const [live, setLive] = useState(false);
-  const [windows, setWindows] = useState<ChatWindow[]>(savedWindows);
+  const [windows, setWindows] = useState<ChatWindow[]>(() =>
+    account ? savedWindows(account) : [],
+  );
   const [toasts, setToasts] = useState<MessageToast[]>([]);
-  const [panel, setPanel] = useState(savedPanel);
+  const [panel, setPanel] = useState(
+    () => account !== null && savedPanel(account),
+  );
   const [tableOpen, setTableOpen] = useState(false);
   const [focusing, setFocusing] = useState<string | null>(null);
   const [said, setSaid] = useState<ChatSaid | null>(null);
+  const drafts = useRef(new Map<string, string>());
+  // Another account, or none: its own windows and fold as the browser remembers them, and nothing
+  // of the last one's (what it was writing, a window taking focus, the bar out at a table). Set
+  // while drawing, so nothing of the last account's is drawn even for a moment (v0.5.1).
+  const [owner, setOwner] = useState(account);
+  if (owner !== account) {
+    setOwner(account);
+    setWindows(account ? savedWindows(account) : []);
+    setPanel(account !== null && savedPanel(account));
+    setFocusing(null);
+    setTableOpen(false);
+    drafts.current = new Map();
+  }
+  // Each table starts with the bar folded away, so it covers nothing of the table; the next
+  // game's too, a rematch's straight after. Set while drawing, so the next table's first frame
+  // never draws the bar out, nor asks the API for anything (v0.5.1).
+  const [tableShown, setTableShown] = useState(table);
+  if (tableShown !== table) {
+    setTableShown(table);
+    setTableOpen(false);
+  }
   const listeners = useRef(new Set<(event: ChatEvent) => void>());
   const { room, phone } = useScreen();
   const docked = useMemo(() => windows.slice(-room), [windows, room]);
@@ -387,13 +433,34 @@ export function useChat(
   const atTableNow = useRef(atTable);
   atTableNow.current = atTable;
 
-  useEffect(() => saveWindows(windows), [windows]);
-  useEffect(() => savePanel(panel), [panel]);
-  // Each table starts with the bar folded away, so it covers nothing of the table; the next
-  // game's too, a rematch's straight after.
   useEffect(() => {
-    setTableOpen(false);
-  }, [table]);
+    if (account) saveWindows(account, windows);
+  }, [account, windows]);
+  useEffect(() => {
+    if (account) savePanel(account, panel);
+  }, [account, panel]);
+  // Signing out (or another account signing in) forgets what the browser remembered of the bar
+  // for the account before; a key without an account, from before v0.5.1, goes too.
+  const remembered = useRef<string | null>(null);
+  useEffect(() => {
+    const before = remembered.current;
+    remembered.current = account;
+    if (before && before !== account) forgetSaved(before);
+    if (account) forgetSaved(null);
+  }, [account]);
+  // A conversation shown has no pop-up: one waiting for the pages since its message came at the
+  // table, or one beside the bell for a window folded then, goes once the window shows it
+  // (v0.5.1).
+  const shownKey = [...showing.current].join();
+  useEffect(() => {
+    if (!shownKey) return;
+    const shown = new Set(shownKey.split(","));
+    setToasts((before) =>
+      before.some((each) => shown.has(each.player.id))
+        ? before.filter((each) => !shown.has(each.player.id))
+        : before,
+    );
+  }, [shownKey]);
   useEffect(() => {
     setUnread(0);
     setToasts([]);
@@ -404,8 +471,17 @@ export function useChat(
       (event) => {
         setUnread(event.unread);
         for (const listener of listeners.current) listener(event);
-        if (event.type !== "message" || event.message.sender_id === account)
+        if (event.type === "read") {
+          // Read, in this tab or another, at the table or on another device: its pop-up, which
+          // waits at the table for the pages, would tell of it as new (v0.5.1).
+          setToasts((before) =>
+            before.some((each) => each.player.id === event.player_id)
+              ? before.filter((each) => each.player.id !== event.player_id)
+              : before,
+          );
           return;
+        }
+        if (event.message.sender_id === account) return;
         const visible = document.visibilityState !== "hidden";
         const said = {
           id: event.message.id,
@@ -490,6 +566,14 @@ export function useChat(
     );
     if (data) setUnread(data.unread);
   }, []);
+  const draft = useCallback(
+    (playerId: string) => drafts.current.get(playerId) ?? "",
+    [],
+  );
+  const setDraft = useCallback((playerId: string, text: string) => {
+    if (text) drafts.current.set(playerId, text);
+    else drafts.current.delete(playerId);
+  }, []);
 
   // One object while nothing in it changes, so what follows it does not start again each render.
   return useMemo(
@@ -511,6 +595,8 @@ export function useChat(
       atTable,
       tableOpen: account ? tableOpen : false,
       setTableOpen,
+      draft,
+      setDraft,
       toasts: account ? toasts : [],
       dismiss,
       said: account ? said : null,
@@ -533,6 +619,8 @@ export function useChat(
       panel,
       atTable,
       tableOpen,
+      draft,
+      setDraft,
       toasts,
       dismiss,
       said,
