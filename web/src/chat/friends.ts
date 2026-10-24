@@ -175,8 +175,7 @@ export function useBarPeople(chat: Chat, enabled = true): BarPeople {
         : null,
       requests: list?.data.incoming.length ?? 0,
       known,
-      friend: (playerId: string) =>
-        list ? friends.has(playerId) : undefined,
+      friend: (playerId: string) => (list ? friends.has(playerId) : undefined),
       state: list ? "ready" : error ? "error" : "loading",
       error,
     };

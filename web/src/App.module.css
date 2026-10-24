@@ -368,7 +368,8 @@ h2 {
   background: #e8cd97;
   color: #15241e;
   padding: 12px;
-  z-index: 30;
+  /* Above the top bar, its pop-overs open (z-index 50), and the chat bar (40). */
+  z-index: 60;
 }
 .skip:focus {
   top: 15px;

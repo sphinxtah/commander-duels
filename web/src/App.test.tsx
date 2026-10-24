@@ -1294,6 +1294,90 @@ describe("the chat bar (v0.5.1)", () => {
       }),
     ).toBeInTheDocument();
   });
+
+  it("stops an old address followed in the app before it lands, where the browser can, so Back is never wasted", async () => {
+    // The Navigation API, as Chrome and Edge have it (jsdom has none).
+    const navigation = new EventTarget();
+    Object.defineProperty(window, "navigation", {
+      configurable: true,
+      value: navigation,
+    });
+    const step = (hash: string, more: Record<string, unknown> = {}) =>
+      Object.assign(new Event("navigate", { cancelable: true }), {
+        navigationType: "push",
+        hashChange: true,
+        destination: { url: `${location.origin}${location.pathname}${hash}` },
+        ...more,
+      });
+    try {
+      window.location.hash = "#settings";
+      render(<App />);
+      await screen.findByRole("heading", { name: "Make yourself at home." });
+      const entries = history.length;
+      // Another page's address goes on as ever.
+      const other = step("#decks");
+      act(() => {
+        navigation.dispatchEvent(other);
+      });
+      expect(other.defaultPrevented).toBe(false);
+      // An old Messages address is stopped: the window opens over the page, and the history
+      // gains no entry.
+      const old = step(`#messages/${ada.id}`);
+      act(() => {
+        navigation.dispatchEvent(old);
+      });
+      expect(old.defaultPrevented).toBe(true);
+      expect(
+        await screen.findByRole("region", { name: "Chat with ada" }),
+      ).toBeInTheDocument();
+      expect(window.location.hash).toBe("#settings");
+      expect(history.length).toBe(entries);
+      // Back into an old entry is left to the hashchange's way.
+      const back = step("#messages", { navigationType: "traverse" });
+      act(() => {
+        navigation.dispatchEvent(back);
+      });
+      expect(back.defaultPrevented).toBe(false);
+    } finally {
+      delete (window as { navigation?: EventTarget }).navigation;
+    }
+  });
+
+  it("on a phone, makes the bar of pages inert while the friends list or a conversation covers it", async () => {
+    const width = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 390,
+    });
+    try {
+      window.location.hash = "#settings";
+      render(<App />);
+      await screen.findByRole("heading", { name: "Make yourself at home." });
+      const pages = screen.getByRole("navigation", {
+        name: "Main navigation on a phone",
+      });
+      expect(pages).not.toHaveAttribute("inert");
+      const list = within(bar()).getByRole("button", { name: /^Friends/ });
+      fireEvent.click(list);
+      expect(pages).toHaveAttribute("inert");
+      // A conversation chosen from it takes its place, over the bar of pages still.
+      fireEvent.click(
+        await within(bar()).findByRole("button", { name: /^Chat with ada/ }),
+      );
+      expect(list).toHaveAttribute("aria-expanded", "false");
+      expect(pages).toHaveAttribute("inert");
+      // Folded, it covers nothing.
+      fireEvent.click(
+        within(bar()).getByRole("button", { expanded: true, name: /^ada/ }),
+      );
+      expect(pages).not.toHaveAttribute("inert");
+    } finally {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: width,
+      });
+    }
+  });
 });
 
 // Last in the file: the install offer is one per page, so it stays for any test after this one.

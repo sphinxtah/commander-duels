@@ -20,6 +20,12 @@
     0 10px 30px #00000080;
   backdrop-filter: blur(6px);
 }
+/* While one of its pop-overs is open (the bell's, the account's menu, the search's results), the
+   bar stands above the chat bar (z-index 40, chat/chat.module.css), whose list and conversations
+   would otherwise cover them (v0.5.1). The skip link stays above both (App.module.css). */
+.topbar:has([aria-expanded="true"]) {
+  z-index: 50;
+}
 /* A hairline of light along the bar's lower edge. */
 .topbar::after {
   content: "";

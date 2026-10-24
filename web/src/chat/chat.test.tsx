@@ -1188,6 +1188,123 @@ describe("the chat bar (v0.5.1)", () => {
     expect(oldMessagesRoute("#messages/nobody")).toBeUndefined();
     expect(oldMessagesRoute("#friends")).toBeUndefined();
   });
+
+  it("at the table, leaves Escape in a message's Report dialog to the dialog, and stays out", async () => {
+    people();
+    on("GET /api/v1/conversations/{player_id}", () => reply(200, page()));
+    on("POST /api/v1/conversations/{player_id}/read", () =>
+      reply(200, { unread: 0 }),
+    );
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([{ playerId: ADA, folded: false }]),
+    );
+    render(<Probe me={me} table="g1" />);
+    act(() => shown!.setTableOpen(true));
+    await settle();
+    fireEvent.click(
+      screen.getByRole("button", { name: "More about the message from ada" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Report" }));
+    const dialog = screen.getByRole("dialog", { name: "Report a message" });
+    expect(dialog).toHaveAttribute("open");
+    // Escape in the dialog is the dialog's: the browser's close is not cancelled, and the bar
+    // stays out, so no modal dialog is left open out of sight over the table.
+    const why = within(dialog).getByLabelText(/Why are you reporting it/);
+    expect(fireEvent.keyDown(why, { key: "Escape" })).toBe(true);
+    expect(shown!.tableOpen).toBe(true);
+    // A key a part of the bar already handled is left alone too.
+    const handled = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    handled.preventDefault();
+    act(() => {
+      screen.getByLabelText("Write to ada").dispatchEvent(handled);
+    });
+    expect(shown!.tableOpen).toBe(true);
+    // The browser closes the dialog; the next Escape puts the bar away.
+    act(() => (dialog as HTMLDialogElement).close());
+    expect(dialog).not.toHaveAttribute("open");
+    expect(
+      fireEvent.keyDown(screen.getByLabelText("Write to ada"), {
+        key: "Escape",
+      }),
+    ).toBe(false);
+    expect(shown!.tableOpen).toBe(false);
+  });
+
+  it("on a phone, a window's Profile link folds it, so the profile shows; on a wider screen it stays", async () => {
+    on("GET /api/v1/conversations/{player_id}", () => reply(200, page()));
+    on("POST /api/v1/conversations/{player_id}/read", () =>
+      reply(200, { unread: 0 }),
+    );
+    screenWidth(390);
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([{ playerId: ADA, folded: false }]),
+    );
+    render(<Probe me={me} />);
+    await settle();
+    const profile = screen.getByRole("link", { name: "Profile" });
+    expect(profile).toHaveAttribute("href", `#player/${ADA}`);
+    fireEvent.click(profile);
+    expect(shown!.windows).toEqual([{ playerId: ADA, folded: true }]);
+    // Wider, the window sits beside the page and stays open.
+    screenWidth(1400);
+    act(() => shown!.fold(ADA, false));
+    fireEvent.click(screen.getByRole("link", { name: "Profile" }));
+    expect(shown!.windows).toEqual([{ playerId: ADA, folded: false }]);
+  });
+
+  it("on a phone, keeps what a sheet covers out of reach, and gives focus to what shows after a close", async () => {
+    people();
+    on("POST /api/v1/conversations/{player_id}/read", () =>
+      reply(200, { unread: 0 }),
+    );
+    screenWidth(390);
+    localStorage.setItem(
+      WINDOWS_KEY,
+      JSON.stringify([
+        { playerId: BOB, folded: false },
+        { playerId: CAL, folded: false },
+      ]),
+    );
+    render(<Probe me={me} />);
+    await settle();
+    const bar = screen.getByRole("complementary", {
+      name: "Friends and messages",
+    });
+    // Cal's conversation lies across the screen, over the list's button (chat.module.css hides
+    // it) and the bar of pages (App makes it inert).
+    expect(shown!.sheet).toBe("window");
+    expect(bar).toHaveAttribute("data-sheet", "window");
+    // Closed, Bob's, waiting its turn, shows in its place and covers the button still: focus goes
+    // to its title bar.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close the chat with cal" }),
+    );
+    expect(shown!.docked).toEqual([{ playerId: BOB, folded: false }]);
+    expect(shown!.sheet).toBe("window");
+    await waitFor(() =>
+      expect(document.getElementById(`chat-window-${BOB}-title`)).toHaveFocus(),
+    );
+    // Closed too, nothing covers the button, which takes focus.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close the chat with bob" }),
+    );
+    expect(shown!.sheet).toBeNull();
+    expect(bar).not.toHaveAttribute("data-sheet");
+    await waitFor(() => expect(toggle()).toHaveFocus());
+    // The list is a sheet of its own.
+    fireEvent.click(toggle());
+    expect(shown!.sheet).toBe("list");
+    expect(bar).toHaveAttribute("data-sheet", "list");
+    // Wider, nothing lies across the page.
+    screenWidth(1400);
+    expect(shown!.sheet).toBeNull();
+  });
 });
 
 describe("the words", () => {

@@ -715,6 +715,38 @@ test.describe("Two-Headed Giant at the table (v0.5.1)", () => {
     await page.context().close();
   });
 
+  test("keeps the turn line whole for SysOp seated at a human table, with every diamond on the band", async ({
+    browser,
+  }) => {
+    const size = SIZES[0];
+    const page = await tablePage(browser, size);
+    const table = await openTable(page, {
+      fixture: { ...tableFixture("giant"), sysop: true },
+      humans: HUMANS,
+    });
+    await sizeChecks(page, size);
+    // The inspection, the table chat and the chat bar's diamond all take a slot on the band.
+    for (const name of [/^Inspection$/, /^Table chat/, /^Friends and messages/])
+      await expect(page.getByRole("button", { name })).toBeVisible();
+    table.send(
+      after(table.fixture.snapshot, (view) => {
+        view.turn = 12;
+        view.active_seat = 2;
+      }),
+    );
+    const turn = page.locator("p[aria-live]").first();
+    await expect(turn).toContainText("Turn 12 · Other team’s turn");
+    const line = turn.locator("span").first();
+    await expect
+      .poll(() =>
+        line.evaluate((element) => element.scrollWidth <= element.clientWidth),
+      )
+      .toBe(true);
+    expect(await occluded(page)).toEqual([]);
+    expect(await table.problems()).toEqual([]);
+    await page.context().close();
+  });
+
   test("numbers each team for SysOp observing, who sees the watched seat's teammate's hand", async ({
     browser,
   }, testInfo) => {
@@ -866,6 +898,19 @@ test.describe("the chat bar at the table (v0.5.1)", () => {
       await expect(
         ada.getByRole("list", { name: "Messages with ada" }),
       ).toContainText("Good luck out there!");
+      // A message's Report dialog keeps its own Escape: it closes, and the bar stays out, with
+      // the table in reach behind it.
+      await ada
+        .getByRole("button", { name: "More about the message from ada" })
+        .click();
+      await ada.getByRole("button", { name: "Report" }).click();
+      const report = page.getByRole("dialog", { name: "Report a message" });
+      await expect(report).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(report).toBeHidden();
+      await expect(bar).toBeVisible();
+      await expect(diamond).toHaveAttribute("aria-expanded", "true");
+      expect(await reachable(diamond)).toBe(true);
       // It stays below the band, and nothing in it leaves the game.
       const band = (await diamond.boundingBox())!;
       for (const part of [ada, bar.getByRole("region", { name: "Friends" })])

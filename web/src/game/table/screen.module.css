@@ -109,10 +109,11 @@
   line-height: 22px;
   text-align: center;
 }
-/* The friends' messages on the chat bar's diamond (v0.5.1), in the bar's own colour. */
+/* The friends' messages on the chat bar's diamond (v0.5.1), in the bar's own colour, with the
+   bar's dark numeral (5.7:1, as the chat's count above). */
 .hudCount[data-tone="friends"] {
   background: #d9714f;
-  color: #fff;
+  color: #1a0f0a;
 }
 .turnLine {
   margin: 0;
@@ -133,6 +134,10 @@
   text-transform: uppercase;
   color: #f6e7c8;
   text-shadow: 0 1px 2px #000;
+}
+/* A line too long for its box is drawn smaller until it fits whole (BandHud, v0.5.1). */
+.turnText {
+  font-size: calc(1.125rem * var(--fit, 1));
 }
 .stepText {
   justify-content: flex-end;

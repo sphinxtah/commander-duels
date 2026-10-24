@@ -69,6 +69,12 @@ const MATCH_ROUTE = /^#match\/([0-9a-f-]{36})$/i;
 function currentGame(): string | undefined {
   return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
 }
+/** What the Navigation API's navigate event tells of a step (not yet in TypeScript's DOM). */
+interface NavigateEvent extends Event {
+  navigationType: "push" | "replace" | "reload" | "traverse";
+  hashChange: boolean;
+  destination: { url: string };
+}
 /** The hash of a whole address, such as a hashchange event's oldURL. */
 function hashOf(url: string): string {
   try {
@@ -268,6 +274,31 @@ export function App() {
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
+  }, []);
+  useEffect(() => {
+    // An old Messages address followed in the app (v0.5.1), where the browser has the Navigation
+    // API: the step is stopped before it lands, so the history keeps no second entry of the page
+    // shown, which Back would step onto with nothing happening. Back into an old entry, and a
+    // browser without it, take the hashchange's way above.
+    const navigation = (window as { navigation?: EventTarget }).navigation;
+    if (!navigation) return;
+    const navigate = (event: Event) => {
+      const step = event as NavigateEvent;
+      if (
+        !step.hashChange ||
+        step.navigationType === "traverse" ||
+        !step.cancelable ||
+        !admittedNow.current ||
+        GAME_ROUTE.test(window.location.hash)
+      )
+        return;
+      const messages = oldMessagesRoute(hashOf(step.destination.url));
+      if (messages === undefined) return;
+      step.preventDefault();
+      setMessagesRoute(messages);
+    };
+    navigation.addEventListener("navigate", navigate);
+    return () => navigation.removeEventListener("navigate", navigate);
   }, []);
   useLayoutEffect(() => {
     // The table fills the window and never scrolls; the other pages scroll as ever, and so does
@@ -511,7 +542,8 @@ export function App() {
     return (
       <ChatContext.Provider value={chat}>
         <GameScreen key={game} gameId={game} me={me} />
-        <ChatBar key={`chat-${game}`} chat={chat} />
+        {/* Keyed by account too: another account signing in here never sees the last one's. */}
+        <ChatBar key={`chat-${me.id}-${game}`} chat={chat} />
       </ChatContext.Provider>
     );
 
@@ -659,7 +691,7 @@ export function App() {
             <SiteLinks className={styles.footerLinks} />
           </footer>
         </main>
-        <PhoneBar shown={shown} />
+        <PhoneBar shown={shown} covered={chat.sheet !== null} />
         <SetupWizard
           me={me}
           onChange={accountChanged}
@@ -667,7 +699,7 @@ export function App() {
           onClose={() => setSetup(null)}
         />
         {/* Friends and their conversations, on every page (v0.5.1). */}
-        <ChatBar chat={chat} />
+        <ChatBar key={`chat-${me.id}`} chat={chat} />
         {/* A game the public queue finds opens from any page (v0.5.0). */}
         {me.permissions.includes("games.play") && <QueueFollower />}
       </div>
