@@ -16,7 +16,9 @@ product, every card resolved to a catalog printing. Drawing a pack:
 - a card the game **cannot play** (v0.4.5) gives way to another from the same sheet, drawn by
   weight from the sheet's cards the game can play, so the pack keeps its size and each slot its
   rarity; the card drawn first is recorded beside the one given. A sheet holding no card the game
-  can play (a token or art card slot) gives nothing.
+  can play (a token or art card slot) gives nothing;
+- a printing **out of reach** (v0.5.1: one of a kind, or its print run all dealt, api/print_runs.py)
+  gives way the same way, but silently: nothing records or shows what was drawn first.
 The randomness is the caller's: the shop draws with the operating system's secure generator, tests
 with a seeded one. Nothing the client sends reaches it.
 """
@@ -234,11 +236,16 @@ def draw_sheet(
 
 
 def draw(
-    collation: Collation, rng: random.Random, removed: frozenset[UUID] = frozenset()
+    collation: Collation,
+    rng: random.Random,
+    removed: frozenset[UUID] = frozenset(),
+    withheld: frozenset[UUID] = frozenset(),
 ) -> tuple[int, list[Pulled]]:
     """A pack: the layout drawn, and its cards, slot by slot in the layout's order. Fixed sheets
     are drawn first, so the random slots avoid duplicating them. removed: printings of cards the
-    game cannot play, each replaced from its own sheet."""
+    game cannot play, each replaced from its own sheet; withheld (v0.5.1): printings out of reach,
+    replaced the same way without a record of them."""
+    gone = removed | withheld
     index = choose_layout(rng, collation.layouts)
     layout = collation.layouts[index]
     taken: set[tuple[UUID, str]] = set()
@@ -250,13 +257,14 @@ def draw(
     for name, _ in layout.contents:
         sheet = collation.sheets[name]
         for card in drawn[name]:
-            if card.printing_id not in removed:
+            if card.printing_id not in gone:
                 pulled.append(Pulled(card.printing_id, card.finish, name))
                 continue
-            others = [other for other in sheet.cards if other.printing_id not in removed]
+            others = [other for other in sheet.cards if other.printing_id not in gone]
             if not others:
                 continue
             given = pick(rng, sheet, taken, others)
             taken.add(key(given))
-            pulled.append(Pulled(given.printing_id, given.finish, name, card.printing_id))
+            replaced = card.printing_id if card.printing_id in removed else None
+            pulled.append(Pulled(given.printing_id, given.finish, name, replaced))
     return index, pulled

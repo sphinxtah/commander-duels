@@ -1,0 +1,22 @@
+{
+  "checked": "2026-10-23",
+  "about": "Print runs (v0.5.1, api/print_runs.py, docs/shop.md \"Print runs\"): printings made in a known, small number of copies, which packs never deal more often than were printed. By Scryfall ID; copies is the serial's denominator.",
+  "printings": [
+    {
+      "scryfall_id": "93de9042-cc62-4ade-8d8d-68fdbc84bfae",
+      "set": "ltr",
+      "number": "0",
+      "name": "The One Ring",
+      "copies": 1,
+      "source": "The card itself, serial 001/001 (Scryfall's image); the owner, 2026-10-23"
+    },
+    {
+      "scryfall_id": "4e6fee52-33a8-4085-b632-bf95dfd2b16d",
+      "set": "ltr",
+      "number": "748z",
+      "name": "The One Ring",
+      "copies": 100,
+      "source": "The owner, 2026-10-23: \"The One Ring — Serialized Poster /100 LTR #748z\""
+    }
+  ]
+}

@@ -92,6 +92,7 @@ from api.models import (
     TokenEntry,
     User,
 )
+from api.print_runs import dealt, limited
 from api.products import (
     ERAS,
     NEVER_SOLD,
@@ -769,16 +770,36 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
             409, "pack_unavailable", f"{product.name} cannot be opened until its data is read."
         )
     collation = load(db, product.collation_id)
-    # A card the game cannot play gives way to another from its sheet (v0.4.5), and so does a
-    # one-of-a-kind printing (v0.5.1): its only copy is one account's, never a pack's.
+    # A card the game cannot play gives way to another from its sheet (v0.4.5).
     removed = frozenset(
         db.scalars(
             select(CardPrinting.id)
             .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
             .where(CardPrinting.id.in_(collation.printings()), not_(playable()))
         )
-    ) | (one_of_a_kind(db) & collation.printings())
-    layout, pulled = draw(collation, secrets.SystemRandom(), removed)
+    )
+    # So, silently, does a printing out of reach (v0.5.1): one of a kind, its only copy one
+    # account's; or one whose print run is all dealt (api/print_runs.py).
+    runs = limited(db, settings_of(request).content_dir, collation.printings())
+    used = dealt(db, set(runs))
+    withheld = (one_of_a_kind(db) & collation.printings()) | {
+        printing for printing, copies in runs.items() if used[printing] >= copies
+    }
+    layout, pulled = draw(collation, secrets.SystemRandom(), removed, frozenset(withheld))
+    # A limited printing the pack drew is counted again under its row's lock, with the copies of
+    # it this pack deals; one the pack would take past its run is drawn again without it.
+    while drawn := {card.printing_id for card in pulled} & set(runs) - withheld:
+        used = dealt(db, drawn, lock=True)
+        over = {
+            printing
+            for printing in drawn
+            if used[printing] + sum(card.printing_id == printing for card in pulled)
+            > runs[printing]
+        }
+        if not over:
+            break
+        withheld |= over
+        layout, pulled = draw(collation, secrets.SystemRandom(), removed, frozenset(withheld))
     printings = {
         printing.id: printing
         for printing in db.scalars(

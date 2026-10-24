@@ -2,9 +2,12 @@
 (LTR #0, 001/001, in the Black Speech of Mordor) to be Sphinx's alone. Packs never deal a
 one-of-a-kind printing, no deck but its owner's (and SysOp's) may hold it, and migration 0027
 grants it to the player whose handle is Sphinx, once. The test catalog has no One Ring: a Lightning
-Bolt printing stands in for it."""
+Bolt printing stands in for it. And print runs (v0.5.1): packs never deal a printing made in a known
+number of copies more often than it was printed, across every account."""
 
+import json
 import os
+from collections.abc import Iterator
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -27,9 +30,9 @@ from test_library_editions import (  # noqa: F401 (fixtures)
 from test_progression import Account
 from test_shop import fixture_product, funded
 
-from api import library
+from api import library, print_runs
 from api import shop as shop_api
-from api.collation import load
+from api.collation import Pulled, load
 from api.identity import utcnow
 from api.models import CardPrinting, LibraryGrant, User
 
@@ -52,9 +55,9 @@ def test_a_pack_never_deals_a_one_of_a_kind_printing(client, monkeypatch):  # no
     removed: list[frozenset[UUID]] = []
     real = shop_api.draw
 
-    def draw(collation, rng, gone):  # type: ignore[no-untyped-def]
-        removed.append(gone)
-        return real(collation, rng, gone)
+    def draw(collation, rng, gone, withheld):  # type: ignore[no-untyped-def]
+        removed.append(withheld)
+        return real(collation, rng, gone, withheld)
 
     monkeypatch.setattr(shop_api, "draw", draw)
     ada = funded(client, "ada", 10_000)
@@ -66,7 +69,7 @@ def test_a_pack_never_deals_a_one_of_a_kind_printing(client, monkeypatch):  # no
         ).json()["pack"]
         opening = ada.send("POST", f"/api/v1/shop/packs/{pack}/open").json()
         assert str(unique.id) not in {card["printing_id"] for card in opening["cards"]}
-    # Every opening gave it way, as it does a card the game cannot play.
+    # Every opening gave it way, as it does a card the game cannot play, but unnamed.
     assert removed and all(unique.id in gone for gone in removed)
 
 
@@ -200,3 +203,102 @@ def test_the_migration_on_postgresql(tmp_path, monkeypatch):
         with admin.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         admin.dispose()
+
+
+# Print runs.
+
+
+@pytest.fixture
+def runs(content: Path) -> Iterator[Path]:  # noqa: F811
+    """The content folder's print-runs.json, written by the test, and gone after it."""
+    path = content / "print-runs.json"
+    print_runs.runs_in.cache_clear()
+    yield path
+    path.unlink(missing_ok=True)
+    print_runs.runs_in.cache_clear()
+
+
+def limit(path: Path, printing: CardPrinting, copies: int) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "printings": [
+                    {"scryfall_id": str(printing.scryfall_id), "copies": copies},
+                    {"scryfall_id": str(uuid4()), "copies": None},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    print_runs.runs_in.cache_clear()
+
+
+def test_a_pack_never_deals_a_printing_past_its_print_run(client, runs, monkeypatch):  # noqa: F811
+    product = fixture_product(client)
+    with database(client) as db:
+        assert product.collation_id is not None
+        collation = load(db, product.collation_id)
+        limited, other = list(
+            db.scalars(
+                select(CardPrinting).where(CardPrinting.id.in_(collation.printings())).limit(2)
+            )
+        )
+    limit(runs, limited, 2)
+    # The draw deals the limited printing whenever it may, twice when asked to, else the other.
+    twice = {"value": False}
+    calls: list[frozenset[UUID]] = []
+
+    def draw(collation, rng, removed, withheld):  # type: ignore[no-untyped-def]
+        calls.append(withheld)
+        if limited.id in withheld:
+            return 0, [Pulled(other.id, "nonfoil", "common")]
+        cards = [Pulled(limited.id, "nonfoil", "common")]
+        if twice["value"]:
+            cards.append(Pulled(limited.id, "foil", "foil"))
+        return 0, cards
+
+    monkeypatch.setattr(shop_api, "draw", draw)
+    ada, bob = Account(client, "ada"), Account(client, "bob")
+    root = Account(client, "root", kind="sysop")
+    for who in (ada, bob):
+        given = root.send(
+            "POST", f"/api/v1/admin/users/{who.id}/tokens", {"amount": 10_000, "reason": "Tests"}
+        )
+        assert given.status_code == 200, given.text
+
+    def opened(who: Account) -> list[tuple[str, bool]]:
+        pack = who.send(
+            "POST", "/api/v1/shop/purchases", {"product": str(product.id), "key": uuid4().hex}
+        ).json()["pack"]
+        answer = who.send("POST", f"/api/v1/shop/packs/{pack}/open")
+        assert answer.status_code == 200, answer.text
+        return [(card["printing_id"], card["replaced"]) for card in answer.json()["cards"]]
+
+    # Two copies printed: one to Ada, then a pack that would take both is drawn again without it.
+    assert opened(ada) == [(str(limited.id), False)]
+    twice["value"] = True
+    assert opened(bob) == [(str(other.id), False)]
+    # One copy is left, and Bob's next pack takes it; then the run is dealt, for everyone, and
+    # what gives way is not named.
+    twice["value"] = False
+    assert opened(bob) == [(str(limited.id), False)]
+    for who in (ada, bob):
+        assert opened(who) == [(str(other.id), False)]
+    assert limited.id in calls[-1]
+    with database(client) as db:
+        assert print_runs.dealt(db, {limited.id}) == {limited.id: 2}
+
+
+def test_the_print_runs_are_sourced_and_name_the_owners_examples():
+    listed = json.loads(
+        (Path(__file__).resolve().parent.parent / "content" / "print-runs.json").read_text(
+            encoding="utf-8"
+        )
+    )["printings"]
+    by_id = {UUID(item["scryfall_id"]): item for item in listed}
+    assert len(by_id) == len(listed)
+    assert by_id[ONE_RING]["copies"] == 1
+    assert by_id[UUID("4e6fee52-33a8-4085-b632-bf95dfd2b16d")]["copies"] == 100
+    for item in listed:
+        assert item["source"], item
+        assert item["copies"] is None or item["copies"] >= 1, item
