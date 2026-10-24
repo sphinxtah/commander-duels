@@ -529,7 +529,7 @@ class PixiTableScene implements TableScene {
     canvasElement.addEventListener("webglcontextrestored", this.onRestored);
     document.addEventListener("visibilitychange", this.onVisible);
     this.unsubscribe = this.ui.subscribe(this.onUi);
-    void this.loadMark();
+    void this.loadBack();
 
     this.layoutStage();
     this.render();
@@ -1781,7 +1781,9 @@ class PixiTableScene implements TableScene {
               // Turn control (rule 723, v0.5.1): a turn another player controls says so.
               const controller = active?.controlledBy ?? null;
               caption =
-                controller !== null && !watching && controller === model.viewSeat
+                controller !== null &&
+                !watching &&
+                controller === model.viewSeat
                   ? "You Control This Turn"
                   : controller !== null && ours
                     ? "Controlled Turn"
@@ -1997,10 +1999,10 @@ class PixiTableScene implements TableScene {
     }
   }
 
-  /** Draws the site's mark onto the card back once its image has loaded. */
-  private async loadMark(): Promise<void> {
+  /** Draws the official card back (v0.6.0) once its image has loaded. */
+  private async loadBack(): Promise<void> {
     try {
-      const response = await fetch("/brand/mark.webp", {
+      const response = await fetch("/brand/card-back.webp", {
         credentials: "same-origin",
       });
       if (!response.ok) return;
@@ -2015,11 +2017,13 @@ class PixiTableScene implements TableScene {
         bitmap,
       );
       bitmap.close();
-      this.backCanvas.getContext("2d")?.drawImage(drawn, 0, 0);
+      const ctx = this.backCanvas.getContext("2d");
+      ctx?.clearRect(0, 0, this.backCanvas.width, this.backCanvas.height);
+      ctx?.drawImage(drawn, 0, 0);
       this.art.back.source.update();
       this.requestFrame();
     } catch {
-      // The lattice alone is still a card back.
+      // The lattice is still a card back.
     }
   }
 

@@ -485,12 +485,9 @@
   backface-visibility: hidden;
   border-radius: 5% / 3.6%;
 }
+/* The official Magic card back (v0.6.0): its picture holds its own black border and corners. */
 .back {
-  background:
-    radial-gradient(ellipse at center, #c9a24a55 0 18%, transparent 19% 100%),
-    repeating-conic-gradient(from 0deg, #3b2a1a 0 15deg, #2b1f13 15deg 30deg),
-    #2b1f13;
-  border: 0.35rem solid #1a120b;
+  background: url("/brand/card-back.webp") center / 100% 100% no-repeat;
   box-shadow: 0 6px 16px #00000077;
 }
 .card:not([aria-disabled="true"]):hover .back,

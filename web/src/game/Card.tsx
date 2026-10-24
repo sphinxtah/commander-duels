@@ -66,7 +66,7 @@ export function CardFace({
   if (card.hidden || !card.name)
     return (
       <div className={styles.cardBack} aria-hidden="true">
-        <img src="/brand/mark.webp" alt="" />
+        <img src="/brand/card-back.webp" alt="" />
       </div>
     );
   // A new name is a new image: remount rather than reset, so a cached image that loads at once

@@ -158,18 +158,26 @@ export function bandStrip(height: number): HTMLCanvasElement {
 }
 
 /**
- * Our card back: a dark lattice with a gold edge and the site's wordless mark in the middle (drawn
- * once the mark's image has loaded; the lattice alone until then). It stands in for every hidden
- * card, so a face-down card never asks for an image.
+ * The card back: the official Magic card back (v0.6.0, the owner's) once its image has loaded, and
+ * until then a dark lattice with a gold edge. It stands in for every hidden card, so a face-down
+ * card never asks for an image of its own.
  */
 export function cardBack(
   width: number,
   height: number,
-  mark: CanvasImageSource | null,
+  official: CanvasImageSource | null,
 ): HTMLCanvasElement {
   const c = canvas(width, height);
   const ctx = context(c);
   const r = width * 0.045;
+  if (official) {
+    // The picture has its own rounded, transparent corners; the clip keeps them round at any size.
+    ctx.beginPath();
+    ctx.roundRect(0, 0, width, height, r);
+    ctx.clip();
+    ctx.drawImage(official, 0, 0, width, height);
+    return c;
+  }
   ctx.beginPath();
   ctx.roundRect(0, 0, width, height, r);
   ctx.fillStyle = "#14201f";
@@ -196,16 +204,6 @@ export function cardBack(
     ctx.moveTo(x + height, 0);
     ctx.lineTo(x, height);
     ctx.stroke();
-  }
-  if (mark) {
-    const w = width * 0.55;
-    const size =
-      "width" in mark && typeof mark.width === "number" && mark.width > 0
-        ? (mark.height as number) / mark.width
-        : 1;
-    ctx.globalAlpha = 0.8;
-    ctx.drawImage(mark, (width - w) / 2, (height - w * size) / 2, w, w * size);
-    ctx.globalAlpha = 1;
   }
   ctx.restore();
   ctx.lineWidth = Math.max(1.5, width * 0.016);

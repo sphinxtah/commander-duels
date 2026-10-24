@@ -106,6 +106,12 @@ export function HomeHub({
     <div className={styles.hub}>
       <Embers />
       <section className={styles.welcome} aria-labelledby="hub-title">
+        {/* The whole greeting opens the profile (v0.6.0, the owner's request). */}
+        <a
+          className={styles.welcomeLink}
+          href="#profile"
+          aria-label="Your profile"
+        />
         <div className={styles.allyStage}>
           {me.alliance ? (
             <Portrait
@@ -161,9 +167,9 @@ export function HomeHub({
             </div>
           )}
           {!me.alliance && (
-            <a className={styles.quiet} href="#profile">
+            <span className={styles.quiet}>
               Choose an ally on your profile <span aria-hidden="true">→</span>
-            </a>
+            </span>
           )}
         </div>
       </section>
