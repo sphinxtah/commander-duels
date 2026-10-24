@@ -228,11 +228,14 @@ test.describe("decks and the card catalog", () => {
     );
     await page.keyboard.press("Escape");
 
-    // A card the game engine cannot play is not in the game (v0.4.5): no search finds it, and
-    // no term or filter names playability any more. Temple of Khonshu is in the test slice, and
-    // the engine has no implementation of it.
+    // A card the game engine cannot play is a stand-in (v0.6.2): search finds it, marked so,
+    // and no term or filter names playability. Temple of Khonshu is in the test slice, and the
+    // engine has no implementation of it.
     await page.getByLabel("Search cards").fill('!"Temple of Khonshu"');
-    await expect(page.getByText("0 cards", { exact: true })).toBeVisible();
+    await expect(page.getByText("1 card", { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Temple of Khonshu, .*Stand-in/ }),
+    ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /not playable yet/ }),
     ).toHaveCount(0);
