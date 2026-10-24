@@ -51,7 +51,7 @@ POST /api/v1/practice-games
 | `bots` | One entry per bot, in turn order, each with an optional `deck`, `deck_id` (one of your decks) or (SysOp) `deck_list` |
 | `bot_skill` | XMage's AI skill, 1–6 (default 4) |
 | `turn_cap` | 1–200 turns (default 60) |
-| `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)). Both true, casual, by default. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
+| `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)), and since v0.6.2 `"stand_in": bool` ([below](#stand-ins-v062)). All true, casual, by default; left out, `stand_in` is allowed when both others are. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
 | `best_of` | Since v0.5.0: 1 (the default), or in Legacy 3 for a best-of-three match with sideboards ([matches](matches.md)) |
 
 The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
@@ -64,6 +64,15 @@ Refusals:
 - 422 for a bad table, a deck of the wrong format, a seat with both a deck and a deck list, a malformed deck list (`invalid_deck_list` with the line), or unknown card names (`unknown_cards`, with the names in `names`). For an own deck: `invalid_deck` when it is not one of yours or not of the format, `deck_not_playable` until it is legal and every card is playable, and since v0.4.5 `deck_not_allowed` when it holds cards the game's `rules` do not allow, named in the message. SysOp's decks need only cards in the game (until v0.4.5, cards the engine implements). A deck list naming a card not in the game gets `cards_not_playable` (v0.4.5). Since v0.4.0, a deck holding Godlike custom cards the running engine has not loaded gets `custom_not_loaded` (their names in `names`), and a bot seat holding one gets `custom_cards_for_bots` ([progression](progression.md#playing-them-v040)).
 - 429 `games_busy` with `Retry-After: 30` when the API runs `CD_GAMES_MAX` games (default 2) or the engine is full (`CD_ENGINE_MAX_GAMES`). Games still being created count toward `CD_GAMES_MAX`, so requests at the same moment cannot all pass the check.
 - 503 `games_unavailable` without a service token; 503 `engine_unavailable` when the engine does not answer.
+
+### Stand-ins (v0.6.2)
+
+A card the engine has no implementation of ([catalog](catalog.md#stand-ins-v062)) plays as a stand-in in casual games, the owner's decision of v0.6.2 ("if someone pulled a Black Lotus from an extremely expensive Alpha deck", they should have and play that card).
+
+- **What it is.** A card with its printed name, mana cost, card types, subtypes and supertypes, power and toughness (a printed `*` counts 0, `1+*` 1), loyalty and defense, and colours, and no abilities: its rules text has no effect. A creature attacks and blocks, a land is played and makes no mana, a spell is cast and resolves doing nothing, a planeswalker enters with its loyalty and has no abilities to activate. Its one rule, which the table shows in place of its text, says so: "Stand-in: the game has no rules for this card yet, so its rules text has no effect." A card with faces stands in as its front face; a split card as its whole name with its first half's cost and types.
+- **Its picture.** The table names it as the catalog does, so its own picture shows ([the game screen](game-screen.md#cards)): the image cache looks every name up in the whole catalog.
+- **The deck list.** The API describes the stand-ins a deck holds beside its list (`api/stand_ins.py`): `"stand_ins": [{"name", "mana_cost", "types", "subtypes", "supertypes", "colors", "power", "toughness", "loyalty", "defense"}]`, and the entries and commanders name them. The engine makes each copy from its description (`StandInCard`), never looking the name up in XMage's database, so a card XMage implements but the site's checks held back plays as a stand-in too. A list without `stand_ins` reads as before. Since v0.6.2 the service route takes bodies up to 256 KiB, so four decks of a hundred stand-ins fit.
+- **Where.** At casual tables, practice games and the queues (the `stand_in` rule, on by default); a table or practice game under tournament rules refuses a deck holding one with `422 deck_not_allowed`, naming the cards ("This table does not allow stand-ins: Farmstead plays as a stand-in."). SysOp's decks and deck lists may hold stand-ins whatever the rules, as they may hold any card in the game. Bots play their starter and fixture decks, which hold none.
 
 ### Two-Headed Giant (v0.5.0, early)
 
@@ -182,7 +191,7 @@ The page then asks `/api/v1/me`, which rotates the cookie, and reconnects at onc
   - **When it is built.** The engine builds it only while XMage waits for a human seat's answer. The game thread is then parked, and an answer cannot close the prompt until the view is built, so XMage's state holds still. Otherwise the engine waits up to 3 seconds for that moment, then answers `unsettled` (409). A finished game keeps its final inspection.
   - **Where SysOp gets it.** With `"inspect": true` on the WebSocket, or from `GET /api/v1/games/{id}/inspection`.
   - **Audit.** Every opening is audited as `game.inspection_opened`. Observing another player's game is `game.observed`, and closing it `game.closed`.
-- **Any card** (`cards.any`). A practice game's `deck_list` may name any card in the game, in any number, for SysOp's seat or a bot's. Until v0.4.5 that was any card the engine implements; since then only cards a game can play are in the game, for SysOp too ([catalog](catalog.md#only-playable-cards-are-in-the-game-v045)).
+- **Any card** (`cards.any`). A practice game's `deck_list` may name any card in the game, in any number, for SysOp's seat or a bot's. Until v0.4.5 that was any card the engine implements; since then only cards a game can play are in the game, for SysOp too ([catalog](catalog.md#only-playable-cards-are-in-the-game-v045)), and since v0.6.2 the stand-ins, which the API describes to the engine ([stand-ins](#stand-ins-v062)).
   - **The text.** One card per line: an optional count (`4`, `4x`), then the name. `#` and `//` lines are comments. Deck sites' set annotations (`Lightning Bolt (M10) 146`) are ignored. A `Commander` heading or a `Commander: Name` line names the commander, and a `Sideboard` heading skips what follows.
   - **Names.** The API first checks each name against the catalog: a card's own name, or one of its faces' (a double-faced card by its front). A name of no card in the game, a token's or an unknown one, is refused (`422 cards_not_playable`, the names together in `names`). The engine then matches them exactly first, then ignoring case, to XMage's preferred printing; names it does not know come back as `unknown_cards`. `GET /api/v1/engine/cards` offers only names of cards in the game.
   - **No format rules.** Nothing is checked beyond the shape: a Commander list names one or two commanders, at most 250 different cards, 250 copies of one card and 1,000 cards in all.
@@ -194,7 +203,7 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 
 | Route | Purpose |
 | --- | --- |
-| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit. Unknown card names return 400 `unknown_cards`. Since v0.5.0 a Legacy deck list may carry its `sideboard`, kept outside the game for wishes, and the request may name the `starting_seat` ([matches](matches.md#the-engine)) |
+| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit (256 KiB since v0.6.2, for stand-ins' descriptions). Unknown card names return 400 `unknown_cards`. Since v0.5.0 a Legacy deck list may carry its `sideboard`, kept outside the game for wishes, and the request may name the `starting_seat` ([matches](matches.md#the-engine)) |
 | `GET` and `POST` under `/v1/service/games/{id}/` (`view`, `commands`) | As the development routes; the seat token still selects the seat |
 | `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices |
 | `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |

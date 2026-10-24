@@ -56,7 +56,7 @@ from api.roster import (
     tier_of,
 )
 from api.schemas import Contract, StoredText
-from catalog.statuses import playable
+from catalog.statuses import in_game
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
@@ -444,8 +444,8 @@ def choose_starters(
 def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryView:
     """The cards in the account's library, one item per card and edition (v0.5.0), each with the
     edition's image, its copies and where they came from. An account that builds from the whole
-    catalog has no list here. Copies of a card the game cannot play stay recorded but are not
-    shown (v0.4.5): they come back if the engine learns it."""
+    catalog has no list here. Copies of a card out of the game stay recorded but are not shown
+    (v0.4.5); since v0.6.2 a stand-in is in the game, and shown with its badge."""
     if library.unlimited:
         return LibraryView(unlimited=True, alliance=library.alliance, cards=[])
     held = {printing_id for printing_id, edition in library.editions.items() if edition.copies}
@@ -454,7 +454,7 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
         for printing in db.scalars(
             select(CardPrinting)
             .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-            .where(CardPrinting.id.in_(held), playable())
+            .where(CardPrinting.id.in_(held), in_game())
         )
     }
     summaries = summaries_by_id(db, {printing.concept_id for printing in printings.values()})
@@ -504,8 +504,8 @@ def my_alliance_cards(
 ) -> AllianceCards:
     """The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
     every account, those that build from the whole catalog included: each says how many copies
-    the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a
-    game can play (v0.4.5)."""
+    the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards in
+    the game (v0.4.5), the stand-ins too since v0.6.2."""
     planeswalker = roster_of(request).get(library.alliance) if library.alliance else None
     if planeswalker is None:
         return AllianceCards(alliance=None, name=None, custom=False, cards=[])
@@ -514,7 +514,7 @@ def my_alliance_cards(
     chosen: dict[str, UUID] = {}
     for card_id, key in db.execute(
         select(CardConcept.id, CardConcept.construction_key)
-        .where(CardConcept.id.in_(ids), playable())
+        .where(CardConcept.id.in_(ids), in_game())
         .order_by(CardConcept.default_printing_id.is_(None), CardConcept.normalized_name)
     ):
         chosen.setdefault(key, card_id)

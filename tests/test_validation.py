@@ -158,18 +158,30 @@ def test_bans_releases_and_engine_support_are_told_apart(session):
     assert banned.needs == ["banned"] and notes(banned) == [("card.banned", "banned")]
     assert banned.warnings[0].card_ids == [card(session, "Black Lotus").id]
     assert "tables that allow banned cards" in banned.warnings[0].message
+    # A card the engine lacks plays as a stand-in since v0.6.2: a note that needs a table allowing
+    # stand-ins, as a banned card's needs one allowing banned cards.
     future = check(session, "legacy", entry(session, "Temple of Khonshu"), lands(session, 59))
     kinds = {problem.code: problem.kind for problem in future.errors}
-    assert kinds == {"card.not_released": "not_released", "card.not_implemented": "not_implemented"}
-    # A card the engine's checks held back (left uncommitted: the next test sees it certified).
+    assert kinds == {"card.not_released": "not_released"}
+    assert ("card.stand_in", "stand_in") in notes(future) and "stand_in" in future.needs
+    # A card the engine's checks held back is a stand-in too (left uncommitted: the next test sees
+    # it certified).
     held = card(session, "Grizzly Bears")
     held.status, held.status_reason = "implemented", "characteristics_differ"
     held.status_detail = "The engine's card differs from the Oracle card: power 3 against 2."
     session.flush()
-    quarantined = check(session, "legacy", entry(session, "Grizzly Bears"), lands(session, 59))
-    assert codes(quarantined) == ["card.not_implemented"]
-    assert (quarantined.legal, quarantined.playable) == (True, False)
-    assert "differs from the Oracle card" in quarantined.errors[0].message
+    stand_in = check(session, "legacy", entry(session, "Grizzly Bears"), lands(session, 59))
+    assert (stand_in.legal, stand_in.playable, codes(stand_in)) == (True, True, [])
+    assert stand_in.needs == ["stand_in"] and notes(stand_in) == [("card.stand_in", "stand_in")]
+    assert "plays as a stand-in" in stand_in.warnings[0].message
+    # One the staff suspended is out of the game: it keeps the deck from playing.
+    held.status, held.status_reason = "suspended", "suspended_by_staff"
+    held.status_detail = "Rules bug"
+    session.flush()
+    suspended = check(session, "legacy", entry(session, "Grizzly Bears"), lands(session, 59))
+    assert codes(suspended) == ["card.not_implemented"]
+    assert (suspended.legal, suspended.playable, suspended.needs) == (True, False, [])
+    assert "Rules bug" in suspended.errors[0].message
     # The maybeboard holds anything without blocking.
     maybe = check(
         session,

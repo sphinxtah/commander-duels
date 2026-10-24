@@ -538,6 +538,7 @@ def record_rematch(
         turn_cap=old.turn_cap,
         allow_banned=old.allow_banned,
         allow_not_legal=old.allow_not_legal,
+        allow_stand_in=old.allow_stand_in,
         status="open",
         created_at=now,
         queued=old.queued,

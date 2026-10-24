@@ -382,7 +382,7 @@ def test_a_table_from_the_lobby_to_the_result(client, engine):
     table = created.json()
     code = table["code"]
     assert len(code) >= 16 and table["status"] == "open" and table["your_seat"] == 0
-    assert table["rules"] == {"banned": True, "not_legal": True}
+    assert table["rules"] == {"banned": True, "not_legal": True, "stand_in": True}
     assert table["players"][0] == {
         "seat": 0,
         "player": "human",
@@ -618,7 +618,7 @@ def test_the_hosts_rules_choose_which_decks_sit(client, engine):
     where the host learns only whose deck no longer fits."""
     ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
     root = Account(client, "sysop", kind="sysop")
-    tournament = {"banned": False, "not_legal": False}
+    tournament = {"banned": False, "not_legal": False, "stand_in": False}
 
     # The host's own deck is checked too.
     refused = ada.send(
@@ -676,6 +676,7 @@ def test_the_hosts_rules_choose_which_decks_sit(client, engine):
     assert casual.status_code == 201 and casual.json()["rules"] == {
         "banned": True,
         "not_legal": True,
+        "stand_in": True,
     }
     bob.send("POST", f"/api/v1/tables/{casual.json()['code']}/leave")
     no_bans = bob.send(
@@ -725,8 +726,18 @@ def test_tables_open_at_the_upgrade_become_casual(tmp_path, monkeypatch):
         )
     command.upgrade(config, "head")
     with engine.connect() as connection:
-        found = connection.execute(text("SELECT allow_banned, allow_not_legal FROM game_tables"))
-        assert [tuple(map(bool, row)) for row in found] == [(True, True)]
+        found = connection.execute(
+            text("SELECT allow_banned, allow_not_legal, allow_stand_in FROM game_tables")
+        )
+        assert [tuple(map(bool, row)) for row in found] == [(True, True, True)]
+    # At the v0.6.2 upgrade a casual table allows stand-ins, and one under other rules does not.
+    command.downgrade(config, "0028_auction_house")
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE game_tables SET allow_banned = false"))
+    command.upgrade(config, "head")
+    with engine.connect() as connection:
+        found = connection.execute(text("SELECT allow_stand_in FROM game_tables"))
+        assert [bool(row[0]) for row in found] == [False]
     command.downgrade(config, before)
     command.upgrade(config, "head")
     engine.dispose()

@@ -72,7 +72,7 @@ function table(fields: Partial<TableView> = {}): TableView {
     bots: 0,
     bot_skill: 4,
     turn_cap: 60,
-    rules: { banned: true, not_legal: true },
+    rules: { banned: true, not_legal: true, stand_in: true },
     best_of: 1,
     host: "bob",
     players: [
@@ -154,11 +154,11 @@ describe("the lobby", () => {
           code: "Tournament-code1",
           format: "commander",
           seats: 4,
-          rules: { banned: false, not_legal: false },
+          rules: { banned: false, not_legal: false, stand_in: false },
         }),
         table({
           code: "Bans-only-code12",
-          rules: { banned: true, not_legal: false },
+          rules: { banned: true, not_legal: false, stand_in: false },
         }),
       ]),
     );
@@ -181,7 +181,7 @@ describe("the lobby", () => {
       within(tournament!).getByText("Tournament rules"),
     ).toBeInTheDocument();
     expect(tournament).toHaveTextContent(
-      "Tournament rules: no banned cards, and no cards not legal in Commander.",
+      "Tournament rules: no banned cards, no cards not legal in Commander, and no stand-ins.",
     );
     expect(within(bans!).getByText("Banned cards allowed")).toBeInTheDocument();
 
@@ -211,7 +211,7 @@ describe("the lobby", () => {
     await settle();
     const opened = api.calls.find((c) => c.route === "POST /api/v1/tables")!;
     expect(opened.options).toMatchObject({
-      body: { rules: { banned: false, not_legal: false }, deck_id: "deck-1" },
+      body: { rules: { banned: false, not_legal: false, stand_in: false }, deck_id: "deck-1" },
     });
     // Unticking Tournament rules goes back to casual.
     await act(async () =>
@@ -377,7 +377,7 @@ describe("a table", () => {
   it("says the table's rules, and greys the decks they do not take", async () => {
     const api = mockApi();
     api.on("GET /api/v1/tables/{code}", () =>
-      reply(200, table({ rules: { banned: false, not_legal: false } })),
+      reply(200, table({ rules: { banned: false, not_legal: false, stand_in: false } })),
     );
     api.on("GET /api/v1/decks", () =>
       reply(200, [
@@ -389,7 +389,7 @@ describe("a table", () => {
     await settle();
     expect(screen.getByText("Tournament rules")).toBeInTheDocument();
     expect(screen.getByText(/^Hosted by bob\./)).toHaveTextContent(
-      "Tournament rules: no banned cards, and no cards not legal in Legacy.",
+      "Tournament rules: no banned cards, no cards not legal in Legacy, and no stand-ins.",
     );
     expect(
       within(screen.getByLabelText("Your deck")).getByRole("option", {

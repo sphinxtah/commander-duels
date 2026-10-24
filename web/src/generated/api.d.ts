@@ -1855,8 +1855,8 @@ export interface paths {
          * My Library
          * @description The cards in the account's library, one item per card and edition (v0.5.0), each with the
          *     edition's image, its copies and where they came from. An account that builds from the whole
-         *     catalog has no list here. Copies of a card the game cannot play stay recorded but are not
-         *     shown (v0.4.5): they come back if the engine learns it.
+         *     catalog has no list here. Copies of a card out of the game stay recorded but are not shown
+         *     (v0.4.5); since v0.6.2 a stand-in is in the game, and shown with its badge.
          */
         get: operations["my_library_api_v1_library_get"];
         put?: never;
@@ -2061,8 +2061,8 @@ export interface paths {
          * My Alliance Cards
          * @description The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
          *     every account, those that build from the whole catalog included: each says how many copies
-         *     the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a
-         *     game can play (v0.4.5).
+         *     the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards in
+         *     the game (v0.4.5), the stand-ins too since v0.6.2.
          */
         get: operations["my_alliance_cards_api_v1_me_alliance_cards_get"];
         put?: never;
@@ -3695,6 +3695,17 @@ export interface components {
             rulings: components["schemas"]["Ruling"][];
             /** Set Code */
             set_code: string | null;
+            /**
+             * Stand In
+             * @description The game has no rules for it yet (v0.6.2): casual games play it as a stand-in, with its cost, types, power and toughness; tournament rules refuse it.
+             * @default false
+             */
+            stand_in: boolean;
+            /**
+             * Stand In Note
+             * @description What a stand-in is, in a sentence, for a stand-in card.
+             */
+            stand_in_note?: string | null;
             /** Status */
             status: string;
             /** Status Detail */
@@ -3843,6 +3854,17 @@ export interface components {
             released_at: string | null;
             /** Set Code */
             set_code: string | null;
+            /**
+             * Stand In
+             * @description The game has no rules for it yet (v0.6.2): casual games play it as a stand-in, with its cost, types, power and toughness; tournament rules refuse it.
+             * @default false
+             */
+            stand_in: boolean;
+            /**
+             * Stand In Note
+             * @description What a stand-in is, in a sentence, for a stand-in card.
+             */
+            stand_in_note?: string | null;
             /** Status */
             status: string;
             /** Status Detail */
@@ -4277,7 +4299,7 @@ export interface components {
              * Needs
              * @description The table options its cards need (v0.4.5): only tables that allow them take it.
              */
-            needs: ("banned" | "not_legal")[];
+            needs: ("banned" | "not_legal" | "stand_in")[];
             /** Notes */
             notes: string;
             /** Playable */
@@ -4442,7 +4464,7 @@ export interface components {
              * Needs
              * @description The table options its cards need (v0.4.5): only tables that allow them take it.
              */
-            needs: ("banned" | "not_legal")[];
+            needs: ("banned" | "not_legal" | "stand_in")[];
             /** Playable */
             playable: boolean;
             /**
@@ -6027,7 +6049,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "format_illegal" | "not_released" | "not_implemented" | "collection_locked" | "structure" | "banned" | "not_legal";
+            kind: "format_illegal" | "not_released" | "not_implemented" | "collection_locked" | "structure" | "banned" | "not_legal" | "stand_in";
             /** Location */
             location?: ("main" | "sideboard" | "commander" | "companion" | "maybeboard") | null;
             /** Message */
@@ -6179,6 +6201,12 @@ export interface components {
             /** Collector Number */
             collector_number: string;
             /**
+             * Extra
+             * @description Given in a pack opened before v0.6.2 in place of the card listed before it, which the game could not play then; since v0.6.2 the account holds both.
+             * @default false
+             */
+            extra: boolean;
+            /**
              * Faces
              * @description Faces with images of their own; 0 for one image.
              */
@@ -6197,7 +6225,10 @@ export interface components {
              * @description No copy of its edition was in the library for good before (by edition since v0.5.0).
              */
             new: boolean;
-            /** Position */
+            /**
+             * Position
+             * @description Its place in the pack as revealed; since v0.6.2 in the order shown, a past pack's card drawn and the one given in its place each with its own.
+             */
             position: number;
             /**
              * Printing Id
@@ -6206,16 +6237,16 @@ export interface components {
             printing_id: string;
             /** Rarity */
             rarity: string;
-            /**
-             * Replaced
-             * @description Drawn from its sheet in place of a card the game cannot play (v0.4.5); the opening's record names that card.
-             * @default false
-             */
-            replaced: boolean;
             /** Set Code */
             set_code: string;
             /** Sheet */
             sheet: string;
+            /**
+             * Stand In
+             * @description The game has no rules for this card yet (v0.6.2): casual games play it as a stand-in.
+             * @default false
+             */
+            stand_in: boolean;
             /** Type Line */
             type_line: string;
         };
@@ -7585,8 +7616,9 @@ export interface components {
         };
         /**
          * TableRules
-         * @description Which cards a table's decks may hold by their legality in its format (v0.4.5); the format's
-         *     deck rules apply whatever these say. Casual rules allow both; tournament rules neither.
+         * @description Which cards a table's decks may hold by their legality in its format (v0.4.5), and since
+         *     v0.6.2 whether they may hold cards the engine plays as stand-ins; the format's deck rules apply
+         *     whatever these say. Casual rules allow all three; tournament rules none.
          */
         TableRules: {
             /**
@@ -7599,6 +7631,11 @@ export interface components {
              * @description Cards not legal in the format: Un-cards, playtest and digital-only cards.
              */
             not_legal: boolean;
+            /**
+             * Stand In
+             * @description Cards the game has no rules for yet, which play as stand-ins with their cost, types, power and toughness (v0.6.2). Left out, it follows the other two: allowed when both are, as a client from before v0.6.2 meant casual rules.
+             */
+            stand_in?: boolean;
         };
         /** TableView */
         TableView: {
@@ -7878,9 +7915,9 @@ export interface components {
             legal: boolean;
             /**
              * Needs
-             * @description The table options the deck needs (v0.4.5): banned for a card banned in the format, not_legal for a card not legal in it. Empty: any table takes it. Its warnings of the same kinds name the cards.
+             * @description The table options the deck needs (v0.4.5): banned for a card banned in the format, not_legal for a card not legal in it, and since v0.6.2 stand_in for a card the engine plays as a stand-in. Empty: any table takes it. Its warnings of the same kinds name the cards.
              */
-            needs: ("banned" | "not_legal")[];
+            needs: ("banned" | "not_legal" | "stand_in")[];
             /** Playable */
             playable: boolean;
             /** Warnings */

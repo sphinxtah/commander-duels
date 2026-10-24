@@ -62,6 +62,17 @@ At the owner's decision of 2026-10-21 ("If the engine can't play a card, and we 
 - **What follows.** Deck drafts lose such cards, with a note ([decks](decks.md#cards-that-leave-the-game-v045)); a pack that would pull one draws another from the same sheet ([shop](shop.md#buying-and-opening)); library copies of one stay recorded but hidden ([progression](progression.md#the-library)).
 - **The game is untouched.** The table still names and pictures any card the engine puts on it, tokens included: the image cache looks every name up in the whole catalog ([the game screen](game-screen.md#cards)). Games, and the deck versions they played, keep their cards.
 - **On 2026-10-22** about 2,600 deck cards were out (351 of them legal in Commander, mostly Un-cards and Attractions; the rest digital-only and playtest cards), with the 4,161 objects no deck holds. No starter deck and no engine fixture deck holds one.
+- **Until v0.6.2.** Since then the deck cards the engine lacks are back in the game as stand-ins ([below](#stand-ins-v062)); what stays out is listed there.
+
+### Stand-ins (v0.6.2)
+
+The owner's decision of v0.6.2, after a pack summary showed Farmstead (Alpha) "In place of a card the game cannot play": "when tearing packs, I want the actual card to be there. No more replacing cards. In casual play, players should still be able to play those "illegal" cards, so let them have it." A deck card the engine cannot play as written is in the game again, for every account, players, administrators and SysOp alike, as a **stand-in**.
+
+- **Which cards** (`catalog/statuses.py` `stand_in()`): a card a deck holds, still in Scryfall's catalog, whose status is `unsupported` (not implemented, or a layout this version does not know), `mapped` (its class does not load), `implemented` (held back by the gates) or `catalog_only` (not checked yet). `in_game()` is the certified cards and the stand-ins; `playable()` still means certified, where the engine must truly implement the card (the coverage counts, guided creation's proposals, the bots' starter decks).
+- **Still out:** tokens, emblems, art cards and the other objects no deck holds (`NOT_A_DECK_CARD`, a meld's back face), cards Scryfall no longer lists, and cards the staff suspended. Administration's review lists them as before.
+- **Where they show:** search and the Cards page, card pages and their printings, the deck builder's finder, deck imports, libraries and the alliance tab, Leng's packs, the auction house and SysOp's deck lists. Every card says whether it is one (`stand_in`, with `stand_in_note`), and the browser shows a "Stand-in" badge wherever a card's status shows (the Cards page, the card page, the library, the deck editor's rows and finder, the pack summary), titled "The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness."
+- **How they play** ([games](games.md#stand-ins-v062)): with their printed cost, card types, subtypes, supertypes, power and toughness, loyalty and defense, and their own picture; their rules text has no effect. Casual tables, practice games and the queues take them; tournament rules refuse them ([the table's rules](tables.md#the-tables-rules-v045)), as they refuse banned cards.
+- **A card the engine learns** becomes certified at the next sync and plays as written; nothing else changes for the decks and libraries that hold it.
 
 ### Prepare cards (v0.4.5)
 
@@ -82,7 +93,7 @@ Coverage on 2026-10-20, engine build `1.4.62-eb69d05b-7909ff1a7bd0`: the engine 
 
 ## Search (DECK03, DECK04)
 
-`GET /api/v1/cards` takes filters (name, text, type, colors with exact/including/within, identity, mana value range, rarity, set, format) and a query in Scryfall's syntax, and finds only cards in the game (v0.4.5). Words are ANDed, `or` and parentheses group, and `-` negates. At most 500 characters, 40 terms and 8 levels of parentheses.
+`GET /api/v1/cards` takes filters (name, text, type, colors with exact/including/within, identity, mana value range, rarity, set, format) and a query in Scryfall's syntax, and finds only cards in the game (v0.4.5), the stand-ins among them since v0.6.2. Words are ANDed, `or` and parentheses group, and `-` negates. At most 500 characters, 40 terms and 8 levels of parentheses.
 
 | Key | Example |
 | --- | --- |
@@ -109,7 +120,7 @@ An unknown key or a malformed term is refused with a message that says what was 
 | Route | Who | |
 | --- | --- | --- |
 | `GET /api/v1/cards` | signed-in players | Search. Since v0.3.1 each card carries `owned`, the copies in the player's library (null when not limited), and `owned=true` keeps to the library ([the Planeswalker Alliance](progression.md#the-library)); since v0.5.0 `editions`, the editions it holds of the card |
-| `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags, status and newest 60 printings; `?printing=<id>` also lists that printing of the card when it is older (since v0.3.0, for a deck entry's chosen printing). Since v0.4.5 a card out of the game answers 404. Since v0.5.0 `printings=owned` lists only the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog), `printings=chosen` only the `printing` given, and the card carries `editions`, the editions the library holds with their copies |
+| `GET /api/v1/cards/{id}` | signed-in players | A card with its faces, rulings, related cards, legalities, tags, status and newest 60 printings; `?printing=<id>` also lists that printing of the card when it is older (since v0.3.0, for a deck entry's chosen printing). Since v0.4.5 a card out of the game answers 404 (since v0.6.2 a stand-in is in it). Since v0.5.0 `printings=owned` lists only the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog), `printings=chosen` only the `printing` given, and the card carries `editions`, the editions the library holds with their copies |
 | `GET /api/v1/cards/{id}/printings` | signed-in players | Its English printings, newest first (404 for a card out of the game) |
 | `GET /api/v1/sets` | signed-in players | Sets holding a card in the game, for the set filter |
 | `GET /api/v1/catalog` | signed-in players | The current revision, the last run, the next scheduled run, whether it is stale (no successful run for 48 hours), format versions and counts |

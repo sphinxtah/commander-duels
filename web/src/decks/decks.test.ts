@@ -16,7 +16,13 @@ import {
   type DeckEntry,
 } from "./decks";
 import { card, edition, entry, problem, validation } from "./fixtures";
-import { verdict } from "./ProblemList";
+import { needWords, verdict } from "./ProblemList";
+import {
+  casualRules,
+  rulesSentence,
+  rulesTag,
+  tournamentRules,
+} from "../tables/tables";
 
 const bolt = card("Lightning Bolt", {
   mana_cost: "{R}",
@@ -254,6 +260,27 @@ describe("the player's library", () => {
     });
     expect(verdict(validation({ needs: ["not_legal"] })).words).toBe(
       "Ready to play at tables that allow cards not legal in Legacy.",
+    );
+    // A card the game has no rules for yet plays as a stand-in at casual tables (v0.6.2).
+    expect(verdict(validation({ needs: ["stand_in"] })).words).toBe(
+      "Ready to play at tables that allow stand-ins. Cards the game has no rules for yet play as stand-ins, with their cost, types, power and toughness.",
+    );
+    expect(
+      verdict(validation({ needs: ["banned", "not_legal", "stand_in"] }))
+        .words,
+    ).toMatch(
+      /^Ready to play at casual tables, which allow banned cards, cards not legal in Legacy and stand-ins\./,
+    );
+    expect(needWords("stand_in", "legacy")).toBe("Plays stand-ins");
+    expect(
+      rulesTag({ banned: true, not_legal: false, stand_in: true }, "legacy"),
+    ).toBe("Banned cards and stand-ins allowed");
+    expect(rulesTag(casualRules, "commander")).toBe("Casual");
+    expect(rulesTag(tournamentRules, "commander")).toBe("Tournament rules");
+    expect(
+      rulesSentence({ banned: true, not_legal: true, stand_in: false }, "legacy"),
+    ).toBe(
+      "Decks may hold banned cards and cards not legal in Legacy, but no stand-ins.",
     );
     expect(
       verdict(

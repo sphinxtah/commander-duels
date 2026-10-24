@@ -293,7 +293,7 @@ describe("the practice table for a player (v0.3.1)", () => {
       (c) => c.route === "POST /api/v1/practice-games",
     )!;
     expect(started.options).toMatchObject({
-      body: { deck_id: "deck-a", rules: { banned: false, not_legal: true } },
+      body: { deck_id: "deck-a", rules: { banned: false, not_legal: true, stand_in: true } },
     });
   });
 

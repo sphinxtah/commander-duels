@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from api.version import APP_VERSION
 
@@ -313,23 +313,38 @@ DECK_LIST = Field(
     max_length=60_000,
     description="SysOp only (cards.any): one card per line, any card in the game.",
 )
-# The table options a deck may need by its cards' legality in the format (v0.4.5).
-TableOption = Literal["banned", "not_legal"]
+# The table options a deck may need by its cards' legality in the format (v0.4.5), and since
+# v0.6.2 by the cards the engine plays as stand-ins.
+TableOption = Literal["banned", "not_legal", "stand_in"]
 
 
 class TableRules(Contract):
-    """Which cards a table's decks may hold by their legality in its format (v0.4.5); the format's
-    deck rules apply whatever these say. Casual rules allow both; tournament rules neither."""
+    """Which cards a table's decks may hold by their legality in its format (v0.4.5), and since
+    v0.6.2 whether they may hold cards the engine plays as stand-ins; the format's deck rules apply
+    whatever these say. Casual rules allow all three; tournament rules none."""
 
     banned: bool = Field(description="Cards banned in the format.")
     not_legal: bool = Field(
         description="Cards not legal in the format: Un-cards, playtest and digital-only cards."
     )
+    stand_in: bool = Field(
+        default=None,  # type: ignore[assignment]
+        description="Cards the game has no rules for yet, which play as stand-ins with their "
+        "cost, types, power and toughness (v0.6.2). Left out, it follows the other two: allowed "
+        "when both are, as a client from before v0.6.2 meant casual rules.",
+    )
+
+    @model_validator(mode="after")
+    def _stand_in(self) -> "TableRules":
+        if self.stand_in is None:
+            self.stand_in = self.banned and self.not_legal
+        return self
 
 
 def casual() -> TableRules:
-    """A new table's rules, and a new practice game's: every card, whatever its legality."""
-    return TableRules(banned=True, not_legal=True)
+    """A new table's rules, and a new practice game's: every card, whatever its legality, and the
+    stand-ins (v0.6.2)."""
+    return TableRules(banned=True, not_legal=True, stand_in=True)
 
 
 # One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards (api/matches.py).

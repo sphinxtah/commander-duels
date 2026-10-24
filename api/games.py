@@ -104,6 +104,7 @@ from api.schemas import (
     TableRules,
 )
 from api.schemas import GameSeat as SeatSummary
+from api.stand_ins import stand_ins
 from api.teams import TEAMS, assign_and_check
 from api.validation import DeckContent, DeckEntry, Problem, not_allowed, validate_deck
 from catalog.statuses import playable
@@ -1180,9 +1181,15 @@ def refusal(db: Session, refused: list[Problem], fmt: str) -> str:
     )
     kinds: list[str] = []
     clauses: list[str] = []
-    for option, kind, said in (
-        ("banned", "banned cards", "banned"),
-        ("not_legal", f"cards not legal in {name}", "not legal"),
+    for option, kind, one, many in (
+        ("banned", "banned cards", f"is banned in {name}", f"are banned in {name}"),
+        (
+            "not_legal",
+            f"cards not legal in {name}",
+            f"is not legal in {name}",
+            f"are not legal in {name}",
+        ),
+        ("stand_in", "stand-ins", "plays as a stand-in", "play as stand-ins"),
     ):
         held = list(
             dict.fromkeys(
@@ -1195,7 +1202,7 @@ def refusal(db: Session, refused: list[Problem], fmt: str) -> str:
         )
         if held:
             kinds.append(kind)
-            clauses.append(f"{listed(held)} {'is' if len(held) == 1 else 'are'} {said} in {name}")
+            clauses.append(f"{listed(held)} {one if len(held) == 1 else many}")
     return (
         f"This table does not allow {' or '.join(kinds)}: {'; '.join(clauses)}. Choose another "
         f"deck, or take {'it' if len(ids) == 1 else 'them'} out of this one."
@@ -1212,9 +1219,10 @@ def own_deck(
     rules: TableRules,
 ) -> tuple[dict[str, object], UUID, str]:
     """One of the account's decks as the engine's deck list, bound to an immutable revision of
-    it (DECK01). The revision must be playable: legal, every card certified, and every copy in the
-    player's library now (v0.3.1). Since v0.4.5 the table's rules must also allow its cards'
-    legality: banned cards, and cards not legal in the format. SysOp's decks need only cards in
+    it (DECK01). The revision must be playable: legal, every card in the game, and every copy in
+    the player's library now (v0.3.1). Since v0.4.5 the table's rules must also allow its cards'
+    legality: banned cards, and cards not legal in the format; since v0.6.2 its stand-ins, which
+    the deck list describes to the engine (api/stand_ins.py). SysOp's decks need only cards in
     the game (since v0.4.5 no longer any card the engine implements), as its deck lists do. A
     table's host starts the game with every player's deck (api/tables.py)."""
     deck = db.get(Deck, deck_id)
@@ -1266,15 +1274,18 @@ def own_deck(
 
 
 def engine_names(db: Session, entries: list[DeckEntry], godlike: bool) -> dict[UUID, str | None]:
-    """The engine's name of each playable card the entries hold: a catalog card's, and the
-    Godlike tier's custom cards by their own names (v0.4.0)."""
-    names = dict(
+    """The engine's name of each card in the game the entries hold: a certified catalog card's,
+    since v0.6.2 a stand-in's name in the game (api/stand_ins.py), and the Godlike tier's custom
+    cards by their own names (v0.4.0)."""
+    held = {entry.card_id for entry in entries}
+    names: dict[UUID, str | None] = dict(
         db.execute(
             select(CardConcept.id, CardConcept.engine_name).where(
-                CardConcept.id.in_({entry.card_id for entry in entries}), playable()
+                CardConcept.id.in_(held), playable()
             )
         ).all()
     )
+    names |= {card: str(data["name"]) for card, data in stand_ins(db, held - names.keys()).items()}
     if godlike:
         names |= dict(
             db.execute(
@@ -1292,7 +1303,8 @@ def engine_deck_list(
     """A deck's main deck and commanders as the engine's deck list, or None when a card has no
     engine name. Since v0.5.0 a Legacy deck's sideboard goes with it: XMage keeps it outside the
     game, where wishes find it (FMT07). Companions stay out of it, as the companion location does,
-    since XMage would offer a sideboard's companion as one."""
+    since XMage would offer a sideboard's companion as one. Since v0.6.2 the list describes the
+    stand-ins it holds (stand_ins), which the engine makes from their description."""
     counts: dict[str, int] = defaultdict(int)
     sideboard: dict[str, int] = defaultdict(int)
     commanders: list[str] = []
@@ -1322,6 +1334,11 @@ def engine_deck_list(
         deck_list["sideboard"] = [
             {"name": name, "count": count} for name, count in sideboard.items()
         ]
+    standing_in = stand_ins(db, {entry.card_id for entry in entries})
+    if standing_in:
+        deck_list["stand_ins"] = list(
+            {str(data["name"]): data for data in standing_in.values()}.values()
+        )
     return deck_list
 
 

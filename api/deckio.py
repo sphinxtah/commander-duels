@@ -39,7 +39,8 @@ from api.identity import ApiError
 from api.models import CardAlias, CardConcept, CardPrinting
 from api.schemas import Contract
 from api.validation import MAX_ENTRIES, MAX_QUANTITY, DeckEntry, Location
-from catalog.statuses import playable, unplayable_reason
+from catalog.statuses import in_game as in_the_game
+from catalog.statuses import stands_in, unplayable_reason
 from catalog.text import normalize
 
 MAX_TEXT_BYTES = 64 * 1024
@@ -246,11 +247,11 @@ def candidates_by_name(
     db: Session, names: set[str], in_game: bool = True
 ) -> dict[str, list[CardConcept]]:
     """Exact matches for each normalized name: the card's name, then its aliases. in_game: the
-    cards a game can play; otherwise those it cannot, deck cards first."""
+    cards in the game (since v0.6.2 the stand-ins too); otherwise the others, deck cards first."""
     found: dict[str, list[CardConcept]] = {name: [] for name in names}
     if not names:
         return found
-    current = playable() if in_game else not_(playable())
+    current = in_the_game() if in_game else not_(in_the_game())
     for concept in db.scalars(
         select(CardConcept)
         .where(CardConcept.normalized_name.in_(names), current)
@@ -287,7 +288,7 @@ def suggestions(db: Session, name: str) -> list[CardConcept]:
         db.scalars(
             select(CardConcept)
             .where(
-                playable(),
+                in_the_game(),
                 or_(*(CardConcept.name_search.contains(word, autoescape=True) for word in words)),
             )
             .order_by(CardConcept.edhrec_rank.is_(None), CardConcept.edhrec_rank)
@@ -300,13 +301,15 @@ def resolve(
     db: Session, parsed: ParsedDeck, custom: Mapping[str, tuple[UUID, str]] | None = None
 ) -> list[ImportLine]:
     """Each line as a card: by identity, then by exact name; custom (a Godlike owner's custom
-    cards by normalized name) matches what the catalog does not. A line naming only a card the
-    game cannot play is unavailable."""
+    cards by normalized name) matches what the catalog does not. A line naming only a card out of
+    the game is unavailable; since v0.6.2 a stand-in is in the game."""
     identities = [line.oracle_id for line in parsed.lines if line.oracle_id]
     by_oracle: dict[UUID, CardConcept] = {}
     out_of_game: dict[UUID, CardConcept] = {}
     for found in db.scalars(select(CardConcept).where(CardConcept.oracle_id.in_(identities))):
-        in_game = found.status == "certified" and found.removed_revision is None
+        in_game = (found.status == "certified" and found.removed_revision is None) or stands_in(
+            found.status, found.status_reason, found.deck_card, found.removed_revision is not None
+        )
         (by_oracle if in_game else out_of_game)[found.oracle_id] = found
     printings = {
         printing.scryfall_id: printing

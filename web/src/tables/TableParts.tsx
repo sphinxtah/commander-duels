@@ -5,6 +5,7 @@ import {
   casualRules,
   deckFormat,
   formatNames,
+  isTournament,
   rulesSentence,
   rulesTag,
   teamName,
@@ -136,7 +137,7 @@ export function RulesFields({
   onChange: (rules: TableRules) => void;
 }) {
   const name = formatNames[deckFormat(format)];
-  const tournament = !rules.banned && !rules.not_legal;
+  const tournament = isTournament(rules);
   return (
     <fieldset>
       <legend>Cards the decks may hold</legend>
@@ -169,6 +170,22 @@ export function RulesFields({
       <label className={game.choice}>
         <input
           type="checkbox"
+          checked={rules.stand_in}
+          onChange={(event) =>
+            onChange({ ...rules, stand_in: event.target.checked })
+          }
+        />
+        <span>
+          <strong>Stand-ins</strong>
+          <small>
+            Cards the game has no rules for yet, played with their cost, types,
+            power and toughness
+          </small>
+        </span>
+      </label>
+      <label className={game.choice}>
+        <input
+          type="checkbox"
           checked={tournament}
           onChange={(event) =>
             onChange(event.target.checked ? tournamentRules : casualRules)
@@ -176,7 +193,7 @@ export function RulesFields({
         />
         <span>
           <strong>Tournament rules</strong>
-          <small>Neither: every card legal in {name}</small>
+          <small>None of these: every card legal in {name}, with its rules</small>
         </span>
       </label>
     </fieldset>

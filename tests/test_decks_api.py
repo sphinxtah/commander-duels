@@ -8,7 +8,7 @@ import json
 import secrets
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 import httpx
@@ -217,15 +217,15 @@ def test_card_search_and_details(client):
         if item["name"].startswith("Delver of Secrets")
     )
     assert delver["image"]["faces"] == 2 and delver["image"]["artist"]
-    # Only cards a game can play are in the game (v0.4.5): no card the engine lacks, no token or
-    # other object no deck holds, and no term or filter that names playability.
-    assert ada.get("/api/v1/cards", q="temple of khonshu").json()["total"] == 0
+    # Only cards in the game (v0.4.5): no token or other object no deck holds, and no term or
+    # filter that names playability. Since v0.6.2 a card the engine lacks is in it, as a stand-in.
+    assert ada.get("/api/v1/cards", q="temple of khonshu").json()["total"] == 1
     assert "Goblin" not in {i["name"] for i in ada.get("/api/v1/cards", q="goblin").json()["items"]}
     for term in ("status:unsupported", "is:unsupported", "is:playable"):
         assert ada.get("/api/v1/cards", q=term).json()["code"] == "invalid_search"
-    temple = card_id(client, "Temple of Khonshu")
-    assert ada.get(f"/api/v1/cards/{temple}").status_code == 404
-    assert ada.get(f"/api/v1/cards/{temple}/printings").status_code == 404
+    goblin = card_id(client, "Goblin")
+    assert ada.get(f"/api/v1/cards/{goblin}").status_code == 404
+    assert ada.get(f"/api/v1/cards/{goblin}/printings").status_code == 404
     # Prepare cards are, by their layout or either face's name.
     prepared = ada.get("/api/v1/cards", q="is:prepare").json()["items"]
     assert {item["name"] for item in prepared} == {
@@ -415,24 +415,31 @@ def test_decks_keep_the_table_options_they_need(client):
 
 
 def test_cards_the_game_cannot_play_leave_drafts_but_not_revisions(client):
-    """v0.4.5: a draft holds only cards the game can play. A save naming another keeps it out; a
-    card that becomes unplayable (here a staff suspension) leaves every draft, archived and
-    trashed ones too, at once. Each deck notes what left and why until its owner dismisses it, its
-    flags follow, and the versions games played keep their cards."""
+    """v0.4.5: a draft holds only cards in the game. A save naming another keeps it out; a card
+    that leaves the game (here a staff suspension) leaves every draft, archived and trashed ones
+    too, at once. Each deck notes what left and why until its owner dismisses it, its flags
+    follow, and the versions games played keep their cards. Since v0.6.2 a card the engine lacks
+    stays, as a stand-in."""
     ada = Account(client, "ada", admin=True)
     temple = card_id(client, "Temple of Khonshu")
+    goblin = card_id(client, "Goblin")
     created = ada.send(
         "POST",
         "/api/v1/decks",
         {
             "title": "Odd burn",
             "format": "legacy",
-            "entries": [*burn(client), entry(client, "Temple of Khonshu", 2, "maybeboard")],
+            "entries": [
+                *burn(client),
+                entry(client, "Temple of Khonshu", 2, "maybeboard"),
+                entry(client, "Goblin", 1, "maybeboard"),
+            ],
         },
     ).json()
-    assert temple not in json.dumps(created["draft"]) and created["playable"] is True
+    assert temple in json.dumps(created["draft"]) and created["playable"] is True
+    assert goblin not in json.dumps(created["draft"])
     assert [(c["name"], c["quantity"], c["reason"]) for c in created["removed_cards"]] == [
-        ("Temple of Khonshu", 2, "The game engine has no implementation of this card yet.")
+        ("Goblin", 1, "Tokens are made by other cards; no deck holds them.")
     ]
     path = f"/api/v1/decks/{created['id']}"
     assert ada.send("DELETE", f"{path}/removed-cards").json()["removed_cards"] == []
@@ -485,7 +492,8 @@ def test_the_worker_takes_unplayable_cards_out_of_drafts_when_it_starts(client, 
     from catalog import worker
 
     ada = Account(client, "ada")
-    temple = card_id(client, "Temple of Khonshu")
+    # A token, out of the game; since v0.6.2 a card the engine lacks stays, as a stand-in.
+    temple = card_id(client, "Goblin")
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
         now = utcnow()
         deck = Deck(
@@ -505,13 +513,13 @@ def test_the_worker_takes_unplayable_cards_out_of_drafts_when_it_starts(client, 
     database.dispose()
     found = ada.get(f"/api/v1/decks/{deck_id}").json()
     assert temple not in json.dumps(found["draft"]) and found["card_count"] == 60
-    assert [card["name"] for card in found["removed_cards"]] == ["Temple of Khonshu"]
+    assert [card["name"] for card in found["removed_cards"]] == ["Goblin"]
 
 
 def test_an_administrator_accepts_a_card_the_checks_held_back(client):
-    """A card the engine implements that its automatic checks held back is out of the game, and
-    listed for review; accepting it puts it in, audited, and the acceptance outlives syncs
-    (test_catalog.py)."""
+    """A card the engine implements that its automatic checks held back is listed for review, and
+    since v0.6.2 in the game as a stand-in; accepting it certifies it, audited, and the acceptance
+    outlives syncs (test_catalog.py)."""
     ada, bob = Account(client, "ada", admin=True), Account(client, "bob")
     giant = card_id(client, "Hill Giant")
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
@@ -523,7 +531,8 @@ def test_an_administrator_accepts_a_card_the_checks_held_back(client):
         concept.capabilities = {**before, "multiplayer": False, "ai": False}
         db.commit()
     try:
-        assert ada.get(f"/api/v1/cards/{giant}").status_code == 404
+        held = ada.get(f"/api/v1/cards/{giant}").json()
+        assert (held["playable"], held["stand_in"]) == (False, True)
         listed = {
             item["card"]["id"]: item for item in ada.get("/api/v1/admin/catalog/reviews").json()
         }
@@ -657,17 +666,12 @@ def test_import_preview_resolves_names_and_round_trips(client):
     assert statuses["1 Lightnin Bolt"] == "unresolved"
     unresolved = next(line for line in preview["lines"] if line["status"] == "unresolved")
     assert "Lightning Bolt" in [card["name"] for card in unresolved["candidates"]]
-    assert (preview["ambiguous"], preview["unresolved"], preview["unavailable"]) == (1, 1, 1)
+    assert (preview["ambiguous"], preview["unresolved"], preview["unavailable"]) == (1, 1, 0)
     assert "Goblin" not in json.dumps(preview["lines"])
-    # A card the game cannot play is named, and left out with the reason (v0.4.5).
-    temple = next(line for line in preview["lines"] if line["status"] == "unavailable")
-    assert (temple["name"], temple["card_id"], temple["candidates"]) == (
-        "Temple of Khonshu",
-        None,
-        [],
-    )
-    assert temple["reason"] == "The game engine has no implementation of this card yet."
-    assert card_id(client, "Temple of Khonshu") not in json.dumps(preview["entries"])
+    # A card the engine lacks is in the game since v0.6.2, as a stand-in (until then it was named
+    # and left out with the reason).
+    assert statuses["1 Temple of Khonshu"] == "resolved"
+    assert card_id(client, "Temple of Khonshu") in json.dumps(preview["entries"])
     sideboard = next(line for line in preview["lines"] if "Brainstorm" in line["text"])
     assert sideboard["location"] == "sideboard"
     bolt = next(line for line in preview["lines"] if "Lightning Bolt (M10)" in line["text"])
@@ -1045,6 +1049,206 @@ def test_practice_games_bind_your_own_deck_revisions(url, starters):
             for table in ACCOUNT_TABLES:
                 db.execute(text(f"DELETE FROM {table}"))
             db.commit()
+
+
+def test_stand_ins_are_in_the_game_and_play_at_casual_tables(url, starters):
+    """v0.6.2: a deck card the engine lacks is in the game as a stand-in: found, shown with its
+    note, held by decks as a note that needs the stand_in option, refused under tournament rules,
+    and sent to the engine described, not named. The test set's Temple of Khonshu is one; Grizzly
+    Bears is made one here, since Temple of Khonshu is not out yet."""
+    from test_games import SERVICE_TOKEN, FakeEngine
+
+    from api.decklists import parse_deck_list, refuse_unplayable
+
+    fake = FakeEngine()
+    app = create_app(
+        Settings(
+            database_url=url,
+            content_dir=str(starters),
+            engine_service_token=SERVICE_TOKEN,
+            games_per_account=4,
+        )
+    )
+    app.state.engine_transport = httpx.MockTransport(fake)
+
+    def mark_bears(status: str, reason: str | None) -> None:
+        with Session(app.state.database) as db:
+            for concept in db.scalars(
+                select(CardConcept).where(CardConcept.name == "Grizzly Bears")
+            ):
+                concept.status, concept.status_reason = status, reason
+            db.commit()
+
+    with TestClient(app, base_url="https://testserver") as client:
+        try:
+            ada = Account(client, "ada", admin=True)
+            temple = card_id(client, "Temple of Khonshu")
+            found = ada.get("/api/v1/cards", q="temple of khonshu").json()["items"]
+            assert [(item["name"], item["playable"], item["stand_in"]) for item in found] == [
+                ("Temple of Khonshu", False, True)
+            ]
+            assert found[0]["stand_in_note"].startswith("The game has no rules for this card yet")
+            page = ada.get(f"/api/v1/cards/{temple}").json()
+            assert page["stand_in"] is True
+            assert ada.get(f"/api/v1/cards/{temple}/printings").status_code == 200
+            # A certified card is no stand-in; a token is still out of the game.
+            bolt = ada.get("/api/v1/cards", q='!"lightning bolt"').json()["items"][0]
+            assert (bolt["playable"], bolt["stand_in"], bolt["stand_in_note"]) == (
+                True,
+                False,
+                None,
+            )
+            assert "Goblin" not in {
+                item["name"] for item in ada.get("/api/v1/cards", q="goblin").json()["items"]
+            }
+            mark_bears("unsupported", "not_implemented")
+            bears = card_id(client, "Grizzly Bears")
+            deck = ada.send(
+                "POST",
+                "/api/v1/decks",
+                {
+                    "title": "Bear burn",
+                    "format": "legacy",
+                    "entries": [
+                        entry(client, "Lightning Bolt", 4),
+                        entry(client, "Mountain", 52),
+                        entry(client, "Grizzly Bears", 4),
+                    ],
+                },
+            ).json()
+            assert bears in json.dumps(deck["draft"]) and deck["removed_cards"] == []
+            assert (deck["legal"], deck["playable"], deck["needs"]) == (True, True, ["stand_in"])
+            notes = {problem["kind"]: problem for problem in deck["validation"]["warnings"]}
+            assert notes["stand_in"]["code"] == "card.stand_in"
+            assert notes["stand_in"]["card_ids"] == [bears]
+            listed = {item["title"]: item for item in ada.get("/api/v1/decks").json()}
+            assert listed["Bear burn"]["needs"] == ["stand_in"]
+            # Tournament rules refuse it, as they refuse banned cards; a client from before v0.6.2
+            # that names only the other two means tournament rules unless both are allowed.
+            for rules in (
+                {"banned": True, "not_legal": True, "stand_in": False},
+                {"banned": True, "not_legal": False},
+            ):
+                refused = ada.send(
+                    "POST",
+                    "/api/v1/practice-games",
+                    {"format": "legacy", "deck_id": deck["id"], "rules": rules},
+                )
+                assert (refused.status_code, refused.json()["code"]) == (422, "deck_not_allowed")
+                assert refused.json()["message"] == (
+                    "This table does not allow stand-ins: Grizzly Bears plays as a stand-in. "
+                    "Choose another deck, or take it out of this one."
+                )
+            casual = ada.send(
+                "POST", "/api/v1/practice-games", {"format": "legacy", "deck_id": deck["id"]}
+            )
+            assert casual.status_code == 201, casual.json()
+            sent = fake.created[-1]["seats"][0]["deck_list"]
+            assert {"name": "Grizzly Bears", "count": 4} in sent["cards"]
+            assert sent["stand_ins"] == [
+                {
+                    "name": "Grizzly Bears",
+                    "mana_cost": "{1}{G}",
+                    "types": ["Creature"],
+                    "subtypes": ["Bear"],
+                    "supertypes": [],
+                    "colors": ["G"],
+                    "power": "2",
+                    "toughness": "2",
+                }
+            ]
+            ada.send("POST", f"/api/v1/games/{casual.json()['id']}/close", {})
+            # A deck of certified cards only sends no descriptions.
+            plain = ada.send(
+                "POST",
+                "/api/v1/decks",
+                {"title": "Burn", "format": "legacy", "entries": burn(client)},
+            ).json()
+            started = ada.send(
+                "POST",
+                "/api/v1/practice-games",
+                {
+                    "format": "legacy",
+                    "deck_id": plain["id"],
+                    "rules": {"banned": False, "not_legal": False},
+                },
+            )
+            assert started.status_code == 201, started.json()
+            assert "stand_ins" not in fake.created[-1]["seats"][0]["deck_list"]
+            ada.send("POST", f"/api/v1/games/{started.json()['id']}/close", {})
+            # SysOp's deck lists may name a stand-in too, and describe it for the engine.
+            with Session(app.state.database) as db:
+                listed_deck = parse_deck_list("20 Mountain\n1 temple of khonshu", "legacy")
+                refuse_unplayable(db, listed_deck)
+                described = cast(list[dict[str, object]], listed_deck["stand_ins"])
+                assert [card["name"] for card in described] == ["Temple of Khonshu"]
+                assert described[0]["types"] == ["Land"]
+        finally:
+            mark_bears("certified", None)
+            with Session(app.state.database) as db:
+                db.execute(text("DELETE FROM game_seats"))
+                db.execute(text("DELETE FROM games"))
+                for table in ACCOUNT_TABLES:
+                    db.execute(text(f"DELETE FROM {table}"))
+                db.commit()
+
+
+def test_a_stand_in_is_described_by_its_front_face():
+    """api/stand_ins.py: a card with faces stands in as its front; a split card as its whole name,
+    with its first half's cost and types."""
+    from api.models import CardFace
+    from api.stand_ins import described
+
+    def face(position: int, name: str, cost: str, types: str, **more: Any) -> CardFace:
+        return CardFace(
+            position=position, name=name, mana_cost=cost, type_line=types, colors=None, **more
+        )
+
+    walker = CardConcept(
+        name="Stand-in Mage // Stand-in Walker",
+        layout="transform",
+        mana_cost=None,
+        type_line="Legendary Creature — Human Wizard // Legendary Planeswalker — Jace",
+        power=None,
+        toughness=None,
+        loyalty=None,
+        defense=None,
+        colors=["U"],
+    )
+    front = face(0, "Stand-in Mage", "{1}{U}{U}", "Legendary Creature — Human Wizard")
+    front.power, front.toughness = "0", "2"
+    back = face(1, "Stand-in Walker", "", "Legendary Planeswalker — Jace", loyalty="5")
+    assert described(walker, [front, back]) == {
+        "name": "Stand-in Mage",
+        "mana_cost": "{1}{U}{U}",
+        "types": ["Creature"],
+        "subtypes": ["Human", "Wizard"],
+        "supertypes": ["Legendary"],
+        "colors": ["U"],
+        "power": "0",
+        "toughness": "2",
+    }
+    split = CardConcept(
+        name="Stand // In",
+        layout="split",
+        mana_cost="{R} // {1}{U}",
+        type_line="Instant // Sorcery",
+        power=None,
+        toughness=None,
+        loyalty=None,
+        defense=None,
+        colors=["U", "R"],
+    )
+    halves = [face(0, "Stand", "{R}", "Instant"), face(1, "In", "{1}{U}", "Sorcery")]
+    halves[0].colors = ["R"]
+    assert described(split, halves) == {
+        "name": "Stand // In",
+        "mana_cost": "{R}",
+        "types": ["Instant"],
+        "subtypes": [],
+        "supertypes": [],
+        "colors": ["R"],
+    }
 
 
 def test_guided_decks_are_playable_and_explain_every_card(client):

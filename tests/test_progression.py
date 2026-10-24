@@ -434,8 +434,9 @@ def test_the_alliance_tab_lists_the_allied_planeswalkers_cards(client):
 
 
 def test_copies_of_a_card_the_game_cannot_play_are_kept_but_hidden(client):
-    """v0.4.5: a card the engine cannot play leaves the library's list and the alliance tab. Its
-    copies stay recorded, so they come back if the engine learns the card."""
+    """v0.4.5: a card out of the game (here suspended by the staff) leaves the library's list and
+    the alliance tab. Its copies stay recorded, so they come back with the card. Since v0.6.2 a
+    card the engine lacks stays, as a stand-in."""
     ada = Account(client, "ada", onboarding="starters")
     ada.send("POST", "/api/v1/me/starters", {"decks": ["starter_red_test", "starter_blue_test"]})
     ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "tibalt"})
@@ -448,6 +449,16 @@ def test_copies_of_a_card_the_game_cannot_play_are_kept_but_hidden(client):
             db.commit()
 
     mark("unsupported", "not_implemented")
+    try:
+        shown = {
+            item["card"]["name"]: item["card"]["stand_in"]
+            for item in ada.get("/api/v1/library").json()["cards"]
+        }
+        assert shown["Lightning Bolt"] is True and shown["Sol Ring"] is False
+        assert len(ada.get("/api/v1/me/alliance/cards").json()["cards"]) == 1
+    finally:
+        mark("certified", None)
+    mark("suspended", "suspended_by_staff")
     try:
         library = {item["card"]["name"] for item in ada.get("/api/v1/library").json()["cards"]}
         assert "Sol Ring" in library and not library & set(names)

@@ -33,30 +33,72 @@ export function teamName(team: number): string {
   return `Team ${team + 1}`;
 }
 
-/** A new table's rules, and a new practice game's (v0.4.5): every card, whatever its legality. */
-export const casualRules: TableRules = { banned: true, not_legal: true };
-/** Neither banned cards nor cards not legal in the format. */
-export const tournamentRules: TableRules = { banned: false, not_legal: false };
+/** A new table's rules, and a new practice game's (v0.4.5): every card, whatever its legality,
+ * and since v0.6.2 the stand-ins. */
+export const casualRules: TableRules = {
+  banned: true,
+  not_legal: true,
+  stand_in: true,
+};
+/** No banned cards, no cards not legal in the format, no stand-ins. */
+export const tournamentRules: TableRules = {
+  banned: false,
+  not_legal: false,
+  stand_in: false,
+};
+const OPTIONS = ["banned", "not_legal", "stand_in"] as const;
 
-/** A table's rules as one tag: Casual, Tournament rules, or the one kind of card it allows. */
+/** Whether the rules allow every option (casual) or none (tournament rules). */
+export function isCasual(rules: TableRules): boolean {
+  return OPTIONS.every((option) => rules[option]);
+}
+export function isTournament(rules: TableRules): boolean {
+  return OPTIONS.every((option) => !rules[option]);
+}
+
+/** The kinds of card an option allows, in words. */
+function optionWords(
+  option: (typeof OPTIONS)[number],
+  format: TableFormat,
+): string {
+  if (option === "banned") return "banned cards";
+  if (option === "not_legal")
+    return `cards not legal in ${formatNames[deckFormat(format)]}`;
+  return "stand-ins";
+}
+
+function joined(words: string[], conjunction = "and"): string {
+  return words.length === 1
+    ? words[0]!
+    : `${words.slice(0, -1).join(", ")} ${conjunction} ${words[words.length - 1]}`;
+}
+
+/** A table's rules as one tag: Casual, Tournament rules, or the kinds of card it allows. */
 export function rulesTag(rules: TableRules, format: TableFormat): string {
-  if (rules.banned && rules.not_legal) return "Casual";
-  if (!rules.banned && !rules.not_legal) return "Tournament rules";
-  return rules.banned
-    ? "Banned cards allowed"
-    : `Cards not legal in ${formatNames[deckFormat(format)]} allowed`;
+  if (isCasual(rules)) return "Casual";
+  if (isTournament(rules)) return "Tournament rules";
+  const allowed = joined(
+    OPTIONS.filter((option) => rules[option]).map((option) =>
+      optionWords(option, format),
+    ),
+  );
+  return `${allowed.charAt(0).toUpperCase()}${allowed.slice(1)} allowed`;
 }
 
 /** A table's rules in a sentence, for its own page. */
 export function rulesSentence(rules: TableRules, format: TableFormat): string {
   const name = formatNames[deckFormat(format)];
-  if (rules.banned && rules.not_legal)
-    return `Casual: decks may hold banned cards and cards not legal in ${name}.`;
-  if (!rules.banned && !rules.not_legal)
-    return `Tournament rules: no banned cards, and no cards not legal in ${name}.`;
-  return rules.banned
-    ? `Decks may hold banned cards, but no cards not legal in ${name}.`
-    : `Decks may hold cards not legal in ${name}, but no banned cards.`;
+  if (isCasual(rules))
+    return `Casual: decks may hold banned cards, cards not legal in ${name}, and stand-ins (cards the game has no rules for yet, played with their cost, types, power and toughness).`;
+  if (isTournament(rules))
+    return `Tournament rules: no banned cards, no cards not legal in ${name}, and no stand-ins.`;
+  const allowed = OPTIONS.filter((option) => rules[option]).map((option) =>
+    optionWords(option, format),
+  );
+  const refused = OPTIONS.filter((option) => !rules[option]).map((option) =>
+    optionWords(option, format),
+  );
+  return `Decks may hold ${joined(allowed)}, but no ${joined(refused, "or")}.`;
 }
 
 /** Why a deck cannot sit at a table with these rules, or null when it can: the stored flags of
@@ -68,12 +110,7 @@ export function unfit(deck: OwnDeck, rules: TableRules): string | null {
       : "not playable yet";
   const refused = deck.needs.filter((need) => !rules[need]);
   if (refused.length === 0) return null;
-  const name = formatNames[deckFormat(deck.format)];
-  return refused.length > 1
-    ? `holds banned cards and cards not legal in ${name}`
-    : refused[0] === "banned"
-      ? "holds banned cards"
-      : `holds cards not legal in ${name}`;
+  return `holds ${joined(refused.map((need) => optionWords(need, deck.format)))}`;
 }
 
 /** Asks again every POLL_MS while the page is shown; the answer of an unmounted page is dropped.

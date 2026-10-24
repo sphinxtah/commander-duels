@@ -7,9 +7,11 @@ printings are listed with it. Search takes structured filters, the search syntax
 or both.
 
 Since v0.4.5 only cards a game can play are in the game: search, card pages and their printings
-find nothing else, for every account (catalog.statuses.playable). Administration's review keeps
-listing the cards the automatic checks held back and the suspended ones, because accepting or
-restoring one is how it comes back.
+find nothing else, for every account. Since v0.6.2 that includes the stand-ins, deck cards the
+engine lacks, which casual games play with their cost, types, power and toughness
+(catalog.statuses.in_game); each card says whether it is one (stand_in). Administration's review
+keeps listing the cards the automatic checks held back and the suspended ones, because accepting
+or restoring one is how it comes back.
 """
 
 import time
@@ -44,7 +46,8 @@ from api.roster import roster_of
 from api.schemas import Contract
 from api.search import Compiler, Leaf, SearchError, condition
 from catalog import sync
-from catalog.statuses import SUSPENDED_DETAIL, playable
+from catalog.statuses import STAND_IN_NOTE, SUSPENDED_DETAIL, playable, stands_in
+from catalog.statuses import in_game as in_the_game
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Manager = Annotated[Principal, Depends(require_permission("catalog.manage"))]
@@ -111,6 +114,14 @@ class CardSummary(Contract):
     status_detail: str | None
     # Certified: a game can be started with it.
     playable: bool
+    stand_in: bool = Field(
+        default=False,
+        description="The game has no rules for it yet (v0.6.2): casual games play it as a "
+        "stand-in, with its cost, types, power and toughness; tournament rules refuse it.",
+    )
+    stand_in_note: str | None = Field(
+        default=None, description="What a stand-in is, in a sentence, for a stand-in card."
+    )
     # The engine's wording may differ from today's Oracle text (CAT08).
     text_differs: bool
     legalities: dict[str, str]
@@ -308,6 +319,12 @@ def image_of(printing: CardPrinting | None) -> CardImageRef | None:
 def summary(
     concept: CardConcept, faces: list[CardFace], printing: CardPrinting | None
 ) -> CardSummary:
+    standing_in = stands_in(
+        concept.status,
+        concept.status_reason,
+        concept.deck_card,
+        concept.removed_revision is not None,
+    )
     return CardSummary(
         id=concept.id,
         name=concept.name,
@@ -344,6 +361,8 @@ def summary(
         status_reason=concept.status_reason,
         status_detail=concept.status_detail,
         playable=concept.status == "certified" and concept.removed_revision is None,
+        stand_in=standing_in,
+        stand_in_note=STAND_IN_NOTE if standing_in else None,
         text_differs=concept.text_differs,
         legalities={
             fmt: (concept.legalities or {}).get(fmt, "not_legal") for fmt in LEGALITY_FORMATS
@@ -456,7 +475,7 @@ def filters(
         leaves.append(Leaf("f", ":", legal))
     conditions.extend(compiler.compile(leaf) for leaf in leaves)
     # Only cards a game can play, which are all deck cards: no token, emblem or art card.
-    conditions.append(playable())
+    conditions.append(in_the_game())
     if library is not None and not library.unlimited:
         owned = [key for key, copies in library.copies.items() if copies > 0]
         conditions.append(CardConcept.construction_key.in_(owned))
@@ -568,7 +587,7 @@ def printing_summary(printing: CardPrinting) -> PrintingSummary:
 
 def in_game(db: Session, card_id: UUID) -> CardConcept:
     """A card a game can play; any other is not found, as a card that does not exist."""
-    concept = db.scalar(select(CardConcept).where(CardConcept.id == card_id, playable()))
+    concept = db.scalar(select(CardConcept).where(CardConcept.id == card_id, in_the_game()))
     if concept is None:
         raise not_found()
     return concept
@@ -692,7 +711,7 @@ def sets(principal: Active, db: Db) -> list[SetSummary]:
             func.count(func.distinct(CardPrinting.concept_id)),
         )
         .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-        .where(CardPrinting.removed_revision.is_(None), playable())
+        .where(CardPrinting.removed_revision.is_(None), in_the_game())
         .group_by(CardPrinting.set_code)
         .order_by(func.min(CardPrinting.released_at).desc(), CardPrinting.set_code)
     )

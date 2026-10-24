@@ -24,10 +24,11 @@ The owner's decision at the start of v0.4.5 ([plan](plans/0.4.5.md#decisions-at-
 - **Two options.** The host chooses whether the table's decks may hold:
   - **banned cards**: banned in the format by Scryfall's legality or the format version's banned list, Lutri as a Commander companion included;
   - **cards not legal in the format**: Un-cards, playtest and digital-only cards.
-- **Casual by default.** A new table allows both. **Tournament rules** turns both off; unticking it goes back to casual. There is no option for restricted cards: no Legacy or Commander card is restricted, and a restricted card still counts as one allowed copy.
+- **A third option** (v0.6.2): **stand-ins**, the cards the game has no rules for yet, which play with their cost, types, power and toughness, their rules text inert ([catalog](catalog.md#stand-ins-v062), [games](games.md#stand-ins-v062)). A deck holding one needs it (`needs` lists `stand_in`), as one holding a banned card needs `banned`; a table refusing it says so: "This table does not allow stand-ins: Farmstead plays as a stand-in." The rules carry it as `stand_in`; a request from before v0.6.2 that leaves it out gets it allowed when both others are, as casual meant then.
+- **Casual by default.** A new table allows all three. **Tournament rules** turns all three off; unticking it goes back to casual. Queues are casual, and a rematch keeps its table's rules. There is no option for restricted cards: no Legacy or Commander card is restricted, and a restricted card still counts as one allowed copy.
 - **The format's deck rules always apply:** deck size, copy limits, Commander's singleton and colour identity, commanders, partners and companions, and no card that is not out yet, not a deck card, or gone from Scryfall.
-- **Tags.** The lobby shows each table's seats and rules as tags: "Casual" when both are allowed, "Tournament rules" when neither is, otherwise the one it allows ("Banned cards allowed", or "Cards not legal in Commander allowed"). The table's own page, which its invite link opens, shows them too, with a sentence that spells them out.
-- **Tables open at the upgrade** became casual. They took only legal decks, so allowing more takes nothing away.
+- **Tags.** The lobby shows each table's seats and rules as tags: "Casual" when all are allowed, "Tournament rules" when none is, otherwise the ones it allows ("Banned cards allowed", "Cards not legal in Commander allowed", "Banned cards and stand-ins allowed"). The table's own page, which its invite link opens, shows them too, with a sentence that spells them out.
+- **Tables open at the upgrade** became casual. They took only legal decks, so allowing more takes nothing away. At the v0.6.2 upgrade a table allowing both banned cards and cards not legal in the format (casual) allows stand-ins too, and any other does not (migration `0029_stand_ins`).
 
 ## Decks
 

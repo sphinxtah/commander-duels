@@ -75,7 +75,7 @@ from api.models import (
 from api.roster import Planeswalker, roster_of
 from api.schemas import Contract, StoredText
 from api.social import AuctionKind, notify_auction
-from catalog.statuses import playable
+from catalog.statuses import in_game
 from catalog.text import normalize
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -1126,7 +1126,7 @@ def sellable(
         query = (
             select(CardPrinting, CardConcept)
             .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-            .where(playable(), CardPrinting.scryfall_id.not_in(list(ONE_OF_A_KIND)))
+            .where(in_game(), CardPrinting.scryfall_id.not_in(list(ONE_OF_A_KIND)))
             .order_by(
                 CardConcept.normalized_name,
                 CardPrinting.released_at.desc().nulls_last(),

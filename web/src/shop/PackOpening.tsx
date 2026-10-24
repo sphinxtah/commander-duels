@@ -272,10 +272,24 @@ export function PackOpening({
                   {rarityLabels[card.rarity] ?? card.rarity}
                   {card.finish === "foil" && " · Foil"}
                   {card.finish === "etched" && " · Etched foil"}
-                  {/* v0.4.5: drawn from its sheet in place of a card not in the game. */}
-                  {card.replaced &&
-                    " · In place of a card the game cannot play"}
                 </span>
+                {/* v0.6.2: the game has no rules for it yet; casual games play it as a stand-in. */}
+                {card.stand_in && (
+                  <span
+                    className={styles.standIn}
+                    title="The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness."
+                  >
+                    Stand-in
+                  </span>
+                )}
+                {/* Before v0.6.2 a card the game could not play gave way to this one; the
+                    card drawn, listed before it, is now the player's too. */}
+                {card.extra && (
+                  <span className={styles.extraMark}>
+                    Extra: given in place of the card before it, which is now
+                    yours too
+                  </span>
+                )}
                 {/* New: the library held no copy of this edition before (v0.5.0). */}
                 {card.new && <span className={styles.newMark}>New</span>}
                 <button

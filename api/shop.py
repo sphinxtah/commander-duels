@@ -13,10 +13,13 @@ the Magic Duels style, their cards the player's for good.
   library for good (library_grants, source pack, key pack:<opening id>), since v0.5.0 each in the
   edition pulled and since v0.6.0 in its finish, and revalidates the account's decks. A card is
   new when its edition is. A pack opens once: asking again returns the same cards. The account's
-  row is locked, so two requests at once open it once. Since v0.4.5 a card the game cannot play
-  gives way to another from its sheet (api/collation.py), and the opening records the card it
-  replaced; the history shows only cards the game can play. Since v0.6.0 basic lands are granted
-  like any card.
+  row is locked, so two requests at once open it once. Since v0.6.0 basic lands are granted
+  like any card. Since v0.6.2 a pack gives the card it drew, whether the engine can play it or
+  not (a stand-in, catalog/statuses.py); objects no deck holds still give way to another card
+  from the sheet, silently (api/collation.py). From v0.4.5 to v0.6.1 a card the game could not
+  play gave way to another, and the opening recorded the card it replaced; migration 0029 grants
+  each of those cards to the account that drew it, keeping the one given, and the opening shows
+  both: the card drawn, then the one given in its place, marked extra.
 - **SysOp gives packs** to any account, its own included, with a reason, audited
   (shop.packs_granted). Administrators and SysOp change prices and sale (shop.manage), each
   change audited, and see the booster data job's runs.
@@ -116,7 +119,7 @@ from api.roster import roster_of
 from api.sales import Sale, SaleInfo, weekly_sale
 from api.schemas import Contract, StoredText
 from catalog import boosters
-from catalog.statuses import playable
+from catalog.statuses import deck_cards, in_game, stands_in
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
@@ -264,7 +267,10 @@ class Purchase(Contract):
 
 
 class PulledCard(Contract):
-    position: int
+    position: int = Field(
+        description="Its place in the pack as revealed; since v0.6.2 in the order shown, a past "
+        "pack's card drawn and the one given in its place each with its own."
+    )
     card_id: UUID
     printing_id: UUID
     name: str
@@ -280,10 +286,15 @@ class PulledCard(Contract):
         "since v0.5.0)."
     )
     faces: int = Field(description="Faces with images of their own; 0 for one image.")
-    replaced: bool = Field(
+    stand_in: bool = Field(
         default=False,
-        description="Drawn from its sheet in place of a card the game cannot play (v0.4.5); the "
-        "opening's record names that card.",
+        description="The game has no rules for this card yet (v0.6.2): casual games play it as a "
+        "stand-in.",
+    )
+    extra: bool = Field(
+        default=False,
+        description="Given in a pack opened before v0.6.2 in place of the card listed before it, "
+        "which the game could not play then; since v0.6.2 the account holds both.",
     )
 
 
@@ -700,38 +711,64 @@ def reveal_order(rarity: str, finish: str) -> tuple[int, int]:
 
 
 def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
-    """An opened pack's cards; one the game cannot play now (a pack opened before v0.4.5, or a
-    card removed since) stays recorded but is not shown."""
+    """An opened pack's cards, every one since v0.6.2. A pack opened from v0.4.5 to v0.6.1 whose
+    card gave way to another shows the card it drew, then the one given in its place, marked
+    extra: the account holds both (migration 0029)."""
     product = db.get_one(ShopProduct, opening.product_id)
     collation = db.get_one(BoosterCollation, opening.collation_id)
     rows = db.execute(
         select(PackCard, CardPrinting, CardConcept)
         .join(CardPrinting, CardPrinting.id == PackCard.printing_id)
         .join(CardConcept, CardConcept.id == PackCard.concept_id)
-        .where(PackCard.opening_id == opening.id, playable())
+        .where(PackCard.opening_id == opening.id)
         .order_by(PackCard.position)
     ).all()
-    cards = []
-    for card, printing, concept in rows:
-        image = image_of(printing)
-        cards.append(
-            PulledCard(
-                position=card.position,
-                card_id=concept.id,
-                printing_id=printing.id,
-                name=concept.name,
-                mana_cost=concept.mana_cost,
-                type_line=concept.type_line,
-                rarity=printing.rarity,
-                set_code=printing.set_code,
-                collector_number=printing.collector_number,
-                finish=card.finish,  # type: ignore[arg-type]
-                sheet=card.sheet,
-                new=card.new,
-                faces=image.faces if image else 0,
-                replaced=card.replaced_printing_id is not None,
+    drawn = {
+        printing.id: (printing, concept)
+        for printing, concept in db.execute(
+            select(CardPrinting, CardConcept)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(
+                CardPrinting.id.in_({card.replaced_printing_id for card, _, _ in rows} - {None}),
+                deck_cards(),
             )
+        ).all()
+    }
+
+    def pulled(
+        card: PackCard, printing: CardPrinting, concept: CardConcept, new: bool, extra: bool
+    ) -> PulledCard:
+        image = image_of(printing)
+        return PulledCard(
+            # In the order shown: a past pack's card drawn and the one given for it are two.
+            position=len(cards),
+            card_id=concept.id,
+            printing_id=printing.id,
+            name=concept.name,
+            mana_cost=concept.mana_cost,
+            type_line=concept.type_line,
+            rarity=printing.rarity,
+            set_code=printing.set_code,
+            collector_number=printing.collector_number,
+            finish=card.finish,  # type: ignore[arg-type]
+            sheet=card.sheet,
+            new=new,
+            faces=image.faces if image else 0,
+            stand_in=stands_in(
+                concept.status,
+                concept.status_reason,
+                concept.deck_card,
+                concept.removed_revision is not None,
+            ),
+            extra=extra,
         )
+
+    cards: list[PulledCard] = []
+    for card, printing, concept in rows:
+        original = drawn.get(card.replaced_printing_id) if card.replaced_printing_id else None
+        if original is not None:
+            cards.append(pulled(card, *original, new=False, extra=False))
+        cards.append(pulled(card, printing, concept, new=card.new, extra=original is not None))
     return Opening(
         id=opening.id,
         pack=opening.pack_id,
@@ -770,22 +807,26 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
             409, "pack_unavailable", f"{product.name} cannot be opened until its data is read."
         )
     collation = load(db, product.collation_id)
-    # A card the game cannot play gives way to another from its sheet (v0.4.5).
-    removed = frozenset(
+    # Since v0.6.2 a pack gives the card it drew, whether the engine can play it or not. A card
+    # out of the game (a token or another object no deck holds, a card Scryfall no longer lists,
+    # one the staff suspended) gives way to another from its sheet, silently.
+    out = set(
         db.scalars(
             select(CardPrinting.id)
             .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-            .where(CardPrinting.id.in_(collation.printings()), not_(playable()))
+            .where(CardPrinting.id.in_(collation.printings()), not_(in_game()))
         )
     )
-    # So, silently, does a printing out of reach (v0.5.1): one of a kind, its only copy one
-    # account's; or one whose print run is all dealt (api/print_runs.py).
+    # So does a printing out of reach (v0.5.1): one of a kind, its only copy one account's; or one
+    # whose print run is all dealt (api/print_runs.py).
     runs = limited(db, settings_of(request).content_dir, collation.printings())
     used = dealt(db, set(runs))
-    withheld = (one_of_a_kind(db) & collation.printings()) | {
-        printing for printing, copies in runs.items() if used[printing] >= copies
-    }
-    layout, pulled = draw(collation, secrets.SystemRandom(), removed, frozenset(withheld))
+    withheld = (
+        out
+        | (one_of_a_kind(db) & collation.printings())
+        | {printing for printing, copies in runs.items() if used[printing] >= copies}
+    )
+    layout, pulled = draw(collation, secrets.SystemRandom(), frozenset(withheld))
     # A limited printing the pack drew is counted again under its row's lock, with the copies of
     # it this pack deals; one the pack would take past its run is drawn again without it.
     while drawn := {card.printing_id for card in pulled} & set(runs) - withheld:
@@ -799,7 +840,7 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
         if not over:
             break
         withheld |= over
-        layout, pulled = draw(collation, secrets.SystemRandom(), removed, frozenset(withheld))
+        layout, pulled = draw(collation, secrets.SystemRandom(), frozenset(withheld))
     printings = {
         printing.id: printing
         for printing in db.scalars(
@@ -848,7 +889,6 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
                 finish=card.finish,
                 sheet=card.sheet[:64],
                 new=new,
-                replaced_printing_id=card.replaced,
             )
         )
     for (concept_id, printing_id, finish), quantity in quantities.items():
@@ -928,13 +968,21 @@ def openings(
         )
     }
     cards: dict[UUID, list[tuple[str, str, bool]]] = defaultdict(list)
+    opened = [row.id for row in found]
     for opening_id, rarity, finish, new in db.execute(
         select(PackCard.opening_id, CardPrinting.rarity, PackCard.finish, PackCard.new)
         .join(CardPrinting, CardPrinting.id == PackCard.printing_id)
-        .join(CardConcept, CardConcept.id == PackCard.concept_id)
-        .where(PackCard.opening_id.in_([row.id for row in found]), playable())
+        .where(PackCard.opening_id.in_(opened))
     ):
         cards[opening_id].append((rarity, finish, new))
+    # The cards drawn before v0.6.2 in place of which another was given count too (opening_of).
+    for opening_id, rarity, finish in db.execute(
+        select(PackCard.opening_id, CardPrinting.rarity, PackCard.finish)
+        .join(CardPrinting, CardPrinting.id == PackCard.replaced_printing_id)
+        .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+        .where(PackCard.opening_id.in_(opened), deck_cards())
+    ):
+        cards[opening_id].append((rarity, finish, False))
     art = art_of(request)
     return [
         OpeningSummary(
