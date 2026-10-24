@@ -16,6 +16,7 @@
 - One rematch a game: asking again answers with the first.
 - **Two-Headed Giant** (v0.5.1): the rematch keeps the teams. Every player keeps their seat, bots
   take the seats bots or removed players held, and each team's decks are checked together again.
+  A table refusing banned cards refuses the format's own (Erayo) again, as at its start.
 """
 
 import secrets
@@ -68,7 +69,7 @@ from api.queues import bot_plans, waiting_of
 from api.roster import roster_of
 from api.schemas import Contract, Error, PracticeGameRequest
 from api.social import notify
-from api.tables import add_table_game, open_table_of, rules_of, under_limits
+from api.tables import add_table_game, open_table_of, rules_of, team_banned, under_limits
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -430,8 +431,13 @@ def plan_rematch(
                 rules_of(table),
             )
             if team:
-                # MTR 9.5: Two-Headed Giant Constructed has no sideboards.
+                # MTR 9.5: Two-Headed Giant Constructed has no sideboards, and bans Erayo, which
+                # Legacy's legality does not: a table refusing banned cards refuses it here too,
+                # as at the table's start (v0.5.1).
                 cast(dict[str, object], seat["deck_list"]).pop("sideboard", None)
+                banned = team_banned(teams.cards_of(seat) or set(), rules_of(table), permissions)
+                if banned is not None:
+                    raise banned
         except ApiError as refused:
             message = f"{user.handle or 'A player'}'s deck cannot be played now."
             db.rollback()
