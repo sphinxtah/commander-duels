@@ -634,6 +634,23 @@ describe("a Two-Headed Giant teammate's hand (v0.5.1)", () => {
     });
   });
 
+  it("takes no attack dropped on the teammate's chip, with the other team's board expanded", () => {
+    const l = layout(fixtureModel("giant"), 2);
+    expect(l.expandedSeat).toBe(2);
+    expect(l.players.get(1)?.chip).toBe(true);
+    expect(
+      l.drops.some((drop) => drop.kind === "attack" && drop.seat === 1),
+    ).toBe(false);
+    const onChip = (seat: number) => {
+      const r = l.players.get(seat)!.target;
+      return dropZoneAt(l, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
+    };
+    // The teammate's chip sits in the expanded board's half, which takes the drop; the other
+    // team's chip takes its own.
+    expect(onChip(1)).toMatchObject({ kind: "attack", seat: 2 });
+    expect(onChip(3)).toMatchObject({ kind: "attack", seat: 3 });
+  });
+
   it("holds the invariants on 300 random Two-Headed Giant boards", () => {
     const problems: string[] = [];
     for (let seed = 1; seed <= 300; seed++) {
