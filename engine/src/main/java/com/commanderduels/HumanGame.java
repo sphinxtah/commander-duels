@@ -50,7 +50,9 @@ import mage.util.ThreadUtils;
  * controlling seat's view shows what the controlled player may see while the control lasts
  * ({@link Visibility}). The controlled player still concedes for themselves (723.6). Control ends
  * when its controller leaves the game (800.4a); a request already open then goes to the
- * controlled player's own seat, or a bot's gets the answer that does the least.
+ * controlled player's own seat, or a bot's gets the answer that does the least. Since v0.6.1 a bot
+ * may control a turn too (patch 0008): XMage's AI then decides for the controlled player, and
+ * nobody is asked.
  */
 final class HumanGame {
     static final long CLOSE_GRACE_MILLIS = 5_000;
@@ -389,6 +391,12 @@ final class HumanGame {
         }
         UUID asking = asking(event);
         endLostControl();
+        if (controlledByBot(asking)) {
+            // v0.6.1: a bot controls the asked player's turn, and XMage's AI decides for them (its
+            // stand-in's priority still fires XMage's request); nobody is asked.
+            refresh();
+            return;
+        }
         Seat askingSeat = humanSeat(asking);
         Seat seat = decider(asking, askingSeat);
         if (seat == null) {
@@ -474,9 +482,18 @@ final class HumanGame {
     }
 
     /**
+     * Whether a bot controls the player's turn (723, v0.6.1): XMage's AI then makes the player's
+     * decisions through a stand-in its controller makes (patch 0008), a human seat's included.
+     */
+    private boolean controlledByBot(UUID playerId) {
+        UUID controller = Visibility.controllerOf(game, playerId);
+        return controller != null && humanSeat(controller) == null;
+    }
+
+    /**
      * The human seat that answers the asked player's request: the seat controlling its turn (723.5),
-     * else its own; null for a bot whose controller has left or is leaving. A player controlled by a
-     * bot answers for itself (XMage lets no computer player control a turn).
+     * else its own; null for a bot whose controller has left or is leaving. A player whose turn a
+     * bot controls is asked nothing ({@link #controlledByBot}).
      */
     private Seat decider(UUID asking, Seat askingSeat) {
         Seat controller = humanSeat(Visibility.controllerOf(game, asking));

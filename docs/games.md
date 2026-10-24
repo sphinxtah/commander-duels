@@ -6,7 +6,7 @@ v0.0.6 routes games through the API. A signed-in player starts a practice game a
 
 Agreed on 2026-10-19 at the start of v0.0.6:
 - **Transport.** WebSocket now, as the scope's protocol, not long-polling first.
-- **Formats.** Legacy against one bot, and Commander against one to three bots. Since v0.5.0, early: Two-Headed Giant with a bot teammate against two bots.
+- **Formats.** Legacy against one bot, and Commander against one to three bots. Since v0.5.0: Two-Headed Giant with a bot teammate against two bots (marked early until v0.6.1).
 - **SysOp's any-card decks.** In v0.0.6: a deck list on SysOp's practice game, any card the engine implements.
 - **Persistence.** Games, seats, owners and results in PostgreSQL now; engine seat tokens stay in the API's memory.
 - **Small fix.** PostgreSQL's host port is configurable (`CD_DB_PORT`).
@@ -73,7 +73,7 @@ You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the 
 - **Bots.** A bot with no deck chosen plays one of the engine's four Legacy fixture decks (mono-red burn, mono-green creatures, mono-white weenie, mono-blue skies), which share no card. Two bots on a team play a measured pair (v0.5.1): red and white, or green and blue, the opponents green and blue unless your deck is one of them ([the measurements](engine/two-headed-giant.md#fixture-decks)); your teammate gets the first fixture left, in that order, that shares no card with your deck. If every free fixture shares a card with it, the teammate's deck must be chosen (`team_decks`).
 - **Results.** The engine's result names the winning team (`winner_seats`); `winner_seat` is its first seat, which is yours when your team wins. Your win counts once, and the tokens pay for the two opponents, never for your teammate.
 
-`GET /api/v1/formats` lists Two-Headed Giant as available, with `early: true`. Since v0.5.1 human tables and the public queue play it too, with players in either team, and every player of the winning team counts a win and is paid ([tables](tables.md#two-headed-giant-v051), [queues](queues.md#two-headed-giant-v051)); the practice game above is unchanged.
+`GET /api/v1/formats` lists Two-Headed Giant as available, with `early: true` until v0.6.1, which gave teams their priority and their choices and one combined attack and block ([the engine](engine/two-headed-giant.md#team-priority-and-team-choices-v061)), and `early: false` since. Since v0.5.1 human tables and the public queue play it too, with players in either team, and every player of the winning team counts a win and is paid ([tables](tables.md#two-headed-giant-v051), [queues](queues.md#two-headed-giant-v051)); the practice game above is unchanged.
 
 ### Reading and ending games
 

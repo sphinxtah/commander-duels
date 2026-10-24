@@ -210,7 +210,7 @@ final class Prompts {
         if (prompt.view().kind().equals("choose_defender") && prompt.view().detail() == null && attacker != null) {
             PromptView view = prompt.view();
             prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message(), "Attacker: " + attacker,
-                view.options(), view.amounts(), view.piles(), view.xmageQuery(), null), prompt.answers(),
+                view.options(), view.amounts(), view.piles(), view.xmageQuery(), null, null), prompt.answers(),
                 prompt.names());
         }
         if (forSeat != null) {
@@ -221,9 +221,35 @@ final class Prompts {
             String hint = " (as " + SeatViews.plain(player.getLogName()) + ")";
             prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message().replace(hint, ""),
                 view.detail() == null ? null : view.detail().replace(hint, ""), view.options(), view.amounts(),
-                view.piles(), view.xmageQuery(), forSeat), prompt.answers(), prompt.names());
+                view.piles(), view.xmageQuery(), forSeat, null), prompt.answers(), prompt.names());
+        }
+        PromptView.Team team = team(game, player, prompt.view().kind());
+        if (team != null) {
+            PromptView view = prompt.view();
+            prompt = new Prompt(new PromptView(view.id(), view.kind(), view.message(), view.detail(), view.options(),
+                view.amounts(), view.piles(), view.xmageQuery(), view.forSeat(), team), prompt.answers(),
+                prompt.names());
         }
         return prompt;
+    }
+
+    /**
+     * The asked player's part in their team's decision (since v0.6.1), null without a teammate.
+     * 805.5: the team has priority, and passes once each of its players has passed in succession;
+     * a priority prompt says whether the asked player's teammates still in the game have all passed
+     * since the team last acted (XMage's pass flags, which any action clears).
+     */
+    static PromptView.Team team(Game game, Player player, String kind) {
+        var teammates = game.getTeammates(player.getId());
+        if (teammates.isEmpty()) {
+            return null;
+        }
+        Boolean passed = null;
+        if (kind.equals("priority")) {
+            passed = teammates.stream().map(game::getPlayer)
+                .allMatch(teammate -> teammate == null || teammate.isPassed() || !teammate.canRespond());
+        }
+        return new PromptView.Team(passed);
     }
 
     private Prompt from(PlayerQueryEvent event, String promptId) {
@@ -326,14 +352,14 @@ final class Prompts {
                 return unsupported(event, promptId, message, detail);
         }
         return new Prompt(new PromptView(promptId, kind, message, detail, List.copyOf(options), amounts, piles,
-            null, null), Map.copyOf(answers), names);
+            null, null, null), Map.copyOf(answers), names);
     }
 
     private Prompt unsupported(PlayerQueryEvent event, String promptId, String message, String detail) {
         options.clear();
         answers.clear();
         return new Prompt(new PromptView(promptId, "unsupported", message, detail, List.of(), null, null,
-            event.getQueryType().name(), null), Map.of(), null);
+            event.getQueryType().name(), null, null), Map.of(), null);
     }
 
     /** A name as the seat may type it: case, surrounding spaces and curly apostrophes do not matter. */
@@ -363,15 +389,22 @@ final class Prompts {
         return new PromptView.Amounts(min, max, List.of(new PromptView.AmountEntry(message, min, max, min)));
     }
 
-    /** Several of the seat's triggers at once: the one chosen goes on the stack first, and XMage asks again. */
+    /**
+     * Several of the seat's triggers at once: the one chosen goes on the stack first, and XMage asks
+     * again. In a team game they are the team's (805.7, since v0.6.1): each option names its
+     * controller's seat.
+     */
     private void triggers(PlayerQueryEvent event) {
         List<? extends Ability> abilities = event.getAbilities() == null ? List.of() : event.getAbilities();
+        boolean team = !game.getTeammates(player.getId()).isEmpty();
         for (Ability ability : abilities) {
             MageObject source = game.getObject(ability.getSourceId());
             boolean visible = Visibility.identityVisible(game, ability.getSourceId(), player.getId());
             String rule = SeatViews.plain(ability.getRule(source == null ? null : source.getName()));
             add("put_first", rule.isEmpty() ? ability.toString() : rule,
-                visible ? views.objectRef(ability.getSourceId()) : null, null, false, new UuidAnswer(ability.getId()));
+                visible ? views.objectRef(ability.getSourceId()) : null,
+                team ? Integer.valueOf(views.seatOf(ability.getControllerId())) : null, false,
+                new UuidAnswer(ability.getId()));
         }
     }
 

@@ -223,13 +223,14 @@ def test_erayo_is_banned_where_the_table_refuses_banned_cards() -> None:
     teams.assign_and_check(seated(listing("Erayo, Soratami Ascendant"), {}, {}, {}), True)
 
 
-def test_the_format_is_listed_as_early_and_offered_for_practice(
+def test_the_format_is_listed_and_offered_for_practice(
     client: TestClient,
 ) -> None:
     ada = Account(client, "ada")
     formats = {entry["id"]: entry for entry in client.get("/api/v1/formats").json()}
     assert formats["two_headed_giant"]["available"] is True
-    assert formats["two_headed_giant"]["early"] is True
+    # Early from v0.5.0 until v0.6.1's team priority and combined attacks.
+    assert formats["two_headed_giant"]["early"] is False
     assert formats["two_headed_giant"]["seats"] == [4]
     assert formats["legacy"]["early"] is False
     options = {f["id"]: f for f in ada.get("/api/v1/practice-games/options").json()["formats"]}

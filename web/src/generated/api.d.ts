@@ -4667,7 +4667,7 @@ export interface components {
             description: string;
             /**
              * Early
-             * @description A first playable version, with known gaps (Two-Headed Giant: since v0.5.0, and since v0.5.1 at tables and in the queue too).
+             * @description A first playable version, with known gaps (Two-Headed Giant from v0.5.0 until v0.6.1; no format since).
              * @default false
              */
             early: boolean;

@@ -270,6 +270,35 @@ def test_seat_view_contract_carries_a_controlled_players_hand_only_with_its_cont
         validator.validate(watched)
 
 
+def test_seat_view_contract_carries_a_teams_part_in_a_decision():
+    # Two-Headed Giant (v0.6.1, rules 805.5 to 805.7): a prompt says whether the asked player's
+    # teammate has passed, and a team's trigger order names each ability's controller.
+    validator = validator_for("contracts/engine-seat-view.schema.json")
+    for passed in (True, False, None):
+        team = snapshot()
+        team["prompt"]["team"] = {"teammate_passed": passed}
+        validator.validate(team)
+    ordering = snapshot()
+    ordering["prompt"].update(kind="order_triggers", team={"teammate_passed": None})
+    ordering["prompt"]["options"] = [
+        {
+            "id": "1",
+            "action": "put_first",
+            "label": "Whenever another creature enters, you gain 1 life.",
+            "object_id": None,
+            "seat": 1,
+            "selected": False,
+        }
+    ]
+    validator.validate(ordering)
+    for bad in ({}, {"teammate_passed": "yes"}, {"teammate_passed": True, "seats": [0, 1]}):
+        refused = snapshot()
+        refused["prompt"]["team"] = bad
+        with pytest.raises(ValidationError):
+            validator.validate(refused)
+            pytest.fail(f"schema accepted the team {bad}")
+
+
 def spectator() -> dict[str, Any]:
     watched = snapshot()
     watched.update(seat=None, status="spectating", prompt=None)

@@ -91,6 +91,11 @@ export interface Prompt {
    * that player's turn; the prompt is built from what that player may see. Null or missing for
    * the viewer's own decisions. */
   for_seat?: Seat | null;
+  /** Two-Headed Giant (v0.6.1): the asked player's part in a decision their team makes together
+   * (rules 805.5 to 805.7, 805.10b, 805.10d). `teammate_passed`, on priority prompts only, says
+   * that every teammate has passed since the team last acted, so passing now passes for the team.
+   * Null or missing in other games. */
+  team?: { teammate_passed: boolean | null } | null;
 }
 
 /** A card face. A hidden card (face down, for instance) carries its id and nothing else. */

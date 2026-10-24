@@ -484,7 +484,7 @@ describe("best of three at the practice table (v0.5.0)", () => {
   });
 });
 
-describe("Two-Headed Giant at the practice table (v0.5.0, early)", () => {
+describe("Two-Headed Giant at the practice table (v0.5.0)", () => {
   const player = {
     ...sysop,
     kind: "player",
@@ -561,7 +561,7 @@ describe("Two-Headed Giant at the practice table (v0.5.0, early)", () => {
     await settle();
     const giant = screen.getByRole("radio", { name: /Two-Headed Giant/ });
     expect(giant.closest("label")).toHaveTextContent(
-      "Early · a bot teammate against two bots, 30 life a team",
+      "A bot teammate against two bots, 30 life a team",
     );
     await act(async () => giant.click());
     // Two-Headed Giant plays Legacy decks: the player's own, not the Commander one.

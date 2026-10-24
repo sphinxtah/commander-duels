@@ -167,6 +167,23 @@
         "for_seat": {
           "description": "Since v0.5.1: the seat whose decision this is when the seat answering controls that player's turn (723.5); the prompt is built from what that player may see, and the answer is theirs. Null (or absent) for the seat's own decisions.",
           "$ref": "#/$defs/nullableSeat"
+        },
+        "team": {
+          "description": "Since v0.6.1: in a team game (Two-Headed Giant), the asked player's part in a decision their team makes together: teams have priority (805.5), put their triggered abilities on the stack in one order (805.7; each put_first option's seat is then the ability's controller) and attack and block together (805.10b, 805.10d). Null (or absent) in other games.",
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["teammate_passed"],
+              "properties": {
+                "teammate_passed": {
+                  "description": "For priority prompts: whether every teammate still in the game has passed since the team last acted, so that passing now passes for the team and priority goes to the other team. Null for other prompts.",
+                  "type": ["boolean", "null"]
+                }
+              }
+            }
+          ]
         }
       }
     },

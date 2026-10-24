@@ -280,8 +280,9 @@ class SeatChecks implements HumanGame.Hooks {
                     + " its turn");
                 reached.add("prompt for a controlled player");
             } else if (viewer != null) {
+                // Whoever controls the seat's turn, a human seat or (since v0.6.1) a bot, decides for it.
                 UUID controller = controllerOf(game, game.getPlayer(viewer));
-                check(controller == null || !request.seats().get(seatIds.indexOf(controller)).human(),
+                check(controller == null,
                     "seat " + seat + " was asked for itself while another seat controls its turn");
             }
             // Searching your own library shows it to you: its cards may appear in your prompts, and in the
