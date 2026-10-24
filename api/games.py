@@ -18,6 +18,10 @@ carry an action ID, the expected revision and the prompt ID; the engine runs a r
 (T14). SysOp may observe any game and inspect every hand and library (games.view_concealed, its
 exception to SEC05 and NET14); every opening is audited.
 
+Turn control (v0.5.1, rule 723) needs nothing here: the engine puts a controlled player's prompts,
+marked with their seat, in the controlling seat's own views, so the controller's tab answers them
+with its own seat's token and lease, and the controlled player's tab is told who controls its turn.
+
 One API process holds the games: a restart marks the running ones interrupted and closes them in
 the engine, because their seat tokens are gone.
 """

@@ -34,7 +34,7 @@ The pinned XMage (`xmage_1.4.62V1`, commit `eb69d05b88142b5c4eec4869bcb23a0fec13
 | 12 | MAD `SimulationNode2.nodeCount` | Not a read: the node count is a static shared by every bot in the process, reset at the start of each search. Bots searching at the same time in different games disturb each other's node limit. | **Limit**; the wall-clock budget still bounds every search. |
 | 13 | `Mage/.../util/RandomUtil` in the search | Not a read: the search draws from XMage's one process-wide generator (tie-breaks, coin flips and shuffles inside copies), so how far a search gets changes the real game's later shuffles. | **Limit** for reproducibility (AI03): a seeded game repeats exactly only when every search finishes within its budget. The determinizer uses the bot's own seeded generator. |
 
-`ComputerPlayerControllableProxy` hands a choice to the controlling player when another player controls the bot (Mindslaver effects); that is the controller's seat, not an AI read.
+`ComputerPlayerControllableProxy` hands a choice to the controlling player when another player controls the bot (Mindslaver effects); that is the controller's seat, not an AI read. Since v0.5.1 a human seat's player makes that stand-in itself, keeping the bot's zones and land count on the bot, and the engine asks the controlling seat ([turn control](human-seat.md#turn-control-v051)).
 
 ## Determinized search copies
 
