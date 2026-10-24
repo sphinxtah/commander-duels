@@ -124,10 +124,21 @@ export function TopBar({
   );
 }
 
-/** The six main pages again, along the bottom of a phone's window. */
-export function PhoneBar({ shown }: { shown: Page }) {
+/** The six main pages again, along the bottom of a phone's window. The chat bar's list or a
+ * conversation, open, covers it (v0.5.1): it is out of reach meanwhile. */
+export function PhoneBar({
+  shown,
+  covered = false,
+}: {
+  shown: Page;
+  covered?: boolean;
+}) {
   return (
-    <nav aria-label="Main navigation on a phone" className={styles.phoneBar}>
+    <nav
+      aria-label="Main navigation on a phone"
+      className={styles.phoneBar}
+      inert={covered || undefined}
+    >
       {mainPages.map((page) => (
         <a
           key={page}

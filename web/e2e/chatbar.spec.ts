@@ -1,4 +1,10 @@
-import { test, expect, type Page, type WebSocketRoute } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Locator,
+  type Page,
+  type WebSocketRoute,
+} from "@playwright/test";
 import type { components } from "../src/generated/api";
 import { standIn } from "./accounts";
 
@@ -131,6 +137,15 @@ async function fakeChat(page: Page): Promise<FakeChat> {
       });
     if (pathname === "/api/v1/friends")
       return json({ friends: FRIENDS, incoming: [], outgoing: [] });
+    const profile = /^\/api\/v1\/players\/([0-9a-f-]{36})$/.exec(pathname);
+    if (profile && method === "GET")
+      return json({
+        ...summary(profile[1]!),
+        blocked: false,
+        member_since: "2025-06-01T00:00:00Z",
+        wins: 12,
+        you: false,
+      });
     if (pathname === "/api/v1/conversations")
       return json({
         conversations: [...threads].map(([id, messages]) => ({
@@ -221,6 +236,18 @@ function problems(page: Page): string[] {
     found.push(entry.text());
   });
   return found;
+}
+
+/** Whether the element at a control's centre is that control: nothing covers it. */
+function reachable(control: Locator) {
+  return control.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      box.left + box.width / 2,
+      box.top + box.height / 2,
+    );
+    return hit === element || element.contains(hit);
+  });
 }
 
 test("the chat bar: friends online, their conversations from page to page, and old Messages links", async ({
@@ -344,13 +371,20 @@ test("the chat bar: friends online, their conversations from page to page, and o
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(toggle).toBeFocused();
 
-  // The Messages page's old addresses open the bar: followed in the app, over the page shown;
-  // opened afresh, over the main menu.
+  // The Messages page's old addresses open the bar: followed in the app, over the page shown,
+  // with no entry left in the history for Back to step onto; opened afresh, over the main menu.
+  const entries = await page.evaluate(() => history.length);
   await page.evaluate((id) => {
     window.location.hash = `#messages/${id}`;
   }, ADA);
   await expect(ada).toBeVisible();
   await expect(page).toHaveURL(/#friends$/);
+  expect(await page.evaluate(() => history.length)).toBe(entries);
+  await page.goBack();
+  await expect(page).toHaveURL(/#settings$/);
+  await expect(
+    page.getByRole("heading", { name: "Make yourself at home." }),
+  ).toBeVisible();
   await page.goto("about:blank");
   await page.goto("/#messages");
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -375,14 +409,19 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
     name: "Friends and messages",
   });
   const toggle = bar.getByRole("button", { name: /^Friends/ });
+  // The same button while a conversation covers it, out of the accessibility tree.
+  const covered = bar.getByRole("button", {
+    name: /^Friends/,
+    includeHidden: true,
+  });
   await expect(toggle).toHaveAccessibleName(
     "Friends, 3 online, 1 unread message",
   );
   // A round button above the bar of pages, at the right.
   const button = (await toggle.boundingBox())!;
-  const pages = (await page
-    .getByRole("navigation", { name: "Main navigation on a phone" })
-    .boundingBox())!;
+  const pagesBar = page.locator('nav[aria-label="Main navigation on a phone"]');
+  await expect(pagesBar).not.toHaveAttribute("inert");
+  const pages = (await pagesBar.boundingBox())!;
   expect(button.width).toBeLessThan(60);
   expect(button.y + button.height).toBeLessThanOrEqual(pages.y);
   expect(button.x + button.width).toBeGreaterThan(390 - 24);
@@ -399,18 +438,26 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
     .boundingBox())!;
   expect(sheet.x).toBe(0);
   expect(sheet.width).toBe(width);
+  // It covers the bar of pages, which is out of reach meanwhile, and stops below the top bar.
+  await expect(pagesBar).toHaveAttribute("inert", "");
+  const top = (await page.getByRole("banner").boundingBox())!;
+  expect(sheet.y).toBeGreaterThanOrEqual(top.y + top.height);
   await page.screenshot({
     path: testInfo.outputPath("chatbar-phone-panel.png"),
   });
 
-  // A friend's conversation takes the list's place, the whole width.
+  // A friend's conversation takes the list's place, the whole width, over the round button,
+  // which is out of reach meanwhile, as the bar of pages is.
   await list.getByRole("button", { name: /^Chat with ada/ }).click();
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(covered).toHaveAttribute("aria-expanded", "false");
   const ada = bar.getByRole("region", { name: "Chat with ada" });
   await expect(ada.getByLabel("Write to ada")).toBeFocused();
+  await expect(covered).toBeHidden();
+  await expect(pagesBar).toHaveAttribute("inert", "");
   const window = (await ada.boundingBox())!;
   expect(window.x).toBe(0);
   expect(window.width).toBe(width);
+  expect(window.y).toBeGreaterThanOrEqual(top.y + top.height);
   await expect(
     ada.getByRole("list", { name: "Messages with ada" }),
   ).toContainText("Good game yesterday! Same time?");
@@ -420,6 +467,7 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
   // Folded, it sits beside the button, above the bar of pages; Bob's, opened after, shows alone.
   await ada.getByRole("button", { expanded: true }).click();
   await expect(toggle).toBeVisible();
+  await expect(pagesBar).not.toHaveAttribute("inert");
   const tab = (await ada.boundingBox())!;
   expect(tab.y + tab.height).toBeLessThanOrEqual(pages.y);
   expect(tab.x + tab.width).toBeLessThanOrEqual(
@@ -431,8 +479,70 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
   await toggle.click();
   await list.getByRole("button", { name: /^Chat with bob/ }).click();
   await expect(bar.getByRole("region", { name: /^Chat with/ })).toHaveCount(1);
-  await expect(
-    bar.getByRole("region", { name: "Chat with bob" }),
-  ).toBeVisible();
+  const bob = bar.getByRole("region", { name: "Chat with bob" });
+  await expect(bob).toBeVisible();
+
+  // Profile folds the conversation, so the profile shows, as the list's link to the Friends page
+  // closes the list.
+  await bob.getByRole("link", { name: "Profile" }).click();
+  await expect(page).toHaveURL(new RegExp(`#player/${BOB}$`));
+  const heading = page.getByRole("heading", { level: 1, name: "bob" });
+  await expect(heading).toBeVisible();
+  await expect(bob.getByRole("button", { expanded: false })).toBeVisible();
+  expect(await reachable(heading)).toBe(true);
+  await expect(pagesBar).not.toHaveAttribute("inert");
+  // Closed from across the screen, focus goes back to the list's button, in reach again.
+  await bob.getByRole("button", { expanded: false }).click();
+  await expect(covered).toBeHidden();
+  await bob.getByRole("button", { name: "Close the chat with bob" }).click();
+  await expect(bob).toHaveCount(0);
+  await expect(toggle).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
+test("the top bar's pop-ups stand above the chat bar, and on a phone its search stays in reach", async ({
+  page,
+}) => {
+  const errors = problems(page);
+  // Short enough that the open list reaches up beside the top bar's corner.
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await fakeChat(page);
+  await page.goto("/#settings");
+  const bar = page.getByRole("complementary", {
+    name: "Friends and messages",
+  });
+  await bar.getByRole("button", { name: /^Friends/ }).click();
+  await expect(bar.getByRole("list", { name: "Your friends" })).toBeVisible();
+  // The account's menu, over the list: every item in reach.
+  const account = page.getByRole("button", { name: /^Your account/ });
+  await account.click();
+  const menu = page.locator(
+    `[id="${await account.getAttribute("aria-controls")}"]`,
+  );
+  await expect(menu).toBeVisible();
+  const items = await menu.locator("a, button").all();
+  expect(items.length).toBeGreaterThan(1);
+  for (const item of items) expect(await reachable(item)).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  // The bell's notifications, over the list too.
+  const bell = page.getByRole("button", { name: /^Notifications/ });
+  await bell.click();
+  const all = page.getByRole("link", { name: /See all notifications/ });
+  await expect(all).toBeVisible();
+  expect(await reachable(all)).toBe(true);
+  await bell.click();
+
+  // A phone's short screen: the list, open still, stops below the top bar, whose search row stays
+  // in reach, and the bell's notifications stand over the list.
+  await page.setViewportSize({ width: 390, height: 600 });
+  await expect(bar.getByRole("list", { name: "Your friends" })).toBeVisible();
+  const search = page.getByRole("combobox", {
+    name: "Find players by handle or email",
+  });
+  expect(await reachable(search)).toBe(true);
+  await bell.click();
+  await expect(all).toBeVisible();
+  expect(await reachable(all)).toBe(true);
   expect(errors).toEqual([]);
 });

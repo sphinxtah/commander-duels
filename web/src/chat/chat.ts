@@ -185,6 +185,10 @@ export interface Chat {
   docked: ChatWindow[];
   /** A phone's screen: the bar is one button, and one thing shows at a time. */
   phone: boolean;
+  /** On a phone, what lies across the screen's lower part, the whole width: the friends list, a
+   * conversation, or nothing. It covers the bar of pages, and a conversation the bar's own
+   * button, which are out of reach meanwhile. */
+  sheet: "list" | "window" | null;
   /** Opens a friend's window, unfolded, or unfolds it, and gives it focus; the oldest of more
    * than WINDOWS goes. On a phone it closes the friends list. */
   open: (playerId: string) => void;
@@ -382,6 +386,14 @@ export function useChat(
   );
   const showing = useRef(new Set<string>());
   showing.current = new Set(docked.filter(shows).map((each) => each.playerId));
+  const sheet: Chat["sheet"] =
+    !account || !phone || (atTable && !tableOpen)
+      ? null
+      : panel
+        ? "list"
+        : docked.some((each) => !each.folded)
+          ? "window"
+          : null;
   const phoneNow = useRef(phone);
   phoneNow.current = phone;
   const atTableNow = useRef(atTable);
@@ -500,6 +512,7 @@ export function useChat(
       windows: account ? windows : [],
       docked: account ? docked : [],
       phone,
+      sheet,
       open,
       close,
       fold,
@@ -524,6 +537,7 @@ export function useChat(
       windows,
       docked,
       phone,
+      sheet,
       open,
       close,
       fold,

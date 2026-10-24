@@ -23,8 +23,9 @@ import styles from "./chat.module.css";
 // with friends docked beside it, each folded to its title bar or open. They stay open from page
 // to page and, which ones, when the page reloads (chat.ts), as does the list's own fold; a closed
 // conversation opens again from the list. On a phone the bar is one button, which opens the list,
-// and one conversation shows at a time, the whole width of the screen. It replaced the Messages
-// page and the windows docked at the bottom right (v0.4.4).
+// and one conversation shows at a time, the whole width of the screen; what that covers (the
+// button, the bar of pages) is out of reach meanwhile. It replaced the Messages page and the
+// windows docked at the bottom right (v0.4.4).
 //
 // At the game's table the bar folds away into a diamond on the band (game/table/BandHud.tsx), so
 // it covers nothing there; the diamond brings it out, floating over the table's lower right, and
@@ -106,7 +107,15 @@ function DockedWindow({
       {/* Folded, the conversation stays mounted: it keeps following, and counts what is new. */}
       <div id={id} className={styles.windowBody} hidden={shown.folded}>
         {who && links && (
-          <a className={styles.profileLink} href={playerLink(who.id)}>
+          <a
+            className={styles.profileLink}
+            href={playerLink(who.id)}
+            onClick={() => {
+              // On a phone the conversation covers the page: it folds, so the profile shows, as
+              // the list's link to the Friends page closes the list.
+              if (chat.phone) chat.fold(shown.playerId, true);
+            }}
+          >
             Profile
           </a>
         )}
@@ -338,6 +347,19 @@ export function ChatBar({ chat }: { chat: Chat }) {
     if (!before.current && !chat.focusing) toggle.current?.focus();
     before.current = tableOpen;
   }, [atTable, tableOpen, chat.focusing]);
+  // Closing a conversation gives focus back to the list's title bar once it is drawn again: on a
+  // phone the conversation covered it, and it was out of reach meanwhile (chat.module.css). There,
+  // one waiting its turn may show in its place, covering it still: focus goes to that one's title.
+  const [toList, setToList] = useState(false);
+  useEffect(() => {
+    if (!toList) return;
+    setToList(false);
+    const next =
+      chat.sheet === "window" && chat.docked.find((each) => !each.folded);
+    if (next)
+      document.getElementById(`chat-window-${next.playerId}-title`)?.focus();
+    else toggle.current?.focus();
+  }, [toList, chat.sheet, chat.docked]);
   // A friend's message: in a window shown, which does not pop up beside the bell; at the table,
   // every one.
   const said = (
@@ -356,11 +378,21 @@ export function ChatBar({ chat }: { chat: Chat }) {
         className={styles.bar}
         aria-label="Friends and messages"
         data-panel={chat.panel || undefined}
+        data-sheet={chat.sheet ?? undefined}
         data-table={atTable || undefined}
         data-chat-bar=""
         onKeyDown={(event) => {
-          // At the table Escape puts the bar away, one layer as the table's Escape closes one.
-          if (event.key !== "Escape" || !atTable) return;
+          // At the table Escape puts the bar away, one layer as the table's Escape closes one. A
+          // dialog opened in it (Report, from a message's menu) closes first, with its own Escape,
+          // which cancelling the key would stop; the bar stays out.
+          if (
+            event.key !== "Escape" ||
+            !atTable ||
+            event.defaultPrevented ||
+            (event.target instanceof Element &&
+              event.target.closest("dialog[open]"))
+          )
+            return;
           event.preventDefault();
           event.stopPropagation();
           setTableOpen(false);
@@ -374,7 +406,7 @@ export function ChatBar({ chat }: { chat: Chat }) {
               window={window}
               chat={chat}
               known={people.known.get(window.playerId)}
-              onClosed={() => toggle.current?.focus()}
+              onClosed={() => setToList(true)}
             />
           ))}
         </div>

@@ -1,4 +1,11 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { boxStyle } from "../Board";
 import type { GameState } from "../connection";
 import { BAND, diamond, diamondBox } from "./geometry";
@@ -27,6 +34,9 @@ const CAPTIONS: Record<string, string> = {
   first_combat_damage: "First strike damage",
   end_turn: "End step",
 };
+
+/** The smallest a turn line is drawn to fit its box, of its own size. */
+const LEAST_FIT = 0.7;
 
 /** The HUD before the table's first layout (still connecting): the Game menu is there at once. */
 const HUD: BandLayout["hud"] = {
@@ -126,6 +136,31 @@ export function BandHud({
     shown && shift > 0
       ? { ...shown, x: shown.x + shift, w: shown.w - shift }
       : shown;
+  // A line longer than its box is drawn smaller until it fits whole (v0.5.1), whatever the font
+  // and the text size: with every diamond on the band (SysOp at a Two-Headed Giant human table:
+  // the inspection, the table chat and the chat bar's) "Turn 12 · Other team’s turn" outgrows
+  // the 268 units left. Measured before it is painted, at its own size, for each line and width.
+  const turnBox = useRef<HTMLSpanElement>(null);
+  const fitKey = `${turnLine?.turn ?? ""}\n${turnText?.w ?? 0}`;
+  const [fit, setFit] = useState({ key: "", scale: 1 });
+  const scale = fit.key === fitKey ? fit.scale : 1;
+  useLayoutEffect(() => {
+    const element = turnBox.current;
+    if (!element || fit.key === fitKey) return;
+    let next = 1;
+    element.style.setProperty("--fit", "1");
+    while (element.scrollWidth > element.clientWidth && next > LEAST_FIT) {
+      next = Math.max(
+        LEAST_FIT,
+        Math.min(
+          next - 0.02,
+          (next * element.clientWidth) / element.scrollWidth,
+        ),
+      );
+      element.style.setProperty("--fit", String(next));
+    }
+    setFit({ key: fitKey, scale: next });
+  }, [fitKey, fit.key]);
   const toggle = (id: DrawerId) => ({
     "aria-expanded": drawer === id,
     "aria-controls": `drawer-${id}`,
@@ -214,7 +249,11 @@ export function BandHud({
       )}
       {turnLine && band && turnText && (
         <p className={styles.turnLine} aria-live="polite">
-          <span className={styles.turnText} style={boxStyle(turnText)}>
+          <span
+            ref={turnBox}
+            className={styles.turnText}
+            style={{ ...boxStyle(turnText), "--fit": scale } as CSSProperties}
+          >
             {turnLine.turn}
           </span>
           {turnLine.step && (
