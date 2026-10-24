@@ -147,7 +147,7 @@ jobs:
             -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -e CD_E2E_PLAYER_SESSION="$player" \
             -v "$PWD:/w" -w /w mcr.microsoft.com/playwright:v1.64.1-noble sh -c "corepack enable \
               && COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm install --frozen-lockfile --reporter=silent \
-              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/matches.spec.ts e2e/social.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
+              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/matches.spec.ts e2e/social.spec.ts e2e/auctions.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
                 --reporter=line"
           docker compose down
       # As in verify; a failed game's error also lists the test player's last answers.

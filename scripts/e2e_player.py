@@ -1,8 +1,9 @@
 """A second account for the browser journeys of human tables (v0.4.0), which need two players
 and cannot sign in with Google. Creates an active player past onboarding, with the welcome grant
 of tokens, and a session; prints the session token, which the journey sets as the
-second browser's cookie (CD_E2E_PLAYER_SESSION). A player builds from basic lands without limit,
-so the journey's deck is basic lands. Refused on a production database.
+second browser's cookie (CD_E2E_PLAYER_SESSION). The journeys' decks are basic lands; since v0.6.0 a
+library holds only the basic lands granted to it, so a new player is granted 100 of each basic land
+in its default printing (as an earlier deck's cards were). Refused on a production database.
 
     python scripts/e2e_player.py rival     # prints the session token
 """
@@ -18,7 +19,9 @@ from api.config import Settings
 from api.database import build_engine
 from api.economy import welcome
 from api.identity import hash_token, utcnow
-from api.models import User, UserSession
+from api.models import CardConcept, LibraryGrant, User, UserSession
+
+BASICS = 100
 
 
 def main(argv: list[str]) -> None:
@@ -45,6 +48,22 @@ def main(argv: list[str]) -> None:
                 db.add(user)
                 db.flush()
                 welcome(db, user)
+                for concept in db.scalars(
+                    select(CardConcept).where(CardConcept.type_line.startswith("Basic Land"))
+                ):
+                    if concept.default_printing_id is None:
+                        continue
+                    db.add(
+                        LibraryGrant(
+                            user_id=user.id,
+                            concept_id=concept.id,
+                            printing_id=concept.default_printing_id,
+                            quantity=BASICS,
+                            source="grandfathered",
+                            grant_key=f"grandfathered:e2e:{handle.casefold()}",
+                            created_at=now,
+                        )
+                    )
             db.add(
                 UserSession(
                     token_hash=hash_token(token),
