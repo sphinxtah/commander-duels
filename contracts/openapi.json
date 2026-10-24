@@ -26197,7 +26197,7 @@
     },
     "/api/v1/me/alliance/cards": {
       "get": {
-        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere). Only cards in\nthe game (v0.4.5), the stand-ins too since v0.6.2.",
+        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a\ngame can play (v0.4.5).",
         "operationId": "my_alliance_cards_api_v1_me_alliance_cards_get",
         "responses": {
           "200": {

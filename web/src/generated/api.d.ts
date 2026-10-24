@@ -2061,8 +2061,8 @@ export interface paths {
          * My Alliance Cards
          * @description The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
          *     every account, those that build from the whole catalog included: each says how many copies
-         *     the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards in
-         *     the game (v0.4.5), the stand-ins too since v0.6.2.
+         *     the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a
+         *     game can play (v0.4.5).
          */
         get: operations["my_alliance_cards_api_v1_me_alliance_cards_get"];
         put?: never;

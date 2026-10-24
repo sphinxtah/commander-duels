@@ -504,9 +504,9 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
 def planeswalker_cards(
     db: Session, roster: dict[str, Planeswalker], planeswalker: Planeswalker, library: Library
 ) -> AllianceCards:
-    """A Planeswalker's own cards in the game (the stand-ins too since v0.6.2), one per card, each with the copies the library
-    holds. The Godlike tier's Planeswalker has none from the catalog: its custom cards are only
-    GET /custom-cards, for a Godlike account allied with it."""
+    """A Planeswalker's own cards in the game (the stand-ins too since v0.6.2), one per card, each
+    with the copies the library holds. The Godlike tier's Planeswalker has none from the catalog:
+    its custom cards are only GET /custom-cards, for a Godlike account allied with it."""
     ids = alliance_cards(db, roster).get(planeswalker.id, [])
     # One card per construction key, as the library counts them: the one with a default printing.
     chosen: dict[str, UUID] = {}

@@ -1,5 +1,19 @@
 # Verification
 
+## v0.6.2
+
+Validated locally on Windows on October 24, 2026, on the work of v0.6.2 as merged: the stand-ins and the real card in every pack, the alliance's cards, the library's filters and the deck as its cards, and Two-Headed Giant's rare cards (each built in a worktree by a subagent and merged here), with the boosted chase cards and the first sets' prices (built here). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy.
+
+| Check | Result |
+|---|---|
+| Python suite | ruff, ruff format and mypy passed; 422 passed, 6 skipped against a throwaway PostgreSQL 17. New: `tests/test_boosts.py` (each boosted card exactly five times as likely, the fallback, fixed sheets, the 38 boosted printings), the first sets' prices in `tests/test_shop.py`, the stand-ins in `tests/test_decks_api.py`, the 0029 backfill in `tests/test_shop.py`, `allow_stand_in` in `tests/test_tables.py`, the alliance's cards route in `tests/test_progression.py` |
+| Migrations | `alembic upgrade head` and `alembic check` on a fresh PostgreSQL; down to 0028 and up again (in the stand-ins worktree) |
+| Contracts | regenerated after the merges: `contracts/openapi.json` on Python 3.12, `web/src/generated/api.d.ts` with `pnpm contracts` |
+| Web | `tsc -b`, the full Vitest run and the production build passed on the merged tree |
+| Engine | `docker build -f engine/Dockerfile --target engine-build .` with patches 0001–0009: 176 JUnit tests, none failing, one skipped (the opt-in pairing measurement). New: `TwoHeadedGiantRareCardsTest` (18 games), `StandInCardTest` (4, including a Legacy game where stand-ins are cast and attack, with the leak checks) |
+| Engine smoke | Two-Headed Giant with a human and three bots, with four humans, and a Legacy game through `scripts/engine_human_game.py` with patch 0009 (in its worktree) |
+| Not run locally | the browser journeys; hosted CI runs them |
+
 ## v0.6.1
 
 Validated locally on Windows on October 24, 2026, on the work of v0.6.1 as merged: the top bar, deleting a deck, own auctions on the market, Sign out in the account's menu and Profile's tabs (built here), Alpha and Beta in Leng's shop, and Two-Headed Giant's team priority with a bot in control of a turn (each built in a worktree by a subagent and merged here). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy.
