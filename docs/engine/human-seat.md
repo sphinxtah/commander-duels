@@ -118,6 +118,8 @@ Some cards let a player control another player's turn (rule 723): Mindslaver, Em
 - Two-Headed Giant: seat 0 controls team B's turn, answering for a human seat and a bot, seeing both hands and its teammate's that turn; its teammate and the other team see no more than before.
 - A game without turn control shows no controller, no prompt for another seat and no hand.
 
+The engine's suite then has 142 tests (one skipped, as before) and passes in the engine image's build; no test that predates turn control changed but for the leak checks' new rules and one comment. The scripted clients' checks (`scripts/engine_human_game.py`, which `scripts/api_practice_game.py` uses) allow another player's hand only while that player's entry names the seat in `controlled_by`, and a prompt for another seat only for such a player (`tests/test_turn_control.py`).
+
 ## Engine endpoints
 
 These exist only when `CD_ENGINE_DEV_ENDPOINTS=true`, which Compose sets. The engine publishes no port, and the web proxy forwards nothing to it.
