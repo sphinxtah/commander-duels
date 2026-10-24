@@ -702,6 +702,40 @@ def test_the_job_waits_retries_and_is_scheduled_weekly(tmp_path, job_content):
     engine.dispose()
 
 
+def test_products_without_booster_data_get_a_run_when_the_worker_starts(tmp_path, job_content):
+    # v0.6.1: Alpha and Beta came with a deploy and waited for Monday's run.
+    engine, settings = job_world(tmp_path, job_content)
+    now = datetime(2026, 10, 24, 20, tzinfo=UTC)
+    assert boosters.ensure_collated(engine, settings, now)
+    # Once for the same products waiting: a start after a run that could not build them queues
+    # nothing more.
+    assert not boosters.ensure_collated(engine, settings, now)
+    with Session(engine) as db:
+        [job] = db.scalars(
+            select(ScheduledJob).where(ScheduledJob.deduplication_key.like("%:waiting:%"))
+        ).all()
+        assert job.due_at.replace(tzinfo=UTC) == now and job.payload == {"trigger": "deploy"}
+    # The worker claims and runs it as any other run.
+    with Session(engine) as db, db.begin():
+        job = db.get(ScheduledJob, job.id)
+        job.status, job.generation, job.lease_until = "running", 1, now + timedelta(minutes=5)
+        claimed = sync.Claimed(job.id, 1, dict(job.payload))
+    host = FakeMtgjson({"ZNR": fixture_set()})
+    with httpx.Client(transport=httpx.MockTransport(host)) as http:
+        assert boosters.handle(engine, settings, http, claimed, None, pause=0).code == "imported"
+    with Session(engine) as db:
+        run = db.scalars(select(BoosterSyncRun)).one()
+        assert run.trigger == "schedule"
+        draft = db.scalars(
+            select(ShopProduct).where(ShopProduct.set_code == "ZNR", ShopProduct.booster == "draft")
+        ).one()
+        assert draft.data_status == "ready"
+    # With no catalog folder there is no booster data at all, and nothing to queue.
+    off = Settings(database_url=settings.database_url, content_dir=settings.content_dir)
+    assert not boosters.ensure_collated(engine, off, now)
+    engine.dispose()
+
+
 # Through the API.
 
 

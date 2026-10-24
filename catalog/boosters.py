@@ -616,6 +616,46 @@ def ensure_scheduled(engine: Engine, settings: Settings, now: datetime) -> None:
                 session.rollback()
 
 
+def ensure_collated(engine: Engine, settings: Settings, now: datetime) -> bool:
+    """On the worker's start, which is each deploy: products a version brought that have no
+    booster data yet (Alpha and Beta in v0.6.1) get a run at once, rather than waiting for
+    Monday's. Once for each set of such products, so a product whose data cannot be built does
+    not start a run on every deploy. The run is logged as a scheduled one. True if one was
+    queued."""
+    if not settings.catalog_dir:
+        return False
+    ensure_products(engine, settings.content_dir)
+    with Session(engine) as session:
+        waiting = sorted(
+            f"{product.set_code}/{product.booster}"
+            for product in session.scalars(
+                select(ShopProduct).where(
+                    ShopProduct.data_status == "waiting", ShopProduct.collation_id.is_(None)
+                )
+            )
+        )
+    if not waiting:
+        return False
+    digest = hashlib.sha256(",".join(waiting).encode()).hexdigest()[:16]
+    with Session(engine) as session:
+        session.add(
+            ScheduledJob(
+                kind=KIND,
+                deduplication_key=f"{KIND}:waiting:{digest}",
+                payload={"trigger": "deploy"},
+                status="pending",
+                due_at=now,
+            )
+        )
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            return False
+    log.info("Booster data queued for %d products without it: %s", len(waiting), waiting[:8])
+    return True
+
+
 def request_now(session: Session, user_id: UUID, now: datetime) -> ScheduledJob | None:
     """Queues a run for an administrator; None while one is queued or running already."""
     busy = session.scalar(

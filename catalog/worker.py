@@ -108,7 +108,9 @@ def start(engine: Engine, config: Settings) -> None:
     """Once each time the worker starts, which is each deploy: a version that learned a layout
     imports its cards again at once, and the decks' drafts lose what the game cannot play when
     that import ends; otherwise they lose it now. On v0.5.0's first start the drafts take the
-    editions their owners' libraries hold."""
+    editions their owners' libraries hold. Since v0.6.1 products a version added get their booster
+    data at once (boosters.ensure_collated)."""
+    boosters.ensure_collated(engine, config, datetime.now(UTC))
     if not sync.ensure_relearned(engine, config, datetime.now(UTC)):
         withdraw_unplayable(engine, config)
     switch_editions(engine, config)
