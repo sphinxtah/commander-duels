@@ -143,6 +143,7 @@ Permission = Literal[
     "chat.read_all",
     "admin.users.reset",
     "players.history",
+    "auctions.manage",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]

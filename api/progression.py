@@ -123,6 +123,14 @@ class LibraryEdition(Contract):
     rarity: str
 
 
+class LibraryFinishes(Contract):
+    """An edition's copies by finish (v0.6.0)."""
+
+    nonfoil: int = 0
+    foil: int = 0
+    etched: int = 0
+
+
 class LibraryCard(Contract):
     card: CardSummary = Field(
         description="The card, its image that of the edition (v0.5.0); owned counts every "
@@ -130,8 +138,16 @@ class LibraryCard(Contract):
     )
     edition: LibraryEdition = Field(description="The edition these copies are (v0.5.0).")
     copies: int | None = Field(description="Copies owned of this edition.")
-    sources: list[Literal["starter", "grandfathered", "alliance", "pack", "unique"]] = Field(
-        description="Where this edition's copies came from."
+    sources: list[Literal["starter", "grandfathered", "alliance", "pack", "unique", "auction"]] = (
+        Field(description="Where this edition's copies came from.")
+    )
+    finishes: LibraryFinishes = Field(
+        description="The copies held now in each finish (v0.6.0), after the auction house: "
+        "those listed or sold are out, those bought are in; an alliance's are nonfoil.",
+    )
+    sellable: int = Field(
+        description="Copies that may be listed at Tivit's Auction House (v0.6.0): granted ones, "
+        "never an alliance's.",
     )
 
 
@@ -466,6 +482,8 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
                 ),
                 copies=edition.copies,
                 sources=sorted(edition.sources),  # type: ignore[arg-type]
+                finishes=LibraryFinishes(**library.finishes.get(printing.id, {})),
+                sellable=library.sellable.get(printing.id, 0),
             )
         )
     # By name, and a card's editions newest first.

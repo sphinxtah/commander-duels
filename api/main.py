@@ -15,6 +15,7 @@ from starlette.responses import Response
 from api import (
     achievements,
     admin,
+    auctions,
     auth,
     card_images,
     cards,
@@ -347,6 +348,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
     app.include_router(shop.router)
+    app.include_router(auctions.router)
     app.include_router(reports.router)
     app.include_router(social.router)
     app.include_router(chat.router)

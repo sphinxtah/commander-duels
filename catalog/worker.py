@@ -1,5 +1,6 @@
 import logging
 import signal
+import time
 from datetime import UTC, datetime, timedelta
 from threading import Event
 from uuid import UUID
@@ -9,13 +10,16 @@ from sqlalchemy import Engine, and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from api import accounts, decks, roster
+from api import accounts, auctions, decks, roster
 from api.config import Settings
 from api.database import build_engine
 from api.models import ScheduledJob
 from catalog import boosters, sync
 
 logger = logging.getLogger(__name__)
+# Tivit's Auction House (v0.6.0): ended auctions are settled this often.
+SETTLE_SECONDS = 10.0
+last_settled = {"at": 0.0}
 
 
 def claim(engine: Engine, now: datetime) -> tuple[UUID, int, str] | None:
@@ -83,6 +87,23 @@ def switch_editions(engine: Engine, config: Settings) -> None:
         logger.info("Decks switched to the editions their owners' libraries hold: %s", changed)
 
 
+def settle_auctions(engine: Engine, config: Settings, force: bool = False) -> int:
+    """Settles the auctions that ended (api/auctions.py), every SETTLE_SECONDS: sold to the
+    leading bid, or unsold. Each settles in its own transaction under its row's lock, so a read
+    settling the same auction at once settles it once."""
+    now = time.monotonic()
+    if not force and now - last_settled["at"] < SETTLE_SECONDS:
+        return 0
+    last_settled["at"] = now
+    with Session(engine) as session:
+        if not auctions.any_due(session):
+            return 0
+        settled = auctions.settle_due(session, roster.load(config.content_dir))
+    if settled:
+        logger.info("Auctions settled: %s", settled)
+    return settled
+
+
 def start(engine: Engine, config: Settings) -> None:
     """Once each time the worker starts, which is each deploy: a version that learned a layout
     imports its cards again at once, and the decks' drafts lose what the game cannot play when
@@ -95,10 +116,11 @@ def start(engine: Engine, config: Settings) -> None:
 
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
     """One iteration: keep the catalog's, the booster data's and the account cleanup's schedules
-    queued, then run one due job."""
+    queued, settle the auctions that ended (v0.6.0), then run one due job."""
     sync.ensure_scheduled(engine, config, datetime.now(UTC))
     boosters.ensure_scheduled(engine, config, datetime.now(UTC))
     accounts.ensure_scheduled(engine, datetime.now(UTC))
+    settle_auctions(engine, config)
     job = claim(engine, datetime.now(UTC))
     if job is None:
         return

@@ -14,6 +14,10 @@ In one transaction, with the account's row locked:
 - **Wins and tokens** go back to 0 and to the welcome's 1,000 through the ledgers' own entries, a
   setting of wins and a grant of tokens with the reason REASON, so both ledgers keep their history.
 
+Since v0.6.0 the account's live auctions end first, as SysOp's cancellation ends them (the cards
+back, the leading bids returned to their bidders), and its own leading bids come back to it
+(api/auctions.py end_auctions_of), so its tokens are counted after.
+
 Friends, blocks, conversations and messages, table chats, problem reports, notifications, privacy
 settings and preferences stay, and so do the account's sessions: its app sees the change at its
 next account check. While the account plays a game or sits at an open table, a reset is refused;
@@ -71,6 +75,12 @@ def reset_account(db: Session, user: User, actor: User, roster: dict[str, Planes
     account plays a game or sits at an open table."""
     if user.kind != "player":
         raise ValueError("Only a player's account can be reset.")
+    # Its live auctions end and its leading bids come back first (v0.6.0), before its row is
+    # locked, as every auction's change locks the auction before the accounts; once more after.
+    # Imported here: api.auctions imports api.decks, which imports far.
+    from api.auctions import end_auctions_of
+
+    end_auctions_of(db, user, "account reset", roster=roster)
     # The account's row is locked, as a purchase, a pack's opening or a seat at a table locks it,
     # and read again, so what got there first is seen; the time is taken after, so everything
     # granted before the lock counts as before the reset.
@@ -90,6 +100,7 @@ def reset_account(db: Session, user: User, actor: User, roster: dict[str, Planes
             "table starts or closes.",
         )
     remove_queue_of(db, user.id)
+    end_auctions_of(db, user, "account reset", roster=roster)
     now = utcnow()
     cleared = Cleared(
         wins=total_wins(db, user.id),
