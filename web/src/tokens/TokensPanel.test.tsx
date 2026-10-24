@@ -17,7 +17,14 @@ function line(fields: Partial<TokenLine>): TokenLine {
 }
 
 function shown(entries: TokenLine[]): Tokens {
-  return { balance: 1514, earned: 1014, given: 1000, spent: 500, entries };
+  return {
+    balance: 1514,
+    earned: 1014,
+    given: 1000,
+    spent: 500,
+    auctions: 0,
+    entries,
+  };
 }
 
 afterEach(() => vi.restoreAllMocks());

@@ -109,6 +109,13 @@ export function notificationWords(item: NotificationItem): string {
       return item.request_pending
         ? `${who} invites you to play Two-Headed Giant as their teammate.`
         : `${who} invited you to play Two-Headed Giant as their teammate.`;
+    case "auction_outbid":
+    case "auction_won":
+    case "auction_sold":
+    case "auction_unsold":
+    case "auction_cancelled":
+      // Said above by auctionNoticeWords; this only closes the switch.
+      return "News from Tivit's Auction House.";
   }
 }
 

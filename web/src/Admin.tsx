@@ -633,10 +633,7 @@ function Audit() {
  * The permission is new in v0.6.0's contract, so it is looked for as a string until the generated
  * types name it. */
 function readsAuctions(me: Me): boolean {
-  return (
-    me.kind === "sysop" ||
-    (me.permissions as string[]).includes("auctions.manage")
-  );
+  return me.kind === "sysop" || me.permissions.includes("auctions.manage");
 }
 
 export function canAdminister(me: Me | null | undefined) {

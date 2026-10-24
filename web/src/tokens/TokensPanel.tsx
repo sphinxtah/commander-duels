@@ -49,6 +49,8 @@ export function TokensPanel({ refresh = 0 }: { refresh?: number }) {
           <p className={account.fine}>
             {tokens(shown.earned)} won in games · {tokens(shown.given)} given ·{" "}
             {tokens(shown.spent)} spent in Leng's card shop
+            {shown.auctions !== 0 &&
+              ` · ${shown.auctions > 0 ? "+" : "−"}${tokens(Math.abs(shown.auctions))} at Tivit's Auction House`}
           </p>
           <p className={account.fine}>
             A win pays 5 to 20 tokens for each bot you beat, by its skill, and

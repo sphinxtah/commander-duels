@@ -35,12 +35,24 @@ export function lineWords(line: TokenLine): string {
       return `Daily quest: ${line.reason ?? "completed"}`;
     case "achievement":
       return `Achievement: ${line.reason ?? "earned"}`;
+    // Tivit's Auction House (v0.6.0): a bid held, a bid returned, a card sold.
+    case "bid":
+      return line.reason ?? "A bid at Tivit's Auction House";
+    case "bid_return":
+      return line.reason ?? "A bid returned";
+    case "sale":
+      return line.reason ?? "A card sold at Tivit's Auction House";
   }
 }
 
 /** Entries whose reason is what they were for, said by lineWords already. */
 export function namedByReason(line: TokenLine): boolean {
   return (
-    line.kind === "pack" || line.kind === "quest" || line.kind === "achievement"
+    line.kind === "pack" ||
+    line.kind === "quest" ||
+    line.kind === "achievement" ||
+    line.kind === "bid" ||
+    line.kind === "bid_return" ||
+    line.kind === "sale"
   );
 }

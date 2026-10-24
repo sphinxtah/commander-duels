@@ -136,6 +136,8 @@ export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
   pack: "Packs you opened",
   // A one-of-a-kind card (v0.5.1): the only copy there is.
   unique: "One of a kind",
+  // Won at Tivit's Auction House (v0.6.0).
+  auction: "Bought at auction",
 };
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */
