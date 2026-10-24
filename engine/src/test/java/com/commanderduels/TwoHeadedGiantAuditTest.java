@@ -384,7 +384,7 @@ class TwoHeadedGiantAuditTest {
 
     @Test
     void theNewerControlOfATeamWins() throws Exception {
-        // 805.8, 720.1a: seat 0 comes to control seat 2's next turn, then seat 1 seat 3's. Both effects
+        // 805.8, 723.1a: seat 0 comes to control seat 2's next turn, then seat 1 seat 3's. Both effects
         // control team B's turn 2, and the newer one works: seat 1 controls seat 2 and seat 3. (The
         // first version of patch 0004 used each player's modifications before reading the next one's
         // position, so the older effect won.)
@@ -610,7 +610,7 @@ class TwoHeadedGiantAuditTest {
 
     @Test
     void eachPlayerOfTheActiveTeamAdvancesTheirSagas() throws Exception {
-        // 714.3b, 805.4: as the precombat main phase of each player of the active team begins, they put a
+        // 714.3c, 805.4: as the precombat main phase of each player of the active team begins, they put a
         // lore counter on each of their Sagas. History of Benalia on seat 1 advances in team A's turn 3,
         // which seat 0 holds, like seat 0's; neither does in team B's turn 2.
         var scenario = new Scenario(fourHumans(5112L, 4))

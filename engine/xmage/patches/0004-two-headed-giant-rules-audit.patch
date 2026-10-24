@@ -13,7 +13,7 @@ turn's holder. With this, in a game that names teammates (Game.getTeammates, fro
   an ability triggers, goes on the stack and resolves, the player whose step it is is "the active
   player" for it (805.9: Game.asActivePlayer), so an effect that reads the active player acts for that
   player. The initiative's "your upkeep" is the upkeep of the player who has it.
-- 714.3b, 805.4: each player of the active team puts a lore counter on each of their Sagas.
+- 714.3c, 805.4: each player of the active team puts a lore counter on each of their Sagas.
 - 805.9: "not your turn" (NotMyTurnCondition) and the core's other "your turn" checks read the team's
   turn; each player of the active team may play the extra lands an effect gives "each player".
 - 805.8: a turn, phase or step a player of the active team skips, or an extra phase or step they get,
@@ -1168,7 +1168,7 @@ index 4567c647..97295272 100644
 -        for (Permanent saga : game.getBattlefield().getAllActivePermanents(filter, activePlayerId, game)) {
 -            if (saga != null) {
 -                saga.addCounters(CounterType.LORE.createInstance(), activePlayerId, null, game);
-+        // 714.3b, 805.4: with shared team turns, it is each player's precombat main phase of the
++        // 714.3c, 805.4: with shared team turns, it is each player's precombat main phase of the
 +        // active team, and each of them puts a lore counter on each Saga they control
 +        for (UUID teamPlayerId : game.getTeam(activePlayerId)) {
 +            Player teamPlayer = game.getPlayer(teamPlayerId);

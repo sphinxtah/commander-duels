@@ -298,7 +298,7 @@ Titan Hunter,TitanHunter,805.4d each player's step,fixed,0004 TeamStepEvent,trig
 Tooth Collector,ToothCollector,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
 Topplegeist,Topplegeist,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
 Umbilicus,Umbilicus,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
-"Urabrask, Heretic Praetor",UrabraskHereticPraetor,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer,"names that opponent only as ""they"": says by hand that it triggers for each player of the active team; the effect reads the active player: the player whose step it is (805.9)"
+"Urabrask, Heretic Praetor",UrabraskHereticPraetor,805.4d each player's step,still wrong,0006 withTriggersForEachTeamPlayer,"names that opponent only as ""they"": says by hand that it triggers for each player of the active team, which is right, but its replacement applies later, at the draw, and reads the turn's holder (Game.isActivePlayer, getActivePlayerId): both teammates' draws are replaced and the holder's library exiles twice (found in the fix's review, v0.5.1)"
 Urborg Stalker,UrborgStalker,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
 Verdant Kraken,VerdantKraken,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
 Viseling,Viseling,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
