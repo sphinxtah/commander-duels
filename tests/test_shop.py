@@ -271,9 +271,40 @@ def test_alpha_and_beta_are_sold_like_any_other_set():
             usd=8464.17,
         )
         assert products.selling(product, date(2026, 10, 24))
-        assert products.price_of(product) == (14_000_000, "market")
+        # A quarter of the curve's 14,000,000 since v0.6.2.
+        assert products.price_of(product) == (3_500_000, "market")
         assert products.era_of(product.released) == "first"
     assert sales.sale_price(440_000_000) == 352_000_000
+
+
+def test_the_first_sets_cost_a_quarter_of_their_curve_price():
+    """v0.6.2, the owner: Alpha, Beta, Unlimited and Arabian Nights, packs and starter decks, at a
+    quarter of the curve; staff prices and every later set as before."""
+    listing = products.price_list(str(CONTENT))
+    assert listing is not None
+
+    def priced(code: str, booster: str) -> int:
+        row = next(row for row in listing.rows if (row.set_code, row.booster) == (code, booster))
+        return products.price_of(ShopProduct(set_code=code, booster=booster, usd=row.usd))[0]
+
+    assert [
+        priced(code, booster)
+        for code, booster in [
+            ("LEA", "default"),
+            ("LEA", "starter"),
+            ("LEB", "default"),
+            ("LEB", "starter"),
+            ("2ED", "default"),
+            ("2ED", "starter"),
+            ("ARN", "default"),
+        ]
+    ] == [15_000_000, 110_000_000, 3_500_000, 28_000_000, 950_000, 4_000_000, 650_000]
+    assert priced("3ED", "default") == 150_000
+    assert priced("ATQ", "default") == products.curve_price(
+        next(row.usd for row in listing.rows if row.set_code == "ATQ") or 0
+    )
+    staff = ShopProduct(set_code="LEA", booster="default", usd=24183.37, price_override=1_000)
+    assert products.price_of(staff) == (1_000, "set")
 
 
 # Drawing.

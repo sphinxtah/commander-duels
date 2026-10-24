@@ -12,7 +12,8 @@
   with `k = ln 300 / ln(343.28 / 6.07)`, rounded to two significant figures. A product with no
   market price costs 500 until it is priced. SysOp and administrators may set any product's price
   and take any product off sale; those settings live in the database, apart from the content file,
-  and each change is audited.
+  and each change is audited. Since v0.6.2 Alpha, Beta, Unlimited and Arabian Nights cost a
+  quarter of their curve price (MARKDOWNS, the owner's decision).
 - A product is **sold** while staff keep it on sale, its booster data is ready (every card found in
   the catalog) and it has been released.
 - **Starter decks** (v0.4.2) are priced from the market value of the cards they grant, basic lands
@@ -55,6 +56,9 @@ TOP_USD = 343.28
 TOP_TOKENS = 150_000
 EXPONENT = math.log(TOP_TOKENS / ANCHOR_TOKENS) / math.log(TOP_USD / ANCHOR_USD)
 UNPRICED = 500
+# The first sets' packs and starter decks at a quarter of their curve price (v0.6.2, the owner):
+# Alpha, Beta, Unlimited and Arabian Nights.
+MARKDOWNS = {"lea": 0.25, "leb": 0.25, "2ed": 0.25, "arn": 0.25}
 LOWEST = 10
 
 BoosterKind = Literal[
@@ -154,7 +158,11 @@ def price_of(product: ShopProduct) -> tuple[int, PriceBasis]:
     if product.price_override is not None:
         return product.price_override, "set"
     if product.usd is not None and product.usd > 0:
-        return curve_price(product.usd), "market"
+        price = curve_price(product.usd)
+        markdown = MARKDOWNS.get(product.set_code.lower())
+        if markdown is not None:
+            price = two_figures(price * markdown)
+        return price, "market"
     return UNPRICED, "unpriced"
 
 

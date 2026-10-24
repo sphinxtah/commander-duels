@@ -50,6 +50,22 @@ Read on 2026-10-24, for ungraded sealed product: a graded pack (PSA and the like
 
 On the curve these come to 14,000,000 tokens for a Beta booster, 61,000,000 for an Alpha booster, 110,000,000 for a Beta starter deck and 440,000,000 for an Alpha starter deck. Each `basis` in the file gives the figures and links again.
 
+## The first sets at a quarter (v0.6.2)
+
+At the owner's request (2026-10-24, "reduce the prices of alpha through arabian nights in 1/4 in the shop", asked: a quarter of the price), Alpha, Beta, Unlimited and Arabian Nights cost a quarter of their curve price, rounded to two figures as every price is (`api/products.py` `MARKDOWNS`). Their market prices in this list are unchanged, and a price staff set by hand still wins.
+
+| Product | Curve | Sold at |
+|---|---:|---:|
+| Alpha booster | 61,000,000 | 15,000,000 |
+| Alpha starter deck | 440,000,000 | 110,000,000 |
+| Beta booster | 14,000,000 | 3,500,000 |
+| Beta starter deck | 110,000,000 | 28,000,000 |
+| Unlimited booster | 3,800,000 | 950,000 |
+| Unlimited starter deck | 16,000,000 | 4,000,000 |
+| Arabian Nights booster | 2,600,000 | 650,000 |
+
+The weekly sale takes its 20% off the price sold at. Administration's Card shop still shows each product's curve price beside the price sold at.
+
 ## Judgement calls: included
 
 MTGJSON describes each of these as a booster, and each was sold, or can be bought, as a single sealed item. Drop any of them by booster name if the shop should not sell it.
