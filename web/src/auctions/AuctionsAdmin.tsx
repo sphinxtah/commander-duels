@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { describe, type Me } from "../api";
 import { auctionApi } from "./api";
 import { editionLine, finishNames, tokens } from "./auctions";
-import { Price } from "./ItemViews";
+import { CardArt, Price } from "./ItemViews";
 import type { AuctionItem, AuctionPage, AuctionStatus } from "./types";
 import styles from "./auctions.module.css";
 
@@ -180,10 +180,19 @@ export function AuctionsAdmin({ me }: { me: Me }) {
                   <time dateTime={item.created_at}>{when(item.created_at)}</time>
                 </td>
                 <th scope="row">
-                  {item.card.name}
-                  <small>
-                    {editionLine(item.card)} · {finishNames[item.finish]}
-                  </small>
+                  <span className={styles.logCard}>
+                    <CardArt
+                      card={item.card}
+                      finish={item.finish}
+                      className={styles.logArt}
+                    />
+                    <span>
+                      {item.card.name}
+                      <small>
+                        {editionLine(item.card)} · {finishNames[item.finish]}
+                      </small>
+                    </span>
+                  </span>
                 </th>
                 <td>{item.seller}</td>
                 <td>{item.buyer ?? (item.high_bidder ? `${item.high_bidder} (leading)` : "—")}</td>

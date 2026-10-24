@@ -14,6 +14,8 @@ export const pages = [
   "Decks",
   "Cards",
   "Shop",
+  // Tivit's Auction House (v0.6.0): its main menu tile leads there; the top bar keeps its six.
+  "Auctions",
   "Friends",
   "Profile",
   "Settings",
@@ -37,6 +39,7 @@ export const pageNames: Record<Page, string> = {
   Decks: "Decks",
   Cards: "Cards",
   Shop: "Shop",
+  Auctions: "Auction House",
   Friends: "Friends",
   Profile: "Profile",
   Settings: "Settings",
@@ -56,6 +59,7 @@ export type IconName =
   | "decks"
   | "cards"
   | "shop"
+  | "auctions"
   | "friends"
   | "messages"
   | "back";
@@ -132,6 +136,14 @@ const icons: Record<IconName, ReactNode> = {
     <>
       <path d="M9 6h6l-1.5-3h-3zM9 6c-4 3-5 7-4 11a3 3 0 0 0 3 2.5h8a3 3 0 0 0 3-2.5c1-4 0-8-4-11" />
       <path d="M12 10v6M10.2 11.4h2.8a1.3 1.3 0 0 1 0 2.6h-2a1.3 1.3 0 0 0 0 2.6H14" />
+    </>
+  ),
+  // An auctioneer's gavel over its block (v0.6.0).
+  auctions: (
+    <>
+      <path d="M13.2 4.6l5.6 5.6M10.4 7.4l5.6 5.6M11.8 6l4.2 4.2" />
+      <path d="M12.6 10.6L5 18.2a1.4 1.4 0 0 0 2 2l7.6-7.6" />
+      <path d="M13 21h8" />
     </>
   ),
   // Two companions.

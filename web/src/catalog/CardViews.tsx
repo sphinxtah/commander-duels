@@ -18,6 +18,7 @@ import {
 import styles from "./catalog.module.css";
 import type { CardView } from "./cardView";
 import { zoomOf, type Zoomed } from "./CardZoom";
+import { foilGlow } from "./foilGlow";
 
 /** The card's printed image over its text: a missing or slow image never hides the text. */
 export function CardImage({
@@ -25,11 +26,14 @@ export function CardImage({
   printingId,
   face,
   size = "normal",
+  finish,
 }: {
   card: CardSummary;
   printingId?: string | null;
   face?: number;
   size?: "normal" | "large";
+  /** The copy's finish, when known: a foil or etched one glows (v0.6.0). */
+  finish?: string | null;
 }) {
   const chosen = printingId ?? card.image?.printing_id;
   const faces = card.image?.faces ?? 0;
@@ -45,7 +49,7 @@ export function CardImage({
   // shows the card's background around it rather than fragments of the text.
   return (
     <div
-      className={styles.cardImage}
+      className={[styles.cardImage, foilGlow(finish)].filter(Boolean).join(" ")}
       data-loaded={image.state === "loaded" || undefined}
     >
       <TextFrame card={card} face={face} />
@@ -133,6 +137,7 @@ export function CardTile({
   onOpen,
   onZoom,
   edition,
+  finish,
   children,
 }: {
   card: CardSummary;
@@ -141,6 +146,8 @@ export function CardTile({
   onZoom?: (card: CardSummary) => void;
   /** The edition the tile shows, in words. */
   edition?: string;
+  /** The finish the tile's copies glow in (v0.6.0). */
+  finish?: string | null;
   children?: ReactNode;
 }) {
   const owned = ownedWords(card);
@@ -152,7 +159,7 @@ export function CardTile({
         onClick={() => (onZoom ?? onOpen)(card)}
         aria-label={`${card.name}${edition ? ` from ${edition}` : ""}, ${card.type_line}${card.playable ? "" : `, ${statusLabel(card)}`}${owned ? `, ${owned.toLowerCase()}` : ""}`}
       >
-        <CardImage card={card} />
+        <CardImage card={card} finish={finish} />
       </button>
       <div className={styles.tileFoot}>
         <span className={styles.tileName} title={card.name}>
@@ -257,7 +264,11 @@ export function CardDetails({
   actions,
   printings: shownPrintings = "all",
   onZoom,
+  finish,
 }: {
+  /** The finish of the copy opened (v0.6.0): foil or etched, the chosen printing's picture
+   * glows. */
+  finish?: string | null;
   cardId: string;
   chosenPrinting?: string | null;
   onChoosePrinting?: (printingId: string | null) => void;
@@ -331,6 +342,9 @@ export function CardDetails({
         card.editions.map((edition) => [edition.printing_id, edition.copies]),
       )
     : null;
+  // The copy's finish belongs to its printing: another printing previewed does not glow.
+  const shownFinish =
+    finish && (preview ?? null) === (chosenPrinting ?? null) ? finish : null;
   return (
     <div className={styles.detail}>
       <div className={styles.detailImage}>
@@ -340,7 +354,7 @@ export function CardDetails({
             className={styles.zoomable}
             aria-label={`Enlarge ${card.name}`}
             onClick={() => {
-              const zoomed = zoomOf(card, preview);
+              const zoomed = zoomOf(card, preview, undefined, shownFinish);
               if (zoomed) onZoom(zoomed);
             }}
           >
@@ -349,6 +363,7 @@ export function CardDetails({
               printingId={preview}
               face={imageFaces > 0 ? face : undefined}
               size="large"
+              finish={shownFinish}
             />
           </button>
         ) : (
@@ -357,6 +372,7 @@ export function CardDetails({
             printingId={preview}
             face={imageFaces > 0 ? face : undefined}
             size="large"
+            finish={shownFinish}
           />
         )}
         {imageFaces > 1 && (

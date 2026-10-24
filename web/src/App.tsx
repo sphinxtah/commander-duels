@@ -41,6 +41,7 @@ import { DeckEditor } from "./decks/DeckEditor";
 import { DecksPage } from "./decks/DecksPage";
 import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
+import { AuctionsPage } from "./auctions/AuctionsPage";
 import { GameScreen } from "./game/GameScreen";
 import { QueueFollower } from "./queues/FindGame";
 import { TablesPage } from "./tables/TablesPage";
@@ -114,6 +115,8 @@ function currentPage(): Page {
   if (path === "notifications") return "Notifications";
   if (path.startsWith("player/")) return "Friends";
   if (path.startsWith("tables/")) return "Tables";
+  // Tivit's Auction House's tabs (v0.6.0): #auctions/search, #auctions/list, #auctions/targets.
+  if (path.startsWith("auctions/")) return "Auctions";
   if (path.startsWith("match/")) return "Play";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
   // The Play page's own anchors: "Find a game" (v0.5.0), its practice table and its formats.
@@ -633,6 +636,8 @@ export function App() {
                 heading={heading}
                 onSetup={() => setSetup("current")}
               />
+            ) : page === "Auctions" ? (
+              <AuctionsPage me={me} heading={heading} />
             ) : page === "Friends" && playerRoute ? (
               <PlayerPage
                 key={playerRoute}

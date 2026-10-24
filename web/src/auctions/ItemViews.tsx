@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { foilGlow } from "../catalog/foilGlow";
 import { useImageRetry } from "../game/RetryingImage";
 import {
   amount,
@@ -83,7 +84,9 @@ export function CardArt({
   const image = useImageRetry(src);
   return (
     <span
-      className={[styles.art, className].filter(Boolean).join(" ")}
+      className={[styles.art, foilGlow(finish), className]
+        .filter(Boolean)
+        .join(" ")}
       data-finish={finish}
       data-rarity={card.rarity}
       data-loaded={image.state === "loaded" || undefined}

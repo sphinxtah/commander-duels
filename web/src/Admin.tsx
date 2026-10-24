@@ -28,6 +28,7 @@ import { Portrait } from "./alliance/Portrait";
 import { TierBadge } from "./alliance/TierBadge";
 import { CatalogAdmin } from "./catalog/CatalogAdmin";
 import { ShopAdmin } from "./shop/ShopAdmin";
+import { AuctionsAdmin } from "./auctions/AuctionsAdmin";
 import { EconomySettings } from "./tokens/EconomySettings";
 import { GiveTokens } from "./tokens/GiveTokens";
 import styles from "./Account.module.css";
@@ -628,6 +629,16 @@ function Audit() {
   );
 }
 
+/** Tivit's Auction House's log (v0.6.0): SysOp's, and an administrator's given auctions.manage.
+ * The permission is new in v0.6.0's contract, so it is looked for as a string until the generated
+ * types name it. */
+function readsAuctions(me: Me): boolean {
+  return (
+    me.kind === "sysop" ||
+    (me.permissions as string[]).includes("auctions.manage")
+  );
+}
+
 export function canAdminister(me: Me | null | undefined) {
   return Boolean(
     me &&
@@ -638,7 +649,8 @@ export function canAdminister(me: Me | null | undefined) {
       me.permissions.includes("custom_cards.manage") ||
       me.permissions.includes("shop.manage") ||
       me.permissions.includes("reports.manage") ||
-      me.permissions.includes("chat.read_all")),
+      me.permissions.includes("chat.read_all") ||
+      readsAuctions(me)),
   );
 }
 
@@ -650,6 +662,7 @@ type Tab =
   | "audit"
   | "catalog"
   | "shop"
+  | "auctions"
   | "custom";
 
 /** A tab's count, with words for screen readers ("Accounts, 2 accounts waiting…"). */
@@ -715,6 +728,8 @@ export function Admin({
   const reports = me!.permissions.includes("reports.manage");
   // SysOp's reader of every chat, each opening audited (v0.4.4).
   const chats = me!.permissions.includes("chat.read_all");
+  // Tivit's Auction House's log and SysOp's cancelling (v0.6.0).
+  const auctions = readsAuctions(me!);
   const pending = counts?.pending_accounts ?? 0;
   const unread = counts?.unread_reports ?? 0;
   const available = [
@@ -725,6 +740,7 @@ export function Admin({
     audit && "audit",
     catalog && "catalog",
     shop && "shop",
+    auctions && "auctions",
     custom && "custom",
   ].filter(Boolean) as Tab[];
   const shown = available.includes(tab) ? tab : available[0];
@@ -808,6 +824,15 @@ export function Admin({
             Card shop
           </button>
         )}
+        {auctions && (
+          <button
+            role="tab"
+            aria-selected={shown === "auctions"}
+            onClick={() => setTab("auctions")}
+          >
+            Auctions
+          </button>
+        )}
         {custom && (
           <button
             role="tab"
@@ -839,6 +864,8 @@ export function Admin({
           <CatalogAdmin />
         ) : shown === "shop" ? (
           <ShopAdmin me={me!} />
+        ) : shown === "auctions" ? (
+          <AuctionsAdmin me={me!} />
         ) : (
           <CustomCards />
         )}

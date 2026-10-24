@@ -1264,10 +1264,36 @@
   background: #1f2a21;
   opacity: 1;
 }
-.compareList li:first-child button::before {
-  content: "Lowest";
-  position: absolute;
-  visibility: hidden;
+.compareWho {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.compareWho > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compareArt,
+.logArt {
+  flex: 0 0 auto;
+  width: 1.9rem;
+  border-radius: 2px;
+}
+.compareArt .artFrame,
+.logArt .artFrame {
+  font-size: 0;
+  border-width: 0.12rem;
+}
+.compareArt .etched,
+.logArt .etched {
+  display: none;
+}
+.logCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
 }
 .salesList li {
   display: flex;

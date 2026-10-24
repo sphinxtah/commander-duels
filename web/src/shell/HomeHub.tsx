@@ -220,6 +220,16 @@ export function HomeHub({
           meta="Five packs 20% off this week"
           index={2}
         />
+        {/* Tivit's Auction House (v0.6.0), beside Leng's shop: the owner's painting. */}
+        <Tile
+          href="#auctions/search"
+          className={styles.auctionsTile}
+          icon="auctions"
+          title="Tivit's Auction House"
+          lead="Bid on other players' cards, or sell your own."
+          meta="No fee: a sale pays you in full"
+          index={2.5}
+        />
         <Tile
           href="#decks"
           className={styles.decksTile}

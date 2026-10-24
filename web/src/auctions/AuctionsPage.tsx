@@ -335,9 +335,9 @@ export function AuctionsPage({
         <h2 id="rules-title">How the auction house works</h2>
         <ul>
           <li>
-            Each auction is one copy of a card in one edition and one finish.
-            Packs, alliance cards, the one of a kind, basic lands and custom
-            cards are never sold.
+            Each auction is one copy of a card in one exact print and one
+            finish, basic lands included. Packs, alliance cards, the one of a
+            kind and custom cards are never sold.
           </li>
           <li>
             A bid is held from your tokens at once and comes back if someone

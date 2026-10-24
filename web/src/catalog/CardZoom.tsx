@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { printingImage, type CardSummary, type CustomCard } from "./catalog";
 import styles from "./catalog.module.css";
+import { foilGlow } from "./foilGlow";
 
 // A card's picture alone, as large as the screen allows, over a dimmed page (v0.5.1, the
 // owner's request: "click the cards ... to make them bigger and easier to read"). A click on a
@@ -15,6 +16,8 @@ export interface Zoomed {
   faces: number;
   /** Opens the card's details in their place. */
   details?: () => void;
+  /** The copy's finish, when known: foil or etched glows (v0.6.0). */
+  finish?: string | null;
 }
 
 /** A catalog card's picture, of a printing (the one it shows by default). */
@@ -22,6 +25,7 @@ export function zoomOf(
   card: CardSummary,
   printingId?: string | null,
   details?: () => void,
+  finish?: string | null,
 ): Zoomed | undefined {
   const chosen = printingId ?? card.image?.printing_id;
   const faces = card.image?.faces ?? 0;
@@ -40,6 +44,7 @@ export function zoomOf(
     src: (face) => printingImage(chosen, "png", faces > 0 ? face : undefined),
     faces,
     details,
+    finish,
   };
 }
 
@@ -82,7 +87,9 @@ export function CardZoom({
         <>
           <img
             key={`${zoomed.name}/${face}`}
-            className={styles.zoomImage}
+            className={[styles.zoomImage, foilGlow(zoomed.finish)]
+              .filter(Boolean)
+              .join(" ")}
             src={zoomed.src(face)}
             alt={zoomed.name}
             decoding="async"

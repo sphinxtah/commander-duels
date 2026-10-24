@@ -246,6 +246,7 @@ export function ItemPanel({
                     src: () => cardImage(item.card, "png"),
                     faces: 0,
                     details: () => setShownDetails(true),
+                    finish: item.finish,
                   })
                 }
               >
@@ -524,6 +525,7 @@ export function ItemPanel({
             cardId={item.card.concept_id}
             chosenPrinting={item.card.printing_id}
             printings="chosen"
+            finish={item.finish}
             onZoom={setZoom}
           />
         )}
@@ -578,7 +580,14 @@ function ComparePanel({
                 onClick={() => onOpen(other)}
                 aria-label={`${other.id === current.id ? "This auction" : `Open ${other.seller}'s`}: ${other.current_bid !== null ? "bid" : "starting bid"} ${tokens(other.current_bid ?? other.starting_bid)}${other.buy_now !== null ? `, Buy Now ${tokens(other.buy_now)}` : ""}, ${timeLeft(other.ends_at, now)} left`}
               >
-                <span>{other.id === current.id ? "This one" : other.seller}</span>
+                <span className={styles.compareWho}>
+                  <CardArt
+                    card={other.card}
+                    finish={other.finish}
+                    className={styles.compareArt}
+                  />
+                  <span>{other.id === current.id ? "This one" : other.seller}</span>
+                </span>
                 <Price value={other.current_bid ?? other.starting_bid} />
                 <Price value={other.buy_now} className={styles.buyNow} />
                 <span

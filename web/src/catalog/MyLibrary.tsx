@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { client, describe } from "../api";
+import { finishesWords } from "../auctions/auctions";
+import { SellDialog, type SellRequest } from "../auctions/SellDialog";
+import type { LibraryFinishes } from "../auctions/types";
 import { ManaCost } from "../game/Card";
 import { CardTile, ViewSwitch } from "./CardViews";
+import { heldFinish } from "./foilGlow";
 import {
   editionName,
   sourceLabels,
@@ -13,6 +17,9 @@ import styles from "./catalog.module.css";
 import type { CardView } from "./cardView";
 
 type Source = LibraryCard["sources"][number];
+/** A library item with its copies by finish and how many may be sold (v0.6.0); until the API's
+ * contract is generated both are optional here. */
+type LibraryItem = LibraryCard & Partial<LibraryFinishes>;
 
 /** Each source in the order a player meets them, with what it gives. */
 const sourceNotes: [Source, string][] = [
@@ -51,10 +58,10 @@ export function MyLibrary({
   view,
   onView,
 }: {
-  /** Opens a card at the edition shown. */
-  onOpen: (card: CardSummary, printingId: string) => void;
+  /** Opens a card at the edition shown; `finish`, the finish its copies glow in (v0.6.0). */
+  onOpen: (card: CardSummary, printingId: string, finish?: string) => void;
   /** Shows the edition's picture big (v0.5.1). */
-  onZoom: (card: CardSummary, printingId: string) => void;
+  onZoom: (card: CardSummary, printingId: string, finish?: string) => void;
   view: CardView;
   onView: (view: CardView) => void;
 }) {
@@ -62,6 +69,11 @@ export function MyLibrary({
   const [error, setError] = useState("");
   const [find, setFind] = useState("");
   const [source, setSource] = useState<Source | "">("");
+  // Sell (v0.6.0): an edition's copies listed in Tivit's Auction House, from its tile or row.
+  const [sell, setSell] = useState<SellRequest | null>(null);
+  const [said, setSaid] = useState("");
+  const [loads, setLoads] = useState(0);
+  const reload = useCallback(() => setLoads((count) => count + 1), []);
   useEffect(() => {
     let active = true;
     void client.GET("/api/v1/library").then(({ data, error: failure }) => {
@@ -72,7 +84,22 @@ export function MyLibrary({
     return () => {
       active = false;
     };
-  }, []);
+  }, [loads]);
+  const sellItem = (item: LibraryItem) =>
+    setSell({
+      mode: "sell",
+      preset: { printingId: item.edition.printing_id, name: item.card.name },
+    });
+  const sellDialog = (
+    <SellDialog
+      request={sell}
+      onClose={() => setSell(null)}
+      onListed={(_items, words) => {
+        setSaid(`${words} See it on the auction house's transfer list.`);
+        reload();
+      }}
+    />
+  );
   // How many cards (not editions) each source gave.
   const counts = useMemo(() => {
     const found: Partial<Record<Source, Set<string>>> = {};
@@ -111,6 +138,11 @@ export function MyLibrary({
           You build from the whole catalog: administrators and SysOp have no
           library, and no limit on copies beyond each format's own.
         </p>
+        <p className={styles.note}>
+          To sell a card, use Sell in{" "}
+          <a href="#auctions/list">Tivit's Auction House</a>: it offers what
+          your account may list.
+        </p>
       </section>
     );
   const copies = library.cards.reduce(
@@ -125,8 +157,13 @@ export function MyLibrary({
       <p className={styles.lead}>
         Your decks are built from these cards, each in the edition you own. A
         deck may hold an edition as many times as your library does; two decks
-        may each hold them all. Basic lands are yours without limit, in every
-        edition, so they are not listed.
+        may each hold them all. Each edition shows its copies by finish,
+        such as &ldquo;2 + 1 foil&rdquo;; Sell lists copies in{" "}
+        <a href="#auctions">Tivit's Auction House</a>, and a listed copy leaves
+        the library until it sells or comes back.
+      </p>
+      <p className={styles.note} role="status">
+        {said}
       </p>
       <dl className={styles.sources}>
         {sourceNotes
@@ -189,26 +226,52 @@ export function MyLibrary({
       </div>
       {editions === 0 ? (
         <p className={styles.note}>
-          Nothing yet beyond basic lands: your two starter decks and an alliance
-          fill it.
+          Nothing yet: your two starter decks and an alliance fill it.
         </p>
       ) : view === "pictures" ? (
         <ul className={styles.grid} aria-label="Your library">
-          {shown.map((item) => (
-            // The tile's own note says the edition's copies; the line under it, where they came
-            // from.
-            <CardTile
-              key={item.edition.printing_id}
-              card={{ ...item.card, owned: item.copies }}
-              edition={editionName(item.edition)}
-              onOpen={(card) => onOpen(card, item.edition.printing_id)}
-              onZoom={(card) => onZoom(card, item.edition.printing_id)}
-            >
-              <span className={styles.tileSources}>
-                {item.sources.map((from) => sourceLabels[from]).join(", ")}
-              </span>
-            </CardTile>
-          ))}
+          {(shown as LibraryItem[]).map((item) => {
+            // The tile's own note says the edition's copies; the lines under it, its copies by
+            // finish (v0.6.0) and where they came from. A foil or etched copy held glows.
+            const finish = heldFinish(item.finishes);
+            const byFinish = finishesWords(item.finishes);
+            return (
+              <CardTile
+                key={item.edition.printing_id}
+                card={{ ...item.card, owned: item.copies }}
+                edition={editionName(item.edition)}
+                finish={finish}
+                onOpen={(card) =>
+                  onOpen(card, item.edition.printing_id, finish)
+                }
+                onZoom={(card) =>
+                  onZoom(card, item.edition.printing_id, finish)
+                }
+              >
+                {byFinish && (
+                  <span
+                    className={styles.tileFinishes}
+                    data-foil={finish !== "nonfoil" || undefined}
+                  >
+                    {byFinish}
+                  </span>
+                )}
+                <span className={styles.tileSources}>
+                  {item.sources.map((from) => sourceLabels[from]).join(", ")}
+                </span>
+                {(item.sellable ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    className={styles.sellLink}
+                    aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
+                    onClick={() => sellItem(item)}
+                  >
+                    Sell
+                  </button>
+                )}
+              </CardTile>
+            );
+          })}
         </ul>
       ) : (
         <div className={styles.libraryScroll}>
@@ -220,17 +283,24 @@ export function MyLibrary({
                 <th scope="col">Type</th>
                 <th scope="col">Copies</th>
                 <th scope="col">From</th>
+                <th scope="col">
+                  <span className={styles.visuallyHidden}>Sell</span>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {shown.map((item) => (
+              {(shown as LibraryItem[]).map((item) => (
                 <tr key={item.edition.printing_id}>
                   <th scope="row">
                     <button
                       type="button"
                       className={styles.cardLink}
                       onClick={() =>
-                        onOpen(item.card, item.edition.printing_id)
+                        onOpen(
+                          item.card,
+                          item.edition.printing_id,
+                          heldFinish(item.finishes),
+                        )
                       }
                     >
                       {item.card.name}
@@ -239,9 +309,24 @@ export function MyLibrary({
                   </th>
                   <td>{editionName(item.edition)}</td>
                   <td>{item.card.type_line}</td>
-                  <td>{item.copies ?? "Any number"}</td>
+                  <td>
+                    {finishesWords(item.finishes) ||
+                      (item.copies ?? "Any number")}
+                  </td>
                   <td>
                     {item.sources.map((from) => sourceLabels[from]).join(", ")}
+                  </td>
+                  <td>
+                    {(item.sellable ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        className={styles.sellLink}
+                        aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
+                        onClick={() => sellItem(item)}
+                      >
+                        Sell
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -249,6 +334,7 @@ export function MyLibrary({
           </table>
         </div>
       )}
+      {sellDialog}
     </section>
   );
 }

@@ -362,6 +362,39 @@
   color: #8f9e94;
   font-size: 0.72rem;
 }
+/* A library edition's copies by finish (v0.6.0): "2 + 1 foil", a foil's in its colours. */
+.tileFinishes {
+  color: #c9d0c6;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+.tileFinishes[data-foil] {
+  background: linear-gradient(90deg, #c9b8ff, #8fdcff, #f4dca6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 600;
+}
+/* Sell, on a library tile or row (v0.6.0): to Tivit's Auction House. */
+.sellLink {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 4px 12px;
+  border: 1px solid #d5b77c99;
+  border-radius: 12px;
+  background: #d5b77c14;
+  color: #f4dca6;
+  font: 700 0.66rem/1.4 var(--cd-display);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.sellLink:hover {
+  background: #d5b77c33;
+}
+.sellLink:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
 /* The edition a library's tile shows (v0.5.0), in the gold of the frames. */
 .tileEdition {
   overflow: hidden;

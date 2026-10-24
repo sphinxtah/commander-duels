@@ -1,0 +1,25 @@
+/* The foil glow (v0.6.0, the owner's): every card picture whose copy is foil or etched glows,
+   outside games. A filter, not a shadow, so it follows the card's rounded corners, is not cut by
+   the picture's own overflow, and never fights a rarity's ring drawn as a box-shadow. It breathes
+   slowly; with reduced motion, global.css stops it and the glow stays. */
+.glow {
+  filter: drop-shadow(0 0 0.28rem #c9b8ffd9) drop-shadow(0 0 0.9rem #6fd6ff73);
+  animation: foilBreathe 3.2s ease-in-out infinite alternate;
+}
+/* Etched foil: warmer, as its metallic frame is. */
+.etched {
+  filter: drop-shadow(0 0 0.28rem #ffd9a8d9) drop-shadow(0 0 0.9rem #c99bff73);
+  animation-name: etchedBreathe;
+}
+@keyframes foilBreathe {
+  to {
+    filter: drop-shadow(0 0 0.38rem #e2d8ffee)
+      drop-shadow(0 0 1.25rem #6fd6ff99);
+  }
+}
+@keyframes etchedBreathe {
+  to {
+    filter: drop-shadow(0 0 0.38rem #ffe6c4ee)
+      drop-shadow(0 0 1.25rem #c99bff99);
+  }
+}

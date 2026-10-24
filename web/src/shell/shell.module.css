@@ -681,10 +681,12 @@
   max-width: 300px;
   font-size: 0.95rem;
 }
+/* Since v0.6.0 three across: Tables, Leng's shop and Tivit's Auction House. */
 .tablesTile,
-.shopTile {
-  grid-column: span 3;
-  min-height: 190px;
+.shopTile,
+.auctionsTile {
+  grid-column: span 2;
+  min-height: 210px;
 }
 /* The owner's paintings behind the other tiles (v0.5.1): a round table set for a game; a deck
    and a hand on a desk; three cards floating over a library's chest; friends at a table. Each is
@@ -733,6 +735,17 @@
     url("/shop/leng-640.webp");
   background-position: right 30%;
 }
+/* Tivit at his auctioneer's desk (v0.6.0), the owner's painting: he sits right of centre, so
+   the words take the dark hall below him. */
+.auctionsTile {
+  --tile-art:
+    linear-gradient(180deg, #0b131226 0%, #0b131299 45%, #0b1312f2 100%),
+    image-set(
+      url("/menu/auctions-640.webp") 1x,
+      url("/menu/auctions-1280.webp") 2x
+    );
+  background-position: 70% 30%;
+}
 .tileIcon {
   display: grid;
   place-items: center;
@@ -752,7 +765,8 @@
 }
 .playTile .tileIcon,
 .shopTile .tileIcon,
-.tablesTile .tileIcon {
+.tablesTile .tileIcon,
+.auctionsTile .tileIcon {
   margin-bottom: auto;
 }
 .playTile .tileIcon {
@@ -1084,7 +1098,8 @@
   .tile,
   .playTile,
   .tablesTile,
-  .shopTile {
+  .shopTile,
+  .auctionsTile {
     grid-column: auto;
   }
   /* The words over the warrior's half, darkened from below, clear of the logo. */

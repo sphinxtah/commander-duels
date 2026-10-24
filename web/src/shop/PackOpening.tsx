@@ -9,6 +9,7 @@ import { useMotionLevel } from "../app/motion";
 import { readTableSettings } from "../app/tableSettings";
 import { CardDetails } from "../catalog/CardViews";
 import { printingImage } from "../catalog/catalog";
+import { foilGlow } from "../catalog/foilGlow";
 import { useImageRetry } from "../game/RetryingImage";
 import { getSoundEngine } from "../game/sound/engine";
 import type { Cue } from "../game/sound/recipes";
@@ -51,7 +52,14 @@ function flipSounds(card: PulledCard, delayMs = 0) {
   if (card.finish !== "nonfoil") play("foilShimmer", delayMs + 160);
 }
 
-export function CardFace({ card }: { card: PulledCard }) {
+export function CardFace({
+  card,
+  glow = false,
+}: {
+  card: PulledCard;
+  /** The foil glow (v0.6.0) on the face itself, where nothing around it turns. */
+  glow?: boolean;
+}) {
   const src = printingImage(
     card.printing_id,
     "normal",
@@ -61,7 +69,9 @@ export function CardFace({ card }: { card: PulledCard }) {
   const image = useImageRetry(src);
   return (
     <span
-      className={styles.face}
+      className={[styles.face, glow ? foilGlow(card.finish) : undefined]
+        .filter(Boolean)
+        .join(" ")}
       data-loaded={image.state === "loaded" || undefined}
     >
       <span className={styles.frame} aria-hidden="true">
@@ -255,7 +265,7 @@ export function PackOpening({
               data-glow={glowOf(card) ?? undefined}
               data-finish={card.finish}
             >
-              <CardFace card={card} />
+              <CardFace card={card} glow />
               <div className={styles.summaryText}>
                 <strong>{card.name}</strong>
                 <span>
@@ -313,6 +323,7 @@ export function PackOpening({
               cardId={details.card_id}
               chosenPrinting={details.printing_id}
               printings="chosen"
+              finish={details.finish}
             />
           )}
         </dialog>
@@ -376,7 +387,14 @@ export function PackOpening({
                   <li key={card.position} className={styles.slot}>
                     <button
                       type="button"
-                      className={styles.card}
+                      /* A foil turned up glows (v0.6.0): on the button, outside the turning
+                         card. */
+                      className={[
+                        styles.card,
+                        up ? foilGlow(card.finish) : undefined,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       data-up={up || undefined}
                       data-glow={up ? (glowOf(card) ?? undefined) : undefined}
                       data-finish={up ? card.finish : undefined}

@@ -1,3 +1,8 @@
+import {
+  auctionNotice,
+  auctionNoticeLink,
+  auctionNoticeWords,
+} from "../auctions/auctions";
 import type { components } from "../generated/api";
 
 // Finding other players, friends, presence and the notification bell (v0.4.3). The server
@@ -71,6 +76,9 @@ export function notificationLink(item: NotificationItem): string | null {
 }
 
 export function notificationWords(item: NotificationItem): string {
+  // The auction house's five kinds (v0.6.0).
+  const auction = auctionNotice(item);
+  if (auction) return auctionNoticeWords(auction.kind, auction.auction);
   const who = item.actor?.handle ?? "A player who has left";
   switch (item.kind) {
     case "friend_request":
@@ -104,8 +112,11 @@ export function notificationWords(item: NotificationItem): string {
   }
 }
 
-/** Where a notification no player caused leads (v0.5.0): the quests' main menu, or Profile. */
+/** Where a notification no player caused leads (v0.5.0): the quests' main menu, or Profile;
+ * since v0.6.0 an auction's, the auction house's transfer targets or transfer list. */
 export function awardLink(item: NotificationItem): string | null {
+  const auction = auctionNotice(item);
+  if (auction) return auctionNoticeLink(auction.kind);
   if (item.kind === "quest_completed") return "#home";
   if (item.kind === "achievement_earned") return "#profile";
   return null;

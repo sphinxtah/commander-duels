@@ -105,6 +105,8 @@ function Browser({
     card: CardSummary;
     printing?: string;
     printings: PrintingsShown;
+    /** The finish its library copies glow in (v0.6.0). */
+    finish?: string;
   }>();
   const openCard = (card: CardSummary) => setOpen({ card, printings: "all" });
   // A card's picture shown big (v0.5.1), with its details a button away.
@@ -113,8 +115,9 @@ function Browser({
     card: CardSummary,
     details: () => void,
     printing?: string,
+    finish?: string,
   ) => {
-    const zoomed = zoomOf(card, printing, details);
+    const zoomed = zoomOf(card, printing, details, finish);
     if (zoomed) setZoom(zoomed);
     else details();
   };
@@ -164,14 +167,15 @@ function Browser({
       </div>
       {view === "library" && (
         <MyLibrary
-          onOpen={(card, printing) =>
-            setOpen({ card, printing, printings: "owned" })
+          onOpen={(card, printing, finish) =>
+            setOpen({ card, printing, printings: "owned", finish })
           }
-          onZoom={(card, printing) =>
+          onZoom={(card, printing, finish) =>
             zoomCard(
               card,
-              () => setOpen({ card, printing, printings: "owned" }),
+              () => setOpen({ card, printing, printings: "owned", finish }),
               printing,
+              finish,
             )
           }
           view={shownAs}
@@ -277,6 +281,7 @@ function Browser({
             cardId={open.card.id}
             chosenPrinting={open.printing}
             printings={open.printings}
+            finish={open.finish}
             onZoom={setZoom}
           />
         )}

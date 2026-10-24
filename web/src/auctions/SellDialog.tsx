@@ -226,8 +226,8 @@ export function SellDialog({
               ) : found.length === 0 ? (
                 <p className={styles.note} role="status">
                   {preset
-                    ? "No copy of this edition can be listed: it is in a live auction already, or it is an alliance's card, the one of a kind, a basic land or a custom card."
-                    : "Nothing you hold by that name can be listed. Alliance cards, the one of a kind, basic lands and custom cards are never sold."}
+                    ? "No copy of this edition can be listed: it is in a live auction already, or it is an alliance's card, the one of a kind or a custom card."
+                    : "Nothing you hold by that name can be listed. Alliance cards, the one of a kind and custom cards are never sold."}
                 </p>
               ) : (
                 <ul
