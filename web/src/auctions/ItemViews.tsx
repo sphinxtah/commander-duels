@@ -131,7 +131,11 @@ export function FinishChip({ finish }: { finish: Finish }) {
 }
 
 /** The words a tile or a row is read by. */
-export function itemLabel(item: AuctionItem, now: number, viewer?: string | null): string {
+export function itemLabel(
+  item: AuctionItem,
+  now: number,
+  viewer?: string | null,
+): string {
   const shown = standing(item, now, viewer);
   const price =
     item.status === "sold" && item.sold_price !== null
@@ -271,7 +275,11 @@ export function ItemRow({
         aria-label={itemLabel(item, now, viewer)}
         onClick={() => onOpen(item)}
       >
-        <CardArt card={item.card} finish={item.finish} className={styles.rowArt} />
+        <CardArt
+          card={item.card}
+          finish={item.finish}
+          className={styles.rowArt}
+        />
         <span className={styles.rowWords}>
           <span className={styles.rowName}>
             {item.card.name}
@@ -283,7 +291,9 @@ export function ItemRow({
         <span className={styles.rowNumbers}>
           {item.status === "sold" ? (
             <span className={styles.rowCell}>
-              <small>{item.mine ? `Sold to ${item.buyer ?? "—"}` : "Sold for"}</small>
+              <small>
+                {item.mine ? `Sold to ${item.buyer ?? "—"}` : "Sold for"}
+              </small>
               <Price value={item.sold_price} />
             </span>
           ) : (

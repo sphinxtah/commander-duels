@@ -327,9 +327,7 @@ export function SearchMarket({
 
       <section className={styles.results} aria-labelledby="results-title">
         <div className={styles.resultsHead}>
-          <h2 id="results-title">
-            {set ? "Search results" : "On the market"}
-          </h2>
+          <h2 id="results-title">{set ? "Search results" : "On the market"}</h2>
           <p role="status" className={styles.resultsCount}>
             {error
               ? ""

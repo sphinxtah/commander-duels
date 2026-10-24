@@ -177,7 +177,9 @@ export function AuctionsAdmin({ me }: { me: Me }) {
             {page?.items.map((item) => (
               <tr key={item.id}>
                 <td>
-                  <time dateTime={item.created_at}>{when(item.created_at)}</time>
+                  <time dateTime={item.created_at}>
+                    {when(item.created_at)}
+                  </time>
                 </td>
                 <th scope="row">
                   <span className={styles.logCard}>
@@ -195,7 +197,10 @@ export function AuctionsAdmin({ me }: { me: Me }) {
                   </span>
                 </th>
                 <td>{item.seller}</td>
-                <td>{item.buyer ?? (item.high_bidder ? `${item.high_bidder} (leading)` : "—")}</td>
+                <td>
+                  {item.buyer ??
+                    (item.high_bidder ? `${item.high_bidder} (leading)` : "—")}
+                </td>
                 <td>
                   <Price
                     value={
@@ -239,9 +244,7 @@ export function AuctionsAdmin({ me }: { me: Me }) {
           </tbody>
         </table>
       </div>
-      {page && page.items.length === 0 && (
-        <p className={styles.note}>None.</p>
-      )}
+      {page && page.items.length === 0 && <p className={styles.note}>None.</p>}
       {(cursors.length > 1 || page?.next_cursor) && (
         <nav className={styles.pager} aria-label="Log pages">
           <button

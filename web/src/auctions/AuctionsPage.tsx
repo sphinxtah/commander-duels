@@ -22,11 +22,7 @@ import { ItemPanel } from "./ItemPanel";
 import { SearchMarket } from "./SearchMarket";
 import { SellDialog, type SellRequest } from "./SellDialog";
 import { TransferListView, TransferTargetsView } from "./Transfers";
-import type {
-  AuctionItem,
-  AuctionTargets,
-  TransferList,
-} from "./types";
+import type { AuctionItem, AuctionTargets, TransferList } from "./types";
 import styles from "./auctions.module.css";
 
 // Tivit's Auction House (v0.6.0): cards between players, as Madden Ultimate Team's transfer market
@@ -126,7 +122,9 @@ export function AuctionsPage({
 
   const onPanelChanged = useCallback(
     (item: AuctionItem, said?: string) => {
-      setOpen((current) => (current && current.id === item.id ? item : current));
+      setOpen((current) =>
+        current && current.id === item.id ? item : current,
+      );
       setReplaced(item);
       if (said) {
         setMessage(said);
@@ -182,9 +180,7 @@ export function AuctionsPage({
     list: list
       ? `${listing} active · ${list.sold.length} sold · ${list.unsold.length} unsold`
       : undefined,
-    targets: targets
-      ? `${winning} winning · ${outbid} outbid`
-      : undefined,
+    targets: targets ? `${winning} winning · ${outbid} outbid` : undefined,
   };
 
   return (
@@ -272,7 +268,10 @@ export function AuctionsPage({
                 )}
               </span>
               {item === "targets" && outbid > 0 && (
-                <span className={styles.tabAlert} aria-label={`${outbid} outbid`}>
+                <span
+                  className={styles.tabAlert}
+                  aria-label={`${outbid} outbid`}
+                >
                   {outbid}
                 </span>
               )}

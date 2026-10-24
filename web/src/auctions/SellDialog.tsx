@@ -287,11 +287,17 @@ export function SellDialog({
 
           <fieldset className={styles.pricing} disabled={!card}>
             <legend>The auction</legend>
+            <label className={styles.check}>
+              <input
+                type="checkbox"
+                checked={useBuyNow}
+                onChange={(event) => setUseBuyNow(event.target.checked)}
+              />
+              <span>Set a Buy Now price</span>
+            </label>
             {!relist && (
               <label className={styles.field}>
-                <span>
-                  Copies to list{chosen ? ` (up to ${most})` : ""}
-                </span>
+                <span>Copies to list{chosen ? ` (up to ${most})` : ""}</span>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -312,14 +318,6 @@ export function SellDialog({
                 value={startingBid}
                 onChange={(event) => setStartingBid(event.target.value)}
               />
-            </label>
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                checked={useBuyNow}
-                onChange={(event) => setUseBuyNow(event.target.checked)}
-              />
-              <span>Set a Buy Now price</span>
             </label>
             {useBuyNow && (
               <label className={styles.field}>

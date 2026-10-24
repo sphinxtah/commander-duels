@@ -105,7 +105,9 @@ describe("Tivit's Auction House", () => {
     });
     expect(outbid).toBeInTheDocument();
     expect(tile(/Counterspell.*Winning/)).toBeInTheDocument();
-    expect(tile(/Sol Ring.*etched foil, starting bid 1,200 tokens/)).toBeInTheDocument();
+    expect(
+      tile(/Sol Ring.*etched foil, starting bid 1,200 tokens/),
+    ).toBeInTheDocument();
     // Under a minute left: red.
     expect(within(tile(/^Counterspell/)).getByText("30s")).toHaveAttribute(
       "data-urgent",
@@ -123,7 +125,9 @@ describe("Tivit's Auction House", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mythic rare" }));
     fireEvent.click(screen.getByRole("button", { name: "Foil" }));
     fireEvent.click(screen.getByRole("button", { name: "Red" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Only with Buy Now" }));
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "Only with Buy Now" }),
+    );
     fireEvent.change(screen.getByRole("combobox", { name: "Sort" }), {
       target: { value: "price_low" },
     });
@@ -159,7 +163,9 @@ describe("Tivit's Auction House", () => {
       (query) =>
         ok(
           query.cursor
-            ? market([auction({ card: { ...boltFoil.card, name: "Page Two" } })])
+            ? market([
+                auction({ card: { ...boltFoil.card, name: "Page Two" } }),
+              ])
             : market([boltFoil], "cursor-2"),
         ) as never,
     );
@@ -187,10 +193,9 @@ describe("Tivit's Auction House", () => {
     expect(star).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(star);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Watch Sol Ring" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      ),
+      expect(
+        screen.getByRole("button", { name: "Watch Sol Ring" }),
+      ).toHaveAttribute("aria-pressed", "true"),
     );
     expect(watch).toHaveBeenCalledWith(expect.stringMatching(/d1$/), true);
   });
@@ -201,19 +206,22 @@ describe("Tivit's Auction House", () => {
       .mockImplementationOnce(() =>
         refused("not_enough_tokens", "You need 252 tokens."),
       )
-      .mockImplementation((_id, amount) =>
-        ok({
-          ...boltFoil,
-          current_bid: amount,
-          high_bidder: "ada",
-          leading: true,
-          outbid: false,
-          my_bid: amount,
-          next_bid: amount + 14,
-        }) as never,
+      .mockImplementation(
+        (_id, amount) =>
+          ok({
+            ...boltFoil,
+            current_bid: amount,
+            high_bidder: "ada",
+            leading: true,
+            outbid: false,
+            my_bid: amount,
+            next_bid: amount + 14,
+          }) as never,
       );
     show();
-    fireEvent.click(await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }),
+    );
     const panel = await screen.findByRole("dialog", { name: "Lightning Bolt" });
     const input = within(panel).getByRole("spinbutton", {
       name: "Your bid in tokens",
@@ -226,7 +234,9 @@ describe("Tivit's Auction House", () => {
       within(panel).getByRole("button", { name: "Raise the bid by 13 tokens" }),
     );
     expect(input).toHaveValue(265);
-    fireEvent.click(within(panel).getByRole("button", { name: /Lower the bid/ }));
+    fireEvent.click(
+      within(panel).getByRole("button", { name: /Lower the bid/ }),
+    );
     expect(input).toHaveValue(252);
     fireEvent.click(within(panel).getByRole("button", { name: "Make bid" }));
     expect(await within(panel).findByRole("alert")).toHaveTextContent(
@@ -240,7 +250,9 @@ describe("Tivit's Auction House", () => {
       await within(panel).findByText("Your bid of 252 tokens is the highest."),
     ).toBeInTheDocument();
     // Holding the high bid, there is nothing to raise against.
-    expect(within(panel).getByRole("button", { name: "Make bid" })).toBeDisabled();
+    expect(
+      within(panel).getByRole("button", { name: "Make bid" }),
+    ).toBeDisabled();
     expect(within(panel).getByText("Winning")).toBeInTheDocument();
   });
 
@@ -256,10 +268,16 @@ describe("Tivit's Auction House", () => {
         }) as never,
     );
     show();
-    fireEvent.click(await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }),
+    );
     const panel = await screen.findByRole("dialog", { name: "Lightning Bolt" });
-    fireEvent.click(within(panel).getByRole("button", { name: "Buy Now · 900" }));
-    const confirm = within(panel).getByRole("group", { name: "Confirm Buy Now" });
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Buy Now · 900" }),
+    );
+    const confirm = within(panel).getByRole("group", {
+      name: "Confirm Buy Now",
+    });
     expect(confirm).toHaveTextContent(
       "Buy Lightning Bolt (Foil) now for 900 tokens? You have 12,345 tokens, and will have 11,445 tokens left.",
     );
@@ -280,15 +298,21 @@ describe("Tivit's Auction House", () => {
       .spyOn(auctionApi, "compare")
       .mockImplementation(() => ok(compare) as never);
     show();
-    fireEvent.click(await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }),
+    );
     const panel = await screen.findByRole("dialog", { name: "Lightning Bolt" });
-    fireEvent.click(within(panel).getByRole("button", { name: "Compare price" }));
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Compare price" }),
+    );
     const section = await within(panel).findByRole("region", {
       name: /Compare price/,
     });
     expect(asked).toHaveBeenCalledWith(boltFoil.card.printing_id, "foil");
     expect(
-      within(section).getByRole("button", { name: /Open bob's: starting bid 180 tokens/ }),
+      within(section).getByRole("button", {
+        name: /Open bob's: starting bid 180 tokens/,
+      }),
     ).toBeInTheDocument();
     expect(
       within(section).getByRole("button", { name: /This auction/ }),
@@ -340,8 +364,12 @@ describe("Tivit's Auction House", () => {
     expect(
       within(dialog).getByRole("spinbutton", { name: "Buy Now (tokens)" }),
     ).toHaveValue(1500);
-    expect(within(dialog).getByRole("radio", { name: "12 hours" })).toBeChecked();
-    expect(within(dialog).getByText("You receive 100% — no fee")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("radio", { name: "12 hours" }),
+    ).toBeChecked();
+    expect(
+      within(dialog).getByText("You receive 100% — no fee"),
+    ).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("radio", { name: "3 days" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Relist" }));
     await waitFor(() =>
@@ -424,14 +452,18 @@ describe("the Sell dialog", () => {
     });
     expect(choices).toHaveLength(2);
     fireEvent.click(choices[0]!);
-    expect(within(dialog).getByText("Copies to list (up to 2)")).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("Copies to list (up to 2)"),
+    ).toBeInTheDocument();
     const list = within(dialog).getByRole("button", { name: "List it" });
     expect(list).toBeDisabled();
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "Starting bid (tokens)" }),
       { target: { value: "100" } },
     );
-    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Set a Buy Now price" }));
+    fireEvent.click(
+      within(dialog).getByRole("checkbox", { name: "Set a Buy Now price" }),
+    );
     fireEvent.change(
       within(dialog).getByRole("spinbutton", { name: "Buy Now (tokens)" }),
       { target: { value: "100" } },
@@ -453,7 +485,9 @@ describe("the Sell dialog", () => {
       { target: { value: "2" } },
     );
     fireEvent.click(within(dialog).getByRole("radio", { name: "1 hour" }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "List 2 copies" }));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "List 2 copies" }),
+    );
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
         printing_id: sellable[0]!.card.printing_id,
@@ -554,7 +588,9 @@ describe("Administration's Auctions tab", () => {
     );
     render(<AuctionsAdmin me={player} />);
     await screen.findByRole("table");
-    expect(screen.getByText(/Only SysOp cancels an auction/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Only SysOp cancels an auction/),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /^Cancel bob's/ }),
     ).not.toBeInTheDocument();

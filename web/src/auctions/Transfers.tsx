@@ -83,8 +83,8 @@ export function TransferListView({
         <div className={styles.empty}>
           <strong>Your transfer list is empty.</strong>
           <p>
-            List a card from your library and it waits here while it sells.
-            Sold cards pay you in full: there is no fee.
+            List a card from your library and it waits here while it sells. Sold
+            cards pay you in full: there is no fee.
           </p>
           <button type="button" className={styles.secondary} onClick={onSell}>
             Sell a card

@@ -23,8 +23,7 @@ import type {
 // the client's shape, { data } or { error }. At the merge each becomes a client.GET/POST call.
 
 export type Answer<T> =
-  | { data: T; error?: undefined }
-  | { data?: undefined; error: ApiError };
+  { data: T; error?: undefined } | { data?: undefined; error: ApiError };
 
 type Query = Record<
   string,

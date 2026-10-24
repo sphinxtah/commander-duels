@@ -7,7 +7,9 @@ import styles from "./foilGlow.module.css";
 export type CardFinish = "nonfoil" | "foil" | "etched";
 
 /** The glow's class for a finish; undefined for nonfoil or an unknown finish. */
-export function foilGlow(finish: string | null | undefined): string | undefined {
+export function foilGlow(
+  finish: string | null | undefined,
+): string | undefined {
   if (finish === "foil") return styles.glow;
   if (finish === "etched") return `${styles.glow} ${styles.etched}`;
   return undefined;

@@ -192,7 +192,8 @@ export function timeLeftWords(endsAt: string, now: number): string {
   const hours = Math.floor((total % 86400) / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   if (days > 0) return `${unit(days, "day")} ${unit(hours, "hour")} left`;
-  if (hours > 0) return `${unit(hours, "hour")} ${unit(minutes, "minute")} left`;
+  if (hours > 0)
+    return `${unit(hours, "hour")} ${unit(minutes, "minute")} left`;
   if (minutes > 0) return `${unit(minutes, "minute")} left`;
   return "less than a minute left";
 }

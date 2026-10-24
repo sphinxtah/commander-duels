@@ -161,10 +161,8 @@ export function MyLibrary({
       <p className={styles.lead}>
         Your decks are built from these cards, each in the edition you own. A
         deck may hold an edition as many times as your library does; two decks
-        may each hold them all. Each edition shows its copies by finish,
-        such as &ldquo;2 + 1 foil&rdquo;; Sell lists copies in{" "}
-        <a href="#auctions">Tivit's Auction House</a>, and a listed copy leaves
-        the library until it sells or comes back.
+        may each hold them all. Sell puts a copy up in{" "}
+        <a href="#auctions">Tivit's Auction House</a>.
       </p>
       <p className={styles.note} role="status">
         {said}
@@ -252,11 +250,9 @@ export function MyLibrary({
                   onZoom(card, item.edition.printing_id, finish)
                 }
               >
-                {byFinish && (
-                  <span
-                    className={styles.tileFinishes}
-                    data-foil={finish !== "nonfoil" || undefined}
-                  >
+                {/* Only nonfoil copies: the note above says it all. */}
+                {byFinish && finish !== "nonfoil" && (
+                  <span className={styles.tileFinishes} data-foil>
                     {byFinish}
                   </span>
                 )}

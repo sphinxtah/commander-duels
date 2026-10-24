@@ -39,7 +39,7 @@ export const pageNames: Record<Page, string> = {
   Decks: "Decks",
   Cards: "Cards",
   Shop: "Shop",
-  Auctions: "Auction House",
+  Auctions: "Auctions",
   Friends: "Friends",
   Profile: "Profile",
   Settings: "Settings",

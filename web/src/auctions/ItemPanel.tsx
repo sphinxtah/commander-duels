@@ -115,7 +115,8 @@ export function ItemPanel({
   }, [shownDetails]);
 
   // The live region speaks at the countdown's milestones only.
-  const mark = item && item.status === "active" ? milestone(item.ends_at, now) : "";
+  const mark =
+    item && item.status === "active" ? milestone(item.ends_at, now) : "";
   const live = Boolean(
     item && item.status === "active" && msLeft(item.ends_at, now) > 0,
   );
@@ -556,7 +557,9 @@ function ComparePanel({
     );
   const sales = compare.recent_sales;
   const average = sales.length
-    ? Math.round(sales.reduce((sum, sale) => sum + sale.price, 0) / sales.length)
+    ? Math.round(
+        sales.reduce((sum, sale) => sum + sale.price, 0) / sales.length,
+      )
     : null;
   return (
     <section className={styles.compare} aria-labelledby="compare-title">
@@ -573,7 +576,10 @@ function ComparePanel({
       ) : (
         <ol className={styles.compareList}>
           {compare.items.map((other) => (
-            <li key={other.id} data-current={other.id === current.id || undefined}>
+            <li
+              key={other.id}
+              data-current={other.id === current.id || undefined}
+            >
               <button
                 type="button"
                 disabled={other.id === current.id}
@@ -586,7 +592,9 @@ function ComparePanel({
                     finish={other.finish}
                     className={styles.compareArt}
                   />
-                  <span>{other.id === current.id ? "This one" : other.seller}</span>
+                  <span>
+                    {other.id === current.id ? "This one" : other.seller}
+                  </span>
                 </span>
                 <Price value={other.current_bid ?? other.starting_bid} />
                 <Price value={other.buy_now} className={styles.buyNow} />

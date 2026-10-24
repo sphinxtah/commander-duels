@@ -104,7 +104,10 @@ export function auction(fields: Partial<AuctionItem> = {}): AuctionItem {
   };
 }
 
-export function market(items: AuctionItem[], next_cursor: string | null = null): AuctionPage {
+export function market(
+  items: AuctionItem[],
+  next_cursor: string | null = null,
+): AuctionPage {
   return { items, next_cursor, total: items.length };
 }
 

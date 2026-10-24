@@ -5,24 +5,11 @@
 export type Finish = "nonfoil" | "foil" | "etched";
 export type Duration = "1h" | "3h" | "12h" | "24h" | "3d";
 export type AuctionStatus =
-  | "active"
-  | "sold"
-  | "expired"
-  | "withdrawn"
-  | "cancelled";
+  "active" | "sold" | "expired" | "withdrawn" | "cancelled";
 export type Rarity =
-  | "common"
-  | "uncommon"
-  | "rare"
-  | "mythic"
-  | "special"
-  | "bonus";
+  "common" | "uncommon" | "rare" | "mythic" | "special" | "bonus";
 export type AuctionSort =
-  | "ending"
-  | "newest"
-  | "price_low"
-  | "price_high"
-  | "buy_now_low";
+  "ending" | "newest" | "price_low" | "price_high" | "buy_now_low";
 
 /** One edition (printing) of a card, as an auction names it. */
 export interface AuctionCard {
