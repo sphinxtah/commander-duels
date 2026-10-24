@@ -1,5 +1,20 @@
 # Verification
 
+## v0.6.0
+
+Validated locally on Windows on October 23 and 24, 2026, on the work of v0.6.0 as merged: the official card back and the main menu's greeting (built here), Tivit's Auction House's server side and its screens (built in two worktrees by subagents and merged here), and the screens moved onto the generated contract, the test player's basic lands and the auction journey (here). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine is unchanged.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 94 Python source files type-checked |
+| Python suite | 407 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New: `tests/test_auctions.py` (16 tests: listing, withdrawing and relisting, what may not be sold, bids held and returned, Buy Now, anti-snipe, settlement by the worker and on reads, the transfer list and targets, the market's filters and comparing, SysOp's cancellation and the log, resets and deletions, finishes and print runs, migration 0028 on SQLite and PostgreSQL, and on PostgreSQL bids racing each other, Buy Now and the end) and basic lands granted in the suites that build decks |
+| Migrations | `alembic upgrade head && alembic check` on a fresh PostgreSQL: one head, `0028_auction_house`, after `0027_one_of_a_kind`, no drift; down to 0027 and up again |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated; the auction screens' types are the generated ones |
+| Web unit tests and build | 1175 Vitest tests in 94 files passed; `tsc -b` and the production build passed |
+| CI's engine job, locally | On a throwaway Compose stack built from the tree (6 m 44 s): the scripted human games and SysOp's practice games through the API with no problems, and 20 browser journeys: the 19 of v0.5.1 (`tables.spec.ts`, `matches.spec.ts` and `social.spec.ts` with the test player now holding its basic lands) and the new `auctions.spec.ts` (a card listed by one player, bid on and bought now by SysOp, the seller paid in full, its page and top bar showing it without a reload, the sale in Administration's log) |
+| CI's verify job's journeys, locally | 60 passed, 17 skipped that need the engine or the second player, on a throwaway API from the source with the test catalog: 58 in one run, and `decks.spec.ts` and `shop.spec.ts`, which timed out under that run's load, passed alone twice each (about 15 s of their 30) |
+| Found and fixed while checking | The test player built its decks from free basic lands, which the owner's rule ends; it is now granted 100 of each in its default printing. The auction page did not show a sale's payment until reloaded; its poll now reads the balance and updates the top bar |
+
 ## v0.5.1
 
 Validated locally on Windows on October 23, 2026, on the work of v0.5.1 as merged: the owner's fixes and additions built here (the email search, card corners, the Cards page's big picture, the match's confirmation, the menu's paintings, The One Ring 001/001 and print runs) and eight parts built in worktrees by subagents and merged here (Two-Headed Giant's tables, queue and team channel; the teammate's hand and the table for two teams; the card audit and the bots' pairing; the chat bar; turn control; and the fixes of the version's reviews, in eleven more worktrees). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine was built by its Dockerfile, with six XMage patches.

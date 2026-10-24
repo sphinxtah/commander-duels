@@ -30,10 +30,11 @@ Along the bottom of every page: the friends list at the right end, "Friends · 3
 
 ## The main menu
 
-The app opens on the main menu (`#home`; any address that names no page, the old Campaign, Learn and Collection ones included, opens it too, and so does the installed app). As in Magic Duels, the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a link to choose an ally on Profile. Beside it, the tiles:
+The app opens on the main menu (`#home`; any address that names no page, the old Campaign, Learn and Collection ones included, opens it too, and so does the installed app). As in Magic Duels, the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a word to choose an ally on Profile. Since v0.6.0 (the owner's request) the whole greeting is a link to the profile. Beside it, the tiles:
 - **Play**, the largest, over the owner's banner: practice games against the bots, and since v0.5.0 the public queues. When one of the account's games is still running, it says so and leads back to it; while the account waits in a queue, it says "Looking for a Legacy game" and leads to the wait ([queues](queues.md)).
 - **Tables**, with the number of open tables.
 - **Leng's Card Shop**, over Leng's painting, with the week's sale.
+- **Tivit's Auction House** (v0.6.0), over the owner's painting of Tivit at the auctioneer's desk, beside the shop ([the auction house](auctions.md)).
 - **Decks**, with the number of the account's decks.
 - **Cards.**
 - **Friends**, with the number of friends online.
