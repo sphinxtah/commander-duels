@@ -106,6 +106,33 @@ def test_bots_get_fixture_decks_their_teammates_share_no_card_with() -> None:
     assert sorted(deck for pair in teams.PAIRS for deck in pair) == sorted(teams.FIXTURES)
 
 
+def test_a_pair_gives_way_when_it_would_leave_a_bot_no_deck() -> None:
+    """Regression (v0.5.1, the audit's review): the bots' pair was dealt first, and could take the
+    only decks a player's bot teammate could play."""
+    red, white = (teams.FIXTURES[deck] for deck in teams.PAIRS[0])
+    green, blue = (teams.FIXTURES[deck] for deck in teams.PAIRS[1])
+    # The player shares a card with red and white: the opponents play them, the teammate green.
+    seats = seated(listing(min(red), min(white)), {}, {}, {})
+    teams.assign_and_check(seats, banned_allowed=True)
+    assert [seat.get("deck") for seat in seats] == [
+        None,
+        "legacy-mono-green-creatures",
+        "legacy-mono-red-burn",
+        "legacy-mono-white-weenie",
+    ]
+    # Seat 2's player shares a card with green and blue: team 0's bots play them instead of their
+    # own pair, and seat 3 plays red.
+    seats = [{"player": "bot"}, {"player": "bot"}, {"player": "human"}, {"player": "bot"}]
+    seats[2].update(listing(min(green), min(blue)))
+    teams.assign_and_check(seats, banned_allowed=True)
+    assert [seat.get("deck") for seat in seats] == [
+        "legacy-mono-green-creatures",
+        "legacy-mono-blue-skies",
+        None,
+        "legacy-mono-red-burn",
+    ]
+
+
 def refusal(seats: list[dict[str, object]], banned_allowed: bool = True) -> ApiError:
     with pytest.raises(ApiError) as refused:
         teams.assign_and_check(seats, banned_allowed=banned_allowed)
@@ -141,6 +168,51 @@ def test_teammates_decks_share_only_basic_lands() -> None:
         "team_decks",
         "Every fixture deck shares a card with your teammate's deck: choose a deck for the bot.",
     )
+
+
+def one_of(deck: str) -> str:
+    """A card of a fixture deck, the first by name."""
+    return min(teams.FIXTURES[deck])
+
+
+def opposite(player: dict[str, object], other: dict[str, object]) -> list[dict[str, object]]:
+    """A player and a bot in each team."""
+    return [
+        {"player": "human", **player},
+        {"player": "bot"},
+        {"player": "human", **other},
+        {"player": "bot"},
+    ]
+
+
+def test_the_bots_decks_are_dealt_so_that_every_bot_has_one() -> None:
+    """Regression (v0.5.1): taking the first fixture deck that fits gave the first bot the only
+    one the second could play, and refused a game that another dealing allowed."""
+    decks = list(teams.FIXTURES)
+    # The first player's deck rules out the first fixture; the other's every one but the second.
+    seats = opposite(
+        listing(one_of(decks[0])),
+        listing(*(one_of(deck) for deck in decks if deck != decks[1])),
+    )
+    teams.assign_and_check(seats, banned_allowed=True)
+    assert [seat.get("deck") for seat in seats] == [None, decks[2], None, decks[1]]
+    # Two players whose decks leave their bots only the same deck: each team's bot plays it, as
+    # only a team's decks must share no card.
+    only_first = listing(*(one_of(deck) for deck in decks[1:]))
+    seats = opposite(only_first, only_first)
+    teams.assign_and_check(seats, banned_allowed=True)
+    assert [seat.get("deck") for seat in seats] == [None, decks[0], None, decks[0]]
+    # Only a deck sharing a card with every fixture deck leaves its bot none: that seat is named,
+    # and nothing is dealt.
+    every = listing(*(one_of(deck) for deck in decks))
+    seats = opposite(listing(one_of(decks[0])), every)
+    assert teams.without_fixture(seats) == [2]
+    assert refusal(seats).code == "team_decks"
+    assert [seat.get("deck") for seat in seats] == [None, None, None, None]
+    assert teams.without_fixture(opposite(every, every)) == [0, 2]
+    assert teams.without_fixture(seated(every, {"deck": decks[0]}, {}, {})) == []
+    assert not teams.fits_a_fixture({one_of(deck) for deck in decks})
+    assert teams.fits_a_fixture({one_of(deck) for deck in decks[1:]} | {"Brainstorm"})
 
 
 def test_erayo_is_banned_where_the_table_refuses_banned_cards() -> None:

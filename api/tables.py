@@ -97,6 +97,11 @@ OPEN_HOURS = 3
 LISTED = 50
 TEAM_FORMAT = teams.FORMAT
 SEATS = {"legacy": [2], "commander": [2, 3, 4], TEAM_FORMAT: [teams.SEATS]}
+# A Two-Headed Giant player beside a bot whose deck leaves the bot no fixture deck (v0.5.1).
+NO_BOT_TEAMMATE = (
+    "Your deck shares a card with every bot deck, so no bot can be your teammate: choose another "
+    "deck."
+)
 Code = Annotated[str, Path(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")]
 Visibility = Literal["public", "private"]
 
@@ -617,7 +622,13 @@ def unready_teammate(db: Session, table: GameTable, row: TableSeat) -> None:
 
 def check_team(db: Session, table: GameTable, row: TableSeat) -> None:
     """Unified Deck Construction (MTR 8.4, 9.5) as a player gets ready: their deck and their
-    teammate's share no card but basic lands. The shared cards are named to the team only."""
+    teammate's share no card but basic lands. The shared cards are named to the team only. Beside
+    a bot (v0.5.1), some fixture deck shares no card with theirs, or the start could not deal the
+    bot one."""
+    if teams.teammate(row.seat) in bot_seats_of(table):
+        if not teams.fits_a_fixture(team_cards(db, row.deck_id)):
+            raise ApiError(422, "team_decks", NO_BOT_TEAMMATE)
+        return
     mate = teammate_row(db, table, row)
     if mate is None:
         return
@@ -739,7 +750,8 @@ def check_teams(
     """Two-Headed Giant's teams at the start (v0.5.1): each team of two players' decks, bound now,
     share no card but basic lands (Unified Deck Construction, MTR 8.4 and 9.5), and each bot gets
     a fixture deck its teammate's shares no card with (api/teams.py). The host's own team is told
-    the cards; another team's players are named, never their cards, and made not ready."""
+    the cards; another team's players are named, never their cards, and made not ready, as is a
+    player whose deck leaves their bot teammate no fixture deck."""
     players = [user for user in users if user is not None]
     handles = dict(db.execute(select(User.id, User.handle).where(User.id.in_(players))).all())
     for first, second in teams.TEAMS:
@@ -769,16 +781,29 @@ def check_teams(
             "share a card, and Two-Headed Giant teammates' decks may share only basic lands: "
             "they need to choose again.",
         )
+    engines = [plan.engine for plan in plans]
     try:
-        teams.assign_and_check([plan.engine for plan in plans], True)
+        teams.assign_and_check(engines, True)
     except ApiError as refused:
         # Only a bot's deck is left to refuse now: every fixture deck shares a card with its
-        # teammate's.
+        # teammate's. That player (v0.5.1) is named, never their cards, and made not ready, as
+        # another team's players are above; the host is told of their own deck.
+        stuck = [
+            user for seat in teams.without_fixture(engines) if (user := users[seat]) is not None
+        ]
+        for row in db.scalars(
+            select(TableSeat).where(TableSeat.table_id == table.id, TableSeat.user_id.in_(stuck))
+        ):
+            row.ready = False
+        db.commit()
+        if principal.user.id in stuck:
+            raise ApiError(409, "team_decks", NO_BOT_TEAMMATE) from refused
+        whose = handles.get(stuck[0]) if stuck else None
         raise ApiError(
             409,
             "team_decks",
-            "A player's deck shares a card with every bot deck, so no bot can be their teammate: "
-            "they need another deck.",
+            f"{whose or 'A player'}'s deck shares a card with every bot deck, so no bot can be "
+            "their teammate: they need another deck.",
         ) from refused
 
 

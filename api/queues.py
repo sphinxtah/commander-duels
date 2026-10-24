@@ -768,7 +768,8 @@ def check_queue_teams(db: Session, group: Group, plans: list[SeatPlan]) -> None:
     """Two-Headed Giant's teams at the start (v0.5.1): each team of two players' decks, bound now,
     share no card but basic lands, and each bot gets a fixture deck its teammate's shares no card
     with (api/teams.py). Friends whose decks now share cards are told which and taken out; two
-    players the queue paired (a deck changed meanwhile) wait on, to be paired apart."""
+    players the queue paired (a deck changed meanwhile) wait on, to be paired apart; a player whose
+    deck shares a card with every fixture deck, beside a bot, is taken out alone."""
     partners = dict(
         db.execute(
             select(QueueEntry.user_id, QueueEntry.partner_id).where(
@@ -797,20 +798,23 @@ def check_queue_teams(db: Session, group: Group, plans: list[SeatPlan]) -> None:
                 other: ("team_decks", shared_with(handles.get(one), both)),
             }
         )
+    engines = [plan.engine for plan in plans]
     try:
-        teams.assign_and_check([plan.engine for plan in plans], True)
+        teams.assign_and_check(engines, True)
     except ApiError as error:
         db.commit()
-        alone = [
+        # Only the players whose deck shares a card with every fixture deck are taken out (v0.5.1):
+        # another player beside a bot is not told so falsely, and waits on.
+        stuck = [
             user
-            for index, user in enumerate(group.seats)
-            if user is not None and group.seats[teams.teammate(index)] is None
+            for seat in teams.without_fixture(engines)
+            if (user := group.seats[seat]) is not None
         ]
         said = (
             "Your deck shares a card with every bot deck, so no bot can be your teammate. Find a "
             "game with another deck, or with a friend."
         )
-        raise Refused({user: ("team_decks", said) for user in alone}) from error
+        raise Refused({user: ("team_decks", said) for user in stuck}) from error
 
 
 def record_group(
