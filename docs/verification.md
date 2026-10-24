@@ -1,5 +1,20 @@
 # Verification
 
+## v0.6.1
+
+Validated locally on Windows on October 24, 2026, on the work of v0.6.1 as merged: the top bar, deleting a deck, own auctions on the market, Sign out in the account's menu and Profile's tabs (built here), Alpha and Beta in Leng's shop, and Two-Headed Giant's team priority with a bot in control of a turn (each built in a worktree by a subagent and merged here). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy.
+
+| Check | Result |
+| --- | --- |
+| Ruff lint and formatting, mypy strict | Passed: 94 Python source files type-checked |
+| Python suite | 412 passed against a throwaway PostgreSQL 17; 6 skipped that read a git clone (CI runs them). New: Alpha and Beta's prices, sale, staff pricing and booster data (`tests/test_shop.py`); every Alpha and Beta printing's print run against its sheets (`tests/test_one_of_a_kind.py`); the team prompts' contract and the scripted client's checks for controlled seats (`tests/test_contracts.py`, `tests/test_turn_control.py`) |
+| Generated contracts | `contracts/openapi.json` and `web/src/generated/api.d.ts` regenerated: the version, and the prompts' `team` object |
+| Web unit tests and build | 1179 Vitest tests in 94 files passed; `tsc -b`, the service worker's `tsc -p sw` and the production build passed. New or changed: the top bar without its pages, the delete confirmation, the market's query with the viewer's own listings, Sign out from the account's menu, Profile's tabs, the team decision's line in the prompt panel |
+| The top bar, measured | A throwaway Playwright test on Vite's dev server at 1920, 1536, 1366, 1180, 1000, 830 and 390 px: the search's middle on the tiles' at 1920, 1536, 1000 and 390 px, 38 px left of it at 1366 and 32 px at 1180 where the account's corner needs the room, 6 px at 830; no width scrolled sideways |
+| The engine (in the subagent's worktree) | The engine image's build: 154 JUnit tests, none failing, one skipped, with patches 0007 and 0008; `TeamPriorityTest` (9 games) and `TurnControlTest` (11 games, Word of Command and Opposition Agent among them). CI's engine job on a throwaway Compose stack: four scripted games with no problems (Legacy, Commander and two of Two-Headed Giant), SysOp's practice games through the API, and 19 of 20 browser journeys; `auctions.spec.ts` read a seller's balance that a game won in a parallel journey had raised by 100, and now checks the auction house's part of the ledger |
+
+**Hosted CI.** Run #124 on bbb83b7, the version's whole work, passed in 29 m 18 s: verify 11 m 24 s, the engine job 27 m 17 s (154 JUnit tests with the two new XMage patches, the scripted games with Two-Headed Giant, and the browser games), publish 1 m 53 s.
+
 ## v0.6.0
 
 Validated locally on Windows on October 23 and 24, 2026, on the work of v0.6.0 as merged: the official card back and the main menu's greeting (built here), Tivit's Auction House's server side and its screens (built in two worktrees by subagents and merged here), and the screens moved onto the generated contract, the test player's basic lands and the auction journey (here). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy. The engine is unchanged.
