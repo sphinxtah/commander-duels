@@ -4,11 +4,9 @@ import mage.cards.Cards;
 import mage.constants.RangeOfInfluence;
 import mage.game.Graveyard;
 import mage.player.human.HumanPlayer;
-import mage.player.human.PlayerResponse;
 import mage.players.Library;
 import mage.players.ManaPool;
 import mage.players.Player;
-import mage.players.PlayerImpl;
 
 /**
  * A human seat's player: XMage's own {@link HumanPlayer}, which differs only when it controls a
@@ -19,10 +17,10 @@ import mage.players.PlayerImpl;
  * with the bot's identity, asking the human's client. XMage's stand-in is a copy of the bot, so what
  * it records on itself is lost when the decision ends: a land it plays was never counted, and the
  * controller could play a land for the bot at every priority. This seat's stand-in keeps the bot's
- * hand, library, graveyard, mana pool, life and land count on the bot itself, and has its own answer
- * channel, so an answer for the bot never reaches the seat's own requests. The engine routes the
+ * hand, library, graveyard, mana pool, life and land count on the bot itself. The engine routes the
  * stand-in's requests to this seat as prompts for the bot's seat and answers them through the bot
- * ({@link HumanGame}).
+ * ({@link HumanGame}); XMage asks one player at a time, so the stand-in and the seat itself never
+ * wait at once.
  */
 final class HumanSeatPlayer extends HumanPlayer {
     private static final long serialVersionUID = 1L;
@@ -43,24 +41,24 @@ final class HumanSeatPlayer extends HumanPlayer {
 
     @Override
     public Player prepareControllableProxy(Player playerUnderControl) {
-        if (!getId().equals(playerUnderControl.getTurnControlledBy())) {
-            throw new IllegalArgumentException("A stand-in is made only by the player controlling the turn: "
-                + getName());
-        }
-        // Like XMage's, the stand-in reads this seat's settings (XMage's getControllingPlayersUserData).
-        return new StandIn((PlayerImpl) playerUnderControl);
+        // XMage's stand-in (which checks that this player controls the turn), copied into ours. Like
+        // XMage's it reads this seat's settings (getControllingPlayersUserData).
+        return new StandIn((HumanPlayer) super.prepareControllableProxy(playerUnderControl), playerUnderControl);
     }
 
     /**
      * A human player standing in for a bot for one decision, with the bot's identity. Its zones, mana
-     * pool, life and land count are the bot's own, read and changed on the bot.
+     * pool, life and land count are the bot's own, read and changed on the bot. Like XMage's own, it
+     * shares the controlling seat's answer channel: XMage clears a concession it has handled only on
+     * the channels of the game's players, and a channel of its own would stay marked and spin.
      */
     static final class StandIn extends HumanPlayer {
         private static final long serialVersionUID = 1L;
         private final Player bot;
 
-        StandIn(PlayerImpl bot) {
-            super(bot, new PlayerResponse());
+        /** @param xmages XMage's stand-in: a copy of the bot with the controlling seat's channel */
+        StandIn(HumanPlayer xmages, Player bot) {
+            super(xmages);
             this.bot = bot;
         }
 

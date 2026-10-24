@@ -142,6 +142,10 @@ class TurnControlTest {
                 }
             }
             if (prompt.forSeat() != null) {
+                if (prompt.message().contains("(as ")
+                        || (prompt.detail() != null && prompt.detail().contains("(as "))) {
+                    seen.problems.add("XMage's controlled-player hint left in: " + prompt.message());
+                }
                 String turn = view.turn() + ":" + prompt.forSeat();
                 switch (prompt.kind()) {
                     case "priority": {
