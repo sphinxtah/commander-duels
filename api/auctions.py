@@ -1295,6 +1295,9 @@ def place(
     auction = locked(db, auction_id)
     if auction is None:
         raise not_found()
+    # A retry sent at once waited on the lock: the bid its key made is there now.
+    if bid_by_key(db, user, key) is not None:
+        return item_of(db, user, auction)
     now = utcnow()
     if auction.status == "active" and auction.ends_at <= now:
         finish_auction(db, request, auction, now, roster)
@@ -1428,6 +1431,9 @@ def relist(
     old = own_locked(db, request, user, auction_id)
     lock_account(db, user.id)
     db.refresh(user)
+    earlier = listed_by(db, user, body.key)
+    if earlier:
+        return item_of(db, user, earlier[0])
     if old.status not in UNSOLD:
         raise ApiError(409, "not_relistable", "Only an unsold auction can be relisted.")
     if db.scalar(select(Auction.id).where(Auction.relisted_from == old.id)) is not None:

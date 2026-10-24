@@ -49,6 +49,7 @@ from api.identity import utcnow
 from api.main import create_app
 from api.models import (
     Auction,
+    AuctionBid,
     AuditEvent,
     CardPrinting,
     LibraryGrant,
@@ -864,15 +865,25 @@ def test_bids_racing_each_other_buy_now_and_the_end_on_postgresql(tmp_path, monk
             assert sum(balance(who) for who in bidders) == 4_000 - 100
             # A retry of one bid four times at once holds once.
             request = key()
+            trailing = next(
+                who
+                for who in bidders
+                if not who.get(f"/api/v1/auctions/{auction}").json()["leading"]
+            )
             with ThreadPoolExecutor(max_workers=4) as workers:
-                list(workers.map(lambda _: bid(bidders[0], auction, 200, request), range(4)))
-            with Session(engine_) as db:
-                held_now = db.scalar(
-                    select(func.count())
-                    .select_from(TokenEntry)
-                    .where(TokenEntry.kind == "bid", TokenEntry.user_id == bidders[0].id)
+                codes = list(
+                    workers.map(
+                        lambda _: bid(trailing, auction, 200, request).status_code, range(4)
+                    )
                 )
-            assert held_now in (1, 2)
+            assert codes == [200, 200, 200, 200]
+            with Session(engine_) as db:
+                made = db.scalar(
+                    select(func.count())
+                    .select_from(AuctionBid)
+                    .where(AuctionBid.request_key == request)
+                )
+            assert made == 1 and balance(trailing) == 800
             # Bids racing Buy Now: one sale, every other bid back.
             racing = sell(ada, second, buy_now=400)["id"]
 
