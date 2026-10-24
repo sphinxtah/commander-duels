@@ -1,14 +1,1359 @@
 {
   "checked": "2026-10-23",
-  "about": "Print runs (v0.5.1, api/print_runs.py, docs/shop.md \"Print runs\"): printings made in a known, small number of copies, which packs never deal more often than were printed. By Scryfall ID; copies is the serial's denominator.",
+  "about": "Print runs (v0.5.1, api/print_runs.py, docs/shop.md \"Print runs\"): printings made in a known, small number of copies, which packs never deal more often than were printed. By Scryfall ID; copies is the serial's denominator. Every serialized printing Scryfall lists (is:serialized), each count from Wizards of the Coast's collecting articles or product pages, checked against the serial on the card's scan; in_boosters names the MTGJSON booster sheets that hold it.",
   "printings": [
+    {
+      "scryfall_id": "2c7f82c4-7223-4dae-b037-aac96a32212f",
+      "set": "acr",
+      "number": "118z",
+      "name": "Leonardo da Vinci",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-assassins-creed: Collector Booster list '4 Double rainbow serialized cards (500 of each)'. Scryfall card image https://cards.scryfall.io/png/front/2/c/2c7f82c4-7223-4dae-b037-aac96a32212f.png reads 'XXX/500'.",
+      "in_boosters": [
+        "ACR collector:foilShowcaseRareMythic"
+      ]
+    },
+    {
+      "scryfall_id": "4ab4bfe8-c213-4cff-80fd-824b8f2c6f8f",
+      "set": "acr",
+      "number": "120z",
+      "name": "Mary Read and Anne Bonny",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-assassins-creed: Collector Booster list '4 Double rainbow serialized cards (500 of each)'. Scryfall card image https://cards.scryfall.io/png/front/4/a/4ab4bfe8-c213-4cff-80fd-824b8f2c6f8f.png reads 'XXX/500'.",
+      "in_boosters": [
+        "ACR collector:foilShowcaseRareMythic"
+      ]
+    },
+    {
+      "scryfall_id": "c2036b2e-89d6-448a-bfcb-50b2247ee17a",
+      "set": "acr",
+      "number": "272",
+      "name": "Cleopatra, Exiled Pharaoh",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-assassins-creed: Collector Booster list '4 Double rainbow serialized cards (500 of each)'. Scryfall card image https://cards.scryfall.io/png/front/c/2/c2036b2e-89d6-448a-bfcb-50b2247ee17a.png reads 'XXX/500'.",
+      "in_boosters": [
+        "ACR collector:foilShowcaseRareMythic"
+      ]
+    },
+    {
+      "scryfall_id": "23a5db83-0098-4e2b-bf23-146e88b9cca9",
+      "set": "acr",
+      "number": "273",
+      "name": "Sokrates, Athenian Teacher",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-assassins-creed: Collector Booster list '4 Double rainbow serialized cards (500 of each)'. Scryfall card image https://cards.scryfall.io/png/front/2/3/23a5db83-0098-4e2b-bf23-146e88b9cca9.png reads 'XXX/500'.",
+      "in_boosters": [
+        "ACR collector:foilShowcaseRareMythic"
+      ]
+    },
+    {
+      "scryfall_id": "0955a8e9-05ea-4747-a148-8d86a800d850",
+      "set": "brr",
+      "number": "64z",
+      "name": "Adaptive Automaton",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'. Scryfall card image https://cards.scryfall.io/png/front/0/9/0955a8e9-05ea-4747-a148-8d86a800d850.png reads '001/500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a19099ae-23f4-4167-abc6-edea9afc032c",
+      "set": "brr",
+      "number": "65z",
+      "name": "Aetherflux Reservoir",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "d5a92c79-8b65-4bdf-9adb-5aeb678df565",
+      "set": "brr",
+      "number": "66z",
+      "name": "Altar of Dementia",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f35ff4b7-c55a-4ede-ae73-b6c648d25613",
+      "set": "brr",
+      "number": "67z",
+      "name": "Ashnod's Altar",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "4a5c8600-af33-4f71-9d2f-a75ee4b3eaeb",
+      "set": "brr",
+      "number": "68z",
+      "name": "Astral Cornucopia",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "354b94c9-8128-4745-89f3-0d9db6019531",
+      "set": "brr",
+      "number": "69z",
+      "name": "Blackblade Reforged",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "d2d2d52d-7d86-4056-a6a5-f12844c189bc",
+      "set": "brr",
+      "number": "70z",
+      "name": "Bone Saw",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f5dc8767-847d-4dc6-81e5-261c835c5c89",
+      "set": "brr",
+      "number": "71z",
+      "name": "Burnished Hart",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "2c4583e3-4b1b-4d08-a80e-142578b9487a",
+      "set": "brr",
+      "number": "72z",
+      "name": "Caged Sun",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "1c86df7a-a40c-440d-8d18-1d24b35f49bc",
+      "set": "brr",
+      "number": "73z",
+      "name": "Chromatic Lantern",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a04cf4dc-f8d7-4c65-b4b6-df5caf99d918",
+      "set": "brr",
+      "number": "74z",
+      "name": "Chromatic Star",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f8f539c4-9b68-49c2-b750-e4afa80d5178",
+      "set": "brr",
+      "number": "75z",
+      "name": "Cloud Key",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "086cb106-a755-447d-915b-e0413c0dc7ca",
+      "set": "brr",
+      "number": "76z",
+      "name": "Defense Grid",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7fece001-6b77-4bbe-9c05-6fd4afc76fb3",
+      "set": "brr",
+      "number": "77z",
+      "name": "Door to Nothingness",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7a40dc2d-bd99-411b-8f98-666a398a71b0",
+      "set": "brr",
+      "number": "78z",
+      "name": "Elsewhere Flask",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "73640ec9-4cb2-41cb-9012-bd272a1cb10e",
+      "set": "brr",
+      "number": "79z",
+      "name": "Foundry Inspector",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "70398b01-0301-4a1c-8768-2f189f12577c",
+      "set": "brr",
+      "number": "80z",
+      "name": "Gilded Lotus",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "6e726e71-b9cc-421a-9f0d-22e321e88610",
+      "set": "brr",
+      "number": "81z",
+      "name": "Goblin Charbelcher",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "8077f5fe-f22a-4840-9417-526e76282a9e",
+      "set": "brr",
+      "number": "82z",
+      "name": "Helm of the Host",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f62689d0-5957-41f4-aade-40a0ed4f2468",
+      "set": "brr",
+      "number": "83z",
+      "name": "Howling Mine",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "2d40b353-2f12-4514-96f4-9ba6c6b420f6",
+      "set": "brr",
+      "number": "84z",
+      "name": "Ichor Wellspring",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "37d93a3d-3692-4016-844c-5c105d183f6c",
+      "set": "brr",
+      "number": "85z",
+      "name": "Inspiring Statuary",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "df7e7bf6-a9e0-4e16-a7e4-c6b09f58aabc",
+      "set": "brr",
+      "number": "86z",
+      "name": "Ivory Tower",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "629cb5ec-75bb-41da-875d-80674eac7196",
+      "set": "brr",
+      "number": "87z",
+      "name": "Jalum Tome",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f821c56c-8abc-4d85-b5f0-8508d76adc1b",
+      "set": "brr",
+      "number": "88z",
+      "name": "Journeyer's Kite",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "bf3fcbb0-6c21-4bcb-ba53-330ff1e3409c",
+      "set": "brr",
+      "number": "89z",
+      "name": "Keening Stone",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "07360a3b-9c01-4ee1-9056-888e420650a9",
+      "set": "brr",
+      "number": "90z",
+      "name": "Key to the City",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "02ac3788-f182-49c3-9fb0-616139aa951f",
+      "set": "brr",
+      "number": "91z",
+      "name": "Liquimetal Coating",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e78a7dd2-6689-4315-a312-080fdc9e1b19",
+      "set": "brr",
+      "number": "92z",
+      "name": "Lodestone Golem",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "769665a4-8441-4a1a-9e44-a1cc4705480c",
+      "set": "brr",
+      "number": "93z",
+      "name": "Mazemind Tome",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7ebfaf88-d862-4a71-a292-fc79c7c25afd",
+      "set": "brr",
+      "number": "94z",
+      "name": "Mesmeric Orb",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "58f37809-d9f8-4e71-918f-56d662108e34",
+      "set": "brr",
+      "number": "95z",
+      "name": "Millstone",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e188602f-d143-4631-90ab-d82c5fdb29c2",
+      "set": "brr",
+      "number": "96z",
+      "name": "Mind's Eye",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "5e74e9f6-1e35-4c96-b989-1cf9c05a5ca4",
+      "set": "brr",
+      "number": "97z",
+      "name": "Mishra's Bauble",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a361c9eb-0a12-4f33-a11d-1d7a40801540",
+      "set": "brr",
+      "number": "98z",
+      "name": "Mox Amber",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7bf210d8-1a57-40a2-9426-5f7be0cad719",
+      "set": "brr",
+      "number": "99z",
+      "name": "Mystic Forge",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "bde658c0-cc18-48a7-a440-75cdf3f7fc6d",
+      "set": "brr",
+      "number": "100z",
+      "name": "Ornithopter",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "98c57f6b-d1a3-401e-bc59-7aec481d3353",
+      "set": "brr",
+      "number": "101z",
+      "name": "Perilous Vault",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a1d31c43-7d50-4eaf-9016-a679e92abcc9",
+      "set": "brr",
+      "number": "102z",
+      "name": "Phyrexian Processor",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "614604ec-02a4-4c4d-849c-e9f4c9c1233e",
+      "set": "brr",
+      "number": "103z",
+      "name": "Phyrexian Revoker",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7269e169-8fa0-43ec-b8a4-f889e3379e40",
+      "set": "brr",
+      "number": "104z",
+      "name": "Platinum Angel",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "13d8e349-e843-4460-92dc-5f4cbc9c1e92",
+      "set": "brr",
+      "number": "105z",
+      "name": "Precursor Golem",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "caf8d689-0e73-4dba-8313-b66244e78140",
+      "set": "brr",
+      "number": "106z",
+      "name": "Pristine Talisman",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "d7b86a5d-9de7-4870-9225-323e7e63d3b9",
+      "set": "brr",
+      "number": "107z",
+      "name": "Psychosis Crawler",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "79a3325c-64f0-4f8a-b250-7739b9027f65",
+      "set": "brr",
+      "number": "108z",
+      "name": "Quicksilver Amulet",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "dd0d9d7b-3e9c-4d0e-993b-e0b273f75777",
+      "set": "brr",
+      "number": "109z",
+      "name": "Quietus Spike",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "cf1d0a49-9a36-4d72-9cc7-3e469936b94d",
+      "set": "brr",
+      "number": "110z",
+      "name": "Ramos, Dragon Engine",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "fd99ef4f-40c5-42bb-ac3a-41e089bd9356",
+      "set": "brr",
+      "number": "111z",
+      "name": "Runechanter's Pike",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "4f2d03d4-32b9-476a-a06f-0e078b0f7603",
+      "set": "brr",
+      "number": "112z",
+      "name": "Scrap Trawler",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "32839d7e-bbd0-4a7a-b1f0-2c32fe1634f2",
+      "set": "brr",
+      "number": "113z",
+      "name": "Sculpting Steel",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "8881ba3b-e1ac-479c-a5e7-f11e1d39b39e",
+      "set": "brr",
+      "number": "114z",
+      "name": "Self-Assembler",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "587b9829-b935-4d75-9856-cb614b2aa6df",
+      "set": "brr",
+      "number": "115z",
+      "name": "Semblance Anvil",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7906e6c0-3ff3-435c-8ed1-e2fb9318d16e",
+      "set": "brr",
+      "number": "116z",
+      "name": "Sigil of Valor",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "1ae68448-04a4-4112-bec9-a353417869ea",
+      "set": "brr",
+      "number": "117z",
+      "name": "Soul-Guide Lantern",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "d11042e2-4f28-499e-a7db-137694063809",
+      "set": "brr",
+      "number": "118z",
+      "name": "Springleaf Drum",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "37b43739-1241-4b32-83aa-52936eb76e00",
+      "set": "brr",
+      "number": "119z",
+      "name": "Staff of Domination",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "0d6245bc-e9c8-43fe-a606-e576e3928e88",
+      "set": "brr",
+      "number": "120z",
+      "name": "Sundering Titan",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "737d82c9-d8e7-4cdb-a207-8e71678addf8",
+      "set": "brr",
+      "number": "121z",
+      "name": "Swiftfoot Boots",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "60b86ef6-684b-4ac0-9d57-64928c0aaf44",
+      "set": "brr",
+      "number": "122z",
+      "name": "Sword of the Meek",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "695add14-fd2d-40bb-88f4-c064e010e4e4",
+      "set": "brr",
+      "number": "123z",
+      "name": "Thorn of Amethyst",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "b4a6f48e-e8fd-4eaa-85e5-11076c8862c9",
+      "set": "brr",
+      "number": "124z",
+      "name": "Unwinding Clock",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "387c054b-a5de-43bd-a29d-e8462dc611a5",
+      "set": "brr",
+      "number": "125z",
+      "name": "Well of Lost Dreams",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "dcdbecfc-fc37-4327-9469-7139e16f7fbd",
+      "set": "brr",
+      "number": "126z",
+      "name": "Wurmcoil Engine",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/whats-inside-the-brothers-war-boosters: 'Each of the 63 schematic cards has 500 serialized versions.' 'Each serialized card is numbered from 1 and 500'. Scryfall card image https://cards.scryfall.io/png/front/d/c/dcdbecfc-fc37-4327-9469-7139e16f7fbd.png reads '001/500'.",
+      "in_boosters": [
+        "BRO collector:doubleRainbowSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "934cc1ca-2ce8-4062-b1b7-1976e76da8b6",
+      "set": "dft",
+      "number": "376",
+      "name": "The Aetherspark",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/products/aetherdrift: 'one of only 500 serialized cards available exclusively in Collector Boosters'. Scryfall card image https://cards.scryfall.io/png/front/9/3/934cc1ca-2ce8-4062-b1b7-1976e76da8b6.png reads 'XXX/500'.",
+      "in_boosters": [
+        "DFT collector:foilBoosterFun"
+      ]
+    },
+    {
+      "scryfall_id": "895e7a6e-cd10-4a00-bfec-30e6330e193c",
+      "set": "ecl",
+      "number": "352",
+      "name": "Bitterbloom Bearer",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/products/lorwyn-eclipsed: 'may find one of 500 serialized versions of Bitterbloom Bearer'. Scryfall card image https://cards.scryfall.io/png/front/8/9/895e7a6e-cd10-4a00-bfec-30e6330e193c.png reads 'XXX/500'.",
+      "in_boosters": [
+        "ECL collector:foilBoosterfun"
+      ]
+    },
+    {
+      "scryfall_id": "6ce8744a-ede3-4662-968a-360eb6639f08",
+      "set": "fin",
+      "number": "551f",
+      "name": "Traveling Chocobo",
+      "copies": 77,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-final-fantasy: serialized golden Traveling Chocobo, 'each copy being uniquely numbered from 1 to 77', English Collector Boosters only. Scryfall card image https://cards.scryfall.io/png/front/6/c/6ce8744a-ede3-4662-968a-360eb6639f08.png reads 'XX/77'.",
+      "in_boosters": [
+        "FIN collector:foilBoosterfunRareMythic"
+      ]
+    },
+    {
+      "scryfall_id": "9a5db4d2-035f-4f48-8752-75487267c222",
+      "set": "fra",
+      "number": "402",
+      "name": "Bloodline Recollector // Ancestral Craving",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-reality-fracture: 'There are 500 serialized versions of Bloodline Recollector'. Scryfall card image https://cards.scryfall.io/png/front/9/a/9a5db4d2-035f-4f48-8752-75487267c222.png reads 'XXX/500'.",
+      "in_boosters": [
+        "FRA collector:foilBoosterfun"
+      ]
+    },
+    {
+      "scryfall_id": "e70bfc25-3c0c-4574-b504-1d1f73e9e790",
+      "set": "inr",
+      "number": "491",
+      "name": "Edgar Markov",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-innistrad-remastered: 'Edgar Markov on 500 serialized printings in the movie poster treatment'. Scryfall card image https://cards.scryfall.io/png/front/e/7/e70bfc25-3c0c-4574-b504-1d1f73e9e790.png reads 'XXX/500'.",
+      "in_boosters": [
+        "INR collector:foilBoosterFun"
+      ]
+    },
+    {
+      "scryfall_id": "190ab58b-88cc-4baf-a843-d1b2710c14a8",
+      "set": "ltc",
+      "number": "378z",
+      "name": "The Great Henge",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters. Scryfall card image https://cards.scryfall.io/png/front/1/9/190ab58b-88cc-4baf-a843-d1b2710c14a8.png reads 'XXX/100'.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "5770803f-e3bb-45eb-8859-0ff4d9255b2b",
+      "set": "ltc",
+      "number": "379z",
+      "name": "Cloudstone Curio",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "5f24a880-09bf-4a75-a367-23be13dbf4ed",
+      "set": "ltc",
+      "number": "380z",
+      "name": "Ensnaring Bridge",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "1fac900d-c40d-4f33-9ae5-45e31e5ce66c",
+      "set": "ltc",
+      "number": "381z",
+      "name": "The Ozolith",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "ee977d30-f37d-4879-be52-c57d50922465",
+      "set": "ltc",
+      "number": "382z",
+      "name": "Rings of Brighthearth",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "9adf5196-41e9-401c-8ccf-abfad0350f87",
+      "set": "ltc",
+      "number": "383z",
+      "name": "Shadowspear",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "3543a80e-251b-498a-bf5e-ee2a2e9166e2",
+      "set": "ltc",
+      "number": "384z",
+      "name": "Sword of Hearth and Home",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "85ff8012-5d11-43bf-9f77-5d0179dc775e",
+      "set": "ltc",
+      "number": "385z",
+      "name": "Sword of the Animist",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "008a3241-df86-4d80-88f9-912b0363d030",
+      "set": "ltc",
+      "number": "386z",
+      "name": "Thorn of Amethyst",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "09721698-35a4-48a2-8896-fe036a642345",
+      "set": "ltc",
+      "number": "387z",
+      "name": "Ancient Tomb",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "621ce7c8-50dd-4487-b1fd-ffe476992ecc",
+      "set": "ltc",
+      "number": "388z",
+      "name": "Bojuka Bog",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "18402090-02af-4dc3-94ed-633a03848ab2",
+      "set": "ltc",
+      "number": "389z",
+      "name": "Boseiju, Who Shelters All",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "8015de93-6d51-425e-9a72-b745db37e8c1",
+      "set": "ltc",
+      "number": "390z",
+      "name": "Cabal Coffers",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "ebaa3b73-abb5-4ad4-a4c7-4b9f358db2c6",
+      "set": "ltc",
+      "number": "391z",
+      "name": "Castle Ardenvale",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "6a150673-8c52-4b56-9b81-c54cfcfc091b",
+      "set": "ltc",
+      "number": "392z",
+      "name": "Cavern of Souls",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters. Scryfall card image https://cards.scryfall.io/png/front/6/a/6a150673-8c52-4b56-9b81-c54cfcfc091b.png reads 'XXX/100'.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "196f121f-bd78-4455-855a-a2dd47314c1e",
+      "set": "ltc",
+      "number": "393z",
+      "name": "Deserted Temple",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "bcfba3c1-b17b-4c09-94af-eb14bf2c1f77",
+      "set": "ltc",
+      "number": "394z",
+      "name": "Gemstone Caverns",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "23fcc3e5-b8c6-4425-a5c3-5de877302496",
+      "set": "ltc",
+      "number": "395z",
+      "name": "Homeward Path",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "70fbe9e9-5b7c-4c70-8854-4b6b051f8bb7",
+      "set": "ltc",
+      "number": "396z",
+      "name": "Horizon Canopy",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "71403ce4-e5ac-4e99-b26d-a51456df5cac",
+      "set": "ltc",
+      "number": "397z",
+      "name": "Karakas",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "61f13afc-a10d-4c17-8bcc-434778ff34ab",
+      "set": "ltc",
+      "number": "398z",
+      "name": "Kor Haven",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "cdaf61a9-02da-48fd-a38b-13ecc326c40c",
+      "set": "ltc",
+      "number": "399z",
+      "name": "Minamo, School at Water's Edge",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "fc82f708-49a7-44de-9b14-e17b67daaa1d",
+      "set": "ltc",
+      "number": "400z",
+      "name": "Mouth of Ronom",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "a585ce22-7ca5-428c-81da-735e2be49b9d",
+      "set": "ltc",
+      "number": "401z",
+      "name": "Oboro, Palace in the Clouds",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "3629730d-4a68-426d-a7e4-6e3873028fab",
+      "set": "ltc",
+      "number": "402z",
+      "name": "Pillar of the Paruns",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "4e849eb2-273e-4de6-bac4-404d4eb91aee",
+      "set": "ltc",
+      "number": "403z",
+      "name": "Reflecting Pool",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "856c3adc-9fdf-4dd2-85a0-28da47f320fb",
+      "set": "ltc",
+      "number": "404z",
+      "name": "Shinka, the Bloodsoaked Keep",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "ab819ad1-36b0-443b-a9fa-2a57665284d2",
+      "set": "ltc",
+      "number": "405z",
+      "name": "Urborg, Tomb of Yawgmoth",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "ab0c7b95-f496-42bd-9cad-9f244a9f59d4",
+      "set": "ltc",
+      "number": "406z",
+      "name": "Wasteland",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "e4a5b982-ce4c-48e1-b1d6-a18012370298",
+      "set": "ltc",
+      "number": "407z",
+      "name": "Yavimaya, Cradle of Growth",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: each of the 30 Realms and Relics box toppers has a serialized double rainbow foil version 'numbered out of 100 (XXX/100)', only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedTopper"
+      ]
+    },
+    {
+      "scryfall_id": "16089845-be81-4fc2-82a8-8a28ec7e20d4",
+      "set": "ltc",
+      "number": "408z",
+      "name": "Sol Ring",
+      "copies": 300,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the serialized double rainbow foil Rings of Power Sol Rings have different totals: 300 Elven, 700 Dwarven, 900 Human (this is the Elven one, read from its image); MTGJSON LTR collector sheet serializedSolRing weights it 3 of 19 (3/7/9), matching. Scryfall card image https://cards.scryfall.io/png/front/1/6/16089845-be81-4fc2-82a8-8a28ec7e20d4.png reads 'XXX/300'.",
+      "in_boosters": [
+        "LTR collector:serializedSolRing"
+      ]
+    },
+    {
+      "scryfall_id": "9fac535f-46a3-440b-bb93-6fe4b2dba600",
+      "set": "ltc",
+      "number": "409z",
+      "name": "Sol Ring",
+      "copies": 700,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the serialized double rainbow foil Rings of Power Sol Rings have different totals: 300 Elven, 700 Dwarven, 900 Human (this is the Dwarven one, read from its image); MTGJSON LTR collector sheet serializedSolRing weights it 7 of 19 (3/7/9), matching. Scryfall card image https://cards.scryfall.io/png/front/9/f/9fac535f-46a3-440b-bb93-6fe4b2dba600.png reads 'XXX/700'.",
+      "in_boosters": [
+        "LTR collector:serializedSolRing"
+      ]
+    },
+    {
+      "scryfall_id": "ca15027f-0f32-4018-9da8-50e4002fa6f8",
+      "set": "ltc",
+      "number": "410z",
+      "name": "Sol Ring",
+      "copies": 900,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the serialized double rainbow foil Rings of Power Sol Rings have different totals: 300 Elven, 700 Dwarven, 900 Human (this is the Human one, read from its image); MTGJSON LTR collector sheet serializedSolRing weights it 9 of 19 (3/7/9), matching. Scryfall card image https://cards.scryfall.io/png/front/c/a/ca15027f-0f32-4018-9da8-50e4002fa6f8.png reads 'XXX/900'.",
+      "in_boosters": [
+        "LTR collector:serializedSolRing"
+      ]
+    },
     {
       "scryfall_id": "93de9042-cc62-4ade-8d8d-68fdbc84bfae",
       "set": "ltr",
       "number": "0",
       "name": "The One Ring",
       "copies": 1,
-      "source": "The card itself, serial 001/001 (Scryfall's image); the owner, 2026-10-23"
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: 'Only one card has been printed with The One Ring (Serialized 001/001)'; in one English non-Special Edition Collector Booster. Scryfall card image https://cards.scryfall.io/png/front/9/3/93de9042-cc62-4ade-8d8d-68fdbc84bfae.png reads '001/001'.",
+      "in_boosters": [
+        "LTR collector:theOneRing"
+      ]
+    },
+    {
+      "scryfall_id": "c9108db3-93b3-4d15-8d43-8d6908c42a7c",
+      "set": "ltr",
+      "number": "731z",
+      "name": "Dawn of a New Age",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters. Scryfall card image https://cards.scryfall.io/png/front/c/9/c9108db3-93b3-4d15-8d43-8d6908c42a7c.png reads 'XXX/100'.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "c991916f-b238-459e-9176-a3a6f00c54c2",
+      "set": "ltr",
+      "number": "732z",
+      "name": "Gandalf the White",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "8213e598-e594-4db1-aad5-836fa972df8f",
+      "set": "ltr",
+      "number": "733z",
+      "name": "Storm of Saruman",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "2256e802-8895-432b-b381-bdca41e7ce06",
+      "set": "ltr",
+      "number": "734z",
+      "name": "The Watcher in the Water",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "7b4b6982-c56e-4880-85ee-e24705afff55",
+      "set": "ltr",
+      "number": "735z",
+      "name": "Shadow of the Enemy",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "3de94e93-2021-4d00-a9db-497373994ec3",
+      "set": "ltr",
+      "number": "736z",
+      "name": "Witch-king of Angmar",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "a614d5f4-cb93-4fdb-a4d6-6a6e14bfd04e",
+      "set": "ltr",
+      "number": "737z",
+      "name": "Hew the Entwood",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "a6975ed0-b2f0-4820-9649-6bc5594af19a",
+      "set": "ltr",
+      "number": "738z",
+      "name": "Spiteful Banditry",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "cebd776a-92ac-4a4c-a88f-335fbcb84c36",
+      "set": "ltr",
+      "number": "739z",
+      "name": "Last March of the Ents",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "385a0103-f15b-41fa-8d2c-5cf2568c4e13",
+      "set": "ltr",
+      "number": "740z",
+      "name": "Radagast the Brown",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "9d481911-48a9-4cd7-a3b4-14c058dcac19",
+      "set": "ltr",
+      "number": "741z",
+      "name": "Aragorn, the Uniter",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "ba4f80df-841d-4ae3-b33e-d45cdc853761",
+      "set": "ltr",
+      "number": "742z",
+      "name": "Arwen, Mortal Queen",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "a4d16e37-1fa1-4515-b29a-dbabb5c69665",
+      "set": "ltr",
+      "number": "743z",
+      "name": "Saruman of Many Colors",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "27251103-e27c-446a-b64c-b7b0d5846b27",
+      "set": "ltr",
+      "number": "744z",
+      "name": "Sauron, the Dark Lord",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "50dd89bd-43a2-49c6-bf56-c9fbbf370540",
+      "set": "ltr",
+      "number": "745z",
+      "name": "Tom Bombadil",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "5a5354dd-ff5f-4231-bf31-039ad3448a09",
+      "set": "ltr",
+      "number": "746z",
+      "name": "Andúril, Flame of the West",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "8a5d405b-dfea-44de-a456-eaac8af73100",
+      "set": "ltr",
+      "number": "747z",
+      "name": "Glamdring",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
     },
     {
       "scryfall_id": "4e6fee52-33a8-4085-b632-bf95dfd2b16d",
@@ -16,7 +1361,1914 @@
       "number": "748z",
       "name": "The One Ring",
       "copies": 100,
-      "source": "The owner, 2026-10-23: \"The One Ring — Serialized Poster /100 LTR #748z\""
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters. Scryfall card image https://cards.scryfall.io/png/front/4/e/4e6fee52-33a8-4085-b632-bf95dfd2b16d.png reads 'XXX/100'.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "b9b95f71-ca89-4173-89bf-99abccd259de",
+      "set": "ltr",
+      "number": "749z",
+      "name": "Palantír of Orthanc",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "6c53dace-4597-4d34-96d1-7aa6290594d4",
+      "set": "ltr",
+      "number": "750z",
+      "name": "Mount Doom",
+      "copies": 100,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-the-lord-of-the-rings-tales-of-middle-earth: the 20 mythic borderless poster cards each have 100 serialized double rainbow foil printings, numbered out of 100 (XXX/100), only in Special Edition Collector Boosters.",
+      "in_boosters": [
+        "LTR collector-special:serializedPoster"
+      ]
+    },
+    {
+      "scryfall_id": "ff08c318-f57e-4557-a6ce-8fa23a732b05",
+      "set": "mh3",
+      "number": "381z",
+      "name": "Emrakul, the World Anew",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3: 'There are 250 serialized printings of each of the three titans featuring concept artwork'. Scryfall card image https://cards.scryfall.io/png/front/f/f/ff08c318-f57e-4557-a6ce-8fa23a732b05.png reads '173/250'.",
+      "in_boosters": [
+        "MH3 collector:foilShowcaseRm"
+      ]
+    },
+    {
+      "scryfall_id": "dbd57dd2-8b91-4c34-b3a9-a58a749c8636",
+      "set": "mh3",
+      "number": "382z",
+      "name": "Kozilek, the Broken Reality",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3: 'There are 250 serialized printings of each of the three titans featuring concept artwork'.",
+      "in_boosters": [
+        "MH3 collector:foilShowcaseRm"
+      ]
+    },
+    {
+      "scryfall_id": "ab8edf1e-1892-49d4-8612-0208b41bc97e",
+      "set": "mh3",
+      "number": "383z",
+      "name": "Ulamog, the Defiler",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3: 'There are 250 serialized printings of each of the three titans featuring concept artwork'.",
+      "in_boosters": [
+        "MH3 collector:foilShowcaseRm"
+      ]
+    },
+    {
+      "scryfall_id": "f39c4234-3b5a-4114-871a-ae8dd5659e86",
+      "set": "mkm",
+      "number": "317z",
+      "name": "Aurelia, the Law Above",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.' Scryfall card image https://cards.scryfall.io/png/front/f/3/f39c4234-3b5a-4114-871a-ae8dd5659e86.png reads '147/250'.",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "32a701da-47d6-4c85-a428-adeb4a20678d",
+      "set": "mkm",
+      "number": "318z",
+      "name": "Lazav, Wearer of Faces",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.'",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "3fdad75c-82e3-4feb-9bc9-29b6251439cb",
+      "set": "mkm",
+      "number": "319z",
+      "name": "Niv-Mizzet, Guildpact",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.'",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "6d5c2b49-ae53-48b7-877a-7f9aa7b6fc4a",
+      "set": "mkm",
+      "number": "320z",
+      "name": "Rakdos, Patron of Chaos",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.'",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "4193a7bd-bba3-44f2-acf3-685847b8be27",
+      "set": "mkm",
+      "number": "321z",
+      "name": "Teysa, Opulent Oligarch",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.'",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "8c420297-04c7-4659-b7cc-141a5c0ad1e1",
+      "set": "mkm",
+      "number": "322z",
+      "name": "Trostani, Three Whispers",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.'",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "62fa5a00-34d3-4ca4-afb9-62ab1c7afb14",
+      "set": "mkm",
+      "number": "323z",
+      "name": "Vannifar, Evolved Enigma",
+      "copies": 250,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-murders-at-karlov-manor: 'There are 250 serialized copies of each of the 7 Ravnica City cards.'",
+      "in_boosters": [
+        "MKM collector:foilRareMythicShowcase"
+      ]
+    },
+    {
+      "scryfall_id": "40307bcf-199c-4487-bfab-cb5fb841dee8",
+      "set": "mom",
+      "number": "338",
+      "name": "Elesh Norn // The Argent Etchings",
+      "copies": 500,
+      "source": "Denominator printed on the card (Scryfall's scan shows a real serial out of 500). https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine confirms serialized Praetors (Collector Boosters only, <1%) but states no count. Scryfall card image https://cards.scryfall.io/png/front/4/0/40307bcf-199c-4487-bfab-cb5fb841dee8.png reads '263/500'.",
+      "in_boosters": [
+        "MOM collector:doubleFoilPraetorSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e4a4a53e-58cb-4c4a-8396-590e41227ef8",
+      "set": "mom",
+      "number": "339",
+      "name": "Jin-Gitaxias // The Great Synthesis",
+      "copies": 500,
+      "source": "Denominator printed on the card (Scryfall's scan shows a real serial out of 500). https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine confirms serialized Praetors (Collector Boosters only, <1%) but states no count. Scryfall card image https://cards.scryfall.io/png/front/e/4/e4a4a53e-58cb-4c4a-8396-590e41227ef8.png reads '111/500'.",
+      "in_boosters": [
+        "MOM collector:doubleFoilPraetorSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c9063b1d-573a-4979-8cb3-4afe4eee66d2",
+      "set": "mom",
+      "number": "340",
+      "name": "Sheoldred // The True Scriptures",
+      "copies": 500,
+      "source": "Denominator printed on the card (Scryfall's scan shows a real serial out of 500). https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine confirms serialized Praetors (Collector Boosters only, <1%) but states no count. Scryfall card image https://cards.scryfall.io/png/front/c/9/c9063b1d-573a-4979-8cb3-4afe4eee66d2.png reads '121/500'.",
+      "in_boosters": [
+        "MOM collector:doubleFoilPraetorSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "b12e031a-3a1a-4544-973b-e4e5b0518db9",
+      "set": "mom",
+      "number": "341",
+      "name": "Urabrask // The Great Work",
+      "copies": 500,
+      "source": "Denominator printed on the card (Scryfall's scan shows a real serial out of 500). https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine confirms serialized Praetors (Collector Boosters only, <1%) but states no count. Scryfall card image https://cards.scryfall.io/png/front/b/1/b12e031a-3a1a-4544-973b-e4e5b0518db9.png reads '292/500'.",
+      "in_boosters": [
+        "MOM collector:doubleFoilPraetorSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c462bdf7-9181-4e52-8bcc-d7d5fa49af1c",
+      "set": "mom",
+      "number": "342",
+      "name": "Vorinclex // The Grand Evolution",
+      "copies": 500,
+      "source": "Denominator printed on the card (Scryfall's scan shows a real serial out of 500). https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine confirms serialized Praetors (Collector Boosters only, <1%) but states no count. Scryfall card image https://cards.scryfall.io/png/front/c/4/c462bdf7-9181-4e52-8bcc-d7d5fa49af1c.png reads '483/500'.",
+      "in_boosters": [
+        "MOM collector:doubleFoilPraetorSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "af6ffc8e-9ef8-4a2c-967f-8b5f967c7080",
+      "set": "mul",
+      "number": "131z",
+      "name": "Anafenza, Kin-Tree Spirit",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'. Scryfall card image https://cards.scryfall.io/png/front/a/f/af6ffc8e-9ef8-4a2c-967f-8b5f967c7080.png reads '001/500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "353a4398-5b8e-48bd-985b-62c8f33110e0",
+      "set": "mul",
+      "number": "132z",
+      "name": "Daxos, Blessed by the Sun",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "221a1c14-db49-47ce-847f-b574301408eb",
+      "set": "mul",
+      "number": "133z",
+      "name": "Elesh Norn, Grand Cenobite",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "89e2e2e7-d609-4216-8b87-9b45a6a80d1e",
+      "set": "mul",
+      "number": "134z",
+      "name": "Kenrith, the Returned King",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "dd0e8824-3b68-42a9-8977-ca266007a3db",
+      "set": "mul",
+      "number": "135z",
+      "name": "Kwende, Pride of Femeref",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f08ae802-1321-492e-87cd-d1c2ccf73197",
+      "set": "mul",
+      "number": "136z",
+      "name": "Sram, Senior Edificer",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "43fe36b0-2a16-4fa4-a1f1-b38ed4a3faad",
+      "set": "mul",
+      "number": "137z",
+      "name": "Thalia, Guardian of Thraben",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "127f2716-7c24-4ca1-bcf8-5f367627dec4",
+      "set": "mul",
+      "number": "138z",
+      "name": "Baral, Chief of Compliance",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "74769812-4d0b-48d7-8dd6-7be1e2b04e15",
+      "set": "mul",
+      "number": "139z",
+      "name": "Emry, Lurker of the Loch",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a658c6fe-d75a-4144-be99-23d9e7505028",
+      "set": "mul",
+      "number": "140z",
+      "name": "Inga Rune-Eyes",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "00fbe0b5-bf75-41ca-b0ba-1bb2a99defd6",
+      "set": "mul",
+      "number": "141z",
+      "name": "Jin-Gitaxias, Core Augur",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "680119a8-8154-40e9-987e-f94fafb4a430",
+      "set": "mul",
+      "number": "142z",
+      "name": "Tetsuko Umezawa, Fugitive",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "06921700-6094-41e6-9f50-4d0e208d0ab2",
+      "set": "mul",
+      "number": "143z",
+      "name": "Ayara, First of Locthwain",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "81a459ee-3c97-4df6-bff3-14f85aec12f8",
+      "set": "mul",
+      "number": "144z",
+      "name": "Horobi, Death's Wail",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c1d4f6fb-fe71-418a-93df-6b32190ce618",
+      "set": "mul",
+      "number": "145z",
+      "name": "Seizan, Perverter of Truth",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "fd6e6a1e-235d-47e2-8c57-9cfe25358a3e",
+      "set": "mul",
+      "number": "146z",
+      "name": "Sheoldred, Whispering One",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "28b3bba9-4140-4a01-a270-8da5aaab1b59",
+      "set": "mul",
+      "number": "147z",
+      "name": "Skithiryx, the Blight Dragon",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e5dca062-ef50-4c72-a71c-9862ab487f21",
+      "set": "mul",
+      "number": "148z",
+      "name": "Tymaret, Chosen from Death",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "64244678-708f-412a-b9b5-9f47ca05769d",
+      "set": "mul",
+      "number": "149z",
+      "name": "Yargle, Glutton of Urborg",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "6c2d70d2-8759-4b0e-aa39-ac4f73a766e3",
+      "set": "mul",
+      "number": "150z",
+      "name": "Captain Lannery Storm",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "fae3bf4a-a732-48aa-a1a4-7e5fd007774c",
+      "set": "mul",
+      "number": "151z",
+      "name": "Ragavan, Nimble Pilferer",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "0e1f9c33-9656-41c1-8760-a46ed0171129",
+      "set": "mul",
+      "number": "152z",
+      "name": "Squee, the Immortal",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "9827b52d-5a4c-4b20-a7e2-507b06d7b9af",
+      "set": "mul",
+      "number": "153z",
+      "name": "Urabrask the Hidden",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "5817ec15-caad-4782-a480-2fa695f758b8",
+      "set": "mul",
+      "number": "154z",
+      "name": "Valduk, Keeper of the Flame",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "15309fb1-3691-432e-a7e1-c48e260dc5a7",
+      "set": "mul",
+      "number": "155z",
+      "name": "Zada, Hedron Grinder",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "2da0033a-aeea-419a-a0d0-ee07be66fbf1",
+      "set": "mul",
+      "number": "156z",
+      "name": "Fynn, the Fangbearer",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f4d18240-d843-4573-b490-5ee72ceb4c1e",
+      "set": "mul",
+      "number": "157z",
+      "name": "Goreclaw, Terror of Qal Sisma",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e1e32a3b-41dc-4dea-8b8b-9d7f812145c0",
+      "set": "mul",
+      "number": "158z",
+      "name": "Renata, Called to the Hunt",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "02831922-f225-4cc6-8797-aef31265b1cd",
+      "set": "mul",
+      "number": "159z",
+      "name": "Vorinclex, Voice of Hunger",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "1a124f4e-b44c-4ab5-bb99-77df62b6c953",
+      "set": "mul",
+      "number": "160z",
+      "name": "Yedora, Grave Gardener",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "9f642fd7-d892-4def-9d1b-be32f177cfae",
+      "set": "mul",
+      "number": "161z",
+      "name": "Aegar, the Freezing Flame",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a2dd9c9b-a06d-46d1-bab5-b8c9a0c77296",
+      "set": "mul",
+      "number": "162z",
+      "name": "Arixmethes, Slumbering Isle",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "3a65dc65-5911-4502-916f-4008779d0b6e",
+      "set": "mul",
+      "number": "163z",
+      "name": "Atraxa, Praetors' Voice",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "59bc3e18-ad64-4249-8956-8fdc158f4c65",
+      "set": "mul",
+      "number": "164z",
+      "name": "Atris, Oracle of Half-Truths",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7854156d-f6cd-4582-808e-4bc67672e4bb",
+      "set": "mul",
+      "number": "165z",
+      "name": "Aurelia, the Warleader",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "0579d842-7b36-4b83-bba9-60864104bcae",
+      "set": "mul",
+      "number": "166z",
+      "name": "Brudiclad, Telchor Engineer",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f6190d91-658c-4867-83f7-d8f5eef5749f",
+      "set": "mul",
+      "number": "167z",
+      "name": "Dina, Soul Steeper",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "b02cd3e2-2ab4-4bb6-84aa-6f4a0df2eb31",
+      "set": "mul",
+      "number": "168z",
+      "name": "Ezuri, Claw of Progress",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e4c12596-228d-49d2-94a0-ec100bdab6f8",
+      "set": "mul",
+      "number": "169z",
+      "name": "Firesong and Sunspeaker",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "44990a9d-8723-4158-9f27-25ee6de3a1a1",
+      "set": "mul",
+      "number": "170z",
+      "name": "Firja, Judge of Valor",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c8506627-a687-4607-b4ed-b9be5b5cf2d3",
+      "set": "mul",
+      "number": "171z",
+      "name": "Grimgrin, Corpse-Born",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f38301d1-d9c9-4487-9350-24808ee381e3",
+      "set": "mul",
+      "number": "172z",
+      "name": "Gyruda, Doom of Depths",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "e0da1688-3852-4719-aece-de012d61e1f5",
+      "set": "mul",
+      "number": "173z",
+      "name": "Imoti, Celebrant of Bounty",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "2313d399-bbb8-4938-995c-489cd6fdd165",
+      "set": "mul",
+      "number": "174z",
+      "name": "Jegantha, the Wellspring",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c47e960d-11ad-45b7-8d5d-25fb149d003b",
+      "set": "mul",
+      "number": "175z",
+      "name": "Judith, the Scourge Diva",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "556ea272-d9a9-4246-936b-428c1d0dcefa",
+      "set": "mul",
+      "number": "176z",
+      "name": "Juri, Master of the Revue",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "d4e6889b-6903-44e9-be2d-5b1afabcc6a0",
+      "set": "mul",
+      "number": "177z",
+      "name": "Kaheera, the Orphanguard",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "ad2a846d-7fee-4fe9-bc32-5479cfcf6c85",
+      "set": "mul",
+      "number": "178z",
+      "name": "Keruga, the Macrosage",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c6d77715-4282-4616-a19f-2fc29783fdfa",
+      "set": "mul",
+      "number": "179z",
+      "name": "Kroxa, Titan of Death's Hunger",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "4dfebabf-64b7-4bf8-adbd-838807c05cb0",
+      "set": "mul",
+      "number": "180z",
+      "name": "Lathiel, the Bounteous Dawn",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "c2c9065c-54e5-473b-b2cd-f2826d92bc17",
+      "set": "mul",
+      "number": "181z",
+      "name": "Lurrus of the Dream-Den",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "f78d2de4-517d-46f4-adda-a85140341361",
+      "set": "mul",
+      "number": "182z",
+      "name": "Lutri, the Spellchaser",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "3d0763ed-8ca5-4755-8c79-c20c042ad466",
+      "set": "mul",
+      "number": "183z",
+      "name": "Niv-Mizzet Reborn",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7b9a0668-57a0-4da6-99b8-a238562e2075",
+      "set": "mul",
+      "number": "184z",
+      "name": "Obosh, the Preypiercer",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "ddd126ec-248d-45b4-a519-1e008340416b",
+      "set": "mul",
+      "number": "185z",
+      "name": "Radha, Coalition Warlord",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "7cd95e86-ae06-451e-b5b1-268b01909f96",
+      "set": "mul",
+      "number": "186z",
+      "name": "Raff, Weatherlight Stalwart",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "b57250e2-b0d1-43b4-bc00-e44825161856",
+      "set": "mul",
+      "number": "187z",
+      "name": "Reyav, Master Smith",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "5bc5ab12-b8e9-45ec-9217-8d83e817a219",
+      "set": "mul",
+      "number": "188z",
+      "name": "Rona, Sheoldred's Faithful",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "8927bd79-94e9-43e5-96bf-64c3f8debe30",
+      "set": "mul",
+      "number": "189z",
+      "name": "Shanna, Sisay's Legacy",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:uncommonMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "a8db3f81-7e21-4780-835d-b4494a8a13ae",
+      "set": "mul",
+      "number": "190z",
+      "name": "Taigam, Ojutai Master",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "cf72d487-fc57-482e-af05-840e836e0e63",
+      "set": "mul",
+      "number": "191z",
+      "name": "Teysa Karlov",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "4af29607-8907-4dda-9575-b6ae6ceaf027",
+      "set": "mul",
+      "number": "192z",
+      "name": "Umori, the Collector",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "513dd256-7a2b-43ba-9502-cf77172987a0",
+      "set": "mul",
+      "number": "193z",
+      "name": "Yarok, the Desecrated",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "d754022f-9921-4701-9b41-d40f265cb311",
+      "set": "mul",
+      "number": "194z",
+      "name": "Yorion, Sky Nomad",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "5a8df264-e89e-43a6-a4a1-9cf4f038172a",
+      "set": "mul",
+      "number": "195z",
+      "name": "Zirda, the Dawnwaker",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-march-of-the-machine: 'Each Multiverse Legends card also has 500 serialized versions.' 'Each serialized card is numbered from 1 to 500'. Scryfall card image https://cards.scryfall.io/png/front/5/a/5a8df264-e89e-43a6-a4a1-9cf4f038172a.png reads '001/500'.",
+      "in_boosters": [
+        "MOM collector:rareMythicMulSerialized"
+      ]
+    },
+    {
+      "scryfall_id": "b697418b-9823-4b9c-b8d4-b38ce818a2a0",
+      "set": "pip",
+      "number": "1057",
+      "name": "Strength Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/b/6/b697418b-9823-4b9c-b8d4-b38ce818a2a0.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "2925410a-7c44-4bf4-83cd-3e75dbe82b23",
+      "set": "pip",
+      "number": "1058",
+      "name": "Perception Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/2/9/2925410a-7c44-4bf4-83cd-3e75dbe82b23.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "ceb36a80-ddef-4be9-a6b3-ebe8143bc1ca",
+      "set": "pip",
+      "number": "1059",
+      "name": "Endurance Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/c/e/ceb36a80-ddef-4be9-a6b3-ebe8143bc1ca.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "d1630054-b9f8-474c-8383-3d6058c0e555",
+      "set": "pip",
+      "number": "1060",
+      "name": "Charisma Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/d/1/d1630054-b9f8-474c-8383-3d6058c0e555.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "114600bd-4bf5-4eeb-bb9d-25bfb8a54adc",
+      "set": "pip",
+      "number": "1061",
+      "name": "Intelligence Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/1/1/114600bd-4bf5-4eeb-bb9d-25bfb8a54adc.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "16414b32-2e70-4da6-9556-fcac07528e5f",
+      "set": "pip",
+      "number": "1062",
+      "name": "Agility Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/1/6/16414b32-2e70-4da6-9556-fcac07528e5f.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "54e26cce-e872-47f4-90b2-0739fa98e97c",
+      "set": "pip",
+      "number": "1063",
+      "name": "Luck Bobblehead",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-fallout: Bobbleheads 'each receiving a serialized treatment limited to 500 total copies.' Scryfall card image https://cards.scryfall.io/png/front/5/4/54e26cce-e872-47f4-90b2-0739fa98e97c.png reads 'XXX/500'.",
+      "in_boosters": [
+        "PIP collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "44a21b89-f540-4932-bb3d-c5c8d7abdda7",
+      "set": "rvr",
+      "number": "302z",
+      "name": "Blazing Archon",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'. Scryfall card image https://cards.scryfall.io/png/front/4/4/44a21b89-f540-4932-bb3d-c5c8d7abdda7.png reads 'XXX/500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "3ea7fef2-5df8-46bb-a7ff-fbdb07ac2af0",
+      "set": "rvr",
+      "number": "303z",
+      "name": "Blind Obedience",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "6aab3dc6-4f9a-48d3-9df2-36c3b87a4ab5",
+      "set": "rvr",
+      "number": "306z",
+      "name": "Divine Visitation",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "b50c62c2-9433-4a26-8128-60e73d83e8df",
+      "set": "rvr",
+      "number": "308z",
+      "name": "Ghostway",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "3e1d7a9b-fba7-4a0c-9ca4-bf67196e875d",
+      "set": "rvr",
+      "number": "309z",
+      "name": "Bruvac the Grandiloquent",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "dc25aaff-8ed8-43ce-9340-d9a76d922da8",
+      "set": "rvr",
+      "number": "312z",
+      "name": "Copy Enchantment",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "ee3bd03a-f296-479a-bd92-af7c55e594c4",
+      "set": "rvr",
+      "number": "313z",
+      "name": "Cyclonic Rift",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "ee61bd89-55db-4668-8783-5af854ada104",
+      "set": "rvr",
+      "number": "319z",
+      "name": "Spark Double",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "620fe765-1e29-4370-9220-3dd6fffd824f",
+      "set": "rvr",
+      "number": "320z",
+      "name": "Tidespout Tyrant",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "1f8224d8-0445-427f-a814-919ca312983f",
+      "set": "rvr",
+      "number": "322z",
+      "name": "Crypt Ghast",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "888597ce-c780-461b-a619-32c14636fc76",
+      "set": "rvr",
+      "number": "323z",
+      "name": "Dark Confidant",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "9f2aaa1b-025c-460f-8d18-07c07c568ed2",
+      "set": "rvr",
+      "number": "326z",
+      "name": "Infernal Tutor",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "e83dafa5-7bad-4f6c-8c5f-6fc9eb9f94cb",
+      "set": "rvr",
+      "number": "327z",
+      "name": "Lord of the Void",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "1a70b4a3-dc57-4338-9a15-a407c94ebee5",
+      "set": "rvr",
+      "number": "328z",
+      "name": "Massacre Girl",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "69d7ea39-1c4e-4583-b655-bc09ea927ca6",
+      "set": "rvr",
+      "number": "331z",
+      "name": "Arclight Phoenix",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "8ff0dab2-f6dd-46e9-a990-5cb0946e9b26",
+      "set": "rvr",
+      "number": "333z",
+      "name": "Hellkite Tyrant",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "dd34273b-4029-4c9f-9f99-ce2c22001781",
+      "set": "rvr",
+      "number": "334z",
+      "name": "Ilharg, the Raze-Boar",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "1044a41d-d3ea-4658-9840-20aabf29d063",
+      "set": "rvr",
+      "number": "335z",
+      "name": "Krenko, Mob Boss",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "fde7c88c-3bef-422a-8527-52c22928df05",
+      "set": "rvr",
+      "number": "337z",
+      "name": "Legion Warboss",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "465d3876-a3db-41c6-8b80-aa784e5147f5",
+      "set": "rvr",
+      "number": "339z",
+      "name": "Mizzix's Mastery",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "495b01ba-27c1-4819-9b49-049cc125e2da",
+      "set": "rvr",
+      "number": "342z",
+      "name": "Utvara Hellkite",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "d816162c-bb87-4d45-ae14-1433b19f50c5",
+      "set": "rvr",
+      "number": "344z",
+      "name": "Birds of Paradise",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "f3ae21be-760d-4f67-ae06-ac4c8e333d1a",
+      "set": "rvr",
+      "number": "345z",
+      "name": "Chord of Calling",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "cbe8cddc-a961-4e5f-9dec-29f5a6a697a0",
+      "set": "rvr",
+      "number": "348z",
+      "name": "Golgari Grave-Troll",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "a0edb568-0613-45dd-8d97-60e603e57d74",
+      "set": "rvr",
+      "number": "349z",
+      "name": "Guardian Project",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "2ffea52b-51a0-4395-8569-9015048e0729",
+      "set": "rvr",
+      "number": "350z",
+      "name": "Life from the Loam",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "7db0a87c-6c17-4e65-b45e-0bafb76b3c8c",
+      "set": "rvr",
+      "number": "353z",
+      "name": "Protean Hulk",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "a248bb24-4e91-4f71-8dfb-d7b462903122",
+      "set": "rvr",
+      "number": "356z",
+      "name": "Aurelia, Exemplar of Justice",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "731683a9-7747-4c07-9d81-d2252cbe0b74",
+      "set": "rvr",
+      "number": "357z",
+      "name": "Borborygmos Enraged",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "d7ed7d62-569c-4a4c-a163-dc1cfb203c8c",
+      "set": "rvr",
+      "number": "360z",
+      "name": "Cindervines",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "642c8f17-0ab5-45f3-8171-1697e610eb74",
+      "set": "rvr",
+      "number": "363z",
+      "name": "Deathrite Shaman",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "df3c4b5c-a1f6-4933-b410-0336b9b6c64a",
+      "set": "rvr",
+      "number": "365z",
+      "name": "Dreadbore",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "94612a52-2542-4c34-ad0a-d706d91359b0",
+      "set": "rvr",
+      "number": "369z",
+      "name": "Karlov of the Ghost Council",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "a00c0cbc-e2e5-43bf-bfaa-355229181393",
+      "set": "rvr",
+      "number": "370z",
+      "name": "Lavinia, Azorius Renegade",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "e22ae0ab-1c6e-445b-a944-3c3885277755",
+      "set": "rvr",
+      "number": "371z",
+      "name": "Lazav, the Multifarious",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "b8a3e4d4-5c1a-4325-966a-b83666ee8460",
+      "set": "rvr",
+      "number": "373z",
+      "name": "Master of Cruelties",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "96154277-c463-4389-b722-479644c100d3",
+      "set": "rvr",
+      "number": "375z",
+      "name": "Mindleech Mass",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "a56cc7a4-b91f-4a6e-9e7e-b9200565b47c",
+      "set": "rvr",
+      "number": "376z",
+      "name": "Niv-Mizzet, Parun",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "f5cf50cb-0937-403b-a4b6-b6da0732bdcc",
+      "set": "rvr",
+      "number": "377z",
+      "name": "Prime Speaker Zegana",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "0e79f417-bfdd-4244-b8e2-004187f8a84b",
+      "set": "rvr",
+      "number": "379z",
+      "name": "Rakdos, Lord of Riots",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "4101a624-0646-4b1f-9b68-82a6f6f9ddcd",
+      "set": "rvr",
+      "number": "381z",
+      "name": "Savra, Queen of the Golgari",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "e7ac727c-80ab-475f-86e9-0c5984283f7d",
+      "set": "rvr",
+      "number": "383z",
+      "name": "Sphinx's Revelation",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "336c02e8-2672-42f5-8510-46963c875a9b",
+      "set": "rvr",
+      "number": "384z",
+      "name": "Stitch in Time",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "dc1ab3c6-6126-4aa2-8d8a-e62d35530365",
+      "set": "rvr",
+      "number": "385z",
+      "name": "Tajic, Legion's Edge",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "d5d7a822-f0c2-43af-90dd-42ebd7dc3d79",
+      "set": "rvr",
+      "number": "386z",
+      "name": "Teysa, Orzhov Scion",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "0758235a-32e4-458c-bb16-16c3708a8429",
+      "set": "rvr",
+      "number": "387z",
+      "name": "Tolsimir Wolfblood",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "da23485a-b899-4c02-9825-e9093cfa57e6",
+      "set": "rvr",
+      "number": "388z",
+      "name": "Voidslime",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "d447f01d-bf97-4c94-87cf-c5e813ceeab9",
+      "set": "rvr",
+      "number": "389z",
+      "name": "Bottled Cloister",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "aa83649c-035e-4da8-8bf9-9a8a615f3e49",
+      "set": "rvr",
+      "number": "390z",
+      "name": "Chromatic Lantern",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "1bb88ac5-95dd-489d-92f4-1f9443781b25",
+      "set": "rvr",
+      "number": "391z",
+      "name": "Cloudstone Curio",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "f8bffa22-b022-4bed-9fbc-68df139975c4",
+      "set": "rvr",
+      "number": "392z",
+      "name": "Illusionist's Bracers",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "8a042c35-a489-4327-9193-51e56bbf3349",
+      "set": "rvr",
+      "number": "393z",
+      "name": "Pariah's Shield",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "c9780f15-d908-4994-bba5-d2d73ac3fe96",
+      "set": "rvr",
+      "number": "394z",
+      "name": "Seal of the Guildpact",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "96fc46cd-d436-4965-9ed3-2e639f09ce74",
+      "set": "rvr",
+      "number": "395z",
+      "name": "Sword of the Paruns",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "06fcc802-1fef-4b6a-a2f2-a2582c7f2f54",
+      "set": "rvr",
+      "number": "397z",
+      "name": "Blood Crypt",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "4f36e582-e734-4159-b156-5a99d844f2ff",
+      "set": "rvr",
+      "number": "399z",
+      "name": "Breeding Pool",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "efa1a2b8-8ea1-4b1f-8e3b-1371d6968749",
+      "set": "rvr",
+      "number": "401z",
+      "name": "Godless Shrine",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "45bf2038-aaa5-418b-8d2f-46e1c492f778",
+      "set": "rvr",
+      "number": "404z",
+      "name": "Hallowed Fountain",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "0ff3028e-68c0-4b1a-af4b-22a33b9cf31b",
+      "set": "rvr",
+      "number": "407z",
+      "name": "Overgrown Tomb",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "0565a5b3-347a-46b2-bd67-ace5138ec6d0",
+      "set": "rvr",
+      "number": "409z",
+      "name": "Sacred Foundry",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "f9c49e51-4589-4213-9cd9-ac4ac14c8f44",
+      "set": "rvr",
+      "number": "412z",
+      "name": "Steam Vents",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "ec5055aa-3c79-4401-b5db-7081ee45cf98",
+      "set": "rvr",
+      "number": "413z",
+      "name": "Stomping Ground",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "7276a9b6-6f01-4b88-8d1b-14663e8baa6d",
+      "set": "rvr",
+      "number": "414z",
+      "name": "Temple Garden",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "bef5692f-d3a9-4687-9cd8-1177acfad1f8",
+      "set": "rvr",
+      "number": "415z",
+      "name": "Watery Grave",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/news/feature/collecting-ravnica-remastered: 'There are 64 retro frame rares and mythic rares serialized out of 500'. Scryfall card image https://cards.scryfall.io/png/front/b/e/bef5692f-d3a9-4687-9cd8-1177acfad1f8.png reads 'XXX/500'.",
+      "in_boosters": [
+        "RVR collector:serialized"
+      ]
+    },
+    {
+      "scryfall_id": "8f6597c9-8271-49c7-b4f6-9265f5d95f99",
+      "set": "sld",
+      "number": "713",
+      "name": "Swords to Plowshares",
+      "copies": 295,
+      "source": "Denominator printed on the card ('#NNN of 295'; footer 'Secret Lair 295'). Event giveaway, not sold in packs: a numbered run of 295 handed to random attendees (Shivan Dragon at MagicCon Philadelphia 2023, Giant Growth at MagicCon Minneapolis, Merfolk of the Pearl Trident at Gen Con 2023; https://articles.starcitygames.com/?p=156702, https://mtgrocks.com/?p=59654). Scryfall card image https://cards.scryfall.io/png/front/8/f/8f6597c9-8271-49c7-b4f6-9265f5d95f99.png reads '#001 of 295'.",
+      "in_boosters": []
+    },
+    {
+      "scryfall_id": "92ff7380-ac9c-46c4-9544-da6554cb0819",
+      "set": "sld",
+      "number": "714",
+      "name": "Merfolk of the Pearl Trident",
+      "copies": 295,
+      "source": "Denominator printed on the card ('#NNN of 295'; footer 'Secret Lair 295'). Event giveaway, not sold in packs: a numbered run of 295 handed to random attendees (Shivan Dragon at MagicCon Philadelphia 2023, Giant Growth at MagicCon Minneapolis, Merfolk of the Pearl Trident at Gen Con 2023; https://articles.starcitygames.com/?p=156702, https://mtgrocks.com/?p=59654). Scryfall card image https://cards.scryfall.io/png/front/9/2/92ff7380-ac9c-46c4-9544-da6554cb0819.png reads '#261 of 295'.",
+      "in_boosters": []
+    },
+    {
+      "scryfall_id": "f7fefff7-2ff5-4abf-a9ec-0e2e737ee225",
+      "set": "sld",
+      "number": "715",
+      "name": "Lord of the Pit",
+      "copies": 295,
+      "source": "Denominator printed on the card ('#NNN of 295'; footer 'Secret Lair 295'). Event giveaway, not sold in packs: a numbered run of 295 handed to random attendees (Shivan Dragon at MagicCon Philadelphia 2023, Giant Growth at MagicCon Minneapolis, Merfolk of the Pearl Trident at Gen Con 2023; https://articles.starcitygames.com/?p=156702, https://mtgrocks.com/?p=59654). Scryfall card image https://cards.scryfall.io/png/front/f/7/f7fefff7-2ff5-4abf-a9ec-0e2e737ee225.png reads '#264 of 295'.",
+      "in_boosters": []
+    },
+    {
+      "scryfall_id": "b0a04baf-5301-4e47-ac8f-243d2a73f18e",
+      "set": "sld",
+      "number": "716",
+      "name": "Shivan Dragon",
+      "copies": 295,
+      "source": "Denominator printed on the card ('#NNN of 295'; footer 'Secret Lair 295'). Event giveaway, not sold in packs: a numbered run of 295 handed to random attendees (Shivan Dragon at MagicCon Philadelphia 2023, Giant Growth at MagicCon Minneapolis, Merfolk of the Pearl Trident at Gen Con 2023; https://articles.starcitygames.com/?p=156702, https://mtgrocks.com/?p=59654). Scryfall card image https://cards.scryfall.io/png/front/b/0/b0a04baf-5301-4e47-ac8f-243d2a73f18e.png reads '#295 of 295'.",
+      "in_boosters": []
+    },
+    {
+      "scryfall_id": "65a168b8-285b-4725-a982-671557d4f0bc",
+      "set": "sld",
+      "number": "717",
+      "name": "Giant Growth",
+      "copies": 295,
+      "source": "Denominator printed on the card ('#NNN of 295'; footer 'Secret Lair 295'). Event giveaway, not sold in packs: a numbered run of 295 handed to random attendees (Shivan Dragon at MagicCon Philadelphia 2023, Giant Growth at MagicCon Minneapolis, Merfolk of the Pearl Trident at Gen Con 2023; https://articles.starcitygames.com/?p=156702, https://mtgrocks.com/?p=59654). Scryfall card image https://cards.scryfall.io/png/front/6/5/65a168b8-285b-4725-a982-671557d4f0bc.png reads '#086 of 295'.",
+      "in_boosters": []
+    },
+    {
+      "scryfall_id": "dba1cf83-e13d-401e-b76f-b12a51b307f9",
+      "set": "sld",
+      "number": "VS",
+      "name": "Viscera Seer",
+      "copies": 100,
+      "source": "Denominator printed on the card (gold stamp). Mirrored foil bonus card found in Secret Lair drops in 2021 (https://mtgazone.com/mtg-serialized-collector-cards/: x/100 stamp, 'there will presumably only ever be 100'); Wizards never published a count. Scryfall card image https://cards.scryfall.io/png/front/d/b/dba1cf83-e13d-401e-b76f-b12a51b307f9.png reads '#77 of 100'.",
+      "in_boosters": [
+        "SLD bonus-phyrexian-praetors-compleat-edition:bonus"
+      ]
+    },
+    {
+      "scryfall_id": "ef371352-ec8f-4da4-9085-67195068fb79",
+      "set": "sos",
+      "number": "306",
+      "name": "Emeritus of Ideation // Ancestral Recall",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/products/secrets-of-strixhaven: 'one of 500 serialized Emeritus of Ideation cards'. Scryfall card image https://cards.scryfall.io/png/front/e/f/ef371352-ec8f-4da4-9085-67195068fb79.png reads 'XXX/500'.",
+      "in_boosters": [
+        "SOS collector:foilBoosterfun"
+      ]
+    },
+    {
+      "scryfall_id": "ec33ea23-c8e8-4066-91b9-5e0ad191bcdb",
+      "set": "tdm",
+      "number": "419",
+      "name": "Mox Jasper",
+      "copies": 500,
+      "source": "https://magic.wizards.com/en/products/tarkir-dragonstorm: 'open one of 500 Serialized Mox Jasper cards (available exclusively in Collector Boosters)'. Scryfall card image https://cards.scryfall.io/png/front/e/c/ec33ea23-c8e8-4066-91b9-5e0ad191bcdb.png reads 'XXX/500'.",
+      "in_boosters": [
+        "TDM collector:foilBoosterFun"
+      ]
+    },
+    {
+      "scryfall_id": "6a040be4-4ffb-49f6-82fe-24140aa6be19",
+      "set": "who",
+      "number": "552z",
+      "name": "The First Doctor",
+      "copies": 501,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/6/a/6a040be4-4ffb-49f6-82fe-24140aa6be19.png reads 'XXX/501'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "3eca0143-5ba3-484d-b177-b31e1a1c90b6",
+      "set": "who",
+      "number": "553z",
+      "name": "The Second Doctor",
+      "copies": 502,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/3/e/3eca0143-5ba3-484d-b177-b31e1a1c90b6.png reads 'XXX/502'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "31ef0850-a822-43b7-88fa-a3756c1b7675",
+      "set": "who",
+      "number": "554z",
+      "name": "The Third Doctor",
+      "copies": 503,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/3/1/31ef0850-a822-43b7-88fa-a3756c1b7675.png reads 'XXX/503'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "bf10611b-38a0-4947-a36b-f5503584d59e",
+      "set": "who",
+      "number": "555z",
+      "name": "The Fourth Doctor",
+      "copies": 504,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/b/f/bf10611b-38a0-4947-a36b-f5503584d59e.png reads 'XXX/504'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "90007d91-554e-4613-8be1-4506fd4773bb",
+      "set": "who",
+      "number": "556z",
+      "name": "The Fifth Doctor",
+      "copies": 505,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/9/0/90007d91-554e-4613-8be1-4506fd4773bb.png reads 'XXX/505'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "c934f0d6-b67a-4554-9061-720064a13d99",
+      "set": "who",
+      "number": "557z",
+      "name": "The Sixth Doctor",
+      "copies": 506,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/c/9/c934f0d6-b67a-4554-9061-720064a13d99.png reads 'XXX/506'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "9499f326-3ebe-4544-8dc3-30b7e16d1d89",
+      "set": "who",
+      "number": "558z",
+      "name": "The Seventh Doctor",
+      "copies": 507,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/9/4/9499f326-3ebe-4544-8dc3-30b7e16d1d89.png reads 'XXX/507'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "6cd796f8-4d34-4a92-b4e2-40bfbe741846",
+      "set": "who",
+      "number": "559z",
+      "name": "The Eighth Doctor",
+      "copies": 508,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/6/c/6cd796f8-4d34-4a92-b4e2-40bfbe741846.png reads 'XXX/508'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "abe06db4-5e06-4504-b8a7-03021a695730",
+      "set": "who",
+      "number": "560z",
+      "name": "The Ninth Doctor",
+      "copies": 509,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/a/b/abe06db4-5e06-4504-b8a7-03021a695730.png reads 'XXX/509'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "520b89b6-53f5-4cad-b842-9dcc0a46224e",
+      "set": "who",
+      "number": "561z",
+      "name": "The Tenth Doctor",
+      "copies": 510,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/5/2/520b89b6-53f5-4cad-b842-9dcc0a46224e.png reads 'XXX/510'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "bd20991b-bab8-4fc7-8d66-fca55ff341db",
+      "set": "who",
+      "number": "562z",
+      "name": "The Eleventh Doctor",
+      "copies": 511,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/b/d/bd20991b-bab8-4fc7-8d66-fca55ff341db.png reads 'XXX/511'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "822d0ca0-9b2d-4c27-9ecd-0b2a7661952e",
+      "set": "who",
+      "number": "563z",
+      "name": "The Twelfth Doctor",
+      "copies": 512,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/8/2/822d0ca0-9b2d-4c27-9ecd-0b2a7661952e.png reads 'XXX/512'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
+    },
+    {
+      "scryfall_id": "25da713c-55c0-4842-b199-5659028cda74",
+      "set": "who",
+      "number": "564z",
+      "name": "The Thirteenth Doctor",
+      "copies": 513,
+      "source": "Denominator printed on the card (the Doctors run /501 for the First to /513 for the Thirteenth). https://magic.wizards.com/en/news/feature/collecting-magic-the-gathering-doctor-who says only 'about 500 printings' each; https://cardgamebase.com/?p=37034: 'There will be 501 serialized First Doctors, 502 serialized Second Doctors, and so on.' Scryfall card image https://cards.scryfall.io/png/front/2/5/25da713c-55c0-4842-b199-5659028cda74.png reads 'XXX/513'.",
+      "in_boosters": [
+        "WHO collector:finale"
+      ]
     }
   ]
 }
