@@ -15,6 +15,8 @@ Validated locally on Windows on October 23 and 24, 2026, on the work of v0.6.0 a
 | CI's verify job's journeys, locally | 60 passed, 17 skipped that need the engine or the second player, on a throwaway API from the source with the test catalog: 58 in one run, and `decks.spec.ts` and `shop.spec.ts`, which timed out under that run's load, passed alone twice each (about 15 s of their 30) |
 | Found and fixed while checking | The test player built its decks from free basic lands, which the owner's rule ends; it is now granted 100 of each in its default printing. The auction page did not show a sale's payment until reloaded; its poll now reads the balance and updates the top bar |
 
+**Hosted CI.** Run #117 on d5a74cf, the version's whole work, passed in 17 m 47 s: verify 15 m 55 s, the engine job 12 m 22 s, publish 1 m 44 s.
+
 ## v0.5.1
 
 Validated locally on Windows on October 23, 2026, on the work of v0.5.1 as merged: the owner's fixes and additions built here (the email search, card corners, the Cards page's big picture, the match's confirmation, the menu's paintings, The One Ring 001/001 and print runs) and eight parts built in worktrees by subagents and merged here (Two-Headed Giant's tables, queue and team channel; the teammate's hand and the table for two teams; the card audit and the bots' pairing; the chat bar; turn control; and the fixes of the version's reviews, in eleven more worktrees). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy; the engine was built by its Dockerfile, with six XMage patches.
