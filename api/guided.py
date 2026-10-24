@@ -153,9 +153,7 @@ def pool(db: Session, fmt: str, identity: int, library: Library | None = None) -
     limited = library is not None and not library.unlimited
     if limited:
         owned = [key for key, copies in library.copies.items() if copies > 0]  # type: ignore[union-attr]
-        query = query.where(
-            CardConcept.construction_key.in_(owned) | CardConcept.type_line.startswith("Basic ")
-        )
+        query = query.where(CardConcept.construction_key.in_(owned))
     rows = db.scalars(query)
     return [
         Candidate(
@@ -172,7 +170,7 @@ def pool(db: Session, fmt: str, identity: int, library: Library | None = None) -
             mana_cost=row.mana_cost or "",
             owned=(
                 library.owned(row.construction_key)  # type: ignore[union-attr]
-                if limited and not row.type_line.startswith("Basic ")
+                if limited
                 else None
             ),
         )
@@ -299,7 +297,7 @@ def propose(db: Session, body: GuidedRequest, library: Library | None = None) ->
     )
     # The lands fill what the spells leave, so the deck has its size even from a small pool.
     left = slots - sum(item.quantity for item in chosen)
-    lands = mana_base(db, body, candidates, chosen, identity, taken, left)
+    lands = mana_base(db, body, candidates, chosen, identity, taken, left, library)
     chosen.extend(lands)
     entries = [
         DeckEntry(card_id=leader.id, quantity=1, location="commander") for leader in leaders
@@ -329,9 +327,17 @@ def mana_base(
     identity: int,
     taken: set[UUID],
     total: int,
+    library: Library | None = None,
 ) -> list[Suggestion]:
     """`total` lands: a few that make two or more of the colors, then basics in proportion to the
-    colored symbols the chosen spells ask for."""
+    colored symbols the chosen spells ask for; since v0.6.0, from a library, no more of each basic
+    than it holds (basic lands are counted like any card), so the deck may come out short."""
+
+    def most(card: CardConcept, wanted: int) -> int:
+        if library is None or library.unlimited:
+            return wanted
+        return min(wanted, library.owned(card.construction_key) or 0)
+
     copies = 1 if body.format == "commander" else 4
     colors = colors_of(identity)
     lands: list[Suggestion] = []
@@ -360,12 +366,12 @@ def mana_base(
     left = total - sum(item.quantity for item in lands)
     if not colors:
         wastes = db.scalar(select(CardConcept).where(CardConcept.normalized_name == "wastes"))
-        if wastes is not None and left > 0:
+        if wastes is not None and most(wastes, left) > 0:
             lands.append(
                 Suggestion(
                     card_id=wastes.id,
                     name=wastes.name,
-                    quantity=left,
+                    quantity=most(wastes, left),
                     location="main",
                     reason="Mana: colorless basic lands.",
                 )
@@ -394,12 +400,12 @@ def mana_base(
     }
     for color in colors:
         basic = basics.get(normalize(BASICS[color]))
-        if basic is not None and counts[color] > 0:
+        if basic is not None and most(basic, counts[color]) > 0:
             lands.append(
                 Suggestion(
                     card_id=basic.id,
                     name=basic.name,
-                    quantity=counts[color],
+                    quantity=most(basic, counts[color]),
                     location="main",
                     reason=f"Mana: {BASICS[color]}s, in proportion to the {color} your spells "
                     "ask for.",

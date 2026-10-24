@@ -14,8 +14,9 @@ the Magic Duels style, their cards the player's for good.
   edition pulled and since v0.6.0 in its finish, and revalidates the account's decks. A card is
   new when its edition is. A pack opens once: asking again returns the same cards. The account's
   row is locked, so two requests at once open it once. Since v0.4.5 a card the game cannot play
-  gives way to another from its sheet (api/collation.py), and the opening records the card it replaced;
-  the history shows only cards the game can play.
+  gives way to another from its sheet (api/collation.py), and the opening records the card it
+  replaced; the history shows only cards the game can play. Since v0.6.0 basic lands are granted
+  like any card.
 - **SysOp gives packs** to any account, its own included, with a reason, audited
   (shop.packs_granted). Administrators and SysOp change prices and sale (shop.manage), each
   change audited, and see the booster data job's runs.
@@ -835,12 +836,10 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
     quantities: dict[tuple[UUID, UUID, str], int] = defaultdict(int)
     for position, card in enumerate(ordered):
         concept = concepts[printings[card.printing_id].concept_id]
-        # Basic lands are in every library already.
-        kept = not concept.type_line.startswith("Basic ")
-        new = kept and card.printing_id not in owned
-        if kept:
-            quantities[(concept.id, card.printing_id, card.finish)] += 1
-            owned.add(card.printing_id)
+        # Since v0.6.0 basic lands are granted like any card (the owner's decision).
+        new = card.printing_id not in owned
+        quantities[(concept.id, card.printing_id, card.finish)] += 1
+        owned.add(card.printing_id)
         db.add(
             PackCard(
                 opening_id=opening.id,

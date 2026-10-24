@@ -882,7 +882,8 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
     assert plain == sorted(plain)
     assert sum(1 for card in cards if card["sheet"] == "rareMythic") == 1
     lands = [card for card in cards if card["sheet"] == "land"]
-    assert len(lands) == 1 and not lands[0]["new"]
+    # Since v0.6.0 a basic land is granted like any card, so the first one is new.
+    assert len(lands) == 1 and lands[0]["new"]
     assert refreshed == [ada.id]
     # The same pack asked for again is the same pack.
     again = ada.send("POST", f"/api/v1/shop/packs/{pack}/open").json()
@@ -894,7 +895,7 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
         grants = db.scalars(select(LibraryGrant).where(LibraryGrant.user_id == ada.id)).all()
         assert {grant.grant_key for grant in grants} == {f"pack:{opening['id']}"}
         assert {grant.source for grant in grants} == {"pack"}
-        # Every card a deck may hold, basic lands aside: they are in every library already.
+        # Every card a deck may hold, since v0.6.0 basic lands too.
         kept = db.scalar(
             select(func.count())
             .select_from(PackCard)
@@ -902,7 +903,6 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
             .where(
                 PackCard.opening_id == UUID(opening["id"]),
                 CardConcept.deck_card.is_(True),
-                CardConcept.type_line.not_like("Basic %"),
             )
         )
         assert kept and sum(grant.quantity for grant in grants) == kept

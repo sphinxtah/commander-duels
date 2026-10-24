@@ -22,6 +22,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.orm import Session
+from test_progression import grant_basics
 from test_tables import Account, TableEngine, card, opened, served
 
 from api import accounts, economy, games, matches
@@ -71,6 +72,8 @@ def legacy_deck(
         {"card_id": card(client, name), "quantity": count, "location": "sideboard"}
         for name, count in (sideboard or {}).items()
     ]
+    # Since v0.6.0 a library holds only the basic lands granted to it.
+    grant_basics(client, account.id, entries)
     made = account.send(
         "POST", "/api/v1/decks", {"title": title, "format": "legacy", "entries": entries}
     ).json()

@@ -225,8 +225,10 @@ def entries(client: TestClient, fmt: str) -> list[dict[str, object]]:
 
 
 def deck(account: Account, client: TestClient, fmt: str = "legacy", title: str = "Burn") -> str:
-    """A playable deck of the account's own. Players' libraries hold basic lands without limit;
-    administrators build from the whole catalog."""
+    """A playable deck of the account's own. Since v0.6.0 a player's library holds the basic lands
+    granted to it, so the deck's are granted first; administrators build from the whole
+    catalog."""
+    test_progression.grant_basics(client, account.id, entries(client, fmt))
     made = account.send(
         "POST", "/api/v1/decks", {"title": title, "format": fmt, "entries": entries(client, fmt)}
     ).json()

@@ -6,6 +6,12 @@
   finishes the opening pulled of that edition (pack_cards), a row per finish; everything else
   nonfoil. library_grants is append-only on PostgreSQL (0007): its trigger is set aside while the
   rows are written. The source 'auction' is a card bought at the auction house (auction:<id>).
+- Basic lands (the owner's decision of v0.6.0) are real library copies, which decks count like any
+  card: every pack opened is granted the basic lands it pulled (pack_cards, by printing and
+  finish, under its own key), and every starter deck chosen or bought the basic lands of its list
+  (content/starter-decks.json, as the API reads it, CD_CONTENT_DIR; the card's default printing
+  where the catalog lacks the list's), nonfoil, under its own key. Grandfathered decks' basic
+  lands are not granted: those decks may become collection-locked.
 - auctions, auction_bids and auction_watches start empty.
 - token_ledger takes the kinds bid (tokens held, never positive), bid_return and sale; the
   notifications take auction_outbid, auction_won, auction_sold, auction_unsold and
@@ -16,11 +22,14 @@ longer holds. Downgrade ends the live auctions as cancelled ones end (each leadi
 bidder, as a grant of tokens, since the previous version knows no other kind for it), takes each
 sold copy out of its seller's grants, keeps the buyers' copies as grandfathered ones, turns the
 auction house's ledger entries into grants (what they moved stays in the balances), adds each
-grant's finishes back into one row per edition, and drops the tables.
+grant's finishes back into one row per edition, takes back every basic land granted (they were
+unlimited before), and drops the tables.
 """
 
+import json
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
@@ -99,6 +108,7 @@ def upgrade() -> None:
         )
     guarded("library_grants", False)
     give_finishes()
+    give_basics()
     guarded("library_grants", True)
     with op.batch_alter_table("library_grants") as table:
         table.create_unique_constraint(
@@ -257,6 +267,144 @@ def give_finishes() -> None:
         bind.execute(grants.insert(), inserts[start : start + 1000])
 
 
+def basic_cards(bind: sa.Connection) -> dict[str, tuple[UUID, UUID | None]]:
+    """The basic lands of the catalog by normalized name: the card and its default printing."""
+    concepts = sa.table(
+        "card_concepts",
+        sa.column("id", sa.Uuid()),
+        sa.column("normalized_name", sa.String()),
+        sa.column("type_line", sa.String()),
+        sa.column("default_printing_id", sa.Uuid()),
+    )
+    return {
+        row.normalized_name: (row.id, row.default_printing_id)
+        for row in bind.execute(
+            sa.select(
+                concepts.c.id, concepts.c.normalized_name, concepts.c.default_printing_id
+            ).where(concepts.c.type_line.startswith("Basic "))
+        )
+    }
+
+
+def give_basics() -> None:
+    """The basic lands packs pulled and starter decks held, granted as any card is."""
+    bind = op.get_bind()
+    basics = basic_cards(bind)
+    if not basics:
+        return
+    ids = {card for card, _ in basics.values()}
+    cards = sa.table(
+        "pack_cards",
+        sa.column("opening_id", sa.Uuid()),
+        sa.column("printing_id", sa.Uuid()),
+        sa.column("concept_id", sa.Uuid()),
+        sa.column("finish", sa.String()),
+    )
+    openings = sa.table(
+        "pack_openings",
+        sa.column("id", sa.Uuid()),
+        sa.column("user_id", sa.Uuid()),
+        sa.column("created_at", TIMESTAMP),
+    )
+    pulled: Counter[tuple[UUID, UUID, datetime, UUID, UUID, str]] = Counter()
+    for row in bind.execute(
+        sa.select(
+            openings.c.id,
+            openings.c.user_id,
+            openings.c.created_at,
+            cards.c.concept_id,
+            cards.c.printing_id,
+            cards.c.finish,
+        )
+        .join(openings, openings.c.id == cards.c.opening_id)
+        .where(cards.c.concept_id.in_(ids))
+    ):
+        pulled[
+            (row.id, row.user_id, row.created_at, row.concept_id, row.printing_id, row.finish)
+        ] += 1
+    inserts: list[dict[str, object]] = [
+        {
+            "id": uuid4(),
+            "user_id": user,
+            "concept_id": concept,
+            "printing_id": printing,
+            "finish": finish,
+            "quantity": copies,
+            "source": "pack",
+            "grant_key": f"pack:{opening}",
+            "created_at": when,
+        }
+        for (opening, user, when, concept, printing, finish), copies in pulled.items()
+    ]
+    inserts.extend(starter_basics(bind, basics))
+    for start in range(0, len(inserts), 1000):
+        bind.execute(grants.insert(), inserts[start : start + 1000])
+
+
+def starter_basics(
+    bind: sa.Connection, basics: dict[str, tuple[UUID, UUID | None]]
+) -> list[dict[str, object]]:
+    """Each starter deck's grant gets the deck's basic lands, nonfoil, in the list's printings."""
+    from api.config import Settings
+    from catalog.text import normalize
+
+    file = Path(Settings().content_dir) / "starter-decks.json"
+    if not file.is_file():
+        return []
+    decks = json.loads(file.read_text(encoding="utf-8")).get("decks", [])
+    printings = sa.table(
+        "card_printings",
+        sa.column("id", sa.Uuid()),
+        sa.column("concept_id", sa.Uuid()),
+        sa.column("set_code", sa.String()),
+        sa.column("collector_number", sa.String()),
+    )
+    ids = {card for card, _ in basics.values()}
+    places = {
+        (row.concept_id, row.set_code, row.collector_number): row.id
+        for row in bind.execute(
+            sa.select(
+                printings.c.id,
+                printings.c.concept_id,
+                printings.c.set_code,
+                printings.c.collector_number,
+            ).where(printings.c.concept_id.in_(ids))
+        )
+    }
+    wanted: dict[str, Counter[tuple[UUID, UUID]]] = defaultdict(Counter)
+    for deck in decks:
+        for card in deck.get("cards", []):
+            found = basics.get(normalize(str(card.get("name", ""))))
+            if found is None:
+                continue
+            concept, default = found
+            place = (concept, str(card.get("set", "")), str(card.get("collector_number", "")))
+            printing = places.get(place) or default
+            if printing is not None:
+                wanted[str(deck["id"])][(concept, printing)] += int(card.get("quantity", 1))
+    granted = bind.execute(
+        sa.select(grants.c.user_id, grants.c.grant_key, sa.func.min(grants.c.created_at))
+        .where(grants.c.source == "starter")
+        .group_by(grants.c.user_id, grants.c.grant_key)
+    ).all()
+    return [
+        {
+            "id": uuid4(),
+            "user_id": user,
+            "concept_id": concept,
+            "printing_id": printing,
+            "finish": "nonfoil",
+            "quantity": copies,
+            "source": "starter",
+            "grant_key": key,
+            "created_at": when,
+        }
+        # starter:<deck>, or starter:<deck>:<time> after a reset.
+        for user, key, when in granted
+        for (concept, printing), copies in wanted.get(str(key).split(":")[1], Counter()).items()
+    ]
+
+
 def downgrade() -> None:
     bind = op.get_bind()
     now = datetime.now(UTC)
@@ -301,6 +449,10 @@ def downgrade() -> None:
             )
         )
     guarded("library_grants", False)
+    # Basic lands were unlimited before: their grants go.
+    basics = {card for card, _ in basic_cards(bind).values()}
+    if basics:
+        bind.execute(grants.delete().where(grants.c.concept_id.in_(basics)))
     # A sold copy leaves its seller's grants of that edition and finish, the newest first; the
     # buyer keeps theirs, as a grandfathered copy.
     sold = list(

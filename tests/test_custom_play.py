@@ -24,7 +24,7 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.orm import Session
 from test_decks_api import ACCOUNT_TABLES, entry
 from test_games import SERVICE_TOKEN, SYSOP_ADDRESS, FakeEngine
-from test_progression import PNG, Account, upload
+from test_progression import PNG, Account, grant_basics, upload
 
 from api import games
 from api.config import Settings
@@ -243,6 +243,7 @@ def test_godlike_decks_hold_custom_cards(client, engine):
     assert listed[SIGIL]["card"]["status_reason"] == "not_loaded"
     assert held["custom_image"] == listed[PARAGON]["image_url"]
 
+    grant_basics(client, ada.id, [entry(client, "Mountain", 56)])
     legacy = ada.send(
         "POST",
         "/api/v1/decks",
@@ -284,6 +285,7 @@ def test_godlike_decks_hold_custom_cards(client, engine):
         f"/api/v1/decks/{deck['id']}/draft",
         {"version": 2, "entries": [custom(sigil, 4), entry(client, "Mountain", 56)]},
     )
+    grant_basics(client, ada.id, [entry(client, "Wastes", 99)])
     commander = ada.send(
         "POST",
         "/api/v1/decks",
@@ -372,6 +374,7 @@ def test_games_play_custom_cards_the_engine_has_loaded(client, engine):
     sigil, _ = stand_ins(root)
     wins(root, ada, 100_000)
     ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "the-sphinx"})
+    grant_basics(client, ada.id, [entry(client, "Mountain", 56)])
     deck = ada.send(
         "POST",
         "/api/v1/decks",

@@ -172,6 +172,22 @@ def grant(client: TestClient, user: UUID, printing: CardPrinting, quantity: int,
         db.commit()
 
 
+def lands(client: TestClient, user: UUID, name: str = "Mountain", quantity: int = 60) -> None:
+    """Basic lands for the burn decks, in their default printing: since v0.6.0 a library holds
+    only the basic lands granted to it."""
+    grant(client, user, printings(client, name)[0], quantity, f"pack:{name}:{uuid4()}")
+
+
+def owned_lands(client: TestClient, found: Counter[tuple[str, str | None]]) -> Counter:
+    """The burn deck's editions once its Mountains took the edition the library holds."""
+    mountain = concept(client, "Mountain")
+    moved = Counter(found)
+    count = moved.pop((str(mountain.id), None), 0)
+    if count:
+        moved[(str(mountain.id), str(mountain.default_printing_id))] += count
+    return moved
+
+
 def entry(card: CardConcept, quantity: int, printing: CardPrinting | None = None) -> dict:
     return {
         "card_id": str(card.id),
@@ -227,7 +243,8 @@ def test_a_pack_grants_each_edition_it_pulled_and_new_is_by_edition(client, monk
                 LibraryGrant.grant_key == f"pack:{opening['id']}"
             )
         ).all()
-    assert sorted(rows, key=str) == sorted([(first.id, 1), (second.id, 2)], key=str)
+    # Since v0.6.0 a row per finish: the second edition's nonfoil and its foil.
+    assert sorted(rows, key=str) == sorted([(first.id, 1), (second.id, 1), (second.id, 1)], key=str)
 
     # The library lists the card once per edition, each with its own picture and copies.
     library = ada.get("/api/v1/library").json()
@@ -266,10 +283,13 @@ def test_card_details_list_the_editions_asked_for(client):
         (str(first.id), 2),
         (str(second.id), 1),
     ]
-    # A basic land is in every library in every edition; an administrator builds from them all.
+    # Since v0.6.0 a basic land is counted like any card: only the editions granted are held.
     mountain = concept(client, "Mountain")
     basic = ada.get(f"/api/v1/cards/{mountain.id}", printings="owned").json()
-    assert basic["printing_count"] == 2 and basic["editions"] is None
+    assert basic["printing_count"] == 0 and basic["editions"] == []
+    lands(client, ada.id)
+    basic = ada.get(f"/api/v1/cards/{mountain.id}", printings="owned").json()
+    assert basic["printing_count"] == 1 and basic["editions"][0]["copies"] == 60
     root = Account(client, "root", admin=True)
     theirs = root.get(path, printings="owned").json()
     assert theirs["printing_count"] == 6 and theirs["editions"] is None
@@ -280,6 +300,7 @@ def test_decks_hold_only_the_editions_the_library_holds(client):
     ada = Account(client, "ada")
     grant(client, ada.id, first, 2, "pack:one")
     grant(client, ada.id, second, 1, "pack:two")
+    lands(client, ada.id)
 
     def check(*held: tuple[int, CardPrinting | None]) -> dict:
         return ada.send(
@@ -322,11 +343,12 @@ def test_decks_hold_only_the_editions_the_library_holds(client):
     # The format's limit still counts every edition together.
     five = check((2, first), (1, second), (2, third))["errors"]
     assert {item["code"] for item in five} >= {"deck.copy_limit", "collection.locked"}
-    # Basic lands stay unlimited in every edition.
+    # Since v0.6.0 basic lands count by edition like any card: another edition is not held.
     mountain = concept(client, "Mountain")
-    lands = [entry(mountain, 60, printings(client, "Mountain")[-1])]
-    valid = ada.send("POST", "/api/v1/decks/validate", {"format": "legacy", "entries": lands})
-    assert valid.json()["playable"] is True
+    other = [entry(mountain, 60, printings(client, "Mountain")[-1])]
+    found = ada.send("POST", "/api/v1/decks/validate", {"format": "legacy", "entries": other})
+    assert found.json()["playable"] is False
+    assert {item["kind"] for item in found.json()["errors"]} == {"collection_locked"}
     # Administrators and SysOp build from the whole catalog in any edition.
     root = Account(client, "root", admin=True)
     theirs = root.send(
@@ -340,6 +362,7 @@ def test_a_save_gives_copies_naming_no_edition_one_the_library_holds(client):
     ada = Account(client, "ada")
     grant(client, ada.id, first, 2, "pack:one")
     grant(client, ada.id, second, 1, "pack:two")
+    lands(client, ada.id)
     bolt = concept(client, "Lightning Bolt")
     made = ada.send(
         "POST",
@@ -406,6 +429,7 @@ def test_the_alliance_playset_is_in_each_cards_default_printing(client):
         if printing.id != valki.default_printing_id
     )
     swamp = concept(client, "Swamp")
+    lands(client, ada.id, "Swamp", 56)
     deck = [entry(valki, 4, other), entry(swamp, 56)]
     found = ada.send("POST", "/api/v1/decks/validate", {"format": "legacy", "entries": deck})
     (problem,) = found.json()["errors"]
@@ -419,6 +443,7 @@ def test_an_import_takes_owned_editions_and_keeps_a_named_one(client):
     ada = Account(client, "ada")
     grant(client, ada.id, first, 2, "pack:one")
     grant(client, ada.id, second, 1, "pack:two")
+    lands(client, ada.id)
     bolt = concept(client, "Lightning Bolt")
     plain = ada.send(
         "POST",
@@ -490,6 +515,7 @@ def test_the_deploy_switches_every_players_drafts_to_owned_editions_once(client,
     ada = Account(client, "ada")
     grant(client, ada.id, first, 2, "pack:one")
     grant(client, ada.id, second, 1, "pack:two")
+    lands(client, ada.id)
     bolt = concept(client, "Lightning Bolt")
     # One switches fully; another holds more copies than the library and keeps the rest.
     fits = plant(client, ada.id, "Fits", burn(client, (1, first), (2, third)))
@@ -502,7 +528,9 @@ def test_the_deploy_switches_every_players_drafts_to_owned_editions_once(client,
     config = Settings(database_url=str(client.app.state.database.url), content_dir=str(content))  # type: ignore[attr-defined]
     worker.switch_editions(client.app.state.database, config)  # type: ignore[attr-defined]
     fitted = ada.get(f"/api/v1/decks/{fits}").json()
-    assert editions(fitted["draft"]["entries"]) == editions(burn(client, (2, first), (1, second)))
+    assert editions(fitted["draft"]["entries"]) == owned_lands(
+        client, editions(burn(client, (2, first), (1, second)))
+    )
     assert fitted["playable"] is True and fitted["draft"]["version"] == 2
     assert sorted(
         (item["quantity"], item["before"], item["after"]) for item in fitted["switched_editions"]
@@ -513,8 +541,8 @@ def test_the_deploy_switches_every_players_drafts_to_owned_editions_once(client,
         ]
     )
     shorted = ada.get(f"/api/v1/decks/{short}").json()
-    assert editions(shorted["draft"]["entries"]) == editions(
-        burn(client, (2, first), (1, second), (1, third))
+    assert editions(shorted["draft"]["entries"]) == owned_lands(
+        client, editions(burn(client, (2, first), (1, second), (1, third)))
     )
     assert shorted["collection_locked"] is True
     listed = {item["title"]: item for item in ada.get("/api/v1/decks").json()}
@@ -662,9 +690,17 @@ def round_trip(database_url: str, folder: Path, monkeypatch: pytest.MonkeyPatch)
             column["name"] for column in inspect(engine_).get_columns("decks")
         }
         back = grants_of(engine_)
-        # One row per card again, every copy kept.
+        # One row per card again, every copy kept but the basic lands', unlimited before v0.6.0.
         assert back[(ada.id, f"pack:{opening}", first.concept_id, None)] == 3
-        assert sum(back.values()) == sum(made.values())
+        with Session(engine_) as db:
+            basics = set(
+                db.scalars(
+                    select(CardConcept.id).where(CardConcept.type_line.startswith("Basic "))
+                )
+            )
+        assert sum(back.values()) == sum(
+            count for key, count in made.items() if key[2] not in basics
+        )
         with Session(engine_) as db:
             assert db.scalar(text("SELECT count(*) FROM site_settings")) == 0
 
