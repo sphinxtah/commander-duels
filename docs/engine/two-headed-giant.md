@@ -1,4 +1,4 @@
-# Two-Headed Giant (v0.0.4 feasibility; v0.5.0 spike and early practice game; v0.5.1 card audit; v0.6.1 team priority)
+# Two-Headed Giant (v0.0.4 feasibility; v0.5.0 spike and early practice game; v0.5.1 card audit; v0.6.1 team priority; v0.6.2 the audit's rare cards)
 
 v0.0.4 assessed Two-Headed Giant and recommended a time-boxed spike on a patched XMage ([the feasibility note](#the-feasibility-note-v004), below). v0.5.0 ran that spike, option 2 of the note. **It held: go.** Shared team turns, a shared life total, team poison and team results work inside XMage with three small patches, and the first playable slice ships: a practice game in which the player and a bot teammate play two bots, marked "Early" on the Play page. It covers FMT08 and FMT09 as written, FMT10 for one human with an AI teammate and the authorized teammate-hand view, and T09 at the engine level.
 
@@ -17,11 +17,13 @@ v0.5.1 ran the full card audit ([the card audit](#the-card-audit-v051), below): 
 
 v0.6.1 gives teams their priority and their choices (805.2, 805.3, 805.5 to 805.7) and one combined attack and block, legal as a whole (805.10b, 805.10d), in a seventh patch, and the format is no longer marked "Early" ([team priority and team choices](#team-priority-and-team-choices-v061), below).
 
+v0.6.2 fixes the 17 rare cards the audit left wrong in a ninth patch, each in its own code, and finds one of them (Elkin Lair) right after all ([the audit's rare cards](#the-audits-rare-cards-v062), below). No card of the audit is still wrong.
+
 The rules quoted are the Comprehensive Rules of 2026-09-25 (rules 805, Shared Team Turns, and 810, Two-Headed Giant) and the Magic Tournament Rules effective 2026-02-27 (sections 8.4 and 9.5).
 
 ## The XMage patches
 
-Seven patches in `engine/xmage/patches`, applied by `build-xmage.sh` in name order at the pinned commit (`xmage_1.4.62V1`, `eb69d05b`): three from v0.5.0's spike, three from v0.5.1's card audit and one from v0.6.1, kept apart so the earlier ones stay as they were reviewed. Each has a header with its reason and its removal condition (upstream implements the format, or Two-Headed Giant is dropped). None is offered upstream yet.
+Eight patches in `engine/xmage/patches`, applied by `build-xmage.sh` in name order at the pinned commit (`xmage_1.4.62V1`, `eb69d05b`): three from v0.5.0's spike, three from v0.5.1's card audit, one from v0.6.1 and one from v0.6.2, kept apart so the earlier ones stay as they were reviewed. Each has a header with its reason and its removal condition (upstream implements the format, or Two-Headed Giant is dropped). None is offered upstream yet.
 
 | Patch | Files | Lines (+/−) | What it does |
 | --- | --- | --- | --- |
@@ -32,8 +34,9 @@ Seven patches in `engine/xmage/patches`, applied by `build-xmage.sh` in name ord
 | `0005-two-headed-giant-ai-team-combat` (v0.5.1) | 2 | +73 / −5 | The computer player attacks and blocks as a team |
 | `0006-two-headed-giant-card-audit` (v0.5.1) | 88 | +256 / −111 | The cards whose own code the audit fixed one by one |
 | `0007-two-headed-giant-team-priority` (v0.6.1) | 4 | +401 / −8 | Team priority, team choices, the team's one attack and block ([below](#team-priority-and-team-choices-v061)) |
+| `0009-two-headed-giant-rare-cards` (v0.6.2) | 16 | +341 / −36 | The rare cards the audit left wrong, one by one ([below](#the-audits-rare-cards-v062)) |
 
-An eighth patch, `0008-ai-turn-control` (v0.6.1), is not the format's: it lets a bot control a turn in every format ([a bot in control](human-seat.md#a-bot-in-control-v061)).
+Another patch, `0008-ai-turn-control` (v0.6.1), is not the format's: it lets a bot control a turn in every format ([a bot in control](human-seat.md#a-bot-in-control-v061)).
 
 The hook is one new method of `mage.game.Game`, `getTeammates(playerId)`, empty by default. A game type that names teammates gets the rules below; every other game behaves as unpatched.
 
@@ -254,9 +257,9 @@ v0.5.0 searched the card pool at the pin (32,498 card classes in `Mage.Sets`) fo
 | "Each upkeep", "the next end step" | 200 | **Right**: once a team step |
 | Sagas (714.3c) and the initiative | all (core) | **Fixed** (0004, the review): each player of the active team advances their own Sagas, and the player with the initiative ventures at their own upkeep |
 | Creatures put onto the battlefield attacking (508.4) | all (core) | **Fixed** (0004, the review): their controller chooses whom they attack, the holder's teammate for their own |
-| Custom step triggers in card code ("your upkeep", "the chosen player's upkeep", Howling Mine's "each player's draw step") | 79 | **Fixed** 38: the step is checked for each player of the active team, and 10 that say "that player" trigger for each (0006). **Right** 40. **Still wrong** 1 (Territorial Hellkite: the attacking player) |
-| Cards that read the active player directly | 134 | **Fixed** 92: the 32 that compared a player with it by id read the team's turn now (0006), most of the rest are step triggers that act for the player whose step it is (0004), and four watchers and three combat effects cover each player of the active team (0006). **Right** 29 (805.9 lets an ability name one active player, and the turn's holder is one). **Still wrong** 12, listed below. One is Planechase |
-| Skip a turn, a step or a phase | 48 | **Fixed** 46 (0004): the team skips it. **Right**: Fatespinner (everyone skips the chosen step). **Still wrong**: Brine Elemental (below) |
+| Custom step triggers in card code ("your upkeep", "the chosen player's upkeep", Howling Mine's "each player's draw step") | 79 | **Fixed** 38: the step is checked for each player of the active team, and 10 that say "that player" trigger for each (0006). **Right** 40. **Still wrong** 1 (Territorial Hellkite: the attacking player), **fixed** in v0.6.2 (0009) |
+| Cards that read the active player directly | 134 | **Fixed** 92: the 32 that compared a player with it by id read the team's turn now (0006), most of the rest are step triggers that act for the player whose step it is (0004), and four watchers and three combat effects cover each player of the active team (0006). **Right** 29 (805.9 lets an ability name one active player, and the turn's holder is one). **Still wrong** 12, listed below; since v0.6.2 11 more **fixed** (0009) and Elkin Lair **right**, so 103 fixed and 30 right. One is Planechase |
+| Skip a turn, a step or a phase | 48 | **Fixed** 46 (0004): the team skips it. **Right**: Fatespinner (everyone skips the chosen step). **Still wrong**: Brine Elemental (below), **fixed** in v0.6.2 (0009) |
 | Extra turns, phases and steps | 59 and more | **Right**: the team takes them; extra phases and steps given to the holder's teammate now count too (0004) |
 | Control another player's turn (Mindslaver, Emrakul, Sorin Markov's −7 and the like) | 9 | **Fixed** in XMage (0004): the controller controls the whole team, by the newest such effect on any of its players (the review: the first version let the older win). Since v0.5.1 the engine routes the controlled players' prompts to a controlling human seat, see below, and since v0.6.1 a bot in control decides for them with its AI (patch 0008) |
 | "You can't lose the game", "your opponents can't win", "you don't lose for 0 life" | 24 | **Fixed** 21 (0004): the team can't lose (or win). **Right** 3 (they trigger when a player loses) |
@@ -265,9 +268,9 @@ v0.5.0 searched the card pool at the pin (32,498 card classes in `Mage.Sets`) fo
 | Poison counter checks | 33 | **Fixed** (0004 for `CorruptedCondition`'s 16 cards, 0006 for 17): the team's counters (810.10a). Losing poison counters is the team's (810.10b), and Melira, Sylvok Outcast keeps the whole team from getting them (810.10c) |
 | Assist | 16 | **Fixed** (0004): the teammate's mana counts, and a bot teammate helps pay |
 | Friend or foe | 5 | **Unchecked** since v0.5.0: each player chooses for every other player, so it should work |
-| "Defending player", "attacking player" | 19 and the core | **Right** for "defending player" (805.10e). "Attacking player" (805.10c): **fixed** in the core and 13 cards ("you attack with" counts your creatures; "that attacking player" is the one attacking the enchanted player; since the review, "whenever a player attacks" triggers for each player of the team who attacks: Norn's Decree, Mirkwood Trapper); **still wrong** in 4 (below) |
+| "Defending player", "attacking player" | 19 and the core | **Right** for "defending player" (805.10e). "Attacking player" (805.10c): **fixed** in the core and 13 cards ("you attack with" counts your creatures; "that attacking player" is the one attacking the enchanted player; since the review, "whenever a player attacks" triggers for each player of the team who attacks: Norn's Decree, Mirkwood Trapper); **still wrong** in 4 (below), **fixed** in v0.6.2 (0009) |
 
-Still wrong after the audit (each row of the review says why):
+Still wrong after the audit (each row of the review says why; all fixed in v0.6.2, Elkin Lair found right, see [the audit's rare cards](#the-audits-rare-cards-v062)):
 - **The turn's holder taken as the attacking player** (805.10c): Contested Game Ball, Ellie (Brick Master), Emberwilde Captain, Tahngarth (First Mate), War's Toll, Invasion Plans, Master Warcraft, Tenuous Truce and Territorial Hellkite. Each picks the holder where the rules want the controller of a particular attacking creature, which matters only when the holder's teammate attacks alone or the card cares whose creatures they are. A fix needs each card's own reading of 805.10c.
 - **Watchers keyed by the turn's holder**: O-Kagachi, Weathered Sentinels, Arboria and Invasion of Fiora remember "attacked you during their last turn" (or cast a spell during it) for the holder only, so the holder's teammate is treated as not having attacked.
 - **Storage Matrix**: the holder makes one choice for both players' untap steps, and the teammate's permanents untap freely.
@@ -298,6 +301,58 @@ A review of the audit (patches 0004 to 0006, the CSV and this note) found ten de
 | The CSV's verdicts | Six "each player's step" verdicts said "once" where the code triggers for each player (five the review found, and Nezumi Shortfang's flip side), Kuon's row was there twice, the two rows of Call to the Grave and of Quicksilver Fountain did not say which trigger each was, and the counts here followed them | Every "each player's step" and "each step" verdict was read again from the code: each card instantiated and its `triggersForEachTeamPlayer()` read on the patched build (cards whose trigger appears only in play, like a Class level, a flip side or a delayed trigger, from their source); new rows for the exchange and attack cards |
 | The AI's lethal check | A teammate's attackers at a planeswalker or a battle counted as damage to the defending team | Only those attacking a player of the defending team count (0005) |
 
+## The audit's rare cards (v0.6.2)
+
+Carried over from v0.5.1 and v0.6.1 ([the plan](../plans/0.6.2.md#carried-over)): the 17 cards the audit left still wrong, 19 rows of [the review](two-headed-giant-audit.csv). Each reads one player where the rules make it each player of the team's, in its own code, out of the core rules' reach, so patch 0009 fixes them one by one, as 0006 did: 16 card classes, each change reduced to the card's own code when the game names no teammates. The rules, from the Comprehensive Rules of 2026-09-25:
+- **805.10a, 805.10c.** Each player of the active team is an attacking player. Anything that refers to "an attacking player" refers to one specific attacking player; when an ability of a blocking creature names one, it is the controller of the creature that blocker blocks, and otherwise, if several could be chosen, the ability's controller chooses one.
+- **805.4a, 805.4b.** The team's turn is each of its players' turn, and its untap step each of theirs.
+- **805.8.** "If a single effect causes more than one player on the same team to ... skip the same step, phase, or turn, that team ... skips only that step, phase, or turn."
+
+| Card | Wrong until v0.6.2 | Since v0.6.2 |
+| --- | --- | --- |
+| Invasion Plans ("the attacking player chooses how each creature blocks") | The turn's holder declared the defending team's blocks | Its controller chooses one player of the attacking team, who declares them (805.10c) |
+| Contested Game Ball ("the attacking player gains control") | The holder gained control | Its controller, dealt combat damage, chooses which player of the attacking team gains control (805.10c) |
+| Ellie, Brick Master ("whenever a player attacks one of your opponents, that attacking player creates ...") | Triggered once; the holder created the token | Triggers for each player of the attacking team whose creatures attack that opponent; that player creates it |
+| Emberwilde Captain ("whenever an opponent attacks you ..., damage to that player equal to the cards in their hand") | Counted and damaged the holder | Triggers for each opponent whose creatures attack you, and counts and damages that player |
+| Tahngarth, First Mate ("whenever an opponent attacks ..., that opponent gains control ... attacks a player or planeswalker that opponent is attacking") | The holder gained control; any defender could be chosen | Triggers for each opponent who attacks with a creature; that opponent gains control, and Tahngarth attacks one of that opponent's creatures' defenders |
+| Tenuous Truce ("when you attack enchanted opponent ... or when they attack you") | The attack was read as the holder's | The attacks of the creatures you control and they control |
+| Master Warcraft ("you choose which creatures attack") | Only the holder's creatures could be chosen, so the teammate's could not attack | The attacking team's creatures can be chosen, and the choice is made when any player of the team has an attacker |
+| War's Toll ("if a creature an opponent controls attacks, all creatures that opponent controls attack if able") | The holder's creatures were checked, and a teammate attacking alone was told about the holder's and could not make the attack legal | The attacking creature's controller's creatures are checked, and that player is told |
+| Territorial Hellkite ("an opponent it didn't attack during your last combat") | The combat was remembered for the holder, so a teammate's Hellkite chose from both opponents every time | Each attacking player's own last combat is remembered |
+| O-Kagachi, Vengeful Kami; Weathered Sentinels ("players who attacked you during their last turn") | The holder was remembered as the player who attacked, and only the holder was forgotten as their team's turn began | The attacking creature's controller is remembered, and each player of the team whose turn begins is forgotten |
+| Arboria ("unless that player cast a spell or put a nontoken permanent onto the battlefield during their last turn") | Only the holder's spells counted, and a teammate's permanents that entered in the other team's turn still counted in theirs | Each active player's spells count, and every player of the team whose turn ended has their record renewed |
+| Invasion of Fiora (Marchesa: "if you haven't been dealt combat damage since your last turn") | Only the holder's damage was forgotten after the team's turn | Each player of the team's |
+| Storage Matrix ("each player chooses ... during their untap step") | The holder chose, for their own permanents only, and the teammate's untapped freely | Each player of the active team chooses, for the permanents they control (805.4b) |
+| Urabrask, Heretic Praetor ("the next time they would draw a card this turn, instead they exile the top card of their library") | Its two triggers (one per player of the team, since v0.5.1) each replaced the first draw of either, from the holder's library: the holder exiled two cards and the teammate drew | Each replaces the draw of the opponent it triggered for, from that player's library |
+| Brine Elemental ("each opponent skips their next untap step") | A skip for each player: the team skipped its next two untap steps | One skip for each opposing team (805.8) |
+
+**Elkin Lair is right.** The audit called its end step's part wrong because it reads the turn's holder, but it puts every card the Lair still has exiled into its owner's graveyard: each player's unplayed card goes to their own graveyard, as the card says. Its row now says so, and a test plays it.
+
+**Found on the way, not the format's.** At the pin, Weathered Sentinels' effect that should keep it from attacking players who did not attack you instead stops all of its controller's creatures from attacking the players its controller attacked during their last turn, and its hint lists those players, in every format: the watcher's two arguments are read the wrong way round. 0009 changes only which player its watcher remembers, so the card keeps XMage's behaviour otherwise. It is an upstream defect, left for XMage.
+
+**How it was checked.** `TwoHeadedGiantRareCardsTest` (JUnit, 18 scripted games under `SeatChecks`, built as `TwoHeadedGiantAuditTest`'s: four human seats, seat 0 starting, the cards put onto the battlefield in turn 1's main phase). Run on the build without 0009, every Two-Headed Giant test fails but Elkin Lair's, as each test's comment says (War's Toll's and Tenuous Truce's by not finishing in time: War's Toll asks seat 1 again without end):
+- Urabrask on seat 0: in team B's turn seats 2 and 3 each exile one card of their own library and draw none (52 cards and 7 in hand each);
+- Brine Elemental's ability (seat 0): team B's lands, tapped, stay tapped in turn 2 and untap in turn 4;
+- Invasion Plans on seat 2: seat 2 chooses seat 1, who alone declares team B's blocks;
+- Master Warcraft cast by seat 2 in team A's turn: seat 1's Llanowar Elves is offered beside seat 0's Grizzly Bears, chosen, and attacks; the Bears do not;
+- Tenuous Truce, cast by seat 2 on seat 1: sacrificed when seat 1 attacks seat 2 alone;
+- Territorial Hellkite on seat 1: attacks seat 3, then seat 2, then seat 3 in team A's turns 1, 3 and 5;
+- Contested Game Ball on seat 2, dealt combat damage by seat 1: seat 2 chooses seat 1, who gains control;
+- Ellie on seat 0, seat 1 attacking seat 3 alone: seat 1's Cordyceps Infected attacks seat 3;
+- Emberwilde Captain on seat 2, the monarch: seat 1 (two cards) attacks it and the team takes 2, not seat 0's 7;
+- Tahngarth on seat 2, tapped: seat 1 attacks seat 3 alone and gains control of Tahngarth, which attacks seat 3;
+- War's Toll on seat 2: seat 1 attacks with one of two Llanowar Elves, is told, and attacks with both; seat 0's Bears stay home;
+- Arboria: seat 3 casts Think Twice in team B's turn, so seat 0's Bears can attack seat 3 and not seat 2 in turn 3; and without the spell, neither, though seat 3's Islands entered in team A's turn 1 (moved from its hand: XMage's cheat puts permanents onto the battlefield without the event the watcher reads);
+- Invasion of Fiora in seat 1's hand: combat damage dealt to seat 1 in team A's turn 1 is forgotten after that turn (Marchesa's watcher, read by reflection);
+- O-Kagachi and Weathered Sentinels on seat 0, seat 3 attacking seat 0 alone in team B's turn: both watchers say seat 3 attacked and seat 2 did not (read by reflection), and O-Kagachi's combat damage to seat 3 in turn 3 exiles seat 3's Bears;
+- Storage Matrix on seat 0: in team B's untap step seat 2 chooses land and seat 3 creature, and only those untap;
+- Elkin Lair on seat 0: seats 2 and 3 each exile a card in team B's upkeep, and each card is in its owner's graveyard by turn 3;
+- a Legacy duel with Urabrask, Brine Elemental, Storage Matrix and Contested Game Ball plays as XMage always did: the opponent exiles instead of drawing, skips one untap step, chooses for Storage Matrix in each of its untap steps, and the attacking player takes the ball without a choice.
+
+**Measured** on 2026-10-24 on the development machine: the engine image to `engine-build` from a cold XMage stage in 8 min 5 s (XMage 232 s: fetch 13 s, the nine patches applied in under a second, compile 217 s, peak memory 4.5 GB; the engine module and its 172 tests 3 min 24 s, one skipped, the opt-in pairing measurement); `TwoHeadedGiantRareCardsTest` 18 tests in 15 to 26 s. The development smoke games on the runtime image (`scripts/engine_human_game.py`): Two-Headed Giant with a human and three bots (10 turns, 523 payloads) and with four humans (11 turns, 453 prompts, 2,594 payloads), and a Legacy game, each finished with no problems.
+
+Storage Matrix asks its question from inside a check of what can untap, which the engine's views make too while the question is open; the first version of the fix recorded the player's choice only once made, so building the prompt's view asked again, without end. The choice is now recorded as none while the player chooses, as XMage records the turn first.
+
 ## What remains, and the revised estimate
 
 The note's estimate for the full format was three to five versions after the spike, and v0.5.0 revised it to two and a half to three and a half. The owner kept all of it in v0.5.1 ([the plan](../plans/0.5.1.md#decisions-at-the-start-of-v051)):
@@ -311,12 +366,12 @@ The note's estimate for the full format was three to five versions after the spi
 | **The full card audit**: the misbehaving patterns patched (805.4d step triggers, 805.8 skips and turn control, 810.8a can't lose, 810.9d and 810.9f, 810.10a poison checks, Assist's mana count, "not your turn", 805.10c), the 134 cards that read the active player reviewed, with scripted tests for each pattern | Done in v0.5.1 ([the card audit](#the-card-audit-v051)), and the ten defects its review found fixed ([the audit's review](#the-audits-review-v051)); 17 cards still wrong, each with its reason in the review |
 | **The AI**: team attacks and blocks planned together, and the fifteen-counter poison check | Done in v0.5.1 as heuristics (patch 0005); the search still simulates one player at a time |
 | **805.5 to 805.7, team priority and team choices; 805.10b, attacks legal as a whole** | Done in v0.6.1 (patch 0007, [above](#team-priority-and-team-choices-v061)), with 805.10d's block legal as a whole, 805.3's mulligans by team and the team's chooser (805.2); the format is no longer marked "Early" |
-| **The rare cards the audit left wrong** (17, each with its reason in [the audit's review](two-headed-giant-audit.csv)) | Carried over to a later version (the owner, 2026-10-24) |
+| **The rare cards the audit left wrong** (17, each with its reason in [the audit's review](two-headed-giant-audit.csv)) | Carried over (the owner, 2026-10-24); done in v0.6.2 (patch 0009, [the audit's rare cards](#the-audits-rare-cards-v062)) |
 | **A browser journey with four people** playing Two-Headed Giant against the real engine | Carried over to a later version (the owner, 2026-10-24) |
 | **Turn control for human seats in the engine** (all formats) | Done in v0.5.1 on the owner's decision: the controller is asked the controlled players' decisions and sees their hands while the control lasts ([the human seat](human-seat.md#turn-control-v051)). Since v0.6.1 a bot controls a turn too, the whole team's in Two-Headed Giant, its AI making the controlled players' decisions (patch 0008, [a bot in control](human-seat.md#a-bot-in-control-v061)) |
 | **Upstream**: offer the patches to XMage as a team game type | Optional; each XMage pin bump means rebasing them until then |
 
-Every pin bump also re-applies the patches; seven now, touching hot core classes (`GameImpl`, `Combat`, `PlayerImpl`, `TriggeredAbilities`) and 88 card classes, so a bump may need them rebased. `TwoHeadedGiantAuditTest` and the review's verdicts are what to re-check; the step-trigger verdicts can be read again from the code by instantiating each card and asking its triggers `triggersForEachTeamPlayer()`, as the audit's review did.
+Every pin bump also re-applies the patches; nine now (eight of them the format's), touching hot core classes (`GameImpl`, `Combat`, `PlayerImpl`, `TriggeredAbilities`) and 103 card classes, so a bump may need them rebased. `TwoHeadedGiantAuditTest`, `TwoHeadedGiantRareCardsTest` and the review's verdicts are what to re-check; the step-trigger verdicts can be read again from the code by instantiating each card and asking its triggers `triggersForEachTeamPlayer()`, as the audit's review did.
 
 ## The feasibility note (v0.0.4)
 

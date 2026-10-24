@@ -1,0 +1,838 @@
+Two-Headed Giant (Commander Duels v0.6.2): the rare cards the v0.5.1 card audit left wrong.
+
+Reason: cards whose own code reads one attacking player, one active player or one player's step where
+rules 805.4a, 805.8 and 805.10 make it each player of the team's, which the core rules of parts 1, 3
+and 7 do not reach. In a team game (Game.getTeammates, from part 1):
+- 805.10c, "the attacking player" is one specific attacking player: the controller of the ability
+  chooses which (Invasion Plans, Contested Game Ball); "whenever a player (an opponent) attacks"
+  triggers for each player of the attacking team who attacks with a creature they control, that
+  player being "that attacking player" (Ellie, Brick Master; Emberwilde Captain; Tahngarth, First
+  Mate); "you attack" and "they attack you" are the attacks of the creatures each controls (Tenuous
+  Truce); Master Warcraft chooses among the attacking team's creatures; War's Toll makes the
+  attacking creature's controller's creatures attack, and its controller is told; Territorial
+  Hellkite remembers each player's own last combat;
+- the watchers of who attacked whom remember the attacking creature's controller, and the
+  watchers of "their last turn" forget the turn for each player of the team whose turn it was
+  (O-Kagachi, Weathered Sentinels, Arboria's two, Invasion of Fiora's Marchesa);
+- Storage Matrix asks each player of the active team during the team's untap step, for the
+  permanents they control (805.4b);
+- Urabrask's draw replacement replaces the draw of the opponent its trigger was for (805.4d);
+- Brine Elemental's "each opponent skips their next untap step" makes a team skip one untap step,
+  not one for each of its players (805.8: "If a single effect causes more than one player on the
+  same team to ... skip the same step ..., that team ... skips only that step").
+docs/engine/two-headed-giant-audit.csv in Commander Duels lists every card reviewed and its verdict.
+Every other game type names no teammates, and each change reduces to the card's own code there.
+Needs parts 1, 3 and 7.
+Upstream: none yet; to be offered to magefree/mage with the other parts.
+Remove when: XMage upstream implements Two-Headed Giant, or the format is dropped.
+
+diff --git a/Mage.Sets/src/mage/cards/a/Arboria.java b/Mage.Sets/src/mage/cards/a/Arboria.java
+index b09a0228..79d500f3 100644
+--- a/Mage.Sets/src/mage/cards/a/Arboria.java
++++ b/Mage.Sets/src/mage/cards/a/Arboria.java
+@@ -96,6 +96,7 @@ class CastSpellYourLastTurnWatcher extends Watcher {
+     private final Map<UUID, Integer> amountOfSpellsCastOnPrevTurn = new HashMap<>();
+     private final Map<UUID, Integer> amountOfSpellsCastOnCurrentTurn = new HashMap<>();
+     private UUID lastActivePlayer = null;
++    private final Set<UUID> lastActiveTeam = new HashSet<>();
+ 
+     CastSpellYourLastTurnWatcher() {
+         super(WatcherScope.GAME);
+@@ -104,9 +105,14 @@ class CastSpellYourLastTurnWatcher extends Watcher {
+     @Override
+     public void watch(GameEvent event, Game game) {
+         lastActivePlayer = game.getActivePlayerId();
++        lastActiveTeam.clear();
++        if (lastActivePlayer != null) {
++            lastActiveTeam.addAll(game.getTeam(lastActivePlayer));
++        }
+         if (event.getType() == GameEvent.EventType.SPELL_CAST) {
+             UUID playerId = event.getPlayerId();
+-            if (playerId != null && playerId.equals(lastActivePlayer)) {
++            // 805.4a: with shared team turns, the team's turn is each of its players' turn
++            if (playerId != null && game.isActivePlayer(playerId)) {
+                 amountOfSpellsCastOnCurrentTurn.putIfAbsent(playerId, 0);
+                 amountOfSpellsCastOnCurrentTurn.compute(playerId, (k, a) -> a + 1);
+             }
+@@ -116,13 +122,15 @@ class CastSpellYourLastTurnWatcher extends Watcher {
+     @Override
+     public void reset() {
+         super.reset();
+-        if (lastActivePlayer != null && amountOfSpellsCastOnPrevTurn.get(lastActivePlayer) != null) {
+-            amountOfSpellsCastOnPrevTurn.remove(lastActivePlayer);
++        // 805.4a: with shared team turns, the turn that ended was each of its team's players' turn
++        for (UUID playerId : lastActiveTeam) {
++            amountOfSpellsCastOnPrevTurn.remove(playerId);
+         }
+ 
+         amountOfSpellsCastOnPrevTurn.putAll(amountOfSpellsCastOnCurrentTurn);
+         amountOfSpellsCastOnCurrentTurn.clear();
+         lastActivePlayer = null;
++        lastActiveTeam.clear();
+     }
+ 
+     public Integer getAmountOfSpellsCastOnPlayersTurn(UUID playerId) {
+@@ -136,6 +144,7 @@ class PermanentsEnteredBattlefieldYourLastTurnWatcher extends Watcher {
+     private final Map<UUID, List<Permanent>> enteringBattlefield = new HashMap<>();
+     private final Map<UUID, List<Permanent>> enteringBattlefieldLastTurn = new HashMap<>();
+     private UUID lastActivePlayer = null;
++    private final Set<UUID> lastActiveTeam = new HashSet<>();
+ 
+     PermanentsEnteredBattlefieldYourLastTurnWatcher() {
+         super(WatcherScope.GAME);
+@@ -144,6 +153,10 @@ class PermanentsEnteredBattlefieldYourLastTurnWatcher extends Watcher {
+     @Override
+     public void watch(GameEvent event, Game game) {
+         lastActivePlayer = game.getActivePlayerId();
++        lastActiveTeam.clear();
++        if (lastActivePlayer != null) {
++            lastActiveTeam.addAll(game.getTeam(lastActivePlayer));
++        }
+ 
+         if (event.getType() == GameEvent.EventType.ENTERS_THE_BATTLEFIELD) {
+             Permanent perm = game.getPermanentEntering(event.getTargetId());
+@@ -166,12 +179,14 @@ class PermanentsEnteredBattlefieldYourLastTurnWatcher extends Watcher {
+     @Override
+     public void reset() {
+         super.reset();
+-        if (lastActivePlayer != null && enteringBattlefieldLastTurn.get(lastActivePlayer) != null) {
+-            enteringBattlefieldLastTurn.remove(lastActivePlayer);
++        // 805.4a: with shared team turns, the turn that ended was each of its team's players' turn
++        for (UUID playerId : lastActiveTeam) {
++            enteringBattlefieldLastTurn.remove(playerId);
+         }
+         enteringBattlefieldLastTurn.putAll(enteringBattlefield);
+         enteringBattlefield.clear();
+         lastActivePlayer = null;
++        lastActiveTeam.clear();
+     }
+ 
+     public List<Permanent> getPermanentsEnteringOnPlayersLastTurn(Game game, UUID playerId) {
+diff --git a/Mage.Sets/src/mage/cards/b/BrineElemental.java b/Mage.Sets/src/mage/cards/b/BrineElemental.java
+index 1519f93c..9bb371ed 100644
+--- a/Mage.Sets/src/mage/cards/b/BrineElemental.java
++++ b/Mage.Sets/src/mage/cards/b/BrineElemental.java
+@@ -1,6 +1,8 @@
+ 
+ package mage.cards.b;
+ 
++import java.util.HashSet;
++import java.util.Set;
+ import java.util.UUID;
+ import mage.MageInt;
+ import mage.abilities.Ability;
+@@ -68,8 +70,15 @@ class BrineElementalEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+         if (controller != null) {
++            Set<UUID> skipping = new HashSet<>();
+             for (UUID playerId: game.getState().getPlayersInRange(controller.getId(), game)) {
+                 if (controller.hasOpponent(playerId, game)) {
++                    // 805.8: one effect that makes several players of a team skip a step makes the
++                    // team skip it once (a turn mod on one of its players is the team's)
++                    if (game.getTeammates(playerId).stream().anyMatch(skipping::contains)) {
++                        continue;
++                    }
++                    skipping.add(playerId);
+                     game.getState().getTurnMods().add(new TurnMod(playerId).withSkipStep(PhaseStep.UNTAP));
+                 }
+             }
+diff --git a/Mage.Sets/src/mage/cards/c/ContestedGameBall.java b/Mage.Sets/src/mage/cards/c/ContestedGameBall.java
+index 0ab9c54c..12b8619f 100644
+--- a/Mage.Sets/src/mage/cards/c/ContestedGameBall.java
++++ b/Mage.Sets/src/mage/cards/c/ContestedGameBall.java
+@@ -17,6 +17,8 @@ import mage.abilities.effects.common.continuous.GainControlTargetEffect;
+ import mage.abilities.effects.common.counter.AddCountersSourceEffect;
+ import mage.cards.CardImpl;
+ import mage.cards.CardSetInfo;
++import mage.choices.Choice;
++import mage.choices.ChoiceImpl;
+ import mage.constants.CardType;
+ import mage.constants.Duration;
+ import mage.constants.Outcome;
+@@ -31,6 +33,9 @@ import mage.game.permanent.token.TreasureToken;
+ import mage.players.Player;
+ import mage.target.targetpointer.FixedTarget;
+ 
++import java.util.LinkedHashMap;
++import java.util.LinkedHashSet;
++import java.util.Map;
+ import java.util.UUID;
+ 
+ /**
+@@ -115,7 +120,7 @@ class ContestedGameBallEffect extends OneShotEffect {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+-        Player newController = game.getPlayer(getTargetPointer().getFirst(game, source));
++        Player newController = game.getPlayer(chooseAttackingPlayer(getTargetPointer().getFirst(game, source), controller, game));
+         if (controller == null || newController == null || controller.getId().equals(newController.getId())) {
+             return false;
+         }
+@@ -129,6 +134,34 @@ class ContestedGameBallEffect extends OneShotEffect {
+         return true;
+     }
+ 
++    /**
++     * 805.10c: with shared team turns, "the attacking player" is one specific player of the
++     * attacking team (the given player's), whom this ability's controller chooses. Otherwise the
++     * given player.
++     */
++    private static UUID chooseAttackingPlayer(UUID attackingPlayerId, Player controller, Game game) {
++        if (attackingPlayerId == null || controller == null || game.getTeammates(attackingPlayerId).isEmpty()) {
++            return attackingPlayerId;
++        }
++        Map<String, UUID> attackingPlayers = new LinkedHashMap<>();
++        for (UUID playerId : game.getTeam(attackingPlayerId)) {
++            Player player = game.getPlayer(playerId);
++            if (player != null && player.isInGame()) {
++                attackingPlayers.put(player.getName(), playerId);
++            }
++        }
++        if (attackingPlayers.size() < 2) {
++            return attackingPlayers.isEmpty() ? attackingPlayerId : attackingPlayers.values().iterator().next();
++        }
++        Choice choice = new ChoiceImpl(true);
++        choice.setMessage("Which attacking player gains control of Contested Game Ball?");
++        choice.setChoices(new LinkedHashSet<>(attackingPlayers.keySet()));
++        if (controller.choose(Outcome.GainControl, choice, game) && attackingPlayers.containsKey(choice.getChoice())) {
++            return attackingPlayers.get(choice.getChoice());
++        }
++        return attackingPlayerId;
++    }
++
+     @Override
+     public ContestedGameBallEffect copy() {
+         return new ContestedGameBallEffect(this);
+diff --git a/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java b/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java
+index 53b6d244..65d976cd 100644
+--- a/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java
++++ b/Mage.Sets/src/mage/cards/e/EllieBrickMaster.java
+@@ -77,10 +77,33 @@ class EllieBrickMasterTriggeredAbility extends TriggeredAbilityImpl {
+         this.getEffects().setTargetPointer(new FixedTarget(event.getTargetId()));
+         return true;
+     }
++
++    /**
++     * 805.10a, 805.10c: with shared team turns, each player of the attacking team who attacks the
++     * opponent with a creature they control is a player attacking them, and the ability triggers
++     * once for each of them, that player being "that attacking player".
++     */
++    @Override
++    public void trigger(Game game, UUID controllerId, GameEvent triggeringEvent) {
++        if (triggeringEvent == null || game.getTeammates(triggeringEvent.getPlayerId()).isEmpty()) {
++            super.trigger(game, controllerId, triggeringEvent);
++            return;
++        }
++        for (UUID attackingPlayerId : game.getTeam(triggeringEvent.getPlayerId())) {
++            if (((DefenderAttackedEvent) triggeringEvent).getAttackers(game).stream()
++                    .anyMatch(attacker -> attacker.isControlledBy(attackingPlayerId))) {
++                this.getEffects().setValue(EllieBrickMasterEffect.ATTACKING_PLAYER, attackingPlayerId);
++                super.trigger(game, controllerId, triggeringEvent);
++            }
++        }
++    }
+ }
+ 
+ class EllieBrickMasterEffect extends OneShotEffect {
+ 
++    /** The value naming "that attacking player" with shared team turns (805.10c). */
++    static final String ATTACKING_PLAYER = "attackingPlayer";
++
+     EllieBrickMasterEffect() {
+         super(Outcome.Benefit);
+         staticText = "that attacking player creates a tapped 1/1 black Fungus Zombie creature token " +
+@@ -98,8 +121,9 @@ class EllieBrickMasterEffect extends OneShotEffect {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
++        UUID attackingPlayerId = (UUID) getValue(ATTACKING_PLAYER);
+         return new CordycepsInfectedToken().putOntoBattlefield(
+-                1, game, source, game.getActivePlayerId(),
++                1, game, source, attackingPlayerId == null ? game.getActivePlayerId() : attackingPlayerId,
+                 true, true, getTargetPointer().getFirst(game, source)
+         );
+     }
+diff --git a/Mage.Sets/src/mage/cards/e/EmberwildeCaptain.java b/Mage.Sets/src/mage/cards/e/EmberwildeCaptain.java
+index e2add83e..077bed22 100644
+--- a/Mage.Sets/src/mage/cards/e/EmberwildeCaptain.java
++++ b/Mage.Sets/src/mage/cards/e/EmberwildeCaptain.java
+@@ -17,6 +17,7 @@ import mage.game.Game;
+ import mage.game.events.GameEvent;
+ import mage.game.permanent.Permanent;
+ import mage.players.Player;
++import mage.target.targetpointer.FixedTarget;
+ 
+ import java.util.UUID;
+ 
+@@ -88,6 +89,33 @@ class EmberwildeCaptainTriggeredAbility extends TriggeredAbilityImpl {
+         return false;
+     }
+ 
++    /**
++     * 805.10a: with shared team turns, each player of the attacking team who attacks you with a
++     * creature they control is an opponent attacking you, and the ability triggers once for each of
++     * them, that player being "that player".
++     */
++    @Override
++    public void trigger(Game game, UUID controllerId, GameEvent triggeringEvent) {
++        UUID attackingPlayerId = game.getCombat().getAttackingPlayerId();
++        if (attackingPlayerId == null || game.getTeammates(attackingPlayerId).isEmpty()) {
++            super.trigger(game, controllerId, triggeringEvent);
++            return;
++        }
++        Player you = game.getPlayer(getControllerId());
++        for (UUID teamPlayerId : game.getTeam(attackingPlayerId)) {
++            boolean attacksYou = false;
++            for (UUID attacker : game.getCombat().getAttackers(teamPlayerId, game)) {
++                if (getControllerId().equals(game.getCombat().getDefendingPlayerId(attacker, game))) {
++                    attacksYou = true;
++                }
++            }
++            if (attacksYou && you != null && you.hasOpponent(teamPlayerId, game)) {
++                this.getEffects().setTargetPointer(new FixedTarget(teamPlayerId));
++                super.trigger(game, controllerId, triggeringEvent);
++            }
++        }
++    }
++
+     @Override
+     public String getRule() {
+         return "Whenever an opponent attacks you while you're the monarch, " +
+@@ -117,7 +145,9 @@ class EmberwildeCaptainEffect extends OneShotEffect {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
+-        Player player = game.getPlayer(game.getActivePlayerId());
++        // 805.10a: with shared team turns, the attacking player the ability triggered for
++        Player player = game.getPlayer(game.getTeammates(game.getActivePlayerId()).isEmpty()
++                ? game.getActivePlayerId() : getTargetPointer().getFirst(game, source));
+         if (player == null || player.getHand().size() < 1) {
+             return false;
+         }
+diff --git a/Mage.Sets/src/mage/cards/i/InvasionOfFiora.java b/Mage.Sets/src/mage/cards/i/InvasionOfFiora.java
+index df1a598c..27afdd38 100644
+--- a/Mage.Sets/src/mage/cards/i/InvasionOfFiora.java
++++ b/Mage.Sets/src/mage/cards/i/InvasionOfFiora.java
+@@ -133,7 +133,10 @@ class MarchesaResoluteMonarchWatcher extends Watcher {
+                 }
+                 return;
+             case END_TURN_STEP_POST:
+-                players.remove(game.getActivePlayerId());
++                // 805.4a: with shared team turns, the turn is each of the active team's players'
++                if (game.getActivePlayerId() != null) {
++                    game.getTeam(game.getActivePlayerId()).forEach(players::remove);
++                }
+                 return;
+ 
+         }
+diff --git a/Mage.Sets/src/mage/cards/i/InvasionPlans.java b/Mage.Sets/src/mage/cards/i/InvasionPlans.java
+index 3fab1b60..93e09477 100644
+--- a/Mage.Sets/src/mage/cards/i/InvasionPlans.java
++++ b/Mage.Sets/src/mage/cards/i/InvasionPlans.java
+@@ -1,6 +1,9 @@
+ 
+ package mage.cards.i;
+ 
++import java.util.LinkedHashMap;
++import java.util.LinkedHashSet;
++import java.util.Map;
+ import java.util.UUID;
+ import mage.abilities.Ability;
+ import mage.abilities.common.SimpleStaticAbility;
+@@ -8,6 +11,8 @@ import mage.abilities.effects.ContinuousRuleModifyingEffectImpl;
+ import mage.abilities.effects.common.combat.BlocksIfAbleAllEffect;
+ import mage.cards.CardImpl;
+ import mage.cards.CardSetInfo;
++import mage.choices.Choice;
++import mage.choices.ChoiceImpl;
+ import mage.constants.*;
+ import mage.filter.StaticFilters;
+ import mage.game.Game;
+@@ -62,7 +67,7 @@ class InvasionPlansEffect extends ContinuousRuleModifyingEffectImpl {
+ 
+     @Override
+     public boolean applies(GameEvent event, Ability source, Game game) {
+-        Player blockController = game.getPlayer(game.getCombat().getAttackingPlayerId());
++        Player blockController = game.getPlayer(chooseAttackingPlayer(game, source));
+         if (blockController != null) {
+             // temporary workaround for AI bugging out while choosing blockers
+             if (!blockController.isComputer()) {
+@@ -72,4 +77,33 @@ class InvasionPlansEffect extends ContinuousRuleModifyingEffectImpl {
+         }
+         return false;
+     }
++
++    /**
++     * 805.10c: with shared team turns, "the attacking player" is one specific player of the
++     * attacking team, whom this ability's controller chooses. Otherwise the attacking player.
++     */
++    private static UUID chooseAttackingPlayer(Game game, Ability source) {
++        UUID attackingPlayerId = game.getCombat().getAttackingPlayerId();
++        if (attackingPlayerId == null || game.getTeammates(attackingPlayerId).isEmpty()) {
++            return attackingPlayerId;
++        }
++        Map<String, UUID> attackingPlayers = new LinkedHashMap<>();
++        for (UUID playerId : game.getTeam(attackingPlayerId)) {
++            Player player = game.getPlayer(playerId);
++            if (player != null && player.isInGame()) {
++                attackingPlayers.put(player.getName(), playerId);
++            }
++        }
++        Player controller = game.getPlayer(source.getControllerId());
++        if (attackingPlayers.size() < 2 || controller == null) {
++            return attackingPlayers.isEmpty() ? attackingPlayerId : attackingPlayers.values().iterator().next();
++        }
++        Choice choice = new ChoiceImpl(true);
++        choice.setMessage("Which attacking player chooses how each creature blocks?");
++        choice.setChoices(new LinkedHashSet<>(attackingPlayers.keySet()));
++        if (controller.choose(Outcome.Benefit, choice, game) && attackingPlayers.containsKey(choice.getChoice())) {
++            return attackingPlayers.get(choice.getChoice());
++        }
++        return attackingPlayerId;
++    }
+ }
+diff --git a/Mage.Sets/src/mage/cards/m/MasterWarcraft.java b/Mage.Sets/src/mage/cards/m/MasterWarcraft.java
+index 8a0c2335..addec693 100644
+--- a/Mage.Sets/src/mage/cards/m/MasterWarcraft.java
++++ b/Mage.Sets/src/mage/cards/m/MasterWarcraft.java
+@@ -14,8 +14,8 @@ import mage.cards.CardSetInfo;
+ import mage.constants.CardType;
+ import mage.constants.Duration;
+ import mage.constants.Outcome;
+-import mage.constants.TargetController;
+ import mage.filter.common.FilterCreaturePermanent;
++import mage.filter.predicate.Predicate;
+ import mage.game.Game;
+ import mage.game.events.GameEvent;
+ import mage.game.permanent.Permanent;
+@@ -68,7 +68,8 @@ class MasterWarcraftChooseAttackersEffect extends ContinuousRuleModifyingEffectI
+     private static final FilterCreaturePermanent filter = new FilterCreaturePermanent("creatures that will attack this combat (creatures not chosen won't attack this combat)");
+ 
+     static {
+-        filter.add(TargetController.ACTIVE.getControllerPredicate());
++        // 805.10a: with shared team turns, the creatures of each player of the active team
++        filter.add(MasterWarcraftActiveTeamPredicate.instance);
+     }
+ 
+     MasterWarcraftChooseAttackersEffect() {
+@@ -104,7 +105,10 @@ class MasterWarcraftChooseAttackersEffect extends ContinuousRuleModifyingEffectI
+         }
+         Player controller = game.getPlayer(source.getControllerId());
+         Player attackingPlayer = game.getPlayer(game.getCombat().getAttackingPlayerId());
+-        if (controller == null || attackingPlayer == null || attackingPlayer.getAvailableAttackers(game).isEmpty()) {
++        if (controller == null || attackingPlayer == null || game.getTeam(attackingPlayer.getId()).stream()
++                .map(game::getPlayer)
++                .noneMatch(player -> player != null && !player.getAvailableAttackers(game).isEmpty())) {
++            // 805.10a: with shared team turns, any player of the attacking team may have attackers
+             return false; // the attack declaration resumes for the active player as normal
+         }
+         Target target = new TargetPermanent(0, Integer.MAX_VALUE, filter, true);
+@@ -141,3 +145,16 @@ class MasterWarcraftChooseAttackersEffect extends ContinuousRuleModifyingEffectI
+         return false; // the attack declaration resumes for the active player as normal
+     }
+ }
++
++/**
++ * Controlled by the active player; with shared team turns, by any player of the active team
++ * (805.4a: Game.isActivePlayer).
++ */
++enum MasterWarcraftActiveTeamPredicate implements Predicate<Permanent> {
++    instance;
++
++    @Override
++    public boolean apply(Permanent input, Game game) {
++        return game.isActivePlayer(input.getControllerId());
++    }
++}
+diff --git a/Mage.Sets/src/mage/cards/o/OKagachiVengefulKami.java b/Mage.Sets/src/mage/cards/o/OKagachiVengefulKami.java
+index ebfe51e4..e0fb89d6 100644
+--- a/Mage.Sets/src/mage/cards/o/OKagachiVengefulKami.java
++++ b/Mage.Sets/src/mage/cards/o/OKagachiVengefulKami.java
+@@ -18,6 +18,7 @@ import mage.filter.FilterPermanent;
+ import mage.filter.common.FilterNonlandPermanent;
+ import mage.game.Game;
+ import mage.game.events.GameEvent;
++import mage.game.permanent.Permanent;
+ import mage.target.TargetPermanent;
+ import mage.target.targetadjustment.ThatPlayerControlsTargetAdjuster;
+ import mage.util.CardUtil;
+@@ -99,10 +100,20 @@ class OKagachiVengefulKamiWatcher extends Watcher {
+     public void watch(GameEvent event, Game game) {
+         switch (event.getType()) {
+             case BEGINNING_PHASE_PRE:
+-                playerMap.remove(game.getActivePlayerId());
++                // 805.4a: with shared team turns, the turn is each of the active team's players'
++                if (game.getActivePlayerId() != null) {
++                    game.getTeam(game.getActivePlayerId()).forEach(playerMap::remove);
++                }
+                 return;
+             case ATTACKER_DECLARED:
+                 UUID attacker = event.getPlayerId();
++                if (attacker != null && !game.getTeammates(attacker).isEmpty()) {
++                    // 805.10a: with shared team turns, the attacking creature's controller attacks
++                    Permanent attackingCreature = game.getPermanent(event.getSourceId());
++                    if (attackingCreature != null) {
++                        attacker = attackingCreature.getControllerId();
++                    }
++                }
+                 Set<UUID> defenders = playerMap.get(attacker);
+                 if (defenders == null) {
+                     defenders = new HashSet<>();
+diff --git a/Mage.Sets/src/mage/cards/s/StorageMatrix.java b/Mage.Sets/src/mage/cards/s/StorageMatrix.java
+index ef344290..39adca83 100644
+--- a/Mage.Sets/src/mage/cards/s/StorageMatrix.java
++++ b/Mage.Sets/src/mage/cards/s/StorageMatrix.java
+@@ -14,7 +14,9 @@ import mage.game.Game;
+ import mage.game.permanent.Permanent;
+ import mage.players.Player;
+ 
++import java.util.HashMap;
+ import java.util.HashSet;
++import java.util.Map;
+ import java.util.Set;
+ import java.util.UUID;
+ 
+@@ -43,7 +45,6 @@ public final class StorageMatrix extends CardImpl {
+ class StorageMatrixRestrictionEffect extends RestrictionEffect {
+ 
+     private int turn;
+-    private boolean applies;
+     private static final Set<String> choice = new HashSet<>();
+ 
+     static {
+@@ -52,7 +53,10 @@ class StorageMatrixRestrictionEffect extends RestrictionEffect {
+         choice.add(CardType.LAND.toString());
+     }
+ 
+-    private CardType type;
++    // 805.4a, 805.4b: with shared team turns, each player of the active team chooses during the
++    // team's untap step, for the permanents they control; by player, this turn's choices (none for
++    // a player who didn't choose)
++    private final Map<UUID, CardType> types = new HashMap<>();
+ 
+     StorageMatrixRestrictionEffect() {
+         super(Duration.WhileOnBattlefield);
+@@ -61,49 +65,53 @@ class StorageMatrixRestrictionEffect extends RestrictionEffect {
+ 
+     private StorageMatrixRestrictionEffect(final StorageMatrixRestrictionEffect effect) {
+         super(effect);
+-        this.type = effect.type;
++        this.types.putAll(effect.types);
+         this.turn = effect.turn;
+-        this.applies = effect.applies;
+     }
+ 
+     @Override
+     public boolean applies(Permanent permanent, Ability source, Game game) {
+-        if (game.getTurnStepType() != PhaseStep.UNTAP || !permanent.isControlledBy(game.getActivePlayerId())) {
++        if (game.getTurnStepType() != PhaseStep.UNTAP || !game.isActivePlayer(permanent.getControllerId())) {
+             return false;
+         }
+         if (game.getTurnNum() != turn) {
+-            applies = makeChoice(game, source);
++            turn = game.getTurnNum();
++            types.clear();
+         }
+-        if (applies) {
++        if (!types.containsKey(permanent.getControllerId())) {
++            // recorded first, as the turn was: a check while the player chooses asks nothing again
++            types.put(permanent.getControllerId(), null);
++            types.put(permanent.getControllerId(), makeChoice(permanent.getControllerId(), game, source));
++        }
++        CardType type = types.get(permanent.getControllerId());
++        if (type != null) {
+             return !permanent.getCardType(game).contains(type);
+         }
+         return false;
+     }
+ 
+-    private boolean makeChoice(Game game, Ability source) {
+-        turn = game.getTurnNum();
++    private CardType makeChoice(UUID playerId, Game game, Ability source) {
+         Permanent storageMatrix = game.getPermanent(source.getSourceId());
+         if (storageMatrix != null && !storageMatrix.isTapped()) {
+             Choice choiceImpl = new ChoiceImpl(true);
+             choiceImpl.setMessage("Untap which kind of permanent?");
+             choiceImpl.setChoices(choice);
+-            Player player = game.getPlayer(game.getActivePlayerId());
++            Player player = game.getPlayer(playerId);
+             if (player != null && player.choose(outcome, choiceImpl, game)) {
+                 String chosenType = choiceImpl.getChoice();
+                 if (chosenType != null) {
+                     game.informPlayers(storageMatrix.getLogName() + ": " + player.getLogName() + " chose to untap " + chosenType);
+                     if (chosenType.equals(CardType.ARTIFACT.toString())) {
+-                        type = CardType.ARTIFACT;
++                        return CardType.ARTIFACT;
+                     } else if (chosenType.equals(CardType.LAND.toString())) {
+-                        type = CardType.LAND;
++                        return CardType.LAND;
+                     } else {
+-                        type = CardType.CREATURE;
++                        return CardType.CREATURE;
+                     }
+-                    return true;
+                 }
+             }
+         }
+-        return false;
++        return null;
+     }
+ 
+     @Override
+diff --git a/Mage.Sets/src/mage/cards/t/TahngarthFirstMate.java b/Mage.Sets/src/mage/cards/t/TahngarthFirstMate.java
+index f8ebf6f3..71b3b345 100644
+--- a/Mage.Sets/src/mage/cards/t/TahngarthFirstMate.java
++++ b/Mage.Sets/src/mage/cards/t/TahngarthFirstMate.java
+@@ -13,6 +13,9 @@ import mage.cards.CardSetInfo;
+ import mage.constants.*;
+ import mage.filter.common.FilterPlayerOrPlaneswalker;
+ import mage.filter.predicate.Predicate;
++import mage.filter.predicate.Predicates;
++import mage.filter.predicate.other.PlayerIdPredicate;
++import mage.filter.predicate.permanent.PermanentIdPredicate;
+ import mage.game.Game;
+ import mage.game.combat.CombatGroup;
+ import mage.game.events.GameEvent;
+@@ -21,6 +24,8 @@ import mage.players.Player;
+ import mage.target.common.TargetPlayerOrPlaneswalker;
+ import mage.target.targetpointer.FixedTarget;
+ 
++import java.util.ArrayList;
++import java.util.List;
+ import java.util.Objects;
+ import java.util.UUID;
+ 
+@@ -81,6 +86,27 @@ class TahngarthFirstMateTriggeredAbility extends TriggeredAbilityImpl {
+                 && !game.getCombat().getAttackers().isEmpty();
+     }
+ 
++    /**
++     * 805.10a: with shared team turns, each player of the attacking team who attacks with a
++     * creature they control is an opponent attacking with one or more creatures, and the ability
++     * triggers once for each of them, that player being "that opponent".
++     */
++    @Override
++    public void trigger(Game game, UUID controllerId, GameEvent triggeringEvent) {
++        UUID attackingPlayerId = game.getCombat().getAttackingPlayerId();
++        if (attackingPlayerId == null || game.getTeammates(attackingPlayerId).isEmpty()) {
++            super.trigger(game, controllerId, triggeringEvent);
++            return;
++        }
++        for (UUID teamPlayerId : game.getTeam(attackingPlayerId)) {
++            if (game.getOpponents(getControllerId()).contains(teamPlayerId)
++                    && !game.getCombat().getAttackers(teamPlayerId, game).isEmpty()) {
++                this.getEffects().setTargetPointer(new FixedTarget(teamPlayerId));
++                super.trigger(game, controllerId, triggeringEvent);
++            }
++        }
++    }
++
+     @Override
+     public boolean checkInterveningIfClause(Game game) {
+         Permanent permanent = game.getPermanent(getSourceId());
+@@ -122,12 +148,14 @@ class TahngarthFirstMateEffect extends OneShotEffect {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+-        Player player = game.getPlayer(game.getActivePlayerId());
++        boolean teamTurn = !game.getTeammates(game.getActivePlayerId()).isEmpty();
++        // 805.10a: with shared team turns, the attacking player the ability triggered for
++        Player player = game.getPlayer(teamTurn ? getTargetPointer().getFirst(game, source) : game.getActivePlayerId());
+         Permanent permanent = game.getPermanent(source.getSourceId());
+         if (controller == null || player == null || permanent == null) {
+             return false;
+         }
+-        TargetPlayerOrPlaneswalker target = new TargetPlayerOrPlaneswalker(filter);
++        TargetPlayerOrPlaneswalker target = new TargetPlayerOrPlaneswalker(teamTurn ? attackedBy(player.getId(), game) : filter);
+         target.withNotTarget(true);
+         if (!controller.choose(outcome, target, source, game)) {
+             return false;
+@@ -138,6 +166,26 @@ class TahngarthFirstMateEffect extends OneShotEffect {
+         game.processAction();
+         return game.getCombat().addAttackerToCombat(permanent.getId(), target.getFirstTarget(), game);
+     }
++
++    /**
++     * 805.10a: the players and planeswalkers that the given attacking player attacks, with the
++     * creatures they control.
++     */
++    private static FilterPlayerOrPlaneswalker attackedBy(UUID attackingPlayerId, Game game) {
++        List<Predicate<Player>> players = new ArrayList<>();
++        List<Predicate<Permanent>> permanents = new ArrayList<>();
++        for (UUID attackerId : game.getCombat().getAttackers(attackingPlayerId, game)) {
++            UUID defenderId = game.getCombat().getDefenderId(attackerId);
++            if (defenderId != null) {
++                players.add(new PlayerIdPredicate(defenderId));
++                permanents.add(new PermanentIdPredicate(defenderId));
++            }
++        }
++        FilterPlayerOrPlaneswalker attacked = new FilterPlayerOrPlaneswalker("player or planeswalker that player is attacking");
++        attacked.getPlayerFilter().add(Predicates.or(players));
++        attacked.getPermanentFilter().add(Predicates.or(permanents));
++        return attacked;
++    }
+ }
+ 
+ enum TahngarthFirstMatePlayerPredicate implements Predicate<Player> {
+diff --git a/Mage.Sets/src/mage/cards/t/TenuousTruce.java b/Mage.Sets/src/mage/cards/t/TenuousTruce.java
+index 88eccd4c..8be0f44d 100644
+--- a/Mage.Sets/src/mage/cards/t/TenuousTruce.java
++++ b/Mage.Sets/src/mage/cards/t/TenuousTruce.java
+@@ -19,6 +19,7 @@ import mage.players.Player;
+ import mage.target.TargetPlayer;
+ import mage.target.common.TargetOpponent;
+ 
++import java.util.Collections;
+ import java.util.Set;
+ import java.util.UUID;
+ 
+@@ -93,6 +94,27 @@ class TenuousTruceAttackTriggeredAbility extends TriggeredAbilityImpl {
+             return false;
+         }
+ 
++        if (!game.getTeammates(attacker.getId()).isEmpty()) {
++            // 805.10a, 805.10c: with shared team turns, each player of the attacking team attacks
++            // with the creatures they control: you attack the enchanted opponent when a creature you
++            // control attacks them (or a planeswalker they control), and they attack you likewise
++            for (UUID attackerId : game.getCombat().getAttackers()) {
++                Permanent attackingCreature = game.getPermanent(attackerId);
++                UUID defenderId = game.getCombat().getDefenderId(attackerId);
++                if (attackingCreature == null || defenderId == null) {
++                    continue;
++                }
++                Set<UUID> defenderIdSet = Collections.singleton(defenderId);
++                if ((attackingCreature.isControlledBy(controller.getId())
++                        && playerOneAttackingPlayerBOrTheirPlaneswalker(controller.getId(), enchantedPlayer.getId(), defenderIdSet, game))
++                        || (attackingCreature.isControlledBy(enchantedPlayer.getId())
++                        && playerOneAttackingPlayerBOrTheirPlaneswalker(enchantedPlayer.getId(), controller.getId(), defenderIdSet, game))) {
++                    return true;
++                }
++            }
++            return false;
++        }
++
+         Set<UUID> defenderIds = game.getCombat().getPlayerDefenders(game, true);
+         if (controller.equals(attacker)) {
+             return TenuousTruceAttackTriggeredAbility.playerOneAttackingPlayerBOrTheirPlaneswalker(controller.getId(), enchantedPlayer.getId(), defenderIds, game);
+diff --git a/Mage.Sets/src/mage/cards/t/TerritorialHellkite.java b/Mage.Sets/src/mage/cards/t/TerritorialHellkite.java
+index 7f15c694..95c4147c 100644
+--- a/Mage.Sets/src/mage/cards/t/TerritorialHellkite.java
++++ b/Mage.Sets/src/mage/cards/t/TerritorialHellkite.java
+@@ -73,9 +73,29 @@ class AttackedLastCombatWatcher extends Watcher {
+ 
+     @Override
+     public void watch(GameEvent event, Game game) {
++        UUID attackingPlayerId = game.getCombat().getAttackingPlayerId();
+         if (event.getType() == GameEvent.EventType.DECLARE_ATTACKERS_STEP_PRE) {
+             // Remove previous attacking creatures of the current combat's player if info exists
+-            attackedLastCombatPlayers.remove(game.getCombat().getAttackingPlayerId());
++            // (805.10a: with shared team turns, of each player of the attacking team)
++            if (attackingPlayerId != null) {
++                game.getTeam(attackingPlayerId).forEach(attackedLastCombatPlayers::remove);
++            }
++        }
++        if (event.getType() == GameEvent.EventType.ATTACKER_DECLARED
++                && attackingPlayerId != null && !game.getTeammates(attackingPlayerId).isEmpty()) {
++            // 805.10a: with shared team turns, each player of the attacking team attacks with the
++            // creatures they control, and their combat is remembered for them
++            for (UUID teamPlayerId : game.getTeam(attackingPlayerId)) {
++                Map<MageObjectReference, UUID> attackedPlayers = new HashMap<>();
++                for (UUID attackerId : game.getCombat().getAttackers(teamPlayerId, game)) {
++                    Permanent attacker = game.getPermanent(attackerId);
++                    if (attacker != null) {
++                        attackedPlayers.put(new MageObjectReference(attacker, game), game.getCombat().getDefenderId(attackerId));
++                    }
++                }
++                attackedLastCombatPlayers.put(teamPlayerId, attackedPlayers);
++            }
++            return;
+         }
+         if (event.getType() == GameEvent.EventType.ATTACKER_DECLARED) {
+             // remember which attacker attacked which player
+diff --git a/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java b/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java
+index 4db1804a..3e892c68 100644
+--- a/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java
++++ b/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java
+@@ -74,12 +74,18 @@ class UrabraskHereticPraetorEffect extends ReplacementEffectImpl {
+ 
+     @Override
+     public boolean applies(GameEvent event, Ability source, Game game) {
+-        return game.isActivePlayer(event.getPlayerId());
++        // 805.4d: "they" is the opponent whose upkeep it was (the trigger's target pointer), not
++        // any player of the active team
++        UUID playerId = getTargetPointer().getFirst(game, source);
++        if (playerId == null) {
++            return game.isActivePlayer(event.getPlayerId());
++        }
++        return playerId.equals(event.getPlayerId());
+     }
+ 
+     @Override
+     public boolean replaceEvent(GameEvent event, Ability source, Game game) {
+-        Player player = game.getPlayer(game.getActivePlayerId());
++        Player player = game.getPlayer(event.getPlayerId());
+         if (player == null) {
+             discard();
+             return false;
+diff --git a/Mage.Sets/src/mage/cards/w/WarsToll.java b/Mage.Sets/src/mage/cards/w/WarsToll.java
+index febbcc67..84fd1984 100644
+--- a/Mage.Sets/src/mage/cards/w/WarsToll.java
++++ b/Mage.Sets/src/mage/cards/w/WarsToll.java
+@@ -89,6 +89,14 @@ class WarsTollAttackRestrictionEffect extends RestrictionEffect {
+     public boolean applies(Permanent permanent, Ability source, Game game) {
+         Player controller = game.getPlayer(permanent.getControllerId());
+         if (controller != null) {
++            if (!game.getTeammates(controller.getId()).isEmpty() && permanent.isAttacking()) {
++                // 805.10a: with shared team turns, each player of the attacking team attacks with the
++                // creatures they control: an attacking creature's controller's own creatures must
++                // attack, so the check after the attack applies to an attacking creature whose
++                // controller left one of theirs out (and its controller is told)
++                return controller.hasOpponent(source.getControllerId(), game)
++                        && !allAttackIfAble(controller.getId(), game);
++            }
+             return controller.hasOpponent(source.getControllerId(), game);
+         }
+         return false;
+@@ -97,7 +105,14 @@ class WarsTollAttackRestrictionEffect extends RestrictionEffect {
+     @Override
+     public boolean canAttackCheckAfter(int numberOfAttackers, Ability source, Game game, boolean canUseChooseDialogs) {
+         if (numberOfAttackers == 0) return true;
+-        for (Permanent creaturePermanent : game.getBattlefield().getAllActivePermanents(StaticFilters.FILTER_PERMANENT_CREATURES, game.getActivePlayerId(), game)) {
++        if (!game.getTeammates(game.getActivePlayerId()).isEmpty()) {
++            return false; // applies only to an attacking creature whose controller left one out
++        }
++        return allAttackIfAble(game.getActivePlayerId(), game);
++    }
++
++    private static boolean allAttackIfAble(UUID playerId, Game game) {
++        for (Permanent creaturePermanent : game.getBattlefield().getAllActivePermanents(StaticFilters.FILTER_PERMANENT_CREATURES, playerId, game)) {
+             if (creaturePermanent.canAttack(null, game) && !creaturePermanent.isAttacking()) {
+                 return false;
+             }
+diff --git a/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java b/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java
+index 6b7b6ea3..0e31a65f 100644
+--- a/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java
++++ b/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java
+@@ -206,10 +206,20 @@ class WeatheredSentinelsLastTurnAttackersWatcher extends Watcher {
+     public void watch(GameEvent event, Game game) {
+         switch (event.getType()) {
+             case BEGINNING_PHASE_PRE:
+-                playerMap.remove(game.getActivePlayerId());
++                // 805.4a: with shared team turns, the turn is each of the active team's players'
++                if (game.getActivePlayerId() != null) {
++                    game.getTeam(game.getActivePlayerId()).forEach(playerMap::remove);
++                }
+                 return;
+             case ATTACKER_DECLARED:
+                 UUID attacker = event.getPlayerId();
++                if (attacker != null && !game.getTeammates(attacker).isEmpty()) {
++                    // 805.10a: with shared team turns, the attacking creature's controller attacks
++                    Permanent attackingCreature = game.getPermanent(event.getSourceId());
++                    if (attackingCreature != null) {
++                        attacker = attackingCreature.getControllerId();
++                    }
++                }
+                 Set<UUID> defenders = playerMap.getOrDefault(attacker, new HashSet<>());
+                 defenders.add(event.getTargetId());
+                 playerMap.put(attacker, defenders);
