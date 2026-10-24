@@ -130,7 +130,7 @@ class LibraryCard(Contract):
     )
     edition: LibraryEdition = Field(description="The edition these copies are (v0.5.0).")
     copies: int | None = Field(description="Copies owned of this edition.")
-    sources: list[Literal["starter", "grandfathered", "alliance", "pack"]] = Field(
+    sources: list[Literal["starter", "grandfathered", "alliance", "pack", "unique"]] = Field(
         description="Where this edition's copies came from."
     )
 

@@ -4651,7 +4651,7 @@ export interface components {
              * Sources
              * @description Where this edition's copies came from.
              */
-            sources: ("starter" | "grandfathered" | "alliance" | "pack")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique")[];
         };
         /**
          * LibraryEdition

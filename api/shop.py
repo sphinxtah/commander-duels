@@ -71,6 +71,7 @@ from api.library import (
     commander_printing,
     grant_starter,
     library_of,
+    one_of_a_kind,
     owned_starters,
     reset_key,
     since_reset,
@@ -768,14 +769,15 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
             409, "pack_unavailable", f"{product.name} cannot be opened until its data is read."
         )
     collation = load(db, product.collation_id)
-    # A card the game cannot play gives way to another from its sheet (v0.4.5).
+    # A card the game cannot play gives way to another from its sheet (v0.4.5), and so does a
+    # one-of-a-kind printing (v0.5.1): its only copy is one account's, never a pack's.
     removed = frozenset(
         db.scalars(
             select(CardPrinting.id)
             .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
             .where(CardPrinting.id.in_(collation.printings()), not_(playable()))
         )
-    )
+    ) | (one_of_a_kind(db) & collation.printings())
     layout, pulled = draw(collation, secrets.SystemRandom(), removed)
     printings = {
         printing.id: printing

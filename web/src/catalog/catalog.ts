@@ -134,6 +134,8 @@ export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
   alliance: "Your alliance",
   grandfathered: "Your earlier decks",
   pack: "Packs you opened",
+  // A one-of-a-kind card (v0.5.1): the only copy there is.
+  unique: "One of a kind",
 };
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */

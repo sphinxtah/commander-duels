@@ -200,12 +200,15 @@ class Collection:
       only those, copy by copy. None counts copies by card alone (a list checked without them).
     - godlike: the owner is at the Godlike tier, which opens the custom cards to them (v0.4.0).
     - loaded: by custom card name, case aside, whether the running engine has loaded it; None
-      when the engine was not asked."""
+      when the engine was not asked.
+    - withheld: since v0.5.1, one-of-a-kind printings someone else owns the only copy of
+      (api/library.py ONE_OF_A_KIND): no deck of this owner's may hold them."""
 
     copies: Mapping[str, int] | None
     godlike: bool = False
     loaded: Mapping[str, bool] | None = None
     editions: Mapping[UUID, Edition] | None = None
+    withheld: frozenset[UUID] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -472,6 +475,9 @@ def validate(
     copies(report, playing, cards, rules)
     if collection is not None and collection.copies is not None:
         owned_copies(report, playing, cards, collection)
+    elif collection is not None and collection.withheld:
+        # A library already allows only editions it holds; the whole catalog all but these.
+        one_of_a_kind(report, playing, cards, collection.withheld)
     if rules.format == "legacy":
         legacy(report, playing, cards, rules, counts)
     else:
@@ -614,6 +620,30 @@ def edition_names(
         name if names.count(name) == 1 else f"{name} #{number}" for name, _, number in editions
     ]
     return shown[0] if len(shown) == 1 else ", ".join(shown[:-1]) + " and " + shown[-1]
+
+
+def one_of_a_kind(
+    report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], withheld: frozenset[UUID]
+) -> None:
+    """Copies naming a one-of-a-kind printing whose only copy is another account's (v0.5.1)."""
+    named: dict[UUID, dict[UUID, int]] = defaultdict(lambda: defaultdict(int))
+    for entry in entries:
+        if entry.printing_id in withheld:
+            named[entry.card_id][entry.printing_id] += entry.quantity
+    for card_id, printings in named.items():
+        card = cards[card_id]
+        for printing, count in printings.items():
+            edition = card.editions.get(printing)
+            where = f" from {edition_label(*edition)}" if edition else ""
+            report.error(
+                "collection.locked",
+                f"{card.name}{where} is one of a kind: another player owns the only copy.",
+                f"Switch {'this copy' if count == 1 else f'these {count} copies'} to another "
+                "edition.",
+                kind="collection_locked",
+                card_ids=[card.id],
+                quantity=count,
+            )
 
 
 def owned_copies(

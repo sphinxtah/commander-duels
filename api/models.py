@@ -1038,7 +1038,8 @@ class LibraryGrant(Base):
         UniqueConstraint("user_id", "grant_key", "printing_id", name="uq_library_grants_edition"),
         CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
         CheckConstraint(
-            "source IN ('starter', 'grandfathered', 'pack')", name="ck_library_grants_source"
+            "source IN ('starter', 'grandfathered', 'pack', 'unique')",
+            name="ck_library_grants_source",
         ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
@@ -1050,8 +1051,9 @@ class LibraryGrant(Base):
     quantity: Mapped[int]
     source: Mapped[str] = mapped_column(String(16))
     # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,
-    # pack:<opening>; after a reset, a starter deck's carries the reset's time (starter:<deck>:
-    # <time>), so the deck can be granted again.
+    # pack:<opening>, unique:<Scryfall ID> (a one-of-a-kind card, v0.5.1); after a reset, a
+    # starter deck's carries the reset's time (starter:<deck>:<time>), so the deck can be granted
+    # again.
     grant_key: Mapped[str] = mapped_column(String(96))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
 

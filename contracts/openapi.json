@@ -5225,7 +5225,8 @@
                 "starter",
                 "grandfathered",
                 "alliance",
-                "pack"
+                "pack",
+                "unique"
               ],
               "type": "string"
             },

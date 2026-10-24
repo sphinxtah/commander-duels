@@ -31,6 +31,12 @@ engine start (api/engine_cards.py), for Godlike accounts and SysOp only.
 
 The ten starter decks are content/starter-decks.json, made from the owner's workbook by
 scripts/starter_decks.py. Each card keeps the printing the owner chose for it.
+
+One of a kind (v0.5.1): a printing made once in the world belongs to one account
+(ONE_OF_A_KIND). The owner asked on 2026-10-23 for the only copy of The One Ring ever printed
+(The Lord of the Rings: Tales of Middle-earth #0, serialized 001/001) to be Sphinx's: migration
+0027 grants it, packs never deal it (api/shop.py), and no deck but its owner's may hold it
+(Library.withheld), whatever the account builds from; SysOp, who builds with anything, excepted.
 """
 
 import json
@@ -63,6 +69,9 @@ from api.validation import (
 from catalog.text import normalize
 
 UNLIMITED = "library.unlimited"
+# One-of-a-kind printings (v0.5.1): Scryfall ID and the normalized handle of the account that
+# owns the only copy (migration 0027 grants it; keep the two the same).
+ONE_OF_A_KIND: dict[UUID, str] = {UUID("93de9042-cc62-4ade-8d8d-68fdbc84bfae"): "sphinx"}
 # The order in which a deck's copies are given editions: the commander first, then the deck.
 LOCATION_ORDER = ("commander", "companion", "main", "sideboard")
 
@@ -82,6 +91,8 @@ class Library:
     custom: dict[str, int] = field(default_factory=dict)
     loaded: Mapping[str, bool] | None = None
     editions: dict[UUID, Edition] = field(default_factory=dict)
+    # One-of-a-kind printings (v0.5.1) this account holds no copy of: no deck of its may hold them.
+    withheld: frozenset[UUID] = frozenset()
     # The editions by card, made the first time they are asked for.
     by_card: dict[UUID, list[Edition]] | None = field(default=None, repr=False, compare=False)
 
@@ -91,6 +102,7 @@ class Library:
             godlike=self.godlike,
             loaded=self.loaded,
             editions=None if self.unlimited else self.editions,
+            withheld=self.withheld,
         )
 
     def owned(self, key: str) -> int | None:
@@ -164,13 +176,37 @@ def reset_key(user: User, key: str) -> str:
     return f"{key}:{user.reset_at.astimezone(UTC):%Y%m%dT%H%M%S%f}"
 
 
+def one_of_a_kind(db: Session) -> frozenset[UUID]:
+    """The catalog's one-of-a-kind printings (v0.5.1)."""
+    return frozenset(
+        db.scalars(select(CardPrinting.id).where(CardPrinting.scryfall_id.in_(ONE_OF_A_KIND)))
+    )
+
+
+def withheld_from(db: Session, user: User) -> frozenset[UUID]:
+    """The one-of-a-kind printings the account may not put in a deck: those it holds no copy of.
+    SysOp builds with anything."""
+    unique = one_of_a_kind(db)
+    if not unique or user.kind == "sysop":
+        return frozenset()
+    held = db.scalars(
+        select(LibraryGrant.printing_id).where(
+            LibraryGrant.user_id == user.id,
+            LibraryGrant.printing_id.in_(unique),
+            since_reset(user, LibraryGrant.created_at),
+        )
+    )
+    return unique - set(held)
+
+
 def library_of(
     db: Session, user: User, permissions: frozenset[str], roster: dict[str, Planeswalker]
 ) -> Library:
     godlike = at_godlike(db, user.id)
+    withheld = withheld_from(db, user)
     if UNLIMITED in permissions:
-        return Library(unlimited=True, alliance=user.alliance, godlike=godlike)
-    library = Library(unlimited=False, alliance=user.alliance, godlike=godlike)
+        return Library(unlimited=True, alliance=user.alliance, godlike=godlike, withheld=withheld)
+    library = Library(unlimited=False, alliance=user.alliance, godlike=godlike, withheld=withheld)
     copies: dict[str, int] = defaultdict(int)
     sources: dict[str, set[str]] = defaultdict(set)
     # By edition: each printing's copies and sources, and the printing as validation names it.
