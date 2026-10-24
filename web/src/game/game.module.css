@@ -256,9 +256,12 @@ button.life[data-selected] {
   display: grid;
   place-items: center;
 }
+/* The official card back (v0.6.0) fills the card; the stripes show only until it loads. */
 .cardBack img {
-  width: 55%;
-  opacity: 0.75;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 .frame {
   position: absolute;

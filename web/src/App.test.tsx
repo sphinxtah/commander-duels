@@ -1139,6 +1139,11 @@ describe("the main menu (v0.4.5)", () => {
       name: "Welcome back, alice",
     });
     expect(heading.tagName).toBe("H1");
+    // The greeting's tile opens the profile (v0.6.0).
+    expect(screen.getByRole("link", { name: "Your profile" })).toHaveAttribute(
+      "href",
+      "#profile",
+    );
     const menu = screen.getByRole("region", { name: "Main menu" });
     await waitFor(() =>
       expect(within(menu).getByRole("link", { name: /^Play/ })).toHaveAttribute(
