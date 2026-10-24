@@ -4,6 +4,50 @@
   "note": "Approximate USD market prices of one sealed English pack per MTGJSON set and booster type, read on 2026-10-21 (mostly TCGplayer market prices); inputs for the shop's token price curve, not trading advice.",
   "products": [
     {
+      "set": "LEA",
+      "set_name": "Limited Edition Alpha",
+      "released": "1993-08-05",
+      "booster": "default",
+      "name": "Limited Edition Alpha Booster Pack",
+      "usd": 24183.37,
+      "method": "estimate",
+      "source": null,
+      "basis": "No sale found in 2025-26 (TCGplayer product 27324 has no market price; PriceCharting has no Alpha pack). The Beta booster's price ($8,464.17) times the ratio of Card Kingdom's Alpha and Beta booster prices, $19,999.99 to $6,999.99 (https://www.cardkingdom.com/mtg/alpha/sealed, read 2026-10-24, out of stock). Asking prices on 2026-10-24: TCGplayer $45,000 (one listing, PSA 7), Ancestral MTG $19,500-$32,000 ungraded and $45,000 PSA 7, Cardmarket EUR 59,999 (one listing)"
+    },
+    {
+      "set": "LEA",
+      "set_name": "Limited Edition Alpha",
+      "released": "1993-08-05",
+      "booster": "starter",
+      "name": "Limited Edition Alpha Starter Deck",
+      "usd": 96733.52,
+      "method": "estimate",
+      "source": null,
+      "basis": "No sale found (TCGplayer product 139147 has no market price; asking from $99,999.99, median $150,000, 3 listings). The Alpha booster's estimate ($24,183.37) times the ratio of Card Kingdom's Alpha starter deck and booster prices, $79,999.99 to $19,999.99 (https://www.cardkingdom.com/mtg/alpha/sealed, read 2026-10-24, out of stock)"
+    },
+    {
+      "set": "LEB",
+      "set_name": "Limited Edition Beta",
+      "released": "1993-10-04",
+      "booster": "default",
+      "name": "Limited Edition Beta Booster Pack",
+      "usd": 8464.17,
+      "method": "pack",
+      "source": "https://www.pricecharting.com/game/magic-beta/booster-pack",
+      "basis": "The mean of the two ungraded sealed packs sold in the past year that PriceCharting lists (eBay $10,495.00 on 2026-04-23 and $6,433.33 on 2026-02-04). PriceCharting's own ungraded price, $9,063, is the price of a PSA 6 pack sold at Heritage on 2026-08-20; graded packs (PSA 6-9) sold for $7,438-$9,688 in 2026. TCGplayer product 27328 has no market price (asking $19,645)"
+    },
+    {
+      "set": "LEB",
+      "set_name": "Limited Edition Beta",
+      "released": "1993-10-04",
+      "booster": "starter",
+      "name": "Limited Edition Beta Starter Deck",
+      "usd": 36275.05,
+      "method": "estimate",
+      "source": null,
+      "basis": "No sale found (TCGplayer product 137017 has no market price; 2 listings without a price). The Beta booster's price ($8,464.17) times the ratio of Card Kingdom's Beta starter deck and booster prices, $29,999.99 to $6,999.99 (https://www.cardkingdom.com/mtg/beta/sealed, read 2026-10-24, out of stock)"
+    },
+    {
       "set": "2ED",
       "set_name": "Unlimited Edition",
       "released": "1993-12-01",

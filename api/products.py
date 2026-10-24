@@ -1,10 +1,12 @@
 """The shop's products and their prices (v0.4.0).
 
-- **Products** are MTGJSON's booster products: content/pack-prices.json lists 392 of them, from
-  Unlimited to the current set, each with the market price of one sealed pack in US dollars, its
+- **Products** are MTGJSON's booster products: content/pack-prices.json lists 396 of them, from
+  Alpha to the current set, each with the market price of one sealed pack in US dollars, its
   method and its source (docs/pack-prices.md). The booster data job adds the expansions, core sets,
-  Masters and draft sets MTGJSON lists after that file (catalog/boosters.py). Alpha and Beta are
-  never products: they are kept for tournaments.
+  Masters and draft sets MTGJSON lists after that file (catalog/boosters.py). Alpha and Beta, kept
+  for tournaments since v0.4.0, are sold like any other set since v0.6.1 (the owner's decision); a
+  tournament may still give them as prizes. Their cards follow the real print runs
+  (api/print_runs.py).
 - **Prices** follow the market price on a curve anchored at the current set's Play Booster (FRA
   play, $6.07: 500 tokens) and Revised (3ED, $343.28: 150,000 tokens), `500 x (usd / 6.07) ^ k`
   with `k = ln 300 / ln(343.28 / 6.07)`, rounded to two significant figures. A product with no
@@ -54,8 +56,6 @@ TOP_TOKENS = 150_000
 EXPONENT = math.log(TOP_TOKENS / ANCHOR_TOKENS) / math.log(TOP_USD / ANCHOR_USD)
 UNPRICED = 500
 LOWEST = 10
-# Alpha and Beta are won in tournaments, many versions from now; never sold.
-NEVER_SOLD = frozenset({"LEA", "LEB"})
 
 BoosterKind = Literal[
     "booster",
@@ -163,7 +163,6 @@ def selling(product: ShopProduct, today: date) -> bool:
         product.on_sale
         and product.data_status == "ready"
         and product.collation_id is not None
-        and product.set_code not in NEVER_SOLD
         and (product.released is None or product.released <= today)
     )
 
@@ -329,8 +328,6 @@ def ensure_products(bind: Engine, content_dir: str) -> None:
                 for product in session.scalars(select(ShopProduct))
             }
             for row in listing.rows:
-                if row.set_code in NEVER_SOLD:
-                    continue
                 values = {
                     "set_name": row.set_name,
                     "name": row.name,

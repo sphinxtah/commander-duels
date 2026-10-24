@@ -28,7 +28,7 @@ from test_library_editions import (  # noqa: F401 (fixtures)
     write_content,
 )
 from test_progression import Account
-from test_shop import fixture_product, funded
+from test_shop import CONTENT, fixture_product, funded
 
 from api import library, print_runs
 from api import shop as shop_api
@@ -302,3 +302,53 @@ def test_the_print_runs_are_sourced_and_name_the_owners_examples():
     for item in listed:
         assert item["source"], item
         assert item["copies"] is None or item["copies"] >= 1, item
+
+
+def test_every_alpha_and_beta_printing_follows_its_sheets():
+    """v0.6.1: each Alpha and Beta printing's copies are its places on the 121-card sheets times
+    the copies of each sheet printed, and the runs come to the published totals."""
+    listing = json.loads((CONTENT / "print-runs.json").read_text(encoding="utf-8"))
+    sheet_runs = listing["sheet_runs"]
+    assert sheet_runs["lea"]["sheets"] == {"rare": 1100, "uncommon": 4500, "common": 15900}
+    assert sheet_runs["leb"]["sheets"] == {"rare": 3200, "uncommon": 13400, "common": 47800}
+    for code, printings, total in (("lea", 295, 2_601_500), ("leb", 302, 7_792_400)):
+        run = sheet_runs[code]
+        listed = [item for item in listing["printings"] if item["set"] == code]
+        assert len(listed) == len({item["number"] for item in listed}) == printings
+        assert run["source"] and run["total"] == total
+        places = {sheet: 0 for sheet in run["sheets"]}
+        for item in listed:
+            assert item["source"] == f"sheet_runs.{code}", item
+            assert item["copies"] == sum(
+                times * run["sheets"][sheet] for sheet, times in item["sheets"].items()
+            ), item
+            for sheet, times in item["sheets"].items():
+                places[sheet] += times
+        # Every sheet is full, so the printings' copies add up to the whole run.
+        assert places == {"rare": 121, "uncommon": 121, "common": 121}
+        assert sum(item["copies"] for item in listed) == total
+    by_id = {UUID(item["scryfall_id"]): item["copies"] for item in listing["printings"]}
+    assert by_id[UUID("b0faa7f2-b547-42c4-a810-839da50dadfe")] == 1_100  # Alpha's Black Lotus
+    assert by_id[UUID("b3a69a1c-c80f-4413-a6fd-ae54cabbce28")] == 3_200  # Beta's Black Lotus
+    assert by_id[UUID("0324641d-af55-4c53-b4dc-c8262e967da5")] == 3_200  # Volcanic Island
+    # Beta's Island #292: twice on the rare sheet, once on the uncommon, four times on the common.
+    assert by_id[UUID("d0c5cf64-9844-4b5b-8e6b-b97c50cce053")] == 2 * 3_200 + 13_400 + 4 * 47_800
+
+
+def test_the_catalogs_alpha_and_beta_printings_are_limited(client):  # noqa: F811
+    hill_giant = UUID("0ddb98e8-13fe-4786-83f7-b72c56db135a")  # Alpha, a common
+    dark_ritual = UUID("0690f724-eb95-416b-b064-f1239e2a30e8")  # Beta, a common
+    print_runs.runs_in.cache_clear()
+    with database(client) as db:
+        found = dict(
+            db.execute(
+                select(CardPrinting.scryfall_id, CardPrinting.id).where(
+                    CardPrinting.scryfall_id.in_([hill_giant, dark_ritual])
+                )
+            ).all()
+        )
+        assert set(found) == {hill_giant, dark_ritual}
+        assert print_runs.limited(db, str(CONTENT), set(found.values())) == {
+            found[hill_giant]: 15_900,
+            found[dark_ritual]: 47_800,
+        }

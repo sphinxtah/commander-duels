@@ -1,11 +1,13 @@
-"""Print runs (v0.5.1): a printing made in a known, small number of copies is never pulled from
-packs more often, across every account, than it was printed (docs/shop.md "Print runs").
+"""Print runs (v0.5.1): a printing made in a known number of copies is never pulled from packs
+more often, across every account, than it was printed (docs/shop.md "Print runs").
 
 The owner asked on 2026-10-23: "make sure you're following the actual counts for releases of
 specific cards so they can't be over pulled", with The One Ring's serialized poster (LTR #748z)
 as the example, of which 100 were printed. The counts are content/print-runs.json, each with
 where it was read: the serialized printings Scryfall lists, with the serial's denominator from
-Wizards of the Coast's own collecting articles or the card itself.
+Wizards of the Coast's own collecting articles or the card itself; and since v0.6.1 every Alpha
+and Beta printing, from the published copies of each sheet printed and how often the printing
+appears on each sheet (the file's sheet_runs).
 
 A printing's copies dealt are every copy any library was ever granted of it, from packs, starter
 decks or a one-of-a-kind grant, before an account's reset too: a copy pulled stays printed. A
