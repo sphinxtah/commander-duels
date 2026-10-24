@@ -194,8 +194,9 @@ class Collection:
     """What a deck's owner may build with.
 
     - copies: the copies of each card they own, by construction key, so another printing or
-      Oracle version of a card counts as that card; basic lands are never limited. None for
-      administrators and SysOp, who build from the whole catalog.
+      Oracle version of a card counts as that card; since v0.6.0 basic lands too, which come
+      only from packs and decks like any card (the owner's decision). None for administrators and
+      SysOp, who build from the whole catalog.
     - editions: since v0.5.0, the copies of each edition they own, by printing: a deck may hold
       only those, copy by copy. None counts copies by card alone (a list checked without them).
     - godlike: the owner is at the Godlike tier, which opens the custom cards to them (v0.4.0).
@@ -601,11 +602,6 @@ def copies(report: Report, entries: list[DeckEntry], cards: dict[UUID, Card], ru
             )
 
 
-def basic_land(card: Card) -> bool:
-    supertypes, types, _ = type_parts(front(card.type_line))
-    return "Basic" in supertypes and "Land" in types
-
-
 def copies_words(count: int) -> str:
     return f"{count} {'copy' if count == 1 else 'copies'}"
 
@@ -663,8 +659,6 @@ def owned_copies(
     named: dict[str, dict[UUID, int]] = defaultdict(lambda: defaultdict(int))
     for entry in entries:
         card = cards[entry.card_id]
-        if basic_land(card):
-            continue
         counted[card.construction_key] += entry.quantity
         if card.id not in holders[card.construction_key]:
             holders[card.construction_key].append(card.id)

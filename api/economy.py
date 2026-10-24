@@ -18,6 +18,10 @@
 - **Spending.** A purchase locks the account's row, so two purchases at once cannot spend the same
   tokens; a balance never goes below zero. Every purchase in Leng's shop is a "pack" entry, the
   starter decks sold there since v0.4.2 too (key deck:<account>:<deck>, named by the reason).
+- **The auction house** (v0.6.0, api/auctions.py). A bid holds its tokens at once (kind bid, key
+  bid:<bid>), returned when it is outbid or the auction ends without it (bid_return:<bid>); the
+  winning bid's hold is the payment, and the seller is paid exactly that (sale:<auction>), with
+  no fee. The accounts are locked as for a purchase, and a balance never goes below zero.
 """
 
 import math
@@ -65,9 +69,20 @@ MAX_BOT_CAP = 100_000
 LEDGER_SHOWN = 50
 EARNED = ("bot_win", "human_win", "back_pay", "quest", "achievement")
 GIVEN = ("welcome", "grant")
+AUCTIONS = ("bid", "bid_return", "sale")
 
 TokenKind = Literal[
-    "bot_win", "human_win", "back_pay", "welcome", "grant", "pack", "quest", "achievement"
+    "bot_win",
+    "human_win",
+    "back_pay",
+    "welcome",
+    "grant",
+    "pack",
+    "quest",
+    "achievement",
+    "bid",
+    "bid_return",
+    "sale",
 ]
 
 
@@ -87,6 +102,11 @@ class Tokens(Contract):
     )
     given: int = Field(description="The welcome grant and SysOp's grants, less any taken back.")
     spent: int = Field(description="On packs, as a positive number.")
+    auctions: int = Field(
+        default=0,
+        description="Tivit's Auction House (v0.6.0): sales less the bids held and paid, as a "
+        "signed number; bids still held are in it until they are returned.",
+    )
     entries: list[TokenLine] = Field(description="The latest entries, newest first.")
 
 
@@ -285,6 +305,61 @@ def spend(db: Session, user_id: UUID, amount: int, key: str, reason: str) -> Tok
     return entry
 
 
+def hold(db: Session, user_id: UUID, amount: int, key: str, reason: str) -> TokenEntry:
+    """Holds a bid's tokens (v0.6.0), in the caller's transaction, with the account already
+    locked by the caller (api/auctions.py locks the auction first, then the accounts in order);
+    refuses when the balance is short."""
+    if amount <= 0:
+        raise ValueError("a bid holds a positive amount")
+    balance = balance_of(db, user_id)
+    if balance < amount:
+        raise ApiError(
+            409,
+            "not_enough_tokens",
+            f"This bid holds {amount:,} tokens, and you have {balance:,}.",
+        )
+    entry = TokenEntry(
+        user_id=user_id,
+        kind="bid",
+        amount=-amount,
+        key=key,
+        policy=POLICY,
+        reason=reason,
+        created_at=utcnow(),
+    )
+    db.add(entry)
+    db.flush()
+    return entry
+
+
+def credit(
+    db: Session,
+    user_id: UUID,
+    kind: Literal["bid_return", "sale"],
+    amount: int,
+    key: str,
+    reason: str,
+) -> bool:
+    """A bid returned or a sale paid (v0.6.0), in the caller's transaction, once per key."""
+    if amount < 0:
+        raise ValueError("a return or a sale pays a positive amount")
+    if db.scalar(select(TokenEntry.id).where(TokenEntry.key == key)) is not None:
+        return False
+    db.add(
+        TokenEntry(
+            user_id=user_id,
+            kind=kind,
+            amount=amount,
+            key=key,
+            policy=POLICY,
+            reason=reason,
+            created_at=utcnow(),
+        )
+    )
+    db.flush()
+    return True
+
+
 def grant(db: Session, user: User, amount: int, reason: str, actor: User) -> TokenEntry:
     """SysOp's grant, in the caller's transaction: tokens given, or taken back down to zero."""
     lock_account(db, user.id)
@@ -380,6 +455,7 @@ def tokens_of(db: Session, user_id: UUID) -> Tokens:
         earned=sum(int(totals.get(kind, 0)) for kind in EARNED),
         given=sum(int(totals.get(kind, 0)) for kind in GIVEN),
         spent=-int(totals.get("pack", 0)),
+        auctions=sum(int(totals.get(kind, 0)) for kind in AUCTIONS),
         entries=[
             TokenLine(
                 kind=row.kind,  # type: ignore[arg-type]

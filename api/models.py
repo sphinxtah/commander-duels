@@ -1041,16 +1041,21 @@ class LibraryGrant(Base):
     the cards of decks saved before libraries existed. An alliance's cards are not granted: they
     are in the library while the alliance lasts. Append-only, like the ledger: a reset (v0.4.5)
     leaves the grants before it recorded, and the library counts only those after it. Since
-    v0.5.0 every grant names the edition (printing) it gives, and one grant gives one edition."""
+    v0.5.0 every grant names the edition (printing) it gives, and one grant gives one edition;
+    since v0.6.0 one finish of it too. A copy listed at the auction house is still granted: the
+    library subtracts the copies on its live and sold listings (api/library.py)."""
 
     __tablename__ = "library_grants"
     __table_args__ = (
-        UniqueConstraint("user_id", "grant_key", "printing_id", name="uq_library_grants_edition"),
+        UniqueConstraint(
+            "user_id", "grant_key", "printing_id", "finish", name="uq_library_grants_finish"
+        ),
         CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
         CheckConstraint(
-            "source IN ('starter', 'grandfathered', 'pack', 'unique')",
+            "source IN ('starter', 'grandfathered', 'pack', 'unique', 'auction')",
             name="ck_library_grants_source",
         ),
+        CheckConstraint("finish IN ('nonfoil', 'foil', 'etched')", name="ck_library_grants_finish"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -1058,10 +1063,13 @@ class LibraryGrant(Base):
     # The edition given (v0.5.0): a pack's pulled printing, a starter deck's own, a grandfathered
     # deck's, or else the card's default printing.
     printing_id: Mapped[UUID] = mapped_column(ForeignKey("card_printings.id"))
+    # The finish given (v0.6.0): a pack's as pulled; nonfoil for everything else.
+    finish: Mapped[str] = mapped_column(String(8), default="nonfoil", server_default="nonfoil")
     quantity: Mapped[int]
     source: Mapped[str] = mapped_column(String(16))
     # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,
-    # pack:<opening>, unique:<Scryfall ID> (a one-of-a-kind card, v0.5.1); after a reset, a
+    # pack:<opening>, unique:<Scryfall ID> (a one-of-a-kind card, v0.5.1), auction:<auction> (a
+    # card bought at Tivit's Auction House, v0.6.0); after a reset, a
     # starter deck's carries the reset's time (starter:<deck>:<time>), so the deck can be granted
     # again.
     grant_key: Mapped[str] = mapped_column(String(96))
@@ -1071,22 +1079,26 @@ class LibraryGrant(Base):
 class TokenEntry(Base):
     """The economy ledger (PROG03, v0.4.0): tokens paid for wins, each from a committed result,
     the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought; since
-    v0.5.0 the rewards of daily quests and achievements. Append-only: PostgreSQL refuses updates
-    and deletes. A balance is the sum of its entries."""
+    v0.5.0 the rewards of daily quests and achievements; since v0.6.0 the auction house's bids
+    held and returned and its sales. Append-only: PostgreSQL refuses updates and deletes. A
+    balance is the sum of its entries."""
 
     __tablename__ = "token_ledger"
     __table_args__ = (
         CheckConstraint(
             "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack', 'quest', "
-            "'achievement')",
+            "'achievement', 'bid', 'bid_return', 'sale')",
             name="ck_token_ledger_kind",
         ),
         CheckConstraint(
             "(kind IN ('bot_win', 'human_win', 'back_pay')) = (game_id IS NOT NULL)",
             name="ck_token_ledger_game",
         ),
-        CheckConstraint("kind IN ('grant', 'pack') OR amount >= 0", name="ck_token_ledger_earned"),
+        CheckConstraint(
+            "kind IN ('grant', 'pack', 'bid') OR amount >= 0", name="ck_token_ledger_earned"
+        ),
         CheckConstraint("kind != 'pack' OR amount <= 0", name="ck_token_ledger_spent"),
+        CheckConstraint("kind != 'bid' OR amount <= 0", name="ck_token_ledger_bid"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -1095,7 +1107,8 @@ class TokenEntry(Base):
     amount: Mapped[int] = mapped_column(BigInteger)
     # Unique per fact, so retries and replays write nothing twice: tokens:<game>:<seat>:<beaten
     # seat>, welcome:<account>, grant:<id>, pack:<opening>; since v0.5.0 quest:<account>:<day>:
-    # <quest> and achievement:<account>:<achievement>, each with a reset's time after one.
+    # <quest> and achievement:<account>:<achievement>, each with a reset's time after one; since
+    # v0.6.0 bid:<bid>, bid_return:<bid> and sale:<auction> (Tivit's Auction House).
     key: Mapped[str] = mapped_column(String(128), unique=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"), index=True)
     # The seat beaten, and its player when a human sat there.
@@ -1426,7 +1439,9 @@ class Notification(Base):
     """What the bell shows an account (v0.4.3): a friend request, a request accepted, a friend
     come online, since v0.4.4 new messages from a friend (one while unread, renewed by each
     message), and since v0.5.0 a rematch offered (the game it would replay), since v0.5.1 an
-    invitation to the Two-Headed Giant queue as a friend's teammate. The actor is the other player.
+    invitation to the Two-Headed Giant queue as a friend's teammate, and since v0.6.0 the auction
+    house's news (outbid, won, sold, unsold, cancelled; the subject is the auction's ID). The
+    actor is the other player.
     Since v0.5.0 also a daily quest completed and an achievement earned, which no player caused:
     the subject names which. Kept NOTIFICATION_DAYS, at most a few hundred per account
     (api/social.py)."""
@@ -1435,7 +1450,9 @@ class Notification(Base):
     __table_args__ = (
         CheckConstraint(
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
-            "'quest_completed', 'achievement_earned', 'rematch', 'team_invite')",
+            "'quest_completed', 'achievement_earned', 'rematch', 'team_invite', "
+            "'auction_outbid', 'auction_won', 'auction_sold', 'auction_unsold', "
+            "'auction_cancelled')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.
@@ -1447,7 +1464,7 @@ class Notification(Base):
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     read_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
-    # The quest or the achievement (v0.5.0), by its ID.
+    # The quest or the achievement (v0.5.0), or the auction (v0.6.0), by its ID.
     subject: Mapped[str | None] = mapped_column(String(48))
     # A rematch's finished game (v0.5.0), whose result screen holds the offer.
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
@@ -1616,3 +1633,97 @@ class PlayerAchievement(Base):
     tokens: Mapped[int]
     pin: Mapped[int | None] = mapped_column(SmallInteger)
     earned_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+# Tivit's Auction House (v0.6.0, api/auctions.py): players auction cards to each other, one copy
+# of one edition in one finish per auction, as Madden Ultimate Team's transfer market does.
+
+
+class Auction(Base):
+    """One copy listed by its seller. The copy leaves the seller's library while the auction runs
+    and once it sold (api/library.py), and comes back when it ends unsold, is withdrawn or is
+    cancelled. The leading bid is kept on the row, which every bid, Buy Now and settlement lock
+    first; then the accounts whose tokens move, in the order of their IDs."""
+
+    __tablename__ = "auctions"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'sold', 'expired', 'withdrawn', 'cancelled')",
+            name="ck_auctions_status",
+        ),
+        CheckConstraint("finish IN ('nonfoil', 'foil', 'etched')", name="ck_auctions_finish"),
+        CheckConstraint(
+            "duration IN ('1h', '3h', '12h', '24h', '3d')", name="ck_auctions_duration"
+        ),
+        CheckConstraint("starting_bid >= 1", name="ck_auctions_starting_bid"),
+        CheckConstraint("buy_now IS NULL OR buy_now > starting_bid", name="ck_auctions_buy_now"),
+        CheckConstraint("(status = 'sold') = (buyer_id IS NOT NULL)", name="ck_auctions_buyer"),
+        # One listing request makes up to 20 auctions, numbered; a retry finds them by its key.
+        UniqueConstraint("seller_id", "request_key", "batch_index"),
+        # The market: the live auctions by their end; and an edition's listings and sales.
+        Index("ix_auctions_status_ends_at", "status", "ends_at"),
+        Index("ix_auctions_printing_id_finish", "printing_id", "finish"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    seller_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    concept_id: Mapped[UUID] = mapped_column(ForeignKey("card_concepts.id"))
+    printing_id: Mapped[UUID] = mapped_column(ForeignKey("card_printings.id"))
+    finish: Mapped[str] = mapped_column(String(8))
+    starting_bid: Mapped[int] = mapped_column(BigInteger)
+    buy_now: Mapped[int | None] = mapped_column(BigInteger)
+    duration: Mapped[str] = mapped_column(String(4))
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    # The leading bid and its bidder, and how many bids were made.
+    current_bid: Mapped[int | None] = mapped_column(BigInteger)
+    high_bidder_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
+    bid_count: Mapped[int] = mapped_column(default=0)
+    buyer_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    sold_price: Mapped[int | None] = mapped_column(BigInteger)
+    request_key: Mapped[str] = mapped_column(String(64))
+    batch_index: Mapped[int] = mapped_column(SmallInteger, default=0)
+    # The unsold auction this one put up again; an auction is relisted once.
+    relisted_from: Mapped[UUID | None] = mapped_column(ForeignKey("auctions.id"), unique=True)
+    # A cancellation's reason and who made it (SysOp; none for an account's reset or deletion).
+    cancel_reason: Mapped[str | None] = mapped_column(Text)
+    cancelled_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    # The seller cleared it from the transfer list.
+    seller_cleared_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    ends_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # When it was settled, withdrawn or cancelled.
+    ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class AuctionBid(Base):
+    """A bid, held from the bidder's balance (ledger key bid:<id>) until it is outbid or the
+    auction ends without it winning (bid_return:<id>); the winning bid's hold is the payment. A
+    Buy Now is a bid of the Buy Now price. The client's key makes a retried bid land once."""
+
+    __tablename__ = "auction_bids"
+    __table_args__ = (
+        CheckConstraint("status IN ('held', 'returned', 'won')", name="ck_auction_bids_status"),
+        CheckConstraint("amount >= 1", name="ck_auction_bids_amount"),
+        UniqueConstraint("bidder_id", "request_key"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    auction_id: Mapped[UUID] = mapped_column(ForeignKey("auctions.id"), index=True)
+    bidder_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    amount: Mapped[int] = mapped_column(BigInteger)
+    buy_now: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[str] = mapped_column(String(16), default="held")
+    request_key: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class AuctionWatch(Base):
+    """An auction an account watches (a star, or a bid, which watches it too), and when the
+    account cleared it from its transfer targets once it ended."""
+
+    __tablename__ = "auction_watches"
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    auction_id: Mapped[UUID] = mapped_column(
+        ForeignKey("auctions.id"), primary_key=True, index=True
+    )
+    watching: Mapped[bool] = mapped_column(default=True)
+    cleared_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())

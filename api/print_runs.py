@@ -8,7 +8,8 @@ where it was read: the serialized printings Scryfall lists, with the serial's de
 Wizards of the Coast's own collecting articles or the card itself.
 
 A printing's copies dealt are every copy any library was ever granted of it, from packs, starter
-decks or a one-of-a-kind grant, before an account's reset too: a copy pulled stays printed. A pack
+decks or a one-of-a-kind grant, before an account's reset too: a copy pulled stays printed. A
+copy bought at the auction house (v0.6.0) changed hands, so it is not counted again. A pack
 that would deal a copy beyond the run deals another card from the same sheet instead, as for a
 card the game cannot play (api/collation.py draw). The check takes a row lock on each limited
 printing the pack drew, in a fixed order, so two packs opened at once never both take the last
@@ -72,7 +73,7 @@ def dealt(db: Session, printings: set[UUID], lock: bool = False) -> dict[UUID, i
     counted = {printing_id: 0 for printing_id in printings}
     for printing_id, copies in db.execute(
         select(LibraryGrant.printing_id, func.sum(LibraryGrant.quantity))
-        .where(LibraryGrant.printing_id.in_(printings))
+        .where(LibraryGrant.printing_id.in_(printings), LibraryGrant.source != "auction")
         .group_by(LibraryGrant.printing_id)
     ):
         counted[printing_id] = int(copies or 0)

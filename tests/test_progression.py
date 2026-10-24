@@ -99,6 +99,35 @@ class Account:
         return self.http.request(method, path, json=body, headers=self.headers())
 
 
+def grant_basics(client: TestClient, user_id: UUID, entries: list[dict[str, Any]]) -> None:
+    """Grants the basic lands the entries hold (since v0.6.0 a library holds only the basic lands
+    granted to it), each in its default printing, as a starter deck would."""
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        wanted: dict[UUID, int] = {}
+        for item in entries:
+            card = UUID(str(item["card_id"]))
+            wanted[card] = wanted.get(card, 0) + int(item["quantity"])
+        key = f"grandfathered:test:{uuid4()}"
+        for concept in db.scalars(
+            select(CardConcept).where(
+                CardConcept.id.in_(wanted), CardConcept.type_line.startswith("Basic ")
+            )
+        ):
+            assert concept.default_printing_id is not None
+            db.add(
+                LibraryGrant(
+                    user_id=user_id,
+                    concept_id=concept.id,
+                    printing_id=concept.default_printing_id,
+                    quantity=wanted[concept.id],
+                    source="grandfathered",
+                    grant_key=key,
+                    created_at=utcnow(),
+                )
+            )
+        db.commit()
+
+
 @pytest.fixture(scope="module")
 def url(tmp_path_factory) -> str:
     folder = tmp_path_factory.mktemp("progression")
@@ -246,13 +275,13 @@ def test_onboarding_chooses_two_starter_decks(client):
     assert (again.status_code, again.json()["code"]) == (409, "starters_chosen")
     assert all(deck["chosen"] for deck in ada.get("/api/v1/decks/starters").json())
 
-    # Every copy of both decks is in the library for good; basic lands need no grant.
+    # Every copy of both decks is in the library for good; since v0.6.0 the basic lands too.
     library = ada.get("/api/v1/library").json()
     copies = {item["card"]["name"]: item for item in library["cards"]}
     assert library["unlimited"] is False
     assert copies["Sol Ring"]["copies"] == 2 and copies["Sol Ring"]["sources"] == ["starter"]
     assert copies["Lightning Bolt"]["copies"] == 1
-    assert "Mountain" not in copies and "Island" not in copies
+    assert copies["Mountain"]["copies"] == 97 and copies["Island"]["sources"] == ["starter"]
     assert ("library.starters_chosen", {"decks": ["starter_red_test", "starter_blue_test"]}) in (
         actions(client)
     )
@@ -280,7 +309,7 @@ def test_players_build_from_their_library(client, engine):
     )
     assert "your library has 1 copy" in problem["message"]
     assert deck["cards"][card_id(client, "Lightning Bolt")]["owned"] == 1
-    assert deck["cards"][card_id(client, "Mountain")]["owned"] is None
+    assert deck["cards"][card_id(client, "Mountain")]["owned"] == 97
     # A collection-locked deck is saved but cannot start a game.
     refused = ada.send(
         "POST", "/api/v1/practice-games", {"format": "legacy", "deck_id": deck["id"]}
@@ -345,6 +374,9 @@ def test_alliances_open_by_tier_and_bring_their_cards(client):
     library = {item["card"]["name"]: item for item in ada.get("/api/v1/library").json()["cards"]}
     valki = library["Valki, God of Lies // Tibalt, Cosmic Impostor"]
     assert valki["copies"] == 4 and valki["sources"] == ["alliance"]
+    # An alliance's cards are never for sale (v0.6.0).
+    assert valki["sellable"] == 0 and valki["finishes"]["nonfoil"] == 4
+    grant_basics(client, ada.id, [entry(client, "Swamp", 56)])
     deck = ada.send(
         "POST",
         "/api/v1/decks",

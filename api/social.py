@@ -32,7 +32,8 @@ describes them for players and staff.
   v0.4.4 new messages from a friend too (api/chat.py), one while unread; since v0.5.0 a daily quest
   completed and an achievement earned (api/quests.py, api/achievements.py), with no actor, and a
   rematch offered at the end of a table's game (api/rematches.py), which waits while the offer
-  stands.
+  stands. Since v0.6.0 the auction house's news (api/auctions.py): outbid, won, sold, unsold and
+  cancelled, each naming its auction (the subject) and the other player, if any.
   Kept NOTIFICATION_DAYS days, at most NOTIFICATION_LIMIT per account. The bell alone shows them:
   no email, no browser notifications.
 """
@@ -55,6 +56,9 @@ from api.admin import decode_cursor, encode_cursor
 from api.auth import INPUT_ERRORS
 from api.identity import Active, ApiError, Db, Principal, not_found, utcnow
 from api.models import (
+    Auction,
+    CardConcept,
+    CardPrinting,
     ExternalIdentity,
     Friendship,
     Game,
@@ -102,7 +106,18 @@ NotificationKind = Literal[
     "achievement_earned",
     "rematch",
     "team_invite",
+    "auction_outbid",
+    "auction_won",
+    "auction_sold",
+    "auction_unsold",
+    "auction_cancelled",
 ]
+AuctionKind = Literal[
+    "auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"
+]
+AUCTION_KINDS = frozenset(
+    {"auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"}
+)
 AwardKind = Literal["quest_completed", "achievement_earned"]
 SearchText = Annotated[
     str,
@@ -236,6 +251,20 @@ class Award(Contract):
     tokens: int = Field(description="What it paid.")
 
 
+class AuctionNotice(Contract):
+    """The auction a notification of the auction house's names (v0.6.0)."""
+
+    id: UUID
+    name: str = Field(description="The card's name.")
+    set_code: str
+    collector_number: str
+    finish: Literal["nonfoil", "foil", "etched"]
+    price: int | None = Field(
+        description="For an outbid, the auction's leading bid now; for a win or a sale, its "
+        "price; null otherwise."
+    )
+
+
 class NotificationItem(Contract):
     id: UUID
     kind: NotificationKind
@@ -261,6 +290,11 @@ class NotificationItem(Contract):
         default=None,
         description="For a rematch (v0.5.0): the finished game, whose result screen holds the "
         "offer.",
+    )
+    auction: AuctionNotice | None = Field(
+        default=None,
+        description="For the auction house's news (v0.6.0): the auction, which the bell links to "
+        "(/auctions).",
     )
 
 
@@ -628,6 +662,25 @@ def notify(
     prune(db, user_id, now)
 
 
+def notify_auction(
+    db: Session,
+    user_id: UUID,
+    kind: AuctionKind,
+    auction_id: UUID,
+    actor_id: UUID | None,
+    now: datetime,
+) -> None:
+    """The auction house's news (v0.6.0): the subject names the auction, the actor the other
+    player (none for an auction unsold, or one cancelled by an account's reset)."""
+    db.add(
+        Notification(
+            user_id=user_id, kind=kind, actor_id=actor_id, subject=str(auction_id), created_at=now
+        )
+    )
+    db.flush()
+    prune(db, user_id, now)
+
+
 def notify_award(db: Session, user_id: UUID, kind: AwardKind, subject: str, now: datetime) -> None:
     """A quest completed or an achievement earned (v0.5.0): no player caused it, and the subject
     names which."""
@@ -761,6 +814,9 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
             select(User).where(User.id.in_([row.actor_id for row in rows if row.actor_id]))
         )
     }
+    auctions = auction_notices(
+        db, [row for row in rows if row.kind in AUCTION_KINDS and row.subject]
+    )
     items = []
     for row in rows:
         actor = actors.get(row.actor_id) if row.actor_id else None
@@ -783,9 +839,53 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                 else 0,
                 award=award_of(row.kind, row.subject),
                 game_id=row.game_id if row.kind == "rematch" else None,
+                auction=auctions.get(row.id),
             )
         )
     return items
+
+
+def auction_notices(db: Session, rows: list[Notification]) -> dict[UUID, AuctionNotice]:
+    """The auctions the auction house's notifications name (v0.6.0), by notification."""
+    ids: dict[UUID, UUID] = {}
+    for row in rows:
+        try:
+            ids[row.id] = UUID(row.subject or "")
+        except ValueError:
+            continue
+    if not ids:
+        return {}
+    found = {
+        auction.id: (auction, name, set_code, number)
+        for auction, name, set_code, number in db.execute(
+            select(Auction, CardConcept.name, CardPrinting.set_code, CardPrinting.collector_number)
+            .join(CardPrinting, CardPrinting.id == Auction.printing_id)
+            .join(CardConcept, CardConcept.id == Auction.concept_id)
+            .where(Auction.id.in_(set(ids.values())))
+        )
+    }
+    notices = {}
+    for row in rows:
+        entry = found.get(ids.get(row.id))  # type: ignore[arg-type]
+        if entry is None:
+            continue
+        auction, name, set_code, number = entry
+        price = (
+            auction.sold_price
+            if row.kind in ("auction_won", "auction_sold")
+            else auction.current_bid
+            if row.kind == "auction_outbid"
+            else None
+        )
+        notices[row.id] = AuctionNotice(
+            id=auction.id,
+            name=name,
+            set_code=set_code,
+            collector_number=number,
+            finish=auction.finish,  # type: ignore[arg-type]
+            price=price,
+        )
+    return notices
 
 
 def delete_social_of(db: Session, user_id: UUID) -> int:

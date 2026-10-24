@@ -16,6 +16,9 @@ games refer to it, and their records stay whole. What identifies the person goes
   started table's seat lets go of the revision it was bound to when no game played it.
 - **Each feature's own rows**, removed by the functions in CLEANUPS.
 
+Since v0.6.0 its live auctions end as SysOp's cancellation ends them, and its leading bids come
+back to it, first (api/auctions.py end_auctions_of).
+
 Wins, tokens, packs, the library, game results and the audit trail stay: they are no contact
 data, and other players' records count them. While the account is seated in a running game, or
 since v0.5.0 plays a match (between its games too), deleting it is refused; it can be deleted once
@@ -28,7 +31,7 @@ deletes chat messages past their time (api/chat.py).
 """
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from uuid import UUID
@@ -55,6 +58,7 @@ from api.models import (
     User,
     UserSession,
 )
+from api.roster import Planeswalker
 from catalog.sync import Outcome
 
 log = logging.getLogger("api.accounts")
@@ -237,12 +241,21 @@ def remove_decks(db: Session, user_id: UUID, now: datetime, removed: Removed) ->
     ).rowcount  # type: ignore[attr-defined]
 
 
-def delete_account(db: Session, user: User, now: datetime) -> Removed:
+def delete_account(
+    db: Session, user: User, now: datetime, roster: Mapping[str, Planeswalker] | None = None
+) -> Removed:
     """Deletes a player's account (the module's docstring says what goes and what stays), in the
     caller's transaction: the caller audits and commits. Refuses 409 while the account is seated
-    in a running game."""
+    in a running game. Since v0.6.0 the account's live auctions end first, their cards back and
+    their leading bids returned, and its own leading bids come back to it (api/auctions.py),
+    before its row is locked, as every auction's change locks the auction before the accounts;
+    and once more under the lock, for a bid that came in meanwhile."""
     if user.kind != "player":
         raise ValueError("Only a player's account can be deleted.")
+    # Imported here: api.auctions imports api.decks, which imports far.
+    from api.auctions import end_auctions_of
+
+    end_auctions_of(db, user, "account deleted", roster=roster)
     # The account's row is locked, as taking a seat at a table locks it, and read again, so a
     # deletion that got there first is seen.
     db.refresh(user, with_for_update=True)
@@ -253,6 +266,7 @@ def delete_account(db: Session, user: User, now: datetime) -> Removed:
             "account_in_game",
             "This account is playing a game. Delete it once the game ends or its seat concedes.",
         )
+    end_auctions_of(db, user, "account deleted", roster=roster)
     removed = Removed(user.status)
     removed.tables_left = leave_open_tables(db, user.id, now)
     # Imported here: api.queues imports api.games, which imports far. Before the decks go: a place

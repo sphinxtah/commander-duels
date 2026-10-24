@@ -389,7 +389,7 @@ def editions_of(library: Library, card_id: UUID) -> list[EditionCopies]:
 
 def mark_owned(db: Session, items: Iterable[CardSummary], library: Library) -> None:
     """Sets each card's copies in the player's library, and since v0.5.0 the editions it holds of
-    it; basic lands stay unlimited."""
+    it; since v0.6.0 basic lands are counted like any card."""
     found = list(items)
     if library.unlimited or not found:
         return
@@ -398,9 +398,7 @@ def mark_owned(db: Session, items: Iterable[CardSummary], library: Library) -> N
             CardConcept.id.in_({item.id for item in found})
         )
     )
-    keys = {
-        card_id: None if type_line.startswith("Basic ") else key for card_id, key, type_line in rows
-    }
+    keys = {card_id: key for card_id, key, _ in rows}
     for item in found:
         key = keys.get(item.id)
         item.owned = library.owned(key) if key is not None else None
@@ -461,9 +459,7 @@ def filters(
     conditions.append(playable())
     if library is not None and not library.unlimited:
         owned = [key for key, copies in library.copies.items() if copies > 0]
-        conditions.append(
-            CardConcept.construction_key.in_(owned) | CardConcept.type_line.startswith("Basic ")
-        )
+        conditions.append(CardConcept.construction_key.in_(owned))
     return conditions
 
 
@@ -507,8 +503,8 @@ def search_cards(
     page_size: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = PAGE_SIZE,
 ) -> CardPage:
     """Cards by structured filters and the search syntax together; all must match, and only cards
-    a game can play are found. `owned` keeps to the cards in the player's library (basic lands
-    included); every card says how many copies the library holds."""
+    a game can play are found. `owned` keeps to the cards in the player's library (since v0.6.0
+    basic lands only as owned); every card says how many copies the library holds."""
     started = time.monotonic()
     try:
         conditions = filters(
@@ -599,8 +595,8 @@ def card_detail(
         Literal["all", "owned", "chosen"],
         Query(
             description="Which printings to list (v0.5.0): all of them, the newest 60 first; "
-            "owned, the editions the player's library holds (every printing for a basic land, "
-            "or an account that builds from the whole catalog); chosen, only `printing`, as a "
+            "owned, the editions the player's library holds (every printing for an account that "
+            "builds from the whole catalog); chosen, only `printing`, as a "
             "card pulled from a pack is."
         ),
     ] = "all",

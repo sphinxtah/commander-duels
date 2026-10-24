@@ -6,7 +6,8 @@ Players build from their own library; administrators and SysOp from the whole ca
   the two starter decks a player chose, every copy of each, and the cards of decks saved before
   libraries existed;
 - while an alliance lasts, a playset of each of that Planeswalker's cards (api/roster.py);
-- basic lands, without limit, which no grant needs to name.
+- until v0.6.0 basic lands without limit; since then a library holds the basic lands granted to it
+  (packs and starter decks give them by printing), like any card.
 Copies count, as in Magic Duels: a deck may hold no more copies of a card than the library does,
 counting every printing and Oracle version of the card together. Copies are a limit per deck, not
 spent by one: two decks may each hold the same owned card.
@@ -21,7 +22,7 @@ playset is in each card's default printing, and a deck may hold only editions th
 copy by copy (api/validation.py). A deck's copies naming no edition take the editions the library
 holds when the draft is saved (with_owned_editions); once, when v0.5.0 deployed, every player's
 drafts were also switched to the editions their library holds where it held enough
-(api/decks.py switch_editions). Basic lands stay unlimited in every edition.
+(api/decks.py switch_editions). Basic lands were unlimited in every edition until v0.6.0.
 
 The Godlike tier's custom cards (v0.4.0) are open only to an account at that tier: an alliance
 with their Planeswalker then holds a playset of each, kept apart from the catalog's copies, and
@@ -37,6 +38,15 @@ One of a kind (v0.5.1): a printing made once in the world belongs to one account
 (The Lord of the Rings: Tales of Middle-earth #0, serialized 001/001) to be Sphinx's: migration
 0027 grants it, packs never deal it (api/shop.py), and no deck but its owner's may hold it
 (Library.withheld), whatever the account builds from; SysOp, who builds with anything, excepted.
+
+Tivit's Auction House (v0.6.0, api/auctions.py): grants name their finish too (nonfoil, foil,
+etched), and a library is its grants (a card bought at the auction house is a grant, source
+auction) less the copies on its own live and sold listings since any reset. Decks count copies by
+edition whatever their finish. A copy may be listed when it was granted (from a pack, a starter
+deck, a grandfathered deck or the auction house), never an alliance's, a custom card or a
+one-of-a-kind printing (sellable_copies). Since v0.6.0 (the owner's decision) basic lands are real
+copies too: packs and starter decks grant them by printing and finish, decks count them against
+the library's copies by edition like any card, and they may be sold.
 """
 
 import json
@@ -50,13 +60,21 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, Request
-from sqlalchemy import ColumnElement, func, not_, select, true
+from sqlalchemy import ColumnElement, func, select, true
 from sqlalchemy.orm import InstrumentedAttribute, Session
 from starlette.concurrency import run_in_threadpool
 
 from api.engine_cards import engine_cards_of
 from api.identity import Active, Db, utcnow
-from api.models import CardConcept, CardPrinting, CustomCard, LibraryGrant, ProgressEntry, User
+from api.models import (
+    Auction,
+    CardConcept,
+    CardPrinting,
+    CustomCard,
+    LibraryGrant,
+    ProgressEntry,
+    User,
+)
 from api.roster import ALLIANCE_COPIES, GODLIKE, Planeswalker, alliance_cards, roster_of
 from api.validation import (
     CUSTOM_KEY,
@@ -74,6 +92,11 @@ UNLIMITED = "library.unlimited"
 ONE_OF_A_KIND: dict[UUID, str] = {UUID("93de9042-cc62-4ade-8d8d-68fdbc84bfae"): "sphinx"}
 # The order in which a deck's copies are given editions: the commander first, then the deck.
 LOCATION_ORDER = ("commander", "companion", "main", "sideboard")
+FINISHES = ("nonfoil", "foil", "etched")
+# The grants whose copies may be listed at the auction house (v0.6.0), and the auctions whose copy
+# is out of the seller's library: while it runs, and once it sold.
+SELLABLE_SOURCES = frozenset({"starter", "grandfathered", "pack", "auction"})
+LISTED = ("active", "sold")
 
 
 @dataclass
@@ -95,6 +118,10 @@ class Library:
     withheld: frozenset[UUID] = frozenset()
     # The editions by card, made the first time they are asked for.
     by_card: dict[UUID, list[Edition]] | None = field(default=None, repr=False, compare=False)
+    # By edition (v0.6.0): the copies held in each finish (an alliance's are nonfoil), and those
+    # that may be listed at the auction house.
+    finishes: dict[UUID, dict[str, int]] = field(default_factory=dict)
+    sellable: dict[UUID, int] = field(default_factory=dict)
 
     def collection(self) -> Collection:
         return Collection(
@@ -199,6 +226,55 @@ def withheld_from(db: Session, user: User) -> frozenset[UUID]:
     return unique - set(held)
 
 
+def listed_copies(db: Session, user: User) -> dict[tuple[UUID, str], int]:
+    """The account's copies out of its library at the auction house (v0.6.0), by edition and
+    finish: those on its live and sold listings since any reset."""
+    return {
+        (printing_id, finish): int(count)
+        for printing_id, finish, count in db.execute(
+            select(Auction.printing_id, Auction.finish, func.count())
+            .where(
+                Auction.seller_id == user.id,
+                Auction.status.in_(LISTED),
+                since_reset(user, Auction.created_at),
+            )
+            .group_by(Auction.printing_id, Auction.finish)
+        )
+    }
+
+
+def sellable_copies(
+    db: Session, user: User, printings: set[UUID] | None = None
+) -> dict[tuple[UUID, str], int]:
+    """The copies the account may list at the auction house (v0.6.0), by edition and finish:
+    those granted from packs, starter decks, grandfathered decks and the auction house, since any
+    reset, less those listed; never a one-of-a-kind printing. Basic lands are sold like any card
+    since v0.6.0. Whether the account builds from a library or the whole catalog: an administrator
+    lists only the copies granted to it (SysOp's unlimited listings are api/auctions.py's)."""
+    query = (
+        select(LibraryGrant.printing_id, LibraryGrant.finish, func.sum(LibraryGrant.quantity))
+        .join(CardPrinting, CardPrinting.id == LibraryGrant.printing_id)
+        .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+        .where(
+            LibraryGrant.user_id == user.id,
+            LibraryGrant.source.in_(SELLABLE_SOURCES),
+            since_reset(user, LibraryGrant.created_at),
+            CardPrinting.scryfall_id.not_in(list(ONE_OF_A_KIND)),
+        )
+        .group_by(LibraryGrant.printing_id, LibraryGrant.finish)
+    )
+    if printings is not None:
+        query = query.where(LibraryGrant.printing_id.in_(printings))
+    granted = {(printing, finish): int(total) for printing, finish, total in db.execute(query)}
+    listed = listed_copies(db, user)
+    found = {}
+    for held, copies in granted.items():
+        left = copies - listed.get(held, 0)
+        if left > 0:
+            found[held] = left
+    return found
+
+
 def library_of(
     db: Session, user: User, permissions: frozenset[str], roster: dict[str, Planeswalker]
 ) -> Library:
@@ -224,29 +300,42 @@ def library_of(
     )
     # A printing's card is the card it is now (a catalog sync may move one to another).
     granted = db.execute(
-        select(*columns, LibraryGrant.source, func.sum(LibraryGrant.quantity))
+        select(
+            *columns,
+            LibraryGrant.source,
+            LibraryGrant.finish,
+            func.sum(LibraryGrant.quantity),
+        )
         .select_from(LibraryGrant)
         .join(CardPrinting, CardPrinting.id == LibraryGrant.printing_id)
         .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
         .where(LibraryGrant.user_id == user.id, since_reset(user, LibraryGrant.created_at))
-        .group_by(*columns, LibraryGrant.source)
+        .group_by(*columns, LibraryGrant.source, LibraryGrant.finish)
     )
-    for (
-        printing_id,
-        card_id,
-        key,
-        set_name,
-        set_code,
-        number,
-        released,
-        source,
-        quantity,
-    ) in granted:
+    # By edition and finish (v0.6.0): every copy granted, and those that may be listed.
+    finishes: dict[UUID, dict[str, int]] = defaultdict(lambda: dict.fromkeys(FINISHES, 0))
+    sellable: dict[tuple[UUID, str], int] = defaultdict(int)
+    unique = one_of_a_kind(db)
+    for row in granted:
+        printing_id, card_id, key, set_name, set_code, number, released = row[:7]
+        source, finish, quantity = row[7], row[8], row[9]
         copies[key] += int(quantity)
         sources[key].add(source)
         held[printing_id] += int(quantity)
         came[printing_id].add(source)
+        finishes[printing_id][finish] += int(quantity)
+        if source in SELLABLE_SOURCES and printing_id not in unique:
+            sellable[(printing_id, finish)] += int(quantity)
         printings[printing_id] = (card_id, key, set_name, set_code, number, released)
+    # The copies on the account's live and sold listings are out of its library.
+    for (printing_id, finish), listed in listed_copies(db, user).items():
+        if printing_id not in printings:
+            continue
+        taken = min(listed, finishes[printing_id][finish])
+        finishes[printing_id][finish] -= taken
+        held[printing_id] -= taken
+        copies[printings[printing_id][1]] -= taken
+        sellable[(printing_id, finish)] = max(0, sellable[(printing_id, finish)] - listed)
     planeswalker = roster.get(user.alliance) if user.alliance else None
     if planeswalker is not None and not planeswalker.custom:
         ids = alliance_cards(db, roster).get(planeswalker.id, [])
@@ -267,6 +356,7 @@ def library_of(
         ):
             held[printing_id] += ALLIANCE_COPIES
             came[printing_id].add("alliance")
+            finishes[printing_id]["nonfoil"] += ALLIANCE_COPIES
             printings[printing_id] = (card_id, key, set_name, set_code, number, released)
         for key in cards:
             copies[key] += ALLIANCE_COPIES
@@ -295,6 +385,9 @@ def library_of(
         )
         for printing_id, (card_id, key, set_name, set_code, number, released) in printings.items()
     }
+    library.finishes = {printing_id: dict(found) for printing_id, found in finishes.items()}
+    for (printing_id, _), count in sellable.items():
+        library.sellable[printing_id] = library.sellable.get(printing_id, 0) + count
     return library
 
 
@@ -457,15 +550,7 @@ def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckE
     """Every copy of the deck's cards, for good, each in the edition the deck holds (v0.5.0; the
     card's default printing where the catalog lacks the owner's choice), so the deck plays at once;
     the grant is keyed by the deck, so it is made once whatever retries (once more after a reset).
-    Basic lands need no grant."""
-    cards = {entry.card_id for entry in entries}
-    basics = set(
-        db.scalars(
-            select(CardConcept.id).where(
-                CardConcept.id.in_(cards), CardConcept.type_line.startswith("Basic ")
-            )
-        )
-    )
+    Since v0.6.0 its basic lands too, in their own editions, nonfoil."""
     key = reset_key(user, f"starter:{starter.id}")
     done = db.scalar(
         select(LibraryGrant.id).where(
@@ -475,12 +560,12 @@ def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckE
     if done is not None:
         return
     fallback = default_printings(
-        db, {entry.card_id for entry in entries if entry.printing_id is None} - basics
+        db, {entry.card_id for entry in entries if entry.printing_id is None}
     )
     quantities: dict[tuple[UUID, UUID], int] = defaultdict(int)
     for entry in entries:
         printing_id = entry.printing_id or fallback.get(entry.card_id)
-        if entry.card_id in basics or printing_id is None:
+        if printing_id is None:
             continue
         quantities[(entry.card_id, printing_id)] += entry.quantity
     now = utcnow()
@@ -523,17 +608,14 @@ def with_owned_editions(
     what no edition is left for still names none, and validation says so. With switch (once, when
     v0.5.0 deployed), a copy naming an edition the library holds too few of moves the same way, to
     another of that card's editions; what cannot move stays. Only the card's own printings are
-    chosen. The maybeboard, basic lands and the custom cards keep what they name. The order is the
+    chosen. The maybeboard and the custom cards keep what they name; since v0.6.0 basic lands take
+    owned editions like any card. The order is the
     commander first, then the deck; the result is one entry per card, printing and location."""
     if library.unlimited or not entries:
         return entries, []
     ids = {entry.card_id for entry in entries}
     concepts = dict(
-        db.execute(
-            select(CardConcept.id, CardConcept.name).where(
-                CardConcept.id.in_(ids), not_(CardConcept.type_line.startswith("Basic "))
-            )
-        ).all()
+        db.execute(select(CardConcept.id, CardConcept.name).where(CardConcept.id.in_(ids))).all()
     )
     if not concepts:
         return entries, []

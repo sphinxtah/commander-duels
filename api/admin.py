@@ -288,7 +288,7 @@ async def delete_user(
 def deleted_by(
     db: Session, request: Request, principal: Principal, user: User, reason: str
 ) -> AdminUser:
-    removed = delete_account(db, user, utcnow())
+    removed = delete_account(db, user, utcnow(), roster_of(request))
     audit(
         db,
         request,

@@ -63,6 +63,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "reports.manage",
             # Every player's real presence, appearing offline or not (v0.4.3).
             "players.presence",
+            # Tivit's Auction House's log of sales and live auctions (v0.6.0); cancelling one
+            # is SysOp's (economy.manage).
+            "auctions.manage",
         }
     ),
 }

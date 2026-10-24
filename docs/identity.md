@@ -258,7 +258,7 @@ Administrators read the trail newest first in the Administration page, filtered 
 
 ## Deleting an account (v0.4.1)
 
-Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions-at-the-start-of-v041)). Someone who wants their data removed asks, as the privacy policy says, and SysOp or an administrator deletes the account in Administration. Requests never approved are deleted on their own after 30 days. One function does both (`api/accounts.py`).
+Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions-at-the-start-of-v041)). Someone who wants their data removed asks, as the privacy policy says, and SysOp or an administrator deletes the account in Administration. Requests never approved are deleted on their own after 30 days. One function does both (`api/accounts.py`). Since v0.6.0 a deletion first ends the account's live auctions at Tivit's Auction House, the cards back and the leading bids returned to their bidders, and returns the account's own leading bids to it ([the auction house](auctions.md#accounts-reset-or-deleted)).
 
 **Who may delete.**
 - SysOp and administrators (`admin.users.manage`), under the rules of every account change: never SysOp, never your own account, and only SysOp deletes an account that holds an administrator grant, whatever its status.
@@ -289,7 +289,7 @@ Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions
 - **In the audit trail**, which a deletion leaves as it was:
   - the source address of every event the account caused: its sign-ins and sign-outs, profile and alliance changes, starter choices and votes to remove a player;
   - each event's time and request ID;
-  - the reasons staff wrote, as they wrote them: `admin.user_status_changed`, `admin.user_deleted`, `progress.wins_set`, `economy.tokens_granted` and `shop.packs_granted`.
+  - the reasons staff wrote, as they wrote them: `admin.user_status_changed`, `admin.user_deleted`, `progress.wins_set`, `economy.tokens_granted`, `shop.packs_granted` and, since v0.6.0, `auction.cancelled`.
   - The code itself writes no name, handle or email into the trail: `profile.updated` lists the fields changed, not their values, and `auth.google_signup` only the status.
 - **In the ledgers**, the reasons staff wrote for wins set, tokens given and packs given.
 - **In backups** ([backups](deployment.md#backups)), everything as it was when each was made, until newer ones replace it: the nightly dumps for two weeks; the pre-deploy and pre-restore dumps until 10 deploys or 5 restores later, however long that takes; the VM's backups on the NAS by the owner's own schedule.
@@ -304,7 +304,7 @@ Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions
 
 ## Resetting an account (v0.4.5)
 
-Asked for by the owner on 2026-10-22 ([the plan](plans/0.4.5.md#added-during-v045)), for a beta tester who had set up his account and wanted to try the setup wizard. The owner chose a fresh start: SysOp returns an account to a new one's state, and the wizard then runs as a new player sees it. One function does it (`api/resets.py`), in one transaction.
+Asked for by the owner on 2026-10-22 ([the plan](plans/0.4.5.md#added-during-v045)), for a beta tester who had set up his account and wanted to try the setup wizard. The owner chose a fresh start: SysOp returns an account to a new one's state, and the wizard then runs as a new player sees it. One function does it (`api/resets.py`), in one transaction. Since v0.6.0 it first ends the account's live auctions, the cards back and the leading bids returned to their bidders, and returns the account's own leading bids to it, so its tokens are counted after ([the auction house](auctions.md#accounts-reset-or-deleted)).
 
 **Who may reset.**
 - SysOp alone (`admin.users.reset`, which no role can be granted). Never SysOp's own account or a deleted one; an administrator's account may be reset.
