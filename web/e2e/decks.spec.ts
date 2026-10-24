@@ -55,6 +55,13 @@ test.describe("decks and the card catalog", () => {
     await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
     const deckId = page.url().split("#deck/")[1];
 
+    // The deck shows as its cards' pictures by default, grouped by type (v0.6.2).
+    await expect(
+      page.getByRole("list", { name: "Main deck: Instants" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^Lightning Bolt.*, 5 copies$/ }),
+    ).toBeVisible();
     // The editor shows the same problem, with its remedy; one fewer bolt fixes it.
     await expect(page.getByText("1 problem to fix")).toBeVisible();
     await expect(page.getByText("Remove 1.")).toBeVisible();

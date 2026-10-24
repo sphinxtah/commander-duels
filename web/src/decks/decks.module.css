@@ -837,6 +837,94 @@ a.deckTitle:hover {
 .remove:hover {
   color: #f0b7a0;
 }
+/* The deck as its cards' pictures (v0.6.2, the default view), the list a switch away. */
+.viewRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -8px;
+}
+.pictures {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+  gap: 14px 12px;
+}
+.picture {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+}
+.picture[data-highlight="true"] {
+  background: #d4b47a18;
+  box-shadow: inset 0 0 0 1px #d4b47a66;
+}
+.pictureButton {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.pictureButton:hover > div {
+  box-shadow: 0 0 0 2px #d4b47a88;
+}
+.pictureButton:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 3px;
+}
+.pictureLoading {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 488 / 680;
+  border: 1px solid #ffffff14;
+  border-radius: 7px;
+  background: #1b2523;
+  color: #93a198;
+  font-size: 0.8rem;
+}
+/* The copies, on the picture's corner: ×4. */
+.pictureCount {
+  position: absolute;
+  top: 8%;
+  right: -4px;
+  padding: 2px 8px;
+  border: 1px solid #f4dca6;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #4a3c1e, #2c2411);
+  color: var(--cd-gold-hi);
+  font:
+    700 0.8rem/1.3 Inter,
+    "Segoe UI",
+    sans-serif;
+  box-shadow: 0 2px 8px #000a;
+}
+.pictureName {
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: #e3e7de;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picture[data-playable="false"] .pictureName {
+  color: #e3bf93;
+}
+.picture[data-locked="true"] .pictureName {
+  color: #c3d4e6;
+}
+.pictureFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
 .stats,
 .meta {
   border: 1px solid #ffffff10;

@@ -678,6 +678,62 @@
 .libraryFilters .field:first-child {
   flex: 1 1 260px;
 }
+/* My library's finer filters (v0.6.2): the auction house's chips and the Cards page's pips. */
+.libraryFilters + .filters {
+  margin-top: 12px;
+}
+.filterCount {
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: #d5b77c33;
+  color: var(--cd-gold-hi);
+  font:
+    700 0.68rem/1.5 Inter,
+    "Segoe UI",
+    sans-serif;
+}
+.field[data-narrow] {
+  min-width: 0;
+  width: 7.5rem;
+}
+.filters fieldset.chips {
+  flex-wrap: wrap;
+}
+.chips button {
+  padding: 5px 10px;
+  border: 1px solid #ffffff24;
+  border-radius: 14px;
+  background: #0c1414;
+  color: #c9d0c6;
+  font-size: 0.72rem;
+}
+.chips button:hover {
+  border-color: #d5b77c88;
+}
+.chips button[aria-pressed="true"] {
+  border-color: #f4dca6;
+  background: linear-gradient(180deg, #4a3c1e, #2c2411);
+  color: var(--cd-gold-hi);
+  box-shadow: 0 0 10px #e9b9603d;
+}
+.chips button[data-rarity="mythic"][aria-pressed="true"] {
+  border-color: #f07a32;
+  background: linear-gradient(180deg, #5a2e14, #301808);
+  color: #ffc49b;
+}
+.chips button[data-finish="foil"][aria-pressed="true"],
+.chips button[data-finish="etched"][aria-pressed="true"] {
+  border-color: #a993ff;
+  background: linear-gradient(135deg, #3a2a6b, #213a4a);
+  color: #e2dcff;
+}
+.chips button:focus-visible {
+  outline: 2px solid #efcc8d;
+  outline-offset: 2px;
+}
+.pip[data-color="C"] span[title] {
+  background: #cfccc6;
+}
 /* A table that is wider than a phone scrolls inside its own box, never the page. */
 .libraryScroll {
   overflow-x: auto;

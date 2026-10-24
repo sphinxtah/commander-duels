@@ -42,7 +42,7 @@ from api.identity import (
     roles_of,
     utcnow,
 )
-from api.library import CurrentLibrary, grant_starter, library_of, starter_entries
+from api.library import CurrentLibrary, Library, grant_starter, library_of, starter_entries
 from api.models import CardConcept, CardPrinting, Game, GameSeat, ProgressEntry, User
 from api.roster import (
     GODLIKE,
@@ -158,7 +158,10 @@ class LibraryView(Contract):
 
 
 class AllianceCards(Contract):
-    alliance: str | None = Field(description="The allied Planeswalker; null with no alliance.")
+    alliance: str | None = Field(
+        description="The allied Planeswalker, or the one asked for (GET /planeswalkers/{id}/cards, "
+        "v0.6.2); null with no alliance."
+    )
     name: str | None
     custom: bool = Field(
         description="The Godlike tier's Planeswalker, whose cards are its custom cards "
@@ -498,18 +501,13 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
     return LibraryView(unlimited=False, alliance=library.alliance, cards=cards)
 
 
-@router.get("/me/alliance/cards", response_model=AllianceCards)
-def my_alliance_cards(
-    request: Request, principal: Active, library: CurrentLibrary, db: Db
+def planeswalker_cards(
+    db: Session, roster: dict[str, Planeswalker], planeswalker: Planeswalker, library: Library
 ) -> AllianceCards:
-    """The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
-    every account, those that build from the whole catalog included: each says how many copies
-    the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a
-    game can play (v0.4.5)."""
-    planeswalker = roster_of(request).get(library.alliance) if library.alliance else None
-    if planeswalker is None:
-        return AllianceCards(alliance=None, name=None, custom=False, cards=[])
-    ids = alliance_cards(db, roster_of(request)).get(planeswalker.id, [])
+    """A Planeswalker's own cards a game can play, one per card, each with the copies the library
+    holds. The Godlike tier's Planeswalker has none from the catalog: its custom cards are only
+    GET /custom-cards, for a Godlike account allied with it."""
+    ids = alliance_cards(db, roster).get(planeswalker.id, [])
     # One card per construction key, as the library counts them: the one with a default printing.
     chosen: dict[str, UUID] = {}
     for card_id, key in db.execute(
@@ -526,6 +524,36 @@ def my_alliance_cards(
         custom=planeswalker.custom,
         cards=sorted(summaries.values(), key=lambda card: card.name.casefold()),
     )
+
+
+@router.get("/me/alliance/cards", response_model=AllianceCards)
+def my_alliance_cards(
+    request: Request, principal: Active, library: CurrentLibrary, db: Db
+) -> AllianceCards:
+    """The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for
+    every account, those that build from the whole catalog included: each says how many copies
+    the library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a
+    game can play (v0.4.5)."""
+    roster = roster_of(request)
+    planeswalker = roster.get(library.alliance) if library.alliance else None
+    if planeswalker is None:
+        return AllianceCards(alliance=None, name=None, custom=False, cards=[])
+    return planeswalker_cards(db, roster, planeswalker, library)
+
+
+@router.get("/planeswalkers/{planeswalker_id}/cards", response_model=AllianceCards)
+def a_planeswalkers_cards(
+    planeswalker_id: str, request: Request, principal: Active, library: CurrentLibrary, db: Db
+) -> AllianceCards:
+    """Any Planeswalker's own cards (v0.6.2), so the alliance picker shows what an alliance brings
+    before it is chosen, locked ones included: the same list the alliance tab shows once allied,
+    with the copies the library holds now. The Godlike tier's custom cards stay private: for The
+    Sphinx it says `custom` and lists none."""
+    roster = roster_of(request)
+    planeswalker = roster.get(planeswalker_id)
+    if planeswalker is None:
+        raise not_found()
+    return planeswalker_cards(db, roster, planeswalker, library)
 
 
 @router.post("/admin/users/{user_id}/wins", response_model=Progress)

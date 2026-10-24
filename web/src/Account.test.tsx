@@ -26,7 +26,12 @@ import {
   setCsrfToken,
   type Me,
 } from "./api";
-import { progress, roster, starterDecks } from "./alliance/fixtures";
+import {
+  planeswalkerCards,
+  progress,
+  roster,
+  starterDecks,
+} from "./alliance/fixtures";
 import { loadGoogle, type GoogleId } from "./google";
 import { achievements, history, stats } from "./records/fixtures";
 
@@ -230,6 +235,16 @@ beforeEach(() => {
   // Profile's progress and the roster (v0.3.1).
   on("GET /api/v1/me/progress", () => reply(200, progress()));
   on("GET /api/v1/planeswalkers", () => reply(200, roster));
+  // A Planeswalker's cards, before an alliance with them (v0.6.2).
+  on("GET /api/v1/planeswalkers/{planeswalker_id}/cards", (init) =>
+    reply(
+      200,
+      planeswalkerCards(
+        (init as { params: { path: { planeswalker_id: string } } }).params.path
+          .planeswalker_id,
+      ),
+    ),
+  );
   // Profile's tokens (v0.4.0).
   on("GET /api/v1/me/tokens", () =>
     reply(200, {
@@ -1096,11 +1111,13 @@ describe("the setup wizard (v0.4.2)", () => {
     expect(seen).toHaveBeenLastCalledWith(
       expect.objectContaining({ onboarding: "complete" }),
     );
-    // The roster by tier: open ones to ally with, locked ones not.
+    // The roster by tier: each opens its cards (v0.6.2), locked ones marked.
     expect(
-      screen.getByRole("button", { name: "Ally with Rowan" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Ally with Kaya" })).toBeNull();
+      screen.getByRole("button", { name: "See Rowan's cards" }),
+    ).not.toHaveAttribute("data-locked");
+    expect(
+      screen.getByRole("button", { name: "See Kaya's cards" }),
+    ).toHaveAttribute("data-locked");
     fireEvent.click(screen.getByRole("button", { name: "Later" }));
     expect(
       await screen.findByRole("heading", {
@@ -1148,7 +1165,10 @@ describe("the setup wizard (v0.4.2)", () => {
       screen.getByRole("button", { name: "Claim these two decks" }),
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "Ally with Rowan" }),
+      await screen.findByRole("button", { name: "See Rowan's cards" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Begin Alliance with Rowan" }),
     );
     expect(
       await screen.findByRole("heading", {
@@ -1362,9 +1382,11 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
       "GodlikeOpens at 100,000 wins",
     ]);
     const silver = screen.getByRole("region", { name: /^Silver/ });
-    expect(within(silver).queryByRole("button")).toBeNull();
+    expect(
+      within(silver).getByRole("button", { name: "See Kaya's cards" }),
+    ).toHaveAttribute("data-locked");
     expect(within(silver).getByRole("listitem")).toHaveTextContent(
-      "KayaOpens at 10 wins1 card playable here",
+      "KayaOpens at 10 wins 1 card playable here",
     );
     // The Godlike tier's Planeswalker has its portrait since v0.4.1.
     const godlike = screen.getByRole("region", { name: /^Godlike/ });
@@ -1375,7 +1397,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     );
     expect(godlike).toHaveTextContent("The Sphinx");
 
-    const abian = screen.getByRole("button", { name: "Ally with Abian" });
+    const abian = screen.getByRole("button", { name: "See Abian's cards" });
     expect(abian).toHaveAccessibleDescription(
       "No cards playable here yet Abian, painted for the tests.",
     );
@@ -1383,7 +1405,18 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
       "src",
       "/portraits/abian-128.webp",
     );
+    // The tile opens Abian's cards (v0.6.2), none playable yet; the alliance begins there.
     fireEvent.click(abian);
+    const tile = await screen.findByRole("dialog", { name: "Abian" });
+    expect(
+      await within(tile).findByText(
+        "None of Abian's cards can be played here yet.",
+      ),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(tile).getByRole("button", { name: "Begin Alliance with Abian" }),
+    );
+    expect(screen.queryByRole("dialog", { name: "Abian" })).toBeNull();
     expect(
       await screen.findByText(
         "You are allied with Abian. None of their cards can be played here yet.",
@@ -1397,11 +1430,11 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     );
     // The picker marks the alliance now, and offers the others.
     expect(
-      screen.queryByRole("button", { name: "Ally with Abian" }),
-    ).toBeNull();
+      screen.getByRole("button", { name: "See Abian's cards" }),
+    ).toHaveAttribute("data-current");
     expect(
-      screen.getByRole("button", { name: "Ally with Rowan" }),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: "See Rowan's cards" }),
+    ).not.toHaveAttribute("data-current");
     expect(
       within(screen.getByRole("region", { name: /^Bronze/ })).getByText(
         "Your alliance",
@@ -1448,7 +1481,10 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "Choose an alliance" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Ally with Rowan" }));
+    fireEvent.click(screen.getByRole("button", { name: "See Rowan's cards" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Begin Alliance with Rowan" }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Rowan opens at 10 wins.",
     );
