@@ -150,6 +150,10 @@ export function MyLibrary({
     0,
   );
   const cards = new Set(library.cards.map((item) => item.card.id)).size;
+  // The list's Sell column, when any edition has a copy to sell (v0.6.0).
+  const selling = (library.cards as LibraryItem[]).some(
+    (item) => (item.sellable ?? 0) > 0,
+  );
   const editions = library.cards.length;
   return (
     <section className={styles.library} aria-labelledby="library-title">
@@ -283,9 +287,11 @@ export function MyLibrary({
                 <th scope="col">Type</th>
                 <th scope="col">Copies</th>
                 <th scope="col">From</th>
-                <th scope="col">
-                  <span className={styles.visuallyHidden}>Sell</span>
-                </th>
+                {selling && (
+                  <th scope="col">
+                    <span className={styles.visuallyHidden}>Sell</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -316,18 +322,20 @@ export function MyLibrary({
                   <td>
                     {item.sources.map((from) => sourceLabels[from]).join(", ")}
                   </td>
-                  <td>
-                    {(item.sellable ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        className={styles.sellLink}
-                        aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
-                        onClick={() => sellItem(item)}
-                      >
-                        Sell
-                      </button>
-                    )}
-                  </td>
+                  {selling && (
+                    <td>
+                      {(item.sellable ?? 0) > 0 && (
+                        <button
+                          type="button"
+                          className={styles.sellLink}
+                          aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
+                          onClick={() => sellItem(item)}
+                        >
+                          Sell
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
