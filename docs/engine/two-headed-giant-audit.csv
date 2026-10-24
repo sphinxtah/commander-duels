@@ -9,14 +9,14 @@ Duelist's Heritage,DuelistsHeritage,805.10c attacking player,fixed,"0006 Combat.
 Fight or Flight,FightOrFlight,805.10c attacking player,fixed,0006 the opponent whose step it is (805.9),
 Flummoxed Cyclops,FlummoxedCyclops,805.10c attacking player,right,opponents of the controller: the other team either way,
 "Gideon, the Oathsworn",GideonTheOathsworn,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
-Invasion Plans,InvasionPlans,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
-Master Warcraft,MasterWarcraft,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
+Invasion Plans,InvasionPlans,805.10c attacking player,fixed,0009 the controller chooses the attacking player,"805.10c: one specific attacking player, whom the ability's controller chooses, declares the blocks; before, the turn's holder always did (v0.6.2)"
+Master Warcraft,MasterWarcraft,805.10c attacking player,fixed,0009 the active team's creatures,"the creatures of each player of the attacking team can be chosen to attack, and the choice is made when any of them has an attacker; before, only the holder's, and the teammate's creatures could not attack (v0.6.2)"
 Mirkwood Trapper,MirkwoodTrapper,805.10c attacking player,fixed,"0004 PlayerAttacksTriggeredAbility, 0006","whenever a player attacks: triggers for each player of the team who attacks, that player being the attacking player; ""if they aren't attacking you"" reads that player's attack"
 Mob Mentality,MobMentality,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
 Norn's Decree,NornsDecree,805.10c attacking player,fixed,0004 PlayerAttacksTriggeredAbility,"whenever a player attacks: triggers for each player of the team who attacks, that player being the attacking player"
 Overwhelming Instinct,OverwhelmingInstinct,805.10c attacking player,fixed,"0006 Combat.isAttackingPlayer, getAttackers(player)",
-Tenuous Truce,TenuousTruce,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
-Territorial Hellkite,TerritorialHellkite,805.10c attacking player,still wrong,805.10c: the turn's holder is the attacking player,
+Tenuous Truce,TenuousTruce,805.10c attacking player,fixed,0009 each attacking creature's controller,"you attack the enchanted opponent, or they attack you, with the creatures each of you controls (805.10a); before, the attack was read as the turn's holder's (v0.6.2)"
+Territorial Hellkite,TerritorialHellkite,805.10c attacking player,fixed,0009 watcher by each attacking player,"its watcher remembers each attacking player's own last combat (805.10a), so a teammate's Hellkite avoids the player it attacked; before, the combat was remembered for the holder only (v0.6.2)"
 "Tomik, Wielder of Law",TomikWielderOfLaw,805.10c attacking player,right,opponents of the controller: the other team either way,
 Accursed Witch,AccursedWitch,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
 Aggression,Aggression,805.4d a player's step,fixed,0004 TeamStepEvent,"at that player's own step: before, at the turn holder's, with ""that player"" the holder"
@@ -135,7 +135,7 @@ Sphinx of the Second Sun,SphinxOfTheSecondSun,805.4d custom step trigger,fixed,0
 "Storrev, Devkarin Lich",StorrevDevkarinLich,805.4d custom step trigger,right,"once a team step (each step, the next step, the first upkeep)",
 Sunseed Nurturer,SunseedNurturer,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
 Takklemaggot,Takklemaggot,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
-Territorial Hellkite,TerritorialHellkite,805.4d custom step trigger,still wrong,"805.10c, the turn's holder is the attacking player",
+Territorial Hellkite,TerritorialHellkite,805.4d custom step trigger,fixed,0009 watcher by each attacking player,"the beginning of combat on your turn triggers for the teammate's Hellkite too (0004), and since v0.6.2 it reads that player's own last combat"
 The Rack,TheRack,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
 Thopter Spy Network,ThopterSpyNetwork,805.4d custom step trigger,fixed,0004 TeamStepEvent (checked at each player's step of the active team),
 Time Vault,TimeVault,805.4d custom step trigger,fixed,0004 TurnMods for the team (805.8),
@@ -298,7 +298,7 @@ Titan Hunter,TitanHunter,805.4d each player's step,fixed,0004 TeamStepEvent,trig
 Tooth Collector,ToothCollector,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
 Topplegeist,Topplegeist,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
 Umbilicus,Umbilicus,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
-"Urabrask, Heretic Praetor",UrabraskHereticPraetor,805.4d each player's step,still wrong,0006 withTriggersForEachTeamPlayer,"names that opponent only as ""they"": says by hand that it triggers for each player of the active team, which is right, but its replacement applies later, at the draw, and reads the turn's holder (Game.isActivePlayer, getActivePlayerId): both teammates' draws are replaced and the holder's library exiles twice (found in the fix's review, v0.5.1)"
+"Urabrask, Heretic Praetor",UrabraskHereticPraetor,805.4d each player's step,fixed,0006 withTriggersForEachTeamPlayer; 0009 the replacement's player,"names that opponent only as ""they"": says by hand that it triggers for each player of the active team (0006); its replacement, which applies later, at the draw, read the turn's holder, so both teammates' draws were replaced and the holder's library exiled twice (found in the fix's review, v0.5.1). Since v0.6.2 each replacement replaces only the draw of the opponent its trigger was for, from that player's library"
 Urborg Stalker,UrborgStalker,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
 Verdant Kraken,VerdantKraken,805.4d each player's step,right,0004 TeamStepEvent,does not refer to that player: triggers once a team step
 Viseling,Viseling,805.4d each player's step,fixed,0004 TeamStepEvent,triggers for each player of the active team
@@ -512,7 +512,7 @@ Wound Reflection,WoundReflection,805.4d each step,right,,triggers once a team st
 "Zopandrel, Hunger Dominus",ZopandrelHungerDominus,805.4d each step,right,,triggers once a team step
 Avizoa,Avizoa,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
 Blinding Angel,BlindingAngel,805.8 skip,fixed,0004 Step.skipStep / Phase.skipPhase,the step or phase is the team's when any of its players skips it
-Brine Elemental,BrineElemental,805.8 skip,still wrong,0004 TurnMods,"each opponent's skip is a turn mod per player: the team skips two untap steps, not one"
+Brine Elemental,BrineElemental,805.8 skip,fixed,0009 one skip a team,"805.8: a single effect that makes several players of a team skip a step makes the team skip it once: the skip goes to one player of each opposing team; before, one for each player, and the team skipped two untap steps (v0.6.2)"
 Chronatog,Chronatog,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
 Chronatog Totem,ChronatogTotem,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
 Chronosavant,Chronosavant,805.8 skip,fixed,0004 TurnMods.useNextForTeam,the team skips it
@@ -714,7 +714,7 @@ Aetherspouts,Aetherspouts,reads the active player,right,"the active player is on
 Angel's Trumpet,AngelsTrumpet,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Antagonism,Antagonism,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Apathy,Apathy,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
-Arboria,Arboria,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+Arboria,Arboria,reads the active player,fixed,0009 watchers by the active team,"the spells either player of the active team casts count, and each of the team's players' record is renewed when the team's turn ends; before, only the holder's spells counted, and a teammate's permanents put onto the battlefield in another team's turn still counted (v0.6.2)"
 Assault Suit,AssaultSuit,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 "Belbe, Corrupted Observer",BelbeCorruptedObserver,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
 "Bello, Bard of the Brambles",BelloBardOfTheBrambles,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
@@ -723,7 +723,7 @@ Boros Battleshaper,BorosBattleshaper,reads the active player,right,compares the 
 "Bumi, Unleashed",BumiUnleashed,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
 Burning Cinder Fury of Crimson Chaos Fire,BurningCinderFuryOfCrimsonChaosFire,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
 Citadel of Pain,CitadelOfPain,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
-Contested Game Ball,ContestedGameBall,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+Contested Game Ball,ContestedGameBall,reads the active player,fixed,0009 the controller chooses the attacking player,"805.10c: the ball's controller chooses which player of the attacking team gains control; before, the turn's holder always did (v0.6.2)"
 "Coram, the Undertaker",CoramTheUndertaker,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 Crimson Honor Guard,CrimsonHonorGuard,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
 Curse of Surveillance,CurseOfSurveillance,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
@@ -735,9 +735,9 @@ Dimensional Breach,DimensionalBreach,reads the active player,fixed,0006 triggers
 Doom Foretold,DoomForetold,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Dream Tides,DreamTides,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Ebony Owl Netsuke,EbonyOwlNetsuke,reads the active player,fixed,0006 triggersForEachTeamPlayer,
-Elkin Lair,ElkinLair,reads the active player,still wrong,"the card's delayed part (its next end step, the next draw) reads the turn's holder",
-"Ellie, Brick Master",EllieBrickMaster,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
-Emberwilde Captain,EmberwildeCaptain,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+Elkin Lair,ElkinLair,reads the active player,right,,"reviewed again in v0.6.2 (TwoHeadedGiantRareCardsTest): the upkeep part acts for the player whose step it is (805.9), and the end step's part, though it reads the turn's holder, puts every card the Lair still has exiled into its owner's graveyard, so each player's unplayed card goes to their own graveyard. The v0.5.1 verdict was a misreading"
+"Ellie, Brick Master",EllieBrickMaster,reads the active player,fixed,0009 triggers for each attacking player,"805.10c: triggers for each player of the attacking team who attacks your opponent, and that player creates the token; before, the turn's holder created it (v0.6.2)"
+Emberwilde Captain,EmberwildeCaptain,reads the active player,fixed,0009 triggers for each attacking player,"triggers for each opponent who attacks you with a creature they control, and deals that player damage for the cards in their hand; before, the holder's hand and the holder (v0.6.2)"
 Emberwilde Djinn,EmberwildeDjinn,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Energy Vortex,EnergyVortex,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
 Eye of Doom,EyeOfDoom,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
@@ -764,7 +764,7 @@ Heroism,Heroism,reads the active player,fixed,0006 each attacking player of the 
 Hylda's Crown of Winter,HyldasCrownOfWinter,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 Illusionist's Gambit,IllusionistsGambit,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
 Impatience,Impatience,reads the active player,fixed,0006 withTriggersForEachTeamPlayer,
-Invasion of Fiora,InvasionOfFiora,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+Invasion of Fiora,InvasionOfFiora,reads the active player,fixed,0009 watcher by the active team,"Marchesa's watcher forgets combat damage for each player of the team whose turn ended; before, for the holder only (v0.6.2)"
 Island Sanctuary,IslandSanctuary,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 Keeper of the Accord,KeeperOfTheAccord,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 "Ketramose, the New Dawn",KetramoseTheNewDawn,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
@@ -789,7 +789,7 @@ Mudslide,Mudslide,reads the active player,fixed,0004 TeamStepEvent,the step trig
 "Muldrotha, the Gravetide",MuldrothaTheGravetide,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 "Neriv, Crackling Vanguard",NerivCracklingVanguard,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 Noetic Scales,NoeticScales,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
-"O-Kagachi, Vengeful Kami",OKagachiVengefulKami,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+"O-Kagachi, Vengeful Kami",OKagachiVengefulKami,reads the active player,fixed,0009 watcher by the attacking creature's controller,"remembers the controller of each attacking creature as the player who attacked, and forgets each player of the team whose turn begins; before, the holder had attacked (v0.6.2)"
 Oath of Druids,OathOfDruids,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Oath of Ghouls,OathOfGhouls,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
 Oath of Lieges,OathOfLieges,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
@@ -818,10 +818,10 @@ Skyclave Shade,SkyclaveShade,reads the active player,fixed,0006 isActivePlayer (
 Souls of the Faultless,SoulsOfTheFaultless,reads the active player,right,life loss from a shared total: the team's either way,
 Sphinx of Foresight,SphinxOfForesight,reads the active player,fixed,0004 TeamStepEvent: the player whose step it is is the active player (805.9),
 Stonebinder's Familiar,StonebindersFamiliar,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
-Storage Matrix,StorageMatrix,reads the active player,still wrong,a choice by the turn's holder for the whole team's permanents (each player chooses),
+Storage Matrix,StorageMatrix,reads the active player,fixed,0009 a choice for each player,"805.4b: each player of the active team chooses during the team's untap step, for the permanents they control; before, the holder chose for theirs and the teammate's untapped freely (v0.6.2)"
 Suppressor Skyguard,SuppressorSkyguard,reads the active player,right,compares the active player with opponents: the team's turn either way,
 Suspend Aggression,SuspendAggression,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
-"Tahngarth, First Mate",TahngarthFirstMate,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
+"Tahngarth, First Mate",TahngarthFirstMate,reads the active player,fixed,0009 triggers for each attacking player,"triggers for each opponent who attacks with a creature; that opponent gains control, and Tahngarth attacks a player or planeswalker that opponent's creatures attack; before, the holder (v0.6.2)"
 Tangle Kelp,TangleKelp,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 Tariff,Tariff,reads the active player,right,"the active player is one of the active team's (805.9); the turn's holder, without a choice",
 Temporal Distortion,TemporalDistortion,reads the active player,fixed,0004 TeamStepEvent,the step trigger's effect reads the active player: the player whose step it is (805.9)
@@ -834,11 +834,11 @@ Tombstone Stairwell,TombstoneStairwell,reads the active player,right,"the active
 "Tomik, Wielder of Law",TomikWielderOfLaw,reads the active player,right,compares the active player with opponents: the team's turn either way,
 Total War,TotalWar,reads the active player,fixed,0006 each attacking player of the active team (805.10a),
 Trove of Temptation,TroveOfTemptation,reads the active player,right,compares the active player with opponents: the team's turn either way,
-"Urabrask, Heretic Praetor",UrabraskHereticPraetor,reads the active player,still wrong,"the card's delayed part (its next end step, the next draw) reads the turn's holder",
+"Urabrask, Heretic Praetor",UrabraskHereticPraetor,reads the active player,fixed,0009 the replacement's player,"its replacement applies to the draw of the opponent its trigger was for and exiles from that player's library; before, either active player's first draw, from the holder's library (v0.6.2)"
 Wall of Dust,WallOfDust,reads the active player,right,effect duration bookkeeping (setStartingControllerAndTurnNum),
 War Room (Star Wars),WarRoomStarWars,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
-War's Toll,WarsToll,reads the active player,still wrong,805.10c: the turn's holder is taken as the attacking player,
-Weathered Sentinels,WeatheredSentinels,reads the active player,still wrong,watcher keyed by the turn's holder (attacked during their last turn),
+War's Toll,WarsToll,reads the active player,fixed,0009 the attacking creature's controller,"the creatures of each opponent who attacks with one must attack, and that player is told when one stays back; before, the holder's creatures were checked, and a teammate attacking alone could not make the attack legal (v0.6.2)"
+Weathered Sentinels,WeatheredSentinels,reads the active player,fixed,0009 watcher by the attacking creature's controller,"as O-Kagachi (v0.6.2). Not the format's: at the pin its replacement effect stops your creatures attacking players you attacked during your last turn, and its hint lists them, in every format (the watcher's arguments read the wrong way round); left as XMage has it"
 Weftwalking,Weftwalking,reads the active player,fixed,0006 each player of the active team (805.4),
 Word of Command,WordOfCommand,reads the active player,fixed,0006 isActivePlayer (805.9: the team's turn),
 Y'shtola Rhul,YshtolaRhul,reads the active player,right,an extra phase for the turn's holder is the team's (805.8),
