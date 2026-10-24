@@ -13,6 +13,7 @@ Validated locally on Windows on October 24, 2026, on the work of v0.6.2 as merge
 | Engine | `docker build -f engine/Dockerfile --target engine-build .` with patches 0001–0009: 176 JUnit tests, none failing, one skipped (the opt-in pairing measurement). New: `TwoHeadedGiantRareCardsTest` (18 games), `StandInCardTest` (4, including a Legacy game where stand-ins are cast and attack, with the leak checks) |
 | Engine smoke | Two-Headed Giant with a human and three bots, with four humans, and a Legacy game through `scripts/engine_human_game.py` with patch 0009 (in its worktree) |
 | Not run locally | the browser journeys; hosted CI runs them |
+| Hosted CI | run #129 failed the Cards journey's old check (a card the engine lacks found nowhere; it is now a stand-in), fixed in bbf5304; run #130 green in 19 m 28 s: 428 pytest, 1,195 Vitest, 62 browser journeys (17 skipped), the engine job with patches 0001–0009 |
 
 ## v0.6.1
 
