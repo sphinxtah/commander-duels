@@ -22,14 +22,6 @@ export const pages = [
   "Admin",
 ] as const;
 export type Page = (typeof pages)[number] | "SysOp" | "Notifications";
-export const mainPages = [
-  "Home",
-  "Play",
-  "Tables",
-  "Decks",
-  "Cards",
-  "Shop",
-] as const;
 
 /** The name the title band shows for each page. */
 export const pageNames: Record<Page, string> = {
@@ -47,10 +39,6 @@ export const pageNames: Record<Page, string> = {
   SysOp: "SysOp",
   Notifications: "Notifications",
 };
-
-export function pageHref(page: Page): string {
-  return `#${page.toLowerCase()}`;
-}
 
 export type IconName =
   | "home"

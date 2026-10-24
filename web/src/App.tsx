@@ -51,7 +51,7 @@ import { useHud } from "./shell/hud";
 import { PageBand } from "./shell/PageBand";
 import { pages, type Page } from "./shell/pages";
 import { PlayPage } from "./shell/PlayPage";
-import { PhoneBar, TopBar } from "./shell/TopBar";
+import { TopBar } from "./shell/TopBar";
 import {
   readPreferences,
   savePreferences,
@@ -696,7 +696,6 @@ export function App() {
             <SiteLinks className={styles.footerLinks} />
           </footer>
         </main>
-        <PhoneBar shown={shown} covered={chat.sheet !== null} />
         <SetupWizard
           me={me}
           onChange={accountChanged}

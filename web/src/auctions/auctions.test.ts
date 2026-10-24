@@ -119,7 +119,11 @@ describe("words", () => {
 
 describe("the market's filters", () => {
   it("asks only for the filters set", () => {
-    expect(marketQuery(noMarketFilters)).toEqual({ sort: "ending", limit: 24 });
+    expect(marketQuery(noMarketFilters)).toEqual({
+      sort: "ending",
+      limit: 24,
+      include_mine: true,
+    });
     const filters = {
       ...noMarketFilters,
       q: " bolt ",
@@ -148,6 +152,7 @@ describe("the market's filters", () => {
       max_time_left: 600,
       sort: "price_low",
       limit: 24,
+      include_mine: true,
       cursor: "next-page",
     });
     expect(filtersSet(filters)).toBe(10);

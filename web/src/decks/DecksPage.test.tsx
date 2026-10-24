@@ -13,6 +13,7 @@ import { DecksPage } from "./DecksPage";
 import {
   deckDetail,
   mockApi,
+  openDialogs,
   problem,
   reply,
   starterDeck,
@@ -96,6 +97,43 @@ describe("the decks page", () => {
       await screen.findByText("Mono-Red Burn is archived."),
     ).toBeInTheDocument();
     expect(await screen.findByText(/No decks yet/)).toBeInTheDocument();
+  });
+
+  it("asks before deleting a deck, and deletes it only when told to (v0.6.1)", async () => {
+    openDialogs();
+    const api = mockApi();
+    api.on(
+      "GET /api/v1/decks",
+      () => reply(200, [summary]),
+      () => reply(200, []),
+    );
+    api.on("GET /api/v1/decks/starters", () => reply(200, []));
+    api.on("DELETE /api/v1/decks/{deck_id}", () => reply(204));
+    render(<DecksPage me={player} heading={createRef()} />);
+    const row = (
+      await screen.findByRole("link", { name: "Mono-Red Burn" })
+    ).closest("li")!;
+    const deletes = () =>
+      api.calls.filter(
+        (call) => call.route === "DELETE /api/v1/decks/{deck_id}",
+      );
+    fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    const dialog = screen
+      .getByRole("heading", { name: "Delete Mono-Red Burn?" })
+      .closest("dialog")!;
+    expect(dialog).toHaveAttribute("open");
+    expect(deletes()).toHaveLength(0);
+    // Kept: nothing is deleted.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep it" }));
+    expect(deletes()).toHaveLength(0);
+    fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    expect(
+      await screen.findByText(
+        "Mono-Red Burn is in the trash. Restore it from there.",
+      ),
+    ).toBeInTheDocument();
+    expect(deletes()).toHaveLength(1);
   });
 
   it("keeps the Archived tab's list when the list asked for after an archive answers last", async () => {

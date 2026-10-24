@@ -417,13 +417,11 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
   await expect(toggle).toHaveAccessibleName(
     "Friends, 3 online, 1 unread message",
   );
-  // A round button above the bar of pages, at the right.
+  // A round button at the bottom right (since v0.6.1 there is no bar of pages under it).
   const button = (await toggle.boundingBox())!;
-  const pagesBar = page.locator('nav[aria-label="Main navigation on a phone"]');
-  await expect(pagesBar).not.toHaveAttribute("inert");
-  const pages = (await pagesBar.boundingBox())!;
   expect(button.width).toBeLessThan(60);
-  expect(button.y + button.height).toBeLessThanOrEqual(pages.y);
+  expect(button.y + button.height).toBeLessThanOrEqual(844);
+  expect(button.y + button.height).toBeGreaterThan(844 - 24);
   expect(button.x + button.width).toBeGreaterThan(390 - 24);
   await page.screenshot({
     path: testInfo.outputPath("chatbar-phone-button.png"),
@@ -438,8 +436,7 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
     .boundingBox())!;
   expect(sheet.x).toBe(0);
   expect(sheet.width).toBe(width);
-  // It covers the bar of pages, which is out of reach meanwhile, and stops below the top bar.
-  await expect(pagesBar).toHaveAttribute("inert", "");
+  // It stops below the top bar.
   const top = (await page.getByRole("banner").boundingBox())!;
   expect(sheet.y).toBeGreaterThanOrEqual(top.y + top.height);
   await page.screenshot({
@@ -447,13 +444,12 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
   });
 
   // A friend's conversation takes the list's place, the whole width, over the round button,
-  // which is out of reach meanwhile, as the bar of pages is.
+  // which is out of reach meanwhile.
   await list.getByRole("button", { name: /^Chat with ada/ }).click();
   await expect(covered).toHaveAttribute("aria-expanded", "false");
   const ada = bar.getByRole("region", { name: "Chat with ada" });
   await expect(ada.getByLabel("Write to ada")).toBeFocused();
   await expect(covered).toBeHidden();
-  await expect(pagesBar).toHaveAttribute("inert", "");
   const window = (await ada.boundingBox())!;
   expect(window.x).toBe(0);
   expect(window.width).toBe(width);
@@ -464,12 +460,12 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
   await page.screenshot({
     path: testInfo.outputPath("chatbar-phone-window.png"),
   });
-  // Folded, it sits beside the button, above the bar of pages; Bob's, opened after, shows alone.
+  // Folded, it sits beside the button, on the window's bottom edge; Bob's, opened after, shows
+  // alone.
   await ada.getByRole("button", { expanded: true }).click();
   await expect(toggle).toBeVisible();
-  await expect(pagesBar).not.toHaveAttribute("inert");
   const tab = (await ada.boundingBox())!;
-  expect(tab.y + tab.height).toBeLessThanOrEqual(pages.y);
+  expect(tab.y + tab.height).toBeLessThanOrEqual(844);
   expect(tab.x + tab.width).toBeLessThanOrEqual(
     (await toggle.boundingBox())!.x,
   );
@@ -490,7 +486,6 @@ test("the chat bar on a phone: one button, then the list or one conversation, th
   await expect(heading).toBeVisible();
   await expect(bob.getByRole("button", { expanded: false })).toBeVisible();
   expect(await reachable(heading)).toBe(true);
-  await expect(pagesBar).not.toHaveAttribute("inert");
   // Closed from across the screen, focus goes back to the list's button, in reach again.
   await bob.getByRole("button", { expanded: false }).click();
   await expect(covered).toBeHidden();

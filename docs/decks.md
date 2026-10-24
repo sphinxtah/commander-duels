@@ -15,7 +15,7 @@ Since v0.3.1 players build from their own **card library**: two starter decks ch
 
 ## The list (DECK01)
 
-Your decks show their format, color identity, card count, commanders and state: "Ready to play", "Legal, not playable yet" (since v0.4.5 only a Godlike card the running engine has not loaded) or "Draft" (problems to fix), and since v0.4.5 how many cards left the game ([below](#cards-that-leave-the-game-v045)). A deck that holds banned cards, or cards not legal in its format, is tagged "Casual tables only" with "Banned cards" or "Not legal in Commander" (or Legacy). From the list a deck can be opened, duplicated, archived (and brought back) or moved to the trash, from where it can be restored. Nothing is deleted for good in v0.2.0.
+Your decks show their format, color identity, card count, commanders and state: "Ready to play", "Legal, not playable yet" (since v0.4.5 only a Godlike card the running engine has not loaded) or "Draft" (problems to fix), and since v0.4.5 how many cards left the game ([below](#cards-that-leave-the-game-v045)). A deck that holds banned cards, or cards not legal in its format, is tagged "Casual tables only" with "Banned cards" or "Not legal in Commander" (or Legacy). From the list a deck can be opened, duplicated, archived (and brought back) or moved to the trash, from where it can be restored. Since v0.6.1 Delete asks first ("Delete <deck>? It goes to the trash, where you can restore it.", Keep it or Delete), at the owner's report, as conceding a match does. Nothing is deleted for good in v0.2.0.
 
 **Starter decks.** The practice table's six fixture decks can be copied to make them yours.
 

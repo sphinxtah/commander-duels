@@ -139,32 +139,26 @@ test("layouts remain usable and keyboard navigation works", async ({
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    // On a phone the six pages move to a bar along the bottom (v0.4.5).
-    const phone = page.getByRole("navigation", {
-      name: "Main navigation on a phone",
-    });
-    if (width < 820) await expect(phone).toBeVisible();
-    else await expect(phone).toBeHidden();
+    // The player search at every width (v0.6.1: the top bar holds no pages, on a phone or not).
+    await expect(
+      page.getByRole("search", { name: "Find players" }),
+    ).toBeVisible();
     await page.screenshot({
       path: testInfo.outputPath(`menu-${width}.png`),
       fullPage: true,
     });
   }
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: "Decks", exact: true })
-    .focus();
+  const tiles = page.getByRole("region", { name: "Main menu" });
+  await tiles.getByRole("link", { name: /^Decks/ }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
   await page.getByRole("button", { name: /^Your account/ }).click();
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByRole("checkbox", { name: "Larger text" }).check();
   await page.getByRole("checkbox", { name: "Reduce motion" }).check();
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: "Play", exact: true })
-    .click();
+  await page.getByRole("link", { name: "Commander Duels home" }).click();
+  await tiles.getByRole("link", { name: /^Play/ }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

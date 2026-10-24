@@ -146,6 +146,8 @@ function Decks({
   const create = useRef<HTMLDialogElement>(null);
   const [importing, setImporting] = useState(false);
   const [guiding, setGuiding] = useState(false);
+  const deleting = useRef<HTMLDialogElement>(null);
+  const [doomed, setDoomed] = useState<DeckSummary | null>(null);
   const lists = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -362,7 +364,10 @@ function Decks({
                     <button
                       type="button"
                       className={styles.secondary}
-                      onClick={() => void act(deck, "delete")}
+                      onClick={() => {
+                        setDoomed(deck);
+                        deleting.current?.showModal();
+                      }}
                     >
                       Delete
                     </button>
@@ -481,6 +486,32 @@ function Decks({
               onClick={() => create.current?.close()}
             >
               Cancel
+            </button>
+          </div>
+        </form>
+      </dialog>
+      {/* Deleting asks first (v0.6.1, the owner's report), as conceding a match does. */}
+      <dialog
+        ref={deleting}
+        className={styles.dialog}
+        aria-labelledby="delete-deck-title"
+        onClose={() => setDoomed(null)}
+      >
+        <form method="dialog">
+          <h2 id="delete-deck-title">Delete {doomed?.title}?</h2>
+          <p className={styles.hint}>
+            It goes to the trash, where you can restore it.
+          </p>
+          <div className={styles.actions}>
+            <button type="submit" className={styles.secondary} autoFocus>
+              Keep it
+            </button>
+            <button
+              type="submit"
+              className={styles.primary}
+              onClick={() => doomed && void act(doomed, "delete")}
+            >
+              Delete
             </button>
           </div>
         </form>

@@ -450,7 +450,7 @@ test("an account waiting for approval sees only its wait, and approval opens the
     page.getByRole("heading", { name: "Make yourself at home." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("navigation", { name: "Main navigation" }),
+    page.getByRole("search", { name: "Find players" }),
   ).toBeVisible();
   await expect(page).toHaveURL(/#settings$/);
 });

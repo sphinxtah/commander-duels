@@ -10,8 +10,8 @@ import { NotificationBell } from "../social/Notifications";
 import { PlayerSearch } from "../social/PlayerSearch";
 import type { Social } from "../social/presence";
 import type { Hud } from "./hud";
-import { hoverSound, selectSound } from "./menuSound";
-import { Icon, mainPages, pageHref, type IconName, type Page } from "./pages";
+import { selectSound } from "./menuSound";
+import { Icon, type Page } from "./pages";
 import styles from "./shell.module.css";
 
 export type Connection = "loading" | "connected" | "unavailable";
@@ -31,9 +31,10 @@ function badge(count: number) {
 }
 
 /**
- * The top bar (v0.4.5), as in Magic Duels' menus: the mark that leads home, the main menu's six
- * pages, the player search, and the account's corner (its tokens, Friends, the bell and its own
- * menu). On a phone the six pages move to a bar at the bottom of the window. Messages, beside
+ * The top bar (v0.4.5), as in Magic Duels' menus: the mark that leads home, the player search,
+ * centred over the main menu's tiles, and the account's corner (its tokens, Friends, the bell and
+ * its own menu). Its links to the main menu's six pages, and the phone's bar of them, went in
+ * v0.6.1: the tiles lead to every page, and every other page's band back to them. Messages, beside
  * Friends until v0.5.1, are on the chat bar along the bottom of every page (chat/ChatBar.tsx).
  */
 export function TopBar({
@@ -66,21 +67,6 @@ export function TopBar({
           COMMANDER<strong>DUELS</strong>
         </span>
       </a>
-      <nav aria-label="Main navigation" className={styles.nav}>
-        {mainPages.map((page) => (
-          <a
-            key={page}
-            href={pageHref(page)}
-            aria-current={shown === page ? "page" : undefined}
-            className={shown === page ? styles.active : undefined}
-            onPointerEnter={() => hoverSound()}
-            onClick={selectSound}
-          >
-            <Icon name={page.toLowerCase() as IconName} />
-            <span>{page}</span>
-          </a>
-        ))}
-      </nav>
       <PlayerSearch className={styles.search} />
       <div className={styles.corner}>
         <UpdateNotice className={styles.update} />
@@ -121,37 +107,6 @@ export function TopBar({
         />
       </div>
     </header>
-  );
-}
-
-/** The six main pages again, along the bottom of a phone's window. The chat bar's list or a
- * conversation, open, covers it (v0.5.1): it is out of reach meanwhile. */
-export function PhoneBar({
-  shown,
-  covered = false,
-}: {
-  shown: Page;
-  covered?: boolean;
-}) {
-  return (
-    <nav
-      aria-label="Main navigation on a phone"
-      className={styles.phoneBar}
-      inert={covered || undefined}
-    >
-      {mainPages.map((page) => (
-        <a
-          key={page}
-          href={pageHref(page)}
-          aria-current={shown === page ? "page" : undefined}
-          className={shown === page ? styles.active : undefined}
-          onClick={selectSound}
-        >
-          <Icon name={page.toLowerCase() as IconName} />
-          <span>{page}</span>
-        </a>
-      ))}
-    </nav>
   );
 }
 

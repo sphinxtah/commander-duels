@@ -321,7 +321,13 @@ export function marketQuery(
   filters: MarketFilters,
   cursor?: string | null,
 ): MarketQuery {
-  const query: MarketQuery = { sort: filters.sort, limit: 24 };
+  // The viewer's own listings are on the market too (v0.6.1, the owner's report: two cards listed
+  // and not found there), marked as theirs and never bid on.
+  const query: MarketQuery = {
+    sort: filters.sort,
+    limit: 24,
+    include_mine: true,
+  };
   if (filters.q.trim()) query.q = filters.q.trim();
   if (filters.set.trim()) query.set = filters.set.trim().toLowerCase();
   if (filters.rarity.length) query.rarity = filters.rarity;

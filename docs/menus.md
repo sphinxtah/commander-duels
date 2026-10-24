@@ -8,7 +8,7 @@ Since v0.4.5 the app's menus and pages take the look of Magic Duels' front end, 
 - **Buttons.** The main buttons are bevelled gold, lit from above, with a sheen that crosses them under the pointer. The others are dark glass in a gold frame.
 - **Panels.** Panels and tiles have a gold hairline, a lit top edge and a deep shadow.
 - **Motion.** A page rises in as it opens; the main menu's tiles come in one after another, lift and glow under the pointer, and embers drift up behind it. The ally's portrait floats gently. Reduce motion (Settings) and the system's own setting stop all of it, as before.
-- **Sound.** The menus make generated sounds, like the table's (no recorded audio): a soft tick when the pointer or the keyboard reaches a tile or a page in the top bar, a whoosh into a bell when one is chosen, and a falling whoosh back to the main menu. They follow the table's sound settings (Settings → the table's volume and mute). As browsers require, no sound plays before the first click or key press. There is no music.
+- **Sound.** The menus make generated sounds, like the table's (no recorded audio): a soft tick when the pointer or the keyboard reaches a tile (or, until v0.6.1, a page in the top bar), a whoosh into a bell when one is chosen, and a falling whoosh back to the main menu. They follow the table's sound settings (Settings → the table's volume and mute). As browsers require, no sound plays before the first click or key press. There is no music.
 
 ## The title screen
 
@@ -18,15 +18,16 @@ Before an account is active, every address shows the title screen: the owner's m
 
 At the top of every page, and staying there as the page scrolls:
 - **The mark and the wordmark**, which lead to the main menu.
-- **The main menu's six pages:** Home, Play, Tables, Decks, Cards and Shop, each with its icon. The page shown is marked by a gold flare under it.
-- **The player search** ([finding players](social.md)).
+- **The player search** ([finding players](social.md)), centred over the main menu's tiles on every page (v0.6.1): its column is worked out from the main column's width and the main menu's two columns. Where the account's corner needs the room (between about 1,180 and 1,500 px wide) the search gives way to the left; where the tiles span the page (narrower than 1,100 px) it is centred on the bar.
 - **The account's corner:** its tokens (a gold coin and the balance, leading to the shop), Friends, the notification bell, and the account's own button: its portrait (its ally's, else its avatar), its handle and its tier with its wins, and a dot for the connection to the service. The button opens a menu of Profile, Settings, Administration (for administrators and SysOp, with what waits there counted on the button and on the item) and Report a problem, with the connection and the version. Messages, with its unread count, sat between Friends and the bell until v0.5.1; the count is now on the chat bar.
 
-On a phone (narrower than 820 px) the six pages move to a bar along the bottom of the window, the search takes a row of its own, and the handle and tier give way to the portrait.
+**The page links are gone** (v0.6.1, the owner: "it's time to retire the menu items at the very top left. I want Home to be the main card/tile area in the middle"). Until then the bar held the main menu's six pages (Home, Play, Tables, Decks, Cards and Shop), and a phone had them again in a bar along the bottom of the window. Now the main menu's tiles lead to every page, and every other page's title band leads back to them ("Main menu"). On a phone that is all it needs: phones matter for the shop, opening packs, the auction house and the social features, which the tiles and the account's corner reach ([the owner's decision](plans/0.6.1.md#the-top-bar-the-owner-2026-10-24)).
+
+On a phone (narrower than 820 px) the search takes a row of its own, the wordmark gives way to the mark, and the handle and tier to the portrait.
 
 ## The chat bar (v0.5.1)
 
-Along the bottom of every page: the friends list at the right end, "Friends · 3 online" with the count of unread messages, folded to a tab or open as the player left it, and friends' conversations docked beside it, each folded to a tab or open above it. At the game's table it folds away into a diamond on the band ([the game screen](game-screen.md#friends-chat-at-the-table-v051)). They take the look of the menus' panels: dark glass in a gold hairline, the list's title in Cinzel. On a phone the bar is one round button above the bar of pages, and the list or one conversation opens the whole width of the screen. The page keeps room at its foot so its end scrolls clear of the bar. [Chat](chat.md#friends-messages) says what it does.
+Along the bottom of every page: the friends list at the right end, "Friends · 3 online" with the count of unread messages, folded to a tab or open as the player left it, and friends' conversations docked beside it, each folded to a tab or open above it. At the game's table it folds away into a diamond on the band ([the game screen](game-screen.md#friends-chat-at-the-table-v051)). They take the look of the menus' panels: dark glass in a gold hairline, the list's title in Cinzel. On a phone the bar is one round button at the bottom right (above the bar of pages until v0.6.1), and the list or one conversation opens the whole width of the screen. The page keeps room at its foot so its end scrolls clear of the bar. [Chat](chat.md#friends-messages) says what it does.
 
 ## The main menu
 

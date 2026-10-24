@@ -103,7 +103,7 @@ The web side of the auction house. It looks and moves like Madden Ultimate Team'
 
 ### Where it opens
 
-- **The main menu's tile** "Tivit's Auction House", beside Leng's card shop, over the owner's painting (`web/public/menu/auctions-640.webp` and `-1280.webp`, made from `auction.house.background.png` as the other tiles' were; [asset-provenance.csv](asset-provenance.csv)). Tables, Leng's shop and the auction house share the second row of the menu; the top bar keeps its six pages.
+- **The main menu's tile** "Tivit's Auction House", beside Leng's card shop, over the owner's painting (`web/public/menu/auctions-640.webp` and `-1280.webp`, made from `auction.house.background.png` as the other tiles' were; [asset-provenance.csv](asset-provenance.csv)). Tables, Leng's shop and the auction house share the second row of the menu; the top bar kept its six pages until v0.6.1 ([the menus](menus.md#the-top-bar)).
 - **The address** `#auctions`, with the tab in it: `#auctions/search`, `#auctions/list`, `#auctions/targets`. Back and Forward move between the tabs. The band above the page says "Auctions".
 - **My library's Sell** (below), and **the bell**, whose auction notifications lead to the targets or the list.
 
@@ -116,6 +116,7 @@ The web side of the auction house. It looks and moves like Madden Ultimate Team'
 #### Search the market
 
 - **Filters** at the side (folded under a "Search filters" bar on a narrow window, with how many are set): card name, set code, type, rarity chips, finish chips, colour pips (W, U, B, R, G and colourless), bid and Buy Now ranges, "Only with Buy Now", time left (under 1 minute to under 24 hours) and the sort (ending soonest, newest, price low and high, Buy Now low). **Search** applies them; **Reset** clears them and searches again.
+- **The viewer's own listings are on the market too** (since v0.6.1, the owner's report: two cards listed and not found there; until then the market left them out, as Madden's does). The page asks with `include_mine=true`; each is badged **Your listing**, counted in the banner's live auctions, and opens the item panel without bidding. The API's default is unchanged.
 - **The results** are Madden's item cards: the edition's picture (a foil shimmers and glows, an etched foil is marked "Etched" too), the name, the edition ("Revised Edition 3ED #162"), rarity and finish chips, and a plate with the bid (or the starting bid), Buy Now and the time left counting down every second, red under a minute. A badge says **Winning**, **Outbid** or **Your listing**, and the card's edge takes its colour. The **star** watches or stops watching an auction, which puts it in the transfer targets.
 - **Paging** by the API's cursor, Previous and Next. The page shown is asked for again every 5 seconds while the tab is visible (marked as the page's own request, so it does not count as the player's activity).
 

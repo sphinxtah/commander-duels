@@ -431,7 +431,7 @@ describe("the landing page", () => {
     });
     expect(window.location.hash).toBe("#settings");
     expect(
-      screen.getByRole("navigation", { name: "Main navigation" }),
+      screen.getByRole("search", { name: "Find players" }),
     ).toBeInTheDocument();
     // Focus lands on the page's heading, as after following a link.
     expect(document.activeElement).toBe(heading);
@@ -518,7 +518,7 @@ describe("the landing page", () => {
     ).toBeInTheDocument();
     expect(window.location.hash).toBe("#admin");
     expect(
-      screen.getByRole("navigation", { name: "Main navigation" }),
+      screen.getByRole("search", { name: "Find players" }),
     ).toBeInTheDocument();
     expect(fetches).toHaveBeenCalledWith(
       "/api/v1/sysop/login",
@@ -600,7 +600,7 @@ describe("an account that is not active", () => {
     await screen.findByRole("heading", { name: "Welcome to the table." });
     expect(window.location.hash).toBe("#profile");
     expect(
-      screen.getByRole("navigation", { name: "Main navigation" }),
+      screen.getByRole("search", { name: "Find players" }),
     ).toBeInTheDocument();
     // The setup wizard opens on the approved account (v0.4.2), with focus on its welcome.
     const welcome = await screen.findByRole("heading", {
@@ -1165,17 +1165,14 @@ describe("the main menu (v0.4.5)", () => {
       expect(
         within(menu).getByRole("link", { name: new RegExp(`^${name}`) }),
       ).toHaveAttribute("href", href);
-    // The top bar: the six pages and the tokens; no title band on the main menu itself.
-    const nav = screen.getByRole("navigation", { name: "Main navigation" });
-    expect(
-      within(nav)
-        .getAllByRole("link")
-        .map((link) => link.textContent),
-    ).toEqual(["Home", "Play", "Tables", "Decks", "Cards", "Shop"]);
-    expect(within(nav).getByRole("link", { name: "Home" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    // The top bar (v0.6.1): the mark leads home, no page links; the tokens; no title band on
+    // the main menu itself.
+    const home = screen.getByRole("link", { name: "Commander Duels home" });
+    expect(home).toHaveAttribute("href", "#home");
+    const top = home.closest("header")!;
+    expect(within(top).queryByRole("navigation")).toBeNull();
+    for (const name of ["Play", "Tables", "Decks", "Cards", "Shop"])
+      expect(within(top).queryByRole("link", { name })).toBeNull();
     expect(
       await screen.findByRole("link", { name: "12,450 tokens" }),
     ).toHaveAttribute("href", "#shop");
@@ -1345,42 +1342,6 @@ describe("the chat bar (v0.5.1)", () => {
       expect(back.defaultPrevented).toBe(false);
     } finally {
       delete (window as { navigation?: EventTarget }).navigation;
-    }
-  });
-
-  it("on a phone, makes the bar of pages inert while the friends list or a conversation covers it", async () => {
-    const width = window.innerWidth;
-    Object.defineProperty(window, "innerWidth", {
-      configurable: true,
-      value: 390,
-    });
-    try {
-      window.location.hash = "#settings";
-      render(<App />);
-      await screen.findByRole("heading", { name: "Make yourself at home." });
-      const pages = screen.getByRole("navigation", {
-        name: "Main navigation on a phone",
-      });
-      expect(pages).not.toHaveAttribute("inert");
-      const list = within(bar()).getByRole("button", { name: /^Friends/ });
-      fireEvent.click(list);
-      expect(pages).toHaveAttribute("inert");
-      // A conversation chosen from it takes its place, over the bar of pages still.
-      fireEvent.click(
-        await within(bar()).findByRole("button", { name: /^Chat with ada/ }),
-      );
-      expect(list).toHaveAttribute("aria-expanded", "false");
-      expect(pages).toHaveAttribute("inert");
-      // Folded, it covers nothing.
-      fireEvent.click(
-        within(bar()).getByRole("button", { expanded: true, name: /^ada/ }),
-      );
-      expect(pages).not.toHaveAttribute("inert");
-    } finally {
-      Object.defineProperty(window, "innerWidth", {
-        configurable: true,
-        value: width,
-      });
     }
   });
 });

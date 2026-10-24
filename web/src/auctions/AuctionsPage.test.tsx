@@ -142,6 +142,7 @@ describe("Tivit's Auction House", () => {
           buy_now_only: true,
           sort: "price_low",
           limit: 24,
+          include_mine: true,
         },
         false,
       ),
@@ -152,7 +153,7 @@ describe("Tivit's Auction House", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     await waitFor(() =>
       expect(auctionApi.search).toHaveBeenLastCalledWith(
-        { sort: "ending", limit: 24 },
+        { sort: "ending", limit: 24, include_mine: true },
         false,
       ),
     );
