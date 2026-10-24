@@ -339,10 +339,11 @@ def test_account_deletion_on_postgresql(monkeypatch):
                 return revision
 
             # Bob played one revision of his burn deck; the other, and his spare deck, no game
-            # played. The spare deck sits at Ada's open table.
+            # played. The spare deck sits at Ada's open table; the burn deck's second revision is
+            # the one his seat at a started table was last bound to (v0.5.1).
             burn, spare = deck_of(bob, "Bob's Burn"), deck_of(bob, "Spare")
             played = revision_of(burn, 1)
-            revision_of(burn, 2)
+            unplayed = revision_of(burn, 2)
             revision_of(spare, 1)
             theirs = revision_of(deck_of(ada, "Ada's"), 1)
             game = Game(
@@ -384,6 +385,31 @@ def test_account_deletion_on_postgresql(monkeypatch):
             db.add(
                 TableSeat(
                     table_id=table.id, seat=1, user_id=bob.id, deck_id=spare.id, joined_at=now
+                )
+            )
+            started = GameTable(
+                code=uuid4().hex,
+                host_id=bob.id,
+                format="legacy",
+                visibility="public",
+                seats=2,
+                bots=0,
+                bot_skill=1,
+                turn_cap=10,
+                status="started",
+                game_id=game.id,
+                created_at=now,
+            )
+            db.add(started)
+            db.flush()
+            db.add(
+                TableSeat(
+                    table_id=started.id,
+                    seat=0,
+                    user_id=bob.id,
+                    deck_id=burn.id,
+                    deck_revision_id=unplayed.id,
+                    joined_at=now,
                 )
             )
             db.add(
@@ -447,11 +473,14 @@ def test_account_deletion_on_postgresql(monkeypatch):
             }
             seats = connection.execute(text("SELECT deck FROM game_seats ORDER BY seat"))
             assert seats.scalars().all() == ["Deleted deck", "Ada's"]
+            # The started table keeps Bob's seat, which lets go of the revision now deleted.
+            kept = connection.execute(text("SELECT deck_id, deck_revision_id FROM table_seats"))
+            assert kept.all() == [(burn.id, None)]
             for name, expected in (
                 ("token_ledger", 1),
                 ("progress_ledger", 1),
                 ("audit_events", 1),
-                ("table_seats", 0),
+                ("table_seats", 1),
                 ("external_identities", 0),
                 ("sessions", 0),
                 ("role_grants", 0),

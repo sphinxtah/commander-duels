@@ -26,6 +26,8 @@
   free seat of the other team. Each deck is a Legacy deck checked by the table's rules, and a
   team's two decks follow Unified Deck Construction: checked when a player gets ready, against
   their teammate's deck, and again at the start, the shared cards named to the team itself only.
+  Each side is the revision its seat is bound to, checked against its player's library, never a
+  draft; once cards are named, the two players stay on that team at the table until it closes.
   Changing deck or team makes the player and their teammate not ready again. Bots get fixture
   decks their teammate's deck shares no card with. A player's concession is their team's (810.8b),
   as the engine plays it.
@@ -48,7 +50,7 @@ from starlette.concurrency import run_in_threadpool
 from api import matches, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
-from api.decks import entries_of, starters_of
+from api.decks import entries_of, revision_entries, starters_of
 from api.games import (
     DECK_FORMATS,
     FORMAT_NAMES,
@@ -80,6 +82,7 @@ from api.library import library_of
 from api.models import (
     CatalogRevision,
     Deck,
+    DeckRevision,
     FormatVersion,
     Game,
     GameSeat,
@@ -89,6 +92,7 @@ from api.models import (
 )
 from api.roster import roster_of
 from api.schemas import BEST_OF_TEXT, BestOf, Contract, Error, TableFormatId, TableRules, casual
+from api.validation import DeckEntry
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -243,8 +247,61 @@ def team_cards(db: Session, deck_id: UUID) -> set[str]:
     deck = db.get(Deck, deck_id)
     if deck is None:
         return set()
-    entries = [entry for entry in entries_of(deck) if entry.location == "main"]
-    return {name for name in engine_names(db, entries, True).values() if name} - teams.BASICS
+    return main_cards(db, entries_of(deck))
+
+
+def bound_cards(db: Session, revision_id: UUID | None) -> set[str]:
+    """A table seat's cards as Unified Deck Construction compares a team's (v0.5.1): those of the
+    revision the seat is bound to, which its player's library was checked against, never the
+    deck's draft, which may hold cards its player does not own."""
+    revision = db.get(DeckRevision, revision_id) if revision_id is not None else None
+    if revision is None:
+        return set()
+    return main_cards(db, revision_entries(db, revision))
+
+
+def main_cards(db: Session, entries: list[DeckEntry]) -> set[str]:
+    """The engine's names of the main deck's cards, basic lands aside."""
+    main = [entry for entry in entries if entry.location == "main"]
+    return {name for name in engine_names(db, main, True).values() if name} - teams.BASICS
+
+
+# Two-Headed Giant (v0.5.1): once the cards two teammates' decks share are named to one of them,
+# both stay on that team at the table until it closes, so what was named never reaches the other
+# team.
+KEPT = (
+    "Cards your deck shares with a teammate's were named at this table, so you may sit only on "
+    "that team until the table closes."
+)
+
+
+def kept_team(table: GameTable, user_id: UUID) -> int | None:
+    """The team a player stays on at this table (v0.5.1), if any."""
+    return (table.kept_teams or {}).get(str(user_id))
+
+
+def keep_team(db: Session, table: GameTable, team: int, told: UUID, mate: UUID) -> None:
+    """A player was told the cards their deck shares with their teammate's: the two stay on the
+    team at this table until it closes (v0.5.1). Recorded on the table, so leaving and joining
+    again does not lift it. SysOp, who may read every deck anyway, is never kept, nor is a player
+    whose cards only SysOp was told."""
+    if sees_all(db, told):
+        return
+    users = [told] if sees_all(db, mate) else [told, mate]
+    table.kept_teams = {str(user): team for user in users} | (table.kept_teams or {})
+
+
+def sees_all(db: Session, user_id: UUID) -> bool:
+    """SysOp, whose inspection shows every seat's cards."""
+    user = db.get(User, user_id)
+    return user is not None and "games.view_concealed" in permissions_for(user, roles_of(db, user))
+
+
+def stays_on(table: GameTable, user_id: UUID, team: int) -> None:
+    """Refuses a player a seat in a team other than the one they stay on (v0.5.1)."""
+    kept = kept_team(table, user_id)
+    if kept is not None and kept != team:
+        raise ApiError(409, "team_locked", KEPT)
 
 
 def shared_with(mate: str | None, both: list[str]) -> str:
@@ -379,20 +436,21 @@ def check_deck(
     deck_id: UUID,
     fmt: str,
     rules: TableRules,
-) -> None:
+) -> UUID:
     """A deck the player may sit down with: theirs, of the table's format, playable with their
     library now (as at the practice table), and holding no card the table's rules do not allow.
     Two-Headed Giant (v0.5.1) takes a Legacy deck, and refuses its own banned card where banned
-    cards are refused."""
+    cards are refused. Returns the revision the deck is bound to, as checked (v0.5.1)."""
     if "decks.edit" not in permissions:
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
     deck_format = DECK_FORMATS.get(fmt, fmt)
-    seat, _, _ = own_deck(db, user, permissions, deck_id, deck_format, library, rules)
+    seat, revision, _ = own_deck(db, user, permissions, deck_id, deck_format, library, rules)
     if fmt == TEAM_FORMAT:
         refused = team_banned(teams.cards_of(seat) or set(), rules, permissions)
         if refused is not None:
             raise refused
+    return revision
 
 
 def may_sit(db: Session, request: Request, principal: Principal) -> None:
@@ -452,7 +510,9 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         raise ApiError(
             422, "invalid_table", "A bot teammate is one of a Two-Headed Giant table's bots."
         )
-    check_deck(db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules)
+    revision = check_deck(
+        db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules
+    )
     may_sit(db, request, principal)
     now = utcnow()
     table = GameTable(
@@ -479,6 +539,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
             seat=0,
             user_id=principal.user.id,
             deck_id=body.deck_id,
+            deck_revision_id=revision,
             ready=True,
             joined_at=now,
         )
@@ -498,7 +559,8 @@ def join_table(
     code: Code, body: SeatTaking, request: Request, principal: Player, db: Db
 ) -> TableView:
     """Takes the first free player's seat with one of your decks."""
-    table = find(db, code)
+    # Locked, as changing seat locks it (v0.5.1): a team a player stays on is read as it stands.
+    table = find(db, code, lock=True)
     if status_of(table) != "open":
         raise ApiError(409, "table_closed", "This table is no longer taking players.")
     rows = seats_of(db, table)
@@ -507,9 +569,16 @@ def join_table(
     free = [seat for seat in player_seats_of(table) if seat not in {r.seat for r in rows}]
     if not free:
         raise ApiError(409, "table_full", "Every player's seat at this table is taken.")
-    if body.team is not None:
+    kept = kept_team(table, principal.user.id)
+    if kept is not None:
+        # Two-Headed Giant (v0.5.1): a player back at a table where their deck's shared cards were
+        # named sits in that team again, or not at all.
+        free = [seat for seat in free if seat // 2 == kept]
+        if not free or body.team not in (None, kept):
+            raise ApiError(409, "team_locked", KEPT)
+    elif body.team is not None:
         free = free_in_team(table, free, body.team)
-    check_deck(
+    revision = check_deck(
         db,
         request,
         principal.user,
@@ -525,6 +594,7 @@ def join_table(
             seat=free[0],
             user_id=principal.user.id,
             deck_id=body.deck_id,
+            deck_revision_id=revision,
             ready=False,
             joined_at=utcnow(),
         )
@@ -568,9 +638,11 @@ def change_seat(
     """Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed
     Giant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready
     too, and you are ready only once your deck and your teammate's share no card but basic lands."""
-    table = find(db, code)
+    # Locked (v0.5.1): what a ready check names is recorded before another change at the table.
+    table = find(db, code, lock=True)
     row = seat_at(db, table, principal)
     if body.team is not None and team_of(table, row.seat) != body.team:
+        stays_on(table, row.user_id, body.team)
         taken = {other.seat for other in seats_of(db, table)}
         free = [seat for seat in player_seats_of(table) if seat not in taken]
         row.seat = free_in_team(table, free, body.team)[0]
@@ -582,7 +654,7 @@ def change_seat(
             raise ApiError(409, "team_full", "That seat was just taken. Try again.") from None
         unready_teammate(db, table, row)
     if body.deck_id is not None and body.deck_id != row.deck_id:
-        check_deck(
+        row.deck_revision_id = check_deck(
             db,
             request,
             principal.user,
@@ -596,7 +668,7 @@ def change_seat(
         unready_teammate(db, table, row)
     if body.ready is not None:
         if body.ready and table.format == TEAM_FORMAT:
-            check_team(db, table, row)
+            check_team(db, request, principal, table, row)
         row.ready = body.ready
     db.commit()
     return view_of(db, table, principal)
@@ -620,21 +692,43 @@ def unready_teammate(db: Session, table: GameTable, row: TableSeat) -> None:
         mate.ready = False
 
 
-def check_team(db: Session, table: GameTable, row: TableSeat) -> None:
+def check_team(
+    db: Session, request: Request, principal: Principal, table: GameTable, row: TableSeat
+) -> None:
     """Unified Deck Construction (MTR 8.4, 9.5) as a player gets ready: their deck and their
     teammate's share no card but basic lands. The shared cards are named to the team only. Beside
     a bot (v0.5.1), some fixture deck shares no card with theirs, or the start could not deal the
-    bot one."""
+    bot one.
+
+    Since v0.5.1 the player's deck is bound again as they get ready, checked against their library,
+    and compared with the revision their teammate's seat is bound to: a draft holding cards its
+    player does not own is never compared. Once cards are named, both players stay on this team at
+    this table (keep_team). The refusal commits that with the rest of the request, a move to this
+    team included, so who was told is what everyone sees."""
+    row.deck_revision_id = check_deck(
+        db,
+        request,
+        principal.user,
+        principal.permissions,
+        row.deck_id,
+        table.format,
+        rules_of(table),
+    )
     if teams.teammate(row.seat) in bot_seats_of(table):
-        if not teams.fits_a_fixture(team_cards(db, row.deck_id)):
+        if not teams.fits_a_fixture(bound_cards(db, row.deck_revision_id)):
             raise ApiError(422, "team_decks", NO_BOT_TEAMMATE)
         return
     mate = teammate_row(db, table, row)
     if mate is None:
         return
-    both = teams.shared(team_cards(db, row.deck_id), team_cards(db, mate.deck_id))
+    both = teams.shared(
+        bound_cards(db, row.deck_revision_id), bound_cards(db, mate.deck_revision_id)
+    )
     if both:
         handle = db.scalar(select(User.handle).where(User.id == mate.user_id))
+        keep_team(db, table, row.seat // 2, row.user_id, mate.user_id)
+        row.ready = False
+        db.commit()
         raise ApiError(422, "team_decks", shared_with(handle, both))
 
 
@@ -657,8 +751,9 @@ def plan_table(
     db: Session, request: Request, table_id: UUID, principal: Principal
 ) -> tuple[list[SeatPlan], list[UUID | None]]:
     """Every seat as the engine takes it, the players' first: each player's deck bound to a
-    revision now (DECK01), then the bots. Returns the plans and each seat's player."""
-    table = db.get(GameTable, table_id)
+    revision now (DECK01), then the bots. Returns the plans and each seat's player. The table is
+    locked, as changing seat locks it (v0.5.1): the teams the start checks are those that stand."""
+    table = db.scalar(select(GameTable).where(GameTable.id == table_id).with_for_update())
     if table is None:
         raise not_found()
     if table.host_id != principal.user.id:
@@ -708,6 +803,9 @@ def plan_table(
                 library,
                 rules_of(table),
             )
+            # The seat is bound to it now (v0.5.1): a ready check after a refused start compares
+            # the decks the start compared.
+            row.deck_revision_id = revision
             if table.format == TEAM_FORMAT:
                 # MTR 9.5: Two-Headed Giant Constructed has no sideboards; a deck's stays home.
                 cast(dict[str, object], seat["deck_list"]).pop("sideboard", None)
@@ -750,8 +848,9 @@ def check_teams(
     """Two-Headed Giant's teams at the start (v0.5.1): each team of two players' decks, bound now,
     share no card but basic lands (Unified Deck Construction, MTR 8.4 and 9.5), and each bot gets
     a fixture deck its teammate's shares no card with (api/teams.py). The host's own team is told
-    the cards; another team's players are named, never their cards, and made not ready, as is a
-    player whose deck leaves their bot teammate no fixture deck."""
+    the cards, and the two then stay on it at this table (keep_team); another team's players are
+    named, never their cards, and made not ready, as is a player whose deck leaves their bot
+    teammate no fixture deck."""
     players = [user for user in users if user is not None]
     handles = dict(db.execute(select(User.id, User.handle).where(User.id.in_(players))).all())
     for first, second in teams.TEAMS:
@@ -770,10 +869,12 @@ def check_teams(
             )
         ):
             row.ready = False
-        db.commit()
         if principal.user.id in (one, other):
             mate = other if principal.user.id == one else one
+            keep_team(db, table, first // 2, principal.user.id, mate)
+            db.commit()
             raise ApiError(409, "team_decks", shared_with(handles.get(mate), both))
+        db.commit()
         raise ApiError(
             409,
             "team_decks",
