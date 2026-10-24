@@ -7,14 +7,18 @@ team never split, bots after a minute), a rematch that keeps the teams and check
 banned card again, and the migration going
 back."""
 
+import asyncio
 import json
 import os
+import threading
+import time
 import uuid
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack
-from datetime import timedelta
+from contextlib import ExitStack, contextmanager, suppress
+from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -23,7 +27,7 @@ import test_progression
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select, text, update
+from sqlalchemy import Engine, create_engine, delete, func, select, text, update
 from sqlalchemy.orm import Session
 from test_games import SERVICE_TOKEN
 from test_queues import Clock, hub, place, queued, tick
@@ -40,14 +44,16 @@ from test_tables import (
     url,
 )
 
-from api import economy, games, progression, queues, tables, teams
-from api.identity import utcnow
+from api import economy, games, progression, queues, social, tables, teams
+from api.identity import Principal, utcnow
 from api.models import (
     Base,
     Deck,
+    Friendship,
     Game,
     GameSeat,
     GameTable,
+    Notification,
     PlayerAchievement,
     PlayerResult,
     ProgressEntry,
@@ -61,7 +67,13 @@ content = test_progression.content
 __all__ = ["url"]
 TEAM = "two_headed_giant"
 # Rows these tests leave behind, removed before the queues' and tables' own cleanups.
-TEAM_TABLES = ("player_achievements", "daily_quests", "player_results", "friendships")
+TEAM_TABLES = (
+    "player_achievements",
+    "daily_quests",
+    "player_results",
+    "friendships",
+    "player_blocks",
+)
 
 
 class TeamGame(TableGame):
@@ -840,6 +852,46 @@ def test_a_team_is_never_split(client, engine, clock):
     assert len(engine.created) == 0
 
 
+def test_an_invitation_ends_with_the_friendship(client):
+    ada, bob, cara, dan, eve = (
+        Account(client, n, admin=True) for n in ("ada", "bob", "cara", "dan", "eve")
+    )
+    for friend in (bob, cara, dan, eve):
+        befriend(ada, friend)
+
+    def ended(name: str, invitee: Account) -> None:
+        """Ada's invitation is over, she is told, and the friend no longer sees it anywhere."""
+        after = place(ada)
+        assert (after["status"], after["reason"]) == ("left", "invite_ended")
+        assert after["message"] == f"{name} can no longer join your team."
+        assert place(invitee)["invites"] == []
+        items = invitee.get("/api/v1/notifications").json()["items"]
+        assert not any(item["request_pending"] for item in items)
+
+    # Bob ends the friendship while Ada's invitation waits for him.
+    queue(ada, deck(ada, client), partner_id=str(bob.id))
+    assert bob.send("DELETE", f"/api/v1/friends/{ada.id}").status_code == 200
+    ended("bob", bob)
+    # Ada blocks Cara, whom she invited; Dan blocks Ada, who invited him.
+    queue(ada, deck(ada, client), partner_id=str(cara.id))
+    assert ada.send("PUT", f"/api/v1/blocks/{cara.id}").status_code == 200
+    ended("cara", cara)
+    queue(ada, deck(ada, client), partner_id=str(dan.id))
+    assert dan.send("PUT", f"/api/v1/blocks/{ada.id}").status_code == 200
+    ended("dan", dan)
+    # An invitation left open when a friendship ends some other way (its row deleted here) shows
+    # nowhere, and cannot be accepted.
+    queue(ada, deck(ada, client), partner_id=str(eve.id))
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        db.execute(delete(Friendship))
+        db.commit()
+    assert place(eve)["invites"] == []
+    bell = eve.get("/api/v1/notifications").json()["items"][0]
+    assert (bell["kind"], bell["request_pending"]) == ("team_invite", False)
+    refused = eve.send("POST", f"/api/v1/queue/invites/{ada.id}", {"deck_id": deck(eve, client)})
+    assert (refused.status_code, refused.json()["code"]) == (409, "not_friends")
+
+
 def test_bots_come_after_a_minute(client, engine, clock):
     ada, bob, cara, dan = (Account(client, n, admin=True) for n in ("ada", "bob", "cara", "dan"))
     # Alone: a practice game with a bot teammate, which records its request.
@@ -1116,10 +1168,9 @@ def test_the_migration_goes_back(tmp_path, monkeypatch):
     engine.dispose()
 
 
-@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
-def test_parallel_team_claims_on_postgresql_seat_each_player_once():
-    """The Two-Headed Giant queue's matches in parallel connections: eight players alone make two
-    tables of two teams, and no player is claimed twice."""
+@contextmanager
+def on_postgresql() -> Iterator[Engine]:
+    """A schema of the test's own on PostgreSQL (CD_TEST_POSTGRES_URL), dropped after it."""
     url = os.environ["CD_TEST_POSTGRES_URL"]
     schema = f"test_{uuid.uuid4().hex}"
     admin = create_engine(url, connect_args={"connect_timeout": 3})
@@ -1132,6 +1183,19 @@ def test_parallel_team_claims_on_postgresql_seat_each_player_once():
     )
     try:
         Base.metadata.create_all(database)
+        yield database
+    finally:
+        database.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_parallel_team_claims_on_postgresql_seat_each_player_once():
+    """The Two-Headed Giant queue's matches in parallel connections: eight players alone make two
+    tables of two teams, and no player is claimed twice."""
+    with on_postgresql() as database:
         now = utcnow()
         with Session(database) as db:
             for index in range(9):
@@ -1172,11 +1236,279 @@ def test_parallel_team_claims_on_postgresql_seat_each_player_once():
         with Session(database) as db:
             statuses = list(db.scalars(select(QueueEntry.status)))
         assert sorted(statuses) == ["starting"] * 8 + ["waiting"]
-    finally:
-        database.dispose()
-        with admin.begin() as connection:
-            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
-        admin.dispose()
+
+
+def players(database: Engine, *names: str) -> dict[str, tuple[uuid.UUID, uuid.UUID]]:
+    """Active players with a handle, each with a Legacy deck: their IDs and their decks'."""
+    now = utcnow()
+    made: dict[str, tuple[uuid.UUID, uuid.UUID]] = {}
+    with Session(database) as db:
+        for name in names:
+            user = User(handle=name, normalized_handle=name, display_name=name, created_at=now)
+            db.add(user)
+            db.flush()
+            owned = Deck(
+                owner_id=user.id,
+                title="Mountains",
+                format="legacy",
+                draft_hash="",
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(owned)
+            db.flush()
+            made[name] = (user.id, owned.id)
+        db.commit()
+    return made
+
+
+def a_team(database: Engine, now: datetime) -> list[uuid.UUID]:
+    """Two players waiting in the Two-Headed Giant queue as a team, as accepting leaves them (one
+    joined_at): their IDs, in user_id order."""
+    (ada, ada_deck), (bob, bob_deck) = players(database, "ada", "bob").values()
+    with Session(database) as db:
+        for user_id, deck_id, partner in ((ada, ada_deck, bob), (bob, bob_deck, ada)):
+            db.add(
+                QueueEntry(
+                    user_id=user_id,
+                    format=TEAM,
+                    seats=4,
+                    deck_id=deck_id,
+                    humans_only=True,
+                    partner_id=partner,
+                    status="waiting",
+                    joined_at=now,
+                    seen_at=now,
+                )
+            )
+        db.commit()
+    return sorted((ada, bob))
+
+
+def leave_at(database: Engine, now: datetime, user_id: uuid.UUID) -> str:
+    """Leaves the queue as its route does, in a connection of its own: the place's status after."""
+    state = SimpleNamespace(queues=SimpleNamespace(clock=lambda: now))
+    request = SimpleNamespace(app=SimpleNamespace(state=state))
+    principal = SimpleNamespace(user=SimpleNamespace(id=user_id))
+    with Session(database, expire_on_commit=False) as db:
+        return queues.leave_queue(request, principal, db).status  # type: ignore[arg-type]
+
+
+def meeting(seconds: float) -> Any:
+    """A wait for the other request at the same point, given up after a while: before the fixes
+    below, both reach it holding what they have locked; after them, the second waits for the
+    first's locks instead, so the first goes on alone once the wait is given up."""
+    barrier = threading.Barrier(2, timeout=seconds)
+
+    def wait() -> None:
+        with suppress(threading.BrokenBarrierError):
+            barrier.wait()
+
+    return wait
+
+
+def paused_leaving(monkeypatch: pytest.MonkeyPatch) -> threading.Event:
+    """Each request meets the other (see meeting) as it takes its team's other place out; the
+    event is set once the first gets there."""
+    meet = meeting(2)
+    reached = threading.Event()
+    leave_team = queues.leave_team
+
+    def paused(*args: Any, **kwargs: Any) -> None:
+        reached.set()
+        meet()
+        leave_team(*args, **kwargs)
+
+    monkeypatch.setattr(queues, "leave_team", paused)
+    return reached
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_teammates_leaving_at_once_on_postgresql(monkeypatch):
+    """Two teammates leave the Two-Headed Giant queue at the same moment, in their own connections:
+    each locks the team's two rows together in one order, so neither holds the row the other waits
+    for (a deadlock PostgreSQL would end by failing one), and the team leaves once."""
+    paused_leaving(monkeypatch)
+    now = utcnow()
+    with on_postgresql() as database:
+        team = a_team(database, now)
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            answers = list(workers.map(lambda user_id: leave_at(database, now, user_id), team))
+        assert answers == ["left", "left"]
+        with Session(database) as db:
+            reasons = sorted(row.reason or "" for row in db.scalars(select(QueueEntry)))
+        assert reasons == ["left", "partner_left"]
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_a_teammate_leaving_as_the_tick_takes_the_other_out_on_postgresql(monkeypatch):
+    """The tick takes out a teammate whose app stopped asking while the other leaves, in their own
+    connections: the tick locks the team's two rows first, in the order leaving does, so the leave
+    waits for it rather than holding the row it takes out next, and the team leaves once."""
+    reached = paused_leaving(monkeypatch)
+    now = utcnow()
+    with on_postgresql() as database:
+        # The one leaving comes first in user_id order, the order leaving locks the two in.
+        leaving, gone = a_team(database, now)
+        with Session(database) as db:
+            row = db.get(QueueEntry, gone)
+            assert row is not None
+            row.seen_at = now - queues.STALE_AFTER - timedelta(seconds=1)
+            db.commit()
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            ticked = workers.submit(queues.waiting_queues, database, now)
+            # The tick is about to take the teammate out, holding what it has locked.
+            assert reached.wait(5)
+            left = workers.submit(leave_at, database, now, leaving)
+            assert (ticked.result(), left.result()) == ([], "left")
+        with Session(database) as db:
+            rows = {row.user_id: row for row in db.scalars(select(QueueEntry))}
+        assert (rows[gone].status, rows[gone].reason) == ("left", "gone")
+        assert (rows[leaving].status, rows[leaving].reason) == ("left", "partner_left")
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_friends_inviting_each_other_at_once_on_postgresql(monkeypatch):
+    """Two friends invite each other to the Two-Headed Giant queue at the same moment, in their own
+    connections: both accounts are locked before either looks for the other's invitation, so the
+    second accepts the first's and they wait as a team, not each on an invitation."""
+    meet = meeting(2)
+    monkeypatch.setattr(queues, "check_deck", lambda *args, **kwargs: meet())
+    now = utcnow()
+
+    async def no_match(key: queues.QueueKey) -> None:
+        return None
+
+    state = SimpleNamespace(
+        queues=SimpleNamespace(clock=lambda: now, match=no_match),
+        settings=SimpleNamespace(games_per_account=3),
+    )
+    request = SimpleNamespace(app=SimpleNamespace(state=state))
+    with on_postgresql() as database:
+        made = players(database, "ada", "bob")
+        (ada, ada_deck), (bob, bob_deck) = made["ada"], made["bob"]
+        decks = {ada: ada_deck, bob: bob_deck}
+        with Session(database) as db:
+            low, high = sorted((ada, bob))
+            db.add(
+                Friendship(
+                    user_low=low,
+                    user_high=high,
+                    requested_by=ada,
+                    status="accepted",
+                    created_at=now,
+                    accepted_at=now,
+                )
+            )
+            db.commit()
+
+        def invite(me: uuid.UUID, friend: uuid.UUID) -> str:
+            with Session(database, expire_on_commit=False) as db:
+                user = db.get(User, me)
+                allowed = frozenset({"games.play", "decks.edit"})
+                principal = Principal(user, None, ["player"], allowed)  # type: ignore[arg-type]
+                body = queues.QueueRequest(
+                    format=TEAM, seats=4, deck_id=decks[me], partner_id=friend
+                )
+                answer = asyncio.run(queues.join_queue(body, request, principal, db))  # type: ignore[arg-type]
+                return answer.status
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            answers = list(workers.map(invite, (ada, bob), (bob, ada)))
+        # The second accepted the first's invitation; the first may see their team already.
+        assert "waiting" in answers and set(answers) <= {"inviting", "waiting"}
+        with Session(database) as db:
+            rows = {row.user_id: row for row in db.scalars(select(QueueEntry))}
+            pending = db.scalar(
+                select(func.count()).where(
+                    Notification.kind == "team_invite", Notification.read_at.is_(None)
+                )
+            )
+        assert (rows[ada].status, rows[bob].status) == ("waiting", "waiting")
+        assert (rows[ada].partner_id, rows[bob].partner_id) == (bob, ada)
+        assert rows[ada].joined_at == rows[bob].joined_at
+        assert pending == 0
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_inviting_a_friend_as_another_accepts_their_invitation_on_postgresql(monkeypatch):
+    """Ada invites Bob while Cara accepts Bob's invitation, in their own connections. Ada's request
+    locks the two accounts FOR NO KEY UPDATE, which Cara's new place, naming Bob, need not wait
+    for: Cara's accepting goes on while Ada's request waits for Bob's place, and neither fails, as
+    they would on a deadlock if Ada's request held Bob's account FOR UPDATE."""
+    monkeypatch.setattr(queues, "check_deck", lambda *args, **kwargs: None)
+    meet = meeting(2)
+    reached = threading.Event()
+    friends = queues.friends
+
+    def paused(*args: Any) -> bool:
+        reached.set()
+        meet()
+        return friends(*args)
+
+    monkeypatch.setattr(queues, "friends", paused)
+    now = utcnow()
+    state = SimpleNamespace(
+        queues=SimpleNamespace(clock=lambda: now),
+        settings=SimpleNamespace(games_per_account=3),
+    )
+    request = SimpleNamespace(app=SimpleNamespace(state=state))
+    allowed = frozenset({"games.play", "decks.edit"})
+    with on_postgresql() as database:
+        (ada, ada_deck), (bob, bob_deck), (cara, cara_deck) = players(
+            database, "ada", "bob", "cara"
+        ).values()
+        with Session(database) as db:
+            for one, other in ((ada, bob), (bob, cara)):
+                low, high = sorted((one, other))
+                db.add(
+                    Friendship(
+                        user_low=low,
+                        user_high=high,
+                        requested_by=one,
+                        status="accepted",
+                        created_at=now,
+                        accepted_at=now,
+                    )
+                )
+            db.add(
+                QueueEntry(
+                    user_id=bob,
+                    format=TEAM,
+                    seats=4,
+                    deck_id=bob_deck,
+                    humans_only=False,
+                    partner_id=cara,
+                    status="inviting",
+                    joined_at=now,
+                    seen_at=now,
+                )
+            )
+            db.commit()
+
+        def accept() -> None:
+            with Session(database) as db:
+                principal = Principal(db.get(User, cara), None, ["player"], allowed)  # type: ignore[arg-type]
+                queues.accept(db, request, principal, bob, cara_deck, now)  # type: ignore[arg-type]
+
+        def invite() -> None:
+            with Session(database) as db:
+                principal = Principal(db.get(User, ada), None, ["player"], allowed)  # type: ignore[arg-type]
+                body = queues.QueueRequest(format=TEAM, seats=4, deck_id=ada_deck, partner_id=bob)
+                queues.join(db, request, principal, body, now)  # type: ignore[arg-type]
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            accepting = workers.submit(accept)
+            # Cara holds Bob's place, about to take her own beside it, which names Bob.
+            assert reached.wait(5)
+            inviting = workers.submit(invite)
+            accepting.result()
+            inviting.result()
+        with Session(database) as db:
+            rows = {
+                row.user_id: (row.status, row.partner_id) for row in db.scalars(select(QueueEntry))
+            }
+        assert rows == {ada: ("inviting", bob), bob: ("waiting", cara), cara: ("waiting", bob)}
 
 
 def test_the_pairing_rules():
@@ -1215,3 +1547,68 @@ def test_the_pairing_rules():
     # Half of a team whose friend is not waiting is passed over.
     assert queues.units_of([row("p", 0, "q")]) == []
     assert teams.SEATS == 4
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_an_invitation_sent_as_the_friendship_ends_does_not_stay_open(monkeypatch):
+    """Regression (v0.5.1, the fix's review): an invitation written while the friendship ended at
+    the same moment stayed open, its inviter waiting on a friend who never saw it. Ending the
+    friendship now waits for the invitation's account locks, then ends it."""
+    reached, unfriending = threading.Event(), threading.Event()
+
+    def paused(*args: Any, **kwargs: Any) -> None:
+        reached.set()
+        unfriending.wait(5)
+
+    monkeypatch.setattr(queues, "check_deck", paused)
+    now = utcnow()
+    state = SimpleNamespace(
+        queues=SimpleNamespace(clock=lambda: now),
+        settings=SimpleNamespace(games_per_account=3),
+    )
+    request = SimpleNamespace(app=SimpleNamespace(state=state))
+    allowed = frozenset({"games.play", "decks.edit"})
+    with on_postgresql() as database:
+        (ada, ada_deck), (bob, _) = players(database, "ada", "bob").values()
+        with Session(database) as db:
+            low, high = sorted((ada, bob))
+            db.add(
+                Friendship(
+                    user_low=low,
+                    user_high=high,
+                    requested_by=ada,
+                    status="accepted",
+                    created_at=now,
+                    accepted_at=now,
+                )
+            )
+            db.commit()
+
+        def invite() -> None:
+            with Session(database) as db:
+                user = db.get(User, ada)
+                assert user is not None
+                principal = Principal(user, None, ["player"], allowed)  # type: ignore[arg-type]
+                body = queues.QueueRequest(format=TEAM, seats=4, deck_id=ada_deck, partner_id=bob)
+                queues.join(db, request, principal, body, now)  # type: ignore[arg-type]
+
+        def unfriend() -> None:
+            with Session(database) as db:
+                me, other = db.get(User, bob), db.get(User, ada)
+                assert me is not None and other is not None
+                social.unfriend(db, me, other)
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            inviting = workers.submit(invite)
+            assert reached.wait(5)
+            ending = workers.submit(unfriend)
+            # The friendship's end waits for the invitation's locks; the invitation goes on.
+            time.sleep(0.5)
+            assert not ending.done()
+            unfriending.set()
+            inviting.result(10)
+            ending.result(10)
+        with Session(database) as db:
+            row = db.get(QueueEntry, ada)
+            assert row is not None and (row.status, row.reason) == ("left", "invite_ended")
+            assert list(db.scalars(select(Friendship))) == []

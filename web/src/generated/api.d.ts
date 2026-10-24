@@ -679,7 +679,8 @@ export interface paths {
         get?: never;
         /**
          * Block Player
-         * @description Blocks a player: any friendship or request between the two ends.
+         * @description Blocks a player: any friendship or request between the two ends, and since v0.5.1 any
+         *     invitation to the Two-Headed Giant queue either sent the other.
          */
         put: operations["block_player_api_v1_blocks__player_id__put"];
         post?: never;

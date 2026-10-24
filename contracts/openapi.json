@@ -16183,7 +16183,7 @@
         "summary": "Unblock Player"
       },
       "put": {
-        "description": "Blocks a player: any friendship or request between the two ends.",
+        "description": "Blocks a player: any friendship or request between the two ends, and since v0.5.1 any\ninvitation to the Two-Headed Giant queue either sent the other.",
         "operationId": "block_player_api_v1_blocks__player_id__put",
         "parameters": [
           {
