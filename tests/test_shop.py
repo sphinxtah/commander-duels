@@ -218,6 +218,8 @@ def buy(account: Account, product: UUID | str, key: str | None = None) -> Any:
 
 # Prices.
 
+ALPHA_BETA = [("LEA", "default"), ("LEA", "starter"), ("LEB", "default"), ("LEB", "starter")]
+
 
 def test_the_price_curve():
     assert products.curve_price(343.28) == 150_000
@@ -229,13 +231,24 @@ def test_the_price_curve():
     assert products.two_figures(45) == 45
     assert products.two_figures(3) == products.LOWEST
     listing = products.price_list(str(CONTENT))
-    assert listing is not None and len(listing.rows) == 392
+    assert listing is not None and len(listing.rows) == 396
     prices = {(row.set_code, row.booster): row for row in listing.rows}
     assert products.curve_price(prices["3ED", "default"].usd or 0) == 150_000
     assert products.curve_price(prices["FRA", "play"].usd or 0) == 500
-    # The early sets are dearer still; Alpha and Beta are not listed at all.
-    assert products.curve_price(prices["2ED", "default"].usd or 0) > 150_000
-    assert not {"LEA", "LEB"} & listing.sets()
+    # The early sets are dearer still, Alpha and Beta (v0.6.1) the dearest, on the same curve.
+    assert products.curve_price(prices["2ED", "default"].usd or 0) == 3_800_000
+    assert [
+        products.curve_price(prices[code, booster].usd or 0) for code, booster in ALPHA_BETA
+    ] == [
+        61_000_000,
+        440_000_000,
+        14_000_000,
+        110_000_000,
+    ]
+    assert [(row.set_code, row.booster) for row in listing.rows[:4]] == ALPHA_BETA
+    for code, booster in ALPHA_BETA:
+        row = prices[code, booster]
+        assert row.method in ("pack", "estimate") and row.released is not None, row
     assert products.kind_of("theme-w") == "theme"
     assert products.kind_of("collector-special") == "collector"
     assert products.kind_of("default") == "booster"
@@ -243,6 +256,24 @@ def test_the_price_curve():
     assert products.era_of(date(1994, 4, 11)) == "first"
     assert products.era_of(date(2024, 2, 9)) == "play"
     assert products.era_of(date(2020, 9, 25)) == "collector"
+
+
+def test_alpha_and_beta_are_sold_like_any_other_set():
+    """v0.6.1: the owner put Alpha and Beta on sale; nothing sets them apart any more."""
+    for code, booster in ALPHA_BETA:
+        product = ShopProduct(
+            set_code=code,
+            booster=booster,
+            on_sale=True,
+            data_status="ready",
+            collation_id=uuid4(),
+            released=date(1993, 8, 5),
+            usd=8464.17,
+        )
+        assert products.selling(product, date(2026, 10, 24))
+        assert products.price_of(product) == (14_000_000, "market")
+        assert products.era_of(product.released) == "first"
+    assert sales.sale_price(440_000_000) == 352_000_000
 
 
 # Drawing.
@@ -527,10 +558,18 @@ def test_the_job_collates_resolves_and_asks_only_for_changes(tmp_path, job_conte
     assert run_job(engine, settings, host).code == "imported"
     with Session(engine) as db:
         found = {(row.set_code, row.booster): row for row in db.scalars(select(ShopProduct))}
-        assert set(found) == {("ZNR", "draft"), ("ZNR", "set"), ("3ED", "default"), ("TRK", "play")}
+        assert set(found) == {
+            ("ZNR", "draft"),
+            ("ZNR", "set"),
+            ("3ED", "default"),
+            ("LEA", "default"),
+            ("TRK", "play"),
+        }
         draft, play = found["ZNR", "draft"], found["TRK", "play"]
         assert (draft.data_status, draft.pack_size, draft.origin) == ("ready", 15, "price_list")
+        # Alpha is a product like any other since v0.6.1; this host has no file for it.
         assert found["ZNR", "set"].data_status == found["3ED", "default"].data_status == "missing"
+        assert found["LEA", "default"].data_status == "missing"
         # A set after the price list is sold at 500 until priced.
         assert (play.origin, play.name, play.data_status) == (
             "mtgjson",
@@ -550,7 +589,12 @@ def test_the_job_collates_resolves_and_asks_only_for_changes(tmp_path, job_conte
         assert run.stats["revisions"] == 2 and run.stats["discovered"] == ["TRK/play"]
     first = [request.url.path for request in host.requests]
     assert first[0] == "/api/v5/SetList.json.xz"
-    assert {"/api/v5/ZNR.json.xz", "/api/v5/TRK.json.xz", "/api/v5/3ED.json.xz"} <= set(first)
+    assert {
+        "/api/v5/ZNR.json.xz",
+        "/api/v5/TRK.json.xz",
+        "/api/v5/3ED.json.xz",
+        "/api/v5/LEA.json.xz",
+    } <= set(first)
     assert all(
         request.headers["user-agent"].startswith("CommanderDuels/") for request in host.requests
     )
@@ -1058,7 +1102,18 @@ def test_staff_set_prices_and_take_products_off_sale(client):
     assert ada.get("/api/v1/admin/shop").status_code == 403
     view = admin.get("/api/v1/admin/shop").json()
     assert view["enabled"] is True and view["prices_as_of"] == "2026-10-21"
-    assert len(view["products"]) == 392
+    assert len(view["products"]) == 396
+    # Alpha and Beta are products as any other (v0.6.1), waiting here for their booster data.
+    alpha = next(
+        item
+        for item in view["products"]
+        if (item["set_code"], item["booster"]) == ("LEA", "default")
+    )
+    assert (alpha["curve_price"], alpha["selling"], alpha["data_status"]) == (
+        61_000_000,
+        False,
+        "waiting",
+    )
     row = next(
         item for item in view["products"] if (item["set_code"], item["booster"]) == ("ZNR", "draft")
     )
@@ -1108,6 +1163,13 @@ def test_staff_set_prices_and_take_products_off_sale(client):
         ("shop.sale_changed", True, False, "Testing a sale stop"),
         ("shop.sale_changed", False, True, "Back on sale"),
     ]
+    # Staff manage them as any other product.
+    alpha_price = admin.send(
+        "PUT",
+        f"/api/v1/admin/shop/products/{alpha['id']}/price",
+        {"tokens": 50_000_000, "reason": "A test price for Alpha"},
+    )
+    assert (alpha_price.status_code, alpha_price.json()["price"]) == (200, 50_000_000)
     queued = admin.send("POST", "/api/v1/admin/shop/sync")
     assert queued.status_code == 202
     busy = admin.send("POST", "/api/v1/admin/shop/sync")

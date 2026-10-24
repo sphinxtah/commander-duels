@@ -35,7 +35,7 @@ import {
 } from "./shop";
 import styles from "./shop.module.css";
 
-// Leng's card shop (v0.4.0): booster packs from Revised to the current set, bought with the tokens
+// Leng's card shop (v0.4.0): booster packs from Alpha to the current set, bought with the tokens
 // wins earn, and opened at Leng's counter. The server prices, sells and draws every pack; the page
 // shows what it says and keeps one client key per purchase, so a retried request buys once. Since
 // v0.4.2 a second tab sells the starter decks (DeckShelf). Since v0.4.3 every pack shows its
@@ -518,8 +518,9 @@ export function ShopPage({
                   : ""}
                 , scaled so a current pack costs 500 tokens and a Revised pack
                 150,000. Tokens are play money: wins earn them, and they cannot
-                be bought, sold or cashed out. Alpha and Beta are not sold here;
-                they are for tournaments.
+                be bought, sold or cashed out. A card printed in a known number
+                of copies, such as Alpha's and Beta's, is never dealt more often
+                than it was printed.
               </p>
             </div>
           </section>

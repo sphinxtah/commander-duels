@@ -1,7 +1,79 @@
 {
- "as_of": "2026-10-22",
+ "as_of": "2026-10-24",
  "note": "Pictures of the packs on Leng's shelves, made by scripts/pack_art.py: copied once from TCGplayer's product pages (or Wizards of the Coast's), the white background made transparent, served from this site. Products under 'generated' are drawn in the browser from their set. Set symbols are Scryfall's set icons.",
  "products": [
+  {
+   "set": "LEA",
+   "booster": "default",
+   "small": {
+    "src": "/packs/lea-default-160.webp",
+    "width": 87,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lea-default-480.webp",
+    "width": 198,
+    "height": 363
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27324",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27324_in_1000x1000.jpg",
+   "product_name": "Alpha Edition - Booster Pack"
+  },
+  {
+   "set": "LEA",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/lea-starter-160.webp",
+    "width": 122,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/lea-starter-480.webp",
+    "width": 365,
+    "height": 480
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/139147",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/139147_in_1000x1000.jpg",
+   "product_name": "Alpha Edition Starter Deck"
+  },
+  {
+   "set": "LEB",
+   "booster": "default",
+   "small": {
+    "src": "/packs/leb-default-160.webp",
+    "width": 84,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/leb-default-480.webp",
+    "width": 198,
+    "height": 378
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/27328",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/27328_in_1000x1000.jpg",
+   "product_name": "Beta Edition - Booster Pack"
+  },
+  {
+   "set": "LEB",
+   "booster": "starter",
+   "small": {
+    "src": "/packs/leb-starter-160.webp",
+    "width": 115,
+    "height": 160
+   },
+   "large": {
+    "src": "/packs/leb-starter-480.webp",
+    "width": 276,
+    "height": 385
+   },
+   "origin": "tcgplayer",
+   "page": "https://www.tcgplayer.com/product/137017",
+   "image": "https://tcgplayer-cdn.tcgplayer.com/product/137017_in_1000x1000.jpg",
+   "product_name": "Beta Edition Starter Deck"
+  },
   {
    "set": "2ED",
    "booster": "default",
@@ -6798,6 +6870,8 @@
   "KLD": "/sets/kld.svg",
   "KTK": "/sets/ktk.svg",
   "LCI": "/sets/lci.svg",
+  "LEA": "/sets/lea.svg",
+  "LEB": "/sets/leb.svg",
   "LEG": "/sets/leg.svg",
   "LGN": "/sets/lgn.svg",
   "LRW": "/sets/lrw.svg",

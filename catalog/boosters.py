@@ -48,7 +48,7 @@ from api.models import (
     ScheduledJob,
     ShopProduct,
 )
-from api.products import NEVER_SOLD, ensure_products, price_list
+from api.products import ensure_products, price_list
 from api.version import APP_VERSION
 from catalog import sync
 from catalog.importer import Fence, Fenced
@@ -778,7 +778,6 @@ class Run:
             if (
                 code
                 and code not in known
-                and code not in NEVER_SOLD
                 and item.get("type") in DISCOVERED_TYPES
                 and not item.get("isOnlineOnly")
                 and released is not None

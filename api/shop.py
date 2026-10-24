@@ -96,7 +96,6 @@ from api.models import (
 from api.print_runs import dealt, limited
 from api.products import (
     ERAS,
-    NEVER_SOLD,
     ArtImage,
     ArtIndex,
     ArtOrigin,
@@ -1138,7 +1137,7 @@ def request_booster_sync(request: Request, principal: ShopManager, db: Db) -> Sy
 
 def managed(db: Session, product_id: UUID) -> ShopProduct:
     product = db.scalar(select(ShopProduct).where(ShopProduct.id == product_id).with_for_update())
-    if product is None or product.set_code in NEVER_SOLD:
+    if product is None:
         raise not_found()
     return product
 
