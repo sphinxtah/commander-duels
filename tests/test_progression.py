@@ -433,6 +433,31 @@ def test_the_alliance_tab_lists_the_allied_planeswalkers_cards(client):
     assert (sphinx["custom"], sphinx["cards"]) == (True, [])
 
 
+def test_the_picker_shows_any_planeswalkers_cards_before_an_alliance(client):
+    # v0.6.2: the alliance picker shows what an alliance brings before it is chosen, locked ones
+    # included, with the copies the library holds now. The custom cards stay private.
+    ada = Account(client, "ada")
+    tibalt = ada.get("/api/v1/planeswalkers/tibalt/cards").json()
+    assert (tibalt["alliance"], tibalt["name"], tibalt["custom"]) == ("tibalt", "Tibalt", False)
+    assert [(card["name"], card["owned"]) for card in tibalt["cards"]] == [
+        ("Valki, God of Lies // Tibalt, Cosmic Impostor", 0)
+    ]
+    # Teferi is locked at Bronze, and still shows his cards; nothing changed on the account.
+    teferi = ada.get("/api/v1/planeswalkers/teferi/cards").json()
+    assert [card["name"] for card in teferi["cards"]] == ["Teferi, Temporal Archmage"]
+    assert ada.get("/api/v1/me/progress").json()["alliance"] is None
+    # Once allied, the same list says the playset.
+    ada.send("PUT", "/api/v1/me/alliance", {"planeswalker": "tibalt"})
+    allied = ada.get("/api/v1/planeswalkers/tibalt/cards").json()
+    assert [card["owned"] for card in allied["cards"]] == [4]
+    assert allied == ada.get("/api/v1/me/alliance/cards").json()
+    # The Godlike tier's custom cards are never listed here, even to SysOp.
+    root = Account(client, "sysop", kind="sysop")
+    sphinx = root.get("/api/v1/planeswalkers/the-sphinx/cards").json()
+    assert (sphinx["custom"], sphinx["cards"]) == (True, [])
+    assert ada.get("/api/v1/planeswalkers/nobody/cards").status_code == 404
+
+
 def test_copies_of_a_card_the_game_cannot_play_are_kept_but_hidden(client):
     """v0.4.5: a card the engine cannot play leaves the library's list and the alliance tab. Its
     copies stay recorded, so they come back if the engine learns the card."""

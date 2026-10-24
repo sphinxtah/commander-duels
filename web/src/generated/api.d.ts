@@ -2333,6 +2333,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/planeswalkers/{planeswalker_id}/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A Planeswalkers Cards
+         * @description Any Planeswalker's own cards (v0.6.2), so the alliance picker shows what an alliance brings
+         *     before it is chosen, locked ones included: the same list the alliance tab shows once allied,
+         *     with the copies the library holds now. The Godlike tier's custom cards stay private: for The
+         *     Sphinx it says `custom` and lists none.
+         */
+        get: operations["a_planeswalkers_cards_api_v1_planeswalkers__planeswalker_id__cards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/players": {
         parameters: {
             query?: never;
@@ -3220,7 +3243,7 @@ export interface components {
         AllianceCards: {
             /**
              * Alliance
-             * @description The allied Planeswalker; null with no alliance.
+             * @description The allied Planeswalker, or the one asked for (GET /planeswalkers/{id}/cards, v0.6.2); null with no alliance.
              */
             alliance: string | null;
             /**
@@ -20355,6 +20378,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlaneswalkerInfo"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    a_planeswalkers_cards_api_v1_planeswalkers__planeswalker_id__cards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                planeswalker_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AllianceCards"];
                 };
             };
             /** @description Bad Request */

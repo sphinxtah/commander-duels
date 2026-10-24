@@ -13,6 +13,7 @@ import {
   CustomCardDetails,
   OwnedNote,
   StatusBadge,
+  ViewSwitch,
 } from "../catalog/CardViews";
 import { useCustomCards } from "../catalog/CustomCards";
 import { SearchControls, useCardSearch } from "../catalog/SearchControls";
@@ -25,6 +26,8 @@ import {
   type CardSummary,
   type Search,
 } from "../catalog/catalog";
+import { DeckPictures } from "./DeckPictures";
+import { useDeckView } from "./deckView";
 import { IdentityPips } from "./DecksPage";
 import { LockIcon, ProblemList } from "./ProblemList";
 import {
@@ -917,8 +920,15 @@ function DeckSections({
 }) {
   // Rows of cards the deck holds more copies of than the player's library, marked with a lock.
   const beyond = useMemo(() => beyondLibrary(entries, cards), [entries, cards]);
+  // The cards' pictures by default, the list a switch away (v0.6.2, the owner's request).
+  const [view, setView] = useDeckView();
   return (
     <div className={styles.sections}>
+      {entries.length > 0 && (
+        <div className={styles.viewRow}>
+          <ViewSwitch view={view} onChange={setView} />
+        </div>
+      )}
       {locationsFor(format).map((location) => {
         const here = entries.filter((entry) => entry.location === location);
         const count = here.reduce((sum, entry) => sum + entry.quantity, 0);
@@ -969,26 +979,34 @@ function DeckSections({
               <div key={group}>
                 {group && (
                   <h3>
-                    {group === "Other"
-                      ? "Other"
-                      : `${group}s`.replace("Sorcerys", "Sorceries")}{" "}
+                    {groupName(group)}{" "}
                     <small>
                       {list.reduce((sum, entry) => sum + entry.quantity, 0)}
                     </small>
                   </h3>
                 )}
-                <ul className={styles.entries}>
-                  {list
-                    .slice()
-                    .sort(
-                      (a, b) =>
-                        (cards[a.card_id]?.mana_value ?? 0) -
-                          (cards[b.card_id]?.mana_value ?? 0) ||
-                        (cards[a.card_id]?.name ?? "").localeCompare(
-                          cards[b.card_id]?.name ?? "",
-                        ),
-                    )
-                    .map((entry) => {
+                {view === "pictures" ? (
+                  <DeckPictures
+                    label={
+                      group
+                        ? `${locationNames[location]}: ${groupName(group)}`
+                        : locationNames[location]
+                    }
+                    location={location}
+                    entries={byCost(list, cards)}
+                    cards={cards}
+                    highlight={highlight}
+                    edition={entryEdition}
+                    lock={(entry, card) => {
+                      const shortage = beyond.get(entryKey(entry));
+                      return shortage ? lockWords(entry, card, shortage) : null;
+                    }}
+                    onUpdate={onUpdate}
+                    onOpen={onOpen}
+                  />
+                ) : (
+                  <ul className={styles.entries}>
+                    {byCost(list, cards).map((entry) => {
                       const card = cards[entry.card_id];
                       const shortage = beyond.get(entryKey(entry));
                       return (
@@ -1061,7 +1079,8 @@ function DeckSections({
                         </li>
                       );
                     })}
-                </ul>
+                  </ul>
+                )}
               </div>
             ))}
           </section>
@@ -1069,6 +1088,30 @@ function DeckSections({
       })}
     </div>
   );
+}
+
+/** A group's heading: "Creatures", "Sorceries", "Other". */
+function groupName(group: string): string {
+  return group === "Other"
+    ? "Other"
+    : `${group}s`.replace("Sorcerys", "Sorceries");
+}
+
+/** A group's entries by mana value, then by name. */
+function byCost(
+  list: DeckEntry[],
+  cards: Record<string, CardSummary>,
+): DeckEntry[] {
+  return list
+    .slice()
+    .sort(
+      (a, b) =>
+        (cards[a.card_id]?.mana_value ?? 0) -
+          (cards[b.card_id]?.mana_value ?? 0) ||
+        (cards[a.card_id]?.name ?? "").localeCompare(
+          cards[b.card_id]?.name ?? "",
+        ),
+    );
 }
 
 /** The edition a deck entry names, in words: the set of one the library holds (v0.5.0), else

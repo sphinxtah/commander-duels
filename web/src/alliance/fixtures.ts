@@ -5,7 +5,8 @@ import type {
   StarterDeck,
   TierInfo,
 } from "../api";
-import { customSummary } from "../decks/fixtures";
+import type { AllianceCards } from "../catalog/catalog";
+import { card as cardSummary, customSummary } from "../decks/fixtures";
 
 // Test data for the Planeswalker Alliance (v0.3.1). The roster's names are the public roster's;
 // the starter decks and custom cards are made-up stand-ins, never the owner's own.
@@ -145,4 +146,26 @@ export function customCard(name: string, fields: Partial<CustomCard> = {}) {
     ...fields,
   };
   return card;
+}
+
+/** A Planeswalker's own cards, as GET /planeswalkers/{id}/cards answers (v0.6.2): Rowan and
+ * Kaya have two stand-ins each, Abian none, and The Sphinx's are custom, so none are listed. */
+export function planeswalkerCards(id: string): AllianceCards {
+  const found = roster.find((item) => item.id === id);
+  const names: Record<string, string[]> = {
+    rowan: ["Rowan, Stand-in Duelist", "Rowan, Stand-in Scion"],
+    kaya: ["Kaya, Stand-in Ghost", "Kaya, Stand-in Spirit"],
+  };
+  return {
+    alliance: id,
+    name: found?.name ?? id,
+    custom: found?.custom ?? false,
+    cards: (names[id] ?? []).map((name, index) =>
+      cardSummary(name, {
+        type_line: "Legendary Planeswalker — Stand-in",
+        image: { printing_id: `printing-${id}-${index}`, faces: 0 },
+        owned: 0,
+      }),
+    ),
+  };
 }

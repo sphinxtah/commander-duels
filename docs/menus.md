@@ -27,7 +27,7 @@ On a phone (narrower than 820 px) the search takes a row of its own, the wordmar
 
 ## Profile in tabs (v0.6.1)
 
-At the owner's request ("the scrolling goes on for too long"), Profile keeps the account's card at the top and puts the rest in tabs: **Achievements** (first, and where it opens), **Alliance** (the progress to the next tier, the alliance and its picker; SysOp's own wins), **Record** (the totals and the games one by one), **Tokens** (the ledger; SysOp's own grants), **Details** (the profile form), **Privacy** and **Sign-ins** (where the account is signed in, *Sign out everywhere*, SysOp's password). Until the setup is done the page shows its setup panel, with Privacy and Sign-ins only.
+At the owner's request ("the scrolling goes on for too long"), Profile keeps the account's card at the top and puts the rest in tabs: **Achievements** (first, and where it opens), **Alliance** (the progress to the next tier, the alliance and its picker, where since v0.6.2 a Planeswalker opens a tile of their cards with "Begin Alliance with …", [alliances](progression.md#alliances); SysOp's own wins), **Record** (the totals and the games one by one), **Tokens** (the ledger; SysOp's own grants), **Details** (the profile form), **Privacy** and **Sign-ins** (where the account is signed in, *Sign out everywhere*, SysOp's password). Until the setup is done the page shows its setup panel, with Privacy and Sign-ins only.
 
 ## The chat bar (v0.5.1)
 

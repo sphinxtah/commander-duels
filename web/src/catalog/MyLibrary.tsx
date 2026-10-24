@@ -6,6 +6,14 @@ import type { LibraryFinishes } from "../auctions/types";
 import { ManaCost } from "../game/Card";
 import { CardTile, ViewSwitch } from "./CardViews";
 import { heldFinish } from "./foilGlow";
+import { LibraryFilterPanel } from "./LibraryFilters";
+import {
+  filterLibrary,
+  filtersSet,
+  librarySets,
+  noLibraryFilters,
+  type LibraryFilters,
+} from "./libraryFilters";
 import {
   editionName,
   sourceLabels,
@@ -67,8 +75,14 @@ export function MyLibrary({
 }) {
   const [library, setLibrary] = useState<LibraryView>();
   const [error, setError] = useState("");
-  const [find, setFind] = useState("");
-  const [source, setSource] = useState<Source | "">("");
+  // The filters (v0.6.2): the words and source as before, and finer ones under Filters.
+  const [filters, setFilters] = useState<LibraryFilters>(noLibraryFilters);
+  const [more, setMore] = useState(false);
+  const { find, source } = filters;
+  const setFind = (value: string) =>
+    setFilters((before) => ({ ...before, find: value }));
+  const setSource = (value: Source | "") =>
+    setFilters((before) => ({ ...before, source: value }));
   // Sell (v0.6.0): an edition's copies listed in Tivit's Auction House, from its tile or row.
   const [sell, setSell] = useState<SellRequest | null>(null);
   const [said, setSaid] = useState("");
@@ -110,18 +124,18 @@ export function MyLibrary({
       Object.entries(found).map(([from, cards]) => [from, cards.size]),
     ) as Partial<Record<Source, number>>;
   }, [library]);
-  const shown = useMemo(() => {
-    const words = find.trim().toLowerCase();
-    return (library?.cards ?? []).filter(
-      (item) =>
-        (!source || item.sources.includes(source)) &&
-        (!words ||
-          item.card.name.toLowerCase().includes(words) ||
-          item.card.type_line.toLowerCase().includes(words) ||
-          item.edition.set_name.toLowerCase().includes(words) ||
-          item.edition.set_code.toLowerCase() === words),
-    );
-  }, [library, find, source]);
+  const shown = useMemo(
+    () => filterLibrary(library?.cards ?? [], filters),
+    [library, filters],
+  );
+  const sets = useMemo(() => librarySets(library?.cards ?? []), [library]);
+  const rarities = useMemo(
+    () => [
+      ...new Set((library?.cards ?? []).map((item) => item.edition.rarity)),
+    ],
+    [library],
+  );
+  const finer = filtersSet(filters);
 
   if (error)
     return (
@@ -217,7 +231,30 @@ export function MyLibrary({
               ))}
           </select>
         </label>
+        <button
+          type="button"
+          className={styles.secondary}
+          aria-expanded={more}
+          aria-controls="library-filters"
+          onClick={() => setMore((value) => !value)}
+        >
+          Filters
+          {finer > 0 && (
+            <span className={styles.filterCount}>
+              {finer}
+              <span className={styles.visuallyHidden}> set</span>
+            </span>
+          )}
+        </button>
       </div>
+      {more && (
+        <LibraryFilterPanel
+          filters={filters}
+          onChange={setFilters}
+          sets={sets}
+          rarities={rarities}
+        />
+      )}
       <div className={styles.resultRow}>
         <p role="status" className={styles.resultLine}>
           {shown.length === editions

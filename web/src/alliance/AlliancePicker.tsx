@@ -1,14 +1,15 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import type { Planeswalker } from "../api";
 import { byTier, playableWords, tierNames, wins } from "./alliance";
+import { AlliancePreview } from "./AlliancePreview";
 import { Portrait } from "./Portrait";
 import { TierBadge } from "./TierBadge";
 import styles from "./alliance.module.css";
 
 /**
- * Every Planeswalker, grouped by tier (v0.3.1). The ones the account's tier has opened are
- * buttons, each named for what it does ("Ally with Rowan"); the current alliance is marked; the
- * locked ones show the wins that open them.
+ * Every Planeswalker, grouped by tier (v0.3.1). The current alliance is marked; the locked ones
+ * show the wins that open them. Since v0.6.2 every tile is a button ("See Rowan's cards") that
+ * opens the Planeswalker's cards, where "Begin Alliance with Rowan" allies with an open one.
  */
 export function AlliancePicker({
   roster,
@@ -24,8 +25,16 @@ export function AlliancePicker({
   onAlly: (planeswalker: Planeswalker) => void;
 }) {
   const prefix = `picker${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const [shown, setShown] = useState<Planeswalker | null>(null);
   return (
     <div className={styles.tiers}>
+      <AlliancePreview
+        planeswalker={shown}
+        current={current}
+        busy={busy}
+        onAlly={onAlly}
+        onClose={() => setShown(null)}
+      />
       {byTier(roster).map(({ tier, planeswalkers }) => {
         const threshold = planeswalkers[0]!.wins;
         const open = planeswalkers.some((found) => found.open);
@@ -50,59 +59,47 @@ export function AlliancePicker({
             <ul className={styles.roster}>
               {planeswalkers.map((planeswalker) => {
                 const about = `${prefix}-${planeswalker.id}`;
-                const portrait = (
-                  <Portrait
-                    id={planeswalker.id}
-                    name={planeswalker.name}
-                    description={planeswalker.description}
-                    portrait={planeswalker.portrait}
-                    size={96}
-                    thumbnail
-                    decorative
-                  />
-                );
-                if (planeswalker.id === current)
-                  return (
-                    <li key={planeswalker.id}>
-                      <div className={styles.tile} data-current="">
-                        {portrait}
-                        <strong>{planeswalker.name}</strong>
-                        <small>Your alliance</small>
-                      </div>
-                    </li>
-                  );
-                if (!planeswalker.open)
-                  return (
-                    <li key={planeswalker.id}>
-                      <div className={styles.tile} data-locked="">
-                        {portrait}
-                        <strong>{planeswalker.name}</strong>
-                        <small>Opens at {wins(planeswalker.wins)}</small>
-                        <small>{playableWords(planeswalker)}</small>
-                      </div>
-                    </li>
-                  );
+                const allied = planeswalker.id === current;
+                const locked = !planeswalker.open && !allied;
                 return (
                   <li key={planeswalker.id}>
-                    {/* aria-disabled while a change is on its way: a disabled button loses
-                        keyboard focus. The portrait's description is read after the name. */}
+                    {/* The notes, then the portrait's description, are read after the name. */}
                     <button
                       type="button"
                       className={styles.tile}
-                      aria-label={`Ally with ${planeswalker.name}`}
+                      data-current={allied ? "" : undefined}
+                      data-locked={locked ? "" : undefined}
+                      aria-label={`See ${planeswalker.name}'s cards`}
+                      aria-haspopup="dialog"
                       aria-describedby={
                         planeswalker.description
                           ? `${about} ${about}-portrait`
                           : about
                       }
-                      aria-disabled={busy}
-                      onClick={() => {
-                        if (!busy) onAlly(planeswalker);
-                      }}
+                      onClick={() => setShown(planeswalker)}
                     >
-                      {portrait}
+                      <Portrait
+                        id={planeswalker.id}
+                        name={planeswalker.name}
+                        description={planeswalker.description}
+                        portrait={planeswalker.portrait}
+                        size={96}
+                        thumbnail
+                        decorative
+                      />
                       <strong>{planeswalker.name}</strong>
-                      <small id={about}>{playableWords(planeswalker)}</small>
+                      <span id={about} className={styles.tileNotes}>
+                        {allied ? (
+                          <small>Your alliance</small>
+                        ) : locked ? (
+                          <>
+                            <small>Opens at {wins(planeswalker.wins)}</small>{" "}
+                            <small>{playableWords(planeswalker)}</small>
+                          </>
+                        ) : (
+                          <small>{playableWords(planeswalker)}</small>
+                        )}
+                      </span>
                       {planeswalker.description && (
                         <span
                           id={`${about}-portrait`}

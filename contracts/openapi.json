@@ -692,7 +692,7 @@
                 "type": "null"
               }
             ],
-            "description": "The allied Planeswalker; null with no alliance.",
+            "description": "The allied Planeswalker, or the one asked for (GET /planeswalkers/{id}/cards, v0.6.2); null with no alliance.",
             "title": "Alliance"
           },
           "cards": {
@@ -27826,6 +27826,116 @@
           }
         },
         "summary": "Planeswalkers"
+      }
+    },
+    "/api/v1/planeswalkers/{planeswalker_id}/cards": {
+      "get": {
+        "description": "Any Planeswalker's own cards (v0.6.2), so the alliance picker shows what an alliance brings\nbefore it is chosen, locked ones included: the same list the alliance tab shows once allied,\nwith the copies the library holds now. The Godlike tier's custom cards stay private: for The\nSphinx it says `custom` and lists none.",
+        "operationId": "a_planeswalkers_cards_api_v1_planeswalkers__planeswalker_id__cards_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "planeswalker_id",
+            "required": true,
+            "schema": {
+              "title": "Planeswalker Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllianceCards"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "A Planeswalkers Cards"
       }
     },
     "/api/v1/players": {

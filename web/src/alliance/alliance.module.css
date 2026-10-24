@@ -194,6 +194,94 @@ button.tile[aria-disabled="true"] {
   color: #dec38b;
   font-weight: 600;
 }
+.tileNotes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+button.tile[data-locked]:hover {
+  border-color: #d5b77c66;
+}
+
+/* An alliance's cards before choosing it (v0.6.2): the Planeswalker's tile over a dimmed page. */
+.preview {
+  box-sizing: border-box;
+  width: min(1040px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 1px solid #d4b47a44;
+  border-radius: 10px;
+  background:
+    radial-gradient(ellipse at 18% 0%, #d5b77c1c, transparent 55%), #101819;
+  color: inherit;
+  box-shadow: 0 24px 80px #000c;
+}
+.preview::backdrop {
+  background: #050909d9;
+}
+.previewBody {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  padding: 28px;
+}
+.previewClose {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  border: 0;
+  background: transparent;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: #b8c1b6;
+}
+.previewHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 26px;
+  padding-right: 32px;
+}
+.previewHead .portrait {
+  filter: drop-shadow(0 10px 22px #000000a0);
+}
+.previewHead > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1;
+  min-width: 220px;
+}
+.previewHead h2 {
+  margin: 0;
+  font: 600 1.7rem var(--cd-display);
+  color: var(--cd-gold-hi);
+}
+.previewTier {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  color: #c9d0c6;
+  font-size: 0.86rem;
+}
+.previewNote {
+  margin: 0;
+  color: #aeb8ac;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.previewNote[data-current] {
+  color: #dec38b;
+  font-weight: 600;
+}
+.previewNote[data-locked] {
+  color: #c9d0c6;
+}
+
 /* Locked: shown, greyed, with the wins that open it. */
 .tile[data-locked] .portrait {
   filter: grayscale(1) brightness(0.6);

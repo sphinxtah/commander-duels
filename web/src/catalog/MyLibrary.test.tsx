@@ -102,6 +102,119 @@ describe("My library's finishes and Sell", () => {
     expect(sellable).toHaveBeenCalledWith("Lightning Bolt");
   });
 
+  it("filters finely under Filters (v0.6.2): set, rarity, finish, colour, type and mana value", async () => {
+    const view = library(0);
+    answer({
+      ...view,
+      cards: [
+        { ...view.cards[0]!, card: { ...bolt, colors: ["R"] } },
+        {
+          card: card("Teferi, Temporal Archmage", {
+            colors: ["U"],
+            type_line: "Legendary Planeswalker — Teferi",
+            mana_value: 6,
+          }),
+          copies: 4,
+          edition: {
+            ...edition,
+            printing_id: "teferi-c16",
+            set_code: "c16",
+            set_name: "Commander 2016",
+            rarity: "mythic",
+          },
+          sources: ["alliance"],
+          finishes: { nonfoil: 4, foil: 0, etched: 0 },
+          sellable: 0,
+        },
+      ],
+    });
+    render(
+      <MyLibrary
+        onOpen={vi.fn()}
+        onZoom={vi.fn()}
+        view="list"
+        onView={vi.fn()}
+      />,
+    );
+    const table = await screen.findByRole("table", { name: "Your library" });
+    const rows = () => within(table).getAllByRole("row").length - 1;
+    expect(rows()).toBe(2);
+    const toggle = screen.getByRole("button", { name: "Filters" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(toggle);
+    const panel = screen.getByRole("group", { name: "Filter your library" });
+    // Only the library's own sets and rarities are offered.
+    expect(
+      within(panel)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(
+      expect.arrayContaining([
+        "Any set",
+        "Commander 2016 (C16)",
+        "Revised Edition (3ED)",
+      ]),
+    );
+    expect(
+      within(within(panel).getByRole("group", { name: "Rarity" }))
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["Common", "Mythic rare"]);
+    fireEvent.click(within(panel).getByRole("button", { name: "Mythic rare" }));
+    expect(rows()).toBe(1);
+    expect(within(table).getByText("Teferi, Temporal Archmage")).toBeVisible();
+    expect(screen.getByText("1 of 2 editions")).toBeInTheDocument();
+    // The Filters button counts what is set.
+    expect(screen.getByRole("button", { expanded: true })).toHaveTextContent(
+      /^Filters\s*1 set$/,
+    );
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Clear filters" }),
+    );
+    expect(rows()).toBe(2);
+    fireEvent.click(within(panel).getByRole("button", { name: "Foil" }));
+    expect(within(table).getByText("Lightning Bolt")).toBeVisible();
+    expect(rows()).toBe(1);
+    fireEvent.click(within(panel).getByRole("button", { name: "Foil" }));
+    fireEvent.click(within(panel).getByRole("checkbox", { name: /Blue/ }));
+    expect(rows()).toBe(1);
+    expect(within(table).getByText("Teferi, Temporal Archmage")).toBeVisible();
+    fireEvent.click(within(panel).getByRole("checkbox", { name: /Blue/ }));
+    fireEvent.change(within(panel).getByLabelText("Type"), {
+      target: { value: "planeswalker" },
+    });
+    expect(rows()).toBe(1);
+    fireEvent.change(within(panel).getByLabelText("Type"), {
+      target: { value: "" },
+    });
+    fireEvent.change(within(panel).getByLabelText("Mana value from"), {
+      target: { value: "2" },
+    });
+    expect(rows()).toBe(1);
+    fireEvent.change(within(panel).getByLabelText("Mana value from"), {
+      target: { value: "" },
+    });
+    fireEvent.change(within(panel).getByLabelText("Set"), {
+      target: { value: "3ed" },
+    });
+    expect(rows()).toBe(1);
+    expect(within(table).getByText("Lightning Bolt")).toBeVisible();
+    fireEvent.change(within(panel).getByLabelText("Set"), {
+      target: { value: "" },
+    });
+    fireEvent.change(within(panel).getByLabelText("Sort by"), {
+      target: { value: "mana_value" },
+    });
+    expect(
+      within(table)
+        .getAllByRole("rowheader")
+        .map((cell) => cell.textContent),
+    ).toEqual([
+      expect.stringContaining("Lightning Bolt"),
+      expect.stringContaining("Teferi"),
+    ]);
+  });
+
   it("offers no Sell where nothing may be sold", async () => {
     answer(library(0));
     render(

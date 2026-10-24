@@ -7,7 +7,15 @@ import {
   within,
 } from "@testing-library/react";
 import { createRef, StrictMode } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { customCard } from "../alliance/fixtures";
 import { DeckEditor } from "./DeckEditor";
 import type { DeckEntry } from "./decks";
@@ -47,6 +55,9 @@ const FOUND = { timeout: 4000 };
 
 beforeAll(openDialogs);
 afterEach(() => vi.restoreAllMocks());
+// Most of these read the deck's list, which since v0.6.2 is a switch away from its pictures; the
+// pictures have their own tests at the end.
+beforeEach(() => localStorage.setItem("cd.decks.view.v1", "list"));
 
 function deck(version: number, entries = [entry(bolt, 4)]) {
   return deckDetail({
@@ -712,5 +723,128 @@ describe("Godlike cards in the deck editor", { timeout: 15_000 }, () => {
     render(<DeckEditor deckId="deck-1" heading={createRef()} />);
     await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
     expect(screen.queryByText("Godlike cards")).toBeNull();
+  });
+});
+
+describe("the deck as its cards (v0.6.2)", { timeout: 15_000 }, () => {
+  // The owner's request: pictures by default, the list the other view.
+  beforeEach(() => localStorage.removeItem("cd.decks.view.v1"));
+  const leader = card("Stand-in Leader", {
+    type_line: "Legendary Creature — Stand-in",
+    commander: true,
+    image: { printing_id: "p-leader", faces: 0 },
+  });
+  function commanderDeck() {
+    return deckDetail({
+      format: "commander",
+      draft: {
+        version: 1,
+        entries: [
+          entry(leader, 1, "commander"),
+          entry(bolt, 1),
+          entry(mountain, 30),
+        ],
+      },
+      cards: { [leader.id]: leader, [bolt.id]: bolt, [mountain.id]: mountain },
+      validation: validation({ format: "commander" }),
+    });
+  }
+
+  it("shows the commander first, then the deck by type, each card with its copies", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, commanderDeck()));
+    api.on("GET /api/v1/cards/{card_id}", () => new Promise(() => {}));
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    const switches = await screen.findByRole("group", {
+      name: "Show cards as",
+    });
+    expect(
+      within(switches).getByRole("button", { name: "Pictures" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const sections = screen
+      .getAllByRole("region")
+      .map((region) => region.getAttribute("aria-label"))
+      .filter((name) => name === "Commander" || name === "Main deck");
+    expect(sections).toEqual(["Commander", "Main deck"]);
+    const commander = within(
+      screen.getByRole("region", { name: "Commander" }),
+    ).getByRole("list", { name: "Commander" });
+    const picture = within(commander).getByRole("button", {
+      name: "Stand-in Leader, 1 copy",
+    });
+    expect(picture.querySelector("img")).toHaveAttribute(
+      "src",
+      "/api/v1/card-images/printings/p-leader?size=normal",
+    );
+    expect(
+      screen.getByRole("list", { name: "Main deck: Instants" }),
+    ).toHaveTextContent("Lightning Bolt");
+    const lands = screen.getByRole("list", { name: "Main deck: Lands" });
+    expect(
+      within(lands).getByRole("button", { name: "Mountain, 30 copies" }),
+    ).toHaveTextContent("×30");
+    // No list rows: the pictures stand in their place.
+    expect(screen.queryByRole("button", { name: "Lightning Bolt" })).toBeNull();
+
+    // A picture opens the card as its name in the list does.
+    fireEvent.click(
+      screen.getByRole("button", { name: "Lightning Bolt, 1 copy" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Lightning Bolt" }),
+    ).toBeInTheDocument();
+    // Its details, of the deck's entry: the editions the library holds.
+    const asked = api.calls.find(
+      (call) => call.route === "GET /api/v1/cards/{card_id}",
+    )!.options as {
+      params: { path: { card_id: string }; query: Record<string, unknown> };
+    };
+    expect(asked.params.path.card_id).toBe(bolt.id);
+    expect(asked.params.query).toMatchObject({ printings: "owned" });
+    fireEvent.click(screen.getByRole("button", { name: "Close the card" }));
+
+    // The copies change below the picture, as in the list.
+    fireEvent.click(
+      screen.getByRole("button", { name: "One more Lightning Bolt" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Lightning Bolt, 2 copies" }),
+    ).toHaveTextContent("×2");
+    expect(screen.getByText("Unsaved changes…")).toBeInTheDocument();
+    expect(
+      within(commander).getByRole("button", {
+        name: "One more Stand-in Leader",
+      }),
+    ).toBeDisabled();
+  });
+
+  it("switches to the list, and the browser remembers it", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, commanderDeck()));
+    finding(api);
+    const { unmount } = render(
+      <DeckEditor deckId="deck-1" heading={createRef()} />,
+    );
+    const switches = await screen.findByRole("group", {
+      name: "Show cards as",
+    });
+    fireEvent.click(within(switches).getByRole("button", { name: "List" }));
+    expect(localStorage.getItem("cd.decks.view.v1")).toBe("list");
+    expect(
+      screen.getByRole("button", { name: "Lightning Bolt" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Main deck: Lands" })).toBeNull();
+    unmount();
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    expect(
+      await screen.findByRole("button", { name: "Lightning Bolt" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("group", { name: "Show cards as" })).getByRole(
+        "button",
+        { name: "List" },
+      ),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });
