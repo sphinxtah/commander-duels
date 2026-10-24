@@ -31,7 +31,7 @@ The dialog says so in plain words: "We'll also send: this page, the version, the
 | The browser | The request's `User-Agent` header, read by the API (at most 512 characters) |
 | The latest API requests, at most 20: method, path without its query, status (0 when no answer came), request ID and time | The page's memory (below) |
 
-**The latest requests.** `web/src/api.ts` notes each request the app's API client makes: its method, its path, the answer's status and `X-Request-ID`, and the time. It never keeps a query string, a body or another header, and it leaves out the counts the page asks for every minute ([counts](#counts)). Only the latest 20 are kept, in the page's memory; a reload starts again. Each request ID matches a line of the API's log, so an administrator can find what the server did.
+**The latest requests.** `web/src/api.ts` notes each request the app's API client makes: its method, its path, the answer's status and `X-Request-ID`, and the time. It never keeps a query string, a body or another header, and it leaves out the counts the page asks for every minute ([counts](#counts)) and, since v0.5.1, the reads the page marks as its own (`X-Background`, such as the chat bar's 30 seconds' refresh of the friends; [sessions](identity.md#sessions-auth03)). Only the latest 20 are kept, in the page's memory; a reload starts again. Each request ID matches a line of the API's log, so an administrator can find what the server did.
 
 Nothing else is sent: no cookie, email address, location, other tab or file. The context is information only: nothing in it is checked against the account or decides anything.
 

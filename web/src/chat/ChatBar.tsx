@@ -21,7 +21,8 @@ import styles from "./chat.module.css";
 // The chat bar (v0.5.1, the owner's request), along the bottom of every page of the app: the
 // friends list at its right end, with who is online and what is unread, and the conversations
 // with friends docked beside it, each folded to its title bar or open. They stay open from page
-// to page and, which ones, when the page reloads (chat.ts), as does the list's own fold; a closed
+// to page and, which ones, when the page reloads (chat.ts, for the account), as does the list's
+// own fold, and what is being written stays from the pages to the table and back; a closed
 // conversation opens again from the list. On a phone the bar is one button, which opens the list,
 // and one conversation shows at a time, the whole width of the screen. It replaced the Messages
 // page and the windows docked at the bottom right (v0.4.4).
@@ -39,12 +40,15 @@ function DockedWindow({
   window: shown,
   chat,
   known,
+  friend,
   onClosed,
 }: {
   window: ChatWindow;
   chat: Chat;
   /** The player as the friends list last saw them, with the newer presence. */
   known: PlayerSummary | undefined;
+  /** Whether the friends list counts them a friend now; undefined before it knows (v0.5.1). */
+  friend: boolean | undefined;
   onClosed: () => void;
 }) {
   // A live game keeps its address, so at the table nothing here leads to another page.
@@ -118,6 +122,7 @@ function DockedWindow({
           onPlayer={learned}
           focus={chat.focusing === shown.playerId && !shown.folded}
           onFocused={chat.focused}
+          friend={friend}
         />
       </div>
     </section>
@@ -374,6 +379,7 @@ export function ChatBar({ chat }: { chat: Chat }) {
               window={window}
               chat={chat}
               known={people.known.get(window.playerId)}
+              friend={people.friend(window.playerId)}
               onClosed={() => toggle.current?.focus()}
             />
           ))}

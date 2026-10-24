@@ -7,7 +7,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { client, describe } from "../api";
+import { backgroundRead, client, describe } from "../api";
 import { timeAgo, type PlayerSummary } from "../social/social";
 import {
   MESSAGE_LENGTH,
@@ -34,11 +34,13 @@ interface Pending {
 // While the live connection is down, a shown conversation asks again this often.
 const POLL_MS = 30_000;
 
-/** A conversation's messages and how to write in it. */
+/** A conversation's messages and how to write in it. `friend` is whether the bar's friends list
+ * counts the player a friend now, when it knows (v0.5.1). */
 export function useConversation(
   playerId: string,
   chat: Chat | null,
   visible: boolean,
+  friend?: boolean,
 ) {
   const [player, setPlayer] = useState<PlayerSummary | null>(null);
   const [friends, setFriends] = useState(true);
@@ -49,6 +51,8 @@ export function useConversation(
   const [error, setError] = useState("");
   // The friend's messages not yet read, as this page knows it.
   const [unread, setUnread] = useState(0);
+  const unreadNow = useRef(0);
+  unreadNow.current = unread;
   const marked = useRef("");
 
   const merge = useCallback((more: ChatMessage[]) => {
@@ -66,39 +70,49 @@ export function useConversation(
     setPending((before) => before.filter((each) => !sent.has(each.clientId)));
   }, []);
 
-  const load = useCallback(async () => {
-    const { data, error } = await client.GET(
-      "/api/v1/conversations/{player_id}",
-      {
-        params: { path: { player_id: playerId } },
-      },
-    );
-    if (!data) {
-      setError(describe(error));
-      setState((before) => (before === "ready" ? before : "error"));
-      return;
-    }
-    setPlayer(data.player);
-    setFriends(data.friends);
-    setUnread(data.unread);
-    setNext((before) => before ?? data.next ?? null);
-    merge(data.messages);
-    setError("");
-    setState("ready");
-  }, [playerId, merge]);
+  // `background`: asked on the page's own, on a timer or after the socket said something, not at
+  // the player's click; the API does not count it as activity (v0.5.1, api.ts backgroundRead).
+  const load = useCallback(
+    async (background = false) => {
+      const { data, error } = await client.GET(
+        "/api/v1/conversations/{player_id}",
+        {
+          params: { path: { player_id: playerId } },
+          ...backgroundRead(background),
+        },
+      );
+      if (!data) {
+        setError(describe(error));
+        setState((before) => (before === "ready" ? before : "error"));
+        return;
+      }
+      setPlayer(data.player);
+      setFriends(data.friends);
+      // Still unread after this page marked it (an answer that crossed the mark, or a mark that
+      // failed): shown, the conversation marks it again (v0.5.1).
+      if (data.unread > 0) marked.current = "";
+      setUnread(data.unread);
+      setNext((before) => before ?? data.next ?? null);
+      merge(data.messages);
+      setError("");
+      setState("ready");
+    },
+    [playerId, merge],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
   // The socket resends nothing: coming back, the conversation asks for what it missed; while it
-  // is down, it asks now and then.
+  // is down, it asks now and then. Opening asks once, above, socket up or not (v0.5.1).
   const live = chat?.live ?? false;
+  const wasLive = useRef(live);
   useEffect(() => {
-    if (live) {
-      void load();
-      return;
-    }
-    const timer = window.setInterval(() => void load(), POLL_MS);
+    const back = live && !wasLive.current;
+    wasLive.current = live;
+    if (back) void load(true);
+    if (live) return;
+    const timer = window.setInterval(() => void load(true), POLL_MS);
     return () => window.clearInterval(timer);
   }, [live, load]);
   useEffect(() => {
@@ -109,8 +123,17 @@ export function useConversation(
         merge([event.message]);
         if (event.message.sender_id === playerId) setUnread((n) => n + 1);
       } else if (event.unread === 0) setUnread(0);
+      // Read in another tab or on another device: the event counts the account's unread, not
+      // this conversation's, so a count still shown here asks for its own (v0.5.1).
+      else if (unreadNow.current > 0) void load(true);
     });
-  }, [chat, playerId, merge]);
+  }, [chat, playerId, merge, load]);
+  // The bar's friends list says the friendship began or ended since the conversation was asked
+  // for: it asks again, so its box opens or closes (v0.5.1).
+  useEffect(() => {
+    if (friend === undefined || state !== "ready" || friend === friends) return;
+    void load(true);
+  }, [friend, friends, state, load]);
 
   // Shown in a tab in use: the friend's messages are read, up to the newest.
   const newestTheirs = [...messages]
@@ -237,6 +260,7 @@ export function ConversationView({
   onPlayer,
   focus = false,
   onFocused,
+  friend,
 }: {
   playerId: string;
   chat: Chat | null;
@@ -250,12 +274,26 @@ export function ConversationView({
    * when the two are no longer friends. */
   focus?: boolean;
   onFocused?: () => void;
+  /** Whether the bar's friends list counts the player a friend now, once it knows (v0.5.1). */
+  friend?: boolean;
 }) {
   const inUse = useTabInUse();
-  const conversation = useConversation(playerId, chat, visible && inUse);
+  const conversation = useConversation(
+    playerId,
+    chat,
+    visible && inUse,
+    friend,
+  );
   const { player, friends, messages, pending, next, state, error } =
     conversation;
-  const [text, setText] = useState("");
+  // What is being written outlasts the window (v0.5.1): the bar drawn again as the player moves
+  // between the pages and a table, or the window closed and opened again. The chat keeps it, in
+  // memory only.
+  const [text, setText] = useState(() => chat?.draft(playerId) ?? "");
+  function write(value: string) {
+    setText(value);
+    chat?.setDraft(playerId, value);
+  }
   const [reported, setReported] = useState<ReportedMessage | null>(null);
   const list = useRef<HTMLOListElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -285,7 +323,7 @@ export function ConversationView({
     event?.preventDefault();
     const body = text.trim();
     if (!body || !friends) return;
-    setText("");
+    write("");
     atBottom.current = true;
     void conversation.send(body);
   }
@@ -370,15 +408,18 @@ export function ConversationView({
             {each.failed ? (
               <span className={styles.failed} role="alert">
                 {each.failed}{" "}
-                <button
-                  type="button"
-                  className={styles.retry}
-                  onClick={() =>
-                    void conversation.send(each.body, each.clientId)
-                  }
-                >
-                  Try again
-                </button>
+                {/* No longer friends, it could only fail again (v0.5.1). */}
+                {friends && (
+                  <button
+                    type="button"
+                    className={styles.retry}
+                    onClick={() =>
+                      void conversation.send(each.body, each.clientId)
+                    }
+                  >
+                    Try again
+                  </button>
+                )}
               </span>
             ) : (
               <span className={styles.sending}>Sending…</span>
@@ -401,7 +442,7 @@ export function ConversationView({
             rows={compact ? 1 : 2}
             maxLength={MESSAGE_LENGTH}
             placeholder={`Write to ${handle}…`}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => write(event.target.value)}
             onKeyDown={keyDown}
           />
           <button type="submit" className={styles.send} disabled={!text.trim()}>

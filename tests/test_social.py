@@ -556,6 +556,34 @@ def test_a_check_in_is_not_activity(client):
         assert session is not None and session.idle_expires_at == before
 
 
+def test_a_read_the_page_makes_on_its_own_is_not_activity(client):
+    """The chat bar's timed and socket-driven reads and the Friends page's refresh (v0.5.1) carry
+    the background marker: a marked GET leaves the idle limit alone. The same GET unmarked, the
+    person's own, extends it, and so does a marked change."""
+    ada = player(client, "ada")
+
+    def extends(method: str, path: str, marked: bool, body: object = None) -> bool:
+        with database(client) as db:
+            session = db.scalar(select(UserSession).where(UserSession.user_id == ada.id))
+            assert session is not None
+            session.last_seen_at = utcnow() - timedelta(minutes=5)
+            session.idle_expires_at = utcnow() + timedelta(hours=1)
+            db.commit()
+            before = session.idle_expires_at
+        headers = ada.headers() | ({"x-background": "1"} if marked else {})
+        answer = client.request(method, path, json=body, headers=headers)
+        assert answer.status_code == 200, answer.text
+        with database(client) as db:
+            session = db.scalar(select(UserSession).where(UserSession.user_id == ada.id))
+            assert session is not None
+            return session.idle_expires_at != before
+
+    assert not extends("GET", "/api/v1/friends", marked=True)
+    assert not extends("GET", "/api/v1/conversations", marked=True)
+    assert extends("GET", "/api/v1/friends", marked=False)
+    assert extends("PATCH", "/api/v1/me/privacy", marked=True, body={"appear_offline": False})
+
+
 # Notifications.
 
 

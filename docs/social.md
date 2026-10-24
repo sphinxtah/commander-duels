@@ -34,7 +34,7 @@ Since v0.5.0 a profile also shows the player's badges (the three they pinned fir
 - **Mutual** (the owner's decision). **Add friend** sends a request; the asker sees **Pending** until the other player accepts it, from the bell, the history, Friends or the asker's profile, or adds the asker back, which is the same thing. Either may withdraw or decline a request, or end a friendship (after a confirmation). `PUT /api/v1/friends/{id}` asks or accepts; `DELETE /api/v1/friends/{id}` withdraws, declines or ends.
 - **A request's notification** goes to the other player once a day at most, however often the request is withdrawn and sent again. A request withdrawn stays in their notifications, no longer waiting; a request declined is marked read.
 - **Limits.** An account may have 50 requests waiting for others' answers (`429 too_many_requests`); answering a request is never limited. An account needs its handle before it can ask (`409 handle_required`).
-- **The Friends page** (`#friends`, in the navigation) lists the requests waiting for your answer, your friends by what they are doing (in a game, online, idle, offline, then those who share nothing), and your requests waiting for theirs. It asks again every 30 seconds while shown. `GET /api/v1/friends`.
+- **The Friends page** (`#friends`, in the navigation) lists the requests waiting for your answer, your friends by what they are doing (in a game, online, idle, offline, then those who share nothing), and your requests waiting for theirs. It asks again every 30 seconds while shown; since v0.5.1 that refresh is marked as the page's own, so it is not activity ([sessions](identity.md#sessions-auth03)). `GET /api/v1/friends`.
 
 ## Blocking
 

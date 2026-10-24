@@ -127,7 +127,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
   | Player (Google) | 14 days | 30 days |
   | SysOp | 60 minutes | 12 hours |
 
-  Activity extends the idle limit at most once a minute. Administration's counts, which the page asks for every minute on its own (v0.4.1), are not activity: a tab left open still reaches the idle limit.
+  Activity extends the idle limit at most once a minute. Administration's counts, which the page asks for every minute on its own (v0.4.1), are not activity: a tab left open still reaches the idle limit. Nor, since v0.5.1, is a GET the page marks as its own with `X-Background: 1` (`identity.BACKGROUND_HEADER`): the chat bar's timed and socket-driven reads of the friends and the conversations, and the Friends page's 30 seconds' refresh ([chat](chat.md#friends-messages)). The API honours the mark on a GET only, since a change is always the person's doing; the person's own clicks and a page's first load go unmarked and count. The web app also leaves marked requests out of a problem report's latest requests ([reports](reports.md)).
 - **Rotation.**
   - Every sign-in issues a new session and ends any session the browser presented.
   - Every role or status change raises the account's privilege version. The account's next request swaps its session for a new identifier, with the same sign-in time, limits and CSRF token.
