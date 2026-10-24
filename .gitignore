@@ -21,3 +21,6 @@ the sphinx mtg/
 # The owner's starter-deck workbook: it holds private production notes (prices, bonus cards);
 # scripts/starter_decks.py turns it into content/starter-decks.json.
 Commander_Duels_Starter_Decks.xlsx
+
+# The owner's folder of files no longer needed, to go through by hand (v0.6.1).
+/archive/
