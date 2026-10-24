@@ -727,10 +727,12 @@ def listable(
     concept = db.get_one(CardConcept, printing.concept_id)
     if printing.scryfall_id in ONE_OF_A_KIND:
         raise not_sellable(f"{concept.name} from {printing.set_name} is one of a kind: it stays.")
-    printed = list(printing.finishes or []) or ["nonfoil"]
-    if finish not in printed:
-        raise not_sellable(f"{concept.name} from {printing.set_name} was not printed {finish}.")
     if user.kind == "sysop":
+        # SysOp's library is the whole catalog: in the finishes the edition was printed in. A
+        # player sells the copies granted, in the finish granted.
+        printed = list(printing.finishes or []) or ["nonfoil"]
+        if finish not in printed:
+            raise not_sellable(f"{concept.name} from {printing.set_name} was not printed {finish}.")
         return concept, printing
     available = sellable_copies(db, user, {printing.id}).get((printing.id, finish), 0)
     if available >= quantity:

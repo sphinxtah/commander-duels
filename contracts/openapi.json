@@ -804,6 +804,381 @@
         "title": "ArrangementRequest",
         "type": "object"
       },
+      "AuctionCard": {
+        "additionalProperties": false,
+        "properties": {
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "colors": {
+            "description": "W, U, B, R, G; empty for a colorless card.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Colors",
+            "type": "array"
+          },
+          "concept_id": {
+            "format": "uuid",
+            "title": "Concept Id",
+            "type": "string"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The edition's picture on this site, as the library's.",
+            "title": "Image"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "rarity": {
+            "title": "Rarity",
+            "type": "string"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "title": "Set Name",
+            "type": "string"
+          },
+          "type_line": {
+            "title": "Type Line",
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept_id",
+          "printing_id",
+          "name",
+          "type_line",
+          "colors",
+          "set_code",
+          "set_name",
+          "collector_number",
+          "rarity",
+          "released_at",
+          "image"
+        ],
+        "title": "AuctionCard",
+        "type": "object"
+      },
+      "AuctionItem": {
+        "additionalProperties": false,
+        "properties": {
+          "bids": {
+            "title": "Bids",
+            "type": "integer"
+          },
+          "buy_now": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Now"
+          },
+          "buyer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buyer"
+          },
+          "card": {
+            "$ref": "#/components/schemas/AuctionCard"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_bid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Bid"
+          },
+          "duration": {
+            "enum": [
+              "1h",
+              "3h",
+              "12h",
+              "24h",
+              "3d"
+            ],
+            "title": "Duration",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "title": "Ends At",
+            "type": "string"
+          },
+          "finish": {
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "high_bidder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Bidder"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "leading": {
+            "description": "The viewer's bid leads (or won).",
+            "title": "Leading",
+            "type": "boolean"
+          },
+          "mine": {
+            "description": "The viewer's own auction.",
+            "title": "Mine",
+            "type": "boolean"
+          },
+          "my_bid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The viewer's highest bid.",
+            "title": "My Bid"
+          },
+          "next_bid": {
+            "description": "The lowest bid the auction takes now.",
+            "title": "Next Bid",
+            "type": "integer"
+          },
+          "outbid": {
+            "description": "The viewer bid, and does not lead.",
+            "title": "Outbid",
+            "type": "boolean"
+          },
+          "seller": {
+            "description": "The seller's handle.",
+            "title": "Seller",
+            "type": "string"
+          },
+          "sold_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sold Price"
+          },
+          "starting_bid": {
+            "title": "Starting Bid",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "sold",
+              "expired",
+              "withdrawn",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "watching": {
+            "title": "Watching",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "card",
+          "finish",
+          "seller",
+          "starting_bid",
+          "buy_now",
+          "current_bid",
+          "high_bidder",
+          "bids",
+          "next_bid",
+          "duration",
+          "created_at",
+          "ends_at",
+          "status",
+          "sold_price",
+          "buyer",
+          "mine",
+          "leading",
+          "outbid",
+          "watching",
+          "my_bid"
+        ],
+        "title": "AuctionItem",
+        "type": "object"
+      },
+      "AuctionList": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AuctionList",
+        "type": "object"
+      },
+      "AuctionNotice": {
+        "additionalProperties": false,
+        "description": "The auction a notification of the auction house's names (v0.6.0).",
+        "properties": {
+          "collector_number": {
+            "title": "Collector Number",
+            "type": "string"
+          },
+          "finish": {
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "The card's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For an outbid, the auction's leading bid now; for a win or a sale, its price; null otherwise.",
+            "title": "Price"
+          },
+          "set_code": {
+            "title": "Set Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "set_code",
+          "collector_number",
+          "finish",
+          "price"
+        ],
+        "title": "AuctionNotice",
+        "type": "object"
+      },
+      "AuctionPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "total"
+        ],
+        "title": "AuctionPage",
+        "type": "object"
+      },
       "AuditActor": {
         "additionalProperties": false,
         "properties": {
@@ -1004,6 +1379,28 @@
         "title": "Award",
         "type": "object"
       },
+      "BidRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "key": {
+            "maxLength": 64,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "key"
+        ],
+        "title": "BidRequest",
+        "type": "object"
+      },
       "BlockedPlayer": {
         "additionalProperties": false,
         "properties": {
@@ -1155,6 +1552,39 @@
           "auth"
         ],
         "title": "Bootstrap",
+        "type": "object"
+      },
+      "BuyNowRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 64,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "BuyNowRequest",
+        "type": "object"
+      },
+      "Cancellation": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "Cancellation",
         "type": "object"
       },
       "Capability": {
@@ -2376,6 +2806,69 @@
           "fresh"
         ],
         "title": "CheckedIn",
+        "type": "object"
+      },
+      "ClearList": {
+        "additionalProperties": false,
+        "properties": {
+          "which": {
+            "enum": [
+              "sold",
+              "unsold"
+            ],
+            "title": "Which",
+            "type": "string"
+          }
+        },
+        "required": [
+          "which"
+        ],
+        "title": "ClearList",
+        "type": "object"
+      },
+      "ClearTargets": {
+        "additionalProperties": false,
+        "properties": {
+          "which": {
+            "enum": [
+              "won",
+              "lost"
+            ],
+            "title": "Which",
+            "type": "string"
+          }
+        },
+        "required": [
+          "which"
+        ],
+        "title": "ClearTargets",
+        "type": "object"
+      },
+      "Comparison": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "Live listings, the lowest price first.",
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "recent_sales": {
+            "description": "The latest sales, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/RecentSale"
+            },
+            "title": "Recent Sales",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "recent_sales"
+        ],
+        "title": "Comparison",
         "type": "object"
       },
       "ConversationItem": {
@@ -5218,6 +5711,15 @@
             "$ref": "#/components/schemas/LibraryEdition",
             "description": "The edition these copies are (v0.5.0)."
           },
+          "finishes": {
+            "$ref": "#/components/schemas/LibraryFinishes",
+            "description": "The copies held now in each finish (v0.6.0), after the auction house: those listed or sold are out, those bought are in; an alliance's are nonfoil."
+          },
+          "sellable": {
+            "description": "Copies that may be listed at Tivit's Auction House (v0.6.0): granted ones, never an alliance's.",
+            "title": "Sellable",
+            "type": "integer"
+          },
           "sources": {
             "description": "Where this edition's copies came from.",
             "items": {
@@ -5226,7 +5728,8 @@
                 "grandfathered",
                 "alliance",
                 "pack",
-                "unique"
+                "unique",
+                "auction"
               ],
               "type": "string"
             },
@@ -5238,7 +5741,9 @@
           "card",
           "edition",
           "copies",
-          "sources"
+          "sources",
+          "finishes",
+          "sellable"
         ],
         "title": "LibraryCard",
         "type": "object"
@@ -5292,6 +5797,29 @@
         "title": "LibraryEdition",
         "type": "object"
       },
+      "LibraryFinishes": {
+        "additionalProperties": false,
+        "description": "An edition's copies by finish (v0.6.0).",
+        "properties": {
+          "etched": {
+            "default": 0,
+            "title": "Etched",
+            "type": "integer"
+          },
+          "foil": {
+            "default": 0,
+            "title": "Foil",
+            "type": "integer"
+          },
+          "nonfoil": {
+            "default": 0,
+            "title": "Nonfoil",
+            "type": "integer"
+          }
+        },
+        "title": "LibraryFinishes",
+        "type": "object"
+      },
       "LibraryView": {
         "additionalProperties": false,
         "properties": {
@@ -5325,6 +5853,74 @@
           "cards"
         ],
         "title": "LibraryView",
+        "type": "object"
+      },
+      "Listing": {
+        "additionalProperties": false,
+        "properties": {
+          "buy_now": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Now"
+          },
+          "duration": {
+            "enum": [
+              "1h",
+              "3h",
+              "12h",
+              "24h",
+              "3d"
+            ],
+            "title": "Duration",
+            "type": "string"
+          },
+          "finish": {
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 64,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "quantity": {
+            "default": 1,
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "starting_bid": {
+            "title": "Starting Bid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "printing_id",
+          "finish",
+          "starting_bid",
+          "duration",
+          "key"
+        ],
+        "title": "Listing",
         "type": "object"
       },
       "MatchGameView": {
@@ -5792,7 +6388,8 @@
                 "players.presence",
                 "chat.read_all",
                 "admin.users.reset",
-                "players.history"
+                "players.history",
+                "auctions.manage"
               ],
               "type": "string"
             },
@@ -5949,6 +6546,17 @@
               }
             ]
           },
+          "auction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuctionNotice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For the auction house's news (v0.6.0): the auction, which the bell links to (/auctions)."
+          },
           "award": {
             "anyOf": [
               {
@@ -5992,7 +6600,12 @@
               "quest_completed",
               "achievement_earned",
               "rematch",
-              "team_invite"
+              "team_invite",
+              "auction_outbid",
+              "auction_won",
+              "auction_sold",
+              "auction_unsold",
+              "auction_cancelled"
             ],
             "title": "Kind",
             "type": "string"
@@ -8443,6 +9056,26 @@
         "title": "RecentRequest",
         "type": "object"
       },
+      "RecentSale": {
+        "additionalProperties": false,
+        "properties": {
+          "price": {
+            "title": "Price",
+            "type": "integer"
+          },
+          "sold_at": {
+            "format": "date-time",
+            "title": "Sold At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "price",
+          "sold_at"
+        ],
+        "title": "RecentSale",
+        "type": "object"
+      },
       "Related": {
         "additionalProperties": false,
         "properties": {
@@ -8472,6 +9105,51 @@
           "type_line"
         ],
         "title": "Related",
+        "type": "object"
+      },
+      "Relisting": {
+        "additionalProperties": false,
+        "properties": {
+          "buy_now": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Now"
+          },
+          "duration": {
+            "enum": [
+              "1h",
+              "3h",
+              "12h",
+              "24h",
+              "3d"
+            ],
+            "title": "Duration",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 64,
+            "minLength": 8,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Key",
+            "type": "string"
+          },
+          "starting_bid": {
+            "title": "Starting Bid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "starting_bid",
+          "duration",
+          "key"
+        ],
+        "title": "Relisting",
         "type": "object"
       },
       "RematchPlayerView": {
@@ -9793,6 +10471,70 @@
         "title": "SeatTaking",
         "type": "object"
       },
+      "SellableItem": {
+        "additionalProperties": false,
+        "properties": {
+          "card": {
+            "$ref": "#/components/schemas/AuctionCard"
+          },
+          "copies": {
+            "description": "Copies held in this edition and finish.",
+            "title": "Copies",
+            "type": "integer"
+          },
+          "finish": {
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "sellable": {
+            "description": "Copies that may be listed; for SysOp, the most one listing takes.",
+            "title": "Sellable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card",
+          "finish",
+          "copies",
+          "sellable"
+        ],
+        "title": "SellableItem",
+        "type": "object"
+      },
+      "SellablePage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SellableItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "SellablePage",
+        "type": "object"
+      },
       "SessionInfo": {
         "additionalProperties": false,
         "properties": {
@@ -11073,6 +11815,40 @@
         "title": "TableView",
         "type": "object"
       },
+      "Targets": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "lost": {
+            "description": "Ended without the viewer winning.",
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Lost",
+            "type": "array"
+          },
+          "won": {
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Won",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active",
+          "won",
+          "lost"
+        ],
+        "title": "Targets",
+        "type": "object"
+      },
       "TeamDeck": {
         "additionalProperties": false,
         "properties": {
@@ -11205,7 +11981,10 @@
               "grant",
               "pack",
               "quest",
-              "achievement"
+              "achievement",
+              "bid",
+              "bid_return",
+              "sale"
             ],
             "title": "Kind",
             "type": "string"
@@ -11248,6 +12027,12 @@
       "Tokens": {
         "additionalProperties": false,
         "properties": {
+          "auctions": {
+            "default": 0,
+            "description": "Tivit's Auction House (v0.6.0): sales less the bids held and paid, as a signed number; bids still held are in it until they are returned.",
+            "title": "Auctions",
+            "type": "integer"
+          },
           "balance": {
             "title": "Balance",
             "type": "integer"
@@ -11319,6 +12104,40 @@
           "no_result"
         ],
         "title": "Totals",
+        "type": "object"
+      },
+      "TransferList": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Active",
+            "type": "array"
+          },
+          "sold": {
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Sold",
+            "type": "array"
+          },
+          "unsold": {
+            "description": "Expired, withdrawn or cancelled, not relisted or cleared.",
+            "items": {
+              "$ref": "#/components/schemas/AuctionItem"
+            },
+            "title": "Unsold",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active",
+          "sold",
+          "unsold"
+        ],
+        "title": "TransferList",
         "type": "object"
       },
       "UnnamedPlayer": {
@@ -11664,6 +12483,279 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/admin/auctions": {
+      "get": {
+        "description": "Every auction, newest first: with status=sold the log of sales (seller, buyer, card,\nedition, finish, price, time); cancelled ones with their reason in the audit trail.",
+        "operationId": "auction_log_api_v1_admin_auctions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "active",
+                    "sold",
+                    "expired",
+                    "withdrawn",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Auction Log"
+      }
+    },
+    "/api/v1/admin/auctions/{auction_id}/cancel": {
+      "post": {
+        "description": "SysOp cancels a live auction, with a reason: the leading bid goes back, the copy too.",
+        "operationId": "cancel_auction_api_v1_admin_auctions__auction_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Cancellation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Cancel Auction"
+      }
+    },
     "/api/v1/admin/audit": {
       "get": {
         "operationId": "audit_log_api_v1_admin_audit_get",
@@ -15714,6 +16806,1949 @@
         "summary": "Change Wins"
       }
     },
+    "/api/v1/auctions": {
+      "get": {
+        "description": "The transfer market: live auctions, never the viewer's own unless asked, filtered and\nsorted; bids count as the current bid, else the starting bid.",
+        "operationId": "market_api_v1_auctions_get",
+        "parameters": [
+          {
+            "description": "The card's name contains.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The card's name contains.",
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "set",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rarity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rarity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "finish",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "nonfoil",
+                      "foil",
+                      "etched"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Finish"
+            }
+          },
+          {
+            "in": "query",
+            "name": "color",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "W",
+                      "U",
+                      "B",
+                      "R",
+                      "G",
+                      "C"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Color"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_bid",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Bid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_bid",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Bid"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_buy_now",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Buy Now"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_buy_now",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Max Buy Now"
+            }
+          },
+          {
+            "in": "query",
+            "name": "buy_now_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Buy Now Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Seconds.",
+            "in": "query",
+            "name": "max_time_left",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seconds.",
+              "title": "Max Time Left"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_mine",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Mine",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "ending",
+              "enum": [
+                "ending",
+                "newest",
+                "price_low",
+                "price_high",
+                "buy_now_low"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Market"
+      },
+      "post": {
+        "description": "Lists copies of one edition in one finish, an auction each: they leave the library at once.\nA retried request (the same key) lists nothing more and answers with what it listed.",
+        "operationId": "list_cards_api_v1_auctions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Listing"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Cards"
+      }
+    },
+    "/api/v1/auctions/compare": {
+      "get": {
+        "description": "The same edition and finish's live listings, the lowest price first, and its last sales.",
+        "operationId": "compare_api_v1_auctions_compare_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "printing_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Printing Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "finish",
+            "required": true,
+            "schema": {
+              "enum": [
+                "nonfoil",
+                "foil",
+                "etched"
+              ],
+              "title": "Finish",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Comparison"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Compare"
+      }
+    },
+    "/api/v1/auctions/mine": {
+      "get": {
+        "description": "The transfer list: the viewer's auctions, live, sold, and unsold ones to relist.",
+        "operationId": "transfer_list_api_v1_auctions_mine_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Transfer List"
+      }
+    },
+    "/api/v1/auctions/mine/clear": {
+      "post": {
+        "description": "Hides the sold or the unsold auctions from the transfer list.",
+        "operationId": "clear_list_api_v1_auctions_mine_clear_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearList"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Clear List"
+      }
+    },
+    "/api/v1/auctions/sellable": {
+      "get": {
+        "description": "What the viewer may list, by edition and finish, by name: copies granted to it, less those\nlisted; for SysOp, any printing the game can play, in each finish it was printed in.",
+        "operationId": "sellable_api_v1_auctions_sellable_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 24,
+              "maximum": 60,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SellablePage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Sellable"
+      }
+    },
+    "/api/v1/auctions/targets": {
+      "get": {
+        "description": "The transfer targets: auctions the viewer watches or bid on, live, won and lost.",
+        "operationId": "targets_api_v1_auctions_targets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Targets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Targets"
+      }
+    },
+    "/api/v1/auctions/targets/clear": {
+      "post": {
+        "description": "Hides the won or the lost auctions from the transfer targets.",
+        "operationId": "clear_targets_api_v1_auctions_targets_clear_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClearTargets"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Clear Targets"
+      }
+    },
+    "/api/v1/auctions/{auction_id}": {
+      "delete": {
+        "description": "The seller withdraws the auction, until its first bid: the copy comes back.",
+        "operationId": "withdraw_api_v1_auctions__auction_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Withdraw"
+      },
+      "get": {
+        "description": "One auction, in any state.",
+        "operationId": "auction_api_v1_auctions__auction_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Auction"
+      }
+    },
+    "/api/v1/auctions/{auction_id}/bids": {
+      "post": {
+        "description": "A bid: held from the balance at once, the leading bid returned to its bidder; at or above\nBuy Now it buys at Buy Now; in the last 30 seconds it pushes the end to 30 seconds away.",
+        "operationId": "make_bid_api_v1_auctions__auction_id__bids_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Make Bid"
+      }
+    },
+    "/api/v1/auctions/{auction_id}/buy-now": {
+      "post": {
+        "description": "Buys at the Buy Now price: the auction ends at once, the leading bid returned.",
+        "operationId": "buy_now_api_v1_auctions__auction_id__buy_now_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BuyNowRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Buy Now"
+      }
+    },
+    "/api/v1/auctions/{auction_id}/relist": {
+      "post": {
+        "description": "A new auction for an unsold auction's copy, if the library still holds it.",
+        "operationId": "relist_api_v1_auctions__auction_id__relist_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Relisting"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Relist"
+      }
+    },
+    "/api/v1/auctions/{auction_id}/watch": {
+      "delete": {
+        "operationId": "stop_watching_api_v1_auctions__auction_id__watch_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Stop Watching"
+      },
+      "put": {
+        "operationId": "start_watching_api_v1_auctions__auction_id__watch_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start Watching"
+      }
+    },
     "/api/v1/auth/google": {
       "post": {
         "operationId": "google_sign_in_api_v1_auth_google_post",
@@ -16759,7 +19794,7 @@
     },
     "/api/v1/cards": {
       "get": {
-        "description": "Cards by structured filters and the search syntax together; all must match, and only cards\na game can play are found. `owned` keeps to the cards in the player's library (basic lands\nincluded); every card says how many copies the library holds.",
+        "description": "Cards by structured filters and the search syntax together; all must match, and only cards\na game can play are found. `owned` keeps to the cards in the player's library (since v0.6.0\nbasic lands only as owned); every card says how many copies the library holds.",
         "operationId": "search_cards_api_v1_cards_get",
         "parameters": [
           {
@@ -17150,13 +20185,13 @@
             }
           },
           {
-            "description": "Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is.",
+            "description": "Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is.",
             "in": "query",
             "name": "printings",
             "required": false,
             "schema": {
               "default": "all",
-              "description": "Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is.",
+              "description": "Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is.",
               "enum": [
                 "all",
                 "owned",

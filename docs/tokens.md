@@ -29,6 +29,7 @@ Daily quests pay 100 to 250 tokens each, and each achievement a one-time reward 
 - **The welcome grant.** Every account gets 1,000 tokens once, enough for two current packs: new accounts when they are created, existing ones through migration 0008.
 - **Back pay.** Migration 0008 paid every win recorded before v0.4.0, by the game's bot skill, under the same keys as pay at the end of a game.
 - **Spending.** Buying locks the account's row for the rest of the transaction, so two purchases at once cannot spend the same tokens, and a balance never goes below zero.
+- **The auction house** (v0.6.0, [Tivit's Auction House](auctions.md#the-ledger)). A bid holds its tokens at once (`bid`, key `bid:<bid>`), returned when outbid or when the auction ends without it (`bid_return`, key `bid_return:<bid>`); the winning bid's hold is the payment, and the seller is paid exactly that (`sale`, key `sale:<auction>`): no fee. `GET /me/tokens` counts their net apart (`auctions`), beside won, given and spent.
 
 ## SysOp and administrators
 

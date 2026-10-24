@@ -694,9 +694,7 @@ def round_trip(database_url: str, folder: Path, monkeypatch: pytest.MonkeyPatch)
         assert back[(ada.id, f"pack:{opening}", first.concept_id, None)] == 3
         with Session(engine_) as db:
             basics = set(
-                db.scalars(
-                    select(CardConcept.id).where(CardConcept.type_line.startswith("Basic "))
-                )
+                db.scalars(select(CardConcept.id).where(CardConcept.type_line.startswith("Basic ")))
             )
         assert sum(back.values()) == sum(
             count for key, count in made.items() if key[2] not in basics

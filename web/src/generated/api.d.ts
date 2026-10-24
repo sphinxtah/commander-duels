@@ -4,6 +4,47 @@
  */
 
 export interface paths {
+    "/api/v1/admin/auctions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auction Log
+         * @description Every auction, newest first: with status=sold the log of sales (seller, buyer, card,
+         *     edition, finish, price, time); cancelled ones with their reason in the audit trail.
+         */
+        get: operations["auction_log_api_v1_admin_auctions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/auctions/{auction_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Auction
+         * @description SysOp cancels a live auction, with a reason: the leading bid goes back, the copy too.
+         */
+        post: operations["cancel_auction_api_v1_admin_auctions__auction_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -601,6 +642,256 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auctions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Market
+         * @description The transfer market: live auctions, never the viewer's own unless asked, filtered and
+         *     sorted; bids count as the current bid, else the starting bid.
+         */
+        get: operations["market_api_v1_auctions_get"];
+        put?: never;
+        /**
+         * List Cards
+         * @description Lists copies of one edition in one finish, an auction each: they leave the library at once.
+         *     A retried request (the same key) lists nothing more and answers with what it listed.
+         */
+        post: operations["list_cards_api_v1_auctions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare
+         * @description The same edition and finish's live listings, the lowest price first, and its last sales.
+         */
+        get: operations["compare_api_v1_auctions_compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Transfer List
+         * @description The transfer list: the viewer's auctions, live, sold, and unsold ones to relist.
+         */
+        get: operations["transfer_list_api_v1_auctions_mine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/mine/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear List
+         * @description Hides the sold or the unsold auctions from the transfer list.
+         */
+        post: operations["clear_list_api_v1_auctions_mine_clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/sellable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sellable
+         * @description What the viewer may list, by edition and finish, by name: copies granted to it, less those
+         *     listed; for SysOp, any printing the game can play, in each finish it was printed in.
+         */
+        get: operations["sellable_api_v1_auctions_sellable_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Targets
+         * @description The transfer targets: auctions the viewer watches or bid on, live, won and lost.
+         */
+        get: operations["targets_api_v1_auctions_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/targets/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear Targets
+         * @description Hides the won or the lost auctions from the transfer targets.
+         */
+        post: operations["clear_targets_api_v1_auctions_targets_clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/{auction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auction
+         * @description One auction, in any state.
+         */
+        get: operations["auction_api_v1_auctions__auction_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw
+         * @description The seller withdraws the auction, until its first bid: the copy comes back.
+         */
+        delete: operations["withdraw_api_v1_auctions__auction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/{auction_id}/bids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Bid
+         * @description A bid: held from the balance at once, the leading bid returned to its bidder; at or above
+         *     Buy Now it buys at Buy Now; in the last 30 seconds it pushes the end to 30 seconds away.
+         */
+        post: operations["make_bid_api_v1_auctions__auction_id__bids_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/{auction_id}/buy-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Buy Now
+         * @description Buys at the Buy Now price: the auction ends at once, the leading bid returned.
+         */
+        post: operations["buy_now_api_v1_auctions__auction_id__buy_now_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/{auction_id}/relist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Relist
+         * @description A new auction for an unsold auction's copy, if the library still holds it.
+         */
+        post: operations["relist_api_v1_auctions__auction_id__relist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auctions/{auction_id}/watch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Start Watching */
+        put: operations["start_watching_api_v1_auctions__auction_id__watch_put"];
+        post?: never;
+        /** Stop Watching */
+        delete: operations["stop_watching_api_v1_auctions__auction_id__watch_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/google": {
         parameters: {
             query?: never;
@@ -786,8 +1077,8 @@ export interface paths {
         /**
          * Search Cards
          * @description Cards by structured filters and the search syntax together; all must match, and only cards
-         *     a game can play are found. `owned` keeps to the cards in the player's library (basic lands
-         *     included); every card says how many copies the library holds.
+         *     a game can play are found. `owned` keeps to the cards in the player's library (since v0.6.0
+         *     basic lands only as owned); every card says how many copies the library holds.
          */
         get: operations["search_cards_api_v1_cards_get"];
         put?: never;
@@ -2969,6 +3260,167 @@ export interface components {
             /** Cards */
             cards: components["schemas"]["ArrangedCard"][];
         };
+        /** AuctionCard */
+        AuctionCard: {
+            /** Collector Number */
+            collector_number: string;
+            /**
+             * Colors
+             * @description W, U, B, R, G; empty for a colorless card.
+             */
+            colors: string[];
+            /**
+             * Concept Id
+             * Format: uuid
+             */
+            concept_id: string;
+            /**
+             * Image
+             * @description The edition's picture on this site, as the library's.
+             */
+            image: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Rarity */
+            rarity: string;
+            /** Released At */
+            released_at: string | null;
+            /** Set Code */
+            set_code: string;
+            /** Set Name */
+            set_name: string;
+            /** Type Line */
+            type_line: string;
+        };
+        /** AuctionItem */
+        AuctionItem: {
+            /** Bids */
+            bids: number;
+            /** Buy Now */
+            buy_now: number | null;
+            /** Buyer */
+            buyer: string | null;
+            card: components["schemas"]["AuctionCard"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current Bid */
+            current_bid: number | null;
+            /**
+             * Duration
+             * @enum {string}
+             */
+            duration: "1h" | "3h" | "12h" | "24h" | "3d";
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /** High Bidder */
+            high_bidder: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Leading
+             * @description The viewer's bid leads (or won).
+             */
+            leading: boolean;
+            /**
+             * Mine
+             * @description The viewer's own auction.
+             */
+            mine: boolean;
+            /**
+             * My Bid
+             * @description The viewer's highest bid.
+             */
+            my_bid: number | null;
+            /**
+             * Next Bid
+             * @description The lowest bid the auction takes now.
+             */
+            next_bid: number;
+            /**
+             * Outbid
+             * @description The viewer bid, and does not lead.
+             */
+            outbid: boolean;
+            /**
+             * Seller
+             * @description The seller's handle.
+             */
+            seller: string;
+            /** Sold Price */
+            sold_price: number | null;
+            /** Starting Bid */
+            starting_bid: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "sold" | "expired" | "withdrawn" | "cancelled";
+            /** Watching */
+            watching: boolean;
+        };
+        /** AuctionList */
+        AuctionList: {
+            /** Items */
+            items: components["schemas"]["AuctionItem"][];
+        };
+        /**
+         * AuctionNotice
+         * @description The auction a notification of the auction house's names (v0.6.0).
+         */
+        AuctionNotice: {
+            /** Collector Number */
+            collector_number: string;
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Name
+             * @description The card's name.
+             */
+            name: string;
+            /**
+             * Price
+             * @description For an outbid, the auction's leading bid now; for a win or a sale, its price; null otherwise.
+             */
+            price: number | null;
+            /** Set Code */
+            set_code: string;
+        };
+        /** AuctionPage */
+        AuctionPage: {
+            /** Items */
+            items: components["schemas"]["AuctionItem"][];
+            /** Next Cursor */
+            next_cursor: string | null;
+            /** Total */
+            total: number;
+        };
         /** AuditActor */
         AuditActor: {
             /** Id */
@@ -3033,6 +3485,13 @@ export interface components {
              * @description What it paid.
              */
             tokens: number;
+        };
+        /** BidRequest */
+        BidRequest: {
+            /** Amount */
+            amount: number;
+            /** Key */
+            key: string;
         };
         /** BlockedPlayer */
         BlockedPlayer: {
@@ -3100,6 +3559,16 @@ export interface components {
              * @default 0.6.0
              */
             version: string;
+        };
+        /** BuyNowRequest */
+        BuyNowRequest: {
+            /** Key */
+            key: string;
+        };
+        /** Cancellation */
+        Cancellation: {
+            /** Reason */
+            reason: string;
         };
         /** Capability */
         Capability: {
@@ -3519,6 +3988,35 @@ export interface components {
             newest: string | null;
             /** Unread */
             unread: number;
+        };
+        /** ClearList */
+        ClearList: {
+            /**
+             * Which
+             * @enum {string}
+             */
+            which: "sold" | "unsold";
+        };
+        /** ClearTargets */
+        ClearTargets: {
+            /**
+             * Which
+             * @enum {string}
+             */
+            which: "won" | "lost";
+        };
+        /** Comparison */
+        Comparison: {
+            /**
+             * Items
+             * @description Live listings, the lowest price first.
+             */
+            items: components["schemas"]["AuctionItem"][];
+            /**
+             * Recent Sales
+             * @description The latest sales, newest first.
+             */
+            recent_sales: components["schemas"]["RecentSale"][];
         };
         /** ConversationItem */
         ConversationItem: {
@@ -4648,11 +5146,18 @@ export interface components {
             copies: number | null;
             /** @description The edition these copies are (v0.5.0). */
             edition: components["schemas"]["LibraryEdition"];
+            /** @description The copies held now in each finish (v0.6.0), after the auction house: those listed or sold are out, those bought are in; an alliance's are nonfoil. */
+            finishes: components["schemas"]["LibraryFinishes"];
+            /**
+             * Sellable
+             * @description Copies that may be listed at Tivit's Auction House (v0.6.0): granted ones, never an alliance's.
+             */
+            sellable: number;
             /**
              * Sources
              * @description Where this edition's copies came from.
              */
-            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction")[];
         };
         /**
          * LibraryEdition
@@ -4675,6 +5180,27 @@ export interface components {
             /** Set Name */
             set_name: string;
         };
+        /**
+         * LibraryFinishes
+         * @description An edition's copies by finish (v0.6.0).
+         */
+        LibraryFinishes: {
+            /**
+             * Etched
+             * @default 0
+             */
+            etched: number;
+            /**
+             * Foil
+             * @default 0
+             */
+            foil: number;
+            /**
+             * Nonfoil
+             * @default 0
+             */
+            nonfoil: number;
+        };
         /** LibraryView */
         LibraryView: {
             /** Alliance */
@@ -4686,6 +5212,35 @@ export interface components {
              * @description Builds from the whole catalog (administrators, SysOp).
              */
             unlimited: boolean;
+        };
+        /** Listing */
+        Listing: {
+            /** Buy Now */
+            buy_now?: number | null;
+            /**
+             * Duration
+             * @enum {string}
+             */
+            duration: "1h" | "3h" | "12h" | "24h" | "3d";
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /** Key */
+            key: string;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /**
+             * Quantity
+             * @default 1
+             */
+            quantity: number;
+            /** Starting Bid */
+            starting_bid: number;
         };
         /** MatchGameView */
         MatchGameView: {
@@ -4858,7 +5413,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
@@ -4911,6 +5466,8 @@ export interface components {
         /** NotificationItem */
         NotificationItem: {
             actor: components["schemas"]["PlayerRef"] | null;
+            /** @description For the auction house's news (v0.6.0): the auction, which the bell links to (/auctions). */
+            auction?: components["schemas"]["AuctionNotice"] | null;
             /** @description For a quest completed or an achievement earned (v0.5.0): which, and what it paid. */
             award?: components["schemas"]["Award"] | null;
             /**
@@ -4932,7 +5489,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -5965,6 +6522,16 @@ export interface components {
              */
             status: number;
         };
+        /** RecentSale */
+        RecentSale: {
+            /** Price */
+            price: number;
+            /**
+             * Sold At
+             * Format: date-time
+             */
+            sold_at: string;
+        };
         /** Related */
         Related: {
             /** Component */
@@ -5973,6 +6540,20 @@ export interface components {
             name: string;
             /** Type Line */
             type_line: string | null;
+        };
+        /** Relisting */
+        Relisting: {
+            /** Buy Now */
+            buy_now?: number | null;
+            /**
+             * Duration
+             * @enum {string}
+             */
+            duration: "1h" | "3h" | "12h" | "24h" | "3d";
+            /** Key */
+            key: string;
+            /** Starting Bid */
+            starting_bid: number;
         };
         /** RematchPlayerView */
         RematchPlayerView: {
@@ -6481,6 +7062,32 @@ export interface components {
              * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. The team to join; the first free seat when left out.
              */
             team?: number | null;
+        };
+        /** SellableItem */
+        SellableItem: {
+            card: components["schemas"]["AuctionCard"];
+            /**
+             * Copies
+             * @description Copies held in this edition and finish.
+             */
+            copies: number;
+            /**
+             * Finish
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /**
+             * Sellable
+             * @description Copies that may be listed; for SysOp, the most one listing takes.
+             */
+            sellable: number;
+        };
+        /** SellablePage */
+        SellablePage: {
+            /** Items */
+            items: components["schemas"]["SellableItem"][];
+            /** Next Cursor */
+            next_cursor: string | null;
         };
         /** SessionInfo */
         SessionInfo: {
@@ -7058,6 +7665,18 @@ export interface components {
             /** Your Seat */
             your_seat: number | null;
         };
+        /** Targets */
+        Targets: {
+            /** Active */
+            active: components["schemas"]["AuctionItem"][];
+            /**
+             * Lost
+             * @description Ended without the viewer winning.
+             */
+            lost: components["schemas"]["AuctionItem"][];
+            /** Won */
+            won: components["schemas"]["AuctionItem"][];
+        };
         /** TeamDeck */
         TeamDeck: {
             /**
@@ -7124,7 +7743,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bot_win" | "human_win" | "back_pay" | "welcome" | "grant" | "pack" | "quest" | "achievement";
+            kind: "bot_win" | "human_win" | "back_pay" | "welcome" | "grant" | "pack" | "quest" | "achievement" | "bid" | "bid_return" | "sale";
             /**
              * Opponent
              * @description Whom the win beat: a bot by its skill, or a handle.
@@ -7135,6 +7754,12 @@ export interface components {
         };
         /** Tokens */
         Tokens: {
+            /**
+             * Auctions
+             * @description Tivit's Auction House (v0.6.0): sales less the bids held and paid, as a signed number; bids still held are in it until they are returned.
+             * @default 0
+             */
+            auctions: number;
             /** Balance */
             balance: number;
             /**
@@ -7173,6 +7798,18 @@ export interface components {
             no_result: number;
             /** Wins */
             wins: number;
+        };
+        /** TransferList */
+        TransferList: {
+            /** Active */
+            active: components["schemas"]["AuctionItem"][];
+            /** Sold */
+            sold: components["schemas"]["AuctionItem"][];
+            /**
+             * Unsold
+             * @description Expired, withdrawn or cancelled, not relisted or cleared.
+             */
+            unsold: components["schemas"]["AuctionItem"][];
         };
         /**
          * UnnamedPlayer
@@ -7305,6 +7942,200 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    auction_log_api_v1_admin_auctions_get: {
+        parameters: {
+            query?: {
+                status?: ("active" | "sold" | "expired" | "withdrawn" | "cancelled") | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    cancel_auction_api_v1_admin_auctions__auction_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Cancellation"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     audit_log_api_v1_admin_audit_get: {
         parameters: {
             query?: {
@@ -10629,6 +11460,1442 @@ export interface operations {
             };
         };
     };
+    market_api_v1_auctions_get: {
+        parameters: {
+            query?: {
+                /** @description The card's name contains. */
+                q?: string | null;
+                set?: string | null;
+                rarity?: string[] | null;
+                finish?: ("nonfoil" | "foil" | "etched")[] | null;
+                color?: ("W" | "U" | "B" | "R" | "G" | "C")[] | null;
+                type?: string | null;
+                min_bid?: number | null;
+                max_bid?: number | null;
+                min_buy_now?: number | null;
+                max_buy_now?: number | null;
+                buy_now_only?: boolean;
+                /** @description Seconds. */
+                max_time_left?: number | null;
+                include_mine?: boolean;
+                sort?: "ending" | "newest" | "price_low" | "price_high" | "buy_now_low";
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionPage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    list_cards_api_v1_auctions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Listing"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    compare_api_v1_auctions_compare_get: {
+        parameters: {
+            query: {
+                printing_id: string;
+                finish: "nonfoil" | "foil" | "etched";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comparison"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    transfer_list_api_v1_auctions_mine_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransferList"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    clear_list_api_v1_auctions_mine_clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClearList"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    sellable_api_v1_auctions_sellable_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SellablePage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    targets_api_v1_auctions_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Targets"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    clear_targets_api_v1_auctions_targets_clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClearTargets"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auction_api_v1_auctions__auction_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    withdraw_api_v1_auctions__auction_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    make_bid_api_v1_auctions__auction_id__bids_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BidRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    buy_now_api_v1_auctions__auction_id__buy_now_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BuyNowRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    relist_api_v1_auctions__auction_id__relist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Relisting"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    start_watching_api_v1_auctions__auction_id__watch_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    stop_watching_api_v1_auctions__auction_id__watch_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     google_sign_in_api_v1_auth_google_post: {
         parameters: {
             query?: never;
@@ -11593,7 +13860,7 @@ export interface operations {
         parameters: {
             query?: {
                 printing?: string | null;
-                /** @description Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for a basic land, or an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is. */
+                /** @description Which printings to list (v0.5.0): all of them, the newest 60 first; owned, the editions the player's library holds (every printing for an account that builds from the whole catalog); chosen, only `printing`, as a card pulled from a pack is. */
                 printings?: "all" | "owned" | "chosen";
             };
             header?: never;
