@@ -31,9 +31,10 @@
   with theirs (Unified Deck Construction, api/teams.py); a player may instead invite a friend, and
   once the friend accepts with a deck of their own (the two checked together) they wait as one
   team, which is never split: when one of them leaves, or is taken out, so is the other. The bell
-  tells the friend of the invitation (team_invite). Two teams make a full table; after BOT_WAIT
-  bots fill a team's empty seat and the other team's. Its games are a Two-Headed Giant table's,
-  with the team's fixed channel in the chat (api/table_chat.py).
+  tells the friend of the invitation (team_invite), which ends if the two stop being friends (a
+  friendship ended, or a block). Two teams make a full table; after BOT_WAIT bots fill a team's
+  empty seat and the other team's. Its games are a Two-Headed Giant table's, with the team's
+  fixed channel in the chat (api/table_chat.py).
 
 Without games set up (no CD_ENGINE_SERVICE_TOKEN, development only), players may join and wait,
 but no game starts.
@@ -54,7 +55,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, FastAPI, Request
 from pydantic import Field
-from sqlalchemy import ColumnElement, Engine, func, select, update
+from sqlalchemy import ColumnElement, Engine, and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -316,7 +317,7 @@ def remove_queue_of(db: Session, user_id: UUID) -> int:
     """Takes the account out of the queues and forgets its last wait: for deleting or resetting
     the account (api/accounts.py, api/resets.py). Its team (v0.5.1) leaves with it, and so do the
     invitations it sent and was sent. Returns the rows removed."""
-    entry = db.get(QueueEntry, user_id)
+    entry = lock_team(db, user_id, invitations=True)
     leave_team(db, user_id, utcnow(), invitations=True)
     db.execute(
         update(QueueEntry)
@@ -356,6 +357,30 @@ def leave_team(db: Session, user_id: UUID, now: datetime, *, invitations: bool =
         row.ended_at = now
 
 
+def lock_team(db: Session, user_id: UUID, *, invitations: bool = False) -> QueueEntry | None:
+    """The account's place, locked together with its team's other place (v0.5.1), which names it,
+    in one statement and in user_id order: the order claim, put_back and record_group take a team's
+    two rows in (they share their joined_at). Locked one after the other, as leaving once did, two
+    teammates leaving at once, or a leave and a match, could each hold the row the other waits
+    for, a deadlock PostgreSQL ends by failing one of them. With invitations, the places of those
+    inviting the account are locked too, for leave_team to end."""
+    rows = db.scalars(
+        select(QueueEntry)
+        .where(
+            or_(
+                QueueEntry.user_id == user_id,
+                and_(
+                    QueueEntry.partner_id == user_id,
+                    QueueEntry.status.in_(HELD if invitations else WAITING),
+                ),
+            )
+        )
+        .order_by(QueueEntry.user_id)
+        .with_for_update()
+    ).all()
+    return next((row for row in rows if row.user_id == user_id), None)
+
+
 def invite_over(db: Session, inviter: UUID, invitee: UUID, now: datetime) -> None:
     """An invitation accepted, declined or withdrawn (v0.5.1): its notification waits no more."""
     db.execute(
@@ -369,6 +394,32 @@ def invite_over(db: Session, inviter: UUID, invitee: UUID, now: datetime) -> Non
         .values(read_at=now)
         .execution_options(synchronize_session=False)
     )
+
+
+def end_invitations(db: Session, one: UUID, other: UUID, now: datetime) -> None:
+    """The two are friends no more (v0.5.1: a friendship ended, or a block, api/social.py): an
+    invitation either sent the other ends, its inviter is told, and its notification waits no more.
+    Only a friend may accept one, so it could otherwise only be refused while its inviter waited.
+    A team of the two already waiting stays one; either may leave, and the other goes too."""
+    handles = dict(db.execute(select(User.id, User.handle).where(User.id.in_((one, other)))).all())
+    for row in db.scalars(
+        select(QueueEntry)
+        .where(
+            or_(
+                and_(QueueEntry.user_id == one, QueueEntry.partner_id == other),
+                and_(QueueEntry.user_id == other, QueueEntry.partner_id == one),
+            ),
+            QueueEntry.status == "inviting",
+        )
+        .order_by(QueueEntry.user_id)
+        .with_for_update()
+    ).all():
+        invitee = other if row.user_id == one else one
+        row.status = "left"
+        row.reason = "invite_ended"
+        row.message = f"{handles.get(invitee) or 'Your friend'} can no longer join your team."
+        row.ended_at = now
+        invite_over(db, row.user_id, invitee, now)
 
 
 def fresh(now: datetime) -> ColumnElement[bool]:
@@ -441,7 +492,9 @@ def status_of(db: Session, user_id: UUID, now: datetime) -> QueueStatus:
 
 def invites_to(db: Session, user_id: UUID, now: datetime) -> list[TeamInvite]:
     """Friends inviting the account to wait with them as a team (v0.5.1), whose app still asks
-    about their place, the oldest first."""
+    about their place, the oldest first: friends still, since only a friend's may be accepted."""
+    from api.social import befriended  # Imported here: see enter.
+
     found = db.execute(
         select(QueueEntry, User)
         .join(User, User.id == QueueEntry.user_id)
@@ -450,6 +503,7 @@ def invites_to(db: Session, user_id: UUID, now: datetime) -> list[TeamInvite]:
             QueueEntry.status == "inviting",
             fresh(now),
             User.status == "active",
+            befriended(user_id, QueueEntry.user_id),
         )
         .order_by(QueueEntry.joined_at)
     ).all()
@@ -485,6 +539,20 @@ def waiting_queues(database: Engine, now: datetime) -> list[QueueKey]:
             )
         )
         if gone:
+            # Locked first with their teammates' places (v0.5.1), in user_id order as leaving
+            # locks a team's: a teammate leaving at the same moment never holds the row this waits
+            # for while waiting for one this holds.
+            db.scalars(
+                select(QueueEntry.user_id)
+                .where(
+                    or_(
+                        QueueEntry.user_id.in_(gone),
+                        and_(QueueEntry.partner_id.in_(gone), QueueEntry.status.in_(WAITING)),
+                    )
+                )
+                .order_by(QueueEntry.user_id)
+                .with_for_update()
+            ).all()
             db.execute(
                 update(QueueEntry)
                 .where(
@@ -653,8 +721,14 @@ def put_back(
     (v0.5.1) the friend each of those waited with as a team: a team is never split."""
     refused = refused or {}
     with Session(database) as db:
+        # In user_id order, as claim and lock_team take a team's two rows.
         rows = list(
-            db.scalars(select(QueueEntry).where(QueueEntry.user_id.in_(users)).with_for_update())
+            db.scalars(
+                select(QueueEntry)
+                .where(QueueEntry.user_id.in_(users))
+                .order_by(QueueEntry.user_id)
+                .with_for_update()
+            )
         )
         handles = dict(db.execute(select(User.id, User.handle).where(User.id.in_(users))).all())
         for row in rows:
@@ -824,10 +898,14 @@ def record_group(
     one transaction. Raises Gone, with the others waiting again, when a player left meanwhile.
     Returns the game and each seat's player."""
     with Session(database, expire_on_commit=False) as db:
+        # In user_id order, as claim and lock_team take a team's two rows.
         rows = {
             row.user_id: row
             for row in db.scalars(
-                select(QueueEntry).where(QueueEntry.user_id.in_(group.users)).with_for_update()
+                select(QueueEntry)
+                .where(QueueEntry.user_id.in_(group.users))
+                .order_by(QueueEntry.user_id)
+                .with_for_update()
             )
         }
         if any(
@@ -1318,21 +1396,32 @@ async def join_queue(
             f"{FORMAT_NAMES[body.format]} has no queue for {body.seats} players"
             + (", best of three." if body.best_of == 3 else "."),
         )
-    now = queues.clock()
-    partner = body.partner_id
-    # Inviting a friend who has invited you is accepting their invitation (v0.5.1).
-    if partner is not None and await run_in_threadpool(has_invited, db, partner, principal, now):
-        await run_in_threadpool(accept, db, request, principal, partner, body.deck_id, now)
-    else:
-        await run_in_threadpool(enter, db, request, principal, body, now)
+    await run_in_threadpool(join, db, request, principal, body, queues.clock())
     await match_now(queues, key)
     return await run_in_threadpool(status_of, db, principal.user.id, queues.clock())
 
 
-def has_invited(db: Session, inviter: UUID, principal: Principal, now: datetime) -> bool:
-    found = invitation(db, inviter, principal.user.id, now) is not None
-    db.rollback()
-    return found
+def join(
+    db: Session, request: Request, principal: Principal, body: QueueRequest, now: datetime
+) -> None:
+    """Takes a place in the queue, except that inviting a friend who has invited you is accepting
+    their invitation (v0.5.1). The two accounts' rows are locked first, in one order (as paying a
+    game's winners locks theirs), and the invitation is looked for and answered in that one
+    transaction: two friends inviting each other at the same moment take turns, and the second
+    accepts the first's invitation. Looked for before the lock, as it once was, both could miss
+    the other's and wait on invitations neither could accept, or deadlock, each holding their own
+    account while their new place, naming the other's, waited for it. The locks are FOR NO KEY
+    UPDATE, which a new row naming the friend does not wait for: a request that holds the friend's
+    place while it writes one (another friend accepting their invitation, their game being
+    recorded) goes on, while this one waits for that place."""
+    friend = body.partner_id
+    if friend is not None:
+        for user_id in sorted({principal.user.id, friend}, key=str):
+            db.scalar(select(User.id).where(User.id == user_id).with_for_update(key_share=True))
+        if invitation(db, friend, principal.user.id, now) is not None:
+            accept(db, request, principal, friend, body.deck_id, now)
+            return
+    enter(db, request, principal, body, now)
 
 
 async def match_now(queues: QueueHub, key: QueueKey) -> None:
@@ -1372,7 +1461,7 @@ def leave_queue(request: Request, principal: Player, db: Db) -> QueueStatus:
     """Leaves the queue, or withdraws your invitation to a friend. A game found a moment before
     stays: the answer names it. Your team (v0.5.1) leaves with you."""
     now = queues_of(request).clock()
-    entry = db.get(QueueEntry, principal.user.id, with_for_update=True)
+    entry = lock_team(db, principal.user.id)
     if entry is not None and entry.status in HELD:
         if entry.status == "inviting" and entry.partner_id is not None:
             invite_over(db, principal.user.id, entry.partner_id, now)

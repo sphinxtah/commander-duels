@@ -18,7 +18,8 @@ describes them for players and staff.
 - **Friends are mutual.** Add friend sends a request, which waits until the other player accepts
   it or adds back; either may withdraw, decline or end it. A block ends any friendship or request
   between the two; the blocked player's requests then wait unseen, and they no longer see the
-  blocker's presence or find them.
+  blocker's presence or find them. A friendship's end, or a block, ends an invitation to the
+  Two-Headed Giant queue between the two (v0.5.1, api/queues.py).
 - **Presence** comes from the app's check-in (POST /presence, every CHECK_IN_SECONDS from each
   open tab), which says only whether its own player is using that tab, and from the games the
   server runs: in a game, in a public queue (v0.5.0), online, idle (no tab in use for IDLE_AFTER),
@@ -47,8 +48,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query, Request
 from pydantic import Field, StringConstraints
-from sqlalchemy import case, delete, func, or_, select, update
-from sqlalchemy.orm import Session
+from sqlalchemy import ColumnElement, and_, case, delete, exists, func, or_, select, update
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
 from api.admin import decode_cursor, encode_cursor
 from api.auth import INPUT_ERRORS
@@ -352,6 +353,27 @@ def friendship_between(db: Session, one: UUID, other: UUID) -> Friendship | None
     )
 
 
+def befriended(user_id: UUID, other: InstrumentedAttribute[UUID]) -> ColumnElement[bool]:
+    """The rows whose other column names a friend of the account: an accepted friendship, and no
+    block either way. A friend's invitation to the Two-Headed Giant queue (v0.5.1) shows only while
+    the two are friends, so one a friendship's end left behind never does."""
+    return and_(
+        exists().where(
+            Friendship.status == "accepted",
+            or_(
+                and_(Friendship.user_low == user_id, Friendship.user_high == other),
+                and_(Friendship.user_low == other, Friendship.user_high == user_id),
+            ),
+        ),
+        ~exists().where(
+            or_(
+                and_(PlayerBlock.blocker_id == user_id, PlayerBlock.blocked_id == other),
+                and_(PlayerBlock.blocker_id == other, PlayerBlock.blocked_id == user_id),
+            )
+        ),
+    )
+
+
 def friendships_of(db: Session, user_id: UUID) -> dict[UUID, Friendship]:
     """Every friendship and request the account is part of, by the other player's ID."""
     rows = db.scalars(
@@ -636,7 +658,7 @@ def rematches_waiting(db: Session, user_id: UUID, game_ids: list[UUID]) -> set[U
 
 def invitations_waiting(db: Session, user_id: UUID, inviters: list[UUID]) -> set[UUID]:
     """The friends among these whose invitation to the Two-Headed Giant queue (v0.5.1) still waits
-    for the account's answer."""
+    for the account's answer: from a friend still, since only a friend's may be accepted."""
     if not inviters:
         return set()
     return set(
@@ -645,6 +667,7 @@ def invitations_waiting(db: Session, user_id: UUID, inviters: list[UUID]) -> set
                 QueueEntry.user_id.in_(inviters),
                 QueueEntry.status == "inviting",
                 QueueEntry.partner_id == user_id,
+                befriended(user_id, QueueEntry.user_id),
             )
         )
     )
@@ -1004,7 +1027,11 @@ def withdraw_unnamed(player_id: UUID, principal: Active, db: Db) -> UnnamedPlaye
 
 
 def unfriend(db: Session, me: User, other: User) -> None:
-    """Withdraws a request, declines one, or ends a friendship."""
+    """Withdraws a request, declines one, or ends a friendship, and with it (v0.5.1) an invitation
+    to the Two-Headed Giant queue either sent the other."""
+    # Imported here: api.social reaches api.resets, which imports api.queues.
+    from api.queues import end_invitations
+
     row = friendship_between(db, me.id, other.id)
     if row is not None:
         if row.status == "pending" and row.requested_by == other.id:
@@ -1020,6 +1047,7 @@ def unfriend(db: Session, me: User, other: User) -> None:
                 .values(read_at=utcnow())
             )
         db.delete(row)
+        end_invitations(db, me.id, other.id, utcnow())
         db.commit()
 
 
@@ -1039,7 +1067,10 @@ def my_blocks(principal: Active, db: Db) -> list[BlockedPlayer]:
 
 @router.put("/blocks/{player_id}", response_model=PlayerProfile)
 def block_player(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
-    """Blocks a player: any friendship or request between the two ends."""
+    """Blocks a player: any friendship or request between the two ends, and since v0.5.1 any
+    invitation to the Two-Headed Giant queue either sent the other."""
+    from api.queues import end_invitations  # Imported here: see unfriend.
+
     me = principal.user
     other = other_player(db, principal, player_id)
     existing = db.scalar(
@@ -1060,6 +1091,7 @@ def block_player(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
             )
         )
         forget_requests(db, other.id, me.id)
+        end_invitations(db, me.id, other.id, utcnow())
         db.commit()
     return profile_of(db, viewer_of(db, principal), other)
 

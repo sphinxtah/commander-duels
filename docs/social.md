@@ -31,14 +31,14 @@ Since v0.5.0 a profile also shows the player's badges (the three they pinned fir
 
 ## Friends
 
-- **Mutual** (the owner's decision). **Add friend** sends a request; the asker sees **Pending** until the other player accepts it, from the bell, the history, Friends or the asker's profile, or adds the asker back, which is the same thing. Either may withdraw or decline a request, or end a friendship (after a confirmation). `PUT /api/v1/friends/{id}` asks or accepts; `DELETE /api/v1/friends/{id}` withdraws, declines or ends.
+- **Mutual** (the owner's decision). **Add friend** sends a request; the asker sees **Pending** until the other player accepts it, from the bell, the history, Friends or the asker's profile, or adds the asker back, which is the same thing. Either may withdraw or decline a request, or end a friendship (after a confirmation); since v0.5.1 ending one also ends an invitation to the Two-Headed Giant queue either sent the other ([queues](queues.md#two-headed-giant-v051)). `PUT /api/v1/friends/{id}` asks or accepts; `DELETE /api/v1/friends/{id}` withdraws, declines or ends.
 - **A request's notification** goes to the other player once a day at most, however often the request is withdrawn and sent again. A request withdrawn stays in their notifications, no longer waiting; a request declined is marked read.
 - **Limits.** An account may have 50 requests waiting for others' answers (`429 too_many_requests`); answering a request is never limited. An account needs its handle before it can ask (`409 handle_required`).
 - **The Friends page** (`#friends`, in the navigation) lists the requests waiting for your answer, your friends by what they are doing (in a game, online, idle, offline, then those who share nothing), and your requests waiting for theirs. It asks again every 30 seconds while shown. `GET /api/v1/friends`.
 
 ## Blocking
 
-A block (from the player's profile, after a confirmation) ends any friendship or request between the two, and removes the notifications the blocked player caused. Afterwards the blocked player no longer finds the blocker in the search and never sees their presence; their friend requests wait unseen, with no notification, and are dropped when the block ends. The blocker cannot ask them either until unblocking. Blocked players are listed in the privacy settings on Profile, each with Unblock. `PUT` and `DELETE /api/v1/blocks/{id}`, `GET /api/v1/me/blocks`.
+A block (from the player's profile, after a confirmation) ends any friendship or request between the two, and since v0.5.1 any invitation to the Two-Headed Giant queue either sent the other, and removes the notifications the blocked player caused. Afterwards the blocked player no longer finds the blocker in the search and never sees their presence; their friend requests wait unseen, with no notification, and are dropped when the block ends. The blocker cannot ask them either until unblocking. Blocked players are listed in the privacy settings on Profile, each with Unblock. `PUT` and `DELETE /api/v1/blocks/{id}`, `GET /api/v1/me/blocks`.
 
 ## Presence
 
