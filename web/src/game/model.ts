@@ -52,6 +52,57 @@ export function playerName(
   );
 }
 
+/** The seat controlling a player's turn (rule 723, v0.5.1: Mindslaver, Sorin Markov and the
+ * like), or null while the player controls it themselves. Every view says it of every player. */
+export function controllerOf(
+  view: GameView | null,
+  seat: Seat | null,
+): Seat | null {
+  if (!view || seat === null) return null;
+  return players(view).find((p) => p.seat === seat)?.controlled_by ?? null;
+}
+
+/** Whose turn it is, for the band's turn line: "Your turn", "Bot 2’s turn". In Two-Headed Giant
+ * (v0.5.0) a team takes its turn together: "Your team’s turn", "Other team’s turn", and to SysOp
+ * observing and spectators each team by its number. A turn another player controls (rule 723,
+ * v0.5.1) says who controls it: "You control bob’s turn", "ada controls your turn". `name` gives a
+ * seat's name as the table shows it (handles at a human table). Null before the first turn. */
+export function turnHolder(
+  view: GameView,
+  observing: boolean,
+  name: (seat: Seat) => string,
+): string | null {
+  const active = view.active_seat;
+  if (active === null) return null;
+  const team = players(view).find((p) => p.seat === active)?.team ?? null;
+  const ours =
+    !observing && (active === view.seat || active === teammateOf(view));
+  const watching = observing || view.you === null;
+  const controller = controllerOf(view, active);
+  if (controller === null)
+    return ours
+      ? active === view.seat
+        ? "Your turn"
+        : "Your team’s turn"
+      : team !== null
+        ? watching
+          ? `Team ${team + 1}’s turn`
+          : "Other team’s turn"
+        : `${name(active)}’s turn`;
+  const whose = ours
+    ? active === view.seat
+      ? "your"
+      : "your team’s"
+    : team !== null
+      ? watching
+        ? `Team ${team + 1}’s`
+        : "the other team’s"
+      : `${name(active)}’s`;
+  return controller === view.seat && !observing
+    ? `You control ${whose} turn`
+    : `${name(controller)} controls ${whose} turn`;
+}
+
 /** The viewer's teammate's seat in Two-Headed Giant (v0.5.0); null in other games and for
  * spectators. Teammates take their turns together and share one life total. */
 export function teammateOf(view: GameView | null): Seat | null {
@@ -68,7 +119,8 @@ export function objectIndex(view: GameView | null): Map<ObjectId, Located> {
     index.set(card.id, { id: card.id, zone, seat, card });
   view.hand.forEach((card) => add(card, "hand", view.seat));
   for (const player of players(view)) {
-    // A Two-Headed Giant teammate's hand, which the seat may see (810.5, v0.5.1).
+    // A Two-Headed Giant teammate's hand, which the seat may see (810.5, v0.5.1), and the hand
+    // of a player whose turn the seat controls (723.4, v0.5.1).
     if (player !== view.you)
       player.hand?.forEach((card) => add(card, "hand", player.seat));
     player.graveyard.forEach((card) => add(card, "graveyard", player.seat));

@@ -196,17 +196,42 @@ class Table {
             `hand holds ${card.name}, not in this seat's deck`,
           );
       // Since v0.5.0 every player carries `hand`, null but for a Two-Headed Giant teammate's,
-      // whose hand is the seat's to see (rule 810.5).
+      // whose hand is the seat's to see (rule 810.5), and since v0.5.1 for a player whose turn
+      // this seat controls, or that player's teammate (723.4), while the control lasts: such a
+      // player's entry names this seat in controlled_by. What the seat sees there it may name.
+      const controlled = view.opponents.filter(
+        (p) => p.controlled_by != null && p.controlled_by === view.seat,
+      );
+      const teams = new Set(
+        controlled.map((p) => p.team).filter((t) => t != null),
+      );
       for (const opponent of view.opponents) {
         const teammate =
           opponent.team != null && opponent.team === view.you?.team;
+        const shown =
+          teammate ||
+          controlled.includes(opponent) ||
+          (opponent.team != null && teams.has(opponent.team));
         for (const key of ["hand", "library"] as const)
           if (
             (opponent as unknown as Record<string, unknown>)[key] != null &&
-            !(key === "hand" && teammate)
+            !(key === "hand" && shown)
           )
             this.problems.push(`an opponent carries ${key}`);
+        if (shown && !teammate)
+          for (const card of opponent.hand ?? [])
+            if (card.name) this.publicNames.add(card.name);
       }
+      if (controlled.length > 0)
+        for (const group of view.looked_at)
+          for (const card of group.cards)
+            if (card.name) this.publicNames.add(card.name);
+      // A prompt for another seat is that of a player whose turn this seat controls.
+      const forSeat = snapshot.prompt?.for_seat;
+      if (forSeat != null && !controlled.some((p) => p.seat === forSeat))
+        this.problems.push(
+          `a prompt for seat ${forSeat}, whose turn this seat does not control`,
+        );
     }
     // As the engine's own check: a concealed name may not be a card's or an option's name, nor a
     // phrase in a prompt, before it has been public. Type lines and rules text are not checked,

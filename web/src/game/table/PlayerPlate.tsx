@@ -568,6 +568,11 @@ export function PlayerPlate({
             {player.teamPill.text}
           </span>
         )}
+        {player.controlPill && (
+          <span className={styles.pill} data-tone={player.controlPill.tone}>
+            {player.controlPill.text}
+          </span>
+        )}
         {player.active && <span className={styles.pill}>Active turn</span>}
         {player.priority && (
           <span className={styles.pill} data-tone="priority">
@@ -601,14 +606,17 @@ export function PlayerPlate({
           {p.life}
         </span>
       </span>
-      {/* A teammate's hand (v0.5.1) lies face up under their board, each card named there. */}
+      {/* A teammate's hand (v0.5.1), or that of a player whose turn you control, lies face up
+          under their board, each card named there. */}
       <Count
         at={node.counts.hand}
         count={p.hand_count}
         label={
           player.hand && player.teammate
             ? `${p.hand_count} cards in your teammate's hand`
-            : `${p.hand_count} cards in hand`
+            : player.hand
+              ? `${p.hand_count} cards in ${player.name}'s hand`
+              : `${p.hand_count} cards in hand`
         }
       />
       <Count at={node.counts.graveyard} count={p.graveyard.length} />

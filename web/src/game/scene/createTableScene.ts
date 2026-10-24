@@ -1774,16 +1774,24 @@ class PixiTableScene implements TableScene {
               // Two-Headed Giant (v0.5.1): a team takes its turn together (805.4a).
               const team = active?.team ?? null;
               const watching = model.observing || model.viewSeat === null;
-              caption =
+              const ours =
                 active &&
                 !watching &&
-                (active.seat === model.viewSeat || active.teammate)
-                  ? "Your Turn"
-                  : team !== null
-                    ? watching
-                      ? `Team ${team + 1}’s Turn`
-                      : "Other Team’s Turn"
-                    : `${active?.name ?? "Next"}’s Turn`;
+                (active.seat === model.viewSeat || active.teammate);
+              // Turn control (rule 723, v0.5.1): a turn another player controls says so.
+              const controller = active?.controlledBy ?? null;
+              caption =
+                controller !== null && !watching && controller === model.viewSeat
+                  ? "You Control This Turn"
+                  : controller !== null && ours
+                    ? "Controlled Turn"
+                    : ours
+                      ? "Your Turn"
+                      : team !== null
+                        ? watching
+                          ? `Team ${team + 1}’s Turn`
+                          : "Other Team’s Turn"
+                        : `${active?.name ?? "Next"}’s Turn`;
             }
             this.showEmblem(event.emblem, caption, layout, "emblem");
           }

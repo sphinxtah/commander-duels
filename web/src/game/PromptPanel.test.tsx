@@ -6,7 +6,14 @@ import type { GameState } from "./connection";
 import { objectIndex, optionsByObject, optionsBySeat } from "./model";
 import { PromptPanel } from "./PromptPanel";
 import type { TimerView } from "./table/types";
-import type { AmountEntry, Prompt, PromptOption, Snapshot } from "./types";
+import type {
+  AmountEntry,
+  GameView,
+  PlayerView,
+  Prompt,
+  PromptOption,
+  Snapshot,
+} from "./types";
 
 vi.mock("../api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api")>()),
@@ -480,5 +487,85 @@ describe("naming a card", () => {
     fireEvent.click(screen.getByRole("button", { name: "Name this card" }));
     expect(onAnswer).toHaveBeenCalledWith({ text: "Black Lotus" });
     vi.useRealTimers();
+  });
+});
+
+describe("turn control (rule 723, v0.5.1)", () => {
+  function seated(
+    seat: number,
+    name: string,
+    controlledBy: number | null,
+  ): PlayerView {
+    return {
+      seat,
+      name,
+      controlled_by: controlledBy,
+      life: 20,
+      counters: {},
+      library_count: 40,
+      hand_count: 3,
+      graveyard: [],
+      exile: [],
+      mana_pool: { white: 0, blue: 0, black: 0, red: 0, green: 0, colorless: 0 },
+      lost: false,
+      won: false,
+      color_identity: null,
+      command_zone: [],
+      commanders: [],
+    };
+  }
+  /** Ada's view (seat 0) at a table with bob (seat 1), in bob's turn 8. */
+  function view(you: number | null, bob: number | null): GameView {
+    return {
+      seat: 0,
+      turn: 8,
+      active_seat: you === null ? 1 : 0,
+      priority_seat: you === null ? 1 : 0,
+      phase: "precombat_main",
+      step: "precombat_main",
+      you: seated(0, "ada", you),
+      opponents: [seated(1, "bob", bob)],
+      hand: [],
+      battlefield: [],
+      stack: [],
+      combat: [],
+      revealed: [],
+      looked_at: [],
+      messages: [],
+      priority: null,
+    };
+  }
+
+  it("marks a choice made for the player whose turn you control as theirs", () => {
+    const snap = {
+      ...snapshot(5, { ...priority("p"), for_seat: 1 }),
+      view: view(null, 0),
+    };
+    render(<Panel game={state(snap)} />);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      /^Priority for bob/,
+    );
+    expect(
+      screen.getByText("You make this choice for bob: you control bob’s turn."),
+    ).toBeInTheDocument();
+    // The choice itself is the prompt's as ever: its options are answered as any other.
+    expect(screen.getByText("Prompt p")).toBeInTheDocument();
+  });
+
+  it("names nobody else's decision on your own prompts", () => {
+    const snap = { ...snapshot(5, priority("p")), view: view(null, null) };
+    render(<Panel game={state(snap)} />);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+      /^Priority(?! for)/,
+    );
+    expect(screen.queryByText(/you control/)).toBeNull();
+  });
+
+  it("tells the controlled player who makes their choices", () => {
+    const snap = { ...snapshot(5, null), view: view(1, null) };
+    render(<Panel game={state(snap)} />);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "bob controls your turn and makes your choices until it ends.",
+    );
   });
 });

@@ -171,6 +171,28 @@ function running(): TimerState {
 }
 
 describe("the response timer's eligibility", () => {
+  it("never runs for a choice made for the player whose turn you control (v0.5.1)", () => {
+    // Bot 1's turn is Alice's to play (Mindslaver): its priority is in her prompt column.
+    const controlled = view({
+      opponents: [{ ...player(1, "Bot 1"), controlled_by: 0 }],
+      stack: [spell("s1", 0)],
+    });
+    const theirs = { ...prompt(), for_seat: 1 };
+    expect(timerKey(input({ prompt: theirs, view: controlled }))).toBeNull();
+    // Her own priority in that turn still answers an opponent's spell, as ever.
+    const bolt = view({
+      opponents: [{ ...player(1, "Bot 1"), controlled_by: 0 }],
+      stack: [spell("s2", 1)],
+    });
+    expect(timerKey(input({ view: bolt }))).toBe("p1|s2");
+    // An attack she declared for Bot 1 is not one she answers in a hurry.
+    const declared = view({
+      ...attack,
+      opponents: [{ ...player(1, "Bot 1"), controlled_by: 0 }],
+    });
+    expect(timerKey(input({ view: declared }))).toBeNull();
+  });
+
   it("runs for an opponent's spell or ability on top of the stack", () => {
     expect(timerKey(input())).toBe("p1|s1");
     const ability = view({ stack: [spell("s9", 1, { kind: "ability" })] });

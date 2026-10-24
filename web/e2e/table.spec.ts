@@ -800,6 +800,128 @@ test.describe("Two-Headed Giant at the table (v0.5.1)", () => {
   });
 });
 
+// Turn control (rule 723, v0.5.1): Alice controls bob's turn 8 (Mindslaver). bob's hand lies face
+// up by his board, hers to play while the control lasts, and his decisions come to her prompt
+// column marked as his; bob's own table says who controls his turn.
+test.describe("turn control at the table (v0.5.1)", () => {
+  const BOB = { 1: "bob" };
+
+  for (const [painter, size] of [
+    ["webgl", { width: 1280, height: 720, dpr: 1 }],
+    ["dom", { width: 1920, height: 1080, dpr: 1 }],
+  ] as const)
+    test(`plays bob's turn from his hand and her prompt column (${painter}, ${size.width} × ${size.height})`, async ({
+      browser,
+    }, testInfo) => {
+      const page = await tablePage(browser, size);
+      const table = await openTable(page, {
+        fixture: "controlling",
+        humans: BOB,
+        settings: { painter: painter === "dom" ? "dom" : "auto" },
+      });
+      await sizeChecks(page, size, painter);
+      await expect(page.locator("p[aria-live]").first()).toContainText(
+        "Turn 8 · You control bob’s turn",
+      );
+
+      // bob's plate says it; his four cards are named buttons by his board, two of them offered.
+      const bob = page.getByRole("article", {
+        name: "bob, seat 2, whose turn you control",
+      });
+      await expect(bob.getByText("Controlled by you")).toBeVisible();
+      const hand = bob.getByRole("group", { name: "bob's hand" });
+      const cards = hand.getByRole("button");
+      await expect(cards).toHaveCount(4);
+      await expect(
+        page.locator('[data-role="teammate-hand"][data-actionable]'),
+      ).toHaveCount(2);
+      await expect(hand.getByRole("button", { name: /^Brainstorm/ })).toHaveAccessibleName(
+        /Options: /,
+      );
+      if (painter === "dom")
+        for (const card of await cards.all())
+          await expect(card.locator("img")).toHaveCount(1);
+
+      // His decision is in her prompt column, marked as his.
+      const column = page.locator("section[data-prompt]");
+      await expect(
+        column.getByRole("heading", { level: 2, name: /^Priority for bob/ }),
+      ).toBeVisible();
+      await expect(
+        column.getByText("You make this choice for bob: you control bob’s turn."),
+      ).toBeVisible();
+      await page.screenshot({
+        path: testInfo.outputPath(`table-controlling-${painter}-${size.width}.jpg`),
+        quality: 80,
+      });
+      expect(await occluded(page)).toEqual([]);
+
+      // Pressing bob's Island plays it for him: the answer is the prompt's own option.
+      const prompt = table.fixture.snapshot.prompt!;
+      const land = prompt.options.find((o) => o.action === "play_land")!;
+      await hand.getByRole("button", { name: /^Island/ }).click();
+      await expect.poll(() => table.commands.length).toBe(1);
+      expect(table.commands[0]).toMatchObject({
+        type: "submit_choice",
+        prompt_id: prompt.id,
+        expected_revision: table.fixture.snapshot.revision,
+        payload: { option_id: land.id },
+      });
+
+      // The control ends with the turn: bob's hand goes back to a count, and the plate's pill goes.
+      const ended = structuredClone(table.fixture.snapshot);
+      ended.revision += 1;
+      ended.prompt = null;
+      ended.status = "waiting";
+      const bobView = ended.view!.opponents[0];
+      bobView.controlled_by = null;
+      bobView.hand = null;
+      ended.view!.turn = 9;
+      ended.view!.active_seat = 0;
+      ended.view!.priority_seat = 1;
+      table.send(ended);
+      await expect(page.locator("p[aria-live]").first()).toContainText(
+        "Turn 9 · Your turn",
+      );
+      const after = page.getByRole("article", { name: "bob, seat 2" });
+      await expect(after.getByRole("group", { name: "bob's hand" })).toHaveCount(0);
+      await expect(after.getByText("Controlled by you")).toHaveCount(0);
+      await expect(page.locator('[data-role="teammate-hand"]')).toHaveCount(0);
+      expect(await occluded(page)).toEqual([]);
+      expect(await table.problems()).toEqual([]);
+      await page.context().close();
+    });
+
+  test("tells the controlled player who makes their choices", async ({
+    browser,
+  }, testInfo) => {
+    const size = { width: 1920, height: 1080, dpr: 1 };
+    const page = await tablePage(browser, size);
+    const table = await openTable(page, { fixture: "controlled", humans: BOB });
+    await sizeChecks(page, size);
+    await expect(page.locator("p[aria-live]").first()).toContainText(
+      "Turn 8 · bob controls your turn",
+    );
+    await expect(page.getByText("Controlled by bob")).toBeVisible();
+    await expect(
+      page
+        .locator("section[data-prompt], section[aria-labelledby='prompt-title']")
+        .first()
+        .getByRole("status"),
+    ).toContainText("bob controls your turn and makes your choices until it ends.");
+    // Her own hand is hers to see, as ever; bob's is not shown to her.
+    await expect(page.getByRole("group", { name: "Your hand" }).getByRole("button")).toHaveCount(3);
+    await expect(page.locator('[data-role="teammate-hand"]')).toHaveCount(0);
+    await page.screenshot({
+      path: testInfo.outputPath("table-controlled.jpg"),
+      quality: 80,
+    });
+    expect(table.commands).toEqual([]);
+    expect(await table.problems()).toEqual([]);
+    await page.context().close();
+  });
+});
+
 test.describe("the chat bar at the table (v0.5.1)", () => {
   const ADA = "00000000-0000-4000-8000-0000000000a1";
   const ada = {

@@ -45,7 +45,7 @@ import {
   players,
   primaryOption,
   resultText,
-  teammateOf,
+  turnHolder,
   words,
   type Located,
 } from "./model";
@@ -643,26 +643,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
           : state.phase === "connecting"
             ? "Connecting…"
             : "Disconnected";
-  // Two-Headed Giant (v0.5.0): a team takes its turn together. Since v0.5.1 the other team's
-  // turn is the team's too, and SysOp observing reads each team by its number.
-  const activeTeam = view
-    ? (players(view).find((p) => p.seat === view.active_seat)?.team ?? null)
-    : null;
   const turnLine: TurnLine | null = view && {
-    turn: [
-      `Turn ${view.turn}`,
-      view.active_seat === null
-        ? null
-        : view.active_seat === view.seat && !observing
-          ? "Your turn"
-          : view.active_seat === teammateOf(view) && !observing
-            ? "Your team’s turn"
-            : activeTeam !== null
-              ? observing || view.you === null
-                ? `Team ${activeTeam + 1}’s turn`
-                : "Other team’s turn"
-              : `${seatName(view.active_seat)}’s turn`,
-    ]
+    turn: [`Turn ${view.turn}`, turnHolder(view, observing, seatName)]
       .filter(Boolean)
       .join(" · "),
     step: words(view.step ?? view.phase) || null,

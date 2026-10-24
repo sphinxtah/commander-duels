@@ -60,11 +60,23 @@ class Frames {
       for (const card of view.hand)
         if (card.name && !this.mine.has(card.name))
           this.problems.push(`hand holds ${card.name}, not this seat's card`);
-      // Since v0.5.0 every player carries `hand`, null at a human table.
-      for (const opponent of view.opponents)
+      // Since v0.5.0 every player carries `hand`, null at a human table but (v0.5.1) for a player
+      // whose turn this seat controls, while the control lasts (rule 723.4): their entry names
+      // this seat in controlled_by, and what the seat sees there it may name.
+      for (const opponent of view.opponents) {
+        const controlled =
+          opponent.controlled_by != null &&
+          opponent.controlled_by === view.seat;
         for (const key of ["hand", "library"])
-          if ((opponent as unknown as Record<string, unknown>)[key] != null)
+          if (
+            (opponent as unknown as Record<string, unknown>)[key] != null &&
+            !(key === "hand" && controlled)
+          )
             this.problems.push(`an opponent carries ${key}`);
+        if (controlled)
+          for (const card of opponent.hand ?? [])
+            if (card.name) this.publicNames.add(card.name);
+      }
     }
     // Checked at the end against every name that became public by then.
     this.seen.push({ revision: snapshot.revision, text: frame });

@@ -231,6 +231,10 @@
 .pill[data-tone="foe"] {
   color: #f0957a;
 }
+/* Turn control (v0.5.1): a player whose turn another controls, in violet. */
+.pill[data-tone="control"] {
+  color: #c8a8ff;
+}
 /* Another player's Alliance button, under their pills: DOM in both painters. */
 .alliance {
   position: absolute;

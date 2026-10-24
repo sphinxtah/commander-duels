@@ -94,8 +94,14 @@ export interface TablePlayer {
   /** The team's poison counters (810.10a, v0.5.1): both teammates' together; null in other
    * games. */
   teamPoison: number | null;
-  /** A teammate's hand this viewer may see (810.5, v0.5.1), as card keys in the view's order;
-   * null for everyone else, and for the anchored player, whose hand is the model's `hand`. */
+  /** Turn control (rule 723, v0.5.1): the seat controlling this player's turn, or null. */
+  controlledBy: Seat | null;
+  /** "Controlled by you" or "Controlled by ada" on the plate while another controls the turn. */
+  controlPill: { text: string; tone: "control" } | null;
+  /** A hand this viewer may see, as card keys in the view's order: a teammate's (810.5, v0.5.1),
+   * shown and never played, or since v0.5.1 that of a player whose turn the viewer controls
+   * (723.4), whose cards carry their options; null for everyone else, and for the anchored
+   * player, whose hand is the model's `hand`. */
   hand: string[] | null;
   sigil: { seed: string; grey: boolean }; // seed: `handle:<h>` | `bot:<seat>` | `seat:<seat>`
   portrait: string | null; // a human's allied Planeswalker (v0.3.1), shown instead of the sigil

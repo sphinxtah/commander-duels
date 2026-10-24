@@ -1,4 +1,9 @@
-import { playerName, primaryOption, teammateOf } from "../model";
+import {
+  controllerOf,
+  playerName,
+  primaryOption,
+  teammateOf,
+} from "../model";
 import type { TimerInput, TimerKey, TimerPhase, TimerView } from "./types";
 
 // The response timer (design §12). When the seat gets priority only to answer an opponent's spell,
@@ -27,6 +32,9 @@ export const timerKey: TimerKey = (input) => {
   // modes, amounts, piles, ordering, payment, attackers or blockers).
   if (prompt.kind !== "priority" || primaryOption(prompt)?.action !== "pass")
     return null;
+  // A decision made for a player whose turn the seat controls (rule 723, v0.5.1) is always the
+  // controller's own to make: nothing passes for them.
+  if ((prompt.for_seat ?? null) !== null) return null;
   if (input.status !== "your_prompt") return null;
   // Never in a watching tab or for SysOp observing another player's game.
   if (input.observing || input.role !== "controller") return null;
@@ -41,10 +49,12 @@ export const timerKey: TimerKey = (input) => {
     // The seat's own object on top is holding priority, not a response.
     return top.controller_seat !== view.seat ? `${prompt.id}|${top.id}` : null;
   // In Two-Headed Giant (v0.5.1) the team attacks together: an attack in a turn the teammate
-  // holds is the seat's own team's.
+  // holds is the seat's own team's. An attack in a turn the seat controls (v0.5.1) the seat
+  // declared itself.
   const attacked =
     view.active_seat !== view.seat &&
     view.active_seat !== teammateOf(view) &&
+    controllerOf(view, view.active_seat) !== view.seat &&
     view.step !== null &&
     COMBAT_STEPS.has(view.step) &&
     view.combat.some((group) => group.attackers.length > 0);

@@ -10,6 +10,7 @@ import { client } from "../api";
 import { CardButton, CardRow, useGameContext } from "./Board";
 import type { GameState } from "./connection";
 import {
+  controllerOf,
   objectName,
   optionText,
   playerName,
@@ -291,6 +292,12 @@ export function PromptPanel({
   const primary = primaryOption(prompt);
   const promptId = prompt?.id;
   const timing = Boolean(timer && timerLive(timer.phase) && onStopTimer);
+  // Turn control (rule 723, v0.5.1): a decision made for the player whose turn this seat
+  // controls, and the seat whose turn another player controls.
+  const forSeat = prompt?.for_seat ?? null;
+  const forName =
+    forSeat === null ? null : playerName(view, forSeat, game.observing);
+  const controller = controllerOf(view, view?.seat ?? null);
 
   // Stopping the timer takes its button away: focus that was on it goes to the first diamond.
   const onStop = useRef(false);
@@ -377,7 +384,11 @@ export function PromptPanel({
       <p role="status" className={styles.waiting}>
         {snapshot.status === "starting"
           ? "Shuffling up…"
-          : `Waiting for ${playerName(view, view?.priority_seat ?? view?.active_seat ?? null, game.observing)}…`}
+          : controller !== null
+            ? game.observing
+              ? `${playerName(view, controller, true)} controls ${playerName(view, view?.seat ?? null, true)}’s turn and makes their choices.`
+              : `${playerName(view, controller)} controls your turn and makes your choices until it ends.`
+            : `Waiting for ${playerName(view, view?.priority_seat ?? view?.active_seat ?? null, game.observing)}…`}
       </p>
     );
   else {
@@ -402,6 +413,13 @@ export function PromptPanel({
     const piles = prompt.piles;
     body = (
       <>
+        {forName && (
+          <p className={styles.forSeat} data-for-seat={forSeat}>
+            {game.observing
+              ? `${playerName(view, view?.seat ?? null, true)} makes this choice for ${forName}, whose turn they control.`
+              : `You make this choice for ${forName}: you control ${forName}’s turn.`}
+          </p>
+        )}
         <p className={styles.promptMessage} id="prompt-message">
           {prompt.message}
         </p>
@@ -529,6 +547,7 @@ export function PromptPanel({
     >
       <h2 id="prompt-title" ref={title} tabIndex={-1}>
         {prompt ? words(prompt.kind) : "Table"}
+        {forName && ` for ${forName}`}
         {view && (
           <span>
             Turn {view.turn} · {words(view.step ?? view.phase)}

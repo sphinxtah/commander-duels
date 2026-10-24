@@ -718,3 +718,84 @@ describe("Two-Headed Giant at the table (v0.5.1)", () => {
     expect(owner(`block:battlefield:${lions.id}:0`)).toBe("opponent");
   });
 });
+
+describe("turn control (rule 723, v0.5.1)", () => {
+  it("lets you play the hand of the player whose turn you control, by a press, never a drag", () => {
+    const m = fixtureModel("controlling");
+    const bot = m.opponents[0];
+    expect(bot).toMatchObject({
+      seat: 1,
+      controlledBy: 0,
+      controlPill: { text: "Controlled by you", tone: "control" },
+      articleLabel: "Bot 2, seat 2, whose turn you control",
+    });
+    expect(m.anchored).toMatchObject({ controlledBy: null, controlPill: null });
+    const theirs = tableFixture("controlling").snapshot.view!.opponents[0]
+      .hand!;
+    expect(bot.hand).toEqual(theirs.map((card) => `hand:${card.id}`));
+    const brainstorm = named(m, "Brainstorm", "hand");
+    expect(brainstorm).toMatchObject({
+      ownerSeat: 1,
+      mark: "playable",
+      drag: null,
+    });
+    expect(brainstorm.offered.map((o) => o.action)).toEqual(["cast"]);
+    expect(named(m, "Island", "hand").offered.map((o) => o.action)).toEqual([
+      "play_land",
+    ]);
+    expect(named(m, "Counterspell", "hand")).toMatchObject({
+      offered: [],
+      mark: "none",
+    });
+    // Your own hand has nothing to do in Bot 2's turn.
+    expect(
+      m.hand.every((key) => m.cards.get(key)!.offered.length === 0),
+    ).toBe(true);
+    // Its cards are laid out face up by its plate, every one in reach.
+    const layout = layoutTable(m, { expandedSeat: null, textScale: 1 });
+    expect(validateHits(layout, m)).toEqual([]);
+    expect(layout.rows.find((r) => r.key === "hand:1")?.nodes).toHaveLength(
+      theirs.length,
+    );
+  });
+
+  it("tells the controlled player, and everyone else, who controls the turn", () => {
+    const m = fixtureModel("controlled");
+    expect(m.anchored).toMatchObject({
+      controlledBy: 1,
+      controlPill: { text: "Controlled by Bot 2", tone: "control" },
+    });
+    expect(m.opponents[0]).toMatchObject({
+      controlledBy: null,
+      controlPill: null,
+      hand: null,
+    });
+    // SysOp observing the controller: names, and the hand's marks without answering.
+    const f = tableFixture("controlling");
+    f.seat = null;
+    f.role = "observer";
+    f.sysop = true;
+    const sysop = model(f);
+    expect(sysop.opponents[0].controlPill?.text).toBe("Controlled by Alice");
+    expect(sysop.opponents[0].articleLabel).toBe(
+      "Bot 2, seat 2, turn controlled by Alice",
+    );
+    expect(named(sysop, "Brainstorm", "hand")).toMatchObject({
+      mark: "playable",
+      drag: null,
+    });
+    expect(sysop.canAnswer).toBe(false);
+  });
+
+  it("keeps a hand shown without control shown only", () => {
+    // A hand in the view of a player nobody controls (a teammate's) never carries options.
+    const f = tableFixture("controlling");
+    f.snapshot.view!.opponents[0].controlled_by = null;
+    const m = model(f);
+    expect(named(m, "Brainstorm", "hand")).toMatchObject({
+      offered: [],
+      mark: "none",
+    });
+    expect(m.opponents[0].controlPill).toBeNull();
+  });
+});
