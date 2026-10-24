@@ -20,11 +20,16 @@ export function comingSoon(format: Format | undefined): boolean {
     format && !format.available && !(format.id in practiceFormats),
   );
 }
-/** A playable version with known gaps, marked "Early": Two-Headed Giant, against the bots since
- * v0.5.0, and since v0.5.1 at tables and in the queue too. */
+/** A playable version with known gaps, marked "Early": Two-Headed Giant from v0.5.0 until v0.6.1,
+ * which gave teams their priority and their choices; no format since. */
 export function early(format: Format | undefined): boolean {
   return Boolean(format?.early) && !comingSoon(format);
 }
+/** What a format's details say of how to play it, beyond the general way in. */
+const howToPlay: Record<string, string> = {
+  two_headed_giant:
+    "Two teams of two, with Legacy decks: in the queue, alone or with a friend; at a table for four players, or players with bots as teammates or opponents; or with a bot teammate at the practice table. Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
+};
 const symbols: Record<string, string> = {
   commander: "♜",
   legacy: "⚔",
@@ -206,9 +211,8 @@ export function PlayPage({
         <p>
           {comingSoon(selected)
             ? `${selected?.name} is coming soon.`
-            : early(selected)
-              ? `Two teams of two, with Legacy decks: in the queue, alone or with a friend; at a table for four players, or players with bots as teammates or opponents; or with a bot teammate at the practice table. Your team takes its turns together, shares one life total and wins together. Early: teammates still receive priority and make their choices one after the other rather than together, and a few rare cards do not follow the team rules yet.`
-              : "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables."}
+            : ((selected && howToPlay[selected.id]) ??
+              "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables.")}
         </p>
         <button
           className={shell.primary}

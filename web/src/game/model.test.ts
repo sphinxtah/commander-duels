@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   objectIndex,
+  optionText,
   playerName,
   resultText,
+  teamNote,
   teammateOf,
   turnHolder,
 } from "./model";
-import type { GameView, PlayerView } from "./types";
+import type { GameView, PlayerView, Prompt, PromptOption } from "./types";
 
 function player(seat: number, name: string): PlayerView {
   return {
@@ -151,6 +153,55 @@ describe("Two-Headed Giant (v0.5.0)", () => {
       title: "Defeat",
       detail: "Bot 3 and Bot 4 won in 12 turns.",
     });
+  });
+
+  it("says what a prompt is to the team (rules 805.5 to 805.7, v0.6.1)", () => {
+    const prompt = (kind: Prompt["kind"], passed: boolean | null): Prompt => ({
+      id: "p",
+      kind,
+      message: "",
+      detail: null,
+      options: [],
+      amounts: null,
+      piles: null,
+      xmage_query: null,
+      team: { teammate_passed: passed },
+    });
+    expect(teamNote(prompt("priority", false), null)).toBe(
+      "Your team has priority: after a pass, your teammate may still act before the other team.",
+    );
+    expect(teamNote(prompt("priority", true), null)).toBe(
+      "Your teammate has passed: a pass now passes for your team, and the other team gets priority.",
+    );
+    expect(teamNote(prompt("declare_attackers", null), "Bob")).toBe(
+      "Bob’s team attacks together: Bob’s teammate’s attackers count too, and the whole attack must be legal. If Bob’s teammate changes it, this choice comes back.",
+    );
+    expect(teamNote(prompt("order_triggers", null), null)).toMatch(
+      /^Your team puts its triggered abilities on the stack in one order/,
+    );
+    expect(teamNote(prompt("yes_no", null), null)).toBeNull();
+    expect(teamNote({ ...prompt("priority", true), team: null }, null)).toBeNull();
+  });
+
+  it("says whose each of a team's triggers is (rule 805.7, v0.6.1)", () => {
+    const trigger = (seat: number | null): PromptOption => ({
+      id: "1",
+      action: "put_first",
+      label: "Whenever another creature enters, you gain 1 life.",
+      object_id: null,
+      seat,
+      selected: false,
+    });
+    const index = objectIndex(giant);
+    expect(optionText(trigger(0), index, giant)).toBe(
+      "Whenever another creature enters, you gain 1 life. · yours",
+    );
+    expect(optionText(trigger(1), index, giant)).toBe(
+      "Whenever another creature enters, you gain 1 life. · Bot 2",
+    );
+    expect(optionText(trigger(null), index, view)).toBe(
+      "Whenever another creature enters, you gain 1 life.",
+    );
   });
 
   it("names the winning team by its number to SysOp observing (v0.5.1)", () => {

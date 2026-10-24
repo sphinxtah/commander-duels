@@ -144,9 +144,9 @@ const formats: Format[] = [
     seats: [4],
     default_seats: 4,
     description: "Two teams of two.",
-    // The server's answer since v0.5.0: open against the bots, and early.
+    // The server's answer since v0.6.1: open, and no longer early (v0.5.0 to v0.6.0).
     available: true,
-    early: true,
+    early: false,
   },
 ];
 const alice: Me = {
@@ -1072,7 +1072,7 @@ describe("what this version offers", () => {
     expect(screen.queryByText(/FRAMEWORK/)).toBeNull();
   });
 
-  it("the Play page opens Commander and Legacy, and Two-Headed Giant as early (v0.5.0)", async () => {
+  it("the Play page opens Commander, Legacy and Two-Headed Giant (early until v0.6.1)", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
     window.location.hash = "#play";
     render(<App />);
@@ -1082,8 +1082,8 @@ describe("what this version offers", () => {
       document.querySelector<HTMLElement>(`[data-format="${id}"]`)!;
     expect(card("commander")).toHaveTextContent("Open to play");
     expect(card("legacy")).toHaveTextContent("Open to play");
-    expect(card("two_headed_giant")).toHaveTextContent("Early");
-    expect(card("two_headed_giant")).not.toHaveTextContent("Coming soon");
+    expect(card("two_headed_giant")).toHaveTextContent("Open to play");
+    expect(card("two_headed_giant")).not.toHaveTextContent(/Coming soon|Early/);
 
     // The format's dialog; the page's other one is Report a problem's (v0.4.1).
     const dialog = document.querySelector(
@@ -1100,17 +1100,19 @@ describe("what this version offers", () => {
     await waitFor(() => expect(dialog).toHaveTextContent("Legacy"));
     expect(dialog).toHaveTextContent("OPEN TO PLAY");
     fireEvent.click(about("two_headed_giant"));
-    await waitFor(() => expect(dialog).toHaveTextContent("EARLY"));
-    expect(dialog).toHaveTextContent("4 seats. Default table: 4 players.");
-    // Since v0.5.1 at tables and in the queue too, after the card audit; early for team priority
-    // and the few cards still wrong.
+    await waitFor(() =>
+      expect(dialog).toHaveTextContent("4 seats. Default table: 4 players."),
+    );
+    expect(dialog).toHaveTextContent("OPEN TO PLAY");
+    // Since v0.5.1 at tables and in the queue too; since v0.6.1 with team priority and the
+    // team's one attack and block.
     expect(dialog).toHaveTextContent(
       "Two teams of two, with Legacy decks: in the queue, alone or with a friend",
     );
     expect(dialog).toHaveTextContent(
-      "Early: teammates still receive priority and make their choices one after the other rather than together, and a few rare cards do not follow the team rules yet.",
+      "Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
     );
-    expect(dialog).not.toHaveTextContent(/coming soon|planned/i);
+    expect(dialog).not.toHaveTextContent(/coming soon|planned|early/i);
   });
 });
 

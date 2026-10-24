@@ -228,9 +228,27 @@ export function optionText(
   view: GameView | null,
   observing = false,
 ): string {
+  const text = optionWords(option, index, view, observing);
+  // Two-Headed Giant (rule 805.7, v0.6.1): a team orders its triggered abilities together, and
+  // each says whose it is.
+  if (option.action === "put_first" && option.seat !== null)
+    return `${text} · ${
+      option.seat === view?.seat && !observing
+        ? "yours"
+        : playerName(view, option.seat, observing)
+    }`;
+  return text;
+}
+
+function optionWords(
+  option: PromptOption,
+  index: Map<ObjectId, Located>,
+  view: GameView | null,
+  observing: boolean,
+): string {
   const subject = option.object_id
     ? objectName(index.get(option.object_id))
-    : option.seat !== null
+    : option.seat !== null && option.action !== "put_first"
       ? playerName(view, option.seat, observing)
       : null;
   if (option.action === "toggle_attacker" && option.selected && subject)
@@ -248,6 +266,31 @@ export function optionText(
     return option.label;
   }
   return subject ? `${verbs[option.action]} ${subject}` : verbs[option.action];
+}
+
+/** Two-Headed Giant (rules 805.5 to 805.7, 805.10b, 805.10d; v0.6.1): what the open prompt is to
+ * the asked player's team, in words; null outside team games and for prompts that are a player's
+ * own. `who` names the asked player when it is not the viewer (SysOp observing a seat, or a seat
+ * controlling that player's turn); null for the viewer. */
+export function teamNote(prompt: Prompt | null, who: string | null): string | null {
+  const team = prompt?.team;
+  if (!prompt || !team) return null;
+  const Your = who === null ? "Your" : `${who}’s`;
+  const your = who === null ? "your" : `${who}’s`;
+  switch (prompt.kind) {
+    case "priority":
+      return team.teammate_passed
+        ? `${Your} teammate has passed: a pass now passes for ${your} team, and the other team gets priority.`
+        : `${Your} team has priority: after a pass, ${your} teammate may still act before the other team.`;
+    case "declare_attackers":
+      return `${Your} team attacks together: ${your} teammate’s attackers count too, and the whole attack must be legal. If ${your} teammate changes it, this choice comes back.`;
+    case "declare_blockers":
+      return `${Your} team blocks together: ${your} teammate’s blockers count too, and the whole block must be legal. If ${your} teammate changes it, this choice comes back.`;
+    case "order_triggers":
+      return `${Your} team puts its triggered abilities on the stack in one order: ${your} teammate’s are listed too.`;
+    default:
+      return null;
+  }
 }
 
 /** The option the "primary" key and button answer: pass, done, keep or yes. */

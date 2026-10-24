@@ -1,0 +1,533 @@
+Two-Headed Giant (Commander Duels v0.6.1): team priority, team choices and the team's one attack
+and block (rules 805.2, 805.3, 805.5 to 805.7, 805.10b, 805.10d).
+
+Reason: until now teammates received priority one after the other in turn order, put their
+triggered abilities on the stack and declared attackers and blockers one player at a time, and
+each player's attack was checked alone. With this patch a team has priority (805.5: priority
+passes to a teammate who has not passed since the team last acted, so the team passes only when
+all its players have, and then the next team gets it); a team puts all the triggered abilities its
+players control on the stack in one order, which the team's chooser picks (805.7, 805.2:
+Game.getTeamChooser, the given player by default, named by the game type); players who act in turn
+order at the start of the game do so team by team, the starting team first (805.3a mulligans,
+805.3b opening-hand actions: Game.inTeamOrder); and the active team declares one combined attack
+(805.10b) and the defending team one combined block (805.10d): each player declares for their own
+creatures, a human player is asked again when a teammate changes the declaration, and the
+restrictions and requirements are checked against the whole attack or block, a human player whose
+creature breaks one declaring again. Every change applies only to players with teammates
+(Game.getTeammates), so every other game type plays as before. Commander Duels' TwoHeadedGiant
+game type (engine/src/main/java/com/commanderduels/TwoHeadedGiant.java) names the chooser.
+Upstream: none yet; offered with the other Two-Headed Giant patches.
+Remove when: XMage upstream implements shared team turns, or Two-Headed Giant is dropped.
+
+diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
+--- a/Mage/src/main/java/mage/game/Game.java
++++ b/Mage/src/main/java/mage/game/Game.java
+@@ -240,6 +240,38 @@
+     }
+ 
+     /**
++     * 805.3a, 805.6, 805.7: with shared team turns, players who act or choose in turn order do so
++     * team by team: the given players in their order, each followed at once by those of their
++     * teammates among them. From the active player that is the active team first, then each other
++     * team in turn order. The same order in games without teams.
++     */
++    default List<UUID> inTeamOrder(Iterable<UUID> playerIds) {
++        List<UUID> given = new ArrayList<>();
++        playerIds.forEach(given::add);
++        List<UUID> ordered = new ArrayList<>();
++        for (UUID playerId : given) {
++            if (!ordered.contains(playerId)) {
++                ordered.add(playerId);
++                for (UUID teammateId : getTeammates(playerId)) {
++                    if (given.contains(teammateId) && !ordered.contains(teammateId)) {
++                        ordered.add(teammateId);
++                    }
++                }
++            }
++        }
++        return ordered;
++    }
++
++    /**
++     * 805.2: the player who makes a choice that the given player's team makes together, such as the
++     * order of its triggered abilities (805.7), when its players can't agree. A team game type
++     * names its primary player, or how its players agree; the given player in games without teams.
++     */
++    default UUID getTeamChooser(UUID playerId) {
++        return playerId;
++    }
++
++    /**
+      * 805.4a, 805.9: with shared team turns, the team whose turn it is is the active team, and each
+      * of its players is an active player.
+      */
+@@ -281,8 +313,8 @@
+ 
+     /**
+      * 810.9d: with a shared team life total, an effect that sets each player's life total sets one
+-     * player's of each team, whom the team chooses (its first player of the given ones chooses, when
+-     * its players' new totals differ). Of the given players, the ones whose life total to set: every
++     * player's of each team, whom the team chooses (its chooser, getTeamChooser, when its players'
++     * new totals differ). Of the given players, the ones whose life total to set: every
+      * one outside team games.
+      */
+     default List<UUID> chooseLifeTotalsToSet(List<UUID> playerIds, java.util.function.ToIntFunction<UUID> newLife) {
+@@ -295,7 +327,8 @@
+             List<UUID> team = playerIds.stream().filter(getTeam(playerId)::contains).collect(Collectors.toList());
+             decided.addAll(team);
+             UUID pick = playerId;
+-            Player chooser = getPlayer(playerId);
++            // 805.2: the team's chooser
++            Player chooser = getPlayer(getTeamChooser(playerId));
+             if (chooser != null && team.stream().mapToInt(newLife).distinct().count() > 1) {
+                 Map<String, UUID> options = new LinkedHashMap<>();
+                 for (UUID teamPlayerId : team) {
+diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
+--- a/Mage/src/main/java/mage/game/GameImpl.java
++++ b/Mage/src/main/java/mage/game/GameImpl.java
+@@ -1424,8 +1424,8 @@
+         getState().setChoosingPlayerId(null);
+         state.resetWatchers(); // watcher objects from cards are reused during match so reset all card watchers already added
+ 
+-        //20100716 - 103.5
+-        for (UUID playerId : state.getPlayerList(startingPlayerId)) {
++        //20100716 - 103.5; 805.3b: the starting team first, then each other team in turn order
++        for (UUID playerId : inTeamOrder(state.getPlayerList(startingPlayerId))) {
+             Player player = getPlayer(playerId);
+             Cards cardsWithOpeningAction = new CardsImpl();
+             for (Card card : player.getHand().getCards(this)) {
+@@ -1950,7 +1950,7 @@
+                             throw new MageException(UNIT_TESTS_ERROR_TEXT + ": " + e.getMessage(), e);
+                         }
+                     }
+-                    state.getPlayerList().getNext();
++                    passPriorityOn();
+                 }
+             }
+         } catch (Exception e) {
+@@ -1974,6 +1974,26 @@
+         }
+     }
+ 
++    /**
++     * 117.3d: the player with priority has passed, and the next player in turn order receives it.
++     * 805.5: with shared team turns, teams have priority, not individual players: while a teammate
++     * of that player has not passed since the team last acted, priority stays with the team and
++     * that teammate receives it, so a team passes only when each of its players has passed in
++     * succession; then the next team in turn order receives priority. Without teammates, the next
++     * player in turn order, as ever.
++     */
++    private void passPriorityOn() {
++        PlayerList players = state.getPlayerList();
++        for (UUID teammateId : getTeammates(players.get())) {
++            Player teammate = getPlayer(teammateId);
++            if (teammate != null && !teammate.isPassed() && teammate.canRespond()) {
++                players.setCurrent(teammateId);
++                return;
++            }
++        }
++        players.getNext();
++    }
++
+     protected void resolve() {
+         StackObject top = null;
+         boolean wasError = false;
+@@ -2467,7 +2487,16 @@
+     boolean checkTriggered() {
+         boolean played = false;
+         state.getTriggers().checkStateTriggers(this);
+-        for (UUID playerId : state.getPlayerList(state.getActivePlayerId())) {
++        Set<UUID> putByTeam = new HashSet<>();
++        for (UUID playerId : inTeamOrder(state.getPlayerList(state.getActivePlayerId()))) {
++            if (putByTeam.contains(playerId)) {
++                continue;
++            }
++            if (!getTeammates(playerId).isEmpty()) {
++                putByTeam.addAll(getTeam(playerId));
++                played |= checkTeamTriggered(playerId);
++                continue;
++            }
+             Player player = getPlayer(playerId);
+             while (player.canRespond()) { // player can die or win caused by triggered abilities or leave the game
+                 List<TriggeredAbility> abilities = state.getTriggered(player.getId());
+@@ -2500,6 +2529,49 @@
+         }
+         return played;
+     }
++
++    /**
++     * 805.7: with shared team turns, the members of a team put all triggered abilities any of them
++     * controls on the stack in any order they choose. Abilities that don't use the stack are
++     * handled first, as for one player. Of several, the team's chooser (805.2, getTeamChooser)
++     * picks the one that goes on the stack next, from all the team's, and its controller puts it
++     * there, making its choices.
++     */
++    private boolean checkTeamTriggered(UUID playerId) {
++        boolean played = false;
++        List<UUID> team = new ArrayList<>(getTeam(playerId));
++        while (team.stream().map(this::getPlayer).anyMatch(player -> player != null && player.canRespond())) {
++            List<TriggeredAbility> abilities = new ArrayList<>();
++            for (UUID teamPlayerId : team) {
++                Player teamPlayer = getPlayer(teamPlayerId);
++                if (teamPlayer != null && teamPlayer.canRespond()) {
++                    abilities.addAll(state.getTriggered(teamPlayerId));
++                }
++            }
++            if (abilities.isEmpty()) {
++                break;
++            }
++            TriggeredAbility next = abilities.stream().filter(ability -> !ability.isUsesStack()).findFirst()
++                    .orElse(null);
++            if (next == null && abilities.size() == 1) {
++                next = abilities.get(0);
++            }
++            if (next == null) {
++                Player chooser = getPlayer(getTeamChooser(playerId));
++                if (chooser == null || !chooser.canRespond()) {
++                    chooser = getPlayer(abilities.get(0).getControllerId());
++                }
++                next = chooser.chooseTriggeredAbility(abilities, this);
++                if (next == null) {
++                    // the chooser left the game while choosing: the rest wait for the next check
++                    break;
++                }
++            }
++            state.removeTriggeredAbility(next);
++            played |= getPlayer(next.getControllerId()).triggerAbility(next, this);
++        }
++        return played;
++    }
+ 
+     /**
+      * 704.5a, 810.8a: a player with 0 or less life loses, unless an effect says they don't lose for
+diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
+--- a/Mage/src/main/java/mage/game/combat/Combat.java
++++ b/Mage/src/main/java/mage/game/combat/Combat.java
+@@ -273,6 +273,20 @@
+             List<UUID> attackingTeam = new ArrayList<>();
+             attackingTeam.add(attackingPlayerId);
+             attackingTeam.addAll(game.getTeammates(attackingPlayerId));
++            List<Player> attackingTeamPlayers = new ArrayList<>();
++            for (UUID attackingTeamPlayerId : attackingTeam) {
++                Player player = game.getPlayer(attackingTeamPlayerId);
++                if (player != null && (attackingTeamPlayerId.equals(attackingPlayerId) || player.isInGame())) {
++                    attackingTeamPlayers.add(player);
++                }
++            }
++            if (attackingTeamPlayers.size() > 1) {
++                if (!game.getCombat().selectTeamAttackers(attackingTeamPlayers, game)) {
++                    return;
++                }
++                game.getCombat().resumeSelectAttackers(game);
++                return;
++            }
+             for (UUID attackingTeamPlayerId : attackingTeam) {
+                 //20101001 - 508.1d
+                 Player player = game.getPlayer(attackingTeamPlayerId);
+@@ -300,6 +314,121 @@
+         }
+     }
+ 
++    /**
++     * 805.10b: the active team declares its attackers as one combined attack, which must be legal
++     * as a whole (508.1). The requirements of every creature of the team are found first. Then each
++     * of the team's players declares for the creatures they control, in turn order from the turn's
++     * holder, seeing what the others have declared so far; a human player whose teammate changed the
++     * attack after they declared is asked again, so every human player of the team agrees to the
++     * attack as it ends (a computer player declares once, and leaves the choice to them). Finally
++     * the restrictions are checked against the team's whole attack: a computer player's creature
++     * that breaks one is removed, as XMage does for a computer player's own attack, and a human
++     * player whose creature breaks one is told and declares again.
++     *
++     * @return false if the game paused, ended or rolled back during the declaration
++     */
++    protected boolean selectTeamAttackers(List<Player> team, Game game) {
++        for (Player player : team) {
++            game.getCombat().checkAttackRequirements(player, game);
++        }
++        Set<UUID> declared = new HashSet<>();
++        Set<UUID> asked = new HashSet<>();
++        while (true) {
++            for (Player player : team) {
++                if (declared.contains(player.getId())) {
++                    continue;
++                }
++                Map<UUID, UUID> before = game.getCombat().getAttackersAndDefenders();
++                if (asked.contains(player.getId()) || !player.getAvailableAttackers(game).isEmpty()) {
++                    player.selectAttackers(game, player.getId());
++                }
++                asked.add(player.getId());
++                if (game.isPaused() || game.checkIfGameIsOver() || game.executingRollback()) {
++                    return false;
++                }
++                declared.add(player.getId());
++                if (!before.equals(game.getCombat().getAttackersAndDefenders())) {
++                    // the team's attack changed: its other human players see it again
++                    for (Player teammate : team) {
++                        if (teammate != player && teammate.isHuman()) {
++                            declared.remove(teammate.getId());
++                        }
++                    }
++                }
++            }
++            if (declared.size() < team.size()) {
++                continue;
++            }
++            Player redeclaring = game.getCombat().checkTeamAttackRestrictions(game);
++            if (redeclaring == null) {
++                return true;
++            }
++            declared.remove(redeclaring.getId());
++        }
++    }
++
++    /**
++     * The attacking creatures and what each attacks, to tell whether a declaration changed the
++     * attack.
++     */
++    protected Map<UUID, UUID> getAttackersAndDefenders() {
++        Map<UUID, UUID> attacks = new HashMap<>();
++        for (CombatGroup group : groups) {
++            for (UUID attackerId : group.getAttackers()) {
++                attacks.put(attackerId, group.getDefenderId());
++            }
++        }
++        return attacks;
++    }
++
++    /**
++     * 805.10b, 508.1c: the restrictions of every attacking creature, checked against the active
++     * team's whole attack. A computer player's creature that breaks one is removed from combat; for
++     * a human player's creature, the player is told and returned to declare again.
++     *
++     * @return the human player who must declare again, or null when the attack is legal
++     */
++    protected Player checkTeamAttackRestrictions(Game game) {
++        for (int numberOfChecks = 1; numberOfChecks <= 50; numberOfChecks++) {
++            int numberAttackers = 0;
++            for (CombatGroup group : groups) {
++                numberAttackers += group.getAttackers().size();
++            }
++            UUID attackerToRemove = null;
++            Check:
++            for (UUID attackingCreatureId : this.getAttackers()) {
++                Permanent attackingCreature = game.getPermanent(attackingCreatureId);
++                if (attackingCreature == null) {
++                    continue;
++                }
++                for (Map.Entry<RestrictionEffect, Set<Ability>> entry : game.getContinuousEffects().getApplicableRestrictionEffects(attackingCreature, game).entrySet()) {
++                    RestrictionEffect effect = entry.getKey();
++                    for (Ability ability : entry.getValue()) {
++                        if (effect.canAttackCheckAfter(numberAttackers, ability, game, true)) {
++                            continue;
++                        }
++                        Player controller = game.getPlayer(attackingCreature.getControllerId());
++                        if (controller != null && controller.isHuman()) {
++                            MageObject sourceObject = ability.getSourceObject(game);
++                            controller.resetPlayerPassedActions();
++                            game.informPlayer(controller, attackingCreature.getIdName() + " can't attack this way ("
++                                    + (sourceObject == null ? "null" : sourceObject.getIdName()) + ')');
++                            return controller;
++                        }
++                        attackerToRemove = attackingCreatureId;
++                        break Check;
++                    }
++                }
++            }
++            if (attackerToRemove == null) {
++                return null;
++            }
++            removeAttacker(attackerToRemove, game);
++        }
++        logger.error("Seems to be an AI declare attacker lock (reached 50 check iterations) in a team's attack");
++        return null;
++    }
++
+     @SuppressWarnings("deprecation")
+     public void resumeSelectAttackers(Game game) {
+         Map<UUID, Set<MageObjectReference>> morSetMap = new HashMap<>();
+@@ -694,6 +823,26 @@
+         for (UUID defenderId : new ArrayList<>(blockingPlayers)) {
+             blockingPlayers.addAll(game.getTeammates(defenderId));
+         }
++        if (blockController == null && blockingPlayers.size() > 1
++                && game.getTeam(blockingPlayers.iterator().next()).containsAll(blockingPlayers)) {
++            List<Player> defendingTeam = new ArrayList<>();
++            for (UUID defenderId : blockingPlayers) {
++                Player defender = game.getPlayer(defenderId);
++                if (defender != null) {
++                    defendingTeam.add(defender);
++                }
++            }
++            if (!game.getCombat().selectTeamBlockers(defendingTeam, source, game)) {
++                return;
++            }
++            for (Player defender : defendingTeam) {
++                game.fireEvent(GameEvent.getEvent(GameEvent.EventType.DECLARED_BLOCKERS, defender.getId(), defender.getId()));
++                if (!game.isSimulation()) {
++                    game.getCombat().logBlockerInfo(defender, game);
++                }
++            }
++            return;
++        }
+         for (UUID defenderId : blockingPlayers) {
+             Player defender = game.getPlayer(defenderId);
+             if (defender == null) {
+@@ -767,6 +916,144 @@
+         }
+     }
+ 
++    /**
++     * 805.10d: the defending team declares one combined block, which must be legal as a whole
++     * (509.1). Each of the team's players declares for the creatures they control, seeing what the
++     * others have declared so far; a human player whose teammate changed the block after they
++     * declared is asked again, so every human player of the team agrees to the block as it ends.
++     * Then the block's restrictions and requirements are checked for the whole team: a player
++     * whose creatures break one declares again (a computer player at most 20 times, as XMage
++     * allows it for its own block).
++     *
++     * @return false if the game paused, ended or rolled back during the declaration
++     */
++    protected boolean selectTeamBlockers(List<Player> team, Ability source, Game game) {
++        Set<UUID> declared = new HashSet<>();
++        int aiTries = 0;
++        while (true) {
++            for (Player player : team) {
++                if (declared.contains(player.getId())) {
++                    continue;
++                }
++                Map<UUID, Set<UUID>> before = game.getCombat().getBlockersAndAttackers();
++                player.selectBlockers(source, game, player.getId());
++                if (game.isPaused() || game.checkIfGameIsOver() || game.executingRollback()) {
++                    return false;
++                }
++                declared.add(player.getId());
++                if (!before.equals(game.getCombat().getBlockersAndAttackers())) {
++                    // the team's block changed: its other human players see it again
++                    for (Player teammate : team) {
++                        if (teammate != player && teammate.isHuman()) {
++                            declared.remove(teammate.getId());
++                        }
++                    }
++                }
++            }
++            if (declared.size() < team.size()) {
++                continue;
++            }
++            Player redeclaring = null;
++            for (Player player : team) {
++                if (!game.getCombat().checkBlockRestrictions(player, game)
++                        || !game.getCombat().checkBlockRequirementsAfter(player, player, game)) {
++                    redeclaring = player;
++                    break;
++                }
++            }
++            if (redeclaring == null) {
++                redeclaring = game.getCombat().checkTeamBlockRestrictionsAfter(game);
++            }
++            if (redeclaring == null) {
++                return true;
++            }
++            if (!redeclaring.isHuman() && ++aiTries > 20) {
++                game.informPlayers(redeclaring.getLogName() + ": WARNING - AI can't find good blocker combination and will skip it - report your battlefield to github - " + game.getCombat());
++                return true;
++            }
++            // the checks may have removed blockers: the player who must fix the block declares
++            // again, and the team's human players see the block again
++            declared.remove(redeclaring.getId());
++            for (Player teammate : team) {
++                if (teammate.isHuman()) {
++                    declared.remove(teammate.getId());
++                }
++            }
++        }
++    }
++
++    /** The blocking creatures and the attackers each blocks, to tell whether a declaration changed the block. */
++    protected Map<UUID, Set<UUID>> getBlockersAndAttackers() {
++        Map<UUID, Set<UUID>> blocks = new HashMap<>();
++        for (CombatGroup group : groups) {
++            for (UUID blockerId : group.getBlockers()) {
++                blocks.computeIfAbsent(blockerId, x -> new HashSet<>()).addAll(group.getAttackers());
++            }
++        }
++        return blocks;
++    }
++
++    /**
++     * checkBlockRestrictionsAfter for a team's combined block (805.10d): each blocking creature's
++     * controller, not one defending player, answers for it. A computer player's blockers that break
++     * a restriction are removed; for a human player's, the player is told and returned to declare
++     * again.
++     *
++     * @return the human player who must declare again, or null when the block is legal
++     */
++    protected Player checkTeamBlockRestrictionsAfter(Game game) {
++        for (UUID blockingCreatureId : new ArrayList<>(this.getBlockers())) {
++            Permanent blockingCreature = game.getPermanent(blockingCreatureId);
++            if (blockingCreature == null) {
++                continue;
++            }
++            for (Map.Entry<RestrictionEffect, Set<Ability>> entry : game.getContinuousEffects().getApplicableRestrictionEffects(blockingCreature, game).entrySet()) {
++                for (Ability ability : entry.getValue()) {
++                    if (!entry.getKey().canBlockCheckAfter(ability, game, true)) {
++                        Player controller = game.getPlayer(blockingCreature.getControllerId());
++                        if (controller != null && controller.isHuman()) {
++                            controller.resetPlayerPassedActions();
++                            game.informPlayer(controller, blockingCreature.getLogName() + " can't block this way.");
++                            return controller;
++                        }
++                        removeBlocker(blockingCreatureId, game);
++                    }
++                }
++            }
++        }
++        for (UUID attackingCreatureId : this.getAttackers()) {
++            Permanent attackingCreature = game.getPermanent(attackingCreatureId);
++            if (attackingCreature == null) {
++                continue;
++            }
++            for (Map.Entry<RestrictionEffect, Set<Ability>> entry : game.getContinuousEffects().getApplicableRestrictionEffects(attackingCreature, game).entrySet()) {
++                for (Ability ability : entry.getValue()) {
++                    if (entry.getKey().canBeBlockedCheckAfter(attackingCreature, ability, game, true)) {
++                        continue;
++                    }
++                    for (CombatGroup combatGroup : this.getGroups()) {
++                        if (!combatGroup.getAttackers().contains(attackingCreatureId)) {
++                            continue;
++                        }
++                        for (UUID blockerId : new ArrayList<>(combatGroup.getBlockers())) {
++                            Permanent blocker = game.getPermanent(blockerId);
++                            Player controller = blocker == null ? null : game.getPlayer(blocker.getControllerId());
++                            if (controller != null && controller.isHuman()) {
++                                controller.resetPlayerPassedActions();
++                                game.informPlayer(controller, attackingCreature.getLogName() + " can't be blocked this way.");
++                                return controller;
++                            }
++                        }
++                        for (UUID blockerId : new ArrayList<>(combatGroup.getBlockers())) {
++                            removeBlocker(blockerId, game);
++                        }
++                    }
++                }
++            }
++        }
++        return null;
++    }
++
+     private void makeSureItsNotComputer(Player controller) {
+         if (controller.isComputer() || !controller.isHuman()) {
+             // TODO: wtf, AI will freeze forever here in games with attacker/blocker restrictions,
+diff --git a/Mage/src/main/java/mage/game/mulligan/Mulligan.java b/Mage/src/main/java/mage/game/mulligan/Mulligan.java
+--- a/Mage/src/main/java/mage/game/mulligan/Mulligan.java
++++ b/Mage/src/main/java/mage/game/mulligan/Mulligan.java
+@@ -40,7 +40,8 @@
+         List<UUID> mulliganPlayers = new ArrayList<>();
+         do {
+             mulliganPlayers.clear();
+-            for (UUID playerId : game.getState().getPlayerList(game.getStartingPlayerId())) {
++            // 805.3a: the starting team's players first, then each other team's in turn order
++            for (UUID playerId : game.inTeamOrder(game.getState().getPlayerList(game.getStartingPlayerId()))) {
+                 if (!keepPlayers.contains(playerId)) {
+                     Player player = game.getPlayer(playerId);
+                     boolean keep = true;

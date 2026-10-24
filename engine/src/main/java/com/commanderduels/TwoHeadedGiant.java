@@ -31,7 +31,9 @@ import mage.players.Player;
  * draw step of its first turn (810.6), team poison counted against 15 (810.8d, 810.10), and teams
  * winning and losing together, a concession included (810.8a, 810.8b). Players attack any opponent
  * (805.10b) and see the whole table. The first mulligan is free, as in every multiplayer game
- * (103.5c).
+ * (103.5c). Since v0.6.1 (patch 0007) a team has priority, orders its triggered abilities and
+ * declares its attack and its block together (805.5 to 805.7, 805.10b, 805.10d), and this game
+ * type names who decides a choice the team makes together (805.2, {@link #getTeamChooser}).
  */
 final class TwoHeadedGiant extends GameImpl {
     private static final long serialVersionUID = 1L;
@@ -89,6 +91,25 @@ final class TwoHeadedGiant extends GameImpl {
     @Override
     public Set<UUID> getTeammates(UUID playerId) {
         return teammates.getOrDefault(playerId, Set.of());
+    }
+
+    /**
+     * 805.2: who makes a choice the team makes together, such as the order of its triggered
+     * abilities (805.7). The team's primary player is the first of its players in turn order: turns
+     * pass to the left (101.4), so that player sits on the right of the team. A bot defers to a
+     * human teammate, so a human on the team makes the choice: the primary player if human, else
+     * the human teammate; between two bots, the primary player. A player who has left the game
+     * makes none.
+     */
+    @Override
+    public UUID getTeamChooser(UUID playerId) {
+        List<UUID> team = teams.stream().filter(players -> players.contains(playerId)).findFirst()
+            .orElse(List.of(playerId));
+        List<Player> playing = team.stream().map(this::getPlayer)
+            .filter(player -> player != null && player.isInGame()).toList();
+        return playing.stream().filter(Player::isHuman).findFirst()
+            .or(() -> playing.stream().findFirst())
+            .map(Player::getId).orElse(playerId);
     }
 
     @Override

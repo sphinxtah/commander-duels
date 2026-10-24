@@ -165,11 +165,12 @@ const formatNames: Record<GameSummary["format"], string> = {
   two_headed_giant: "Two-Headed Giant",
 };
 
-/** What each format's choice says: the bots and life, and an early format's mark (v0.5.0). */
+/** What each format's choice says: the bots and life (Two-Headed Giant marked early from v0.5.0
+ * until v0.6.1). */
 const formatLines: Record<Request["format"], string> = {
   legacy: "One bot, 20 life",
   commander: "One to three bots, 40 life",
-  two_headed_giant: "Early · a bot teammate against two bots, 30 life a team",
+  two_headed_giant: "A bot teammate against two bots, 30 life a team",
 };
 
 /** The format a game's decks are built for: Two-Headed Giant plays Legacy decks (v0.5.0). */

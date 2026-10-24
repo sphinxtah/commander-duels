@@ -15,6 +15,7 @@ import {
   optionText,
   playerName,
   primaryOption,
+  teamNote,
   words,
 } from "./model";
 import { duelsLabel } from "./table/diamonds";
@@ -298,6 +299,12 @@ export function PromptPanel({
   const forName =
     forSeat === null ? null : playerName(view, forSeat, game.observing);
   const controller = controllerOf(view, view?.seat ?? null);
+  // Two-Headed Giant (v0.6.1): the prompt's part in the team's decision.
+  const team = teamNote(
+    prompt,
+    forName ??
+      (game.observing ? playerName(view, view?.seat ?? null, true) : null),
+  );
 
   // Stopping the timer takes its button away: focus that was on it goes to the first diamond.
   const onStop = useRef(false);
@@ -423,6 +430,11 @@ export function PromptPanel({
         <p className={styles.promptMessage} id="prompt-message">
           {prompt.message}
         </p>
+        {team && (
+          <p className={styles.promptDetail} data-team-note>
+            {team}
+          </p>
+        )}
         {prompt.detail && (
           <p className={styles.promptDetail}>{prompt.detail}</p>
         )}

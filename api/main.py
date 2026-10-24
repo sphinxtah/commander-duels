@@ -309,9 +309,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 description="Two players. Deep card history. Your next decisive play.",
                 available=True,
             ),
-            # Early (v0.5.0), on a patched XMage: at the practice table, and since v0.5.1 at human
-            # tables and in the public queue (alone or with a friend), with the card audit done;
-            # team priority (805.5-805.7) and 17 rare cards are not done yet.
+            # On a patched XMage: at the practice table since v0.5.0, and since v0.5.1 at human
+            # tables and in the public queue (alone or with a friend). Early until v0.6.1, which
+            # gave teams their priority and choices (805.5-805.7) and one combined attack and
+            # block (805.10b, 805.10d); 17 rare cards still play wrong (the card audit).
             Format(
                 id="two_headed_giant",
                 name="Two-Headed Giant",
@@ -319,7 +320,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 default_seats=4,
                 description="Two teams of two. Plan together and share the victory.",
                 available=True,
-                early=True,
             ),
         ]
 

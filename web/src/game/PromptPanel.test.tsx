@@ -569,3 +569,28 @@ describe("turn control (rule 723, v0.5.1)", () => {
     );
   });
 });
+
+describe("Two-Headed Giant's team decisions (rules 805.5 to 805.7, v0.6.1)", () => {
+  it("says on a priority prompt whether a pass passes for the team", () => {
+    const passed = { ...priority("p"), team: { teammate_passed: true } };
+    const { unmount } = render(<Panel game={state(snapshot(5, passed))} />);
+    expect(
+      screen.getByText(
+        "Your teammate has passed: a pass now passes for your team, and the other team gets priority.",
+      ),
+    ).toBeInTheDocument();
+    unmount();
+    const holding = { ...priority("q"), team: { teammate_passed: false } };
+    render(<Panel game={state(snapshot(6, holding))} />);
+    expect(
+      screen.getByText(
+        "Your team has priority: after a pass, your teammate may still act before the other team.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("adds nothing to prompts outside team games", () => {
+    render(<Panel game={state(snapshot(5, priority("p")))} />);
+    expect(document.querySelector("[data-team-note]")).toBeNull();
+  });
+});
