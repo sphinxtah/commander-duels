@@ -2,7 +2,10 @@
 
 - game_tables: a table's format may be two_headed_giant, and bot_seats names the seats its bots
   fill when they are not the last ones (a bot may sit in either team). Null for every table
-  already there: their bots fill the last seats, as before.
+  already there: their bots fill the last seats, as before. kept_teams names the players who stay
+  on a team at the table, because cards their deck shares with a teammate's were named there.
+- table_seats: deck_revision_id, the revision of its deck a seat is bound to, checked against the
+  player's library; a team's decks are compared by it. Null for every seat already there.
 - queue_entries: a place's format may be two_headed_giant; two friends wait as a team, the one
   who invites is inviting until the other accepts (status inviting), and partner_id names the
   friend (each of the two rows names the other once they wait together).
@@ -44,8 +47,18 @@ KINDS = (
 def upgrade() -> None:
     with op.batch_alter_table("game_tables") as tables:
         tables.add_column(sa.Column("bot_seats", JSON))
+        tables.add_column(sa.Column("kept_teams", JSON))
         tables.drop_constraint("ck_game_tables_format", type_="check")
         tables.create_check_constraint("ck_game_tables_format", FORMATS)
+    with op.batch_alter_table("table_seats") as seats:
+        seats.add_column(
+            sa.Column(
+                "deck_revision_id",
+                sa.Uuid(),
+                sa.ForeignKey("deck_revisions.id", name="fk_table_seats_deck_revision_id"),
+            )
+        )
+        seats.create_index("ix_table_seats_deck_revision_id", ["deck_revision_id"])
     with op.batch_alter_table("queue_entries") as entries:
         entries.add_column(
             sa.Column(
@@ -84,7 +97,11 @@ def downgrade() -> None:
     op.execute(f"DELETE FROM table_seats WHERE table_id IN ({unstarted})")
     op.execute("DELETE FROM game_tables WHERE format = 'two_headed_giant' AND game_id IS NULL")
     op.execute("UPDATE game_tables SET format = 'legacy' WHERE format = 'two_headed_giant'")
+    with op.batch_alter_table("table_seats") as seats:
+        seats.drop_index("ix_table_seats_deck_revision_id")
+        seats.drop_column("deck_revision_id")
     with op.batch_alter_table("game_tables") as tables:
         tables.drop_constraint("ck_game_tables_format", type_="check")
         tables.create_check_constraint("ck_game_tables_format", FORMATS_BEFORE)
+        tables.drop_column("kept_teams")
         tables.drop_column("bot_seats")

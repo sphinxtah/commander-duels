@@ -314,6 +314,9 @@ class GameTable(Base):
     # Made by the public queue (v0.5.0, api/queues.py), or a rematch of such a table: started at
     # once, never in the lobby, casual. Its players go back to the queue, not the lobby.
     queued: Mapped[bool] = mapped_column(default=False)
+    # Two-Headed Giant (v0.5.1): the players who stay on a team at this table until it closes, by
+    # user id, because cards their deck shares with a teammate's were named here. Null for none.
+    kept_teams: Mapped[dict[str, int] | None] = mapped_column(JsonType)
 
 
 class TableSeat(Base):
@@ -326,6 +329,13 @@ class TableSeat(Base):
     seat: Mapped[int]
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     deck_id: Mapped[UUID] = mapped_column(ForeignKey("decks.id"))
+    # The revision of the deck the seat is bound to (v0.5.1), checked against the player's library
+    # as they chose it, got ready or the game started: what a Two-Headed Giant team's decks are
+    # compared by, never a draft. Null for the seats the queue and rematches make, started at
+    # once, and for those from before v0.5.1.
+    deck_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("deck_revisions.id"), index=True
+    )
     ready: Mapped[bool] = mapped_column(default=False)
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
 

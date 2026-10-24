@@ -12,7 +12,8 @@ games refer to it, and their records stay whole. What identifies the person goes
   notes; its deck stays only as the row the revision belongs to, emptied, private and in the
   trash. The game seats that played it name it "Deleted deck".
 - **Tables.** The account leaves every table still open, as leaving does: a host's table closes.
-  Since v0.5.0 it leaves its public queue too, and its last wait is forgotten.
+  Since v0.5.0 it leaves its public queue too, and its last wait is forgotten. Since v0.5.1 a
+  started table's seat lets go of the revision it was bound to when no game played it.
 - **Each feature's own rows**, removed by the functions in CLEANUPS.
 
 Wins, tokens, packs, the library, game results and the audit trail stay: they are no contact
@@ -180,6 +181,13 @@ def remove_decks(db: Session, user_id: UUID, now: datetime, removed: Removed) ->
     played = select(GameSeat.deck_revision_id).where(GameSeat.deck_revision_id.is_not(None))
     unplayed = revisions.where(DeckRevision.id.not_in(played))
     quiet = {"synchronize_session": False}
+    # A seat a table still keeps (a started table's) lets go of a revision no game played (v0.5.1).
+    db.execute(
+        update(TableSeat)
+        .where(TableSeat.deck_revision_id.in_(unplayed))
+        .values(deck_revision_id=None),
+        execution_options=quiet,
+    )
     db.execute(
         delete(DeckEntryRow).where(DeckEntryRow.revision_id.in_(unplayed)),
         execution_options=quiet,

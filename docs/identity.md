@@ -272,7 +272,7 @@ Decided by the owner at the start of v0.4.1 ([the plan](plans/0.4.1.md#decisions
 - **Roles.** Every grant.
 - **The profile.** The handle, which anyone may then take; the name, which becomes "Deleted player"; the avatar, the locale, the accessibility settings, the alliance and the time last seen.
 - **Decks.** Every deck, revision and entry that no game played. A revision a game played stays, with its cards as the game played them (DECK01), and loses its title and notes. Its deck stays only as the row that revision belongs to: emptied, private and in the trash. The game's seats that played it name it "Deleted deck". Share links stop working.
-- **Tables.** The account leaves every open table, as leaving does: a table it hosts closes for everyone.
+- **Tables.** The account leaves every open table, as leaving does: a table it hosts closes for everyone. Since v0.5.1 a table's seat records the deck revision it is bound to ([Two-Headed Giant](tables.md#two-headed-giant-v051)); a started table keeps its seats, and one bound to a revision no game played lets go of it, as that revision goes.
 - **Bug reports** (v0.4.1) and their screenshots. Each feature that keeps rows of its own about an account removes them in the same transaction, through `CLEANUPS` in `api/accounts.py`.
 
 **What is kept, and why.**

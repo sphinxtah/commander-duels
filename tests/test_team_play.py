@@ -1,9 +1,10 @@
 """Two-Headed Giant with players (v0.5.1) through the API, against the human tables' fake engine
 taught that a concession is the team's (810.8b): tables with teams (choosing a team, readiness and
-Unified Deck Construction by team, bots in either team, the start), both winners counted and paid
-once whatever replays, the fixed team channel that the other team never reads, the queue whose
-teams form alone or with a friend (pairing, invitations, a team never split, bots after a minute),
-a rematch that keeps the teams, and the migration going back."""
+Unified Deck Construction by team on bound decks, named cards keeping a team, bots in either team,
+the start), both winners counted and paid once whatever replays, the fixed team channel that the
+other team never reads, the queue whose teams form alone or with a friend (pairing, invitations, a
+team never split, bots after a minute), a rematch that keeps the teams, and the migration going
+back."""
 
 import json
 import os
@@ -434,6 +435,137 @@ def test_the_start_checks_each_team_again(client, engine):
     assert "Lightning Bolt" in again.json()["message"]
 
 
+def seat(account: Account, code: str, **change: Any) -> httpx.Response:
+    return account.send("PATCH", f"/api/v1/tables/{code}/seat", change)
+
+
+def kept(response: httpx.Response) -> bool:
+    return (response.status_code, response.json()["code"]) == (409, "team_locked")
+
+
+def test_cards_named_at_ready_keep_both_players_on_that_team(client, engine):
+    """A player on the other team moves beside Ada and gets ready in one request: the move stands
+    with the refusal that names Ada's cards, and from then on neither may leave that team at the
+    table, by moving or by sitting down again (v0.5.1)."""
+    hal, ada, eve = (Account(client, n, admin=True) for n in ("hal", "ada", "eve"))
+    code = team_table(hal, deck(hal, client))["code"]
+    assert sit(ada, code, bolts(ada, client), team=1).json()["your_seat"] == 2
+    assert ready(ada, code).status_code == 200
+    assert sit(eve, code, bolts(eve, client, "Eve's bolts"), team=0).json()["your_seat"] == 1
+
+    probe = seat(eve, code, team=1, ready=True)
+    assert (probe.status_code, probe.json()["code"]) == (422, "team_decks")
+    assert "Your deck and ada's share Lightning Bolt" in probe.json()["message"]
+    # Ada sees her new teammate, and is not ready again: nothing about the request was undone.
+    players = ada.get(f"/api/v1/tables/{code}").json()["players"]
+    assert [(p["handle"], p["ready"]) for p in players] == [
+        ("hal", True),
+        (None, False),
+        ("ada", False),
+        ("eve", False),
+    ]
+    assert kept(seat(eve, code, team=0))
+    assert kept(seat(ada, code, team=0))
+    # Sitting down again puts Eve back in Ada's team, never in the other one.
+    eve.send("POST", f"/api/v1/tables/{code}/leave")
+    assert kept(sit(eve, code, deck(eve, client), team=0))
+    # A player nothing was named to moves freely; while Ada's team is full, Eve may not sit at all.
+    cara = Account(client, "cara", admin=True)
+    assert sit(cara, code, deck(cara, client)).json()["your_seat"] == 1
+    assert seat(cara, code, team=1).json()["your_seat"] == 3
+    assert kept(sit(eve, code, deck(eve, client)))
+    assert seat(cara, code, team=0).json()["your_seat"] == 1
+    assert sit(eve, code, deck(eve, client)).json()["your_seat"] == 3
+
+
+def test_sysop_is_never_kept_on_a_team(client, engine):
+    """SysOp, who may read every deck anyway, is never kept on a team: not when told a teammate's
+    cards, nor when SysOp's own are named to a player, who is (v0.5.1)."""
+    hal, ada = Account(client, "hal", admin=True), Account(client, "ada", admin=True)
+    root = Account(client, "sysop", kind="sysop")
+    code = team_table(hal, deck(hal, client))["code"]
+    assert sit(root, code, bolts(root, client), team=1).json()["your_seat"] == 2
+    assert sit(ada, code, bolts(ada, client), team=1).json()["your_seat"] == 3
+    told = ready(ada, code)
+    assert "Your deck and sysop's share Lightning Bolt" in told.json()["message"]
+    assert "Your deck and ada's share Lightning Bolt" in ready(root, code).json()["message"]
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        table = db.scalar(select(GameTable).where(GameTable.code == code))
+        assert table is not None and table.kept_teams == {str(ada.id): 1}
+    assert seat(root, code, team=0).json()["your_seat"] == 1
+    assert kept(seat(ada, code, team=0))
+
+
+def test_a_host_told_at_the_start_stays_on_the_team(client, engine):
+    """The host is told the cards their teammate's deck shares with theirs at the start: the two
+    stay on that team at the table (v0.5.1)."""
+    hal, cara, bob, dan = (Account(client, n, admin=True) for n in ("hal", "cara", "bob", "dan"))
+    hal_deck, cara_deck = deck(hal, client), deck(cara, client, title="Cara's")
+    code = team_table(hal, hal_deck)["code"]
+    for account, deck_id in ((cara, cara_deck), (bob, deck(bob, client)), (dan, deck(dan, client))):
+        sit(account, code, deck_id)
+        assert ready(account, code).status_code == 200
+    entries = [
+        {"card_id": card(client, "Lightning Bolt"), "quantity": 4, "location": "main"},
+        {"card_id": card(client, "Mountain"), "quantity": 56, "location": "main"},
+    ]
+    for account, deck_id in ((hal, hal_deck), (cara, cara_deck)):
+        saved = account.send(
+            "PUT", f"/api/v1/decks/{deck_id}/draft", {"version": 1, "entries": entries}
+        )
+        assert saved.status_code == 200, saved.text
+    refused = hal.send("POST", f"/api/v1/tables/{code}/start")
+    assert (refused.status_code, refused.json()["code"]) == (409, "team_decks")
+    assert "Your deck and cara's share Lightning Bolt" in refused.json()["message"]
+    bob.send("POST", f"/api/v1/tables/{code}/leave")
+    assert kept(seat(hal, code, team=1))
+    assert kept(seat(cara, code, team=1))
+    assert seat(dan, code, team=0).json()["code"] == "team_full"
+
+
+def test_a_ready_check_compares_bound_decks_never_drafts(client, engine):
+    """The ready check compares the deck each seat is bound to, checked against its player's
+    library (v0.5.1): a draft of cards the player does not own is refused as their own deck's
+    problem, naming nothing of the teammate's, and a teammate's draft edited since they sat down
+    is not read."""
+    ada, mia = Account(client, "ada", admin=True), Account(client, "mia")
+    code = team_table(ada, bolts(ada, client))["code"]
+    mia_deck = deck(mia, client, title="Mia's")
+    assert sit(mia, code, mia_deck).json()["your_seat"] == 1
+    # Mia's library holds basic lands only: her draft of Bolts is saved, and is no deck she owns.
+    probing = [
+        {"card_id": card(client, "Lightning Bolt"), "quantity": 4, "location": "main"},
+        {"card_id": card(client, "Mountain"), "quantity": 56, "location": "main"},
+    ]
+    saved = mia.send("PUT", f"/api/v1/decks/{mia_deck}/draft", {"version": 1, "entries": probing})
+    assert saved.status_code == 200, saved.text
+    probe = ready(mia, code)
+    assert (probe.status_code, probe.json()["code"]) == (422, "deck_not_playable")
+    assert "Lightning Bolt" not in probe.json()["message"]
+    assert "ada" not in probe.json()["message"]
+    # A refusal that names nothing undoes the whole request, a move in it included.
+    moving = seat(mia, code, team=1, ready=True)
+    assert (moving.status_code, moving.json()["code"]) == (422, "deck_not_playable")
+    assert mia.get(f"/api/v1/tables/{code}").json()["your_seat"] == 1
+    # Nothing was named, so Mia may change team.
+    assert seat(mia, code, team=1).json()["your_seat"] == 2
+
+    # Bob sits in the other team with basic lands, then puts Bolts in his deck's draft: Dan's Bolts
+    # are compared with the deck Bob sat down with.
+    bob, dan = Account(client, "bob", admin=True), Account(client, "dan", admin=True)
+    mia.send("POST", f"/api/v1/tables/{code}/leave")
+    bob_deck = deck(bob, client, title="Bob's")
+    assert sit(bob, code, bob_deck, team=1).json()["your_seat"] == 2
+    saved = bob.send("PUT", f"/api/v1/decks/{bob_deck}/draft", {"version": 1, "entries": probing})
+    assert saved.status_code == 200, saved.text
+    assert sit(dan, code, bolts(dan, client, "Dan's bolts"), team=1).json()["your_seat"] == 3
+    assert ready(dan, code).json()["players"][3]["ready"] is True
+    # Bob getting ready binds his deck as it now stands, and is told.
+    told = ready(bob, code)
+    assert (told.status_code, told.json()["code"]) == (422, "team_decks")
+    assert "Your deck and dan's share Lightning Bolt" in told.json()["message"]
+
+
 def test_two_headed_giants_own_banned_card():
     """MTR 9.5 bans Erayo, Soratami Ascendant in Two-Headed Giant Constructed: a table refusing
     banned cards refuses it, unless the deck is SysOp's."""
@@ -732,21 +864,48 @@ def test_the_migration_goes_back(tmp_path, monkeypatch):
             ),
             {"id": game.hex, "user": user.hex},
         )
+        table_ids = {"started-table": uuid.uuid4(), "open-table-1": uuid.uuid4()}
         for code, started in (("started-table", game.hex), ("open-table-1", None)):
             connection.execute(
                 text(
                     "INSERT INTO game_tables (id, code, host_id, format, visibility, seats, bots, "
                     "bot_seats, bot_skill, turn_cap, allow_banned, allow_not_legal, best_of, "
-                    "status, game_id, created_at, queued) VALUES (:id, :code, :user, "
+                    "status, game_id, created_at, queued, kept_teams) VALUES (:id, :code, :user, "
                     "'two_headed_giant', 'public', 4, 1, '[1]', 4, 60, 1, 1, 1, :status, :game, "
-                    "CURRENT_TIMESTAMP, 0)"
+                    "CURRENT_TIMESTAMP, 0, :kept)"
                 ),
                 {
-                    "id": uuid.uuid4().hex,
+                    "id": table_ids[code].hex,
                     "code": code,
                     "user": user.hex,
                     "status": "started" if started else "open",
                     "game": started,
+                    "kept": json.dumps({str(user): 0}),
+                },
+            )
+        # Each table's seat is bound to a revision of the deck (v0.5.1).
+        revision = uuid.uuid4()
+        connection.execute(
+            text(
+                "INSERT INTO deck_revisions (id, deck_id, number, format, title, notes, "
+                "content_hash, legal, playable, created_at) VALUES (:id, :deck, 1, 'legacy', "
+                "'Burn', '', 'x', 1, 1, CURRENT_TIMESTAMP)"
+            ),
+            {"id": revision.hex, "deck": deck_id.hex},
+        )
+        for table_id in table_ids.values():
+            connection.execute(
+                text(
+                    "INSERT INTO table_seats (id, table_id, seat, user_id, deck_id, "
+                    "deck_revision_id, ready, joined_at) VALUES (:id, :table, 0, :user, :deck, "
+                    ":revision, 1, CURRENT_TIMESTAMP)"
+                ),
+                {
+                    "id": uuid.uuid4().hex,
+                    "table": table_id.hex,
+                    "user": user.hex,
+                    "deck": deck_id.hex,
+                    "revision": revision.hex,
                 },
             )
         connection.execute(
@@ -772,6 +931,11 @@ def test_the_migration_goes_back(tmp_path, monkeypatch):
         found = connection.execute(text("SELECT code, format FROM game_tables")).all()
         assert found == [("started-table", "legacy")]
         assert connection.execute(text("SELECT format FROM games")).scalar() == TEAM
+        # The started table keeps its seat, without the revision it was bound to; the columns go.
+        seats = connection.execute(text("SELECT * FROM table_seats")).mappings().all()
+        assert len(seats) == 1 and "deck_revision_id" not in seats[0]
+        tables_left = connection.execute(text("SELECT * FROM game_tables")).mappings().all()
+        assert "kept_teams" not in tables_left[0]
     command.upgrade(config, "head")
     engine.dispose()
 
