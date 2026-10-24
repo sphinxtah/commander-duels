@@ -843,6 +843,8 @@ describe("the account", () => {
     window.location.hash = "#profile";
     render(<App />);
     await screen.findByRole("heading", { name: "Welcome back, Alice." });
+    // Profile's Details tab (v0.6.1).
+    fireEvent.click(screen.getByRole("tab", { name: "Details" }));
     const name = screen.getByLabelText("Display name");
     fireEvent.change(name, { target: { value: "Alice the Bold" } });
 
@@ -865,12 +867,15 @@ describe("the account", () => {
     expect(document.activeElement).toBe(signIn);
   });
 
-  it("signing out on Profile moves focus to the sign-in", async () => {
+  it("signing out from the account's menu moves focus to the sign-in (v0.6.1)", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
     on("POST /api/v1/auth/logout", () => reply(204));
     window.location.hash = "#profile";
     render(<App />);
-    const signOut = await screen.findByRole("button", { name: "Sign out" });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Your account: alice" }),
+    );
+    const signOut = screen.getByRole("button", { name: "Sign out" });
     signOut.focus();
     fireEvent.click(signOut);
     expect(await screen.findByText("You signed out.")).toBeInTheDocument();
@@ -895,7 +900,9 @@ describe("the account", () => {
     on("POST /api/v1/auth/logout", () => reply(204));
     window.location.hash = "#profile";
     render(<App />);
-    await screen.findByRole("button", { name: "Sign out" });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Your account: alice" }),
+    );
     act(() => void window.dispatchEvent(new Event("online")));
     await waitFor(() => expect(count("GET /api/v1/me")).toBe(2));
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));

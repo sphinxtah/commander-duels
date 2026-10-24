@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { avatars } from "../Account";
+import { avatars, useSignOut } from "../Account";
 import { canAdminister } from "../Admin";
 import { countsWords } from "../admin/counts";
 import { Portrait } from "../alliance/Portrait";
@@ -45,6 +45,8 @@ export function TopBar({
   counts,
   connection,
   online,
+  onChange,
+  onSignedOut,
 }: {
   me: Me;
   shown: Page;
@@ -53,6 +55,9 @@ export function TopBar({
   counts: AdminCounts | null;
   connection: Connection;
   online: boolean;
+  onChange: (me: Me) => void;
+  /** This browser's session ended; the notice is what the sign-in page then says. */
+  onSignedOut: (notice: string) => void;
 }) {
   return (
     <header className={styles.topbar}>
@@ -104,6 +109,8 @@ export function TopBar({
           counts={counts}
           connection={connection}
           online={online}
+          onChange={onChange}
+          onSignedOut={onSignedOut}
         />
       </div>
     </header>
@@ -112,8 +119,9 @@ export function TopBar({
 
 /**
  * The account's corner: its portrait (its ally's, else its avatar), handle and tier, with the
- * connection's dot, opening a menu of Profile, Settings, Administration and Report a problem.
- * What waits for Administration (v0.4.1) is counted on it.
+ * connection's dot, opening a menu of Profile, Settings, Administration, Report a problem and,
+ * since v0.6.1, Sign out (on Profile before). What waits for Administration (v0.4.1) is counted
+ * on it.
  */
 function AccountMenu({
   me,
@@ -122,6 +130,8 @@ function AccountMenu({
   counts,
   connection,
   online,
+  onChange,
+  onSignedOut,
 }: {
   me: Me;
   shown: Page;
@@ -129,7 +139,10 @@ function AccountMenu({
   counts: AdminCounts | null;
   connection: Connection;
   online: boolean;
+  onChange: (me: Me) => void;
+  onSignedOut: (notice: string) => void;
 }) {
+  const { message, busy, signOut } = useSignOut(me, onChange, onSignedOut);
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -266,6 +279,19 @@ function AccountMenu({
         >
           Report a problem
         </button>
+        {/* aria-disabled, not disabled, as on Profile before: focus stays on it after a refusal. */}
+        <button
+          type="button"
+          aria-disabled={busy}
+          onClick={() => void signOut(false)}
+        >
+          Sign out
+        </button>
+        {message && (
+          <p role="alert" className={styles.menuError}>
+            {message}
+          </p>
+        )}
         <p className={styles.menuNote}>
           <span
             className={styles.statusDot}

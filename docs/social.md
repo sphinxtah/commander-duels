@@ -59,7 +59,7 @@ A block (from the player's profile, after a confirmation) ends any friendship or
 
 ## Privacy settings
 
-On Profile, under "Privacy" (`PrivacySettings.tsx`): who sees whether you are online, idle or in a game (your friends, or every player); appear offline; let players find you by your email address; and the players you blocked. Each change saves at once. `GET` and `PATCH /api/v1/me/privacy`. The [privacy policy](../web/public/pages/privacy.html) says all of this to players.
+On Profile, under "Privacy" (its Privacy tab since v0.6.1; `PrivacySettings.tsx`): who sees whether you are online, idle or in a game (your friends, or every player); appear offline; let players find you by your email address; and the players you blocked. Each change saves at once. `GET` and `PATCH /api/v1/me/privacy`. The [privacy policy](../web/public/pages/privacy.html) says all of this to players.
 
 ## Deleting an account
 

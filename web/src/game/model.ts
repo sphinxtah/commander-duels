@@ -272,7 +272,10 @@ function optionWords(
  * the asked player's team, in words; null outside team games and for prompts that are a player's
  * own. `who` names the asked player when it is not the viewer (SysOp observing a seat, or a seat
  * controlling that player's turn); null for the viewer. */
-export function teamNote(prompt: Prompt | null, who: string | null): string | null {
+export function teamNote(
+  prompt: Prompt | null,
+  who: string | null,
+): string | null {
   const team = prompt?.team;
   if (!prompt || !team) return null;
   const Your = who === null ? "Your" : `${who}’s`;

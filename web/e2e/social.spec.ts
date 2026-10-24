@@ -106,6 +106,7 @@ test.describe("friends in two browsers", () => {
 
       // Appearing offline hides it from everyone but administrators and SysOp.
       await player.goto("/#profile");
+      await player.getByRole("tab", { name: "Privacy" }).click();
       await player.getByRole("checkbox", { name: /Appear offline/ }).check();
       await expect(player.getByText("Privacy settings saved.")).toBeVisible();
       await sysop.reload();

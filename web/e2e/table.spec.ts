@@ -835,9 +835,9 @@ test.describe("turn control at the table (v0.5.1)", () => {
       await expect(
         page.locator('[data-role="teammate-hand"][data-actionable]'),
       ).toHaveCount(2);
-      await expect(hand.getByRole("button", { name: /^Brainstorm/ })).toHaveAccessibleName(
-        /Options: /,
-      );
+      await expect(
+        hand.getByRole("button", { name: /^Brainstorm/ }),
+      ).toHaveAccessibleName(/Options: /);
       if (painter === "dom")
         for (const card of await cards.all())
           await expect(card.locator("img")).toHaveCount(1);
@@ -848,10 +848,14 @@ test.describe("turn control at the table (v0.5.1)", () => {
         column.getByRole("heading", { level: 2, name: /^Priority for bob/ }),
       ).toBeVisible();
       await expect(
-        column.getByText("You make this choice for bob: you control bob’s turn."),
+        column.getByText(
+          "You make this choice for bob: you control bob’s turn.",
+        ),
       ).toBeVisible();
       await page.screenshot({
-        path: testInfo.outputPath(`table-controlling-${painter}-${size.width}.jpg`),
+        path: testInfo.outputPath(
+          `table-controlling-${painter}-${size.width}.jpg`,
+        ),
         quality: 80,
       });
       expect(await occluded(page)).toEqual([]);
@@ -884,7 +888,9 @@ test.describe("turn control at the table (v0.5.1)", () => {
         "Turn 9 · Your turn",
       );
       const after = page.getByRole("article", { name: "bob, seat 2" });
-      await expect(after.getByRole("group", { name: "bob's hand" })).toHaveCount(0);
+      await expect(
+        after.getByRole("group", { name: "bob's hand" }),
+      ).toHaveCount(0);
       await expect(after.getByText("Controlled by you")).toHaveCount(0);
       await expect(page.locator('[data-role="teammate-hand"]')).toHaveCount(0);
       expect(await occluded(page)).toEqual([]);
@@ -905,12 +911,18 @@ test.describe("turn control at the table (v0.5.1)", () => {
     await expect(page.getByText("Controlled by bob")).toBeVisible();
     await expect(
       page
-        .locator("section[data-prompt], section[aria-labelledby='prompt-title']")
+        .locator(
+          "section[data-prompt], section[aria-labelledby='prompt-title']",
+        )
         .first()
         .getByRole("status"),
-    ).toContainText("bob controls your turn and makes your choices while the control lasts.");
+    ).toContainText(
+      "bob controls your turn and makes your choices while the control lasts.",
+    );
     // Her own hand is hers to see, as ever; bob's is not shown to her.
-    await expect(page.getByRole("group", { name: "Your hand" }).getByRole("button")).toHaveCount(3);
+    await expect(
+      page.getByRole("group", { name: "Your hand" }).getByRole("button"),
+    ).toHaveCount(3);
     await expect(page.locator('[data-role="teammate-hand"]')).toHaveCount(0);
     await page.screenshot({
       path: testInfo.outputPath("table-controlled.jpg"),

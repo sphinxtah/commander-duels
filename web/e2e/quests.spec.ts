@@ -46,15 +46,17 @@ test.describe("quests, achievements and the record", () => {
     expect(await quests.getByRole("listitem").allTextContents()).toEqual(names);
     await page.screenshot({ path: testInfo.outputPath("quests.png") });
 
+    // Profile opens on its Achievements tab (v0.6.1); the record and the games are on Record.
     await page.goto("/#profile");
-    await expect(
-      page.getByRole("region", { name: "Your record" }),
-    ).toBeVisible();
     const achievements = page.getByRole("region", { name: "Achievements" });
     await expect(achievements).toContainText(/\d+ of 29 earned\./);
     await expect(
       achievements.getByRole("list", { name: "Commander" }),
     ).toContainText("Commander and Legacy addition");
+    await page.getByRole("tab", { name: "Record" }).click();
+    await expect(
+      page.getByRole("region", { name: "Your record" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Your games" }),
     ).toBeVisible();

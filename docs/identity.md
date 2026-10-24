@@ -137,9 +137,9 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
   - **No late clearing.** A rotated token is never answered with the cookie-clearing header, so a late response cannot erase the new cookie. The exception is when the session it stands for is itself unusable: expired, its account disabled, or a SysOp session used from off its network. The 401 then clears the cookie, as it would for that session's own token.
   - **A bug's 500.** Starlette answers an unhandled exception outside every middleware. The API's handler for it adds what the correlation middleware would: the rotated cookie, the request ID and the usual headers. It also gives the 500 the usual error shape, `internal_error`, with no details. Starlette then re-raises the exception, so the server still logs it.
 - **Ending sessions.**
-  - Sign out ends this session.
-  - *Sign out everywhere* ends all of the account's sessions.
-  - The Profile page lists the active sessions and ends any one of them.
+  - Sign out ends this session. Since v0.6.1 it is in the account's menu at the top right of every page (the owner's request); it was on Profile before.
+  - *Sign out everywhere* ends all of the account's sessions. It stays on Profile, on its Sign-ins tab.
+  - Profile's Sign-ins tab lists the active sessions and ends any one of them.
   - **On the page** (since v0.1.1):
     - The page shows the signed-out screen only when the server confirms. A 401 also counts, because the session had already ended. Any other refusal, or a network failure, shows the error and keeps the account. Since v0.3.0 the signed-out screen is the landing page, which says "You signed out." below its button, at the same address.
     - While a sign-out is pending, further presses of Sign out and Sign out everywhere are ignored: a second request would find the session already ended.
@@ -206,7 +206,7 @@ SysOp copies Kingdom Connect's root account:
 - **Its own entrance.** The browser opens `#sysop`. The API's `/api/v1/sysop/*` routes exist only for clients in `CD_SYSOP_NETWORKS`. Everywhere else they answer exactly like a path that does not exist, and the page looks like any unknown address. They are left out of the published OpenAPI document.
 - **Password.** Argon2id (argon2-cffi's current parameters, rehashed on sign-in when they change), at least 12 characters.
   - It is set only from the server console, never through the interface.
-  - SysOp can change it in the Profile page by giving the current one.
+  - SysOp can change it on the Profile page (its Sign-ins tab, since v0.6.1) by giving the current one.
   - Setting or changing it ends every SysOp session.
 - **Lockout.** Five failed attempts from one address in 15 minutes lock that address out until the window passes.
   - Failed attempts are sign-ins, and wrong current passwords on the Profile page's password change.

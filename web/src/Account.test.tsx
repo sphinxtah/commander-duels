@@ -16,7 +16,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { Account, SignIn, Waiting } from "./Account";
+import { Account, SignIn, useSignOut, Waiting } from "./Account";
 import { SetupWizard } from "./app/SetupWizard";
 import {
   ANSWER_MS,
@@ -96,6 +96,32 @@ function account(overrides: Partial<Me> = {}): Me {
 }
 const google = { google_client_id: "client", signup_policy: "open" } as const;
 
+/** Sign out as the account's menu on the top bar has it (shell/TopBar.tsx, since v0.6.1). */
+function MenuSignOut({
+  me,
+  onChange,
+  onSignedOut,
+}: {
+  me: Me;
+  onChange: (me: Me) => void;
+  onSignedOut: (notice: string) => void;
+}) {
+  const { message, busy, signOut } = useSignOut(me, onChange, onSignedOut);
+  return (
+    <>
+      <button aria-disabled={busy} onClick={() => void signOut(false)}>
+        Sign out
+      </button>
+      {message && <p role="alert">{message}</p>}
+    </>
+  );
+}
+
+/** Opens one of Profile's tabs (v0.6.1). */
+function tab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
 /**
  * The account's screens inside a page that keeps the account it is handed, as App does: the
  * sign-in when signed out, the wait until approval, and Profile once active.
@@ -154,6 +180,7 @@ function Page({
     );
   return (
     <>
+      <MenuSignOut me={me} onChange={change} onSignedOut={signedOut} />
       <Account
         me={me}
         onChange={change}
@@ -233,6 +260,7 @@ describe("signing out", () => {
     on("POST /api/v1/auth/logout-all", () => reply(502));
     const seen = vi.fn();
     render(<Page initial={account()} auth={google} seen={seen} />);
+    tab("Sign-ins");
     fireEvent.click(
       screen.getByRole("button", { name: "Sign out everywhere" }),
     );
@@ -294,6 +322,7 @@ describe("signing out", () => {
     on("GET /api/v1/me", () => reply(200, bob));
     const seen = vi.fn();
     render(<Page initial={account()} auth={google} seen={seen} />);
+    tab("Sign-ins");
     fireEvent.click(
       screen.getByRole("button", { name: "Sign out everywhere" }),
     );
@@ -308,6 +337,7 @@ describe("signing out", () => {
     expect(seen).not.toHaveBeenCalledWith(null);
     expect(count("POST /api/v1/auth/logout-all")).toBe(1);
     // The profile form shows Bob's values, not Alice's.
+    tab("Details");
     expect(screen.getByLabelText("Display name")).toHaveValue("Bob");
   });
 
@@ -316,6 +346,7 @@ describe("signing out", () => {
       reply(401, { code: "not_signed_in", message: "Sign in." }),
     );
     render(<Page initial={account()} auth={google} />);
+    tab("Sign-ins");
     fireEvent.click(
       screen.getByRole("button", { name: "Sign out everywhere" }),
     );
@@ -331,6 +362,7 @@ describe("signing out", () => {
   it("signs out when the server confirms", async () => {
     on("POST /api/v1/auth/logout-all", () => reply(204));
     render(<Page initial={account()} auth={google} />);
+    tab("Sign-ins");
     fireEvent.click(
       screen.getByRole("button", { name: "Sign out everywhere" }),
     );
@@ -369,10 +401,11 @@ describe("signing out", () => {
     );
     on("DELETE /api/v1/me/sessions/{session_id}", () => reply(204));
     render(<Page initial={account()} auth={google} />);
+    tab("Sign-ins");
     const other = await screen.findByRole("button", {
       name: /^End the session in Safari, signed in /,
     });
-    // Only this browser's button is "Sign out".
+    // Only this browser's button is "Sign out" (the account's menu's, since v0.6.1).
     expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
     fireEvent.click(other);
     await waitFor(() =>
@@ -407,6 +440,7 @@ describe("signing out", () => {
     );
     on("DELETE /api/v1/me/sessions/{session_id}", offline, () => reply(204));
     render(<Page initial={account()} auth={google} />);
+    tab("Sign-ins");
     const other = await screen.findByRole("button", {
       name: /^End the session in Safari, signed in /,
     });
@@ -437,6 +471,7 @@ describe("signing out", () => {
       () => second.promise,
     );
     render(<Page initial={account()} auth={google} />);
+    tab("Sign-ins");
     const button = screen.getByRole("button", { name: "Sign out everywhere" });
     // A double click: the second arrives before the page has drawn the first's answer.
     act(() => {
@@ -1077,10 +1112,15 @@ describe("the setup wizard (v0.4.2)", () => {
     ).toHaveAttribute("href", "#play");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("heading", { name: /ready to play/ })).toBeNull();
-    // The profile, now that onboarding is done.
+    // The profile, now that onboarding is done, on its first tab (v0.6.1): Achievements.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Welcome back, Alice.",
     );
+    expect(screen.getByRole("tab", { name: "Achievements" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    tab("Alliance");
     expect(
       screen.getByRole("heading", { name: "Your alliance" }),
     ).toBeInTheDocument();
@@ -1224,6 +1264,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
       ),
     );
     render(<Page initial={account({ alliance: "rowan" })} auth={google} />);
+    tab("Alliance");
     const card = screen.getByRole("region", { name: "Account" });
     expect(
       await within(card).findByRole("img", { name: "Gold tier" }),
@@ -1260,6 +1301,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
   it("keeps the avatar with no alliance, and says when the tier is the highest", async () => {
     on("GET /api/v1/me/progress", () => reply(200, progress({ wins: 100000 })));
     render(<Page initial={account()} auth={google} />);
+    tab("Alliance");
     const card = screen.getByRole("region", { name: "Account" });
     expect(
       await within(card).findByRole("img", { name: "Godlike tier" }),
@@ -1298,6 +1340,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     on("GET /api/v1/me", () => reply(200, account({ alliance: "abian" })));
     const seen = vi.fn();
     render(<Page initial={account()} auth={google} seen={seen} />);
+    tab("Alliance");
     const choose = await screen.findByRole("button", {
       name: "Choose an alliance",
     });
@@ -1310,7 +1353,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
       screen
         .getAllByRole("heading", { level: 3 })
         .map((heading) => heading.textContent)
-        // The privacy settings' own (v0.4.3), further down the page.
+        // The privacy settings' own (v0.4.3), on a tab of their own since v0.6.1.
         .filter((text) => text !== "Blocked players"),
     ).toEqual([
       "BronzeOpen from the start",
@@ -1373,6 +1416,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     on("DELETE /api/v1/me/alliance", () => reply(200, progress()));
     on("GET /api/v1/me", () => reply(200, account()));
     render(<Page initial={account({ alliance: "rowan" })} auth={google} />);
+    tab("Alliance");
     fireEvent.click(
       await screen.findByRole("button", {
         name: "Leave the alliance with Rowan",
@@ -1400,6 +1444,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
     );
     const seen = vi.fn();
     render(<Page initial={account()} auth={google} seen={seen} />);
+    tab("Alliance");
     fireEvent.click(
       await screen.findByRole("button", { name: "Choose an alliance" }),
     );
@@ -1418,6 +1463,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
       () => reply(200, progress()),
     );
     render(<Page initial={account()} auth={google} />);
+    tab("Alliance");
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The application service is unavailable. Try again.",
     );
@@ -1451,6 +1497,7 @@ describe("progress and the alliance on Profile (v0.3.1)", () => {
       reply(200, progress({ wins: 1000, counted_wins: 0, set_wins: 1000 })),
     );
     render(<Page initial={sysop} auth={google} />);
+    tab("Alliance");
     const form = await screen.findByRole("form", { name: "Set your wins" });
     const wins = within(form).getByLabelText("Wins");
     await waitFor(() => expect(wins).toHaveValue(100000));

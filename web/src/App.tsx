@@ -573,6 +573,8 @@ export function App() {
           counts={counts}
           connection={connection}
           online={online}
+          onChange={accountChanged}
+          onSignedOut={signedOut}
         />
         <main
           id="main"

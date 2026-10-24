@@ -327,6 +327,13 @@
   color: var(--cd-faint);
   font-size: 0.68rem;
 }
+/* A sign-out the server refused (v0.6.1): the session is still alive, and the menu says so. */
+.menuError {
+  max-width: 260px;
+  margin: 6px 14px 0;
+  color: #f0a39a;
+  font-size: 0.72rem;
+}
 .visuallyHidden {
   position: absolute;
   width: 1px;

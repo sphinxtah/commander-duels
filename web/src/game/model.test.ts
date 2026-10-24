@@ -180,7 +180,9 @@ describe("Two-Headed Giant (v0.5.0)", () => {
       /^Your team puts its triggered abilities on the stack in one order/,
     );
     expect(teamNote(prompt("yes_no", null), null)).toBeNull();
-    expect(teamNote({ ...prompt("priority", true), team: null }, null)).toBeNull();
+    expect(
+      teamNote({ ...prompt("priority", true), team: null }, null),
+    ).toBeNull();
   });
 
   it("says whose each of a team's triggers is (rule 805.7, v0.6.1)", () => {

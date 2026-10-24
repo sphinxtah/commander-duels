@@ -7,10 +7,15 @@ import { test, expect, type Page } from "@playwright/test";
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const playerSession = process.env.CD_E2E_PLAYER_SESSION;
 
-async function balance(page: Page): Promise<number> {
+/** The account's tokens: its balance, and what the auction house gave or took. The second
+ * account also wins games in other journeys running at once, so the sale is checked on the
+ * auction house's part, which nothing else moves. */
+async function tokens(
+  page: Page,
+): Promise<{ balance: number; auctions: number }> {
   return page.evaluate(async () => {
     const response = await fetch("/api/v1/me/tokens");
-    return ((await response.json()) as { balance: number }).balance;
+    return (await response.json()) as { balance: number; auctions: number };
   });
 }
 
@@ -50,7 +55,7 @@ test.describe("Tivit's Auction House", () => {
       await expect(
         seller.getByRole("heading", { name: "Tivit's Auction House" }),
       ).toBeVisible();
-      const before = await balance(seller);
+      const before = (await tokens(seller)).auctions;
       await seller.getByRole("button", { name: /Sell a card/ }).click();
       const sell = seller.getByRole("dialog", { name: "List on the market" });
       await sell.getByLabel("Find a card you may sell").fill("Plains");
@@ -127,12 +132,15 @@ test.describe("Tivit's Auction House", () => {
       await expect(seller.getByRole("list", { name: "Sold" })).toContainText(
         "Plains",
       );
-      await expect.poll(() => balance(seller)).toBe(before + 60);
-      // The page's poll shows the payment without a reload.
+      await expect
+        .poll(async () => (await tokens(seller)).auctions)
+        .toBe(before + 60);
+      // The page's poll shows the balance without a reload.
+      const paid = (await tokens(seller)).balance;
       await expect(
         seller
           .getByRole("definition")
-          .filter({ hasText: (before + 60).toLocaleString("en-US") }),
+          .filter({ hasText: paid.toLocaleString("en-US") }),
       ).toBeVisible({ timeout: 15000 });
 
       // Administration's log lists the sale.

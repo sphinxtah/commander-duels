@@ -34,6 +34,7 @@ import { TierBadge } from "./alliance/TierBadge";
 import { loadGoogle } from "./google";
 import styles from "./Account.module.css";
 import { PrivacySettings } from "./social/PrivacySettings";
+import { AchievementsPanel } from "./records/AchievementsPanel";
 import { RecordPanels } from "./records/RecordPanels";
 import shell from "./App.module.css";
 
@@ -469,11 +470,12 @@ function ProfileForm({ me, onChange }: { me: Me; onChange: (me: Me) => void }) {
 }
 
 /**
- * Sign out and Sign out everywhere for the account on show, on Profile and on the page an account
- * waits on for approval. The page shows the signed-out screen only once the server confirms: a
+ * Sign out and Sign out everywhere for the account on show: Sign out in the account's menu on the
+ * top bar (since v0.6.1; on Profile before), Sign out everywhere on Profile's Sign-ins tab, and
+ * both on the page an account waits on for approval. The page shows the signed-out screen only once the server confirms: a
  * refused sign-out leaves the session alive, and saying otherwise would be false comfort.
  */
-function useSignOut(
+export function useSignOut(
   me: Me,
   onChange: (me: Me) => void,
   onSignedOut: (notice: string) => void,
@@ -627,13 +629,7 @@ function Sessions({
       {/* aria-disabled, not disabled: a disabled button loses keyboard focus, so after a
           refused sign-out a keyboard user would start again from the top of the page. */}
       <div className={styles.actions}>
-        <button
-          className={shell.primary}
-          aria-disabled={busy}
-          onClick={() => void signOut(false)}
-        >
-          Sign out
-        </button>
+        {/* Sign out is in the account's menu on the top bar (v0.6.1). */}
         <button
           className={styles.secondary}
           aria-disabled={busy}
@@ -863,11 +859,30 @@ export function Waiting({
   );
 }
 
+type ProfileTab =
+  | "achievements"
+  | "alliance"
+  | "record"
+  | "tokens"
+  | "details"
+  | "privacy"
+  | "signins";
+const tabNames: Record<ProfileTab, string> = {
+  achievements: "Achievements",
+  alliance: "Alliance",
+  record: "Record",
+  tokens: "Tokens",
+  details: "Details",
+  privacy: "Privacy",
+  signins: "Sign-ins",
+};
+
 /**
  * The Profile page. App shows it, like every page, only to an active account (v0.3.0). Until the
  * account has its handle and its two starter decks, the setup wizard does that (v0.4.2): here a
- * panel opens it again. Then the page shows the account's progress, its alliance and the
- * alliance picker, the profile form and where the account is signed in.
+ * panel opens it again. Since v0.6.1 the rest is in tabs: Achievements; the Alliance (progress,
+ * the alliance and its picker); the Record; Tokens; Details (the profile form); Privacy; and
+ * Sign-ins (where the account is signed in, Sign out everywhere, SysOp's password).
  */
 export function Account({
   me,
@@ -892,6 +907,19 @@ export function Account({
   const progress = standing.progress;
   // A grant SysOp gives itself here shows in the tokens panel at once.
   const [tokensShown, setTokensShown] = useState(0);
+  const tabs: ProfileTab[] = onboarding(me)
+    ? ["privacy", "signins"]
+    : [
+        "achievements",
+        "alliance",
+        "record",
+        "tokens",
+        "details",
+        "privacy",
+        "signins",
+      ];
+  const [tab, setTab] = useState<ProfileTab>("achievements");
+  const shownTab = tabs.includes(tab) ? tab : tabs[0]!;
   return (
     <>
       <span className={shell.eyebrow}>YOUR ACCOUNT</span>
@@ -933,7 +961,7 @@ export function Account({
           ))}
         </ul>
       </section>
-      {onboarding(me) ? (
+      {onboarding(me) && (
         <section className={styles.panel} aria-labelledby="setup-title">
           <h2 id="setup-title">Set up your game</h2>
           <p className={styles.fine}>
@@ -945,80 +973,122 @@ export function Account({
             Continue setup
           </button>
         </section>
-      ) : (
-        <>
-          {progress ? (
-            <ProgressPanel progress={progress} />
-          ) : (
-            standing.error && (
-              <section className={styles.panel} aria-label="Your progress">
-                <p role="alert" className={styles.error}>
-                  {standing.error}
+      )}
+      {/* The page in tabs (v0.6.1, the owner's request: it scrolled on too long), Achievements
+          first and the Alliance second. Until the setup is done only Privacy and Sign-ins. */}
+      <div className={styles.tabs} role="tablist" aria-label="Profile sections">
+        {tabs.map((item) => (
+          <button
+            key={item}
+            type="button"
+            role="tab"
+            id={`profile-tab-${item}`}
+            aria-selected={shownTab === item}
+            aria-controls="profile-tab-panel"
+            onClick={() => setTab(item)}
+          >
+            {tabNames[item]}
+          </button>
+        ))}
+      </div>
+      <div
+        id="profile-tab-panel"
+        role="tabpanel"
+        aria-labelledby={`profile-tab-${shownTab}`}
+      >
+        {shownTab === "achievements" && <AchievementsPanel />}
+        {shownTab === "alliance" && (
+          <>
+            {progress ? (
+              <ProgressPanel progress={progress} />
+            ) : (
+              standing.error && (
+                <section className={styles.panel} aria-label="Your progress">
+                  <p role="alert" className={styles.error}>
+                    {standing.error}
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.secondary}
+                    onClick={standing.reload}
+                  >
+                    Try again
+                  </button>
+                </section>
+              )
+            )}
+            <AlliancePanel me={me} standing={standing} alliance={alliance} />
+            {/* SysOp sets its own wins here: it is not among the accounts in Administration. */}
+            {me.permissions.includes("progress.manage") && (
+              <section
+                className={styles.panel}
+                aria-labelledby="own-wins-title"
+              >
+                <h2 id="own-wins-title">Set your wins</h2>
+                <p className={styles.fine}>
+                  SysOp may set any account's wins, its own included, to test
+                  the tiers and what they open. A setting is kept apart from the
+                  wins counted from games, and the audit log records it with its
+                  reason.
                 </p>
-                <button
-                  type="button"
-                  className={styles.secondary}
-                  onClick={standing.reload}
-                >
-                  Try again
-                </button>
+                <SetWins
+                  userId={me.id}
+                  subject="your"
+                  wins={progress?.wins}
+                  onSet={(changed) => {
+                    standing.setProgress(changed);
+                    // A new tier opens or closes Planeswalkers: the roster is asked for again.
+                    standing.reload();
+                  }}
+                />
               </section>
-            )
-          )}
-          <TokensPanel refresh={tokensShown} />
-          {/* The record, achievements and games one by one (v0.5.0). */}
-          <RecordPanels />
-          <AlliancePanel me={me} standing={standing} alliance={alliance} />
+            )}
+          </>
+        )}
+        {/* The record and the games one by one (v0.5.0). */}
+        {shownTab === "record" && <RecordPanels />}
+        {shownTab === "tokens" && (
+          <>
+            <TokensPanel refresh={tokensShown} />
+            {/* SysOp gives itself tokens here too, to try Leng's card shop (v0.4.0). */}
+            {me.permissions.includes("economy.manage") && (
+              <section
+                className={styles.panel}
+                aria-labelledby="own-tokens-title"
+              >
+                <h2 id="own-tokens-title">Give yourself tokens</h2>
+                <p className={styles.fine}>
+                  SysOp may give tokens to any account, its own included, or
+                  take them back. A grant is kept apart from the tokens won in
+                  games, and the audit log records it with its reason.
+                </p>
+                <GiveTokens
+                  userId={me.id}
+                  subject="your"
+                  onGiven={() => setTokensShown((value) => value + 1)}
+                />
+              </section>
+            )}
+          </>
+        )}
+        {shownTab === "details" && (
           <section className={styles.panel}>
             <ProfileForm key={me.id} me={me} onChange={onChange} />
           </section>
-        </>
-      )}
-      {/* SysOp sets its own wins here: it is not among the accounts in Administration. */}
-      {me.permissions.includes("progress.manage") && (
-        <section className={styles.panel} aria-labelledby="own-wins-title">
-          <h2 id="own-wins-title">Set your wins</h2>
-          <p className={styles.fine}>
-            SysOp may set any account's wins, its own included, to test the
-            tiers and what they open. A setting is kept apart from the wins
-            counted from games, and the audit log records it with its reason.
-          </p>
-          <SetWins
-            userId={me.id}
-            subject="your"
-            wins={progress?.wins}
-            onSet={(changed) => {
-              standing.setProgress(changed);
-              // A new tier opens or closes Planeswalkers: the roster is asked for again.
-              standing.reload();
-            }}
-          />
-        </section>
-      )}
-      {/* SysOp gives itself tokens here too, to try Leng's card shop (v0.4.0). */}
-      {me.permissions.includes("economy.manage") && (
-        <section className={styles.panel} aria-labelledby="own-tokens-title">
-          <h2 id="own-tokens-title">Give yourself tokens</h2>
-          <p className={styles.fine}>
-            SysOp may give tokens to any account, its own included, or take them
-            back. A grant is kept apart from the tokens won in games, and the
-            audit log records it with its reason.
-          </p>
-          <GiveTokens
-            userId={me.id}
-            subject="your"
-            onGiven={() => setTokensShown((value) => value + 1)}
-          />
-        </section>
-      )}
-      {me.kind === "sysop" && (
-        <section className={styles.panel}>
-          <SysopPassword onChange={onChange} />
-        </section>
-      )}
-      {/* Who sees your presence, appearing offline, being found by email, blocks (v0.4.3). */}
-      <PrivacySettings />
-      <Sessions me={me} onChange={onChange} onSignedOut={onSignedOut} />
+        )}
+        {/* Who sees your presence, appearing offline, being found by email, blocks (v0.4.3). */}
+        {shownTab === "privacy" && <PrivacySettings />}
+        {shownTab === "signins" && (
+          <>
+            <Sessions me={me} onChange={onChange} onSignedOut={onSignedOut} />
+            {me.kind === "sysop" && (
+              <section className={styles.panel}>
+                <SysopPassword onChange={onChange} />
+              </section>
+            )}
+          </>
+        )}
+      </div>
     </>
   );
 }

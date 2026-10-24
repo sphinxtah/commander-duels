@@ -357,6 +357,8 @@ test("SysOp signs in at its entrance under the mark, administers and sees its ow
   await page.getByRole("button", { name: /^Your account/ }).click();
   await page.getByRole("link", { name: "Profile" }).click();
   await expect(page.getByText("Local administrator")).toBeVisible();
+  // Profile's Sign-ins tab (v0.6.1): the sessions and SysOp's password.
+  await page.getByRole("tab", { name: "Sign-ins" }).click();
   await expect(
     page.getByRole("heading", { name: "SysOp password" }),
   ).toBeVisible();
@@ -382,7 +384,9 @@ test("SysOp signs in at its entrance under the mark, administers and sees its ow
     ),
   ).toBe(true);
 
-  // Signing out leaves the app for the landing page, at the same address.
+  // Signing out, from the account's menu since v0.6.1, leaves the app for the landing page, at
+  // the same address.
+  await page.getByRole("button", { name: /^Your account/ }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expectLanding(page);
   await expect(page.getByText("You signed out.")).toBeVisible();

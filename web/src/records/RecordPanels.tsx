@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { client, describe } from "../api";
 import account from "../Account.module.css";
-import { AchievementsPanel } from "./AchievementsPanel";
 import { HistoryList } from "./HistoryList";
 import { RecordTable } from "./RecordTable";
 import type { Stats } from "./records";
 
-// Profile's record (v0.5.0, PROG08): the account's totals, its achievements and its games one by
-// one. Other players see the totals and the badges on the account's player page; the games are
+// Profile's record (v0.5.0, PROG08): the account's totals and its games one by one, on Profile's
+// Record tab; its achievements have a tab of their own since v0.6.1 (AchievementsPanel). Other players see the totals and the badges on the account's player page; the games are
 // the account's own, and SysOp's to read.
 
 export function RecordPanels() {
@@ -44,7 +43,6 @@ export function RecordPanels() {
           and your badges.
         </p>
       </section>
-      <AchievementsPanel />
       <section className={account.panel} aria-labelledby="games-title">
         <h2 id="games-title">Your games</h2>
         <p className={account.fine}>
