@@ -680,13 +680,14 @@ def test_sysop_inspects_observes_and_plays_any_card(
     )
     assert unknown.status_code == 422, unknown.text
     assert unknown.json()["names"] == ["Unknown Card", "Unknown Other"]
-    # A card the game cannot play is refused as one no card is, a token too.
+    # A card out of the game is refused as one no card is, a token too. Since v0.6.2 a card the
+    # engine lacks is in it, as a stand-in, and the list describes it to the engine.
     unplayable = root.post(
         "/api/v1/practice-games",
         {"deck_list": "20 Mountain\n1 Temple of Khonshu\n1 Goblin"},
     )
     assert (unplayable.status_code, unplayable.json()["code"]) == (422, "cards_not_playable")
-    assert unplayable.json()["names"] == ["Temple of Khonshu", "Goblin"]
+    assert unplayable.json()["names"] == ["Goblin"]
     deck = (
         "Commander\n1 Kenrith, the Returned King\n\nDeck\n4x Lightning Bolt (M10) 146\n"
         "36 Mountain\n"

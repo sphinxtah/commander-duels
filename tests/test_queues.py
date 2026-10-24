@@ -369,7 +369,7 @@ def test_bots_fill_the_empty_seats_after_a_minute(client, engine, clock):
         assert game is not None and game.settings is not None
         assert game.settings["format"] == "commander"
         assert game.settings["bots"] == [{"deck": None, "deck_id": None, "deck_list": None}] * 3
-        assert game.settings["rules"] == {"banned": True, "not_legal": True}
+        assert game.settings["rules"] == {"banned": True, "not_legal": True, "stand_in": True}
     assert table_of(client, game_id) is None
 
     # Two players who take bots, after the minute: a table, with bots in the other seats.

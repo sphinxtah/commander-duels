@@ -422,10 +422,10 @@ def test_duplicates_foils_fixed_and_balanced_sheets():
         collations.from_json([{"contents": {"missing": 1}, "weight": 1}], sheets)
 
 
-def test_a_card_the_game_cannot_play_gives_way_to_another_from_its_sheet():
-    """v0.4.5: a pack keeps its size and each slot its sheet, so its rarity odds; the card drawn
-    first is named beside the one given. A sheet holding nothing the game can play (a token's)
-    gives nothing."""
+def test_a_withheld_card_gives_way_to_another_from_its_sheet():
+    """A pack keeps its size and each slot its sheet, so its rarity odds, silently. Since v0.6.2
+    only a card out of the game (a token, here) or out of reach is withheld: the engine's
+    playing a card no longer matters. A sheet holding nothing else (a token's) gives nothing."""
     commons, (rare, gone_rare), token = ids(3), ids(2), uuid4()
     gone = commons[0]
     collation = Collation(
@@ -436,21 +436,19 @@ def test_a_card_the_game_cannot_play_gives_way_to_another_from_its_sheet():
             "token": sheet_of((token, 1)),
         },
     )
-    removed = frozenset({gone, gone_rare, token})
+    withheld = frozenset({gone, gone_rare, token})
     rng = random.Random(20261022)
-    replaced: Counter[UUID] = Counter()
     for _ in range(2_000):
-        _, pulled = collations.draw(collation, rng, removed)
+        _, pulled = collations.draw(collation, rng, withheld)
         assert [card.sheet for card in pulled] == ["common", "common", "rare"]
-        assert not removed & {card.printing_id for card in pulled}
+        assert not withheld & {card.printing_id for card in pulled}
         assert len({card.printing_id for card in pulled[:2]}) == 2
         assert pulled[2].printing_id == rare
-        replaced.update(card.replaced for card in pulled if card.replaced is not None)
-    assert set(replaced) == {gone, gone_rare}
-    # The removed rare was drawn first three times in four, and gave way each time.
-    assert replaced[gone_rare] / 2_000 == pytest.approx(0.75, abs=0.03)
-    # With nothing removed, the draw is as before: no card gives way.
-    assert all(card.replaced is None for card in collations.draw(collation, rng)[1])
+    # With nothing withheld, the draw gives what it drew: the rare drawn three times in four.
+    rares: Counter[UUID] = Counter(
+        collations.draw(collation, rng)[1][2].printing_id for _ in range(2_000)
+    )
+    assert rares[gone_rare] / 2_000 == pytest.approx(0.75, abs=0.03)
 
 
 def test_finishes_follow_the_sheet_and_the_printing():
@@ -967,24 +965,18 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
     cards = opening["cards"]
     assert len(cards) == 15 and opening["collation_revision"] == 1
     assert [card["position"] for card in cards] == list(range(15))
-    # Only cards the game can play (v0.4.5): the test set's Temple of Khonshu, which the engine
-    # lacks, gives way to another card of its sheet whenever it is drawn, and the record names it.
+    # Since v0.6.2 a pack gives the card it drew: the test set's Temple of Khonshu, which the
+    # engine lacks, is dealt as a stand-in, and nothing is replaced.
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
         rows = db.execute(
-            select(PackCard.replaced_printing_id, CardConcept.status)
+            select(PackCard.replaced_printing_id, CardConcept.name, CardConcept.status)
             .join(CardConcept, CardConcept.id == PackCard.concept_id)
             .where(PackCard.opening_id == UUID(opening["id"]))
         ).all()
-        assert {status for _, status in rows} == {"certified"}
-        replaced = [printing for printing, _ in rows if printing is not None]
-        assert len(replaced) == sum(1 for card in cards if card["replaced"])
-        for printing in replaced:
-            gone = db.scalar(
-                select(CardConcept.name)
-                .join(CardPrinting, CardPrinting.concept_id == CardConcept.id)
-                .where(CardPrinting.id == printing)
-            )
-            assert gone == "Temple of Khonshu"
+        assert all(printing is None for printing, _, _ in rows)
+        assert {name for _, name, status in rows if status != "certified"} <= {"Temple of Khonshu"}
+    assert all(card["stand_in"] == (card["name"] == "Temple of Khonshu") for card in cards)
+    assert not any(card["extra"] for card in cards)
     # Revealed commons first, the rarest last, any foil after them.
     order = {"common": 0, "uncommon": 1, "rare": 2, "mythic": 3}
     plain = [order[card["rarity"]] for card in cards if card["finish"] == "nonfoil"]
@@ -1029,6 +1021,95 @@ def test_opening_draws_once_and_grants_the_cards(client, monkeypatch):
     for card in more:
         if card["printing_id"] in before:
             assert not card["new"]
+
+
+def test_packs_opened_before_v062_grant_the_card_they_drew(client):
+    """Migration 0029: a pack card that gave way to another from v0.4.5 to v0.6.1 (recorded in
+    replaced_printing_id) grants the card drawn, in that card's finish, once, keeping the one
+    given; a token drawn first grants nothing; the opening shows both, the card drawn first and
+    the one given marked extra; an opening from before the account's reset counts for nothing."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "stand_ins_migration", Path("api/migrations/versions/0029_stand_ins.py")
+    )
+    assert spec is not None and spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    ada = funded(client, "ada", 1_000)
+    pack = buy(ada, fixture_product(client).id).json()["pack"]
+    opening = ada.send("POST", f"/api/v1/shop/packs/{pack}/open").json()
+    opening_id = UUID(opening["id"])
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        temple = db.scalars(
+            select(CardPrinting)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardConcept.name == "Temple of Khonshu")
+        ).first()
+        token = db.scalars(
+            select(CardPrinting)
+            .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
+            .where(CardConcept.deck_card.is_(False))
+        ).first()
+        given = db.scalars(
+            select(PackCard)
+            .join(CardConcept, CardConcept.id == PackCard.concept_id)
+            .where(PackCard.opening_id == opening_id, CardConcept.status == "certified")
+            .order_by(PackCard.position)
+        ).first()
+        assert given is not None
+        given_name = db.get_one(CardConcept, given.concept_id).name
+        assert temple is not None and token is not None
+        temple_id, token_id = temple.id, token.id
+        # As v0.4.5 recorded them: two more cards given, one in place of Temple of Khonshu, in
+        # foil, and one in place of a token.
+        for position, drawn in ((90, temple_id), (91, token_id)):
+            db.add(
+                PackCard(
+                    opening_id=opening_id,
+                    position=position,
+                    printing_id=given.printing_id,
+                    concept_id=given.concept_id,
+                    finish="foil",
+                    sheet="common",
+                    new=False,
+                    replaced_printing_id=drawn,
+                )
+            )
+        db.commit()
+    with client.app.state.database.begin() as connection:  # type: ignore[attr-defined]
+        assert migration.grant_drawn(connection) == 1
+    with client.app.state.database.begin() as connection:  # type: ignore[attr-defined]
+        assert migration.grant_drawn(connection) == 0
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        drawn = db.scalars(
+            select(LibraryGrant).where(LibraryGrant.grant_key == f"pack-drawn:{opening_id}")
+        ).all()
+        assert [(g.printing_id, g.finish, g.quantity, g.source) for g in drawn] == [
+            (temple_id, "foil", 1, "pack")
+        ]
+    library = {item["card"]["name"]: item for item in ada.get("/api/v1/library").json()["cards"]}
+    assert library["Temple of Khonshu"]["card"]["stand_in"] is True
+    shown = ada.get(f"/api/v1/shop/openings/{opening_id}").json()["cards"]
+    assert [card["position"] for card in shown] == list(range(len(shown)))
+    names = [(card["name"], card["extra"], card["stand_in"]) for card in shown[-3:]]
+    assert names == [
+        ("Temple of Khonshu", False, True),
+        (given_name, True, False),
+        (given_name, False, False),
+    ]
+    history = ada.get("/api/v1/shop/openings").json()
+    assert history[0]["cards"] == len(shown)
+    # After a reset the opening, and the card it drew, no longer count.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        from api.models import User
+
+        db.get_one(User, ada.id).reset_at = utcnow()
+        db.commit()
+    names_after = {item["card"]["name"] for item in ada.get("/api/v1/library").json()["cards"]}
+    assert "Temple of Khonshu" not in names_after
+    assert ada.get("/api/v1/shop/openings").json() == []
 
 
 def test_every_answer_naming_a_product_carries_its_pack_art(client):

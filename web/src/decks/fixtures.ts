@@ -39,6 +39,8 @@ export function card(
     status_reason: null,
     status_detail: null,
     playable: true,
+    stand_in: false,
+    stand_in_note: null,
     text_differs: false,
     legalities: { legacy: "legal", commander: "legal" },
     commander: false,

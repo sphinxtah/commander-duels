@@ -102,7 +102,7 @@ from api.validation import (
     symbol_colors,
     validate_deck,
 )
-from catalog.statuses import playable, unplayable_reason
+from catalog.statuses import in_game, unplayable_reason
 from catalog.text import colors_of, normalize
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -385,9 +385,9 @@ def store_flags(deck: Deck, validation: Validation) -> None:
 
 
 def without_unplayable(db: Session, deck: Deck, entries: list[DeckEntry]) -> list[DeckEntry]:
-    """The entries the game can play. A catalog card it cannot leaves the draft, every location
-    together, and the deck's note names it and why (the newest removal of each card). Custom
-    cards are not the catalog's, and stay."""
+    """The entries in the game (since v0.6.2 the stand-ins too). A catalog card out of it leaves
+    the draft, every location together, and the deck's note names it and why (the newest removal
+    of each card). Custom cards are not the catalog's, and stay."""
     ids = {entry.card_id for entry in entries}
     gone = (
         {
@@ -399,7 +399,7 @@ def without_unplayable(db: Session, deck: Deck, entries: list[DeckEntry]) -> lis
                     CardConcept.status,
                     CardConcept.status_detail,
                     CardConcept.removed_revision,
-                ).where(CardConcept.id.in_(ids), not_(playable()))
+                ).where(CardConcept.id.in_(ids), not_(in_game()))
             )
         }
         if ids
@@ -623,13 +623,14 @@ def refresh_decks(db: Session, user_id: UUID, library: Library) -> None:
 
 
 def withdraw_unplayable(db: Session, roster: dict[str, Planeswalker]) -> int:
-    """Takes every card the game cannot play out of the decks' drafts, the archived and trashed
-    ones too (v0.4.5): after a catalog sync, a staff suspension, and once each time the worker
-    starts, which is each deploy. A deck that loses one notes it, gets a new draft version, so an
-    editor open elsewhere shows the change rather than saving over it, and has its flags refreshed
-    against its owner's library. Revisions keep their cards. Returns how many decks changed."""
+    """Takes every card out of the game (since v0.6.2 a stand-in is in it) out of the decks'
+    drafts, the archived and trashed ones too (v0.4.5): after a catalog sync, a staff suspension,
+    and once each time the worker starts, which is each deploy. A deck that loses one notes it,
+    gets a new draft version, so an editor open elsewhere shows the change rather than saving over
+    it, and has its flags refreshed against its owner's library. Revisions keep their cards.
+    Returns how many decks changed."""
     # Drafts store card IDs as text.
-    unplayable = {str(card) for card in db.scalars(select(CardConcept.id).where(not_(playable())))}
+    unplayable = {str(card) for card in db.scalars(select(CardConcept.id).where(not_(in_game())))}
     holding = [
         deck_id
         for deck_id, draft in db.execute(select(Deck.id, Deck.draft))

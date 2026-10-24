@@ -6,8 +6,9 @@
   unguessable. SysOp sees every table. A table nobody started closes after 3 hours.
 - **Rules** (v0.4.5). The host chooses which cards its decks may hold by their legality in the
   format: banned cards, and cards not legal in it (Un-cards, playtest and digital-only cards).
-  A new table is casual, allowing both; tournament rules allow neither. The format's deck rules
-  always apply. The lobby shows each table's rules.
+  A new table is casual, allowing both; tournament rules allow neither. Since v0.6.2 a third
+  option allows the cards the engine plays as stand-ins, on at a casual table, off under
+  tournament rules. The format's deck rules always apply. The lobby shows each table's rules.
 - **Seats.** A player takes a seat with one of their own decks, checked as at the practice table:
   every copy in their library, no deck that cannot be played, and no card the table's rules do
   not allow (the player is told which). Administrators' whole-catalog decks play too. Players may
@@ -214,7 +215,11 @@ def status_of(table: GameTable) -> str:
 
 
 def rules_of(table: GameTable) -> TableRules:
-    return TableRules(banned=table.allow_banned, not_legal=table.allow_not_legal)
+    return TableRules(
+        banned=table.allow_banned,
+        not_legal=table.allow_not_legal,
+        stand_in=table.allow_stand_in,
+    )
 
 
 def team_bot_seats(bots: int, teammate: bool) -> list[int]:
@@ -527,6 +532,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         turn_cap=body.turn_cap,
         allow_banned=body.rules.banned,
         allow_not_legal=body.rules.not_legal,
+        allow_stand_in=body.rules.stand_in,
         best_of=body.best_of,
         status="open",
         created_at=now,

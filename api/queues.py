@@ -3,7 +3,8 @@
 - **The queues.** One for each format and size (QUEUES): Legacy for two, best of one or best of
   three (api/matches.py), and Commander for two, three or four seats, each size its own queue. A
   queue is a key, (format, seats, best_of). Casual only: no rating, and every game takes the
-  casual table's rules (banned cards and cards not legal in the format both allowed).
+  casual table's rules (banned cards and cards not legal in the format both allowed, and since
+  v0.6.2 the cards the engine plays as stand-ins).
 - **Joining.** A player joins one queue with one of their decks, checked as a table checks it,
   and may choose to wait for players only. A player waits in one queue at a time, and never while
   they sit at an open table (a table refuses a player who waits in a queue, too); joining needs
@@ -947,6 +948,7 @@ def record_group(
                 turn_cap=TURN_CAP,
                 allow_banned=True,
                 allow_not_legal=True,
+                allow_stand_in=True,
                 status="open",
                 created_at=utcnow(),
                 queued=True,

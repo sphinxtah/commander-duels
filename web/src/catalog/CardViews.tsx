@@ -9,6 +9,7 @@ import {
   legalityLabels,
   ownedWords,
   printingImage,
+  STAND_IN_NOTE,
   statusLabel,
   type CardDetail,
   type CardSummary,
@@ -105,6 +106,20 @@ function TextFrame({ card, face }: { card: CardSummary; face?: number }) {
  * version of a deck that games played. */
 export function StatusBadge({ card }: { card: CardSummary }) {
   if (card.playable && !card.custom) return null;
+  // A card the game has no rules for yet (v0.6.2): in the game, as a stand-in at casual tables.
+  if (card.stand_in)
+    return (
+      <span
+        className={styles.status}
+        data-stand-in="true"
+        title={card.stand_in_note ?? STAND_IN_NOTE}
+      >
+        Stand-in
+        <span className={styles.visuallyHidden}>
+          : {card.stand_in_note ?? STAND_IN_NOTE}
+        </span>
+      </span>
+    );
   return (
     <span
       className={styles.status}
@@ -117,6 +132,13 @@ export function StatusBadge({ card }: { card: CardSummary }) {
       </span>
     </span>
   );
+}
+
+/** Why a card is not playable as written, in a sentence: a stand-in's note (v0.6.2), or its
+ * status's detail. */
+function statusWords(card: CardSummary): string {
+  if (card.stand_in) return card.stand_in_note ?? STAND_IN_NOTE;
+  return card.status_detail ?? statusLabel(card);
 }
 
 /** A card's copies in the player's library, when the library limits it: nothing otherwise. */
@@ -318,7 +340,7 @@ export function CardDetails({
     return (
       <p role="status">
         {gone
-          ? "This card is not in the game: the game engine cannot play it."
+          ? "This card is not in the game: no deck holds it, Scryfall no longer lists it, or the site's staff took it out."
           : "Loading the card…"}
       </p>
     );
@@ -419,9 +441,7 @@ export function CardDetails({
               <dt>Status</dt>
               <dd>
                 <StatusBadge card={card} />{" "}
-                {!card.playable && (
-                  <span>{card.status_detail ?? statusLabel(card)}</span>
-                )}
+                {!card.playable && <span>{statusWords(card)}</span>}
                 {card.text_differs && (
                   <span className={styles.warning}>
                     The game engine's wording of this card may differ from
@@ -646,9 +666,7 @@ export function CustomCardDetails({
             <dt>Status</dt>
             <dd>
               <StatusBadge card={card} />{" "}
-              {!card.playable && (
-                <span>{card.status_detail ?? statusLabel(card)}</span>
-              )}
+              {!card.playable && <span>{statusWords(card)}</span>}
             </dd>
           </div>
           {ownedWords(card) && (

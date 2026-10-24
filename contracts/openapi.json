@@ -1941,6 +1941,24 @@
             ],
             "title": "Set Code"
           },
+          "stand_in": {
+            "default": false,
+            "description": "The game has no rules for it yet (v0.6.2): casual games play it as a stand-in, with its cost, types, power and toughness; tournament rules refuse it.",
+            "title": "Stand In",
+            "type": "boolean"
+          },
+          "stand_in_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What a stand-in is, in a sentence, for a stand-in card.",
+            "title": "Stand In Note"
+          },
           "status": {
             "title": "Status",
             "type": "string"
@@ -2429,6 +2447,24 @@
               }
             ],
             "title": "Set Code"
+          },
+          "stand_in": {
+            "default": false,
+            "description": "The game has no rules for it yet (v0.6.2): casual games play it as a stand-in, with its cost, types, power and toughness; tournament rules refuse it.",
+            "title": "Stand In",
+            "type": "boolean"
+          },
+          "stand_in_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What a stand-in is, in a sentence, for a stand-in card.",
+            "title": "Stand In Note"
           },
           "status": {
             "title": "Status",
@@ -3539,7 +3575,8 @@
             "items": {
               "enum": [
                 "banned",
-                "not_legal"
+                "not_legal",
+                "stand_in"
               ],
               "type": "string"
             },
@@ -3961,7 +3998,8 @@
             "items": {
               "enum": [
                 "banned",
-                "not_legal"
+                "not_legal",
+                "stand_in"
               ],
               "type": "string"
             },
@@ -7865,7 +7903,8 @@
               "collection_locked",
               "structure",
               "banned",
-              "not_legal"
+              "not_legal",
+              "stand_in"
             ],
             "title": "Kind",
             "type": "string"
@@ -8333,6 +8372,12 @@
             "title": "Collector Number",
             "type": "string"
           },
+          "extra": {
+            "default": false,
+            "description": "Given in a pack opened before v0.6.2 in place of the card listed before it, which the game could not play then; since v0.6.2 the account holds both.",
+            "title": "Extra",
+            "type": "boolean"
+          },
           "faces": {
             "description": "Faces with images of their own; 0 for one image.",
             "title": "Faces",
@@ -8368,6 +8413,7 @@
             "type": "boolean"
           },
           "position": {
+            "description": "Its place in the pack as revealed; since v0.6.2 in the order shown, a past pack's card drawn and the one given in its place each with its own.",
             "title": "Position",
             "type": "integer"
           },
@@ -8380,12 +8426,6 @@
             "title": "Rarity",
             "type": "string"
           },
-          "replaced": {
-            "default": false,
-            "description": "Drawn from its sheet in place of a card the game cannot play (v0.4.5); the opening's record names that card.",
-            "title": "Replaced",
-            "type": "boolean"
-          },
           "set_code": {
             "title": "Set Code",
             "type": "string"
@@ -8393,6 +8433,12 @@
           "sheet": {
             "title": "Sheet",
             "type": "string"
+          },
+          "stand_in": {
+            "default": false,
+            "description": "The game has no rules for this card yet (v0.6.2): casual games play it as a stand-in.",
+            "title": "Stand In",
+            "type": "boolean"
           },
           "type_line": {
             "title": "Type Line",
@@ -11661,7 +11707,7 @@
       },
       "TableRules": {
         "additionalProperties": false,
-        "description": "Which cards a table's decks may hold by their legality in its format (v0.4.5); the format's\ndeck rules apply whatever these say. Casual rules allow both; tournament rules neither.",
+        "description": "Which cards a table's decks may hold by their legality in its format (v0.4.5), and since\nv0.6.2 whether they may hold cards the engine plays as stand-ins; the format's deck rules apply\nwhatever these say. Casual rules allow all three; tournament rules none.",
         "properties": {
           "banned": {
             "description": "Cards banned in the format.",
@@ -11671,6 +11717,11 @@
           "not_legal": {
             "description": "Cards not legal in the format: Un-cards, playtest and digital-only cards.",
             "title": "Not Legal",
+            "type": "boolean"
+          },
+          "stand_in": {
+            "description": "Cards the game has no rules for yet, which play as stand-ins with their cost, types, power and toughness (v0.6.2). Left out, it follows the other two: allowed when both are, as a client from before v0.6.2 meant casual rules.",
+            "title": "Stand In",
             "type": "boolean"
           }
         },
@@ -12325,11 +12376,12 @@
             "type": "boolean"
           },
           "needs": {
-            "description": "The table options the deck needs (v0.4.5): banned for a card banned in the format, not_legal for a card not legal in it. Empty: any table takes it. Its warnings of the same kinds name the cards.",
+            "description": "The table options the deck needs (v0.4.5): banned for a card banned in the format, not_legal for a card not legal in it, and since v0.6.2 stand_in for a card the engine plays as a stand-in. Empty: any table takes it. Its warnings of the same kinds name the cards.",
             "items": {
               "enum": [
                 "banned",
-                "not_legal"
+                "not_legal",
+                "stand_in"
               ],
               "type": "string"
             },
@@ -24872,7 +24924,7 @@
     },
     "/api/v1/library": {
       "get": {
-        "description": "The cards in the account's library, one item per card and edition (v0.5.0), each with the\nedition's image, its copies and where they came from. An account that builds from the whole\ncatalog has no list here. Copies of a card the game cannot play stay recorded but are not\nshown (v0.4.5): they come back if the engine learns it.",
+        "description": "The cards in the account's library, one item per card and edition (v0.5.0), each with the\nedition's image, its copies and where they came from. An account that builds from the whole\ncatalog has no list here. Copies of a card out of the game stay recorded but are not shown\n(v0.4.5); since v0.6.2 a stand-in is in the game, and shown with its badge.",
         "operationId": "my_library_api_v1_library_get",
         "responses": {
           "200": {
@@ -26145,7 +26197,7 @@
     },
     "/api/v1/me/alliance/cards": {
       "get": {
-        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere). Only cards a\ngame can play (v0.4.5).",
+        "description": "The allied Planeswalker's own cards (v0.4.2), which the Cards page's alliance tab shows, for\nevery account, those that build from the whole catalog included: each says how many copies\nthe library holds (a playset while the alliance lasts, or more from elsewhere). Only cards in\nthe game (v0.4.5), the stand-ins too since v0.6.2.",
         "operationId": "my_alliance_cards_api_v1_me_alliance_cards_get",
         "responses": {
           "200": {

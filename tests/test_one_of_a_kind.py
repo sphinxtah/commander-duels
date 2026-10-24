@@ -55,9 +55,9 @@ def test_a_pack_never_deals_a_one_of_a_kind_printing(client, monkeypatch):  # no
     removed: list[frozenset[UUID]] = []
     real = shop_api.draw
 
-    def draw(collation, rng, gone, withheld):  # type: ignore[no-untyped-def]
+    def draw(collation, rng, withheld):  # type: ignore[no-untyped-def]
         removed.append(withheld)
-        return real(collation, rng, gone, withheld)
+        return real(collation, rng, withheld)
 
     monkeypatch.setattr(shop_api, "draw", draw)
     ada = funded(client, "ada", 10_000)
@@ -248,7 +248,7 @@ def test_a_pack_never_deals_a_printing_past_its_print_run(client, runs, monkeypa
     twice = {"value": False}
     calls: list[frozenset[UUID]] = []
 
-    def draw(collation, rng, removed, withheld):  # type: ignore[no-untyped-def]
+    def draw(collation, rng, withheld):  # type: ignore[no-untyped-def]
         calls.append(withheld)
         if limited.id in withheld:
             return 0, [Pulled(other.id, "nonfoil", "common")]
@@ -272,7 +272,7 @@ def test_a_pack_never_deals_a_printing_past_its_print_run(client, runs, monkeypa
         ).json()["pack"]
         answer = who.send("POST", f"/api/v1/shop/packs/{pack}/open")
         assert answer.status_code == 200, answer.text
-        return [(card["printing_id"], card["replaced"]) for card in answer.json()["cards"]]
+        return [(card["printing_id"], card["extra"]) for card in answer.json()["cards"]]
 
     # Two copies printed: one to Ada, then a pack that would take both is drawn again without it.
     assert opened(ada) == [(str(limited.id), False)]

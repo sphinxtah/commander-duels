@@ -10,7 +10,9 @@ location), an explanation and a remedy, and its kind:
   build from their own library; administrators and SysOp from the whole catalog), or since v0.5.0
   more copies of an edition than the library holds of that edition;
 - structure: the deck itself is malformed (a printing of another card, a sideboard in Commander);
-- banned, not_legal: notes, not errors (v0.4.5): a card banned in the format, or not legal in it.
+- banned, not_legal: notes, not errors (v0.4.5): a card banned in the format, or not legal in it;
+- stand_in: a note too (v0.6.2): a deck card the engine cannot play as written, which casual games
+  play as a stand-in (catalog/statuses.py stand_in()).
 
 Copies are counted by construction key, the card's English name, so another printing or another
 Oracle version of a card is still that card (T03). Legality comes from the format version: its
@@ -20,7 +22,8 @@ rules (at most 250 cards in a main deck) say so.
 Since v0.4.5 a card's legality no longer makes a deck illegal: each table's host chooses whether
 its decks may hold banned cards, and cards not legal in the format (TableRules). A deck holding
 either is legal by the format's deck rules and lists the table options it needs; a game checks
-them against its table's rules. Restricted cards still count as one allowed copy.
+them against its table's rules. Restricted cards still count as one allowed copy. Since v0.6.2 a
+card the engine lacks is a third such option (stand_in), which tournament rules refuse.
 
 Since v0.4.0 a deck may also hold the Godlike tier's custom cards (api/custom_cards.py), from a
 table of their own, while its owner is at the Godlike tier. Each counts as legal in Legacy and
@@ -46,6 +49,7 @@ from api.models import CardConcept, CardPrinting, CustomCard, FormatVersion
 from api.schemas import Contract, TableOption, TableRules
 from catalog.formats import RULES, TECHNICAL_MAX_MAIN
 from catalog.roles import roles
+from catalog.statuses import stands_in
 from catalog.text import ALL_COLORS, COLOR_BITS, colors_of, front, normalize, type_parts
 
 GameFormatName = Literal["legacy", "commander"]
@@ -58,11 +62,12 @@ Kind = Literal[
     "structure",
     "banned",
     "not_legal",
+    "stand_in",
 ]
 # Problems that keep a legal deck from starting a game.
 BLOCKING = frozenset({"not_implemented", "collection_locked"})
 # The table options a deck may need, in the order it lists them.
-TABLE_OPTIONS: tuple[TableOption, ...] = ("banned", "not_legal")
+TABLE_OPTIONS: tuple[TableOption, ...] = ("banned", "not_legal", "stand_in")
 MAX_ENTRIES = 400
 MAX_QUANTITY = 250
 PERMANENTS = frozenset({"Artifact", "Creature", "Enchantment", "Land", "Planeswalker", "Battle"})
@@ -114,8 +119,9 @@ class Validation(Contract):
     playable: bool
     needs: list[TableOption] = Field(
         description="The table options the deck needs (v0.4.5): banned for a card banned in the "
-        "format, not_legal for a card not legal in it. Empty: any table takes it. Its warnings of "
-        "the same kinds name the cards."
+        "format, not_legal for a card not legal in it, and since v0.6.2 stand_in for a card the "
+        "engine plays as a stand-in. Empty: any table takes it. Its warnings of the same kinds "
+        "name the cards."
     )
     errors: list[Problem]
     warnings: list[Problem]
@@ -146,6 +152,7 @@ class Card:
     activated: bool
     keywords: tuple[str, ...]
     printings: frozenset[UUID] = frozenset()
+    status_reason: str | None = None
     # Each printing's set name, set code and collector number (v0.5.0), which messages name.
     editions: Mapping[UUID, tuple[str, str, str]] = field(
         default_factory=dict, compare=False, hash=False
@@ -310,6 +317,7 @@ def cards_of(session: Session, ids: set[UUID]) -> dict[UUID, Card]:
             activated=row.activated,
             keywords=tuple(row.keywords or ()),
             printings=frozenset(printings[row.id]),
+            status_reason=row.status_reason,
             editions=printings[row.id],
         )
         for row in rows
@@ -562,7 +570,19 @@ def card_problems(report: Report, card: Card, rules: Rules, today: date) -> None
                 kind="not_legal",
                 card_ids=[card.id],
             )
-    if card.status != "certified":
+    if card.status != "certified" and stands_in(
+        card.status, card.status_reason, card.deck_card, card.removed
+    ):
+        report.warning(
+            "card.stand_in",
+            f"{card.name} plays as a stand-in: the game has no rules for it yet, so in casual "
+            "games it plays with its cost, types, power and toughness, its rules text inert. The "
+            "deck plays only at tables that allow stand-ins.",
+            "Remove it to play at any table.",
+            kind="stand_in",
+            card_ids=[card.id],
+        )
+    elif card.status != "certified":
         report.error(
             "card.not_implemented",
             f"{card.name} cannot be played yet: "

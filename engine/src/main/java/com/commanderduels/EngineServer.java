@@ -35,8 +35,11 @@ import java.util.regex.Pattern;
 public final class EngineServer {
     public static final int PROTOCOL_VERSION = 1;
     static final int MAX_BODY_BYTES = 4096;
-    /** Service game requests may carry deck lists. */
-    static final int MAX_SERVICE_BODY_BYTES = 65_536;
+    /**
+     * Service game requests may carry deck lists; since v0.6.2 with their stand-ins described card
+     * by card, so four decks of a hundred stand-ins still fit.
+     */
+    static final int MAX_SERVICE_BODY_BYTES = 262_144;
     static final long MAX_WAIT_MILLIS = 30_000;
     static final String SERVICE_TOKEN_HEADER = "X-Service-Token";
     static final int DEFAULT_CARD_RESULTS = 20;

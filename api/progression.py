@@ -56,7 +56,7 @@ from api.roster import (
     tier_of,
 )
 from api.schemas import Contract, StoredText
-from catalog.statuses import playable
+from catalog.statuses import in_game
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
@@ -447,8 +447,8 @@ def choose_starters(
 def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryView:
     """The cards in the account's library, one item per card and edition (v0.5.0), each with the
     edition's image, its copies and where they came from. An account that builds from the whole
-    catalog has no list here. Copies of a card the game cannot play stay recorded but are not
-    shown (v0.4.5): they come back if the engine learns it."""
+    catalog has no list here. Copies of a card out of the game stay recorded but are not shown
+    (v0.4.5); since v0.6.2 a stand-in is in the game, and shown with its badge."""
     if library.unlimited:
         return LibraryView(unlimited=True, alliance=library.alliance, cards=[])
     held = {printing_id for printing_id, edition in library.editions.items() if edition.copies}
@@ -457,7 +457,7 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
         for printing in db.scalars(
             select(CardPrinting)
             .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-            .where(CardPrinting.id.in_(held), playable())
+            .where(CardPrinting.id.in_(held), in_game())
         )
     }
     summaries = summaries_by_id(db, {printing.concept_id for printing in printings.values()})
@@ -504,7 +504,7 @@ def my_library(principal: Active, library: CurrentLibrary, db: Db) -> LibraryVie
 def planeswalker_cards(
     db: Session, roster: dict[str, Planeswalker], planeswalker: Planeswalker, library: Library
 ) -> AllianceCards:
-    """A Planeswalker's own cards a game can play, one per card, each with the copies the library
+    """A Planeswalker's own cards in the game (the stand-ins too since v0.6.2), one per card, each with the copies the library
     holds. The Godlike tier's Planeswalker has none from the catalog: its custom cards are only
     GET /custom-cards, for a Godlike account allied with it."""
     ids = alliance_cards(db, roster).get(planeswalker.id, [])
@@ -512,7 +512,7 @@ def planeswalker_cards(
     chosen: dict[str, UUID] = {}
     for card_id, key in db.execute(
         select(CardConcept.id, CardConcept.construction_key)
-        .where(CardConcept.id.in_(ids), playable())
+        .where(CardConcept.id.in_(ids), in_game())
         .order_by(CardConcept.default_printing_id.is_(None), CardConcept.normalized_name)
     ):
         chosen.setdefault(key, card_id)

@@ -180,11 +180,19 @@ export const reasonLabels: Record<string, string> = {
   godlike_only: "Only the Godlike tier may play it",
 };
 
-/** A short label for why a card cannot be played; the detail explains more. */
+/** What a stand-in is (v0.6.2), as the server says it with each stand-in card. */
+export const STAND_IN_NOTE =
+  "The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness.";
+
+/** A short label for why a card cannot be played; the detail explains more. Since v0.6.2 a card
+ * the engine lacks is a stand-in, in the game for casual tables. */
 export function statusLabel(
-  card: Pick<CardSummary, "playable" | "status" | "status_reason">,
+  card: Pick<CardSummary, "playable" | "status" | "status_reason"> & {
+    stand_in?: boolean;
+  },
 ): string {
   if (card.playable) return "Playable";
+  if (card.stand_in) return "Stand-in";
   return (
     reasonLabels[card.status_reason ?? ""] ?? `Not playable (${card.status})`
   );

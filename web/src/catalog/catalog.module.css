@@ -348,6 +348,11 @@
   border-color: #c59b6566;
   color: #e3bf93;
 }
+/* A stand-in (v0.6.2): in the game, with no rules yet. */
+.status[data-stand-in="true"] {
+  border-color: #9fb3d966;
+  color: #c3d2ee;
+}
 /* A player's copies of a card (v0.3.1): quiet when owned, muted further when not, so a page of
    cards outside the library reads as the catalog, not as a page of warnings. */
 .owned {

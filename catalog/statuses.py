@@ -13,9 +13,12 @@ shows that the engine's wording may differ, and waits in the review list (CAT08)
 held back (implemented) also waits there, and an administrator who accepts it certifies it for
 good: the acceptance is kept across syncs (v0.4.5).
 
-Since v0.4.5 only playable cards are in the game at all: search, card pages, decks, libraries and
-packs show nothing else (playable()). The catalog keeps every card, so one comes back when the
-engine learns it.
+Since v0.4.5 only playable cards were in the game at all. Since v0.6.2 (the owner's decision) a deck
+card the engine lacks is back in the game for everyone as a stand-in (in_game(), stand_in()):
+search, card pages, decks, libraries and packs show it with a "Stand-in" badge, and a casual game
+plays it with its printed cost, types, power and toughness, its rules text inert. playable() still
+means certified, where the engine must truly implement the card. Tokens and the other objects no
+deck holds, cards Scryfall no longer lists and cards the staff suspended stay out.
 """
 
 import html
@@ -23,7 +26,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, func, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from api.models import CardConcept, EngineCard
@@ -339,9 +342,49 @@ def wording_differs(card: Concept, found: Implementation) -> bool:
 
 
 def playable() -> ColumnElement[bool]:
-    """The cards a game can be played with, and since v0.4.5 the only cards the site shows:
-    certified, and still in Scryfall's catalog."""
+    """The cards the engine plays as written: certified, and still in Scryfall's catalog. From
+    v0.4.5 to v0.6.1 the only cards the site showed; since v0.6.2 see in_game()."""
     return and_(CardConcept.status == "certified", CardConcept.removed_revision.is_(None))
+
+
+# The statuses of a deck card the engine lacks, or holds back, which plays as a stand-in (v0.6.2).
+STAND_IN_STATUSES = ("implemented", "mapped", "unsupported", "catalog_only")
+STAND_IN_NOTE = (
+    "The game has no rules for this card yet: in casual games it plays as a stand-in with its "
+    "cost, types, power and toughness."
+)
+
+
+def deck_cards() -> ColumnElement[bool]:
+    """Cards a deck holds: not tokens, emblems, art cards or the other objects of NOT_A_DECK_CARD,
+    nor a meld's back face."""
+    return and_(
+        CardConcept.deck_card.is_(True),
+        func.coalesce(CardConcept.status_reason, "") != "not_a_deck_card",
+    )
+
+
+def stand_in() -> ColumnElement[bool]:
+    """A deck card in the game that the engine cannot play as written (v0.6.2): one it lacks, one
+    that does not load, one its checks held back, or one not checked yet. Casual games play it as
+    a stand-in; tables under tournament rules refuse it."""
+    return and_(
+        CardConcept.removed_revision.is_(None),
+        CardConcept.status.in_(STAND_IN_STATUSES),
+        deck_cards(),
+    )
+
+
+def in_game() -> ColumnElement[bool]:
+    """The cards the site shows, lists, grants and lets decks hold (v0.6.2): certified ones, and
+    the stand-ins. Not tokens or other objects no deck holds, not a card Scryfall no longer lists,
+    not one the staff suspended."""
+    return or_(playable(), stand_in())
+
+
+def stands_in(status: str, reason: str | None, deck_card: bool, removed: bool = False) -> bool:
+    """stand_in() for a card already read."""
+    return not removed and status in STAND_IN_STATUSES and deck_card and reason != "not_a_deck_card"
 
 
 def unplayable_reason(status: str, detail: str | None, removed: bool) -> str:

@@ -8,7 +8,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { opening } from "./fixtures";
+import { card, opening } from "./fixtures";
 import { PackOpening, TIMING } from "./PackOpening";
 
 const sound = vi.hoisted(() => ({
@@ -199,5 +199,32 @@ describe("opening a pack", () => {
       ).getAllByRole("listitem"),
     ).toHaveLength(6);
     expect(sound.play).not.toHaveBeenCalled();
+  });
+
+  it("marks a stand-in, and a past pack's card given in place of the one drawn (v0.6.2)", () => {
+    const past = {
+      ...opening,
+      cards: [
+        card(0, { name: "Farmstead", rarity: "rare", stand_in: true }),
+        card(1, { name: "Given Card", extra: true }),
+        card(2),
+      ],
+    };
+    render(<PackOpening opening={past} onDone={vi.fn()} startOpen />);
+    const items = within(
+      screen.getByRole("list", { name: "Cards in the pack" }),
+    ).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    const stand = within(items[0]!).getByText("Stand-in");
+    expect(stand).toHaveAttribute(
+      "title",
+      expect.stringContaining("plays as a stand-in"),
+    );
+    expect(items[1]).toHaveTextContent(
+      "Extra: given in place of the card before it, which is now yours too",
+    );
+    expect(items[2]).not.toHaveTextContent("Stand-in");
+    expect(items[2]).not.toHaveTextContent("Extra");
+    expect(screen.queryByText(/In place of a card the game cannot play/)).toBeNull();
   });
 });

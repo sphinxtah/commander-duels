@@ -232,7 +232,7 @@ describe("a card's details", () => {
     render(<CardDetails cardId="card-temple-of-khonshu" />);
     expect(
       await screen.findByText(
-        "This card is not in the game: the game engine cannot play it.",
+        "This card is not in the game: no deck holds it, Scryfall no longer lists it, or the site's staff took it out.",
       ),
     ).toHaveAttribute("role", "status");
   });
@@ -256,5 +256,28 @@ describe("a card's details", () => {
     render(<CardDetails cardId="card-lightning-bolt" />);
     expect(await screen.findByText("Status")).toBeInTheDocument();
     expect(screen.getByText(/wording of this card may differ/)).toBeVisible();
+  });
+
+  it("says a card plays as a stand-in when the game has no rules for it (v0.6.2)", async () => {
+    const api = mockApi();
+    const note =
+      "The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness.";
+    api.on("GET /api/v1/cards/{card_id}", () =>
+      reply(200, {
+        ...detail([printing("p1", "Artist")], 1),
+        status: "unsupported",
+        status_reason: "not_implemented",
+        status_detail: "The game engine has no implementation of this card yet.",
+        playable: false,
+        stand_in: true,
+        stand_in_note: note,
+      }),
+    );
+    render(<CardDetails cardId="card-farmstead" />);
+    expect(await screen.findByText("Status")).toBeInTheDocument();
+    const badge = screen.getByText(/^Stand-in/, { selector: "span[data-stand-in]" });
+    expect(badge).toHaveAttribute("title", note);
+    expect(screen.getByText(note, { selector: "dd > span:not([data-stand-in])" })).toBeVisible();
+    expect(document.body).not.toHaveTextContent("Not playable");
   });
 });

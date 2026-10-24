@@ -303,6 +303,8 @@ class GameTable(Base):
     # not legal in it. Both is casual, neither tournament rules.
     allow_banned: Mapped[bool] = mapped_column(default=True)
     allow_not_legal: Mapped[bool] = mapped_column(default=True)
+    # And since v0.6.2 whether they may hold cards the engine plays as stand-ins.
+    allow_stand_in: Mapped[bool] = mapped_column(default=True)
     # Best of one game, or (v0.5.0, Legacy only) of three: a match with sideboarding between games.
     best_of: Mapped[int] = mapped_column(default=1)
     # open (the lobby), started (its game holds the rest) or closed (the host left).

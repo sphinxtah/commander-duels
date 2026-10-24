@@ -16,13 +16,23 @@ const kinds: Record<Problem["kind"], string> = {
   structure: "Needs fixing",
   banned: "Casual tables only",
   not_legal: "Casual tables only",
+  stand_in: "Casual tables only",
 };
 
-/** What a table must allow for a deck that needs the option (v0.4.5), as a tag names it. */
+/** What a table must allow for a deck that needs the option (v0.4.5), as a tag names it; since
+ * v0.6.2 a card the game has no rules for yet, which plays as a stand-in. */
 export function needWords(need: TableOption, format: DeckFormat): string {
+  if (need === "stand_in") return "Plays stand-ins";
   return need === "banned"
     ? "Banned cards"
     : `Not legal in ${formatLabels[format]}`;
+}
+
+/** Why a deck needs the option, for the tag's title. */
+function needTitle(need: TableOption): string | undefined {
+  return need === "stand_in"
+    ? "It holds cards the game has no rules for yet: casual games play them as stand-ins, with their cost, types, power and toughness."
+    : undefined;
 }
 
 /** The table options a deck needs, as tags: only tables that allow them take it (v0.4.5). */
@@ -38,7 +48,12 @@ export function NeedsTags({
     <span className={styles.needs}>
       <small>Casual tables only:</small>
       {needs.map((need) => (
-        <span key={need} className={styles.badge} data-state="needs">
+        <span
+          key={need}
+          className={styles.badge}
+          data-state="needs"
+          title={needTitle(need)}
+        >
           {needWords(need, format)}
         </span>
       ))}
@@ -67,17 +82,29 @@ export function LockIcon() {
   );
 }
 
-/** Which tables take a playable deck, by the options its cards need (v0.4.5). */
+/** Which tables take a playable deck, by the options its cards need (v0.4.5; stand-ins since
+ * v0.6.2). */
 function tablesFor(validation: Validation): string {
   const format = formatLabels[validation.format];
   const needs = validation.needs;
   if (needs.length === 0)
     return "Ready to play: legal, and every card is playable here.";
-  if (needs.length > 1)
-    return `Ready to play at casual tables, which allow banned cards and cards not legal in ${format}.`;
-  return needs[0] === "banned"
-    ? "Ready to play at tables that allow banned cards."
-    : `Ready to play at tables that allow cards not legal in ${format}.`;
+  const words: Record<TableOption, string> = {
+    banned: "banned cards",
+    not_legal: `cards not legal in ${format}`,
+    stand_in: "stand-ins",
+  };
+  const listed = needs.map((need) => words[need]);
+  const joined =
+    listed.length === 1
+      ? listed[0]
+      : `${listed.slice(0, -1).join(", ")} and ${listed[listed.length - 1]}`;
+  const standIns = needs.includes("stand_in")
+    ? " Cards the game has no rules for yet play as stand-ins, with their cost, types, power and toughness."
+    : "";
+  return needs.length > 1
+    ? `Ready to play at casual tables, which allow ${joined}.${standIns}`
+    : `Ready to play at tables that allow ${joined}.${standIns}`;
 }
 
 /** The one line that says whether the deck can play, and if not, what kind of problem keeps it. */
@@ -134,7 +161,9 @@ export function ProblemList({
               // A card's legality is a note, not a problem (v0.4.5): it says which tables take
               // the deck.
               const casual =
-                problem.kind === "banned" || problem.kind === "not_legal";
+                problem.kind === "banned" ||
+                problem.kind === "not_legal" ||
+                problem.kind === "stand_in";
               return (
                 <li
                   key={`${problem.code}-${index}`}

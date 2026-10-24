@@ -24,7 +24,7 @@ from api.models import CardConcept, CardTag, CardTagLink
 from api.schemas import Contract
 from api.search import colors as color_bits
 from api.validation import DeckEntry, GameFormatName, Location
-from catalog.statuses import playable
+from catalog.statuses import in_game
 from catalog.text import ALL_COLORS, colors_of, front, normalize, type_parts
 
 Theme = Literal[
@@ -214,8 +214,9 @@ def propose(db: Session, body: GuidedRequest, library: Library | None = None) ->
     leaders: list[CardConcept] = []
     for card_id in (body.commander_id, body.partner_id):
         if card_id is not None:
-            # Only a card in the game may lead (v0.4.5).
-            found = db.scalar(select(CardConcept).where(CardConcept.id == card_id, playable()))
+            # Only a card in the game may lead (v0.4.5), since v0.6.2 a stand-in the player chose
+            # too; the proposal's own cards are all ones the engine plays as written.
+            found = db.scalar(select(CardConcept).where(CardConcept.id == card_id, in_game()))
             if found is not None:
                 leaders.append(found)
     if body.format == "commander" and leaders:

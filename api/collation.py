@@ -13,12 +13,16 @@ product, every card resolved to a catalog printing. Drawing a pack:
   allows duplicates (or nothing else is left on it);
 - a card's **finish** is the sheet's: foil sheets give foils (etched foils where the sheet or the
   printing says so);
-- a card the game **cannot play** (v0.4.5) gives way to another from the same sheet, drawn by
-  weight from the sheet's cards the game can play, so the pack keeps its size and each slot its
-  rarity; the card drawn first is recorded beside the one given. A sheet holding no card the game
-  can play (a token or art card slot) gives nothing;
-- a printing **out of reach** (v0.5.1: one of a kind, or its print run all dealt, api/print_runs.py)
-  gives way the same way, but silently: nothing records or shows what was drawn first;
+- a pack gives the card it drew, since v0.6.2 whether the engine can play it or not (the owner's
+  decision: a card the engine lacks plays as a stand-in in casual games). From v0.4.5 to v0.6.1
+  such a card gave way to another from its sheet, and the card drawn first was recorded beside
+  the one given;
+- a printing **withheld** gives way to another from the same sheet, drawn by weight from the
+  sheet's other cards, so the pack keeps its size and each slot its rarity, silently: nothing
+  records or shows what was drawn first. Withheld are printings out of reach (v0.5.1: one of a
+  kind, or its print run all dealt, api/print_runs.py) and those of cards out of the game:
+  tokens, art cards and the other objects no deck holds, cards Scryfall no longer lists, cards
+  the staff suspended. A sheet holding nothing else (a token or art card slot) gives nothing.
 - a **boosted** printing (v0.6.2, api/shop.py BOOSTED) is drawn its factor times as often from
   its random sheets, the sheet's other cards sharing the rest: Alpha's and Beta's Power Nine and
   dual lands five times as often.
@@ -214,8 +218,6 @@ class Pulled:
     printing_id: UUID
     finish: str
     sheet: str
-    # The printing drawn first, which the game cannot play.
-    replaced: UUID | None = None
 
 
 def weighted(rng: random.Random, cards: Sequence[SheetCard]) -> SheetCard:
@@ -283,14 +285,15 @@ def draw_sheet(
 def draw(
     collation: Collation,
     rng: random.Random,
-    removed: frozenset[UUID] = frozenset(),
     withheld: frozenset[UUID] = frozenset(),
 ) -> tuple[int, list[Pulled]]:
     """A pack: the layout drawn, and its cards, slot by slot in the layout's order. Fixed sheets
-    are drawn first, so the random slots avoid duplicating them. removed: printings of cards the
-    game cannot play, each replaced from its own sheet; withheld (v0.5.1): printings out of reach,
-    replaced the same way without a record of them."""
-    gone = removed | withheld
+    are drawn first, so the random slots avoid duplicating them. withheld: printings a pack never
+    gives (v0.5.1: out of reach; since v0.6.2 also those of objects no deck holds, and of cards
+    out of the game), each replaced from its own sheet without a record of it. From v0.4.5 to
+    v0.6.1 a card the engine could not play was replaced too, and the opening recorded it; since
+    v0.6.2 a pack gives the card it drew (the owner's decision)."""
+    gone = withheld
     index = choose_layout(rng, collation.layouts)
     layout = collation.layouts[index]
     taken: set[tuple[UUID, str]] = set()
@@ -310,6 +313,5 @@ def draw(
                 continue
             given = pick(rng, sheet, taken, others)
             taken.add(key(given))
-            replaced = card.printing_id if card.printing_id in removed else None
-            pulled.append(Pulled(given.printing_id, given.finish, name, replaced))
+            pulled.append(Pulled(given.printing_id, given.finish, name))
     return index, pulled

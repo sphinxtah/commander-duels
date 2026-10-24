@@ -580,6 +580,21 @@
     background-position: -160% 0;
   }
 }
+/* A stand-in (v0.6.2), and a past pack's extra card. */
+.standIn {
+  display: inline-block;
+  align-self: flex-start;
+  border: 1px solid #9fb3d966;
+  color: #c3d2ee;
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-size: 0.62rem;
+  letter-spacing: 0.6px;
+}
+.extraMark {
+  font-size: 0.7rem;
+  color: #c9bfa6;
+}
 .newMark {
   display: inline-block;
   align-self: flex-start;
