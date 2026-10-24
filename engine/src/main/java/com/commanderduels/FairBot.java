@@ -25,6 +25,7 @@ import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.player.ai.SimulationNode2;
 import mage.player.ai.score.GameStateEvaluator2;
 import mage.players.Player;
+import mage.players.PlayerImpl;
 import mage.util.ThreadUtils;
 import mage.util.XmageThreadFactory;
 import org.apache.log4j.Logger;
@@ -57,9 +58,10 @@ import org.apache.log4j.Logger;
  *       concealed order; this bot walks it in name order.</li>
  * </ul>
  *
- * See docs/engine/fair-bots.md for the audit of XMage's AI code behind these changes.
+ * See docs/engine/fair-bots.md for the audit of XMage's AI code behind these changes. Not final
+ * since v0.6.1: a test scripts one bot's spell (TurnControlTest).
  */
-final class FairBot extends ComputerPlayerControllableProxy {
+class FairBot extends ComputerPlayerControllableProxy {
     private static final long serialVersionUID = 1L;
     private static final Logger LOG = Logger.getLogger(FairBot.class);
     /** How long a cancelled search may take to stop before the bot gives up on its result. */
@@ -170,7 +172,7 @@ final class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /** XMage copies players with every saved state; a copy shares the original's random source and statistics. */
-    private FairBot(FairBot bot) {
+    FairBot(FairBot bot) {
         super(bot);
         this.random = bot.random;
         this.budget = bot.budget;
@@ -180,9 +182,27 @@ final class FairBot extends ComputerPlayerControllableProxy {
         this.maxNodes = bot.maxNodes;
     }
 
+    /**
+     * A stand-in for a player whose turn this bot controls (723.5, v0.6.1, patch 0008): a fair bot
+     * with that player's identity, zones and life, deciding each of their decisions as XMage's AI
+     * decides for the player it plays, with this bot's skill, budget, search threads and random
+     * source. Its searches redeal what that player may not see, as this bot's own do.
+     */
+    private FairBot(PlayerImpl playerUnderControl, FairBot controller) {
+        super(playerUnderControl, controller);
+        this.random = controller.random;
+        this.budget = controller.budget;
+        this.stats = controller.stats;
+    }
+
     @Override
     public FairBot copy() {
         return new FairBot(this);
+    }
+
+    @Override
+    protected ComputerPlayerControllableProxy makeStandIn(PlayerImpl playerUnderControl) {
+        return new FairBot(playerUnderControl, this);
     }
 
     /** A bot's random stream: the game's seed mixed with the bot's seat, so bots at one table differ. */

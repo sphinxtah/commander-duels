@@ -109,6 +109,23 @@ class TwoHeadedGiantAuditTest {
             return this;
         }
 
+        /** The player for each bot seat, instead of the fair bot (v0.6.1: a scripted one). */
+        interface Bots {
+            Player bot(int seat, String name, RangeOfInfluence range, int skill, long seed);
+        }
+
+        private volatile Bots bots;
+
+        Scenario bots(Bots maker) {
+            bots = maker;
+            return this;
+        }
+
+        @Override
+        public Player bot(int seat, String name, RangeOfInfluence range, int skill, long seed) {
+            return bots == null ? super.bot(seat, name, range, skill, seed) : bots.bot(seat, name, range, skill, seed);
+        }
+
         @Override
         public void published(Game game, ObjectRefs refs, int seat, SeatView view, PromptView prompt) {
             super.published(game, refs, seat, view, prompt);
@@ -345,7 +362,11 @@ class TwoHeadedGiantAuditTest {
             "team A's extra combat phase in the log");
     }
 
-    /** XMage's computer player, which XMage lets control another player's turn (it refuses bots). */
+    /**
+     * XMage's computer player, which XMage lets control another player's turn as a human player (a
+     * plain ComputerPlayer7 makes no AI stand-in, and is refused; since patch 0008 the fair bot's kind
+     * is not).
+     */
     static final class ControllingBot extends ComputerPlayer7 {
         private static final long serialVersionUID = 1L;
 

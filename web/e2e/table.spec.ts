@@ -908,7 +908,7 @@ test.describe("turn control at the table (v0.5.1)", () => {
         .locator("section[data-prompt], section[aria-labelledby='prompt-title']")
         .first()
         .getByRole("status"),
-    ).toContainText("bob controls your turn and makes your choices until it ends.");
+    ).toContainText("bob controls your turn and makes your choices while the control lasts.");
     // Her own hand is hers to see, as ever; bob's is not shown to her.
     await expect(page.getByRole("group", { name: "Your hand" }).getByRole("button")).toHaveCount(3);
     await expect(page.locator('[data-role="teammate-hand"]')).toHaveCount(0);

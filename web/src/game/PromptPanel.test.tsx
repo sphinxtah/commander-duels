@@ -565,7 +565,7 @@ describe("turn control (rule 723, v0.5.1)", () => {
     const snap = { ...snapshot(5, null), view: view(1, null) };
     render(<Panel game={state(snap)} />);
     expect(screen.getByRole("status")).toHaveTextContent(
-      "bob controls your turn and makes your choices until it ends.",
+      "bob controls your turn and makes your choices while the control lasts.",
     );
   });
 });

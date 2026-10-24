@@ -247,6 +247,53 @@ def seat_snapshot(viewer: int, prompt: dict[str, Any] | None = None) -> dict[str
     }
 
 
+def test_the_scripted_clients_check_bot_controllers_and_team_prompts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # v0.6.1: a seat whose turn a bot controls is asked nothing (patch 0008), and a Two-Headed Giant
+    # prompt carries the asked player's part in the team's decision, only there.
+    checks = scripted_checks(monkeypatch)
+    bot = seat_snapshot(1, {"id": str(uuid.uuid4()), "kind": "priority", "for_seat": None})
+    bot["settings"]["seats"][0]["player"] = "bot"
+    bot["view"]["you"]["controlled_by"] = 0
+    checks.snapshot(1, bot)
+
+    def giant(prompt: dict[str, Any]) -> dict[str, Any]:
+        snapshot = seat_snapshot(0, {"id": str(uuid.uuid4()), "for_seat": None} | prompt)
+        snapshot["view"]["you"]["team"] = 0
+        snapshot["view"]["opponents"][0]["team"] = 1
+        return snapshot
+
+    trigger = {"id": "1", "action": "put_first", "label": "Gain 1 life", "seat": 0}
+    checks.snapshot(0, giant({"kind": "priority", "team": {"teammate_passed": True}}))
+    checks.snapshot(
+        0,
+        giant({"kind": "order_triggers", "team": {"teammate_passed": None}, "options": [trigger]}),
+    )
+    assert checks.problems == ["seat 1 was asked for itself while seat 0 controls its turn"]
+
+    checks.problems.clear()
+    checks.snapshot(0, giant({"kind": "priority", "team": None}))
+    checks.snapshot(0, giant({"kind": "declare_attackers", "team": {"teammate_passed": False}}))
+    checks.snapshot(
+        0,
+        seat_snapshot(
+            0, {"id": str(uuid.uuid4()), "kind": "priority", "team": {"teammate_passed": True}}
+        ),
+    )
+    checks.snapshot(
+        0,
+        giant(
+            {
+                "kind": "order_triggers",
+                "team": {"teammate_passed": None},
+                "options": [trigger | {"seat": None}],
+            }
+        ),
+    )
+    assert len(checks.problems) == 4, checks.problems
+
+
 def test_the_scripted_clients_allow_the_controllers_view_only_while_it_lasts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -261,8 +308,8 @@ def test_the_scripted_clients_allow_the_controllers_view_only_while_it_lasts(
     assert checks.problems == []
 
     # The same hand once the control has ended, or with another controller, is a leak; so is a
-    # prompt for a seat the viewer does not control, a seat asked for itself while a human seat
-    # controls its turn, and any hand sent to a spectator.
+    # prompt for a seat the viewer does not control, a seat asked for itself while another seat (a
+    # bot too, since v0.6.1) controls its turn, and any hand sent to a spectator.
     ended = seat_snapshot(0)
     ended["view"]["opponents"][0]["hand"] = [{"name": "Forest"}]
     checks.snapshot(0, ended)

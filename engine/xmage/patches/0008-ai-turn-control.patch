@@ -1,0 +1,530 @@
+A computer player taking control of a turn (Commander Duels v0.6.1, rule 723), in every format.
+
+Reason: XMage refuses every computer player the control of another player's turn ("is AI and can't
+take control"), so a bot's Mindslaver, Word of Command or Opposition Agent loses its control. With
+this patch the computer player makes the controlled player's decisions (723.5) through an AI
+stand-in: ComputerPlayerControllableProxy.prepareControllableProxy makes one for each decision, a
+copy of the controlled player that decides with the controller's AI (its skill, depth and think
+time) and reads and changes the controlled player's own hand, library, graveyard, mana pool, life
+and land count. A human player whose turn a computer player controls hands every decision to it
+(HumanPlayer, computerDeciding) and is asked nothing; a computer player under a computer player's
+control already handed its decisions to its controller's stand-in, which was the controller itself.
+A computer player that makes no stand-in is still refused (Player.canControlOtherPlayers). The
+stand-in plays as XMage's AI plays for the player it stands in for, not against them. Commander
+Duels' fair bot (engine/src/main/java/com/commanderduels/FairBot.java) makes its stand-ins as fair
+bots.
+Upstream: none yet; XMage's own TODOs ("add support computer over computer", "computer over human")
+ask for it.
+Remove when: XMage upstream lets computer players control turns.
+
+diff --git a/Mage/src/main/java/mage/players/Player.java b/Mage/src/main/java/mage/players/Player.java
+--- a/Mage/src/main/java/mage/players/Player.java
++++ b/Mage/src/main/java/mage/players/Player.java
+@@ -1318,4 +1318,13 @@
+     default Player prepareControllableProxy(Player playerUnderControl) {
+         return this;
+     }
++
++    /**
++     * Whether this player can make another player's decisions while controlling their turn (723.5):
++     * a human player through their client, and a computer player only if it makes an AI stand-in for
++     * the controlled player (prepareControllableProxy). A player who can't is refused the control.
++     */
++    default boolean canControlOtherPlayers() {
++        return !isComputer();
++    }
+ }
+diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
+--- a/Mage/src/main/java/mage/players/PlayerImpl.java
++++ b/Mage/src/main/java/mage/players/PlayerImpl.java
+@@ -604,9 +604,9 @@
+     public boolean controlPlayersTurn(Game game, UUID playerUnderControlId, String info) {
+         Player playerUnderControl = game.getPlayer(playerUnderControlId);
+ 
+-        // TODO: add support computer over computer
+-        // TODO: add support computer over human
+-        if (this.isComputer()) {
++        // a computer player controls another player's turn only when it can make that player's
++        // decisions (canControlOtherPlayers): through an AI stand-in for them
++        if (!this.canControlOtherPlayers()) {
+             // not supported yet
+             game.informPlayers(getLogName() + " is AI and can't take control over " + playerUnderControl.getLogName() + info);
+             return false;
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/ComputerPlayer.java
+@@ -103,6 +103,15 @@
+         super(player);
+     }
+ 
++    /**
++     * An AI stand-in for another player, human or computer: that player's identity and state, with
++     * the AI's own decisions. Used while a computer player controls that player's turn (723.5).
++     */
++    protected ComputerPlayer(final PlayerImpl playerUnderControl) {
++        super(playerUnderControl);
++        human = false;
++    }
++
+     @Override
+     public boolean chooseMulligan(Game game) {
+         if (hand.size() < 6
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+@@ -28,6 +28,7 @@
+ import mage.player.ai.util.CombatInfo;
+ import mage.player.ai.util.CombatUtil;
+ import mage.players.Player;
++import mage.players.PlayerImpl;
+ import mage.target.Target;
+ import mage.target.TargetAmount;
+ import mage.target.TargetCard;
+@@ -100,6 +101,18 @@
+         this.actionCache = new HashSet<>();
+     }
+ 
++    /**
++     * An AI stand-in for a player whose turn the given computer player controls (723.5): the
++     * controlled player's identity and state, searched as deep and as long as the controller.
++     */
++    protected ComputerPlayer6(final PlayerImpl playerUnderControl, final ComputerPlayer6 controller) {
++        super(playerUnderControl);
++        this.maxDepth = controller.maxDepth;
++        this.maxNodes = controller.maxNodes;
++        this.maxThinkTimeSecs = controller.maxThinkTimeSecs;
++        this.actionCache = new HashSet<>();
++    }
++
+     public ComputerPlayer6(final ComputerPlayer6 player) {
+         super(player);
+         this.maxDepth = player.maxDepth;
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer7.java
+@@ -4,6 +4,7 @@
+ import mage.constants.RangeOfInfluence;
+ import mage.game.Game;
+ import mage.player.ai.score.GameStateEvaluator2;
++import mage.players.PlayerImpl;
+ import org.apache.log4j.Logger;
+ 
+ import java.util.Date;
+@@ -29,6 +30,12 @@
+         this.allowBadMoves = player.allowBadMoves;
+     }
+ 
++    /** An AI stand-in for a player whose turn the given computer player controls (723.5). */
++    protected ComputerPlayer7(final PlayerImpl playerUnderControl, final ComputerPlayer7 controller) {
++        super(playerUnderControl, controller);
++        this.allowBadMoves = controller.allowBadMoves;
++    }
++
+     @Override
+     public ComputerPlayer7 copy() {
+         return new ComputerPlayer7(this);
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayerControllableProxy.java
+@@ -12,10 +12,14 @@
+ import mage.constants.Outcome;
+ import mage.constants.RangeOfInfluence;
+ import mage.game.Game;
++import mage.game.Graveyard;
+ import mage.game.draft.Draft;
+ import mage.game.match.Match;
+ import mage.game.tournament.Tournament;
++import mage.players.Library;
++import mage.players.ManaPool;
+ import mage.players.Player;
++import mage.players.PlayerImpl;
+ import mage.target.Target;
+ import mage.target.TargetAmount;
+ import mage.target.TargetCard;
+@@ -44,6 +48,12 @@
+ 
+     Player lastControllingPlayer = null;
+ 
++    /**
++     * For an AI stand-in (see prepareControllableProxy): the player it decides for, whose zones, mana
++     * pool, life and land count it reads and changes; null for a player of its own.
++     */
++    private Player standInFor = null;
++
+     public ComputerPlayerControllableProxy(String name, RangeOfInfluence range, int skill) {
+         super(name, range, skill);
+     }
+@@ -51,6 +61,22 @@
+     public ComputerPlayerControllableProxy(final ComputerPlayerControllableProxy player) {
+         super(player);
+         this.lastControllingPlayer = player;
++        this.standInFor = player.standInFor;
++    }
++
++    /**
++     * An AI stand-in for a player whose turn the given computer player controls (723.5): the
++     * controlled player's identity, with the controller's AI making each decision as that player.
++     * Like the human stand-in a human controller makes, it is made anew for each decision; what it
++     * records on itself would be lost, so its hand, library, graveyard, mana pool, life and land
++     * count are the controlled player's own.
++     */
++    protected ComputerPlayerControllableProxy(final PlayerImpl playerUnderControl,
++                                              final ComputerPlayerControllableProxy controller) {
++        super(playerUnderControl, controller);
++        this.standInFor = playerUnderControl;
++        // the stand-in decides for itself, whoever controls the player it stands in for
++        this.isGameUnderControl = true;
+     }
+ 
+     @Override
+@@ -59,7 +85,71 @@
+     }
+ 
+     private boolean isUnderMe(Game game) {
+-        return game.isSimulation() || this.isGameUnderControl();
++        return standInFor != null || game.isSimulation() || this.isGameUnderControl();
++    }
++
++    /**
++     * A computer player controlling another player's turn makes that player's decisions through an
++     * AI stand-in (723.5): Word of Command, Opposition Agent, Mindslaver and the like, over a human
++     * player or another computer player.
++     */
++    @Override
++    public Player prepareControllableProxy(Player playerUnderControl) {
++        return makeStandIn((PlayerImpl) playerUnderControl.getRealPlayer());
++    }
++
++    /** The AI stand-in for a player whose turn this computer player controls. */
++    protected ComputerPlayerControllableProxy makeStandIn(PlayerImpl playerUnderControl) {
++        return new ComputerPlayerControllableProxy(playerUnderControl, this);
++    }
++
++    @Override
++    public boolean canControlOtherPlayers() {
++        return true;
++    }
++
++    @Override
++    public Cards getHand() {
++        return standInFor == null ? super.getHand() : standInFor.getHand();
++    }
++
++    @Override
++    public Library getLibrary() {
++        return standInFor == null ? super.getLibrary() : standInFor.getLibrary();
++    }
++
++    @Override
++    public Graveyard getGraveyard() {
++        return standInFor == null ? super.getGraveyard() : standInFor.getGraveyard();
++    }
++
++    @Override
++    public ManaPool getManaPool() {
++        return standInFor == null ? super.getManaPool() : standInFor.getManaPool();
++    }
++
++    @Override
++    public int getLife() {
++        return standInFor == null ? super.getLife() : standInFor.getLife();
++    }
++
++    @Override
++    public void incrementLandsPlayed() {
++        if (standInFor == null) {
++            super.incrementLandsPlayed();
++        } else {
++            standInFor.incrementLandsPlayed();
++        }
++    }
++
++    @Override
++    public int getLandsPlayed() {
++        return standInFor == null ? super.getLandsPlayed() : standInFor.getLandsPlayed();
++    }
++
++    @Override
++    public boolean canPlayLand() {
++        return standInFor == null ? super.canPlayLand() : standInFor.canPlayLand();
+     }
+ 
+     private Player getControllingPlayer(Game game) {
+diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+--- a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
++++ b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+@@ -433,8 +433,30 @@
+         return !gameInCheckPlayableState(game) && !game.isSimulation();
+     }
+ 
++    /**
++     * While a computer player controls this player's turn (723.5: Word of Command, Opposition Agent,
++     * Mindslaver and the like), the AI makes this player's decisions: the AI stand-in the controller
++     * makes for this player, which every decision is handed to, and this player is asked nothing.
++     * Null while this player, or a human player controlling their turn, decides.
++     */
++    private Player computerDeciding(Game game) {
++        if (isGameUnderControl() || game.isSimulation()) {
++            return null;
++        }
++        Player controller = game.getPlayer(getTurnControlledBy());
++        if (controller == null || controller.getId().equals(getId()) || !controller.isComputer()
++                || !controller.isInGame()) {
++            return null;
++        }
++        return controller.prepareControllableProxy(this);
++    }
++
+     @Override
+     public boolean chooseMulligan(Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseMulligan(game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -471,11 +493,19 @@
+ 
+     @Override
+     public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseUse(outcome, message, source, game);
++        }
+         return this.chooseUse(outcome, message, null, "Yes", "No", source, game);
+     }
+ 
+     @Override
+     public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText, String falseText, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseUse(outcome, message, secondMessage, trueText, falseText, source, game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -567,6 +597,10 @@
+ 
+     @Override
+     public int chooseReplacementEffect(Map<String, String> effectsMap, Map<String, MageObject> objectsMap, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseReplacementEffect(effectsMap, objectsMap, game);
++        }
+         if (gameInCheckPlayableState(game, true) || game.isSimulation()) { // TODO: ignore warning logs until double call for TAPPED_FOR_MANA will be fix
+             return 0;
+         }
+@@ -673,6 +707,10 @@
+ 
+     @Override
+     public boolean choose(Outcome outcome, Choice choice, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.choose(outcome, choice, game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -731,11 +769,19 @@
+ 
+     @Override
+     public boolean choose(Outcome outcome, Target target, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.choose(outcome, target, source, game);
++        }
+         return choose(outcome, target, source, game, null);
+     }
+ 
+     @Override
+     public boolean choose(Outcome outcome, Target target, Ability source, Game game, Map<String, Serializable> options) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.choose(outcome, target, source, game, options);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -823,6 +869,10 @@
+ 
+     @Override
+     public boolean chooseTarget(Outcome outcome, Target target, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseTarget(outcome, target, source, game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -905,6 +955,10 @@
+ 
+     @Override
+     public boolean choose(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.choose(outcome, cards, target, source, game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -995,6 +1049,10 @@
+     // choose one or multiple target cards
+     @Override
+     public boolean chooseTarget(Outcome outcome, Cards cards, TargetCard target, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseTarget(outcome, cards, target, source, game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }
+@@ -1087,6 +1145,10 @@
+ 
+     @Override
+     public boolean chooseTargetAmount(Outcome outcome, TargetAmount target, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseTargetAmount(outcome, target, source, game);
++        }
+         // choose amount
+         // human can choose or un-choose MULTIPLE targets at once
+         if (!canCallFeedback(game)) {
+@@ -1256,6 +1318,14 @@
+ 
+     @Override
+     public boolean priority(Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            try {
++                return computer.priority(game);
++            } finally {
++                this.passed = computer.isPassed();
++            }
++        }
+         passed = false;
+         // TODO: fix problems with turn under out control:
+         // TODO: change pass and other states like passedUntilStackResolved for controlling player, not for "this"
+@@ -1556,6 +1626,10 @@
+ 
+     @Override
+     public TriggeredAbility chooseTriggeredAbility(java.util.List<TriggeredAbility> abilities, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseTriggeredAbility(abilities, game);
++        }
+         // choose triggered ability from list
+         if (!canCallFeedback(game)) {
+             return abilities.isEmpty() ? null : abilities.get(0);
+@@ -1676,6 +1750,10 @@
+ 
+     @Override
+     public boolean playMana(Ability abilityToCast, ManaCost unpaid, String promptText, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.playMana(abilityToCast, unpaid, promptText, game);
++        }
+         payManaMode = true;
+         try {
+             return playManaHandling(abilityToCast, unpaid, promptText, game);
+@@ -1758,6 +1836,10 @@
+      */
+     @Override
+     public int announceX(int min, int max, String message, Game game, Ability source, boolean isManaPay) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.announceX(min, max, message, game, source, isManaPay);
++        }
+         if (!canCallFeedback(game)) {
+             return min;
+         }
+@@ -1840,6 +1922,11 @@
+ 
+     @Override
+     public void selectAttackers(Game game, UUID attackingPlayerId) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            computer.selectAttackers(game, attackingPlayerId);
++            return;
++        }
+         if (!canCallFeedback(game)) {
+             return;
+         }
+@@ -2110,6 +2197,11 @@
+ 
+     @Override
+     public void selectBlockers(Ability source, Game game, UUID defendingPlayerId) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            computer.selectBlockers(source, game, defendingPlayerId);
++            return;
++        }
+         if (!canCallFeedback(game)) {
+             return;
+         }
+@@ -2227,6 +2319,10 @@
+ 
+     @Override
+     public int getAmount(int min, int max, String message, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.getAmount(min, max, message, source, game);
++        }
+         if (!canCallFeedback(game)) {
+             return min;
+         }
+@@ -2268,6 +2364,10 @@
+             MultiAmountType type,
+             Game game
+     ) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.getMultiAmountWithIndividualConstraints(outcome, messages, totalMin, totalMax, type, game);
++        }
+         int needCount = messages.size();
+         List<Integer> defaultList = MultiAmountType.prepareDefaultValues(messages, totalMin, totalMax);
+         if (needCount == 0 || (needCount == 1 && totalMin == totalMax)
+@@ -2468,6 +2568,10 @@
+ 
+     @Override
+     public SpellAbility chooseAbilityForCast(Card card, Game game, boolean noMana) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseAbilityForCast(card, game, noMana);
++        }
+         if (!canCallFeedback(game)) {
+             return null;
+         }
+@@ -2508,6 +2612,10 @@
+ 
+     @Override
+     public ActivatedAbility chooseLandOrSpellAbility(Card card, Game game, boolean noMana) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseLandOrSpellAbility(card, game, noMana);
++        }
+         if (!canCallFeedback(game)) {
+             return null;
+         }
+@@ -2554,6 +2662,10 @@
+ 
+     @Override
+     public Mode chooseMode(Modes modes, Ability source, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.chooseMode(modes, source, game);
++        }
+         // choose mode to activate
+         if (!canCallFeedback(game)) {
+             return null;
+@@ -2694,6 +2806,10 @@
+ 
+     @Override
+     public boolean choosePile(Outcome outcome, String message, java.util.List<? extends Card> pile1, java.util.List<? extends Card> pile2, Game game) {
++        Player computer = computerDeciding(game);
++        if (computer != null) {
++            return computer.choosePile(outcome, message, pile1, pile2, game);
++        }
+         if (!canCallFeedback(game)) {
+             return false;
+         }

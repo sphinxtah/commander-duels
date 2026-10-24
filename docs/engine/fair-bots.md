@@ -45,6 +45,8 @@ The pinned XMage (`xmage_1.4.62V1`, commit `eb69d05b88142b5c4eec4869bcb23a0fec13
 - **Reproducible.** Each pool is put in card-name order before it is shuffled, so a sample depends only on the cards in the pool and the random source, never on the real order. The random source is the bot's own, seeded with `FairBot.seedFor(game seed, seat)`, so bots at one table draw different samples and the same seed deals the same samples. Copies of a bot share its source.
 - **One sample per search.** Each search plays out one sample. A new search, with a new sample, starts for every decision that does not continue a planned chain.
 
+**A bot controlling another player's turn** (since v0.6.1, [a bot in control](human-seat.md#a-bot-in-control-v061)) decides for that player through a stand-in, a fair bot with that player's identity: its searches redeal from that player's point of view, so it knows that player's hand (723.4 lets the controller see it), and the controlling bot's own hand is dealt again like any other player's.
+
 Copies made further down the search are copies of this root, so the whole search sees the sample. Zones are written through XMage's own calls (`Card.setZone` for each hand card, so the halves of split and double-faced cards follow; `Library.putOnBottom` for each library card). A player whose hand or library holds a card it does not own is left as it is.
 
 ## Limits

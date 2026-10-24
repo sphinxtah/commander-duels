@@ -394,7 +394,7 @@ export function PromptPanel({
           : controller !== null
             ? game.observing
               ? `${playerName(view, controller, true)} controls ${playerName(view, view?.seat ?? null, true)}’s turn and makes their choices.`
-              : `${playerName(view, controller)} controls your turn and makes your choices until it ends.`
+              : `${playerName(view, controller)} controls your turn and makes your choices while the control lasts.`
             : `Waiting for ${playerName(view, view?.priority_seat ?? view?.active_seat ?? null, game.observing)}…`}
       </p>
     );

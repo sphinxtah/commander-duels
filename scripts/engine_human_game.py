@@ -127,20 +127,46 @@ class Checks:
             self.problem(
                 f"seat {seat} was asked for seat {for_seat}, whose turn it does not control"
             )
+        # Whoever controls the seat's turn, a human seat or since v0.6.1 a bot, decides for it.
         controller = you.get("controlled_by")
-        seats = (snapshot.get("settings") or {}).get("seats", [])
-        human_controller = any(
-            entry.get("seat") == controller and entry.get("player") == "human" for entry in seats
-        )
-        if prompt and for_seat is None and controller is not None and human_controller:
+        if prompt and for_seat is None and controller is not None:
             self.problem(
                 f"seat {seat} was asked for itself while seat {controller} controls its turn"
             )
+        if prompt:
+            self.team(seat, prompt, you, opponents)
         if you and len(view.get("hand", [])) != you.get("hand_count"):
             self.problem(f"seat {seat}'s hand size disagrees with its count")
         for card in view.get("hand", []):
             if not OBJECT_ID.match(card.get("id", "")):
                 self.problem(f"hand card without an opaque id: {card}")
+
+    def team(
+        self,
+        seat: int | None,
+        prompt: dict[str, Any],
+        you: dict[str, Any],
+        opponents: list[dict[str, Any]],
+    ) -> None:
+        """Two-Headed Giant (v0.6.1): a prompt carries the asked player's part in a team decision,
+        and only in a team game; a team's trigger order names each ability's controller."""
+        for_seat = prompt.get("for_seat")
+        asked = (
+            you
+            if for_seat is None
+            else next((player for player in opponents if player.get("seat") == for_seat), {})
+        )
+        team = prompt.get("team")
+        kind = prompt.get("kind")
+        if (asked.get("team") is None) != (team is None):
+            self.problem(f"seat {seat}'s {kind} prompt carries the wrong team: {team}")
+        elif team is not None and (team.get("teammate_passed") is None) != (kind != "priority"):
+            self.problem(f"seat {seat}'s {kind} prompt says teammate_passed wrongly: {team}")
+        for option in prompt.get("options") or []:
+            if option.get("action") == "put_first" and (option.get("seat") is None) != (
+                team is None
+            ):
+                self.problem(f"seat {seat}'s trigger order names the wrong controller: {option}")
 
     def problem(self, message: str) -> None:
         with self.lock:
@@ -397,11 +423,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--url", default=os.environ.get("CD_ENGINE_URL", "http://engine:8090"))
     parser.add_argument("--seed", type=int, default=20261018)
-    parser.add_argument("--format", choices=["legacy", "commander"], default="legacy")
+    parser.add_argument(
+        "--format", choices=["legacy", "commander", "two_headed_giant"], default="legacy"
+    )
     parser.add_argument(
         "--seats",
-        help="players in seat order, for example human,bot,bot,bot"
-        " (default: human,bot for legacy and human,bot,bot,bot for commander)",
+        help="players in seat order, for example human,bot,bot,bot (default: human,bot for"
+        " legacy, human,bot,bot,bot for commander and two_headed_giant, where seats 0 and 1"
+        " play seats 2 and 3)",
     )
     parser.add_argument(
         "--deck", help="the first human seat's deck; other seats get the format's fixtures"

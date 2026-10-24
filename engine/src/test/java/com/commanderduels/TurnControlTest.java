@@ -16,7 +16,13 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import mage.cards.Card;
+import mage.cards.Cards;
+import mage.cards.CardsImpl;
+import mage.constants.RangeOfInfluence;
+import mage.game.Game;
 import mage.game.turn.TurnMod;
+import mage.players.Player;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +33,9 @@ import org.junit.jupiter.api.Test;
  * to its end, so none may hang, and every view and prompt goes through {@link SeatChecks}, whose
  * leak checks allow the controller's view only while the control lasts. Mindslaver is put onto the
  * battlefield with four lands in turn 1 (XMage's cheat) and activated by seat 0's policy; the other
- * games give the control directly, as Mindslaver's effect does (a turn modification). Needs ./db.
+ * games give the control directly, as Mindslaver's effect does (a turn modification). Since v0.6.1
+ * (patch 0008) a bot may control a turn too, by a turn modification, Word of Command or Opposition
+ * Agent: its AI decides for the controlled player, who is asked nothing. Needs ./db.
  */
 class TurnControlTest {
     private static final List<String> LEGACY = LegacyDuel.DECKS;
@@ -432,9 +440,12 @@ class TurnControlTest {
     }
 
     @Test
-    void aBotDoesNotTakeControlOfAHumansTurn() throws Exception {
-        // XMage lets no computer player control a turn: the bot's control of seat 1's turn 2 does not
-        // happen ("is AI and can't take control"), and seat 1 plays that turn itself.
+    void aBotControlsAHumansTurn() throws Exception {
+        // v0.6.1 (patch 0008): the bot controls seat 1's turn 2, as Mindslaver does, and XMage's AI
+        // makes seat 1's decisions that turn through the stand-in the bot makes for it. Seat 1 is
+        // asked nothing in turn 2, sees that seat 0 controls its turn, never sees the bot's hand,
+        // and decides for itself again in turn 4. Until v0.6.1 XMage refused ("is AI and can't take
+        // control").
         Seen seen = new Seen();
         var scenario = new TwoHeadedGiantAuditTest.Scenario(request(7106L, GameFormat.LEGACY, 4,
                 Tables.bot(LEGACY.get(0)), Tables.human(LEGACY.get(1))))
@@ -446,10 +457,181 @@ class TurnControlTest {
             seen.prompt(seat, prompt, view);
             return pass.choose(seat, prompt, view);
         });
-        assertTrue(seen.own(2, 1) > 0, "seat 1 decided its own turn 2");
+        List<String> log = run.log();
+        System.out.println("The controlled turn: " + log.stream().filter(line -> line.contains("Human 2")).toList());
+
+        assertEquals(0, seen.own(2, 1), "seat 1 was asked nothing in the turn the bot controlled");
+        assertTrue(seen.own(4, 1) > 0, "seat 1 decided for itself again in turn 4");
         assertTrue(seen.answeredFor.isEmpty(), "no prompt for another seat: " + seen.answeredFor);
-        assertTrue(seen.controllers(2, 1).isEmpty(), "nobody controlled seat 1");
-        assertTrue(run.log().stream().anyMatch(line -> line.contains("can't take control")), "XMage's log line");
+        assertEquals(Set.of(0), seen.controllers(2, 1), "seat 1 saw that seat 0 controls its turn");
+        assertTrue(seen.controllers(3, 1).isEmpty() && seen.controllers(4, 1).isEmpty(), "then nobody");
+        assertTrue(seen.handsShown.isEmpty(), "no hand shown to seat 1: " + seen.handsShown);
+        assertTrue(log.stream().anyMatch(line -> line.contains("taken turn control of Human 2")), "XMage's log line");
+        assertTrue(log.stream().noneMatch(line -> line.contains("can't take control")), "no refusal");
+        assertTrue(run.scenario().reached.contains("controlled player shown to itself"));
+    }
+
+    /**
+     * A fair bot that casts Word of Command at its first priority with it in hand and the stack
+     * empty. XMage copies players when it saves the game's state, so the copies share the flag.
+     */
+    static final class Commanding extends FairBot {
+        private static final long serialVersionUID = 1L;
+        private final AtomicBoolean cast;
+
+        Commanding(String name, RangeOfInfluence range, int skill, long seed) {
+            super(name, range, skill, seed);
+            this.cast = new AtomicBoolean();
+        }
+
+        private Commanding(Commanding bot) {
+            super(bot);
+            this.cast = bot.cast;
+        }
+
+        @Override
+        public Commanding copy() {
+            return new Commanding(this);
+        }
+
+        @Override
+        public boolean priority(Game game) {
+            Card word = getHand().getCards(game).stream().filter(card -> "Word of Command".equals(card.getName()))
+                .findFirst().orElse(null);
+            if (word != null && isGameUnderControl() && game.getStack().isEmpty() && cast.compareAndSet(false, true)
+                    && activateAbility(word.getSpellAbility(), game)) {
+                return true;
+            }
+            return super.priority(game);
+        }
+    }
+
+    @Test
+    void aBotControlsAHumanWithWordOfCommand() throws Exception {
+        // 723.5, patch 0008: the bot casts Word of Command at seat 1, whose hand is Llanowar Elves
+        // alone, with two Forests. The bot chooses the Elves and controls seat 1 until Word of Command
+        // has resolved: seat 1 casts the Elves, as Word of Command makes it, paying with a Forest, all
+        // decided by the bot's AI; seat 1 is asked nothing for it, and the Elves are seat 1's.
+        Seen seen = new Seen();
+        Map<String, AtomicInteger> kinds = new ConcurrentHashMap<>();
+        var scenario = new TwoHeadedGiantAuditTest.Scenario(request(7109L, GameFormat.LEGACY, 2,
+                Tables.bot(LEGACY.get(0)), Tables.human(LEGACY.get(1))))
+            .bots((seat, name, range, skill, seed) -> new Commanding(name, range, skill, FairBot.seedFor(seed, seat)))
+            .battlefield(0, "Swamp", "Swamp").hand(0, "Word of Command")
+            .battlefield(1, "Forest", "Forest").hand(1, "Llanowar Elves")
+            .setup((game, ids, seat, view) -> {
+                // Seat 1's hand becomes the one Llanowar Elves: the rest goes to the bottom of its library.
+                Player human = game.getPlayer(ids.get(1));
+                Cards rest = new CardsImpl();
+                boolean kept = false;
+                for (Card card : human.getHand().getCards(game)) {
+                    if (!kept && card.getName().equals("Llanowar Elves")) {
+                        kept = true;
+                    } else {
+                        rest.add(card);
+                    }
+                }
+                human.putCardsOnBottomOfLibrary(rest, game, null, false);
+            })
+            .probe(seen.probe());
+        Tables.Policy pass = TwoHeadedGiantAuditTest.passing(false);
+        Run run = play(scenario, new AtomicReference<>(), (seat, prompt, view) -> {
+            seen.prompt(seat, prompt, view);
+            kinds.computeIfAbsent(seat + ":" + prompt.kind(), key -> new AtomicInteger()).incrementAndGet();
+            return pass.choose(seat, prompt, view);
+        });
+        List<String> log = run.log();
+        System.out.println("Word of Command: " + log.stream()
+            .filter(line -> line.contains("Word of Command") || line.contains("control") || line.contains("Elves"))
+            .toList() + "; seat 1's prompts: " + kinds);
+
+        assertTrue(log.stream().anyMatch(line -> line.contains("casts Word of Command")), "the bot cast it");
+        assertTrue(log.stream().anyMatch(line -> line.contains("taken turn control of Human 2")),
+            "the bot took control of seat 1");
+        assertTrue(log.stream().anyMatch(line -> line.contains("Human 2 casts Llanowar Elves")),
+            "seat 1 cast the chosen card");
+        assertTrue(log.stream().noneMatch(line -> line.contains("can't take control")), "no refusal");
+        for (String kind : List.of("pay_mana", "choose_target", "yes_no", "order_triggers")) {
+            assertNull(kinds.get("1:" + kind), "seat 1 was asked nothing for the card: " + kinds);
+        }
+        assertEquals(1, scenario.count.getOrDefault("2:Llanowar Elves:1", 0), "the Elves are seat 1's: "
+            + scenario.count);
+        assertTrue(seen.answeredFor.isEmpty() && seen.handsShown.isEmpty());
+    }
+
+    @Test
+    void aBotControlsAHumansSearchWithOppositionAgent() throws Exception {
+        // Opposition Agent (seat 0, the bot): "you control your opponents while they're searching
+        // their libraries". Seat 1 activates Evolving Wilds; the bot controls seat 1 for the search
+        // and its AI chooses the land, which Opposition Agent exiles. Seat 1 is asked nothing for the
+        // search. Until v0.6.1 XMage refused the bot the control, though its AI still chose the land.
+        Map<String, AtomicInteger> kinds = new ConcurrentHashMap<>();
+        Map<String, Set<String>> exiled = new ConcurrentHashMap<>();
+        AtomicBoolean activated = new AtomicBoolean();
+        AtomicInteger activatedIn = new AtomicInteger();
+        var scenario = new TwoHeadedGiantAuditTest.Scenario(request(7110L, GameFormat.LEGACY, 2,
+                Tables.bot(LEGACY.get(0)), Tables.human(LEGACY.get(1))))
+            .battlefield(0, "Opposition Agent").battlefield(1, "Evolving Wilds");
+        Tables.Policy pass = TwoHeadedGiantAuditTest.passing(false);
+        Run run = play(scenario, new AtomicReference<>(), (seat, prompt, view) -> {
+            if (view.you() != null) {
+                exiled.computeIfAbsent(String.valueOf(view.turn()), key -> ConcurrentHashMap.newKeySet())
+                    .addAll(view.you().exile().stream().map(SeatView.CardInfo::name).toList());
+            }
+            if (activated.get() && view.turn() == activatedIn.get()) {
+                kinds.computeIfAbsent(prompt.kind(), key -> new AtomicInteger()).incrementAndGet();
+            }
+            if (prompt.kind().equals("priority")) {
+                var wilds = prompt.options().stream()
+                    .filter(option -> option.action().equals("activate") && "Evolving Wilds".equals(option.label()))
+                    .findFirst();
+                if (wilds.isPresent() && activated.compareAndSet(false, true)) {
+                    activatedIn.set(view.turn());
+                    return wilds.get().id();
+                }
+            }
+            return pass.choose(seat, prompt, view);
+        });
+        List<String> log = run.log();
+        System.out.println("Opposition Agent: " + log.stream()
+            .filter(line -> line.contains("search") || line.contains("control") || line.contains("Evolving"))
+            .toList() + "; seat 1's prompts after activating: " + kinds + "; exiled: " + exiled);
+
+        assertTrue(activated.get(), "seat 1 activated Evolving Wilds");
+        assertTrue(log.stream().anyMatch(line -> line.contains("taken turn control of Human 2")),
+            "the bot took control of seat 1 for the search");
+        assertTrue(log.stream().noneMatch(line -> line.contains("can't take control")), "no refusal");
+        assertNull(kinds.get("choose_target"), "seat 1 chose nothing in the search: " + kinds);
+        assertTrue(exiled.getOrDefault("2", Set.of()).contains("Forest"), "the land found was exiled: " + exiled);
+    }
+
+    @Test
+    void aBotControllingAPlayerControlsTheirTeam() throws Exception {
+        // 805.8 with a bot controller (patch 0008): seat 2, a bot, controls seat 1's next turn, so it
+        // controls team A's turn 3, both human seats: neither is asked anything that turn, both see
+        // that seat 2 controls it, and the game goes on.
+        Seen seen = new Seen();
+        List<String> decks = GameFormat.TWO_HEADED_GIANT.decks();
+        var scenario = new TwoHeadedGiantAuditTest.Scenario(request(7111L, GameFormat.TWO_HEADED_GIANT, 4,
+                Tables.human(decks.get(0)), Tables.human(decks.get(1)), Tables.bot(decks.get(2)),
+                Tables.bot(decks.get(3))))
+            .setup((game, ids, seat, view) -> game.getState().getTurnMods()
+                .add(new TurnMod(ids.get(1)).withNewController(ids.get(2))))
+            .probe(seen.probe());
+        Tables.Policy pass = TwoHeadedGiantAuditTest.passing(false);
+        Run run = play(scenario, new AtomicReference<>(), (seat, prompt, view) -> {
+            seen.prompt(seat, prompt, view);
+            return pass.choose(seat, prompt, view);
+        });
+        System.out.println("Own prompts: " + seen.ownPrompts + "; controllers seen: " + seen.controlledBy);
+
+        assertEquals(0, seen.own(3, 0), "seat 0 was asked nothing in team A's controlled turn");
+        assertEquals(0, seen.own(3, 1), "nor seat 1");
+        assertEquals(Set.of(2), seen.controllers(3, 0));
+        assertEquals(Set.of(2), seen.controllers(3, 1));
+        assertTrue(seen.own(1, 0) > 0, "seat 0 decided its team's turn 1 itself");
+        assertEquals(Set.of(0), seen.hands(3, 1), "seat 1 sees its teammate's hand only: " + seen.handsShown);
+        assertTrue(run.log().stream().anyMatch(line -> line.contains("taken turn control")), "XMage's log line");
     }
 
     @Test
