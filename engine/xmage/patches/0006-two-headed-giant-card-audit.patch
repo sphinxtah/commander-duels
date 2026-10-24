@@ -4,11 +4,14 @@ Reason: the cards whose own code reads one active player, one attacking player o
 counters, where part 3's rules do not reach. In a team game (Game.getTeammates, from part 1):
 - "your turn" compared with the active player by id reads the team's turn (805.9: Game.isActivePlayer);
 - custom triggers worded for "each player's" step and "that player" trigger for each player of the
-  active team, and a few "each player's" triggers built as "each step" say so (805.4d:
-  triggersForEachTeamPlayer, withTriggersForEachTeamPlayer);
+  active team, and a few "each player's" triggers built as "each step", or whose rules text names that
+  player only as "they" (Roiling Vortex, Persistent Constrictor, Urabrask) or not at all (Eladamri's
+  Vineyard, Magus of the Vineyard), say so (805.4d: triggersForEachTeamPlayer,
+  withTriggersForEachTeamPlayer);
 - watchers that record the beginning of a turn record it for each player of the active team;
-- "you attack with" counts the creatures you control, and "that attacking player" is the one
-  attacking the enchanted player (805.10a, 805.10c);
+- "you attack with" counts the creatures you control, "that attacking player" is the one attacking
+  the enchanted player, and Mirkwood Trapper's "if they aren't attacking you" reads the attack of the
+  player it triggered for (805.10a, 805.10c);
 - effects that check a player's poison counters count the team's (810.10a), and Melira, Sylvok
   Outcast keeps the whole team from getting them (810.10c);
 - Biorhythm, Shaman of Forgotten Ways and Reverse the Sands set or redistribute one life total per
@@ -321,6 +324,19 @@ index 3be16e3d..0f63ccf7 100644
      @Override
      public EbonyOwlNetsukeTriggeredAbility copy() {
          return new EbonyOwlNetsukeTriggeredAbility(this);
+diff --git a/Mage.Sets/src/mage/cards/e/EladamrisVineyard.java b/Mage.Sets/src/mage/cards/e/EladamrisVineyard.java
+index 9be6b9e4..72388a25 100644
+--- a/Mage.Sets/src/mage/cards/e/EladamrisVineyard.java
++++ b/Mage.Sets/src/mage/cards/e/EladamrisVineyard.java
+@@ -21,7 +21,7 @@ public final class EladamrisVineyard extends CardImpl {
+         // At the beginning of each player's precombat main phase, add {G}{G} to that player's mana pool.
+         this.addAbility(new BeginningOfFirstMainTriggeredAbility(
+                 TargetController.EACH_PLAYER, new AddManaToManaPoolTargetControllerEffect(Mana.GreenMana(2), "that player's"),
+-                false));
++                false).withTriggersForEachTeamPlayer(true)); // 805.4d: that player adds {G}{G}
+     }
+ 
+     private EladamrisVineyard(final EladamrisVineyard card) {
 diff --git a/Mage.Sets/src/mage/cards/e/EnergyVortex.java b/Mage.Sets/src/mage/cards/e/EnergyVortex.java
 index e009fc6c..b7b28614 100644
 --- a/Mage.Sets/src/mage/cards/e/EnergyVortex.java
@@ -697,6 +713,19 @@ index eb2ee661..3b806aef 100644
          if (countPoisonCounters > 0) {
              targetPlayer.loseAllCounters(CounterType.POISON.getName(), source, game);
              targetPlayer.damage(countPoisonCounters, source.getSourceId(), source, game);
+diff --git a/Mage.Sets/src/mage/cards/m/MagusOfTheVineyard.java b/Mage.Sets/src/mage/cards/m/MagusOfTheVineyard.java
+index 1902494c..e5c85905 100644
+--- a/Mage.Sets/src/mage/cards/m/MagusOfTheVineyard.java
++++ b/Mage.Sets/src/mage/cards/m/MagusOfTheVineyard.java
+@@ -28,7 +28,7 @@ public final class MagusOfTheVineyard extends CardImpl {
+         // At the beginning of each player's precombat main phase, add {G}{G} to that player's mana pool.
+         this.addAbility(new BeginningOfFirstMainTriggeredAbility(
+                 TargetController.EACH_PLAYER, new AddManaToManaPoolTargetControllerEffect(Mana.GreenMana(2), "that player's"),
+-                false));
++                false).withTriggersForEachTeamPlayer(true)); // 805.4d: that player adds {G}{G}
+     }
+ 
+     private MagusOfTheVineyard(final MagusOfTheVineyard card) {
 diff --git a/Mage.Sets/src/mage/cards/m/ManaCache.java b/Mage.Sets/src/mage/cards/m/ManaCache.java
 index b6592f70..41f882f4 100644
 --- a/Mage.Sets/src/mage/cards/m/ManaCache.java
@@ -779,6 +808,30 @@ index 5994ad52..5874243e 100644
      }
  
  }
+diff --git a/Mage.Sets/src/mage/cards/m/MirkwoodTrapper.java b/Mage.Sets/src/mage/cards/m/MirkwoodTrapper.java
+index c92d3a26..9a74232a 100644
+--- a/Mage.Sets/src/mage/cards/m/MirkwoodTrapper.java
++++ b/Mage.Sets/src/mage/cards/m/MirkwoodTrapper.java
+@@ -85,6 +85,19 @@ enum MirkwoodTrapperCondition implements Condition {
+ 
+     @Override
+     public boolean apply(Game game, Ability source) {
++        // 805.10c: with shared team turns, "they" is the attacking player the ability triggered for, and
++        // only the creatures that player attacks with count
++        UUID attackingPlayerId = source.getEffects().isEmpty() ? null
++                : source.getEffects().get(0).getTargetPointer().getFirst(game, source);
++        if (attackingPlayerId != null && !game.getTeammates(attackingPlayerId).isEmpty()) {
++            return game.getCombat()
++                    .getGroups()
++                    .stream()
++                    .filter(group -> !group.isDefenderIsPermanent() && source.isControlledBy(group.getDefenderId()))
++                    .flatMap(group -> group.getAttackers().stream())
++                    .map(game::getPermanent)
++                    .noneMatch(attacker -> attacker != null && attacker.isControlledBy(attackingPlayerId));
++        }
+         return game.getCombat()
+                 .getPlayerDefenders(game, false)
+                 .stream()
 diff --git a/Mage.Sets/src/mage/cards/m/MisersCage.java b/Mage.Sets/src/mage/cards/m/MisersCage.java
 index 4786e402..ea2b98e0 100644
 --- a/Mage.Sets/src/mage/cards/m/MisersCage.java
@@ -860,6 +913,19 @@ index 1be5830f..9e47bd7e 100644
 +                && game.getCombat().isAttackingPlayer(getControllerId(), game); // 805.10a
      }
  }
+diff --git a/Mage.Sets/src/mage/cards/p/PersistentConstrictor.java b/Mage.Sets/src/mage/cards/p/PersistentConstrictor.java
+index fb12f5df..afef9c54 100644
+--- a/Mage.Sets/src/mage/cards/p/PersistentConstrictor.java
++++ b/Mage.Sets/src/mage/cards/p/PersistentConstrictor.java
+@@ -43,7 +43,7 @@ public final class PersistentConstrictor extends CardImpl {
+         // At the beginning of each opponent's upkeep, they lose 1 life and you put a -1/-1 counter on up to one target creature they control.
+         Ability ability = new BeginningOfUpkeepTriggeredAbility(
+                 TargetController.OPPONENT, new PersistentConstrictorEffect(), false
+-        );
++        ).withTriggersForEachTeamPlayer(true); // 805.4d: "they" is that opponent
+         ability.addEffect(new AddCountersTargetEffect(CounterType.M1M1.createInstance()).concatBy("and you"));
+         ability.addTarget(new TargetPermanent(0, 1, filter));
+         this.addAbility(ability);
 diff --git a/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java b/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java
 index 37379146..ab31fe4c 100644
 --- a/Mage.Sets/src/mage/cards/p/PhyresisOutbreak.java
@@ -1065,6 +1131,19 @@ index 7bbfbffe..770d8282 100644
              return false;
          }
          // attacked with Rogue
+diff --git a/Mage.Sets/src/mage/cards/r/RoilingVortex.java b/Mage.Sets/src/mage/cards/r/RoilingVortex.java
+index e35c3e04..f7d1e3d6 100644
+--- a/Mage.Sets/src/mage/cards/r/RoilingVortex.java
++++ b/Mage.Sets/src/mage/cards/r/RoilingVortex.java
+@@ -34,7 +34,7 @@ public final class RoilingVortex extends CardImpl {
+         this.addAbility(new BeginningOfUpkeepTriggeredAbility(
+                 TargetController.EACH_PLAYER, new DamageTargetEffect(1).withTargetDescription("them"),
+                 false
+-        ));
++        ).withTriggersForEachTeamPlayer(true)); // 805.4d: "them" is that player
+ 
+         // Whenever a player casts a spell, if no mana was spent to cast that spell, Roiling Vortex deals 5 damage to that player.
+         this.addAbility(new SpellCastAllTriggeredAbility(
 diff --git a/Mage.Sets/src/mage/cards/s/SarkhansScorn.java b/Mage.Sets/src/mage/cards/s/SarkhansScorn.java
 index 50cd3703..79a4478e 100644
 --- a/Mage.Sets/src/mage/cards/s/SarkhansScorn.java
@@ -1292,6 +1371,19 @@ index e02c5873..be6f8765 100644
 -        return true;
      }
  }
+diff --git a/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java b/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java
+index fb0d7eb4..4db1804a 100644
+--- a/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java
++++ b/Mage.Sets/src/mage/cards/u/UrabraskHereticPraetor.java
+@@ -42,7 +42,7 @@ public final class UrabraskHereticPraetor extends CardImpl {
+         // At the beginning of each opponent's upkeep, the next time they would draw a card this turn, instead they exile the top card of their library. They may play it this turn.
+         this.addAbility(new BeginningOfUpkeepTriggeredAbility(
+                 TargetController.OPPONENT, new UrabraskHereticPraetorEffect(), false
+-        ));
++        ).withTriggersForEachTeamPlayer(true)); // 805.4d: "they" is that opponent
+     }
+ 
+     private UrabraskHereticPraetor(final UrabraskHereticPraetor card) {
 diff --git a/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java b/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java
 index 4ec44145..fc0c9d9f 100644
 --- a/Mage.Sets/src/mage/cards/v/ViridianBetrayers.java

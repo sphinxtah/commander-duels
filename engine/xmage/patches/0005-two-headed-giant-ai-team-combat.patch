@@ -1,8 +1,9 @@
 Two-Headed Giant (Commander Duels v0.5.1 card audit): the computer player attacks and blocks as a team.
 
 Reason: XMage's AI declares its own attackers and blockers alone. In a team game (Game.getTeammates,
-from part 1) its lethal-attack check now counts the attackers its teammate has declared or, when it
-declares first (it holds the team's turn), could declare (805.10b), against the defending team's
+from part 1) its lethal-attack check now counts the attackers its teammate has declared at a player
+of the defending team (not at a planeswalker or a battle) or, when it declares first (it holds the
+team's turn), could declare (805.10b), against the defending team's
 blockers together (805.10d); a defending AI leaves alone the attackers its teammate has blocked; and
 the poison part of the lethal check counts the defending team's counters against the format's number
 (810.10, 810.8d: 15 in Two-Headed Giant) instead of a player's own against ten. Other games are
@@ -12,7 +13,7 @@ Upstream: none yet; to be offered to magefree/mage with the other parts.
 Remove when: XMage upstream's AI supports teams, or Two-Headed Giant is dropped.
 
 diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
-index ca070e50..d8ec815e 100644
+index ca070e50..b39ddd4a 100644
 --- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
 +++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
 @@ -17,6 +17,7 @@ import mage.counters.CounterType;
@@ -70,7 +71,7 @@ index ca070e50..d8ec815e 100644
  
                  // The AI will now attack more sanely.  Simple, but good enough for now.
                  // The sim minmax does not work at the moment.
-@@ -1153,6 +1170,52 @@ public class ComputerPlayer6 extends ComputerPlayer {
+@@ -1153,6 +1170,55 @@ public class ComputerPlayer6 extends ComputerPlayer {
          }
      }
  
@@ -106,8 +107,11 @@ index ca070e50..d8ec815e 100644
 +                continue;
 +            }
 +            for (UUID attackerId : game.getCombat().getAttackers()) {
++                // only an attack on a player of the defending team lowers its life: one on a
++                // planeswalker or a battle does not count
 +                Permanent attacker = game.getPermanent(attackerId);
-+                if (attacker != null && attacker.isControlledBy(teammateId)) {
++                if (attacker != null && attacker.isControlledBy(teammateId)
++                        && game.getTeam(defenderId).contains(game.getCombat().getDefenderId(attackerId))) {
 +                    team.add(attacker);
 +                }
 +            }

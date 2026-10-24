@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,9 +25,12 @@ import mage.constants.TurnPhase;
 import mage.counters.CounterType;
 import mage.game.Game;
 import mage.game.PutToBattlefieldInfo;
+import mage.game.command.Dungeon;
 import mage.game.match.Match;
 import mage.game.permanent.Permanent;
+import mage.game.permanent.PermanentToken;
 import mage.game.turn.TurnMod;
+import mage.player.ai.ComputerPlayer6;
 import mage.player.ai.ComputerPlayer7;
 import mage.players.Player;
 import mage.util.RandomUtil;
@@ -201,6 +205,16 @@ class TwoHeadedGiantAuditTest {
         };
     }
 
+    /**
+     * {@link #passing}, with the attack in the given turn only (XMage's cheat puts creatures onto the
+     * battlefield able to attack in turn 1 already).
+     */
+    static Tables.Policy attackingIn(int turn) {
+        Tables.Policy attack = passing(true);
+        Tables.Policy pass = passing(false);
+        return (seat, prompt, view) -> (view.turn() == turn ? attack : pass).choose(seat, prompt, view);
+    }
+
     private static HumanGameRequest fourHumans(long seed, int turnCap) {
         List<HumanGameRequest.Seat> seats = new ArrayList<>();
         for (String deck : DECKS) {
@@ -360,11 +374,40 @@ class TwoHeadedGiantAuditTest {
         // it, and seat 3; then the control ends. Played by XMage's own bots on the game thread: the
         // engine does not hand a controlled player's decisions to the controlling seat (in any format;
         // see docs/engine/two-headed-giant.md), so human seats are not used here.
-        var outcome = new AtomicReference<Map<String, Boolean>>();
+        Map<String, Integer> controller = controlled(5105L,
+            ids -> List.of(new TurnMod(ids.get(3)).withNewController(ids.get(0))));
+        assertEquals(0, controller.get("2:2"), "seat 0 controlled seat 2 in turn 2: " + controller);
+        assertEquals(0, controller.get("2:3"), "seat 0 controlled seat 3 in turn 2: " + controller);
+        assertEquals(2, controller.get("3:2"), "control ended with turn 2: " + controller);
+        assertEquals(3, controller.get("3:3"), "control ended with turn 2: " + controller);
+    }
+
+    @Test
+    void theNewerControlOfATeamWins() throws Exception {
+        // 805.8, 720.1a: seat 0 comes to control seat 2's next turn, then seat 1 seat 3's. Both effects
+        // control team B's turn 2, and the newer one works: seat 1 controls seat 2 and seat 3. (The
+        // first version of patch 0004 used each player's modifications before reading the next one's
+        // position, so the older effect won.)
+        Map<String, Integer> controller = controlled(5122L, ids -> List.of(
+            new TurnMod(ids.get(2)).withNewController(ids.get(0)),
+            new TurnMod(ids.get(3)).withNewController(ids.get(1))));
+        assertEquals(1, controller.get("2:2"), "seat 1 controlled seat 2 in turn 2: " + controller);
+        assertEquals(1, controller.get("2:3"), "seat 1 controlled seat 3 in turn 2: " + controller);
+        assertEquals(2, controller.get("3:2"), "control ended with turn 2: " + controller);
+    }
+
+    /**
+     * Plays a game of XMage's bots, seats 0 and 1 able to control a turn, with the given turn
+     * modifications added before it starts. By "turn:seat" for team B's seats: the seat whose player
+     * controlled that seat in that turn's first main phase.
+     */
+    private static Map<String, Integer> controlled(long seed, java.util.function.Function<List<UUID>, List<TurnMod>> mods)
+            throws Exception {
+        var outcome = new AtomicReference<Map<String, Integer>>();
         var failure = new AtomicReference<Throwable>();
         Thread thread = new Thread(() -> {
             try {
-                outcome.set(playControlled());
+                outcome.set(playControlled(seed, mods));
             } catch (Throwable t) {
                 failure.set(t);
             }
@@ -375,22 +418,19 @@ class TwoHeadedGiantAuditTest {
         if (failure.get() != null) {
             throw new AssertionError("the game failed", failure.get());
         }
-        Map<String, Boolean> controlled = outcome.get();
-        assertEquals(Boolean.TRUE, controlled.get("2:2"), "seat 0 controlled seat 2 in turn 2: " + controlled);
-        assertEquals(Boolean.TRUE, controlled.get("2:3"), "seat 0 controlled seat 3 in turn 2: " + controlled);
-        assertEquals(Boolean.FALSE, controlled.get("3:2"), "control ended with turn 2: " + controlled);
-        assertEquals(Boolean.FALSE, controlled.get("3:3"), "control ended with turn 2: " + controlled);
+        return outcome.get();
     }
 
-    /** By "turn:seat": whether seat 0 controlled that seat at a table event of that turn's first main phase. */
-    private static Map<String, Boolean> playControlled() throws Exception {
-        RandomUtil.setSeed(5105L);
+    private static Map<String, Integer> playControlled(long seed, java.util.function.Function<List<UUID>, List<TurnMod>> mods)
+            throws Exception {
+        RandomUtil.setSeed(seed);
         GameFormat format = GameFormat.TWO_HEADED_GIANT;
         Game game = format.newGame(TwoHeadedGiant.PLAYERS, 3);
         Match match = format.newMatch("Two-Headed Giant control", TwoHeadedGiant.PLAYERS);
         List<Player> players = new ArrayList<>();
         players.add(new ControllingBot("Bot 1"));
-        for (int seat = 1; seat < TwoHeadedGiant.PLAYERS; seat++) {
+        players.add(new ControllingBot("Bot 2"));
+        for (int seat = 2; seat < TwoHeadedGiant.PLAYERS; seat++) {
             players.add(new ComputerPlayer7("Bot " + (seat + 1), RangeOfInfluence.ALL, 1));
         }
         for (int index : HumanGame.additionOrder(players.size())) {
@@ -398,19 +438,19 @@ class TwoHeadedGiantAuditTest {
         }
         List<UUID> ids = players.stream().map(Player::getId).toList();
         format.seatTeams(game, ids);
-        Map<String, Boolean> controlled = new ConcurrentHashMap<>();
+        Map<String, Integer> controller = new ConcurrentHashMap<>();
         game.addTableEventListener(event -> {
             if (game.getTurnStepType() != PhaseStep.PRECOMBAT_MAIN) {
                 return; // control changes as a turn begins
             }
             for (int index = 2; index < 4; index++) {
-                controlled.merge(game.getTurnNum() + ":" + index,
-                    game.getPlayer(ids.get(index)).getTurnControlledBy().equals(ids.get(0)), Boolean::logicalOr);
+                controller.put(game.getTurnNum() + ":" + index,
+                    ids.indexOf(game.getPlayer(ids.get(index)).getTurnControlledBy()));
             }
         });
-        game.getState().getTurnMods().add(new TurnMod(ids.get(3)).withNewController(ids.get(0)));
+        mods.apply(ids).forEach(game.getState().getTurnMods()::add);
         game.start(ids.get(0));
-        return controlled;
+        return controller;
     }
 
     @Test
@@ -517,6 +557,291 @@ class TwoHeadedGiantAuditTest {
         assertEquals(at(scenario.library, 3, 1) - 1, afterAttack.get(1), "seat 1 attacked with three creatures: a card");
     }
 
+    // The review of the audit (v0.5.1): one test for each finding it confirmed
+
+    /** By seat: the library at the first view of team A's turn 3 postcombat main phase, after its attack. */
+    private static Map<Integer, Integer> afterTurn3Attack(Scenario scenario) {
+        Map<Integer, Integer> afterAttack = new ConcurrentHashMap<>();
+        scenario.probe((game, ids, seat, view) -> {
+            if (view.turn() == 3 && "postcombat_main".equals(view.step())) {
+                List<SeatView.PlayerState> players = new ArrayList<>(view.opponents());
+                players.add(view.you());
+                players.forEach(player -> afterAttack.putIfAbsent(player.seat(), player.libraryCount()));
+            }
+        });
+        return afterAttack;
+    }
+
+    /**
+     * Records, by "turn:seat", the largest value the function gives for each seat in the views of each
+     * turn's precombat main phase.
+     */
+    private static Map<String, Integer> mostInMainPhase(Scenario scenario, java.util.function.BiFunction<Game, UUID, Integer> value) {
+        Map<String, Integer> most = new ConcurrentHashMap<>();
+        scenario.probe((game, ids, seat, view) -> {
+            if ("precombat_main".equals(view.step())) {
+                for (int index = 0; index < ids.size(); index++) {
+                    most.merge(view.turn() + ":" + index, value.apply(game, ids.get(index)), Math::max);
+                }
+            }
+        });
+        return most;
+    }
+
+    @Test
+    void aStepTriggerThatDoesNotReferToThatPlayerTriggersOnce() throws Exception {
+        // 805.4d: "they", "them" and "their" alone do not make a step trigger refer to the player whose
+        // step it is. Smuggler's Share ("each end step" in its Oracle text, built for each player's)
+        // triggers once at team B's end step and draws seat 0 a card for each opponent who drew two
+        // cards (Howling Mine); Roiling Vortex, whose "them" is that player, says so by hand and deals
+        // 1 damage to each player of the active team.
+        var scenario = new Scenario(fourHumans(5111L, 4))
+            .battlefield(0, "Smuggler's Share", "Howling Mine", "Roiling Vortex");
+        play(scenario, passing(false));
+        System.out.println("Life by turn and seat: " + new java.util.TreeMap<>(scenario.life));
+        System.out.println("Libraries by turn and seat: " + new java.util.TreeMap<>(scenario.library));
+
+        assertEquals(28, at(scenario.life, 2, 2), "team B's upkeep: one damage to each of its players");
+        assertEquals(28, at(scenario.life, 3, 0), "team A's upkeep: one damage to each of its players");
+        // Seat 0: 53 cards, two drawn once at team B's end step, then two in its own draw step.
+        assertEquals(49, at(scenario.library, 3, 0));
+        assertEquals(51, at(scenario.library, 3, 1));
+    }
+
+    @Test
+    void eachPlayerOfTheActiveTeamAdvancesTheirSagas() throws Exception {
+        // 714.3b, 805.4: as the precombat main phase of each player of the active team begins, they put a
+        // lore counter on each of their Sagas. History of Benalia on seat 1 advances in team A's turn 3,
+        // which seat 0 holds, like seat 0's; neither does in team B's turn 2.
+        var scenario = new Scenario(fourHumans(5112L, 4))
+            .battlefield(0, "History of Benalia")
+            .battlefield(1, "History of Benalia");
+        Map<String, Integer> lore = mostInMainPhase(scenario, (game, playerId) -> game.getBattlefield()
+            .getAllActivePermanents(playerId).stream()
+            .filter(permanent -> permanent.getName().equals("History of Benalia"))
+            .mapToInt(permanent -> permanent.getCounters(game).getCount(CounterType.LORE)).max().orElse(-1));
+        play(scenario, passing(false));
+        System.out.println("Lore counters by turn and seat: " + new java.util.TreeMap<>(lore));
+
+        assertEquals(lore.get("1:0"), lore.get("2:0"), "seat 0's Saga waits in team B's turn: " + lore);
+        assertEquals(lore.get("1:1"), lore.get("2:1"), "seat 1's Saga waits in team B's turn: " + lore);
+        assertEquals(lore.get("2:0") + 1, lore.get("3:0"), "seat 0's Saga advances in turn 3: " + lore);
+        assertEquals(lore.get("2:1") + 1, lore.get("3:1"), "seat 1's Saga advances in turn 3: " + lore);
+    }
+
+    @Test
+    void eladamrisVineyardGivesEachPlayerOfTheActiveTeamTwoGreen() throws Exception {
+        // 805.4d: "at the beginning of each player's precombat main phase, that player adds {G}{G}"
+        // triggers for each player of the active team (XMage's text leaves "that player" out, so the
+        // card says so by hand).
+        var scenario = new Scenario(fourHumans(5113L, 4)).battlefield(0, "Eladamri's Vineyard");
+        Map<String, Integer> green = mostInMainPhase(scenario,
+            (game, playerId) -> game.getPlayer(playerId).getManaPool().getGreen());
+        play(scenario, passing(false));
+        System.out.println("Green mana by turn and seat: " + new java.util.TreeMap<>(green));
+
+        assertEquals(2, green.get("2:2"), "seat 2 added {G}{G} in team B's turn: " + green);
+        assertEquals(2, green.get("2:3"), "seat 3 added {G}{G} in team B's turn: " + green);
+        assertEquals(0, green.get("2:0"), "not team A's turn: " + green);
+        assertEquals(2, green.get("3:0"), "seat 0 added {G}{G} in team A's turn: " + green);
+        assertEquals(2, green.get("3:1"), "seat 1 added {G}{G} in team A's turn: " + green);
+    }
+
+    @Test
+    void theTeammateWithTheInitiativeVenturesInTheTeamsUpkeep() throws Exception {
+        // The initiative's "at the beginning of your upkeep, venture into Undercity" is the upkeep of the
+        // player who has it (805.4d). Seat 1 takes it in turn 1 and ventures; in team A's upkeep in turn
+        // 3, which seat 0 holds, seat 1 ventures again and seat 0 does not; team B never does.
+        var scenario = new Scenario(fourHumans(5114L, 4))
+            .setup((game, ids, seat, view) -> game.takeInitiative(null, ids.get(1)));
+        Map<String, String> rooms = new ConcurrentHashMap<>();
+        scenario.probe((game, ids, seat, view) -> {
+            if ("precombat_main".equals(view.step())) {
+                for (int index = 0; index < ids.size(); index++) {
+                    Dungeon dungeon = game.getPlayerDungeon(ids.get(index));
+                    rooms.put(view.turn() + ":" + index,
+                        dungeon == null || dungeon.getCurrentRoom() == null ? "none" : dungeon.getCurrentRoom().getName());
+                }
+            }
+        });
+        play(scenario, passing(false));
+        System.out.println("Undercity rooms by turn and seat: " + new java.util.TreeMap<>(rooms));
+
+        assertFalse("none".equals(rooms.get("2:1")), "seat 1 ventured as it took the initiative: " + rooms);
+        assertFalse(rooms.get("2:1").equals(rooms.get("3:1")), "seat 1 ventured in team A's upkeep: " + rooms);
+        assertEquals("none", rooms.get("3:0"), "seat 0 never ventured: " + rooms);
+        assertEquals("none", rooms.get("3:2"), "team B never ventured: " + rooms);
+        assertEquals("none", rooms.get("3:3"), "team B never ventured: " + rooms);
+    }
+
+    @Test
+    void noExchangeOfLifeTotalsWhenATeammateCantLoseLife() throws Exception {
+        // 810.9g, 810.9h: with Platinum Emperion ("your life total can't change") on seat 1, no player of
+        // team A can lose life, so team B at 5 exchanges life totals with team A at 30 neither when seat
+        // 2 starts it nor when seat 0 does.
+        Map<String, Object> seen = new ConcurrentHashMap<>();
+        var scenario = new Scenario(fourHumans(5115L, 3))
+            .battlefield(1, "Platinum Emperion")
+            .setup((game, ids, seat, view) -> {
+                game.processAction();
+                seen.put("seat 1 can lose life", game.getPlayer(ids.get(1)).isCanLoseLife());
+                Player seat0 = game.getPlayer(ids.get(0));
+                Player seat2 = game.getPlayer(ids.get(2));
+                seat2.loseLife(25, game, null, false);
+                seat2.exchangeLife(seat0, null, game);
+                seen.put("after seat 2's exchange", List.of(seat0.getLife(), seat2.getLife()));
+                seat0.exchangeLife(seat2, null, game);
+                seen.put("after seat 0's exchange", List.of(seat0.getLife(), seat2.getLife()));
+            });
+        play(scenario, passing(false));
+
+        assertEquals(false, seen.get("seat 1 can lose life"), "Platinum Emperion applies: " + seen);
+        assertEquals(List.of(30, 5), seen.get("after seat 2's exchange"));
+        assertEquals(List.of(30, 5), seen.get("after seat 0's exchange"));
+        assertEquals(30, at(scenario.life, 2, 1));
+        assertEquals(5, at(scenario.life, 2, 3));
+    }
+
+    @Test
+    void eachPlayerWhoAttacksIsTheAttackingPlayer() throws Exception {
+        // 805.10a, 805.10c: Norn's Decree on seat 2 ("whenever a player attacks, if one or more players
+        // being attacked are poisoned, the attacking player draws a card"), team B poisoned. When seat 1
+        // attacks alone in team A's turn 3, seat 1 draws and seat 0, who holds the turn, does not; when
+        // both attack, each draws one card.
+        assertEquals(List.of(0, 1), nornsDecreeDraws(5116L, false), "seat 1 attacked alone");
+        assertEquals(List.of(1, 1), nornsDecreeDraws(5117L, true), "both attacked");
+    }
+
+    @Test
+    void mirkwoodTrapperReadsEachAttackingPlayersOwnAttack() throws Exception {
+        // 805.10c: Mirkwood Trapper on seat 2 ("whenever a player attacks, if they aren't attacking you,
+        // that player chooses an attacking creature; it gets +2/+0"). In team A's turn 3 seat 0 attacks
+        // seat 2 and seat 1 attacks seat 3: the ability triggers for seat 1 only, and seat 1 chooses.
+        var scenario = new Scenario(fourHumans(5121L, 4))
+            .battlefield(0, "Grizzly Bears")
+            .battlefield(1, "Llanowar Elves")
+            .battlefield(2, "Mirkwood Trapper");
+        Tables.Policy policy = attackingIn(3);
+        List<String> log = play(scenario, (seat, prompt, view) -> {
+            if (prompt.kind().equals("choose_defender") && seat < 2) {
+                Integer defender = seat == 0 ? 2 : 3;
+                return prompt.options().stream().filter(option -> defender.equals(option.seat())).findFirst()
+                    .orElse(prompt.options().get(0)).id();
+            }
+            return policy.choose(seat, prompt, view);
+        }).log();
+        List<String> chose = log.stream().filter(line -> line.matches("Human \\d chose .*")).toList();
+        System.out.println("Mirkwood Trapper's choices: " + chose);
+
+        assertEquals(1, chose.size(), "one attacking player was not attacking seat 2: " + chose);
+        assertTrue(chose.get(0).startsWith("Human 2 chose"), "seat 1 chose: " + chose);
+    }
+
+    /** The cards seats 0 and 1 drew in team A's turn 3 attack, with Norn's Decree on seat 2. */
+    private static List<Integer> nornsDecreeDraws(long seed, boolean bothAttack) throws Exception {
+        var scenario = new Scenario(fourHumans(seed, 4))
+            .battlefield(1, "Grizzly Bears")
+            .battlefield(2, "Norn's Decree")
+            .setup((game, ids, seat, view) -> game.getPlayer(ids.get(3))
+                .addCounters(CounterType.POISON.createInstance(1), ids.get(0), null, game));
+        if (bothAttack) {
+            scenario.battlefield(0, "Grizzly Bears");
+        }
+        Map<Integer, Integer> afterAttack = afterTurn3Attack(scenario);
+        play(scenario, attackingIn(3));
+        System.out.println("Libraries by turn and seat: " + new java.util.TreeMap<>(scenario.library)
+            + "; after team A's attack in turn 3: " + afterAttack);
+        return List.of(at(scenario.library, 3, 0) - afterAttack.get(0), at(scenario.library, 3, 1) - afterAttack.get(1));
+    }
+
+    @Test
+    void aTeammatesTokensPutOntoTheBattlefieldAttackingAreAimedByTheirController() throws Exception {
+        // 508.4: Hero of Bladehold on seat 1 attacks in team A's turn 3 and makes two Soldiers tapped and
+        // attacking. Seat 1, their controller, chooses which player of team B each attacks, not seat 0,
+        // who holds the turn and controls nothing.
+        var scenario = new Scenario(fourHumans(5118L, 4)).battlefield(1, "Hero of Bladehold");
+        Map<String, Integer> tokens = new ConcurrentHashMap<>();
+        scenario.probe((game, ids, seat, view) -> {
+            if (view.turn() != 3) {
+                return;
+            }
+            for (UUID attackerId : game.getCombat().getAttackers()) {
+                Permanent attacker = game.getPermanent(attackerId);
+                if (attacker instanceof PermanentToken && attacker.isControlledBy(ids.get(1))) {
+                    tokens.put(attackerId.toString(), ids.indexOf(game.getCombat().getDefenderId(attackerId)));
+                }
+            }
+        });
+        Map<Integer, Integer> defenderPrompts = new ConcurrentHashMap<>();
+        Tables.Policy policy = attackingIn(3);
+        play(scenario, (seat, prompt, view) -> {
+            if (prompt.kind().equals("choose_defender")) {
+                defenderPrompts.merge(seat, 1, Integer::sum);
+            }
+            return policy.choose(seat, prompt, view);
+        });
+        System.out.println("Defender choices by seat: " + defenderPrompts + "; the tokens' defenders: " + tokens);
+
+        assertEquals(2, tokens.size(), "two Soldiers attacked: " + tokens);
+        assertTrue(tokens.values().stream().allMatch(defender -> defender == 2 || defender == 3),
+            "each attacked a player of team B: " + tokens);
+        assertEquals(null, defenderPrompts.get(0), "seat 0 chose nothing: " + defenderPrompts);
+        // Seat 1 chose once for the creatures it attacked with, then once for each token
+        assertTrue(defenderPrompts.getOrDefault(1, 0) >= 3, "seat 1 chose for its tokens: " + defenderPrompts);
+    }
+
+    @Test
+    void aBotsLethalCheckCountsItsTeammatesAttacksOnTheDefendingTeamOnly() throws Exception {
+        // The computer player's lethal-attack check (patch 0005) counts the creatures its teammate
+        // attacks a player of the defending team with: those attacking a planeswalker or a battle deal
+        // the team no damage. Seat 0 attacks seat 2's Ajani Goldmane with two Grizzly Bears and seat 2
+        // with Llanowar Elves; the bot on seat 1 counts the Elves only.
+        List<HumanGameRequest.Seat> seats = new ArrayList<>();
+        for (int seat = 0; seat < DECKS.size(); seat++) {
+            seats.add(seat == 1 ? Tables.bot(DECKS.get(seat)) : Tables.human(DECKS.get(seat)));
+        }
+        var scenario = new Scenario(new HumanGameRequest(5119L, GameFormat.TWO_HEADED_GIANT, seats, 1, 4, 900, 0, 0))
+            .battlefield(0, "Grizzly Bears", "Grizzly Bears", "Llanowar Elves")
+            .battlefield(2, "Ajani Goldmane");
+        Map<String, Object> seen = new ConcurrentHashMap<>();
+        scenario.probe((game, ids, seat, view) -> {
+            long seat0Attackers = game.getCombat().getAttackers().stream().map(game::getPermanent)
+                .filter(attacker -> attacker != null && attacker.isControlledBy(ids.get(0))).count();
+            if (view.turn() != 3 || seat0Attackers < 3 || seen.containsKey("counted")) {
+                return;
+            }
+            try {
+                Method teamAttackers = ComputerPlayer6.class.getDeclaredMethod("teamAttackers", List.class,
+                    UUID.class, Game.class);
+                teamAttackers.setAccessible(true);
+                @SuppressWarnings("unchecked")
+                List<Permanent> counted = (List<Permanent>) teamAttackers.invoke(game.getPlayer(ids.get(1)),
+                    new ArrayList<Permanent>(), ids.get(2), game);
+                seen.put("counted", counted.stream().map(Permanent::getName).sorted().toList());
+            } catch (ReflectiveOperationException e) {
+                seen.put("counted", e.toString());
+            }
+        });
+        Tables.Policy policy = passing(false);
+        play(scenario, (seat, prompt, view) -> {
+            if (seat == 0 && view.turn() == 3 && prompt.kind().equals("declare_attackers")) {
+                return prompt.options().stream()
+                    .filter(option -> option.action().equals("toggle_attacker") && !option.selected())
+                    .findFirst().orElse(ScriptedPlayer.byAction(prompt.options(), "done").get(0)).id();
+            }
+            if (seat == 0 && prompt.kind().equals("choose_defender")) {
+                boolean elves = prompt.detail() != null && prompt.detail().contains("Llanowar Elves");
+                return prompt.options().stream()
+                    .filter(option -> elves ? Integer.valueOf(2).equals(option.seat())
+                        : option.label() != null && option.label().contains("Ajani"))
+                    .findFirst().orElse(prompt.options().get(0)).id();
+            }
+            return policy.choose(seat, prompt, view);
+        });
+
+        assertEquals(List.of("Llanowar Elves"), seen.get("counted"), "the attack on seat 2 only: " + seen);
+    }
+
     @Test
     void aLegacyDuelPlaysAsBefore() throws Exception {
         // The same patterns between two players, where every rule is XMage's own: each upkeep and draw
@@ -534,5 +859,70 @@ class TwoHeadedGiantAuditTest {
         assertTrue(scenario.typeLine.get("2:Warden of the Wall").contains("Creature"));
         assertFalse(scenario.typeLine.get("3:Warden of the Wall").contains("Creature"));
         assertEquals(18, at(scenario.life, 3, 0), "seat 0 took two in its upkeep");
+    }
+
+    @Test
+    void aLegacyDuelPlaysTheReviewsPatternsAsBefore() throws Exception {
+        // The patterns the review of the audit changed, between two players: a Saga gets its lore counter
+        // in its controller's turn only; Eladamri's Vineyard gives the active player {G}{G}; the player
+        // with the initiative ventures in their own upkeep; Hero of Bladehold's tokens attack the one
+        // opponent and Norn's Decree draws the attacking player one card; life totals are exchanged.
+        var request = new HumanGameRequest(5120L, GameFormat.LEGACY,
+            List.of(Tables.human(LegacyDuel.DECKS.get(0)), Tables.human(LegacyDuel.DECKS.get(1))), 1, 4, 900, 0, 0);
+        Map<String, Object> seen = new ConcurrentHashMap<>();
+        var scenario = new Scenario(request)
+            .battlefield(0, "History of Benalia", "Eladamri's Vineyard", "Norn's Decree", "Hero of Bladehold")
+            .setup((game, ids, seat, view) -> {
+                Player seat0 = game.getPlayer(ids.get(0));
+                Player seat1 = game.getPlayer(ids.get(1));
+                seat0.loseLife(5, game, null, false);
+                seat0.exchangeLife(seat1, null, game);
+                seen.put("exchanged", List.of(seat0.getLife(), seat1.getLife()));
+                seat1.addCounters(CounterType.POISON.createInstance(1), ids.get(0), null, game);
+                game.takeInitiative(null, ids.get(0));
+            });
+        Map<String, Integer> lore = mostInMainPhase(scenario, (game, playerId) -> game.getBattlefield()
+            .getAllActivePermanents(playerId).stream()
+            .filter(permanent -> permanent.getName().equals("History of Benalia"))
+            .mapToInt(permanent -> permanent.getCounters(game).getCount(CounterType.LORE)).max().orElse(-1));
+        Map<String, Integer> green = mostInMainPhase(scenario,
+            (game, playerId) -> game.getPlayer(playerId).getManaPool().getGreen());
+        Map<String, String> rooms = new ConcurrentHashMap<>();
+        Map<String, Integer> tokens = new ConcurrentHashMap<>();
+        scenario.probe((game, ids, seat, view) -> {
+            if ("precombat_main".equals(view.step())) {
+                for (int index = 0; index < ids.size(); index++) {
+                    Dungeon dungeon = game.getPlayerDungeon(ids.get(index));
+                    rooms.put(view.turn() + ":" + index,
+                        dungeon == null || dungeon.getCurrentRoom() == null ? "none" : dungeon.getCurrentRoom().getName());
+                }
+            }
+            if (view.turn() == 3) {
+                for (UUID attackerId : game.getCombat().getAttackers()) {
+                    if (game.getPermanent(attackerId) instanceof PermanentToken token && token.getName().contains("Soldier")) {
+                        tokens.put(attackerId.toString(), ids.indexOf(game.getCombat().getDefenderId(attackerId)));
+                    }
+                }
+            }
+        });
+        Map<Integer, Integer> afterAttack = afterTurn3Attack(scenario);
+        play(scenario, attackingIn(3));
+        System.out.println("Lore " + new java.util.TreeMap<>(lore) + "; green " + new java.util.TreeMap<>(green)
+            + "; rooms " + new java.util.TreeMap<>(rooms) + "; tokens " + tokens + "; " + seen);
+
+        assertEquals(List.of(20, 15), seen.get("exchanged"), "seat 0 at 15 and seat 1 at 20 exchanged");
+        assertEquals(lore.get("1:0"), lore.get("2:0"), "the Saga waits in the opponent's turn: " + lore);
+        assertEquals(lore.get("2:0") + 1, lore.get("3:0"), "the Saga advances in its controller's turn: " + lore);
+        assertEquals(2, green.get("2:1"), "seat 1 added {G}{G} in its turn: " + green);
+        assertEquals(0, green.get("2:0"), green.toString());
+        assertEquals(2, green.get("3:0"), "seat 0 added {G}{G} in its turn: " + green);
+        assertEquals(0, green.get("3:1"), green.toString());
+        assertFalse("none".equals(rooms.get("1:0")), "seat 0 ventured as it took the initiative: " + rooms);
+        assertEquals(rooms.get("1:0"), rooms.get("2:0"), "not in its opponent's upkeep: " + rooms);
+        assertFalse(rooms.get("2:0").equals(rooms.get("3:0")), "seat 0 ventured in its upkeep: " + rooms);
+        assertEquals("none", rooms.get("3:1"), rooms.toString());
+        assertEquals(2, tokens.size(), "two Soldiers attacked: " + tokens);
+        assertTrue(tokens.values().stream().allMatch(defender -> defender == 1), "the opponent: " + tokens);
+        assertEquals(at(scenario.library, 3, 0) - 1, afterAttack.get(0), "seat 0 attacked: Norn's Decree drew one");
     }
 }
