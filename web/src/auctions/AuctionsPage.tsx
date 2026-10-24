@@ -1,11 +1,12 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
-import { client, describe, type Me } from "../api";
+import { BACKGROUND_HEADER, client, describe, type Me } from "../api";
 import { hudChanged } from "../shell/hud";
 import { auctionApi } from "./api";
 import {
@@ -68,6 +69,7 @@ export function AuctionsPage({
   const now = useNow();
   const viewer = me.handle;
   const [balance, setBalance] = useState<number>();
+  const shownBalance = useRef<number | undefined>(undefined);
   const [marketTotal, setMarketTotal] = useState<number>();
   const [list, setList] = useState<TransferList>();
   const [targets, setTargets] = useState<AuctionTargets>();
@@ -89,9 +91,20 @@ export function AuctionsPage({
     return () => window.removeEventListener("hashchange", change);
   }, []);
 
-  const loadBalance = useCallback(async () => {
-    const { data } = await client.GET("/api/v1/me/tokens");
-    if (data) setBalance(data.balance);
+  const loadBalance = useCallback(async (background = false) => {
+    const { data } = await client.GET("/api/v1/me/tokens", {
+      headers: background ? { [BACKGROUND_HEADER]: "1" } : undefined,
+    });
+    if (!data) return;
+    // A sale paid or a bid returned while the page watched: the top bar follows too.
+    if (
+      background &&
+      shownBalance.current !== undefined &&
+      shownBalance.current !== data.balance
+    )
+      hudChanged();
+    shownBalance.current = data.balance;
+    setBalance(data.balance);
   }, []);
   const loadMine = useCallback(async (background: boolean) => {
     const [mine, watched] = await Promise.all([
@@ -104,15 +117,17 @@ export function AuctionsPage({
       setError(describe(mine.error ?? watched.error));
   }, []);
   useEffect(() => {
-    void loadBalance();
+    void loadBalance(false);
     void loadMine(false);
   }, [loadBalance, loadMine, refresh]);
   useEffect(() => {
     const timer = window.setInterval(() => {
-      if (document.visibilityState !== "hidden") void loadMine(true);
+      if (document.visibilityState === "hidden") return;
+      void loadMine(true);
+      void loadBalance(true);
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [loadMine]);
+  }, [loadMine, loadBalance]);
 
   /** Something spent, paid or moved a card: the balance, the lists and the top bar ask again. */
   const changed = useCallback(() => {

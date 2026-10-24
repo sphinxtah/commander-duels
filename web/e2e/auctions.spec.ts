@@ -64,14 +64,14 @@ test.describe("Tivit's Auction House", () => {
       await sell.getByLabel("Buy Now (tokens)").fill("60");
       await sell
         .getByRole("radiogroup", { name: "Length of the auction" })
-        .getByText("1 hour")
-        .click();
+        .getByRole("radio", { name: "1 hour" })
+        .check();
       await expect(sell.getByText("You receive 100% — no fee")).toBeVisible();
       await sell.getByRole("button", { name: "List it" }).click();
       await expect(sell).toBeHidden();
       await seller.goto("/#auctions/list");
       const active = seller.getByRole("list", { name: "Active" });
-      await expect(active.getByText("Plains").first()).toBeVisible();
+      await expect(active).toContainText("Plains");
 
       // SysOp, with tokens of its own giving, finds it, bids the least, then buys it now.
       await sysop.goto("/#sysop");
@@ -100,7 +100,9 @@ test.describe("Tivit's Auction House", () => {
       await sysop.goto("/#auctions/search");
       const filters = sysop.getByRole("search", { name: "Search the market" });
       await filters.getByLabel("Card name").fill("Plains");
-      await filters.getByRole("button", { name: "Search", exact: true }).click();
+      await filters
+        .getByRole("button", { name: "Search", exact: true })
+        .click();
       const results = sysop.getByRole("list", { name: "Auctions" });
       await results
         .getByLabel(/^Plains.*Buy Now 60 tokens/)
@@ -116,21 +118,28 @@ test.describe("Tivit's Auction House", () => {
         .getByRole("button", { name: "Buy for 60 tokens" })
         .click();
       await sysop.goto("/#auctions/targets");
-      await expect(
-        sysop.getByRole("list", { name: "Won" }).getByText("Plains").first(),
-      ).toBeVisible();
+      await expect(sysop.getByRole("list", { name: "Won" })).toContainText(
+        "Plains",
+      );
 
       // The seller is paid the whole price: no fee.
       await seller.goto("/#auctions/list");
-      await expect(
-        seller.getByRole("list", { name: "Sold" }).getByText("Plains").first(),
-      ).toBeVisible();
+      await expect(seller.getByRole("list", { name: "Sold" })).toContainText(
+        "Plains",
+      );
       await expect.poll(() => balance(seller)).toBe(before + 60);
+      // The page's poll shows the payment without a reload.
+      await expect(
+        seller
+          .getByRole("definition")
+          .filter({ hasText: (before + 60).toLocaleString("en-US") }),
+      ).toBeVisible({ timeout: 15000 });
 
       // Administration's log lists the sale.
       await sysop.goto("/#admin");
       await sysop.getByRole("tab", { name: "Auctions" }).click();
-      await expect(sysop.getByText("Plains").first()).toBeVisible();
+      await expect(sysop.getByRole("main")).toContainText("Plains");
+      await expect(sysop.getByRole("main")).toContainText("rival");
       expect(errors).toEqual([]);
     } finally {
       await Promise.all([sysopContext.close(), playerContext.close()]);
