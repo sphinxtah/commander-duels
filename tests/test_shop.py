@@ -1354,6 +1354,12 @@ def test_concurrent_opens_and_purchases_on_postgresql(monkeypatch, tmp_path, con
         command.upgrade(Config("alembic.ini"), "head")
         import_bulk(engine, tmp_path / "files", bulk(), engine_list())
         assert boosters.load_local(engine, SET_FILES, str(content))["ready"] == 1
+        # The basic land packs (v0.6.4) off the shelf, so the week's sale holds the fixture's.
+        lands.ensure_land_packs(engine)
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE shop_products SET on_sale = false WHERE origin = 'lands'")
+            )
         app = create_app(
             Settings(database_url=scoped, content_dir=str(content), sysop_networks="10.20.0.0/24")
         )
