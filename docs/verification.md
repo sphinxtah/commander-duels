@@ -6,12 +6,13 @@ Validated locally on Windows on October 25, 2026: the auction house's 7-day, 30-
 
 | Check | Result |
 |---|---|
-| Python suite | ruff, ruff format and mypy passed. `tests/test_auctions.py`, `tests/test_migrations.py` and `tests/test_contracts.py` passed, including the new `test_seven_and_thirty_days_and_unlimited_buy_now_only`. The rest of the suite, run on native Windows: 183 passed up to `tests/test_matches.py`, where `test_a_player_removed_while_away_loses_the_match` hung (the Windows-only hang noted since v0.4.2; it does not touch auctions); `test_card_images`' 429 check failed once under load and passed alone. Hosted CI runs the whole suite on Linux |
+| Python suite | ruff, ruff format and mypy passed. `tests/test_auctions.py`, `tests/test_migrations.py` and `tests/test_contracts.py` passed, including the new `test_seven_and_thirty_days_and_unlimited_buy_now_only`. The rest of the suite, run on native Windows: 183 passed up to `tests/test_matches.py`, where `test_a_player_removed_while_away_loses_the_match` hung, and the files after it ran until `tests/test_tables.py::test_away_players_are_voted_out` hung the same way (both wait on a queue for an away player's timer; neither touches auctions or combat); `test_card_images`' 429 check failed once under load and passed alone. Hosted CI runs the whole suite on Linux |
 | Migrations | `alembic upgrade head` and `alembic check` on a fresh PostgreSQL; down to 0029 and up again; SQLite up, down to base and up in `tests/test_migrations.py` |
 | Contracts | `contracts/openapi.json` regenerated; `web/src/generated/api.d.ts` with `pnpm contracts` |
 | Web | the full Vitest run (96 files, 1,195 tests) and the production build (`tsc -b`) passed on the auction change; after the new unit tests and Prettier, `src/auctions` (28 tests) and `tsc -b` again |
 | Engine | `docker build --target engine-build` compiled; `BlockersTest` (new: against a flier, only the creature with reach is offered as a blocker, and it blocks), `TeamPriorityTest`, `TwoHeadedGiantTest`, `PromptFamiliesTest` and `TwoHeadedGiantRareCardsTest` passed |
 | Not run locally | the browser journeys and the whole JUnit run; hosted CI runs them |
+| Hosted CI | run #134 on 835c05d green in 18 m 8 s: verify 16 m 30 s (the whole pytest suite on Linux, Vitest, build, browser journeys), engine 16 m 15 s (JUnit with `BlockersTest`, game journeys), publish 1 m 31 s |
 
 ## v0.6.2
 
