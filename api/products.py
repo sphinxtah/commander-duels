@@ -18,6 +18,8 @@
   the catalog) and it has been released.
 - **Starter decks** (v0.4.2) are priced from the market value of the cards they grant, basic lands
   aside (content/starter-deck-prices.json), at the current pack's rate, rounded the same way.
+- **Basic land packs** (v0.6.4, api/lands.py) cost their own price: 200 tokens for the Basic Land
+  Pack, 50 for a pack of one color, unless staff set another.
 - **Pack artwork** (v0.4.3): content/pack-art.json, made by scripts/pack_art.py, names the
   picture of each product's sealed pack (two WebP sizes under web/public/packs/) and each set's
   symbol (web/public/sets/). A product it does not picture, and every set the booster data job
@@ -40,6 +42,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from api.identity import utcnow
+from api.lands import is_land_pack, land_price
 from api.models import ShopProduct
 
 PRICE_LIST = "pack-prices.json"
@@ -73,9 +76,10 @@ BoosterKind = Literal[
     "starter",
     "tournament",
     "special",
+    "lands",
 ]
-EraId = Literal["play", "collector", "frame15", "mythic", "modern", "oldborder", "first"]
-PriceBasis = Literal["market", "set", "unpriced"]
+EraId = Literal["lands", "play", "collector", "frame15", "mythic", "modern", "oldborder", "first"]
+PriceBasis = Literal["market", "set", "fixed", "unpriced"]
 PLAIN_KINDS = frozenset({"draft", "set", "play", "six", "starter", "tournament"})
 
 
@@ -98,6 +102,10 @@ ERAS = (
 )
 
 
+# The basic land packs' shelf (v0.6.4), apart from the eras: basic lands since Alpha.
+LAND_ERA = Era("lands", "Basic land packs", date(1993, 8, 5))
+
+
 def era_of(released: date | None) -> EraId:
     if released is None:
         return ERAS[0].id
@@ -108,6 +116,8 @@ def kind_of(booster: str) -> BoosterKind:
     """The kind of product an MTGJSON booster name stands for."""
     if booster == "default":
         return "booster"
+    if booster.startswith("basic-lands"):
+        return "lands"
     if booster in PLAIN_KINDS:
         return booster  # type: ignore[return-value]
     for prefix in ("collector", "jumpstart", "theme"):
@@ -157,6 +167,9 @@ def deck_prices(content_dir: str) -> dict[str, int]:
 def price_of(product: ShopProduct) -> tuple[int, PriceBasis]:
     if product.price_override is not None:
         return product.price_override, "set"
+    fixed = land_price(product)
+    if fixed is not None:
+        return fixed, "fixed"
     if product.usd is not None and product.usd > 0:
         price = curve_price(product.usd)
         markdown = MARKDOWNS.get(product.set_code.lower())
@@ -164,6 +177,10 @@ def price_of(product: ShopProduct) -> tuple[int, PriceBasis]:
             price = two_figures(price * markdown)
         return price, "market"
     return UNPRICED, "unpriced"
+
+
+def era_of_product(product: ShopProduct) -> EraId:
+    return LAND_ERA.id if is_land_pack(product) else era_of(product.released)
 
 
 def selling(product: ShopProduct, today: date) -> bool:

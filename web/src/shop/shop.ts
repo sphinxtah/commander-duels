@@ -28,6 +28,7 @@ export const kindLabels: Record<BoosterKind, string> = {
   starter: "Starter Deck",
   tournament: "Tournament Pack",
   special: "Special",
+  lands: "Basic Land Pack",
 };
 
 export type Sort = "newest" | "oldest" | "cheapest" | "dearest";
@@ -84,6 +85,13 @@ export function matches(product: Product, q: string): boolean {
 
 function released(product: Product): string {
   return product.released ?? "9999-12-31";
+}
+
+/** What a basic land pack holds (v0.6.4), for the shelf's line under its name. */
+export function landsLine(product: Pick<Product, "booster">): string {
+  return product.booster === "basic-lands"
+    ? "40 of each basic land, from every edition since Alpha"
+    : "40 lands, from every edition since Alpha";
 }
 
 /** What buying the product costs now: this week's sale price, or its own (v0.4.3). */

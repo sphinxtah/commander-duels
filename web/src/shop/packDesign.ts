@@ -44,6 +44,15 @@ export type EraStyle = {
 };
 
 export const eraStyles: Record<Era, EraStyle> = {
+  // The basic land packs (v0.6.4): a shelf of their own, not an era.
+  lands: {
+    saturation: 22,
+    lightness: 30,
+    accent: "#e6d3a3",
+    crimp: ["#e4dccb", "#7f7564"],
+    texture: "speckle",
+    medallion: "round",
+  },
   first: {
     saturation: 28,
     lightness: 30,
@@ -168,11 +177,12 @@ const BAND: Record<string, string> = {
   starter: "#3b7650",
   tournament: "#2b5687",
   special: "#7a2f6e",
+  lands: "#6b5a3a",
 };
 
 export type Band = {
   label: string;
-  /** One colour, or two for a guild's theme booster. */
+  /** One colour, two for a guild's theme booster, or a land pack's colours (v0.6.4). */
   colours: string[];
   text: string;
 };
@@ -190,6 +200,13 @@ export function bandOf(product: PackProduct): Band {
     if (rest) label = rest;
   }
   let colours = [BAND[product.kind] ?? BAND.booster];
+  if (product.kind === "lands") {
+    // The basic land packs (v0.6.4): a stripe per colour they hold, named for what they hold.
+    const letter = product.booster.slice("basic-lands-".length).toUpperCase();
+    const letters = MANA[letter] ? letter : "WUBRG";
+    colours = [...letters].map((one) => MANA[one]);
+    label = letters.length === 1 ? `40 ${product.name.replace(/ Pack$/, "")}s` : "200 Basic Lands";
+  }
   if (product.booster.startsWith("theme-")) {
     const word = product.booster.slice("theme-".length);
     const letters = COLOUR_WORDS[word];

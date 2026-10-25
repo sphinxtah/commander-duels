@@ -1148,7 +1148,9 @@ class ShopProduct(Base):
     __tablename__ = "shop_products"
     __table_args__ = (
         UniqueConstraint("set_code", "booster"),
-        CheckConstraint("origin IN ('price_list', 'mtgjson')", name="ck_shop_products_origin"),
+        CheckConstraint(
+            "origin IN ('price_list', 'mtgjson', 'lands')", name="ck_shop_products_origin"
+        ),
         CheckConstraint(
             "data_status IN ('waiting', 'ready', 'unresolved', 'missing')",
             name="ck_shop_products_data_status",
@@ -1164,7 +1166,8 @@ class ShopProduct(Base):
     set_name: Mapped[str] = mapped_column(Text)
     name: Mapped[str] = mapped_column(Text)
     released: Mapped[date | None] = mapped_column(Date)
-    # price_list: from content/pack-prices.json; mtgjson: a set released after that list.
+    # price_list: from content/pack-prices.json; mtgjson: a set released after that list; lands:
+    # a basic land pack (v0.6.4), its collation built from the catalog (api/lands.py).
     origin: Mapped[str] = mapped_column(String(16))
     # The market price of one pack in US dollars, its method and source; staff see it, players
     # never do.

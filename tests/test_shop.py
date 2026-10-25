@@ -32,7 +32,7 @@ from test_games import SERVICE_TOKEN, SYSOP_ADDRESS
 from test_progression import Account
 
 from api import collation as collations
-from api import products, sales
+from api import lands, products, sales
 from api import shop as shop_api
 from api.collation import Collation, Layout, Sheet, SheetCard
 from api.config import Settings
@@ -162,6 +162,14 @@ def client(collated: str, content: Path, engine, tmp_path):
         # is kept empty, so prices are the shelf's, unless a test draws the week itself.
         with Session(app.state.database) as db:
             no_sale(db)
+        # The basic land packs (v0.6.4) are kept off the shelf, so these tests see the fixture's
+        # product alone; tests/test_land_packs.py puts them back.
+        lands.ensure_land_packs(app.state.database)
+        with Session(app.state.database) as db:
+            db.execute(
+                text("UPDATE shop_products SET on_sale = :no WHERE origin = 'lands'"), {"no": False}
+            )
+            db.commit()
         yield client
         with Session(app.state.database) as db:
             db.execute(text("DELETE FROM shop_weekly_sales"))
@@ -792,7 +800,8 @@ def test_the_shop_lists_what_is_on_sale(client):
         "pack_size": 15,
         "sale_price": None,
     }
-    assert [era["id"] for era in shop["eras"]][:2] == ["play", "collector"]
+    # The basic land packs' shelf first (v0.6.4), then the eras, newest first.
+    assert [era["id"] for era in shop["eras"]][:3] == ["lands", "play", "collector"]
     assert shop["data"] == {
         "mtgjson_version": "5.3.0+fixture",
         "prices_as_of": "2026-10-21",
@@ -1248,7 +1257,8 @@ def test_staff_set_prices_and_take_products_off_sale(client):
     assert ada.get("/api/v1/admin/shop").status_code == 403
     view = admin.get("/api/v1/admin/shop").json()
     assert view["enabled"] is True and view["prices_as_of"] == "2026-10-21"
-    assert len(view["products"]) == 396
+    assert len(view["products"]) == 396 + len(lands.PACKS)
+    assert sum(item["origin"] == "lands" for item in view["products"]) == len(lands.PACKS)
     # Alpha and Beta are products as any other (v0.6.1), waiting here for their booster data.
     alpha = next(
         item

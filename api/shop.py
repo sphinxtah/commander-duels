@@ -39,6 +39,10 @@ the Magic Duels style, their cards the player's for good.
 - **The weekly sale** (v0.4.3, api/sales.py). Each week five products on the shelf cost 20% less,
   from Sunday midnight to Sunday midnight, Arizona time: the shelf and Leng's counter show the sale
   price, and a purchase pays it while the week lasts.
+- **Basic land packs** (v0.6.4, api/lands.py). The Basic Land Pack (40 of each basic, 200 tokens)
+  and a pack of each basic (40, 50 tokens) are products of their own, on a shelf of their own,
+  bought, held, opened and on the weekly sale like any pack; the newer the edition, the likelier
+  its lands, and each color's 40 hold 1 to 5 foils.
 """
 
 import secrets
@@ -70,6 +74,7 @@ from api.identity import (
     settings_of,
     utcnow,
 )
+from api.lands import ensure_land_packs, is_land_pack, land_layout
 from api.library import (
     Starter,
     commander_printing,
@@ -99,6 +104,7 @@ from api.models import (
 from api.print_runs import dealt, limited
 from api.products import (
     ERAS,
+    LAND_ERA,
     ArtImage,
     ArtIndex,
     ArtOrigin,
@@ -108,7 +114,7 @@ from api.products import (
     curve_price,
     deck_prices,
     ensure_products,
-    era_of,
+    era_of_product,
     kind_of,
     pack_art,
     price_list,
@@ -203,7 +209,7 @@ class ProductInfo(ProductRef):
     price: int = Field(description="In tokens.")
     price_basis: PriceBasis = Field(
         description="market: from the pack's market price; set: set by the site's staff; "
-        "unpriced: not priced yet."
+        "fixed: the product's own price (basic land packs, v0.6.4); unpriced: not priced yet."
     )
     pack_size: int | None = Field(description="Cards in the usual pack.")
     sale_price: int | None = Field(
@@ -359,7 +365,7 @@ class AdminProduct(ProductInfo):
     on_sale: bool = Field(description="Staff's setting; selling needs the booster data too.")
     sale_reason: str | None
     selling: bool
-    origin: Literal["price_list", "mtgjson"]
+    origin: Literal["price_list", "mtgjson", "lands"]
     data_status: Literal["waiting", "ready", "unresolved", "missing"]
     unresolved_count: int
     unresolved: list[UnresolvedCard]
@@ -429,7 +435,7 @@ def ref_of(product: ShopProduct, art: ArtIndex) -> ProductRef:
         kind=kind_of(product.booster),
         released=product.released,
         booster=product.booster,
-        era=era_of(product.released),
+        era=era_of_product(product),
         art=PackArt(
             small=image_of_pack(picture.small),
             large=image_of_pack(picture.large),
@@ -457,8 +463,10 @@ def newest_first(product: ShopProduct) -> tuple[date, str, str]:
 
 
 def ensured(request: Request) -> None:
-    """The products brought up to the price list (api/products.py), once per list."""
+    """The products brought up to the price list (api/products.py), once per list, and the
+    basic land packs to the catalog (api/lands.py), once per catalog revision."""
     ensure_products(request.app.state.database, settings_of(request).content_dir)
+    ensure_land_packs(request.app.state.database)
 
 
 def products_of(request: Request, db: Session) -> list[ShopProduct]:
@@ -509,6 +517,9 @@ def latest_version(db: Session) -> tuple[str | None, datetime | None]:
     if row is None:
         version = db.scalar(
             select(BoosterCollation.mtgjson_version)
+            .join(ShopProduct, ShopProduct.id == BoosterCollation.product_id)
+            # Not a basic land pack's (v0.6.4): built from the catalog, not MTGJSON.
+            .where(ShopProduct.origin != "lands")
             .order_by(BoosterCollation.created_at.desc())
             .limit(1)
         )
@@ -540,7 +551,7 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
     return ShopView(
         balance=balance_of(db, principal.user.id),
         products=[info_of(product, art, sale) for product in on_sale],
-        eras=[EraInfo(id=era.id, name=era.name, since=era.since) for era in ERAS],
+        eras=[EraInfo(id=era.id, name=era.name, since=era.since) for era in (LAND_ERA, *ERAS)],
         inventory=inventory_of(db, principal.user, art),
         data=ShopData(
             mtgjson_version=version,
@@ -844,6 +855,10 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
             409, "pack_unavailable", f"{product.name} cannot be opened until its data is read."
         )
     collation = boosted(load(db, product.collation_id), boosts(db))
+    rng = secrets.SystemRandom()
+    if is_land_pack(product):
+        # 1 to 5 of each color's 40 lands are foils, drawn now (v0.6.4).
+        collation = land_layout(collation, rng)
     # Since v0.6.2 a pack gives the card it drew, whether the engine can play it or not. A card
     # out of the game (a token or another object no deck holds, a card Scryfall no longer lists,
     # one the staff suspended) gives way to another from its sheet, silently.
@@ -863,7 +878,7 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
         | (one_of_a_kind(db) & collation.printings())
         | {printing for printing, copies in runs.items() if used[printing] >= copies}
     )
-    layout, pulled = draw(collation, secrets.SystemRandom(), frozenset(withheld))
+    layout, pulled = draw(collation, rng, frozenset(withheld))
     # A limited printing the pack drew is counted again under its row's lock, with the copies of
     # it this pack deals; one the pack would take past its run is drawn again without it.
     while drawn := {card.printing_id for card in pulled} & set(runs) - withheld:
@@ -877,7 +892,7 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
         if not over:
             break
         withheld |= over
-        layout, pulled = draw(collation, secrets.SystemRandom(), frozenset(withheld))
+        layout, pulled = draw(collation, rng, frozenset(withheld))
     printings = {
         printing.id: printing
         for printing in db.scalars(

@@ -3111,7 +3111,7 @@ export interface components {
              * Era
              * @enum {string}
              */
-            era: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            era: "lands" | "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
             /**
              * Id
              * Format: uuid
@@ -3121,7 +3121,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special";
+            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special" | "lands";
             /** Mtgjson Version */
             mtgjson_version: string | null;
             /** Name */
@@ -3135,7 +3135,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "price_list" | "mtgjson";
+            origin: "price_list" | "mtgjson" | "lands";
             /**
              * Pack Size
              * @description Cards in the usual pack.
@@ -3148,10 +3148,10 @@ export interface components {
             price: number;
             /**
              * Price Basis
-             * @description market: from the pack's market price; set: set by the site's staff; unpriced: not priced yet.
+             * @description market: from the pack's market price; set: set by the site's staff; fixed: the product's own price (basic land packs, v0.6.4); unpriced: not priced yet.
              * @enum {string}
              */
-            price_basis: "market" | "set" | "unpriced";
+            price_basis: "market" | "set" | "fixed" | "unpriced";
             /** Price Override */
             price_override: number | null;
             /** Price Reason */
@@ -3579,7 +3579,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.6.3
+             * @default 0.6.4
              */
             version: string;
         };
@@ -4657,7 +4657,7 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            id: "lands" | "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
             /** Name */
             name: string;
             /**
@@ -4999,7 +4999,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.6.3
+             * @default 0.6.4
              */
             version: string;
         };
@@ -6095,7 +6095,7 @@ export interface components {
              * Era
              * @enum {string}
              */
-            era: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            era: "lands" | "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
             /**
              * Id
              * Format: uuid
@@ -6105,7 +6105,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special";
+            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special" | "lands";
             /** Name */
             name: string;
             /**
@@ -6120,10 +6120,10 @@ export interface components {
             price: number;
             /**
              * Price Basis
-             * @description market: from the pack's market price; set: set by the site's staff; unpriced: not priced yet.
+             * @description market: from the pack's market price; set: set by the site's staff; fixed: the product's own price (basic land packs, v0.6.4); unpriced: not priced yet.
              * @enum {string}
              */
-            price_basis: "market" | "set" | "unpriced";
+            price_basis: "market" | "set" | "fixed" | "unpriced";
             /** Released */
             released: string | null;
             /**
@@ -6154,7 +6154,7 @@ export interface components {
              * Era
              * @enum {string}
              */
-            era: "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
+            era: "lands" | "play" | "collector" | "frame15" | "mythic" | "modern" | "oldborder" | "first";
             /**
              * Id
              * Format: uuid
@@ -6164,7 +6164,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special";
+            kind: "booster" | "draft" | "set" | "collector" | "play" | "jumpstart" | "theme" | "six" | "starter" | "tournament" | "special" | "lands";
             /** Name */
             name: string;
             /** Released */

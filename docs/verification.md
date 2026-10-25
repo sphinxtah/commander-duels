@@ -1,5 +1,17 @@
 # Verification
 
+## v0.6.4
+
+Validated locally on Windows on October 25, 2026: the basic land packs. Python ran natively on 3.12 in the repository's virtual environment; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy.
+
+| Check | Result |
+|---|---|
+| Python suite | ruff, ruff format and mypy passed. New `tests/test_land_packs.py` (7: edition weights by release rank, 40 per color with 1 to 5 foils over 200 seeds, a 1 : 2 : 3 draw within 3%, the six packs on the shelf at 200 and 50 tokens, the Basic Land Pack and a Forest Pack opened and granted, a land pack in the weekly sale at 160). The whole suite on native Windows, `tests/test_matches.py` and `tests/test_tables.py` aside (they hang there on away-player timers): 367 passed, 47 skipped. Hosted CI runs everything on Linux |
+| PostgreSQL | on a throwaway PostgreSQL 17: `alembic upgrade head`, `scripts/load_fixture_catalog.py` (the six land packs ready, off sale, one collation each; run again, nothing duplicated), down to 0030 and up again (the land packs back as land packs, on sale) |
+| Contracts | `contracts/openapi.json` regenerated; `web/src/generated/api.d.ts` with `pnpm contracts` |
+| Web | the full Vitest run (96 files, 1,199 tests) and the production build (`tsc -b`) passed |
+| Not run locally | the browser journeys; hosted CI runs them |
+
 ## v0.6.3
 
 Validated locally on Windows on October 25, 2026: the auction house's 7-day, 30-day and unlimited listings, and the blockers fix. Docker was not running at first, so Python ran natively on 3.13 in the repository's virtual environment, against a throwaway PostgreSQL 17 in Docker. The web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy, and the engine in its Docker build image.

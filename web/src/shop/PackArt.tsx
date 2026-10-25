@@ -355,32 +355,16 @@ function DrawnPack({
         </text>
       )}
 
-      {band.colours.length > 1 ? (
-        <>
-          <rect
-            x={LEFT}
-            y="146"
-            width={(RIGHT - LEFT) / 2}
-            height="18"
-            fill={band.colours[0]}
-          />
-          <rect
-            x={W / 2}
-            y="146"
-            width={(RIGHT - LEFT) / 2}
-            height="18"
-            fill={band.colours[1]}
-          />
-        </>
-      ) : (
+      {band.colours.map((colour, index) => (
         <rect
-          x={LEFT}
+          key={index}
+          x={LEFT + ((RIGHT - LEFT) * index) / band.colours.length}
           y="146"
-          width={RIGHT - LEFT}
+          width={(RIGHT - LEFT) / band.colours.length}
           height="18"
-          fill={band.colours[0]}
+          fill={colour}
         />
-      )}
+      ))}
       <rect
         x={LEFT}
         y="146"

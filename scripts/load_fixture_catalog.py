@@ -10,6 +10,9 @@ A database that already holds a catalog is left alone.
 The shop's test collation comes with it (v0.4.0): mtgjson/ZNR.json, a made-up set file whose
 Zendikar Rising draft booster draws from the same cards, read as the booster data job reads
 MTGJSON's. A database that holds a collation already is left alone.
+
+The basic land packs (v0.6.4, api/lands.py) are built from the same catalog and taken off sale:
+the shop's journey needs the test booster alone on the shelf, so the weekly sale holds it.
 """
 
 import json
@@ -17,12 +20,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from api.config import Settings
 from api.database import build_engine
-from api.models import BoosterCollation, CatalogRevision
+from api.lands import ORIGIN, ensure_land_packs
+from api.models import BoosterCollation, CatalogRevision, ShopProduct
 from catalog import boosters, engine_export
 from catalog.importer import Apply, Source, validate
 from catalog.scryfall import DATASETS, Limits
@@ -51,12 +55,28 @@ def main(argv: list[str]) -> None:
             playable = playable_count(session)
             print(f"Catalog revision {applied.revision_id}: {playable} playable cards.")
     with Session(engine) as session:
-        collated = session.scalar(select(BoosterCollation.id).limit(1)) is not None
+        collated = (
+            session.scalar(
+                select(BoosterCollation.id)
+                .join(ShopProduct, ShopProduct.id == BoosterCollation.product_id)
+                .where(ShopProduct.origin != ORIGIN)
+                .limit(1)
+            )
+            is not None
+        )
     if collated:
         print("The database holds booster data already; nothing collated.")
-        return
-    counts = boosters.load_local(engine, folder / "mtgjson", settings.content_dir)
-    print(f"Booster data: {counts['ready']} product ready, {counts['unresolved']} unresolved.")
+    else:
+        counts = boosters.load_local(engine, folder / "mtgjson", settings.content_dir)
+        print(f"Booster data: {counts['ready']} product ready, {counts['unresolved']} unresolved.")
+    ensure_land_packs(engine)
+    with Session(engine) as session, session.begin():
+        session.execute(
+            update(ShopProduct)
+            .where(ShopProduct.origin == ORIGIN)
+            .values(on_sale=False, sale_reason="Off the browser journeys' shelf")
+        )
+    print("Basic land packs built and taken off sale.")
 
 
 if __name__ == "__main__":

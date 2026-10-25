@@ -5,7 +5,9 @@ import {
   describeCard,
   filtered,
   glowOf,
+  kindLabels,
   kindsOf,
+  landsLine,
   matches,
   noFilters,
   purchaseKey,
@@ -17,6 +19,16 @@ describe("the shop's helpers", () => {
   it("says prices in tokens", () => {
     expect(tokens(150_000)).toBe("150,000 tokens");
     expect(tokens(1)).toBe("1 token");
+  });
+
+  it("names the basic land packs (v0.6.4)", () => {
+    expect(kindLabels.lands).toBe("Basic Land Pack");
+    expect(landsLine({ booster: "basic-lands" })).toBe(
+      "40 of each basic land, from every edition since Alpha",
+    );
+    expect(landsLine({ booster: "basic-lands-g" })).toBe(
+      "40 lands, from every edition since Alpha",
+    );
   });
 
   it("searches by set name, set code or product name", () => {

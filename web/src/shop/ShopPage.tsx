@@ -19,6 +19,7 @@ import {
   filtered,
   kindLabels,
   kindsOf,
+  landsLine,
   noFilters,
   priceToPay,
   purchaseKey,
@@ -402,7 +403,9 @@ export function ShopPage({
                           </span>
                         </header>
                         <p>
-                          {product.set_name} · {day(product.released)}
+                          {product.kind === "lands"
+                            ? landsLine(product)
+                            : `${product.set_name} · ${day(product.released)}`}
                         </p>
                         <p>
                           {kindLabels[product.kind]}

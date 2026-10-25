@@ -553,7 +553,10 @@ def product_keys(engine: Engine) -> list[ProductKey]:
         return [
             ProductKey(product.id, product.set_code, product.booster)
             for product in session.scalars(
-                select(ShopProduct).order_by(ShopProduct.set_code, ShopProduct.booster)
+                select(ShopProduct)
+                # Basic land packs (v0.6.4) are built from the catalog, not MTGJSON (api/lands.py).
+                .where(ShopProduct.origin != "lands")
+                .order_by(ShopProduct.set_code, ShopProduct.booster)
             )
         ]
 
@@ -630,7 +633,9 @@ def ensure_collated(engine: Engine, settings: Settings, now: datetime) -> bool:
             f"{product.set_code}/{product.booster}"
             for product in session.scalars(
                 select(ShopProduct).where(
-                    ShopProduct.data_status == "waiting", ShopProduct.collation_id.is_(None)
+                    ShopProduct.data_status == "waiting",
+                    ShopProduct.collation_id.is_(None),
+                    ShopProduct.origin != "lands",
                 )
             )
         )

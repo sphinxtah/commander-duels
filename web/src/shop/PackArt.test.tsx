@@ -185,6 +185,28 @@ describe("the drawn pack's design", () => {
     ).toMatchObject({ label: "Theme Booster Black", colours: ["#2e2a2b"] });
   });
 
+  it("draws a basic land pack with a stripe for each colour it holds (v0.6.4)", () => {
+    const lands = product({
+      set_code: "LANDS",
+      set_name: "Basic Lands",
+      name: "Basic Land Pack",
+      kind: "lands",
+      booster: "basic-lands",
+      released: null,
+      era: "lands",
+      art: null,
+      symbol: null,
+    });
+    const band = bandOf(lands);
+    expect(band.label).toBe("200 Basic Lands");
+    expect(band.colours).toHaveLength(5);
+    expect(
+      bandOf({ ...lands, name: "Mountain Pack", booster: "basic-lands-r" }),
+    ).toMatchObject({ label: "40 Mountains", colours: ["#b8382c"] });
+    const { container } = render(<PackArt product={lands} height={9} />);
+    expect(container.querySelectorAll("svg rect[height='18']")).toHaveLength(6);
+  });
+
   it("sets the set's name in at most three lines", () => {
     expect(linesOf("Zendikar Rising")).toEqual({
       lines: ["Zendikar", "Rising"],

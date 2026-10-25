@@ -293,6 +293,7 @@
           },
           "era": {
             "enum": [
+              "lands",
               "play",
               "collector",
               "frame15",
@@ -321,7 +322,8 @@
               "six",
               "starter",
               "tournament",
-              "special"
+              "special",
+              "lands"
             ],
             "title": "Kind",
             "type": "string"
@@ -349,7 +351,8 @@
           "origin": {
             "enum": [
               "price_list",
-              "mtgjson"
+              "mtgjson",
+              "lands"
             ],
             "title": "Origin",
             "type": "string"
@@ -372,10 +375,11 @@
             "type": "integer"
           },
           "price_basis": {
-            "description": "market: from the pack's market price; set: set by the site's staff; unpriced: not priced yet.",
+            "description": "market: from the pack's market price; set: set by the site's staff; fixed: the product's own price (basic land packs, v0.6.4); unpriced: not priced yet.",
             "enum": [
               "market",
               "set",
+              "fixed",
               "unpriced"
             ],
             "title": "Price Basis",
@@ -1553,7 +1557,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.6.3",
+            "default": "0.6.4",
             "title": "Version",
             "type": "string"
           }
@@ -4433,6 +4437,7 @@
         "properties": {
           "id": {
             "enum": [
+              "lands",
               "play",
               "collector",
               "frame15",
@@ -5328,7 +5333,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.6.3",
+            "default": "0.6.4",
             "title": "Version",
             "type": "string"
           }
@@ -7991,6 +7996,7 @@
           },
           "era": {
             "enum": [
+              "lands",
               "play",
               "collector",
               "frame15",
@@ -8019,7 +8025,8 @@
               "six",
               "starter",
               "tournament",
-              "special"
+              "special",
+              "lands"
             ],
             "title": "Kind",
             "type": "string"
@@ -8046,10 +8053,11 @@
             "type": "integer"
           },
           "price_basis": {
-            "description": "market: from the pack's market price; set: set by the site's staff; unpriced: not priced yet.",
+            "description": "market: from the pack's market price; set: set by the site's staff; fixed: the product's own price (basic land packs, v0.6.4); unpriced: not priced yet.",
             "enum": [
               "market",
               "set",
+              "fixed",
               "unpriced"
             ],
             "title": "Price Basis",
@@ -8139,6 +8147,7 @@
           },
           "era": {
             "enum": [
+              "lands",
               "play",
               "collector",
               "frame15",
@@ -8167,7 +8176,8 @@
               "six",
               "starter",
               "tournament",
-              "special"
+              "special",
+              "lands"
             ],
             "title": "Kind",
             "type": "string"
@@ -12548,7 +12558,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.6.3"
+    "version": "0.6.4"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -49,6 +49,7 @@ const dataNames: Record<AdminProduct["data_status"], string> = {
 const basisNames: Record<AdminProduct["price_basis"], string> = {
   market: "from the market price",
   set: "set by staff",
+  fixed: "its own price (basic land packs)",
   unpriced: "not priced yet",
 };
 
