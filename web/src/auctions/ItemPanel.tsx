@@ -121,6 +121,8 @@ export function ItemPanel({
     item && item.status === "active" && msLeft(item.ends_at, now) > 0,
   );
   const canBid = live && item && !item.mine;
+  // An unlimited auction (v0.6.3) is Buy Now only: no bids.
+  const buyNowOnly = item?.duration === "unlimited";
   const outcome = item ? bidOutcome(item, bid) : "too_low";
   const short = balance !== undefined && bid > balance ? bid - balance : 0;
 
@@ -271,55 +273,61 @@ export function ItemPanel({
             </div>
 
             <dl className={styles.facts}>
-              <div>
-                <dt>
-                  {item.status === "sold"
-                    ? "Sold for"
-                    : item.current_bid !== null
-                      ? "Current bid"
-                      : "Starting bid"}
-                </dt>
-                <dd>
-                  <Price
-                    value={
-                      item.status === "sold"
-                        ? item.sold_price
-                        : (item.current_bid ?? item.starting_bid)
-                    }
-                    className={styles.bigPrice}
-                  />
-                </dd>
-              </div>
+              {(!buyNowOnly || item.status === "sold") && (
+                <div>
+                  <dt>
+                    {item.status === "sold"
+                      ? "Sold for"
+                      : item.current_bid !== null
+                        ? "Current bid"
+                        : "Starting bid"}
+                  </dt>
+                  <dd>
+                    <Price
+                      value={
+                        item.status === "sold"
+                          ? item.sold_price
+                          : (item.current_bid ?? item.starting_bid)
+                      }
+                      className={styles.bigPrice}
+                    />
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>Buy Now</dt>
                 <dd>
                   <Price value={item.buy_now} className={styles.bigPrice} />
                 </dd>
               </div>
-              <div>
-                <dt>{live ? "Time left" : "Ended"}</dt>
-                <dd className={styles.bigTime}>
-                  {live ? (
-                    <TimeLeft endsAt={item.ends_at} now={now} />
-                  ) : (
-                    <time dateTime={item.ends_at}>
-                      {new Date(item.ends_at).toLocaleString("en-US", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </time>
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Bids</dt>
-                <dd>
-                  {item.bids.toLocaleString("en-US")}
-                  {item.high_bidder && (
-                    <small> · highest {item.high_bidder}</small>
-                  )}
-                </dd>
-              </div>
+              {(live || item.ends_at !== null) && (
+                <div>
+                  <dt>{live ? "Time left" : "Ended"}</dt>
+                  <dd className={styles.bigTime}>
+                    {live || item.ends_at === null ? (
+                      <TimeLeft endsAt={item.ends_at} now={now} />
+                    ) : (
+                      <time dateTime={item.ends_at}>
+                        {new Date(item.ends_at).toLocaleString("en-US", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </time>
+                    )}
+                  </dd>
+                </div>
+              )}
+              {!buyNowOnly && (
+                <div>
+                  <dt>Bids</dt>
+                  <dd>
+                    {item.bids.toLocaleString("en-US")}
+                    {item.high_bidder && (
+                      <small> · highest {item.high_bidder}</small>
+                    )}
+                  </dd>
+                </div>
+              )}
               {item.my_bid !== null && !item.mine && (
                 <div>
                   <dt>Your bid</dt>
@@ -344,57 +352,76 @@ export function ItemPanel({
             </p>
 
             {canBid && (
-              <section className={styles.bidBox} aria-label="Make a bid">
-                <div className={styles.stepper}>
-                  <button
-                    type="button"
-                    aria-label={`Lower the bid by ${tokens(bid - stepDown(bid, item.next_bid))}`}
-                    disabled={bid <= item.next_bid || busy}
-                    onClick={() => setBid(stepDown(bid, item.next_bid))}
-                  >
-                    −
-                  </button>
-                  <label>
-                    <span className={styles.hidden}>Your bid in tokens</span>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={item.next_bid}
-                      step={1}
-                      value={Number.isFinite(bid) ? bid : ""}
-                      onChange={(event) =>
-                        setBid(Math.floor(Number(event.target.value)))
-                      }
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    aria-label={`Raise the bid by ${tokens(increment(bid))}`}
-                    disabled={busy}
-                    onClick={() => setBid(stepUp(bid))}
-                  >
-                    +
-                  </button>
-                </div>
-                <p className={styles.bidHint}>
-                  {outcome === "too_low"
-                    ? `The least bid is ${tokens(item.next_bid)}.`
-                    : outcome === "buys"
-                      ? `A bid of ${tokens(bid)} reaches Buy Now: it buys the card for ${tokens(item.buy_now!)}.`
-                      : item.leading
-                        ? "You hold the highest bid."
-                        : `Least bid ${amount(item.next_bid)} · steps of 5%. The tokens are held until someone outbids you.`}
-                  {short > 0 && ` You need ${tokens(short)} more.`}
-                </p>
+              <section
+                className={styles.bidBox}
+                aria-label={buyNowOnly ? "Buy it" : "Make a bid"}
+              >
+                {buyNowOnly ? (
+                  <p className={styles.bidHint}>
+                    Buy Now only: this listing has no end and takes no bids.
+                    {item.buy_now !== null &&
+                      balance !== undefined &&
+                      item.buy_now > balance &&
+                      ` You need ${tokens(item.buy_now - balance)} more.`}
+                  </p>
+                ) : (
+                  <>
+                    <div className={styles.stepper}>
+                      <button
+                        type="button"
+                        aria-label={`Lower the bid by ${tokens(bid - stepDown(bid, item.next_bid))}`}
+                        disabled={bid <= item.next_bid || busy}
+                        onClick={() => setBid(stepDown(bid, item.next_bid))}
+                      >
+                        −
+                      </button>
+                      <label>
+                        <span className={styles.hidden}>
+                          Your bid in tokens
+                        </span>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={item.next_bid}
+                          step={1}
+                          value={Number.isFinite(bid) ? bid : ""}
+                          onChange={(event) =>
+                            setBid(Math.floor(Number(event.target.value)))
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        aria-label={`Raise the bid by ${tokens(increment(bid))}`}
+                        disabled={busy}
+                        onClick={() => setBid(stepUp(bid))}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className={styles.bidHint}>
+                      {outcome === "too_low"
+                        ? `The least bid is ${tokens(item.next_bid)}.`
+                        : outcome === "buys"
+                          ? `A bid of ${tokens(bid)} reaches Buy Now: it buys the card for ${tokens(item.buy_now!)}.`
+                          : item.leading
+                            ? "You hold the highest bid."
+                            : `Least bid ${amount(item.next_bid)} · steps of 5%. The tokens are held until someone outbids you.`}
+                      {short > 0 && ` You need ${tokens(short)} more.`}
+                    </p>
+                  </>
+                )}
                 <div className={styles.bidActions}>
-                  <button
-                    type="button"
-                    className={shell.primary}
-                    disabled={busy || item.leading || outcome === "too_low"}
-                    onClick={() => void placeBid()}
-                  >
-                    {error && !confirming ? "Try again" : "Make bid"}
-                  </button>
+                  {!buyNowOnly && (
+                    <button
+                      type="button"
+                      className={shell.primary}
+                      disabled={busy || item.leading || outcome === "too_low"}
+                      onClick={() => void placeBid()}
+                    >
+                      {error && !confirming ? "Try again" : "Make bid"}
+                    </button>
+                  )}
                   {item.buy_now !== null && !confirming && (
                     <button
                       type="button"

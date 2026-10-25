@@ -25,6 +25,10 @@ transfer market does (docs/auctions.md). The owner's rules are in the v0.6.0 pla
 - **Settlement.** Auctions end by time: the worker settles the ended ones every few seconds
   (settle_due), and every read settles any ended auction before it answers, so nothing shows as
   active past its end. Settling is idempotent: it re-reads the auction under its lock.
+- **Unlimited listings** (v0.6.3) have no end: Buy Now only, as eBay's Good 'Til Cancelled.
+  They need a Buy Now price, which is their starting bid too, and take no bids
+  (`409 buy_now_only`); they run until bought, withdrawn (at any time, having no bids) or
+  cancelled. Their ends_at is null. 7 and 30 days are lengths like the others.
 - **Withdrawing** is the seller's until the first bid; **SysOp cancels** any live auction with a
   reason (audited): the leading bid goes back, and the copy. A reset or deletion of an account
   first ends its live auctions so, and returns its own leading bids (end_auctions_of).
@@ -34,13 +38,13 @@ transfer market does (docs/auctions.md). The owner's rules are in the v0.6.0 pla
 
 import math
 from collections.abc import Iterable, Mapping
-from datetime import date, datetime, timedelta
-from typing import Annotated, Literal
+from datetime import UTC, date, datetime, timedelta
+from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import Field
-from sqlalchemy import ColumnElement, func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -85,7 +89,7 @@ Canceller = Annotated[Principal, Depends(require_permission("economy.manage"))]
 Roster = Mapping[str, Planeswalker]
 
 Finish = Literal["nonfoil", "foil", "etched"]
-Duration = Literal["1h", "3h", "12h", "24h", "3d"]
+Duration = Literal["1h", "3h", "12h", "24h", "3d", "7d", "30d", "unlimited"]
 Status = Literal["active", "sold", "expired", "withdrawn", "cancelled"]
 Sort = Literal["ending", "newest", "price_low", "price_high", "buy_now_low"]
 Color = Literal["W", "U", "B", "R", "G", "C"]
@@ -98,7 +102,13 @@ DURATIONS: dict[str, timedelta] = {
     "12h": timedelta(hours=12),
     "24h": timedelta(hours=24),
     "3d": timedelta(days=3),
+    "7d": timedelta(days=7),
+    "30d": timedelta(days=30),
 }
+# The length with no end (v0.6.3): Buy Now only.
+UNLIMITED = "unlimited"
+# Sorts an unlimited auction after every one with an end.
+NO_END = datetime.max.replace(tzinfo=UTC)
 # A bid this close to the end pushes the end to this long after it.
 SNIPE = timedelta(seconds=30)
 INCREMENT_PERCENT = 5
@@ -145,7 +155,7 @@ class AuctionItem(Contract):
     next_bid: int = Field(description="The lowest bid the auction takes now.")
     duration: Duration
     created_at: datetime
-    ends_at: datetime
+    ends_at: datetime | None = Field(description="None for an unlimited auction: it has no end.")
     status: Status
     sold_price: int | None
     buyer: str | None
@@ -280,6 +290,16 @@ def next_bid(auction: Auction) -> int:
     if auction.current_bid is None:
         return auction.starting_bid
     return auction.current_bid + max(1, math.ceil(auction.current_bid * INCREMENT_PERCENT / 100))
+
+
+def ended(auction: Auction, now: datetime) -> bool:
+    """Whether the auction reached its end; an unlimited one never does."""
+    return auction.ends_at is not None and auction.ends_at <= now
+
+
+def end_of(auction: Auction) -> datetime:
+    """The auction's end for sorting: an unlimited one after the rest."""
+    return auction.ends_at or NO_END
 
 
 def items_of(db: Session, viewer: User, auctions: list[Auction]) -> list[AuctionItem]:
@@ -555,7 +575,7 @@ def settle(
 ) -> bool:
     """Settles the auction if it ended and is not settled yet: under its lock, so twice is once."""
     auction = locked(db, auction_id)
-    if auction is None or auction.status != "active" or auction.ends_at > now:
+    if auction is None or auction.status != "active" or not ended(auction, now):
         return False
     finish_auction(db, request, auction, now, roster)
     return True
@@ -675,7 +695,7 @@ def end_auctions_of(
         if auction.status != "active":
             continue
         touched += 1
-        if auction.ends_at <= now:
+        if ended(auction, now):
             if roster is not None:
                 finish_auction(db, request, auction, now, roster)
         elif auction.seller_id == user.id:
@@ -699,7 +719,14 @@ def end_auctions_of(
 # Listing.
 
 
-def check_prices(starting_bid: int, buy_now: int | None) -> None:
+def check_prices(starting_bid: int, buy_now: int | None, duration: str) -> int:
+    """Checks the prices and returns the starting bid: an unlimited auction's is its Buy Now."""
+    if duration == UNLIMITED:
+        if buy_now is None:
+            raise ApiError(422, "buy_now_required", "An unlimited auction needs a Buy Now price.")
+        if not 1 <= buy_now <= MAX_PRICE:
+            raise ApiError(422, "invalid_price", f"Buy Now is 1 to {MAX_PRICE:,} tokens.")
+        return buy_now
     if not 1 <= starting_bid <= MAX_PRICE:
         raise ApiError(422, "invalid_price", f"The starting bid is 1 to {MAX_PRICE:,} tokens.")
     if buy_now is not None and not starting_bid < buy_now <= MAX_PRICE:
@@ -708,6 +735,7 @@ def check_prices(starting_bid: int, buy_now: int | None) -> None:
             "invalid_price",
             f"Buy Now is more than the starting bid, at most {MAX_PRICE:,} tokens, or none.",
         )
+    return starting_bid
 
 
 def not_sellable(message: str) -> ApiError:
@@ -793,7 +821,7 @@ def put_up(
         batch_index=index,
         relisted_from=relisted,
         created_at=now,
-        ends_at=now + DURATIONS[duration],
+        ends_at=None if duration == UNLIMITED else now + DURATIONS[duration],
     )
     db.add(auction)
     record(
@@ -906,7 +934,7 @@ def market(
         .join(CardConcept, CardConcept.id == Auction.concept_id)
         .where(
             Auction.status == "active",
-            Auction.ends_at > now,
+            or_(Auction.ends_at.is_(None), Auction.ends_at > now),
             *market_filters(
                 q,
                 set_code,
@@ -926,12 +954,14 @@ def market(
     if not include_mine:
         query = query.where(Auction.seller_id != principal.user.id)
     price = func.coalesce(Auction.current_bid, Auction.starting_bid)
-    order = {
-        "ending": (Auction.ends_at, Auction.id),
+    # Unlimited auctions have no end: last when sorted by it.
+    ends = Auction.ends_at.asc().nulls_last()
+    order: tuple[Any, ...] = {
+        "ending": (ends, Auction.id),
         "newest": (Auction.created_at.desc(), Auction.id),
-        "price_low": (price, Auction.ends_at, Auction.id),
-        "price_high": (price.desc(), Auction.ends_at, Auction.id),
-        "buy_now_low": (Auction.buy_now.asc().nulls_last(), Auction.ends_at, Auction.id),
+        "price_low": (price, ends, Auction.id),
+        "price_high": (price.desc(), ends, Auction.id),
+        "buy_now_low": (Auction.buy_now.asc().nulls_last(), ends, Auction.id),
     }[sort]
     rows = db.execute(query.order_by(*order)).all()
     wanted: set[str] = set(color or [])
@@ -959,7 +989,7 @@ def compare(
                 Auction.finish == finish,
                 Auction.status == "active",
             )
-            .order_by(price, Auction.ends_at, Auction.id)
+            .order_by(price, Auction.ends_at.asc().nulls_last(), Auction.id)
             .limit(COMPARED)
         )
     )
@@ -1008,11 +1038,11 @@ def target_auctions(db: Session, user: User) -> tuple[list[Auction], list[Auctio
         ]
     active = sorted(
         (auction for auction in found if auction.status == "active"),
-        key=lambda auction: auction.ends_at,
+        key=end_of,
     )
     ended = sorted(
         (auction for auction in found if auction.status != "active"),
-        key=lambda auction: auction.ended_at or auction.ends_at,
+        key=lambda auction: auction.ended_at or end_of(auction),
         reverse=True,
     )
     won = [auction for auction in ended if auction.buyer_id == user.id]
@@ -1067,7 +1097,7 @@ def own_auctions(db: Session, user: User) -> tuple[list[Auction], list[Auction],
     relisted = {auction.relisted_from for auction in found if auction.relisted_from}
     active = sorted(
         (auction for auction in found if auction.status == "active"),
-        key=lambda auction: auction.ends_at,
+        key=end_of,
     )
     ended = sorted(
         (
@@ -1075,7 +1105,7 @@ def own_auctions(db: Session, user: User) -> tuple[list[Auction], list[Auction],
             for auction in found
             if auction.status != "active" and auction.seller_cleared_at is None
         ),
-        key=lambda auction: auction.ended_at or auction.ends_at,
+        key=lambda auction: auction.ended_at or end_of(auction),
         reverse=True,
     )
     sold = [auction for auction in ended if auction.status == "sold"]
@@ -1225,7 +1255,7 @@ def auction(auction_id: UUID, request: Request, principal: Active, db: Db) -> Au
 def list_cards(body: Listing, request: Request, principal: Active, db: Db) -> AuctionList:
     """Lists copies of one edition in one finish, an auction each: they leave the library at once.
     A retried request (the same key) lists nothing more and answers with what it listed."""
-    check_prices(body.starting_bid, body.buy_now)
+    starting_bid = check_prices(body.starting_bid, body.buy_now, body.duration)
     user = principal.user
     lock_account(db, user.id)
     db.refresh(user)
@@ -1244,7 +1274,7 @@ def list_cards(body: Listing, request: Request, principal: Active, db: Db) -> Au
             concept,
             printing,
             body.finish,
-            body.starting_bid,
+            starting_bid,
             body.buy_now,
             body.duration,
             body.key,
@@ -1299,7 +1329,7 @@ def place(
     if bid_by_key(db, user, key) is not None:
         return item_of(db, user, auction)
     now = utcnow()
-    if auction.status == "active" and auction.ends_at <= now:
+    if auction.status == "active" and ended(auction, now):
         finish_auction(db, request, auction, now, roster)
         db.commit()
     if auction.status != "active":
@@ -1311,6 +1341,8 @@ def place(
             raise ApiError(409, "no_buy_now", "This auction has no Buy Now price.")
         price = auction.buy_now
     else:
+        if auction.duration == UNLIMITED:
+            raise ApiError(409, "buy_now_only", "This auction is Buy Now only.")
         if auction.high_bidder_id == user.id:
             raise ApiError(409, "already_leading", "Your bid leads already.")
         minimum = next_bid(auction)
@@ -1349,7 +1381,7 @@ def place(
     watch(db, user.id, auction.id, now)
     if buying:
         sell(db, request, auction, bid, now, roster)
-    elif auction.ends_at - now < SNIPE:
+    elif auction.ends_at is not None and auction.ends_at - now < SNIPE:
         auction.ends_at = now + SNIPE
     try:
         db.commit()
@@ -1386,7 +1418,7 @@ def own_locked(db: Session, request: Request, user: User, auction_id: UUID) -> A
     if auction.seller_id != user.id:
         raise ApiError(403, "not_your_auction", "Only its seller can do that.")
     now = utcnow()
-    if auction.status == "active" and auction.ends_at <= now:
+    if auction.status == "active" and ended(auction, now):
         finish_auction(db, request, auction, now, roster_of(request))
         db.commit()
         auction = locked(db, auction_id)
@@ -1423,7 +1455,7 @@ def relist(
     auction_id: UUID, body: Relisting, request: Request, principal: Active, db: Db
 ) -> AuctionItem:
     """A new auction for an unsold auction's copy, if the library still holds it."""
-    check_prices(body.starting_bid, body.buy_now)
+    starting_bid = check_prices(body.starting_bid, body.buy_now, body.duration)
     user = principal.user
     earlier = listed_by(db, user, body.key)
     if earlier:
@@ -1447,7 +1479,7 @@ def relist(
         concept,
         printing,
         old.finish,
-        body.starting_bid,
+        starting_bid,
         body.buy_now,
         body.duration,
         body.key,
@@ -1531,7 +1563,7 @@ def cancel_auction(
     if auction is None:
         raise not_found()
     now = utcnow()
-    if auction.status == "active" and auction.ends_at <= now:
+    if auction.status == "active" and ended(auction, now):
         finish_auction(db, request, auction, now, roster)
         db.commit()
     if auction.status != "active":

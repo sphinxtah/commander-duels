@@ -33,11 +33,13 @@ import mage.constants.PlayerAction;
 import mage.constants.MultiAmountType;
 import mage.constants.Zone;
 import mage.game.Game;
+import mage.game.combat.CombatGroup;
 import mage.game.events.PlayerQueryEvent;
 import mage.game.permanent.Permanent;
 import mage.players.ManaPool;
 import mage.players.Player;
 import mage.players.PlayerImpl;
+import mage.target.common.TargetAttackingCreature;
 import mage.util.MultiAmountMessage;
 
 /**
@@ -273,7 +275,7 @@ final class Prompts {
                     add("done", "Done", null, null, false, new BooleanAnswer(true));
                 } else if (extra.containsKey(Constants.Option.POSSIBLE_BLOCKERS)) {
                     kind = "declare_blockers";
-                    combatants(uuids(extra.get(Constants.Option.POSSIBLE_BLOCKERS)),
+                    combatants(canBlockAny(uuids(extra.get(Constants.Option.POSSIBLE_BLOCKERS))),
                         game.getCombat().getBlockers(), "toggle_blocker");
                     add("done", "Done", null, null, false, new BooleanAnswer(true));
                 } else {
@@ -743,6 +745,33 @@ final class Prompts {
     }
 
     /** Creatures the seat may toggle, including those already declared. */
+    /**
+     * The possible blockers that can block one of the attackers now (v0.6.3). XMage lists every
+     * creature able to block something, and only asks which attacker after one is picked; with none
+     * it can block (a flier, an attacker it cannot block, one attacking someone else), that question
+     * offers nothing, and Done asks for blockers again, forever (the owner's Varragoth, Bloodsky
+     * Sire). This is XMage's own test (HumanPlayer.selectCombatGroup), so a creature offered here
+     * always has an attacker to choose.
+     */
+    private Set<UUID> canBlockAny(Set<UUID> possible) {
+        Set<UUID> attackers = new TargetAttackingCreature().possibleTargets(player.getId(), null, game);
+        Set<UUID> able = new LinkedHashSet<>();
+        for (UUID id : possible) {
+            Permanent blocker = game.getPermanent(id);
+            if (blocker == null) {
+                continue;
+            }
+            for (UUID attacker : attackers) {
+                CombatGroup group = game.getCombat().findGroup(attacker);
+                if (group != null && group.canBlock(blocker, game)) {
+                    able.add(id);
+                    break;
+                }
+            }
+        }
+        return able;
+    }
+
     private void combatants(Set<UUID> possible, Set<UUID> declared, String action) {
         Set<UUID> creatures = new LinkedHashSet<>(possible);
         for (UUID id : declared) {

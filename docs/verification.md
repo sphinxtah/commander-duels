@@ -1,5 +1,18 @@
 # Verification
 
+## v0.6.3
+
+Validated locally on Windows on October 25, 2026: the auction house's 7-day, 30-day and unlimited listings, and the blockers fix. Docker was not running at first, so Python ran natively on 3.13 in the repository's virtual environment, against a throwaway PostgreSQL 17 in Docker. The web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy, and the engine in its Docker build image.
+
+| Check | Result |
+|---|---|
+| Python suite | ruff, ruff format and mypy passed. `tests/test_auctions.py`, `tests/test_migrations.py` and `tests/test_contracts.py` passed, including the new `test_seven_and_thirty_days_and_unlimited_buy_now_only`. The rest of the suite, run on native Windows: 183 passed up to `tests/test_matches.py`, where `test_a_player_removed_while_away_loses_the_match` hung (the Windows-only hang noted since v0.4.2; it does not touch auctions); `test_card_images`' 429 check failed once under load and passed alone. Hosted CI runs the whole suite on Linux |
+| Migrations | `alembic upgrade head` and `alembic check` on a fresh PostgreSQL; down to 0029 and up again; SQLite up, down to base and up in `tests/test_migrations.py` |
+| Contracts | `contracts/openapi.json` regenerated; `web/src/generated/api.d.ts` with `pnpm contracts` |
+| Web | the full Vitest run (96 files, 1,195 tests) and the production build (`tsc -b`) passed on the auction change; after the new unit tests and Prettier, `src/auctions` (28 tests) and `tsc -b` again |
+| Engine | `docker build --target engine-build` compiled; `BlockersTest` (new: against a flier, only the creature with reach is offered as a blocker, and it blocks), `TeamPriorityTest`, `TwoHeadedGiantTest`, `PromptFamiliesTest` and `TwoHeadedGiantRareCardsTest` passed |
+| Not run locally | the browser journeys and the whole JUnit run; hosted CI runs them |
+
 ## v0.6.2
 
 Validated locally on Windows on October 24, 2026, on the work of v0.6.2 as merged: the stand-ins and the real card in every pack, the alliance's cards, the library's filters and the deck as its cards, and Two-Headed Giant's rare cards (each built in a worktree by a subagent and merged here), with the boosted chase cards and the first sets' prices (built here). Python ran on 3.12.10 in the API image, as in CI, on a copy of the repository; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy.

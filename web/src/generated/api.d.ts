@@ -3340,12 +3340,12 @@ export interface components {
              * Duration
              * @enum {string}
              */
-            duration: "1h" | "3h" | "12h" | "24h" | "3d";
+            duration: "1h" | "3h" | "12h" | "24h" | "3d" | "7d" | "30d" | "unlimited";
             /**
              * Ends At
-             * Format: date-time
+             * @description None for an unlimited auction: it has no end.
              */
-            ends_at: string;
+            ends_at: string | null;
             /**
              * Finish
              * @enum {string}
@@ -3579,7 +3579,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.6.2
+             * @default 0.6.3
              */
             version: string;
         };
@@ -4999,7 +4999,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.6.2
+             * @default 0.6.3
              */
             version: string;
         };
@@ -5266,7 +5266,7 @@ export interface components {
              * Duration
              * @enum {string}
              */
-            duration: "1h" | "3h" | "12h" | "24h" | "3d";
+            duration: "1h" | "3h" | "12h" | "24h" | "3d" | "7d" | "30d" | "unlimited";
             /**
              * Finish
              * @enum {string}
@@ -6603,7 +6603,7 @@ export interface components {
              * Duration
              * @enum {string}
              */
-            duration: "1h" | "3h" | "12h" | "24h" | "3d";
+            duration: "1h" | "3h" | "12h" | "24h" | "3d" | "7d" | "30d" | "unlimited";
             /** Key */
             key: string;
             /** Starting Bid */

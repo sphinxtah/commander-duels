@@ -1655,10 +1655,17 @@ class Auction(Base):
         ),
         CheckConstraint("finish IN ('nonfoil', 'foil', 'etched')", name="ck_auctions_finish"),
         CheckConstraint(
-            "duration IN ('1h', '3h', '12h', '24h', '3d')", name="ck_auctions_duration"
+            "duration IN ('1h', '3h', '12h', '24h', '3d', '7d', '30d', 'unlimited')",
+            name="ck_auctions_duration",
         ),
         CheckConstraint("starting_bid >= 1", name="ck_auctions_starting_bid"),
-        CheckConstraint("buy_now IS NULL OR buy_now > starting_bid", name="ck_auctions_buy_now"),
+        # An unlimited auction (v0.6.3) is Buy Now only: its starting bid is its Buy Now.
+        CheckConstraint(
+            "(duration = 'unlimited' AND buy_now = starting_bid) "
+            "OR (duration != 'unlimited' AND (buy_now IS NULL OR buy_now > starting_bid))",
+            name="ck_auctions_buy_now",
+        ),
+        CheckConstraint("(duration = 'unlimited') = (ends_at IS NULL)", name="ck_auctions_ends"),
         CheckConstraint("(status = 'sold') = (buyer_id IS NOT NULL)", name="ck_auctions_buyer"),
         # One listing request makes up to 20 auctions, numbered; a retry finds them by its key.
         UniqueConstraint("seller_id", "request_key", "batch_index"),
@@ -1673,7 +1680,7 @@ class Auction(Base):
     finish: Mapped[str] = mapped_column(String(8))
     starting_bid: Mapped[int] = mapped_column(BigInteger)
     buy_now: Mapped[int | None] = mapped_column(BigInteger)
-    duration: Mapped[str] = mapped_column(String(4))
+    duration: Mapped[str] = mapped_column(String(9))
     status: Mapped[str] = mapped_column(String(16), default="active")
     # The leading bid and its bidder, and how many bids were made.
     current_bid: Mapped[int | None] = mapped_column(BigInteger)
@@ -1691,7 +1698,8 @@ class Auction(Base):
     # The seller cleared it from the transfer list.
     seller_cleared_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
-    ends_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    # None for an unlimited auction: it has no end.
+    ends_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     # When it was settled, withdrawn or cancelled.
     ended_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
 

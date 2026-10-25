@@ -12,7 +12,8 @@ Since v0.6.0 players auction cards to each other at Tivit's Auction House, a mar
 
 ## A listing
 
-- **The seller sets** the starting bid (at least 1 token), an optional Buy Now price (more than the starting bid) and the length: 1 hour, 3 hours, 12 hours, 24 hours or 3 days. There is no limit on prices beyond 10,000,000,000 tokens (`422 invalid_price`).
+- **The seller sets** the starting bid (at least 1 token), an optional Buy Now price (more than the starting bid) and the length: 1 hour, 3 hours, 12 hours, 24 hours, 3 days, 7 days, 30 days (7 and 30 since v0.6.3) or unlimited. There is no limit on prices beyond 10,000,000,000 tokens (`422 invalid_price`).
+- **Unlimited listings** (v0.6.3, the owner's choice: Buy Now only, as eBay's Good 'Til Cancelled). An unlimited listing needs a Buy Now price (`422 buy_now_required`), which is its starting bid too, and has no end (`ends_at` is null; `duration` is `unlimited`). It takes no bids (`409 buy_now_only`), so it never comes due and never expires: it runs until someone pays Buy Now, the seller withdraws it (at any time, as it has no bids) or SysOp cancels it. The market sorts it after every auction with an end, and "time left" filters leave it out. Relisting may change its length either way.
 - **The copy leaves the library at once.** A library is its grants less the copies on its live and sold listings (since any reset). A deck that relied on the copy becomes collection-locked by the usual validation, and the seller's decks are revalidated, as opening a pack does. Unsold, withdrawn or cancelled, the copy comes back and the decks are revalidated again.
 - **Withdrawing** is the seller's, until the first bid (`409 has_bids` after it).
 - **Relisting** an unsold auction (expired, withdrawn or cancelled) makes a new auction for the same copy, with new prices and length, if the library still holds it (`409 not_enough_copies`); an auction is relisted once (`409 not_relistable`).
@@ -24,6 +25,7 @@ Since v0.6.0 players auction cards to each other at Tivit's Auction House, a mar
 - **Refused:** a bid on one's own auction (`409 own_auction`), a bid by the leading bidder (`409 already_leading`), a bid under the next bid (`409 bid_too_low`, naming it), a bid on an auction that ended (`409 auction_ended`).
 - **Anti-snipe.** A bid in the last 30 seconds pushes the end to 30 seconds after the bid.
 - **Buy Now** buys at the Buy Now price and ends the auction at once; the leading bid, if any, comes back. A bid at or above Buy Now buys at Buy Now, for the Buy Now price. An auction with no Buy Now price refuses it (`409 no_buy_now`).
+- **Unlimited auctions take no bids** (`409 buy_now_only`): only Buy Now.
 - **Watching.** Any auction can be watched (a star); a bid watches it too.
 
 ## The end
@@ -140,7 +142,7 @@ The auctions the viewer watches or bid on: **Active**, each marked winning or ou
 
 #### The Sell dialog
 
-Opened from Sell a card, from Relist, or from My library. It finds what the viewer may sell (`GET /auctions/sellable`, searched by name) and offers each edition and finish with how many copies are free to sell; from My library it offers only that edition's finishes, and a single one is chosen already. Then: **Set a Buy Now price**, the copies to list (up to 20, each its own auction), the starting bid (at least 1 token) and Buy Now (above the starting bid), and the length, 1 hour, 3 hours, 12 hours, 24 hours or 3 days. The summary says **"You receive 100% — no fee"** and what will be listed. One client key per listing until it succeeds.
+Opened from Sell a card, from Relist, or from My library. It finds what the viewer may sell (`GET /auctions/sellable`, searched by name) and offers each edition and finish with how many copies are free to sell; from My library it offers only that edition's finishes, and a single one is chosen already. Then: **Set a Buy Now price**, the copies to list (up to 20, each its own auction), the starting bid (at least 1 token) and Buy Now (above the starting bid), and the length, 1 hour, 3 hours, 12 hours, 24 hours, 3 days, 7 days, 30 days or Unlimited. Unlimited hides the starting bid and asks only for the Buy Now price; its summary says the listing is Buy Now only, with no end. An unlimited auction's panel shows its Buy Now, "No end" for its time and no bid stepper, only Buy Now. The summary says **"You receive 100% — no fee"** and what will be listed. One client key per listing until it succeeds.
 
 ### My library
 

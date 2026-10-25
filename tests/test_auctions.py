@@ -437,6 +437,54 @@ def test_withdrawing_only_before_the_first_bid_and_only_by_the_seller(client):
     assert (refused.status_code, refused.json()["code"]) == (409, "has_bids")
 
 
+def test_seven_and_thirty_days_and_unlimited_buy_now_only(client):
+    first, second, third = bolts(client)
+    ada = Account(client, "ada")
+    for printing in (first, second, third):
+        finished(client, ada.id, printing, "nonfoil", 1)
+    bob = funded(client, "bob", 1_000)
+    week = auctions_api.AuctionItem.model_validate(sell(ada, first, duration="7d"))
+    month = auctions_api.AuctionItem.model_validate(sell(ada, second, duration="30d"))
+    for item, days in ((week, 7), (month, 30)):
+        assert item.ends_at is not None
+        assert abs((item.ends_at - item.created_at) - timedelta(days=days)) < timedelta(seconds=1)
+    # Unlimited needs a Buy Now price, which is its starting bid too, and has no end.
+    none = ada.send("POST", "/api/v1/auctions", listing(third, buy_now=None, duration="unlimited"))
+    assert (none.status_code, none.json()["code"]) == (422, "buy_now_required")
+    endless = sell(ada, third, starting=900, buy_now=400, duration="unlimited")
+    assert (endless["duration"], endless["ends_at"]) == ("unlimited", None)
+    assert (endless["starting_bid"], endless["buy_now"]) == (400, 400)
+    auction = endless["id"]
+    refused = bid(bob, auction, 400)
+    assert (refused.status_code, refused.json()["code"]) == (409, "buy_now_only")
+    # It never comes due, is on the market, and sorts after the auctions with an end.
+    with database(client) as db:
+        assert auctions_api.settle_due(db, {}) == 0
+    market = bob.get("/api/v1/auctions", sort="ending").json()["items"]
+    assert [item["id"] for item in market][-1] == auction
+    assert auction not in {
+        item["id"] for item in bob.get("/api/v1/auctions", max_time_left=3600).json()["items"]
+    }
+    # The seller sees it in the transfer list; Buy Now ends it.
+    mine = ada.get("/api/v1/auctions/mine").json()
+    assert auction in {item["id"] for item in mine["active"]}
+    bought = bob.send("POST", f"/api/v1/auctions/{auction}/buy-now", {"key": key()}).json()
+    assert (bought["status"], bought["sold_price"], bought["ends_at"]) == ("sold", 400, None)
+    assert balance(bob) == 600
+    # Another one: withdrawn at any time, then relisted for 7 days.
+    finished(client, ada.id, first, "nonfoil", 1)
+    again = sell(ada, first, buy_now=50, duration="unlimited")
+    gone = ada.send("DELETE", f"/api/v1/auctions/{again['id']}").json()
+    assert gone["status"] == "withdrawn"
+    relisted = ada.send(
+        "POST",
+        f"/api/v1/auctions/{again['id']}/relist",
+        {"starting_bid": 10, "buy_now": None, "duration": "7d", "key": key()},
+    )
+    assert relisted.status_code == 201, relisted.text
+    assert relisted.json()["ends_at"] is not None
+
+
 def test_a_late_bid_pushes_the_end_and_the_end_settles_on_a_read(client):
     first, _, _ = bolts(client)
     ada = Account(client, "ada")
@@ -444,8 +492,9 @@ def test_a_late_bid_pushes_the_end_and_the_end_settles_on_a_read(client):
     bob = funded(client, "bob", 1_000)
     auction = sell(ada, first, buy_now=None)["id"]
     ends_in(client, auction, 10)
-    pushed = bid(bob, auction, 150).json()
-    left = (auctions_api.AuctionItem.model_validate(pushed).ends_at - utcnow()).total_seconds()
+    pushed = auctions_api.AuctionItem.model_validate(bid(bob, auction, 150).json())
+    assert pushed.ends_at is not None
+    left = (pushed.ends_at - utcnow()).total_seconds()
     assert 25 < left <= 30
     # Past its end, any read settles it: sold to the leading bid.
     ends_in(client, auction, -1)

@@ -5,6 +5,7 @@ import { auctionApi } from "./api";
 import {
   DURATIONS,
   durationNames,
+  forHowLong,
   editionLine,
   finishNames,
   priceProblem,
@@ -120,9 +121,12 @@ export function SellDialog({
       : !Number.isInteger(Number(quantity)) || count < 1 || count > most
         ? `List 1 to ${most} ${most === 1 ? "copy" : "copies"}.`
         : "";
+  // An unlimited listing (v0.6.3) is Buy Now only: its Buy Now is its starting bid too.
+  const unlimited = duration === "unlimited";
   const problem = useMemo(
-    () => priceProblem(startingBid, useBuyNow ? buyNow : ""),
-    [startingBid, buyNow, useBuyNow],
+    () =>
+      priceProblem(startingBid, useBuyNow || unlimited ? buyNow : "", duration),
+    [startingBid, buyNow, useBuyNow, unlimited, duration],
   );
   const ready = (relist || chosen) && !problem && !quantityProblem;
 
@@ -130,8 +134,9 @@ export function SellDialog({
     if (!ready || busy) return;
     setBusy(true);
     setError("");
-    const start = Number(startingBid);
-    const buy = useBuyNow && buyNow.trim() ? Number(buyNow) : null;
+    const buy =
+      (useBuyNow || unlimited) && buyNow.trim() ? Number(buyNow) : null;
+    const start = unlimited ? Number(buyNow) : Number(startingBid);
     try {
       if (relist) {
         const { data, error: refused } = await auctionApi.relist(relist.id, {
@@ -143,7 +148,7 @@ export function SellDialog({
         if (!data) return setError(describe(refused));
         onListed(
           [data],
-          `${relist.card.name} is back on the market for ${durationNames[duration]}.`,
+          `${relist.card.name} is back on the market ${forHowLong(duration)}.`,
         );
       } else if (chosen) {
         const { data, error: refused } = await auctionApi.create({
@@ -160,8 +165,8 @@ export function SellDialog({
         onListed(
           data.items,
           listed === 1
-            ? `${chosen.card.name} is on the market for ${durationNames[duration]}.`
-            : `${listed} copies of ${chosen.card.name} are on the market for ${durationNames[duration]}.`,
+            ? `${chosen.card.name} is on the market ${forHowLong(duration)}.`
+            : `${listed} copies of ${chosen.card.name} are on the market ${forHowLong(duration)}.`,
         );
       }
       dialog.current?.close();
@@ -173,7 +178,7 @@ export function SellDialog({
   const card = relist ? relist.card : chosen?.card;
   const finish = relist ? relist.finish : chosen?.finish;
   const start = Number(startingBid) || 0;
-  const buy = useBuyNow ? Number(buyNow) || 0 : 0;
+  const buy = useBuyNow || unlimited ? Number(buyNow) || 0 : 0;
   const copies = relist ? 1 : count || 1;
   return (
     <dialog
@@ -287,14 +292,16 @@ export function SellDialog({
 
           <fieldset className={styles.pricing} disabled={!card}>
             <legend>The auction</legend>
-            <label className={styles.check}>
-              <input
-                type="checkbox"
-                checked={useBuyNow}
-                onChange={(event) => setUseBuyNow(event.target.checked)}
-              />
-              <span>Set a Buy Now price</span>
-            </label>
+            {!unlimited && (
+              <label className={styles.check}>
+                <input
+                  type="checkbox"
+                  checked={useBuyNow}
+                  onChange={(event) => setUseBuyNow(event.target.checked)}
+                />
+                <span>Set a Buy Now price</span>
+              </label>
+            )}
             {!relist && (
               <label className={styles.field}>
                 <span>Copies to list{chosen ? ` (up to ${most})` : ""}</span>
@@ -308,24 +315,27 @@ export function SellDialog({
                 />
               </label>
             )}
-            <label className={styles.field}>
-              <span>Starting bid (tokens)</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                required
-                value={startingBid}
-                onChange={(event) => setStartingBid(event.target.value)}
-              />
-            </label>
-            {useBuyNow && (
+            {!unlimited && (
+              <label className={styles.field}>
+                <span>Starting bid (tokens)</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  required
+                  value={startingBid}
+                  onChange={(event) => setStartingBid(event.target.value)}
+                />
+              </label>
+            )}
+            {(useBuyNow || unlimited) && (
               <label className={styles.field}>
                 <span>Buy Now (tokens)</span>
                 <input
                   type="number"
                   inputMode="numeric"
-                  min={Math.max(2, start + 1)}
+                  min={unlimited ? 1 : Math.max(2, start + 1)}
+                  required={unlimited}
                   value={buyNow}
                   onChange={(event) => setBuyNow(event.target.value)}
                 />
@@ -353,7 +363,15 @@ export function SellDialog({
 
           <div className={styles.summary} aria-live="polite">
             <p className={styles.noFee}>You receive 100% — no fee</p>
-            {card && !problem && (
+            {card && !problem && unlimited && (
+              <p>
+                {copies > 1 ? `${copies} listings, each ` : ""}at{" "}
+                <Price value={buy} /> Buy Now only, with no end: no bids. The
+                card leaves your library while it is listed; withdrawn, it comes
+                back.
+              </p>
+            )}
+            {card && !problem && !unlimited && (
               <p>
                 {copies > 1 ? `${copies} auctions, each ` : ""}from{" "}
                 <Price value={start} />
@@ -367,9 +385,10 @@ export function SellDialog({
                 while it is listed; unsold, it comes back.
               </p>
             )}
-            {(problem || quantityProblem) && startingBid !== "" && (
-              <p className={styles.error}>{quantityProblem || problem}</p>
-            )}
+            {(problem || quantityProblem) &&
+              (unlimited ? buyNow !== "" : startingBid !== "") && (
+                <p className={styles.error}>{quantityProblem || problem}</p>
+              )}
           </div>
           {error && (
             <p className={styles.error} role="alert">

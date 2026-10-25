@@ -7,6 +7,7 @@ import {
   editionLine,
   filtersSet,
   finishesWords,
+  forHowLong,
   increment,
   itemName,
   marketQuery,
@@ -58,6 +59,24 @@ describe("the auction house's arithmetic", () => {
     expect(priceProblem("100", "")).toBe("");
     expect(priceProblem("100", "100")).toMatch(/more than the starting bid/);
     expect(priceProblem("100", "101")).toBe("");
+  });
+
+  it("asks an unlimited listing only for its Buy Now (v0.6.3)", () => {
+    expect(priceProblem("", "", "unlimited")).toMatch(/Buy Now only/);
+    expect(priceProblem("", "0", "unlimited")).toMatch(/at least 1/);
+    expect(priceProblem("", "250", "unlimited")).toBe("");
+    expect(priceProblem("100", "", "7d")).toBe("");
+    expect(forHowLong("30d")).toBe("for 30 days");
+    expect(forHowLong("unlimited")).toBe("with no end");
+  });
+
+  it("gives an unlimited auction no end (v0.6.3)", () => {
+    expect(timeLeft(null, NOW)).toBe("No end");
+    expect(timeLeftWords(null, NOW)).toBe("no end");
+    expect(urgent(null, NOW)).toBe(false);
+    expect(milestone(null, NOW)).toBe("");
+    const endless = auction({ duration: "unlimited", ends_at: null });
+    expect(standing(endless, NOW)?.kind).not.toBe("ended");
   });
 });
 

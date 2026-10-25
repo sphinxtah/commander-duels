@@ -944,15 +944,26 @@
               "3h",
               "12h",
               "24h",
-              "3d"
+              "3d",
+              "7d",
+              "30d",
+              "unlimited"
             ],
             "title": "Duration",
             "type": "string"
           },
           "ends_at": {
-            "format": "date-time",
-            "title": "Ends At",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "None for an unlimited auction: it has no end.",
+            "title": "Ends At"
           },
           "finish": {
             "enum": [
@@ -1542,7 +1553,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.6.2",
+            "default": "0.6.3",
             "title": "Version",
             "type": "string"
           }
@@ -5317,7 +5328,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.6.2",
+            "default": "0.6.3",
             "title": "Version",
             "type": "string"
           }
@@ -5913,7 +5924,10 @@
               "3h",
               "12h",
               "24h",
-              "3d"
+              "3d",
+              "7d",
+              "30d",
+              "unlimited"
             ],
             "title": "Duration",
             "type": "string"
@@ -9173,7 +9187,10 @@
               "3h",
               "12h",
               "24h",
-              "3d"
+              "3d",
+              "7d",
+              "30d",
+              "unlimited"
             ],
             "title": "Duration",
             "type": "string"
@@ -12531,7 +12548,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.6.2"
+    "version": "0.6.3"
   },
   "openapi": "3.1.0",
   "paths": {

@@ -47,7 +47,13 @@ export function Price({
 }
 
 /** Time left, red under a minute. Only its words are read, not each second. */
-export function TimeLeft({ endsAt, now }: { endsAt: string; now: number }) {
+export function TimeLeft({
+  endsAt,
+  now,
+}: {
+  endsAt: string | null;
+  now: number;
+}) {
   return (
     <span
       className={styles.time}

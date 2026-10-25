@@ -20,7 +20,8 @@ const statusNames: Record<AuctionStatus, string> = {
   cancelled: "Cancelled",
 };
 
-function when(iso: string): string {
+function when(iso: string | null): string {
+  if (iso === null) return "No end";
   return new Date(iso).toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",

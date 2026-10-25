@@ -58,8 +58,18 @@ export const durationNames: Record<Duration, string> = {
   "12h": "12 hours",
   "24h": "24 hours",
   "3d": "3 days",
+  "7d": "7 days",
+  "30d": "30 days",
+  unlimited: "Unlimited",
 };
 export const DURATIONS = Object.keys(durationNames) as Duration[];
+
+/** How long a listing runs, after "on the market": "for 3 days", or "with no end" (v0.6.3). */
+export function forHowLong(duration: Duration): string {
+  return duration === "unlimited"
+    ? "with no end"
+    : `for ${durationNames[duration]}`;
+}
 
 export const rarityNames: Record<string, string> = {
   common: "Common",
@@ -161,8 +171,10 @@ export function shownPrice(
   return item.current_bid ?? item.starting_bid;
 }
 
-/** Milliseconds left until an auction ends; never below zero. */
-export function msLeft(endsAt: string, now: number): number {
+/** Milliseconds left until an auction ends; never below zero. An unlimited auction (no end,
+ * v0.6.3) has forever. */
+export function msLeft(endsAt: string | null, now: number): number {
+  if (endsAt === null) return Infinity;
   return Math.max(0, Date.parse(endsAt) - now);
 }
 
@@ -170,7 +182,8 @@ export function msLeft(endsAt: string, now: number): number {
  * Time left as Madden shows it: "2d 4h", "5h 12m", "12m 05s", "45s"; "Ended" at zero. Under a
  * minute it is urgent (red on screen).
  */
-export function timeLeft(endsAt: string, now: number): string {
+export function timeLeft(endsAt: string | null, now: number): string {
+  if (endsAt === null) return "No end";
   const total = Math.ceil(msLeft(endsAt, now) / 1000);
   if (total <= 0) return "Ended";
   const days = Math.floor(total / 86400);
@@ -184,7 +197,8 @@ export function timeLeft(endsAt: string, now: number): string {
 }
 
 /** The same in words for screen readers: "2 days 4 hours left". */
-export function timeLeftWords(endsAt: string, now: number): string {
+export function timeLeftWords(endsAt: string | null, now: number): string {
+  if (endsAt === null) return "no end";
   const total = Math.ceil(msLeft(endsAt, now) / 1000);
   if (total <= 0) return "ended";
   const unit = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
@@ -198,7 +212,7 @@ export function timeLeftWords(endsAt: string, now: number): string {
   return "less than a minute left";
 }
 
-export function urgent(endsAt: string, now: number): boolean {
+export function urgent(endsAt: string | null, now: number): boolean {
   const left = msLeft(endsAt, now);
   return left > 0 && left < 60_000;
 }
@@ -207,7 +221,7 @@ export function urgent(endsAt: string, now: number): boolean {
  * The milestone an auction's countdown has reached, for the live region: it speaks when this
  * changes (an hour left, ten minutes, one minute, ended), never every second.
  */
-export function milestone(endsAt: string, now: number): string {
+export function milestone(endsAt: string | null, now: number): string {
   const left = msLeft(endsAt, now);
   if (left <= 0) return "The auction has ended.";
   if (left < 60_000) return "Less than a minute left.";
@@ -369,8 +383,19 @@ export function requestKey(): string {
 }
 
 /** The price form's checks, as the server makes them: a starting bid of at least 1 token, and a
- * Buy Now above it. Empty when the prices are fine. */
-export function priceProblem(startingBid: string, buyNow: string): string {
+ * Buy Now above it; an unlimited listing, Buy Now only, a Buy Now of at least 1 token. Empty when
+ * the prices are fine. */
+export function priceProblem(
+  startingBid: string,
+  buyNow: string,
+  duration?: Duration,
+): string {
+  if (duration === "unlimited") {
+    const buy = Number(buyNow);
+    if (!buyNow.trim() || !Number.isInteger(buy) || buy < 1)
+      return "An unlimited listing is Buy Now only: its Buy Now is a whole number of tokens, at least 1.";
+    return "";
+  }
   const start = Number(startingBid);
   if (!startingBid.trim() || !Number.isInteger(start) || start < 1)
     return "The starting bid is a whole number of tokens, at least 1.";

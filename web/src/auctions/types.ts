@@ -5,7 +5,8 @@ import type { components } from "../generated/api";
 type Schemas = components["schemas"];
 
 export type Finish = "nonfoil" | "foil" | "etched";
-export type Duration = "1h" | "3h" | "12h" | "24h" | "3d";
+export type Duration =
+  "1h" | "3h" | "12h" | "24h" | "3d" | "7d" | "30d" | "unlimited";
 export type AuctionStatus =
   "active" | "sold" | "expired" | "withdrawn" | "cancelled";
 export type Rarity =
