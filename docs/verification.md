@@ -10,7 +10,9 @@ Validated locally on Windows on October 25, 2026: the basic land packs. Python r
 | PostgreSQL | on a throwaway PostgreSQL 17: `alembic upgrade head`, `scripts/load_fixture_catalog.py` (the six land packs ready, off sale, one collation each; run again, nothing duplicated), down to 0030 and up again (the land packs back as land packs, on sale) |
 | Contracts | `contracts/openapi.json` regenerated; `web/src/generated/api.d.ts` with `pnpm contracts` |
 | Web | the full Vitest run (96 files, 1,199 tests) and the production build (`tsc -b`) passed |
+| PostgreSQL tests | after run #138: `tests/test_shop.py`, `test_sales.py`, `test_land_packs.py`, `test_auctions.py`, `test_account_reset.py` and `test_migrations.py` with `CD_TEST_POSTGRES_URL` on a throwaway PostgreSQL 17: 57 passed |
 | Not run locally | the browser journeys; hosted CI runs them |
+| Hosted CI | run #138 failed the PostgreSQL concurrency test (the land packs shared the week's sale), fixed in a8442f7; run #139 green in 18 m 10 s: 436 pytest, 1,199 Vitest, 62 browser journeys (17 skipped), the engine job |
 
 ## v0.6.3
 
