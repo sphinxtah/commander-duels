@@ -12,6 +12,7 @@ Validated locally on Windows on October 25, 2026: the Power Nine and dual lands 
 | Reopened: motion | Windows' animation effects were off on the owner's PC (`SPI_GETCLIENTAREAANIMATION` false), which browsers report as reduced motion. The flip and foil glow's CSS on a test page in the Playwright image, Chromium and Firefox, with motion not reduced: the card turned (mid-turn `rotateY` transform after 200 ms) and the foil glowed and breathed (`foilBreathe`) |
 | Reopened: web | Prettier on the changed files; the full Vitest run (96 files, 1,199 tests, with `motion.test.ts`'s "the system's reduced motion does not count") and the production build passed, in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy |
 | Not run locally | the browser journeys; hosted CI runs them |
+| Hosted CI, reopened | run #150 on 0d97249 green in 18 m 39 s |
 | Hosted CI | runs #143 and #144 failed the contracts check (the generated API types' version) and #142 a Vitest race in the transfer targets, both fixed; run #145 on 0ce1bef green in 18 m 39 s |
 
 ## v0.6.4
