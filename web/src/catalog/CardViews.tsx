@@ -46,6 +46,8 @@ export function CardImage({
       : null);
   // A failure is tried again (v0.4.4): a page of new cards may find the server busy at first.
   const image = useImageRetry(src);
+  // No decoding="async" (v0.6.5): in a library of thousands, Chrome left such lazy pictures
+  // unpainted, blank tiles until the pointer passed over them.
   // Once the image has drawn, the frame beneath it is hidden, so a printing of another shape
   // shows the card's background around it rather than fragments of the text.
   return (
@@ -60,7 +62,6 @@ export function CardImage({
           src={src}
           alt=""
           loading="lazy"
-          decoding="async"
           ref={image.ref}
           onLoad={image.onLoad}
           onError={image.onError}
