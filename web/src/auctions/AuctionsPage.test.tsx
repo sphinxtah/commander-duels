@@ -392,7 +392,8 @@ describe("Tivit's Auction House", () => {
       .mockImplementation(() => ok(undefined) as never);
     show("#auctions/targets");
     const active = await screen.findByRole("region", { name: /Active/ });
-    expect(within(active).getByText("Outbid")).toBeInTheDocument();
+    // The section shows before the targets load, so wait for them.
+    expect(await within(active).findByText("Outbid")).toBeInTheDocument();
     expect(within(active).getByText("Winning")).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: /Won/ })).getByText("Won", {
