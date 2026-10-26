@@ -1,5 +1,16 @@
 # Verification
 
+## v0.6.5
+
+Validated locally on Windows on October 25, 2026: the Power Nine and dual lands back at their real pull ratios. Python ran natively on 3.12 in the repository's virtual environment.
+
+| Check | Result |
+|---|---|
+| Python suite | ruff, ruff format and mypy passed. `tests/test_boosts.py` removed with the boost. The whole suite on native Windows, `tests/test_matches.py` and `tests/test_tables.py` aside (they hang there on away-player timers): 363 passed, 47 skipped (v0.6.4's 367 less the four boost tests). Hosted CI runs everything on Linux |
+| PostgreSQL tests | `tests/test_shop.py`, `test_sales.py`, `test_land_packs.py`, `test_auctions.py`, `test_account_reset.py` and `test_migrations.py` with `CD_TEST_POSTGRES_URL` on a throwaway PostgreSQL 17: 57 passed |
+| Contracts | `contracts/openapi.json` regenerated (the version only); `web/src/generated/api.d.ts` unchanged |
+| Not run locally | the web suite and browser journeys (nothing in `web/` changed); hosted CI runs them |
+
 ## v0.6.4
 
 Validated locally on Windows on October 25, 2026: the basic land packs. Python ran natively on 3.12 in the repository's virtual environment; the web toolchain ran in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy.

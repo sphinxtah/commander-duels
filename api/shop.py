@@ -59,7 +59,7 @@ from sqlalchemy.orm import Session
 
 from api.auth import INPUT_ERRORS
 from api.cards import SyncQueued, image_of
-from api.collation import boosted, draw, load
+from api.collation import draw, load
 from api.decks import create_deck, refresh_decks, starters_of
 from api.economy import balance_of, lock_account, spend, target
 from api.identity import (
@@ -136,30 +136,6 @@ MAX_GRANT = 100
 HISTORY_SHOWN = 50
 # The order a pack is revealed in: commons first, the rarest last, foils after the rest.
 RARITY_ORDER = {"common": 0, "uncommon": 1, "rare": 2, "mythic": 3}
-# Cards drawn more often than their sheet's weights say, by set and name (v0.6.2, the owner: five
-# times the chance of the Power Nine and the dual lands in Alpha and Beta, packs and starter decks).
-BOOSTED_CARDS = (
-    "Black Lotus",
-    "Mox Pearl",
-    "Mox Sapphire",
-    "Mox Jet",
-    "Mox Ruby",
-    "Mox Emerald",
-    "Ancestral Recall",
-    "Time Walk",
-    "Timetwister",
-    "Tundra",
-    "Underground Sea",
-    "Badlands",
-    "Taiga",
-    "Savannah",
-    "Scrubland",
-    "Volcanic Island",
-    "Bayou",
-    "Plateau",
-    "Tropical Island",
-)
-BOOSTED = {(code, name): 5 for code in ("lea", "leb") for name in BOOSTED_CARDS}
 Finish = Literal["nonfoil", "foil", "etched"]
 RequestKey = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 Reason = Annotated[StoredText, Field(min_length=3, max_length=200)]
@@ -833,19 +809,6 @@ def granted_editions(db: Session, user: User, printings: set[UUID]) -> set[UUID]
     )
 
 
-def boosts(db: Session) -> dict[UUID, int]:
-    """BOOSTED's printings, by ID, with their factors."""
-    factors: dict[UUID, int] = {}
-    for printing_id, set_code, name in db.execute(
-        select(CardPrinting.id, CardPrinting.set_code, CardConcept.name)
-        .join(CardConcept, CardConcept.id == CardPrinting.concept_id)
-        .where(CardPrinting.set_code.in_({code for code, _ in BOOSTED}))
-        .where(CardConcept.name.in_({name for _, name in BOOSTED}))
-    ):
-        factors[printing_id] = BOOSTED.get((set_code, name), 1)
-    return factors
-
-
 def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -> PackOpening:
     """Draws the pack, records it, and grants its cards: in the caller's transaction, with the
     account's row locked."""
@@ -854,7 +817,7 @@ def open_pack(request: Request, db: Session, principal: Principal, pack: Pack) -
         raise ApiError(
             409, "pack_unavailable", f"{product.name} cannot be opened until its data is read."
         )
-    collation = boosted(load(db, product.collation_id), boosts(db))
+    collation = load(db, product.collation_id)
     rng = secrets.SystemRandom()
     if is_land_pack(product):
         # 1 to 5 of each color's 40 lands are foils, drawn now (v0.6.4).

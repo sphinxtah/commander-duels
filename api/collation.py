@@ -23,9 +23,6 @@ product, every card resolved to a catalog printing. Drawing a pack:
   kind, or its print run all dealt, api/print_runs.py) and those of cards out of the game:
   tokens, art cards and the other objects no deck holds, cards Scryfall no longer lists, cards
   the staff suspended. A sheet holding nothing else (a token or art card slot) gives nothing.
-- a **boosted** printing (v0.6.2, api/shop.py BOOSTED) is drawn its factor times as often from
-  its random sheets, the sheet's other cards sharing the rest: Alpha's and Beta's Power Nine and
-  dual lands five times as often.
 The randomness is the caller's: the shop draws with the operating system's secure generator, tests
 with a seeded one. Nothing the client sends reaches it.
 """
@@ -35,7 +32,7 @@ import json
 import random
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 from uuid import UUID
@@ -113,48 +110,6 @@ class Collation:
         """The cards in the most likely layout (ties go to the larger pack)."""
         best = max(self.layouts, key=lambda layout: (layout.weight, layout.size))
         return best.size
-
-
-def boost_sheet(sheet: Sheet, factors: dict[UUID, int]) -> Sheet:
-    """The sheet with each boosted card's chance multiplied by its factor, the rest sharing what is
-    left in their old proportions. With total weight S, boosted weight F once multiplied and the
-    others' weight O, a boosted card weighs f * w * O and another card w * (S - F): exact integers.
-    A sheet whose boosts would take all of it (F >= S) multiplies the weights instead."""
-    if sheet.fixed or not any(card.printing_id in factors for card in sheet.cards):
-        return sheet
-    total = sum(card.weight for card in sheet.cards)
-    others = sum(card.weight for card in sheet.cards if card.printing_id not in factors)
-    lifted = sum(
-        card.weight * factors[card.printing_id]
-        for card in sheet.cards
-        if card.printing_id in factors
-    )
-    if lifted >= total or others == 0:
-        weights = [card.weight * factors.get(card.printing_id, 1) for card in sheet.cards]
-    else:
-        weights = [
-            card.weight * factors[card.printing_id] * others
-            if card.printing_id in factors
-            else card.weight * (total - lifted)
-            for card in sheet.cards
-        ]
-    return replace(
-        sheet,
-        cards=tuple(
-            replace(card, weight=weight) for card, weight in zip(sheet.cards, weights, strict=True)
-        ),
-    )
-
-
-def boosted(collation: Collation, factors: dict[UUID, int]) -> Collation:
-    """The collation with these printings drawn more often on its random sheets (v0.6.2: the
-    owner's five times the chance of Alpha's and Beta's Power Nine and dual lands)."""
-    if not factors or not factors.keys() & collation.printings():
-        return collation
-    return Collation(
-        collation.layouts,
-        {name: boost_sheet(sheet, factors) for name, sheet in collation.sheets.items()},
-    )
 
 
 def from_json(layouts: Sequence[Any], sheets: dict[str, Any]) -> Collation:
