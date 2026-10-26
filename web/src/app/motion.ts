@@ -2,20 +2,8 @@ import { useSyncExternalStore } from "react";
 import type { MotionLevel, TableSettings } from "../game/table/types";
 
 // The page's accessibility settings, for code that draws outside CSS (the PixiJS table, the
-// timer's ring). App writes the account's choices to <html data-reduced-motion data-large-text>;
-// the system's reduced-motion setting counts too, as it does in global.css.
-
-const REDUCE = "(prefers-reduced-motion: reduce)";
-
-function media(): MediaQueryList | null {
-  try {
-    return typeof window.matchMedia === "function"
-      ? window.matchMedia(REDUCE)
-      : null;
-  } catch {
-    return null;
-  }
-}
+// timer's ring). App writes the account's choices to <html data-reduced-motion data-large-text>.
+// Since v0.6.5 the system's reduced-motion setting does not count, as in global.css.
 
 function subscribe(listener: () => void): () => void {
   const observer =
@@ -26,19 +14,11 @@ function subscribe(listener: () => void): () => void {
     attributes: true,
     attributeFilter: ["data-reduced-motion", "data-large-text"],
   });
-  const query = media();
-  query?.addEventListener?.("change", listener);
-  return () => {
-    observer?.disconnect();
-    query?.removeEventListener?.("change", listener);
-  };
+  return () => observer?.disconnect();
 }
 
 function reducedMotion(): boolean {
-  return (
-    document.documentElement.dataset.reducedMotion === "true" ||
-    media()?.matches === true
-  );
+  return document.documentElement.dataset.reducedMotion === "true";
 }
 
 function largeText(): boolean {

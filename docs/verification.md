@@ -9,7 +9,9 @@ Validated locally on Windows on October 25, 2026: the Power Nine and dual lands 
 | Python suite | ruff, ruff format and mypy passed. `tests/test_boosts.py` removed with the boost. The whole suite on native Windows, `tests/test_matches.py` and `tests/test_tables.py` aside (they hang there on away-player timers): 363 passed, 47 skipped (v0.6.4's 367 less the four boost tests). Hosted CI runs everything on Linux |
 | PostgreSQL tests | `tests/test_shop.py`, `test_sales.py`, `test_land_packs.py`, `test_auctions.py`, `test_account_reset.py` and `test_migrations.py` with `CD_TEST_POSTGRES_URL` on a throwaway PostgreSQL 17: 57 passed |
 | Contracts | `contracts/openapi.json` regenerated (the version only); `web/src/generated/api.d.ts` unchanged |
-| Not run locally | the web suite and browser journeys; hosted CI runs them |
+| Reopened: motion | Windows' animation effects were off on the owner's PC (`SPI_GETCLIENTAREAANIMATION` false), which browsers report as reduced motion. The flip and foil glow's CSS on a test page in the Playwright image, Chromium and Firefox, with motion not reduced: the card turned (mid-turn `rotateY` transform after 200 ms) and the foil glowed and breathed (`foilBreathe`) |
+| Reopened: web | Prettier on the changed files; the full Vitest run (96 files, 1,199 tests, with `motion.test.ts`'s "the system's reduced motion does not count") and the production build passed, in the `mcr.microsoft.com/playwright:v1.64.1-noble` image on a copy |
+| Not run locally | the browser journeys; hosted CI runs them |
 | Hosted CI | runs #143 and #144 failed the contracts check (the generated API types' version) and #142 a Vitest race in the transfer targets, both fixed; run #145 on 0ce1bef green in 18 m 39 s |
 
 ## v0.6.4

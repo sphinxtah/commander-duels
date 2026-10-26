@@ -38,7 +38,7 @@ describe("the page's settings, for the table's drawing", () => {
     expect(result.current).toBe("faster");
   });
 
-  it("the system's reduced motion counts too", () => {
+  it("the system's reduced motion does not count (v0.6.5)", () => {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,
       value: (query: string) => ({
@@ -48,7 +48,7 @@ describe("the page's settings, for the table's drawing", () => {
       }),
     });
     const { result } = renderHook(() => useMotionLevel("normal"));
-    expect(result.current).toBe("none");
+    expect(result.current).toBe("normal");
   });
 
   it("Larger text is read from the page", async () => {

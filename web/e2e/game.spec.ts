@@ -741,7 +741,6 @@ test.describe("practice games in the browser", () => {
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 1366, height: 768 });
-    await page.emulateMedia({ reducedMotion: "reduce" });
     const mine = deckNames("legacy-mono-green-creatures");
     const theirs = deckNames("legacy-mono-red-burn");
     const table = new Table(

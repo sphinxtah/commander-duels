@@ -47,10 +47,7 @@ export function Settings({
         <label>
           <span>
             <strong>Reduce motion</strong>
-            <small>
-              Keep transitions and movement to a minimum. System preferences are
-              also respected.
-            </small>
+            <small>Keep transitions and movement to a minimum.</small>
           </span>
           <input
             type="checkbox"

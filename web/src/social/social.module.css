@@ -508,11 +508,6 @@ a.noteLink:hover {
 :global(html[data-reduced-motion="true"]) .toast {
   animation: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .toast {
-    animation: none;
-  }
-}
 
 /* A player's profile. */
 .profile {

@@ -108,21 +108,15 @@ html {
     scroll-padding-top: 128px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
+/* Motion is reduced by the account's Reduce motion setting alone (v0.6.5, the owner): the
+   system's setting no longer counts, since Windows with its animation effects off reports it and
+   took away the pack's card flips and the foils' glow in every browser. */
 :root[data-reduced-motion="true"] {
   scroll-behavior: auto;
 }
-:root[data-reduced-motion="true"] * {
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
   animation: none !important;
   transition: none !important;
 }
