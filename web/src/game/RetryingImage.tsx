@@ -10,7 +10,8 @@ import {
 // A card image from our own server's cache, retried the way the table's textures are (images.ts):
 // a failure asks the server why; an image it has none for stays failed, remembered by its key for
 // a while; any other failure (a 429 or 503 while many cards load at once, a deploy) is tried again
-// with backoff, up to RETRIES times. Every card picture uses it: the table's faces by card name,
+// with backoff, up to RETRIES times (since v0.6.5 a busy answer, with its Retry-After, for as
+// long as the picture is on the page). Every card picture uses it: the table's faces by card name,
 // and since v0.4.4 the catalog's, the pack opening's and the decks' by printing, which until then
 // gave up at the first failure and kept their text frame for good.
 
@@ -59,7 +60,13 @@ export function useImageRetry(
     void whyFailed(src).then((why) => {
       if (why === "missing") {
         if (key !== null) rememberMissing(key);
-      } else if (live.current === src && tried < RETRIES)
+      } else if (
+        live.current === src &&
+        // A busy server (a Retry-After) is asked again as long as the picture is on the page
+        // (v0.6.5): a big library's pictures queue for their downloads; other failures RETRIES
+        // times.
+        (tried < RETRIES || (typeof why === "number" && why > 0))
+      )
         retry.current = window.setTimeout(
           () => {
             setAttempt(tried + 1);

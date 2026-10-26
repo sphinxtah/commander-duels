@@ -4,7 +4,7 @@ import { client } from "../api";
 import { auctionApi } from "../auctions/api";
 import { bolt as boltCard } from "../auctions/fixtures";
 import { card } from "../decks/fixtures";
-import { MyLibrary } from "./MyLibrary";
+import { LIBRARY_PAGE, MyLibrary } from "./MyLibrary";
 
 // My library in v0.6.0: each edition's copies by finish, a foil held glows, and Sell lists copies
 // in Tivit's Auction House.
@@ -228,5 +228,37 @@ describe("My library's finishes and Sell", () => {
     const table = await screen.findByRole("table", { name: "Your library" });
     expect(within(table).getByText("2 + 1 foil")).toBeInTheDocument();
     expect(within(table).queryByRole("button", { name: /^Sell/ })).toBeNull();
+  });
+
+  it("draws a big library a page at a time, and a filter starts again at one page (v0.6.5)", async () => {
+    const view = library(0);
+    const many = LIBRARY_PAGE + 30;
+    answer({
+      ...view,
+      cards: Array.from({ length: many }, (_, index) => ({
+        ...view.cards[0]!,
+        card: card(`Card ${index}`),
+        edition: { ...edition, printing_id: `p-${index}` },
+      })),
+    });
+    render(
+      <MyLibrary
+        onOpen={vi.fn()}
+        onZoom={vi.fn()}
+        view="pictures"
+        onView={vi.fn()}
+      />,
+    );
+    const tiles = await screen.findByRole("list", { name: "Your library" });
+    expect(within(tiles).getAllByRole("listitem")).toHaveLength(LIBRARY_PAGE);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show more (30 left)" }),
+    );
+    expect(within(tiles).getAllByRole("listitem")).toHaveLength(many);
+    expect(screen.queryByRole("button", { name: /Show more/ })).toBeNull();
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "Card" },
+    });
+    expect(within(tiles).getAllByRole("listitem")).toHaveLength(LIBRARY_PAGE);
   });
 });

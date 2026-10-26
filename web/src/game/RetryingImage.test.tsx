@@ -134,4 +134,21 @@ describe("card pictures outside the table", () => {
     expect(image(deck.container)).not.toBeNull();
     expect(deck.container.textContent).toBe("");
   });
+
+  it("ask a busy server again for as long as the picture is shown (v0.6.5)", async () => {
+    const fetch = answering(429, "card_images_busy", 1);
+    const card = render(<CardImage card={summary} printingId="p-busy" />);
+    // Well past the RETRIES other failures get: a big library's pictures queue for their turn.
+    for (let tries = 0; tries < 8; tries += 1) {
+      fireEvent.error(image(card.container)!);
+      await wait(75_000);
+      expect(image(card.container)).not.toBeNull();
+    }
+    expect(fetch).toHaveBeenCalledTimes(8);
+    fireEvent.load(image(card.container)!);
+    expect(card.container.firstElementChild).toHaveAttribute(
+      "data-loaded",
+      "true",
+    );
+  });
 });

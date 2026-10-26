@@ -891,3 +891,9 @@
   line-height: 1;
   color: #d9ddd3;
 }
+/* The library's next page (v0.6.5): drawn as the end comes near, or with the button. */
+.libraryMore {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 6px;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { client, describe } from "../api";
 import { finishesWords } from "../auctions/auctions";
 import { SellDialog, type SellRequest } from "../auctions/SellDialog";
@@ -45,6 +45,38 @@ const sourceNotes: [Source, string][] = [
     "The cards your decks held when libraries began, so none of them stopped working.",
   ],
 ];
+/** Editions drawn at a time (v0.6.5): a library of thousands drawn whole was slow to scroll, and
+ * its pictures, asked for all at once, outran the server's downloads and kept their text frames. */
+export const LIBRARY_PAGE = 120;
+
+/** How many of the shown editions to draw: a page, and a page more each time the end comes near
+ * (or "Show more" is pressed); a new filter starts again at one page. */
+function usePaged(shown: readonly unknown[]) {
+  const [state, setState] = useState({ shown, limit: LIBRARY_PAGE });
+  if (state.shown !== shown) setState({ shown, limit: LIBRARY_PAGE });
+  const limit = state.shown === shown ? state.limit : LIBRARY_PAGE;
+  const more = useCallback(
+    () =>
+      setState((before) => ({ ...before, limit: before.limit + LIBRARY_PAGE })),
+    [],
+  );
+  const end = useRef<HTMLDivElement | null>(null);
+  const left = shown.length > limit;
+  useEffect(() => {
+    const target = end.current;
+    if (!left || !target || typeof IntersectionObserver !== "function") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) more();
+      },
+      { rootMargin: "800px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [left, limit, more]);
+  return { limit, more, end, left };
+}
+
 /** The sources every library names, whether or not they gave it anything yet. */
 const alwaysNamed: Source[] = ["starter", "alliance"];
 
@@ -136,6 +168,8 @@ export function MyLibrary({
     [library],
   );
   const finer = filtersSet(filters);
+  const paged = usePaged(shown);
+  const drawn = (shown as LibraryItem[]).slice(0, paged.limit);
 
   if (error)
     return (
@@ -269,7 +303,7 @@ export function MyLibrary({
         </p>
       ) : view === "pictures" ? (
         <ul className={styles.grid} aria-label="Your library">
-          {(shown as LibraryItem[]).map((item) => {
+          {drawn.map((item) => {
             // The tile's own note says the edition's copies; the lines under it, its copies by
             // finish (v0.6.0) and where they came from. A foil or etched copy held glows.
             const finish = heldFinish(item.finishes);
@@ -328,7 +362,7 @@ export function MyLibrary({
               </tr>
             </thead>
             <tbody>
-              {(shown as LibraryItem[]).map((item) => (
+              {drawn.map((item) => (
                 <tr key={item.edition.printing_id}>
                   <th scope="row">
                     <button
@@ -373,6 +407,17 @@ export function MyLibrary({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {paged.left && (
+        <div ref={paged.end} className={styles.libraryMore}>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={paged.more}
+          >
+            Show more ({(shown.length - paged.limit).toLocaleString()} left)
+          </button>
         </div>
       )}
       {sellDialog}
