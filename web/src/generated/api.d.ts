@@ -3579,7 +3579,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.6.4
+             * @default 0.6.5
              */
             version: string;
         };
@@ -4999,7 +4999,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.6.4
+             * @default 0.6.5
              */
             version: string;
         };
