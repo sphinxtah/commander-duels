@@ -337,7 +337,8 @@ describe("Tivit's Auction House", () => {
       .mockImplementation(() => ok(mineList.unsold[0]!) as never);
     show("#auctions/list");
     const active = await screen.findByRole("region", { name: /Active/ });
-    expect(within(active).getByText("2")).toBeInTheDocument();
+    // The section shows before the listings load, so wait for them.
+    expect(await within(active).findByText("2")).toBeInTheDocument();
     // Only the one without bids may be withdrawn.
     expect(
       within(active).getAllByRole("button", { name: /^Withdraw/ }),
@@ -555,7 +556,8 @@ describe("Administration's Auctions tab", () => {
       .mockImplementation(() => ok({ ...live, status: "cancelled" }) as never);
     render(<AuctionsAdmin me={sysop} />);
     const table = await screen.findByRole("table");
-    expect(within(table).getByText("carol")).toBeInTheDocument();
+    // The table shows before its rows load, so wait for them.
+    expect(await within(table).findByText("carol")).toBeInTheDocument();
     expect(list).toHaveBeenCalledWith("sold", null);
     fireEvent.change(screen.getByRole("combobox", { name: "Show" }), {
       target: { value: "active" },
