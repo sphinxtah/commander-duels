@@ -158,6 +158,9 @@ class FairBot extends ComputerPlayerControllableProxy {
 
     private final Random random;
     private final transient Budget budget;
+    /** The share of priority decisions, in percent, this bot lets pass (v0.6.5, the owner: level 1
+     * played like level 6): 50 at skill 1, ten fewer each level, none at skill 6. */
+    private final int missPercent;
     private final transient Stats stats;
 
     FairBot(String name, RangeOfInfluence range, int skill, long seed) {
@@ -168,6 +171,7 @@ class FairBot extends ComputerPlayerControllableProxy {
         super(name, range, skill);
         this.random = new Random(seed);
         this.budget = budget;
+        this.missPercent = Math.max(0, (6 - skill) * 10);
         this.stats = new Stats();
     }
 
@@ -176,6 +180,7 @@ class FairBot extends ComputerPlayerControllableProxy {
         super(bot);
         this.random = bot.random;
         this.budget = bot.budget;
+        this.missPercent = bot.missPercent;
         this.stats = bot.stats;
         // XMage's own copy constructor leaves these at zero.
         this.maxThinkTimeSecs = bot.maxThinkTimeSecs;
@@ -192,7 +197,18 @@ class FairBot extends ComputerPlayerControllableProxy {
         super(playerUnderControl, controller);
         this.random = controller.random;
         this.budget = controller.budget;
+        this.missPercent = controller.missPercent;
         this.stats = controller.stats;
+    }
+
+    /** A lower skill lets some of its chances pass, as a weaker player misses plays. */
+    @Override
+    public boolean priority(Game game) {
+        if (missPercent > 0 && random.nextInt(100) < missPercent) {
+            pass(game);
+            return false;
+        }
+        return super.priority(game);
     }
 
     @Override
