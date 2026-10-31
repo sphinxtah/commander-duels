@@ -42,13 +42,13 @@ import org.apache.log4j.Logger;
 /**
  * The bot of Commander Duels: XMage's "Computer - mad" AI, playing with only its seat's information
  * (AI02) and a bounded search for each decision (AI05). Difficulty comes from XMage's search depth
- * and think time for the skill (AI01) and, since v0.7.0, from the habits of a weaker player
+ * and think time for the skill (AI01) and, since v0.7.1, from the habits of a weaker player
  * ({@link Profile}), never from concealed cards.
  *
  * <ul>
  *   <li>XMage's skill changes little that a player feels: its search is four actions deep at every
  *       skill up to 4 and its attacks, blocks, targets and choices are the same heuristics at every
- *       skill, so the owner found level 1 playing like level 6 (v0.6.5, v0.7.0). A low skill now
+ *       skill, so the owner found level 1 playing like level 6 (v0.6.5, v0.7.1). A low skill now
  *       plays like an amateur: it lets chances pass, casts what comes to hand instead of what the
  *       search prefers, holds attackers back or sends them into bad blocks, and leaves attacks
  *       unblocked when no lethal blow is coming. Each habit's share falls steeply with the skill and
@@ -99,7 +99,7 @@ class FairBot extends ComputerPlayerControllableProxy {
         }
 
         /** XMage's own limit for a skill level, three seconds per level, from skill 4 up; a lower
-         * skill thinks one second per level (v0.7.0), which also spares the server. */
+         * skill thinks one second per level (v0.7.1), which also spares the server. */
         static Budget forSkill(int skill) {
             int level = Math.max(1, skill);
             return new Budget(TimeUnit.SECONDS.toMillis(level < 4 ? level : 3L * level));
@@ -107,7 +107,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /**
-     * The habits of a weaker player, as shares in percent of the decisions they touch (v0.7.0). Each
+     * The habits of a weaker player, as shares in percent of the decisions they touch (v0.7.1). Each
      * is a base share scaled by {@code ((6 - skill) / 5) ^ 1.5}: the whole share at skill 1, about
      * 72% of it at 2, 46% at 3, 25% at 4, 9% at 5 and none at 6, so the default table bot (skill 4)
      * stays a decent player and skill 6 is XMage's AI unchanged.
@@ -150,7 +150,7 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong longestMillis = new AtomicLong();
         private final AtomicLong longestWaitMillis = new AtomicLong();
         private final AtomicLong unstarted = new AtomicLong();
-        // The weaker player's habits (v0.7.0).
+        // The weaker player's habits (v0.7.1).
         private final AtomicLong slips = new AtomicLong();
         private final AtomicLong naivePlays = new AtomicLong();
         private final AtomicLong heldBack = new AtomicLong();
@@ -201,17 +201,17 @@ class FairBot extends ComputerPlayerControllableProxy {
             return unstarted.get();
         }
 
-        /** Priorities a weaker player let pass unsearched (v0.7.0). */
+        /** Priorities a weaker player let pass unsearched (v0.7.1). */
         long slips() {
             return slips.get();
         }
 
-        /** Main-phase plays made without the search (v0.7.0). */
+        /** Main-phase plays made without the search (v0.7.1). */
         long naivePlays() {
             return naivePlays.get();
         }
 
-        /** Attackers held back, creatures sent in anyway, and attacks left unblocked (v0.7.0). */
+        /** Attackers held back, creatures sent in anyway, and attacks left unblocked (v0.7.1). */
         long heldBack() {
             return heldBack.get();
         }
@@ -241,7 +241,7 @@ class FairBot extends ComputerPlayerControllableProxy {
 
     private final Random random;
     private final transient Budget budget;
-    /** The habits of this bot's skill (v0.7.0; before, v0.6.5 let a flat share of priorities pass). */
+    /** The habits of this bot's skill (v0.7.1; before, v0.6.5 let a flat share of priorities pass). */
     private final transient Profile profile;
     private final transient Stats stats;
 
@@ -288,7 +288,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /**
-     * A weaker player's priority (v0.7.0): some chances pass unsearched, most of all responses on
+     * A weaker player's priority (v0.7.1): some chances pass unsearched, most of all responses on
      * other players' turns, and in its own main phases it sometimes plays what comes to hand
      * instead of what the search would choose. Skill 6 is XMage's AI as it is.
      */
@@ -351,7 +351,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /**
-     * A weaker player's attack (v0.7.0): XMage's choice of attackers, then some of them held back
+     * A weaker player's attack (v0.7.1): XMage's choice of attackers, then some of them held back
      * and some of the creatures it kept home sent in anyway, so lethal attacks are missed and
      * creatures run into blocks. XMage checks the requirements and restrictions afterwards, as it
      * does for its own choices.
@@ -401,7 +401,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /**
-     * A weaker player's blocks (v0.7.0): sometimes none at all, unless the attack as declared would
+     * A weaker player's blocks (v0.7.1): sometimes none at all, unless the attack as declared would
      * take all of this player's life, when even an amateur blocks.
      */
     @Override

@@ -1368,7 +1368,7 @@
   letter-spacing: 1.6px;
   text-transform: uppercase;
 }
-/* The folding heading (v0.7.0): the whole title is the button, styled as the heading was. */
+/* The folding heading (v0.7.1): the whole title is the button, styled as the heading was. */
 .sectionToggle {
   display: flex;
   align-items: center;

@@ -6,7 +6,7 @@ import styles from "./auctions.module.css";
 // Madden's other two screens (v0.6.0). The transfer list: the viewer's own listings, active, sold
 // and unsold, with Withdraw before the first bid, Relist and the Clear buttons. The transfer
 // targets: the auctions the viewer watches or bid on, active (winning or outbid), won and lost.
-// Since v0.7.0 each section folds: its heading is a button, and every section starts folded (the
+// Since v0.7.1 each section folds: its heading is a button, and every section starts folded (the
 // owner, with a hundred active listings, scrolled a long way to the sold ones). The count and the
 // Clear button stay on the folded bar.
 

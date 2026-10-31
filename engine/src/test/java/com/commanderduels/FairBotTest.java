@@ -211,7 +211,7 @@ class FairBotTest {
 
     @Test
     void aSkillHasItsHabitsAndItsBudget() {
-        // The habits (v0.7.0) fall steeply with the skill and are gone at 6, where XMage's AI plays as it is.
+        // The habits (v0.7.1) fall steeply with the skill and are gone at 6, where XMage's AI plays as it is.
         FairBot.Profile one = FairBot.Profile.forSkill(1);
         assertEquals(new FairBot.Profile(1, 30, 70, 50, 35, 30, 45), one);
         assertEquals(new FairBot.Profile(2, 21, 50, 36, 25, 21, 32), FairBot.Profile.forSkill(2));

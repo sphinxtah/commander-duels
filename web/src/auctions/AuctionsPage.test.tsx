@@ -78,7 +78,7 @@ function show(hash = "#auctions/search") {
   window.location.hash = hash;
   return render(<AuctionsPage me={player} heading={createRef()} />);
 }
-/** Presses a folded transfer section's heading (v0.7.0): the toggle is the heading's only button. */
+/** Presses a folded transfer section's heading (v0.7.1): the toggle is the heading's only button. */
 function unfold(region: HTMLElement) {
   const heading = within(region).getByRole("heading", { level: 2 });
   fireEvent.click(within(heading).getByRole("button"));
@@ -345,7 +345,7 @@ describe("Tivit's Auction House", () => {
     const active = await screen.findByRole("region", { name: /Active/ });
     // The section shows before the listings load, so wait for them.
     expect(await within(active).findByText("2")).toBeInTheDocument();
-    // Every section starts folded (v0.7.0): its rows are there once its heading is pressed.
+    // Every section starts folded (v0.7.1): its rows are there once its heading is pressed.
     expect(
       within(active).queryByRole("button", { name: /^Withdraw/ }),
     ).toBeNull();

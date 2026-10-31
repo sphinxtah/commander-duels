@@ -75,7 +75,7 @@ test.describe("Tivit's Auction House", () => {
       await sell.getByRole("button", { name: "List it" }).click();
       await expect(sell).toBeHidden();
       await seller.goto("/#auctions/list");
-      // The sections start folded (v0.7.0): the heading's button ("Active 1") opens one.
+      // The sections start folded (v0.7.1): the heading's button ("Active 1") opens one.
       await seller.getByRole("button", { name: /^Active \d+$/ }).click();
       const active = seller.getByRole("list", { name: "Active" });
       await expect(active).toContainText("Plains");
