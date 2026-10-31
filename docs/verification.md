@@ -11,7 +11,7 @@ Built on October 30, 2026 in a cloud workspace with no npm or PyPI access, from 
 | Contracts | the version only: `contracts/openapi.json` (three places) and `web/src/generated/api.d.ts` (two) edited by hand; CI's drift check regenerates both |
 | New tests, run only in CI | `notable.test.ts` (mana values, big spells and creatures, colours), `scene/effects/plan.test.ts` (which effects each event plans at each level), `scene/effects/effects.test.ts` (the particles' paths, the slash's strokes, the node on PixiJS's scene graph with no renderer), two events tests (`combat`, `commander`, `big` and `colours`), new cue cases, the settings' `effects` field, and four scene tests (a slain card holding under its X, nothing off or with reduced motion, the layer stopping when turned off, the other effects playing out) |
 | Not run locally | pytest, Vitest, the production build and the browser journeys; hosted CI runs them |
-| Hosted CI | runs #163 (9eec58e) and #164 (f315891) on the branch `effects-0.7.0` failed two Vitest tests, the scene's no-mask rule and the new reduced-motion case, both fixed in 4d462c5; run #165 on it green in 16 m 26 s (verify 16 m 26 s, engine 11 m 2 s). The runs on `main` and on the tag `v0.7.0` are in the release notes |
+| Hosted CI | runs #163 (9eec58e) and #164 (f315891) on the branch `effects-0.7.0` failed two Vitest tests, the scene's no-mask rule and the new reduced-motion case, both fixed in 4d462c5; run #165 on it green in 16 m 26 s (verify 16 m 26 s, engine 11 m 2 s). run #167 on `main` and run #168 on the tag `v0.7.0` (both cc94eb9) green, #168 publishing the `0.7.0` images; the private engine image's run #32 built `commander-duels-engine-sphinx:0.7.0` |
 
 ## v0.6.5
 
