@@ -14,7 +14,7 @@ Built on October 30, 2026 in a cloud workspace with no npm or PyPI access, from 
 | Hosted CI | runs #163 (9eec58e) and #164 (f315891) on the branch `effects-0.7.0` failed two Vitest tests, the scene's no-mask rule and the new reduced-motion case, both fixed in 4d462c5; run #165 on it green in 16 m 26 s (verify 16 m 26 s, engine 11 m 2 s). run #167 on `main` and run #168 on the tag `v0.7.0` (both cc94eb9) green, #168 publishing the `0.7.0` images; the private engine image's run #32 built `commander-duels-engine-sphinx:0.7.0` |
 | Reopened: bots | `FairBot.java` and `FairBotTest.java` parsed by `javac` with XMage absent (only the expected "does not override" errors); not compiled or run locally: CI's engine job on the branch `reopen-0.7.0` is the first build and test of the habits |
 | Reopened: web | `tsc --noEmit` on `web/` on the owner's PC as above; Prettier on the changed files; the Vitest and journey changes (the folded sections opened before their rows are read) run in CI |
-| Reopened: hosted CI | see the release notes |
+| Reopened: hosted CI | runs #170 to #173 on the branch `reopen-0.7.0` failed in turn on a compile error and on the auctions journey's folded sections (the release notes); run #174 on 4bab331 green in 20 m 32 s (verify 17 m 3 s, engine 20 m 32 s). The runs on `main` and on the moved tag are in the release notes |
 
 ## v0.6.5
 
