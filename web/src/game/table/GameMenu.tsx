@@ -5,7 +5,8 @@ import type { FullscreenState } from "./types";
 import styles from "./screen.module.css";
 
 // The Game menu (design §9.1): a popover above the band's menu diamond with the way back to the
-// Table, Full screen, Mute, the table options, Report a problem (v0.4.1) and Concede. It is a
+// Table, Full screen, Mute, Mute music (v0.7.2), the table options, Report a problem (v0.4.1) and
+// Concede. It is a
 // list of ordinary links and buttons that Tab moves through, never a dialog: the game goes on
 // behind it. Escape closes it (the table's Escape chain), and so does a press anywhere else.
 
@@ -17,6 +18,8 @@ export function GameMenu({
   fullscreen,
   muted,
   onMute,
+  musicMuted,
+  onMuteMusic,
   onOptions,
   onReport,
   onConcede,
@@ -29,6 +32,9 @@ export function GameMenu({
   fullscreen: FullscreenState;
   muted: boolean;
   onMute(muted: boolean): void;
+  /** The gameplay music alone (v0.7.2); Mute silences it too. */
+  musicMuted: boolean;
+  onMuteMusic(muted: boolean): void;
   onOptions(): void;
   /** Opens "Report a problem" with this game and its turn. */
   onReport(): void;
@@ -95,6 +101,15 @@ export function GameMenu({
             onClick={() => onMute(!muted)}
           >
             Mute
+          </button>
+        </li>
+        <li>
+          <button
+            type="button"
+            aria-pressed={musicMuted}
+            onClick={() => onMuteMusic(!musicMuted)}
+          >
+            Mute music
           </button>
         </li>
         <li>

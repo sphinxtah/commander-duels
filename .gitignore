@@ -24,3 +24,8 @@ Commander_Duels_Starter_Decks.xlsx
 
 # The owner's folder of files no longer needed, to go through by hand (v0.6.1).
 /archive/
+
+# The gameplay music (v0.7.2): the owner's tracks, never in the public repository. Locally,
+# music/game.mp3 beside compose.yaml plays in the Docker stack and the dev server; the live site
+# takes it from the private web image (docs/deployment.md).
+/music/

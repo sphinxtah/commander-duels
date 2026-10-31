@@ -1,5 +1,17 @@
 # Verification
 
+## v0.7.2
+
+Built on October 31, 2026 in the same cloud workspace as v0.7.0 and v0.7.1 (no npm or PyPI access), on the branch `music-0.7.2`; the version is open. The music is the browser's alone, so the checks are the web's.
+
+| Check | Result |
+|---|---|
+| TypeScript, Prettier, Vitest, the build | run on the owner's PC from the branch, and in hosted CI on the branch (the runs below) |
+| Contracts | the version only: `contracts/openapi.json` (three places) and `web/src/generated/api.d.ts` (two) edited by hand; CI's drift check regenerates both |
+| New tests | `game/music/gameMusic.test.ts` (the player on a fake `<audio>`: the track from the start and looping, the fades in and out, a new game beginning again mid fade-out, an effect run twice, the level as (v/100)², a mute pausing the stream and the unmute resuming it, a game started muted streaming nothing, the wait for a gesture and its end, no retries without a track, no audio at all, a late start after the game ended, dispose; and the hook: live, both mutes, the result and leaving), `game/music/devServer.test.ts` (the dev server's music addresses and byte ranges, and the folder's wiring in `compose.yaml`, `.gitignore` and `nginx.conf`), the settings' two music fields (`tableSettings.test.ts`, `Settings.test.tsx`), and the service worker passing `/music/` through |
+| Heard | the owner, in the local Docker stack at http://localhost:8080 with `music/game.mp3` mounted: the track during a game, the fades, the mutes (to record here) |
+| Hosted CI | the branch's runs (to record here) |
+
 ## v0.7.1
 
 Built on October 31, 2026 in the same cloud workspace as v0.7.0, on the branch `reopen-0.7.0`, with hosted CI as the test run.

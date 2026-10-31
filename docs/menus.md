@@ -8,7 +8,7 @@ Since v0.4.5 the app's menus and pages take the look of Magic Duels' front end, 
 - **Buttons.** The main buttons are bevelled gold, lit from above, with a sheen that crosses them under the pointer. The others are dark glass in a gold frame.
 - **Panels.** Panels and tiles have a gold hairline, a lit top edge and a deep shadow.
 - **Motion.** A page rises in as it opens; the main menu's tiles come in one after another, lift and glow under the pointer, and embers drift up behind it. The ally's portrait floats gently. Reduce motion (Settings) and the system's own setting stop all of it, as before.
-- **Sound.** The menus make generated sounds, like the table's (no recorded audio): a soft tick when the pointer or the keyboard reaches a tile (or, until v0.6.1, a page in the top bar), a whoosh into a bell when one is chosen, and a falling whoosh back to the main menu. They follow the table's sound settings (Settings → the table's volume and mute). As browsers require, no sound plays before the first click or key press. There is no music.
+- **Sound.** The menus make generated sounds, like the table's (no recorded audio): a soft tick when the pointer or the keyboard reaches a tile (or, until v0.6.1, a page in the top bar), a whoosh into a bell when one is chosen, and a falling whoosh back to the main menu. They follow the table's sound settings (Settings → the table's volume and mute). As browsers require, no sound plays before the first click or key press. There is no music in the menus; since v0.7.2 the table has its own, during a game only ([the game screen](game-screen.md#the-table)). The menu playlist the owner planned is still to come ([the v0.7.2 plan](plans/0.7.2.md)).
 
 ## The title screen
 

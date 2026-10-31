@@ -51,6 +51,7 @@ import {
 } from "./model";
 import { PriorityPanel } from "./PriorityPanel";
 import { PromptPanel } from "./PromptPanel";
+import { useGameMusic } from "./music/useGameMusic";
 import { useTableSound } from "./sound/useTableSound";
 import { AllianceContext, type TableAlliances } from "./table/Alliance";
 import { BandHud, type TurnLine } from "./table/BandHud";
@@ -422,6 +423,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
     refusal: state.refusal,
     timer: timer.view,
   });
+  // The gameplay music (v0.7.2), while the game is live; it fades out as the result comes.
+  useGameMusic({ live, settings });
 
   const drag = useDragController({
     layout,
@@ -735,6 +738,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 fullscreen={fullscreen}
                 muted={settings.muted}
                 onMute={(muted) => updateSettings({ muted })}
+                musicMuted={settings.musicMuted}
+                onMuteMusic={(musicMuted) => updateSettings({ musicMuted })}
                 onOptions={() => openDrawer("options")}
                 onReport={() => {
                   closeMenu(false);

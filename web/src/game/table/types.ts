@@ -632,9 +632,11 @@ export interface TableSettings {
   responseTimerSeconds: 0 | 5 | 8 | 15 | 30 | 90;
   animationSpeed: "normal" | "fast" | "faster";
   effectsVolume: number; // 0–100
-  muted: boolean;
+  muted: boolean; // every sound, the music included
   painter: "auto" | "dom";
   effects: EffectsLevel; // the special effects layer (v0.7.0)
+  musicVolume: number; // 0–100, the gameplay music (v0.7.2)
+  musicMuted: boolean; // the music alone; the sound effects go on
 }
 export const TABLE_SETTINGS_KEY = "cd.table.v1";
 export const DEFAULT_TABLE_SETTINGS: TableSettings = {
@@ -645,6 +647,8 @@ export const DEFAULT_TABLE_SETTINGS: TableSettings = {
   muted: false,
   painter: "auto",
   effects: "full",
+  musicVolume: 50,
+  musicMuted: false,
 };
 
 /* ---------- app services used by the game screen ---------- */

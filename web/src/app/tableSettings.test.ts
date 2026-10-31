@@ -35,6 +35,8 @@ describe("the table's device settings", () => {
         muted: true,
         painter: "dom",
         effects: "loud",
+        musicVolume: -12,
+        musicMuted: "yes",
         somethingNew: 1,
       }),
     );
@@ -44,7 +46,15 @@ describe("the table's device settings", () => {
       effectsVolume: 100,
       muted: true,
       painter: "dom",
+      musicVolume: 0,
     });
+    // A table saved before v0.7.2 has no music fields: the music plays at its default level.
+    expect(sanitizeTableSettings({ muted: true })).toEqual({
+      ...DEFAULT_TABLE_SETTINGS,
+      muted: true,
+    });
+    expect(sanitizeTableSettings({ musicVolume: 33.6 }).musicVolume).toBe(34);
+    expect(sanitizeTableSettings({ musicMuted: true }).musicMuted).toBe(true);
     expect(sanitizeTableSettings({ effects: "subtle" }).effects).toBe("subtle");
     expect(sanitizeTableSettings({ effects: "off" }).effects).toBe("off");
     const timer = (value: unknown) =>

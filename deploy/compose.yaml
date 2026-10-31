@@ -90,7 +90,9 @@ services:
       start_period: 90s
       start_interval: 2s
   web:
-    image: ${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/web:${CD_VERSION:?}
+    # The public web image, or with CD_WEB_IMAGE in .env the owner's private one, which adds the
+    # gameplay music (v0.7.2; docs/deployment.md). Either way tagged as the version.
+    image: ${CD_WEB_IMAGE:-${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/web}:${CD_VERSION:?}
     restart: unless-stopped
     logging: *logging
     # The host proxy reaches this port over the LAN; web-access.conf (written by deploy.sh) lets

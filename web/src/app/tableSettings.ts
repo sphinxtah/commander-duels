@@ -32,6 +32,8 @@ export function sanitizeTableSettings(value: unknown): TableSettings {
     typeof v === "number" && Number.isFinite(v) ? v : null;
   const seconds = number(record.responseTimerSeconds);
   const volume = number(record.effectsVolume);
+  const music = number(record.musicVolume);
+  const percent = (v: number) => Math.min(100, Math.max(0, Math.round(v)));
   return {
     fullscreenOnStart:
       typeof record.fullscreenOnStart === "boolean"
@@ -42,10 +44,7 @@ export function sanitizeTableSettings(value: unknown): TableSettings {
     animationSpeed: ANIMATION_SPEEDS.find((s) => s === record.animationSpeed)
       ? (record.animationSpeed as TableSettings["animationSpeed"])
       : d.animationSpeed,
-    effectsVolume:
-      volume === null
-        ? d.effectsVolume
-        : Math.min(100, Math.max(0, Math.round(volume))),
+    effectsVolume: volume === null ? d.effectsVolume : percent(volume),
     muted: typeof record.muted === "boolean" ? record.muted : d.muted,
     painter:
       record.painter === "auto" || record.painter === "dom"
@@ -54,6 +53,9 @@ export function sanitizeTableSettings(value: unknown): TableSettings {
     effects: EFFECTS_LEVELS.find((level) => level === record.effects)
       ? (record.effects as TableSettings["effects"])
       : d.effects,
+    musicVolume: music === null ? d.musicVolume : percent(music),
+    musicMuted:
+      typeof record.musicMuted === "boolean" ? record.musicMuted : d.musicMuted,
   };
 }
 

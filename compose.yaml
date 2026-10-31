@@ -90,6 +90,10 @@ services:
   web:
     build: {context: ., dockerfile: web/Dockerfile}
     ports: ["127.0.0.1:8080:8080"]
+    # The gameplay music (v0.7.2): copy the track to music/game.mp3 (gitignored, beside this file)
+    # and the table plays it at http://localhost:8080. The live site gets it from the owner's
+    # private web image instead (docs/deployment.md). An empty folder means no music.
+    volumes: ["./music:/usr/share/nginx/html/music:ro"]
     networks:
       default: {ipv4_address: 172.30.233.10}
     depends_on:

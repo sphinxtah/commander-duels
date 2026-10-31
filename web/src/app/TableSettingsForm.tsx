@@ -231,10 +231,49 @@ export function TableSettingsForm({ compact = false }: { compact?: boolean }) {
             </output>
           </span>
         </Row>
+        {/* The gameplay music (v0.7.2): one track, during games only. */}
+        <Row
+          id={`${id}-music`}
+          name="Music volume"
+          description={said(
+            "The soundtrack during games, and only then: it starts from the beginning with each game and loops until the game ends. The menus have no music.",
+          )}
+        >
+          <span className={styles.range}>
+            <input
+              id={`${id}-music`}
+              type="range"
+              min={0}
+              max={100}
+              {...named(`${id}-music`, !compact)}
+              value={settings.musicVolume}
+              onChange={(event) =>
+                change({ musicVolume: Number(event.target.value) })
+              }
+            />
+            <output htmlFor={`${id}-music`} aria-hidden="true">
+              {settings.musicVolume}
+            </output>
+          </span>
+        </Row>
+        <Row
+          id={`${id}-mute-music`}
+          name="Mute the music"
+          description={said(
+            "Silences the soundtrack and keeps the sound effects. Also in the Game menu.",
+          )}
+        >
+          <input
+            type="checkbox"
+            {...named(`${id}-mute-music`, !compact)}
+            checked={settings.musicMuted}
+            onChange={(event) => change({ musicMuted: event.target.checked })}
+          />
+        </Row>
         <Row
           id={`${id}-mute`}
           name="Mute all sound"
-          description={said("Silences every sound effect.")}
+          description={said("Silences every sound effect and the music.")}
         >
           <input
             type="checkbox"

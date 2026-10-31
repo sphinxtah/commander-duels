@@ -51,6 +51,8 @@ export function routeRequest(
   if (path.startsWith("/assets/")) return "asset";
   if (path.startsWith("/brand/") || path === "/manifest.webmanifest")
     return "brand";
+  // Everything else, the pictures the HTTP cache keeps and the gameplay music (v0.7.2, a stream of
+  // tens of megabytes that no cache should hold) among it.
   return "pass";
 }
 

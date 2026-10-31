@@ -123,6 +123,14 @@ describe("the Settings page", () => {
     expect(volume.parentElement!.querySelector("output")).toHaveTextContent(
       "35",
     );
+    const music = screen.getByRole<HTMLInputElement>("slider", {
+      name: "Music volume",
+    });
+    expect(music.value).toBe("50");
+    fireEvent.change(music, { target: { value: "80" } });
+    expect(stored().musicVolume).toBe(80);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mute the music" }));
+    expect(stored().musicMuted).toBe(true);
     fireEvent.click(screen.getByRole("checkbox", { name: "Mute all sound" }));
     expect(stored()).toEqual({
       ...DEFAULT_TABLE_SETTINGS,
@@ -132,6 +140,8 @@ describe("the Settings page", () => {
       painter: "dom",
       effectsVolume: 35,
       muted: true,
+      musicVolume: 80,
+      musicMuted: true,
     });
     expect(screen.getByText("Saved on this device.")).toBeInTheDocument();
   });
@@ -153,6 +163,8 @@ describe("the Settings page", () => {
       ["combobox", "Response timer"],
       ["combobox", "Draw the table with"],
       ["slider", "Sound effects volume"],
+      ["slider", "Music volume"],
+      ["checkbox", "Mute the music"],
       ["checkbox", "Mute all sound"],
     ] as const)
       expect(screen.getByRole(role, { name })).toHaveAccessibleDescription("");

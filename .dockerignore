@@ -15,3 +15,5 @@ engine/db
 Planeswalkers images
 the sphinx mtg
 .claude
+# The owner's music (gitignored, v0.7.2): mounted locally, baked only into the private web image
+music

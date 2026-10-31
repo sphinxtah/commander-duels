@@ -148,6 +148,17 @@ The Godlike tier's custom cards play only on an engine that has loaded them ([pr
 
 From then on `deploy.sh` pulls that image with the same tag as the version it deploys (`0.4.0`, or `sha-<commit>` for a build of `main`), so the private repository's CI must publish each version's tag before that version is deployed. If the pull fails, `deploy.sh` stops before anything is replaced and asks whether the VM is logged in and the tag exists. The private repository's workflow (`build.yml`, "Private engine image") builds the newest public `v*` tag's image on a daily schedule, when that image is missing, and at once when run by hand: from the repository's Actions page ("Run workflow", the version empty for the newest tag), or `POST /repos/sphinxtah/commander-duels-sphinx/actions/workflows/build.yml/dispatches` with `{"ref":"main","inputs":{"version":"0.7.0"}}` (v0.7.0: the tag's public images were published at 05:50 UTC, the private image did not exist until this dispatch built it in under 4 minutes, and the first `upgrade.sh` stopped at the pull as designed). Without `CD_ENGINE_IMAGE` (or with it empty) the site runs the public engine: everything works, and the custom cards show "Not loaded by this engine" in the deck builder and cannot start a game. The deploy's engine status line shows which card database is running (its `cards` counts are higher on the private image).
 
+### The web image with the music (v0.7.2)
+
+The gameplay music ([the game screen](game-screen.md#the-table)) is the owner's track, never in the public repository or its images: the public web image answers 404 at `/music/game.mp3` and the table stays quiet. The private repository `sphinxtah/commander-duels-sphinx` holds the file (`music/game.mp3`) and publishes a private web image, `ghcr.io/sphinxtah/commander-duels-web-sphinx:<version>`: the public web image of the same version with the music folder copied into nginx's root (`web/Dockerfile` there, and the workflow `web.yml`, "Private web image", which runs on a push of the music or the Dockerfile, by hand with a version, and daily for the newest public tag whose private web image is missing, as the engine's does). The live site runs that image instead of the public one. Once, on the VM, with the same ghcr.io login as the engine's (step 1 above):
+
+```sh
+# In /srv/commander-duels/.env, without a tag:
+CD_WEB_IMAGE=ghcr.io/sphinxtah/commander-duels-web-sphinx
+```
+
+From then on `deploy.sh` pulls that image with the version's tag, after the private repository's web workflow has published it; if the pull fails, `deploy.sh` stops before anything is replaced and names the private images it was asked for. Without `CD_WEB_IMAGE` (or with it empty) the site runs the public web image: everything works, and games are silent. The web image is the only one that changes for the music; the API, the engine and the worker know nothing of it, and the browser streams the track from nginx with Range requests (about 16 kB/s a listener), so the VM's cost is the file's bytes and nothing more.
+
 ### SysOp
 
 After the first deploy, set SysOp's password on the VM. It asks twice, without echo:
@@ -288,6 +299,7 @@ After the first deploy and at each version's close-out:
 | `CD_SYSOP_NETWORKS` | The home LAN, 10.10.1.0/24 |
 | `CD_GAMES_PER_ACCOUNT`, `CD_GAMES_MAX` | 1 and 64 (since v0.4.1). The `.env` of earlier versions says 6, and the live one still did after 0.4.1's deploy, so the engine ran 6 games; since v0.4.2 `deploy.sh` raises a 6 to 64 when it deploys over 0.1.1–0.4.1, and keeps any other value |
 | `CD_DB_PASSWORD`, `CD_ENGINE_SERVICE_TOKEN` | Generated on the VM by the bootstrap |
+| `CD_WEB_IMAGE` | Since v0.7.2: the web image without its tag. Empty or absent: the public `ghcr.io/sphinxtah/commander-duels/web`, silent. The live site: `ghcr.io/sphinxtah/commander-duels-web-sphinx`, the private image with the gameplay music ([above](#the-web-image-with-the-music-v072)) |
 | `CD_ENGINE_IMAGE` | Since v0.4.0: the engine image without its tag. Empty or absent: the public `ghcr.io/sphinxtah/commander-duels/engine`. The live site: `ghcr.io/sphinxtah/commander-duels-engine-sphinx`, the private image with the custom cards ([above](#the-engine-with-the-custom-cards-v040)) |
 
 The API runs with `CD_ENVIRONMENT=production`. In production it refuses to start unless:

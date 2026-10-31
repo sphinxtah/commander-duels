@@ -45,6 +45,8 @@ describe("the service worker's routes", () => {
     expect(routeRequest(get("/sw.js"), origin)).toBe("pass");
     expect(routeRequest(get("/table-lab.html"), origin)).toBe("pass");
     expect(routeRequest(get("/favicon.ico"), origin)).toBe("pass");
+    // The gameplay music (v0.7.2) streams from the server, never from a cache.
+    expect(routeRequest(get("/music/game.mp3"), origin)).toBe("pass");
     expect(
       routeRequest({ method: "GET", url: "not a url", mode: "cors" }, origin),
     ).toBe("pass");
