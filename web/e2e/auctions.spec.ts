@@ -75,12 +75,8 @@ test.describe("Tivit's Auction House", () => {
       await sell.getByRole("button", { name: "List it" }).click();
       await expect(sell).toBeHidden();
       await seller.goto("/#auctions/list");
-      // The sections start folded (v0.7.0): the heading opens one.
-      await seller
-        .getByRole("region", { name: /Active/ })
-        .getByRole("heading")
-        .getByRole("button")
-        .click();
+      // The sections start folded (v0.7.0): the heading's button ("Active 1") opens one.
+      await seller.getByRole("button", { name: /^Active \d+$/ }).click();
       const active = seller.getByRole("list", { name: "Active" });
       await expect(active).toContainText("Plains");
 
@@ -129,23 +125,14 @@ test.describe("Tivit's Auction House", () => {
         .getByRole("button", { name: "Buy for 60 tokens" })
         .click();
       await sysop.goto("/#auctions/targets");
-      // The sections start folded (v0.7.0): the heading opens one.
-      await sysop
-        .getByRole("region", { name: /Won/ })
-        .getByRole("heading")
-        .getByRole("button")
-        .click();
+      await sysop.getByRole("button", { name: /^Won \d+$/ }).click();
       await expect(sysop.getByRole("list", { name: "Won" })).toContainText(
         "Plains",
       );
 
       // The seller is paid the whole price: no fee.
       await seller.goto("/#auctions/list");
-      await seller
-        .getByRole("region", { name: /^Sold\b/ })
-        .getByRole("heading")
-        .getByRole("button")
-        .click();
+      await seller.getByRole("button", { name: /^Sold \d+$/ }).click();
       await expect(seller.getByRole("list", { name: "Sold" })).toContainText(
         "Plains",
       );
