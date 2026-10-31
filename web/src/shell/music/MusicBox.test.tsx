@@ -109,7 +109,7 @@ describe("the music box", () => {
     expect(songs[0]).toHaveTextContent("Heavy Is the Crown");
     expect(songs[0]).toHaveTextContent("Linkin Park");
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Now playing Heavy Is the Crown Linkin Park",
+      /^Now playing\s+Heavy Is the Crown\s+Linkin Park$/,
     );
     // The song is remembered for the next visit.
     expect(readMenuMusic().track).toBe("01-a.mp3");

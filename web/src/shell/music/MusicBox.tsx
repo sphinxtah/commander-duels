@@ -136,8 +136,9 @@ export function MusicBox({ player }: { player?: MenuMusic }) {
       <div className={styles.panel}>
         <div className={styles.head}>
           <div className={styles.now} role="status">
-            <span className={styles.word}>{word}</span>
-            <strong>{current ? current.title : "The menu music"}</strong>
+            {/* The spaces keep the three lines apart when read as one sentence. */}
+            <span className={styles.word}>{word}</span>{" "}
+            <strong>{current ? current.title : "The menu music"}</strong>{" "}
             {current?.artist && <small>{current.artist}</small>}
           </div>
           <button
