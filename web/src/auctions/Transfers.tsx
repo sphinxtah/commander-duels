@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ItemRow } from "./ItemViews";
 import type { AuctionItem, AuctionTargets, TransferList } from "./types";
 import styles from "./auctions.module.css";
@@ -6,6 +6,9 @@ import styles from "./auctions.module.css";
 // Madden's other two screens (v0.6.0). The transfer list: the viewer's own listings, active, sold
 // and unsold, with Withdraw before the first bid, Relist and the Clear buttons. The transfer
 // targets: the auctions the viewer watches or bid on, active (winning or outbid), won and lost.
+// Since v0.7.0 each section folds: its heading is a button, and every section starts folded (the
+// owner, with a hundred active listings, scrolled a long way to the sold ones). The count and the
+// Clear button stay on the folded bar.
 
 function Section({
   id,
@@ -24,11 +27,21 @@ function Section({
   children: (item: AuctionItem) => ReactNode;
 }) {
   const count = items?.length ?? 0;
+  const [open, setOpen] = useState(false);
   return (
     <section className={styles.transfers} aria-labelledby={id}>
       <header className={styles.transferHead}>
         <h2 id={id}>
-          {title} <span className={styles.sectionCount}>{count}</span>
+          <button
+            type="button"
+            className={styles.sectionToggle}
+            aria-expanded={open}
+            aria-controls={`${id}-body`}
+            onClick={() => setOpen((was) => !was)}
+          >
+            <span className={styles.sectionChevron} aria-hidden="true" />
+            {title} <span className={styles.sectionCount}>{count}</span>
+          </button>
         </h2>
         {clear && count > 0 && (
           <button
@@ -41,17 +54,19 @@ function Section({
           </button>
         )}
       </header>
-      {items === undefined ? (
-        <p className={styles.note} role="status">
-          Loading…
-        </p>
-      ) : count === 0 ? (
-        <p className={styles.sectionEmpty}>{empty}</p>
-      ) : (
-        <ul className={styles.rows} aria-label={title}>
-          {items.map(children)}
-        </ul>
-      )}
+      <div id={`${id}-body`} hidden={!open}>
+        {items === undefined ? (
+          <p className={styles.note} role="status">
+            Loading…
+          </p>
+        ) : count === 0 ? (
+          <p className={styles.sectionEmpty}>{empty}</p>
+        ) : (
+          <ul className={styles.rows} aria-label={title}>
+            {items.map(children)}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

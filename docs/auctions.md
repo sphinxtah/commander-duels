@@ -136,6 +136,8 @@ An auction opens in a drawer at the right of a wide window, or a sheet from the 
 
 The viewer's own listings in three sections with counts: **Active** (Withdraw while there is no bid), **Sold** (the buyer and the price; Clear sold) and **Unsold**, expired, withdrawn or cancelled (Relist, which opens the Sell dialog prefilled with the last prices and length; Clear unsold, which only tidies the list: the card is back in the library already).
 
+Since v0.7.0 the sections fold, here and in the targets: each heading is a button (`aria-expanded`), every section starts folded, and its count and Clear button stay on the folded bar, so a seller with a hundred active listings reaches Sold without scrolling past them (the owner, 2026-10-30). The fold is the page's for the visit: it is not kept.
+
 #### Transfer targets
 
 The auctions the viewer watches or bid on: **Active**, each marked winning or outbid, **Won** and **Lost**, with Clear won and Clear lost.

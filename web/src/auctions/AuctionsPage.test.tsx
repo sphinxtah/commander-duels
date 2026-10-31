@@ -78,6 +78,12 @@ function show(hash = "#auctions/search") {
   window.location.hash = hash;
   return render(<AuctionsPage me={player} heading={createRef()} />);
 }
+/** Presses a folded transfer section's heading (v0.7.0): the toggle is the heading's only button. */
+function unfold(region: HTMLElement) {
+  const heading = within(region).getByRole("heading", { level: 2 });
+  fireEvent.click(within(heading).getByRole("button"));
+}
+
 function tile(name: RegExp) {
   return within(screen.getByRole("list", { name: "Auctions" })).getByRole(
     "button",
@@ -339,6 +345,14 @@ describe("Tivit's Auction House", () => {
     const active = await screen.findByRole("region", { name: /Active/ });
     // The section shows before the listings load, so wait for them.
     expect(await within(active).findByText("2")).toBeInTheDocument();
+    // Every section starts folded (v0.7.0): its rows are there once its heading is pressed.
+    expect(
+      within(active).queryByRole("button", { name: /^Withdraw/ }),
+    ).toBeNull();
+    unfold(active);
+    expect(
+      within(active).getByRole("button", { name: /Active/ }),
+    ).toHaveAttribute("aria-expanded", "true");
     // Only the one without bids may be withdrawn.
     expect(
       within(active).getAllByRole("button", { name: /^Withdraw/ }),
@@ -353,9 +367,11 @@ describe("Tivit's Auction House", () => {
     ).toBeInTheDocument();
     expect(withdraw).toHaveBeenCalledWith(mineList.active[0]!.id);
 
+    // Clear stays on the folded bar.
     fireEvent.click(screen.getByRole("button", { name: "Clear sold" }));
     await waitFor(() => expect(clear).toHaveBeenCalledWith("sold"));
 
+    unfold(screen.getByRole("region", { name: /Unsold/ }));
     fireEvent.click(screen.getByRole("button", { name: "Relist Sol Ring" }));
     const dialog = await screen.findByRole("dialog", {
       name: "Relist on the market",
@@ -393,18 +409,19 @@ describe("Tivit's Auction House", () => {
       .mockImplementation(() => ok(undefined) as never);
     show("#auctions/targets");
     const active = await screen.findByRole("region", { name: /Active/ });
+    unfold(active);
     // The section shows before the targets load, so wait for them.
     expect(await within(active).findByText("Outbid")).toBeInTheDocument();
     expect(within(active).getByText("Winning")).toBeInTheDocument();
+    const won = screen.getByRole("region", { name: /Won/ });
+    unfold(won);
     expect(
-      within(screen.getByRole("region", { name: /Won/ })).getByText("Won", {
-        selector: "[data-kind='won']",
-      }),
+      within(won).getByText("Won", { selector: "[data-kind='won']" }),
     ).toBeInTheDocument();
+    const lost = screen.getByRole("region", { name: /Lost/ });
+    unfold(lost);
     expect(
-      within(screen.getByRole("region", { name: /Lost/ })).getByText("Lost", {
-        selector: "[data-kind='lost']",
-      }),
+      within(lost).getByText("Lost", { selector: "[data-kind='lost']" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Clear lost" }));
     await waitFor(() => expect(clear).toHaveBeenCalledWith("lost"));

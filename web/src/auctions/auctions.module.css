@@ -1368,6 +1368,40 @@
   letter-spacing: 1.6px;
   text-transform: uppercase;
 }
+/* The folding heading (v0.7.0): the whole title is the button, styled as the heading was. */
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.sectionToggle:hover {
+  background: #ffffff0a;
+}
+.sectionToggle:focus-visible {
+  outline: 2px solid var(--cd-gold-hi);
+  outline-offset: 2px;
+}
+.sectionChevron {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 150ms ease;
+}
+.sectionToggle[aria-expanded="true"] .sectionChevron {
+  transform: rotate(45deg);
+}
 .sectionCount {
   min-width: 1.6rem;
   padding: 1px 8px;

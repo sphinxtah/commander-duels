@@ -123,12 +123,23 @@ test.describe("Tivit's Auction House", () => {
         .getByRole("button", { name: "Buy for 60 tokens" })
         .click();
       await sysop.goto("/#auctions/targets");
+      // The sections start folded (v0.7.0): the heading opens one.
+      await sysop
+        .getByRole("region", { name: /Won/ })
+        .getByRole("heading")
+        .getByRole("button")
+        .click();
       await expect(sysop.getByRole("list", { name: "Won" })).toContainText(
         "Plains",
       );
 
       // The seller is paid the whole price: no fee.
       await seller.goto("/#auctions/list");
+      await seller
+        .getByRole("region", { name: /^Sold\b/ })
+        .getByRole("heading")
+        .getByRole("button")
+        .click();
       await expect(seller.getByRole("list", { name: "Sold" })).toContainText(
         "Plains",
       );

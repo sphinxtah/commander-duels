@@ -1,6 +1,6 @@
 # Fair bots: hidden information and decision budgets (v0.3.1)
 
-The bots no longer plan with cards their seat cannot see (AI02), and every decision that searches has a bounded budget with a valid fallback (AI05). Difficulty still comes from XMage's search depth, node limit and think time for the skill, not from knowing future draws or other players' hands (AI01).
+The bots no longer plan with cards their seat cannot see (AI02), and every decision that searches has a bounded budget with a valid fallback (AI05). Difficulty comes from XMage's search depth and think time for the skill and, since v0.7.0, from the habits of a weaker player ([below](#skill-and-habits-v070)), not from knowing future draws or other players' hands (AI01).
 
 Every bot seat, at the practice table and in bot matches, is now a `FairBot` (`engine/src/main/java/com/commanderduels/FairBot.java`): XMage's "Computer - mad" AI (`ComputerPlayerControllableProxy`, which extends `ComputerPlayer7` and `ComputerPlayer6`) with five of its protected methods overridden: `createSimulation`, `getNextAction`, `addActionsTimed`, `chooseCreatureType` and `printBattlefieldScore`. The search copies are dealt by `Determinizer` (same folder). No XMage patch was needed: every hook is a protected method of XMage's AI classes, and `engine/xmage/patches` stays empty. (Since v0.5.0 a patch teaches XMage's AI about teammates for Two-Headed Giant, and a fair bot keeps its teammate's real hand in its search copy, which its seat may see: [Two-Headed Giant](two-headed-giant.md).)
 
@@ -65,7 +65,7 @@ XMage's own bounds on a search, at the pinned commit (MAD `ComputerPlayer6`):
 | --- | --- |
 | Depth | `max(4, skill)` actions deep |
 | Nodes | 5,000 per search (`MAX_SIMULATED_NODES_PER_CALC`); past 5,100 the search throws, which is caught |
-| Think time | 3 seconds × skill per search: 3 s at skill 1, 18 s at skill 6 |
+| Think time | 3 seconds × skill per search from skill 4 up (12 s at 4, 18 s at 6); since v0.7.0 one second × skill below it (1 s at skill 1), which also spares the server |
 | Cancellation | The search runs on a pool thread; on time-out XMage cancels it with an interrupt, which the search checks at every node |
 | Fallback | `ComputerPlayer7.calculateActions` plays the best action the search has recorded, or passes when there is none |
 
@@ -94,6 +94,25 @@ Measured in the engine image build on the development machine, with skill 1 (3 s
 The four-human tables, which have no bot, took 1 s longer in the second run too, so part of the difference is the machine. Table 322 played a different game because the fair bots, which see less, chose differently along the way; the search also shares XMage's random generator with the game (audit row 13).
 
 Decisions that do not search (targets, modes, X, mulligans, attackers and blockers, mana payment) run XMage's heuristics on the game thread: their work is bounded by the number of options, not by a clock, and they cannot be cancelled. Choosing blockers copies the game once per attacker and blocker pair, the slowest of them on a large Commander board.
+
+## Skill and habits (v0.7.0)
+
+XMage's skill changes little that a player feels. Its search is four actions deep at every skill up to 4 (five and six at 5 and 6), the think time rarely runs out on an ordinary board, and its attacks (`declareAttackers`: an alpha strike when it kills, else the attackers no blocker can kill), blocks (`CombatUtil.blockWithGoodTrade2`), targets and choices are the same heuristics at every skill. v0.6.5 let a flat share of priorities pass (50% at skill 1), which mostly delayed a spell from one main phase to the next; the owner found level 1 still playing like level 6.
+
+Since v0.7.0 a `FairBot` has a `Profile` for its skill: the habits of a weaker player, each a share in percent of the decisions it touches, scaled by `((6 − skill) / 5)^1.5` so that skill 1 has the whole share, 2 about 72% of it, 3 46%, 4 25%, 5 9% and 6 none (XMage's AI as it is). The default table bot, skill 4, stays a decent player.
+
+| Habit | Where | Share at skill 1 | At 4 |
+| --- | --- | --- | --- |
+| Lets the chance pass | its own main phase with an empty stack, before the search | 30% | 8% |
+| Passes without searching | every other priority: responses, other players' turns | 70% | 18% |
+| Plays naively | its own main phase: a land if one can be played (an amateur still makes land drops), otherwise a random castable spell with XMage's usual targets and payment, instead of the search's choice | 50% | 13% |
+| Holds an attacker back | each attacker XMage's heuristic sent, withdrawn (`Combat.removeAttacker`); lethal attacks are missed this way | 35% | 9% |
+| Attacks anyway | each creature XMage kept home, declared at the player the attack already goes at (else the first opponent); XMage's requirement and restriction checks still run | 30% | 8% |
+| Blocks nothing | the whole declaration, unless the attackers' total power reaches this player's life: even an amateur blocks a lethal attack | 45% | 11% |
+
+The search itself is unchanged, so what the bot does play is still legal and sound: an amateur who knows the rules and plays badly, not a broken one. The depth is left at XMage's: at a depth below four the search scores a spell while it still sits on the stack, which reads as a card lost, and the bot would stop casting. `FairBot.Stats` counts the habits (`slips`, `naivePlays`, `heldBack`, `recklessAttacks`, `unblocked`) in the engine's end-of-game line. The random source is the bot's seeded one, so a seeded game is the same game each time.
+
+`FairBotTest.aSkillHasItsHabitsAndItsBudget` fixes the shares and the budgets; `aLowSkillPlaysLikeAnAmateurAndStillLegally` plays a skill-1 bot for twelve turns against a scripted seat with XMage reporting no error and at least one slip.
 
 ## Tests
 

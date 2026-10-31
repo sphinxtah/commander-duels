@@ -210,6 +210,62 @@ class FairBotTest {
     }
 
     @Test
+    void aSkillHasItsHabitsAndItsBudget() {
+        // The habits (v0.7.0) fall steeply with the skill and are gone at 6, where XMage's AI plays as it is.
+        FairBot.Profile one = FairBot.Profile.forSkill(1);
+        assertEquals(new FairBot.Profile(1, 30, 70, 50, 35, 30, 45), one);
+        assertEquals(new FairBot.Profile(2, 21, 50, 36, 25, 21, 32), FairBot.Profile.forSkill(2));
+        assertEquals(new FairBot.Profile(3, 14, 33, 23, 16, 14, 21), FairBot.Profile.forSkill(3));
+        assertEquals(new FairBot.Profile(4, 8, 18, 13, 9, 8, 11), FairBot.Profile.forSkill(4));
+        assertEquals(new FairBot.Profile(5, 3, 6, 4, 3, 3, 4), FairBot.Profile.forSkill(5));
+        assertTrue(FairBot.Profile.forSkill(6).sharp());
+        assertTrue(FairBot.Profile.forSkill(99).sharp(), "a skill above 6 is 6");
+        assertEquals(one, FairBot.Profile.forSkill(-3), "a skill below 1 is 1");
+        assertTrue(!one.sharp());
+        // One second per level below skill 4, XMage's three per level from it.
+        assertEquals(1_000, FairBot.Budget.forSkill(1).thinkMillis());
+        assertEquals(3_000, FairBot.Budget.forSkill(3).thinkMillis());
+        assertEquals(12_000, FairBot.Budget.forSkill(4).thinkMillis());
+        assertEquals(18_000, FairBot.Budget.forSkill(6).thinkMillis());
+    }
+
+    @Test
+    void aLowSkillPlaysLikeAnAmateurAndStillLegally() throws Exception {
+        // A skill-1 bot over a short game: some chances slip, some plays are naive, some attacks are
+        // held back or reckless, some attacks go unblocked; XMage reports no error for any of it.
+        HumanGameRequest request = HumanGameTest.legacy(302L, "legacy-mono-green-creatures", 12, 600);
+        List<FairBot> bots = new CopyOnWriteArrayList<>();
+        var check = new SeatChecks(request) {
+            @Override
+            public Player bot(int seat, String name, RangeOfInfluence range, int skill, long seed) {
+                var bot = new FairBot(name, range, skill, FairBot.seedFor(seed, seat));
+                bots.add(bot);
+                return bot;
+            }
+        };
+        HumanGame game = Tables.start(request, check);
+        var player = new ScriptedPlayer(302L);
+        Tables.Played played = Tables.play(game, (seat, prompt, view) -> player.choose(prompt, view), 4,
+            new Tables.Coverage());
+        check.settle();
+        assertTrue(check.failures.isEmpty(), "XMage errors or wrong views: " + check.failures);
+        HumanGame.Result result = played.last().result();
+        assertTrue(Set.of("completed", "turn_limit").contains(result.kind()), result.toString());
+        assertNull(result.error());
+        assertTrue(BotMatchRunner.join(game.thread(), 10_000), "game thread still running");
+
+        assertEquals(1, bots.size());
+        FairBot bot = bots.get(0);
+        assertEquals(FairBot.Profile.forSkill(1), bot.profile());
+        FairBot.Stats stats = bot.stats();
+        long habits = stats.slips() + stats.naivePlays() + stats.heldBack() + stats.recklessAttacks()
+            + stats.unblocked();
+        System.out.printf("skill 1: %s%n", stats);
+        assertTrue(habits > 0, "a skill-1 bot showed none of its habits: " + stats);
+        assertTrue(stats.slips() > 0, "a skill-1 bot let no chance pass: " + stats);
+    }
+
+    @Test
     void theSearchPoolHasAThreadPerProcessorUnlessConfigured() {
         assertEquals(16, FairBot.searchThreads(null, 16));
         assertEquals(16, FairBot.searchThreads(" ", 16));
