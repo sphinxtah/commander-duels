@@ -82,6 +82,8 @@ export function burstHue(colours: ManaColour[], commander: boolean): number {
 }
 
 const CARD_RATIO = 150 / 209.52;
+/** How long the shine's beam is along the band, in stage units. */
+const BEAM_LENGTH = 260;
 
 /** The share of the slash's life its card waits before leaving: the second stroke has landed and
  * the X has been seen. */
@@ -672,26 +674,24 @@ export class EffectsNode {
     this.add(root, ms, particles, () => undefined);
   }
 
-  /** A gold shine sweeping the band from left to right as your turn begins. */
+  /** A gold shine sweeping the band from left to right as your turn begins. The beam fades in
+   * and out at the ends and travels inside the view, so it needs no clipping. */
   shine(band: Rect, span: { left: number; right: number }): void {
     const ms = this.kit.duration("shine");
     if (ms <= 0) return;
     const root = new Container();
-    const mask = new Graphics();
-    mask.rect(span.left, band.y, span.right - span.left, band.h).fill(0xffffff);
     const beam = new Sprite(this.sheet().beam);
     beam.tint = GOLD;
     beam.blendMode = "add";
-    beam.alpha = 0.5;
+    beam.alpha = 0;
     beam.anchor.set(0.5, 0);
     // The gradient fades along its height; turned on its side it fades along the band.
     beam.rotation = -Math.PI / 2;
     beam.width = band.h;
-    beam.height = 260;
-    root.addChild(mask, beam);
-    root.mask = mask;
-    const from = span.left - 260;
-    const to = span.right + 260;
+    beam.height = BEAM_LENGTH;
+    root.addChild(beam);
+    const from = span.left;
+    const to = span.right - BEAM_LENGTH;
     this.add(root, ms, [], (t) => {
       const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
       beam.position.set(from + (to - from) * e, band.y + band.h / 2);

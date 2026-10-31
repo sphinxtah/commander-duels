@@ -748,12 +748,16 @@ describe("the special effects (v0.7.0)", () => {
       await table.start(motion, effects);
       slay(table);
       expect(table.internals.fx.count).toBe(0);
-      if (motion === "normal") {
-        const [ghost] = [...table.internals.ghosts.values()];
-        const start = ghost.root.x;
-        await run(100);
-        expect(ghost.root.x).not.toBe(start);
-      } else expect(table.internals.ghosts.size).toBe(0);
+      const [ghost] = [...table.internals.ghosts.values()];
+      const start = ghost.root.x;
+      await run(100);
+      // With motion the card flies to the graveyard at once; with none it only fades.
+      if (motion === "normal") expect(ghost.root.x).not.toBe(start);
+      else {
+        expect(ghost.root.x).toBe(start);
+        await run(200);
+        expect(table.internals.ghosts.size).toBe(0);
+      }
       table.scene.destroy();
     }
   });
