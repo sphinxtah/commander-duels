@@ -242,7 +242,7 @@ class FairBot extends ComputerPlayerControllableProxy {
     private final Random random;
     private final transient Budget budget;
     /** The habits of this bot's skill (v0.7.0; before, v0.6.5 let a flat share of priorities pass). */
-    private final Profile profile;
+    private final transient Profile profile;
     private final transient Stats stats;
 
     FairBot(String name, RangeOfInfluence range, int skill, long seed) {
@@ -378,9 +378,11 @@ class FairBot extends ComputerPlayerControllableProxy {
         }
         Set<UUID> attacking = new HashSet<>(game.getCombat().getAttackers());
         for (Permanent idle : getAvailableAttackers(defenderId, game)) {
-            if (!attacking.contains(idle.getId()) && chance(profile.reckless())
-                && declareAttacker(idle.getId(), defenderId, game, false)) {
-                stats.recklessAttacks.incrementAndGet();
+            if (!attacking.contains(idle.getId()) && chance(profile.reckless())) {
+                declareAttacker(idle.getId(), defenderId, game, false);
+                if (game.getCombat().getAttackers().contains(idle.getId())) {
+                    stats.recklessAttacks.incrementAndGet();
+                }
             }
         }
     }
