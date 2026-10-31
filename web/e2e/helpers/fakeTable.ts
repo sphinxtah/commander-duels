@@ -25,6 +25,8 @@ export const QUIET: TableSettings = {
   effectsVolume: 0,
   muted: true,
   painter: "auto",
+  // The journeys check the table's state, not its sparks (v0.7.0).
+  effects: "off",
 };
 
 export interface FakeTable {

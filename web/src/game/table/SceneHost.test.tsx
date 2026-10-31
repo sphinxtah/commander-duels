@@ -8,6 +8,7 @@ import { stageFit } from "./stage";
 import { buildTableModel } from "./tableModel";
 import type {
   CreateTableScene,
+  EffectsLevel,
   MotionLevel,
   SceneFrame,
   SceneStats,
@@ -49,6 +50,10 @@ class FakeScene implements TableScene {
   }
   setMotion(motion: MotionLevel) {
     this.motions.push(motion);
+  }
+  effects: EffectsLevel[] = [];
+  setEffects(effects: EffectsLevel) {
+    this.effects.push(effects);
   }
   status() {
     return this.current;

@@ -74,6 +74,7 @@ export function SceneHost({
   frame,
   fit,
   motion,
+  effects = "full",
   ui,
   create,
   onStatus,
@@ -82,13 +83,13 @@ export function SceneHost({
   const scene = useRef<TableScene | null>(null);
   /** What the current scene was last given. */
   const committed = useRef<SceneFrame | null>(null);
-  const latest = useRef({ frame, fit, motion, onStatus });
+  const latest = useRef({ frame, fit, motion, effects, onStatus });
   const [generation, setGeneration] = useState(0);
   const recreations = useRef<number[]>([]);
   const gaveUp = useRef(false);
 
   useLayoutEffect(() => {
-    latest.current = { frame, fit, motion, onStatus };
+    latest.current = { frame, fit, motion, effects, onStatus };
   });
 
   useEffect(() => {
@@ -139,11 +140,16 @@ export function SceneHost({
       report(status);
     };
 
-    const { fit: startFit, motion: startMotion } = latest.current;
+    const {
+      fit: startFit,
+      motion: startMotion,
+      effects: startEffects,
+    } = latest.current;
     (create ?? lazyCreate)(canvas, {
       fit: startFit,
       motion: startMotion,
       ui,
+      effects: startEffects,
     }).then(
       (started) => {
         if (cancelled) {
@@ -158,6 +164,7 @@ export function SceneHost({
         const now = latest.current;
         started.resize(now.fit);
         started.setMotion(now.motion);
+        started.setEffects(now.effects);
         if (now.frame) {
           committed.current = now.frame;
           started.commit(now.frame);
@@ -198,6 +205,9 @@ export function SceneHost({
   useEffect(() => {
     scene.current?.setMotion(motion);
   }, [motion]);
+  useEffect(() => {
+    scene.current?.setEffects(effects);
+  }, [effects]);
 
   return (
     <div

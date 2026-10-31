@@ -520,6 +520,10 @@ describe("the sound recipes", () => {
     ["menuHover", 60, 0.08],
     ["menuSelect", 420, 0.22],
     ["menuBack", 360, 0.2],
+    ["slash", 460, 0.45],
+    ["arcane", 820, 0.34],
+    ["impact", 380, 0.55],
+    ["shatter", 700, 0.5],
   ])("%s lasts %s ms at gain %s, every part inside it", (cue, ms, gain) => {
     const recipe = RECIPES[cue];
     expect(recipe).toMatchObject({ ms, gain });
@@ -529,8 +533,8 @@ describe("the sound recipes", () => {
       ).toBeLessThanOrEqual(ms);
   });
 
-  it("has nineteen cues for the table, six for opening packs and three for the menus, and a falling counter", () => {
-    expect(CUES).toHaveLength(28);
+  it("has nineteen cues for the table, six for opening packs, three for the menus and four for the special effects, and a falling counter", () => {
+    expect(CUES).toHaveLength(32);
     expect(RECIPES.counter.parts).toMatchObject([{ hz: 1320 }]);
     expect(RECIPES.counter.low).toMatchObject([{ hz: 660 }]);
   });
@@ -579,9 +583,41 @@ const graveyard = { kind: "anchor", anchor: "graveyard", seat: 1 } as const;
 /** One of each event the cues are tested with. */
 const events = {
   draw: { type: "draw", seat: 0, keys: ["hand:h1"], count: 1 },
-  cast: { type: "cast", key: "stack:s1", controllerSeat: 1, from: appear },
-  resolve: { type: "resolve", key: "stack:s1", to: { kind: "node", key: c1 } },
-  instant: { type: "resolve", key: "stack:s1", to: graveyard },
+  cast: {
+    type: "cast",
+    key: "stack:s1",
+    controllerSeat: 1,
+    from: appear,
+    commander: false,
+  },
+  commanderCast: {
+    type: "cast",
+    key: "stack:s1",
+    controllerSeat: 1,
+    from: { kind: "anchor", anchor: "command", seat: 1, faceDown: false },
+    commander: true,
+  },
+  resolve: {
+    type: "resolve",
+    key: "stack:s1",
+    to: { kind: "node", key: c1 },
+    big: false,
+    colours: [],
+  },
+  bigSpell: {
+    type: "resolve",
+    key: "stack:s1",
+    to: { kind: "node", key: c1 },
+    big: true,
+    colours: ["R"],
+  },
+  instant: {
+    type: "resolve",
+    key: "stack:s1",
+    to: graveyard,
+    big: false,
+    colours: [],
+  },
   land: { type: "enter", key: c1, from: appear, land: true, token: false },
   token: { type: "enter", key: c1, from: appear, land: false, token: true },
   permanent: {
@@ -591,27 +627,55 @@ const events = {
     land: false,
     token: false,
   },
-  dies: { type: "leave", key: c1, to: graveyard, creature: true },
+  dies: {
+    type: "leave",
+    key: c1,
+    to: graveyard,
+    creature: true,
+    combat: false,
+  },
+  slain: {
+    type: "leave",
+    key: c1,
+    to: graveyard,
+    creature: true,
+    combat: true,
+  },
   dropped: {
     type: "leave",
     key: c1,
     to: { kind: "node", key: "graveyard:c9" },
     creature: true,
+    combat: false,
   },
   exiled: {
     type: "leave",
     key: c1,
     to: { kind: "anchor", anchor: "exile", seat: 1 },
     creature: true,
+    combat: false,
   },
-  destroyed: { type: "leave", key: c1, to: graveyard, creature: false },
+  destroyed: {
+    type: "leave",
+    key: c1,
+    to: graveyard,
+    creature: false,
+    combat: false,
+  },
   // A token stops existing when it dies: no graveyard grows, so its exit is a fade.
-  tokenDies: { type: "leave", key: c1, to: { kind: "vanish" }, creature: true },
+  tokenDies: {
+    type: "leave",
+    key: c1,
+    to: { kind: "vanish" },
+    creature: true,
+    combat: false,
+  },
   treasureSpent: {
     type: "leave",
     key: c1,
     to: { kind: "vanish" },
     creature: false,
+    combat: false,
   },
   tap: { type: "tap", key: c1, tapped: true },
   untap: { type: "tap", key: c1, tapped: false },
@@ -625,6 +689,7 @@ const events = {
   },
   damage: { type: "damage", key: c1, amount: 3 },
   lifeLost: { type: "life", seat: 1, delta: -3 },
+  heavyBlow: { type: "life", seat: 1, delta: -7 },
   lifeGained: { type: "life", seat: 0, delta: 4 },
   commander: { type: "commanderDamage", seat: 0, fromSeat: 1, delta: 5 },
   attack: { type: "attack", keys: [c1] },
@@ -672,11 +737,14 @@ describe("the cues for a diff", () => {
   it.each<[string, TableEvent, Cue | null, boolean?]>([
     ["a draw", events.draw, "draw"],
     ["a cast", events.cast, "cast"],
+    ["a commander cast", events.commanderCast, "arcane"],
     ["a permanent resolving", events.resolve, "resolve"],
+    ["a big spell resolving", events.bigSpell, "arcane"],
     ["an instant resolving", events.instant, null],
     ["a land entering", events.land, "land"],
     ["a token entering", events.token, "enter"],
     ["a creature dying", events.dies, "die"],
+    ["a creature slain in combat", events.slain, "slash"],
     ["a creature put in a graveyard", events.dropped, "die"],
     ["a creature token dying", events.tokenDies, "die"],
     ["a creature exiled", events.exiled, null],
@@ -688,6 +756,7 @@ describe("the cues for a diff", () => {
     ["a counter removed", events.uncounter, "counter", true],
     ["damage", events.damage, "damage"],
     ["life lost", events.lifeLost, "damage"],
+    ["a heavy blow", events.heavyBlow, "impact"],
     ["life gained", events.lifeGained, "lifeGain"],
     ["commander damage", events.commander, "damage"],
     ["an attack", events.attack, "attack"],
@@ -696,7 +765,7 @@ describe("the cues for a diff", () => {
     ["another player's turn", events.theirTurn, null],
     ["a step emblem", events.emblem, "phase"],
     ["a step without an emblem", events.damageStep, null],
-    ["an elimination", events.eliminated, null],
+    ["an elimination", events.eliminated, "shatter"],
     ["a victory", events.victory, "victory"],
     ["a defeat", events.defeat, "defeat"],
     ["a drawn game", events.drawn, "drawGame"],

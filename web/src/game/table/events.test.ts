@@ -168,6 +168,7 @@ describe("moving cards", () => {
         key: `stack:${item.id}`,
         controllerSeat: 0,
         from: { kind: "node", key: `hand:${bolt.id}` },
+        commander: false,
       },
     ]);
     expect(of(list, "draw")).toEqual([]);
@@ -202,6 +203,8 @@ describe("moving cards", () => {
         type: "resolve",
         key: `stack:${item.id}`,
         to: { kind: "node", key: `battlefield:${bears.id}` },
+        big: false,
+        colours: [],
       },
     ]);
     expect(of(list, "enter")).toEqual([
@@ -229,6 +232,7 @@ describe("moving cards", () => {
         key: `battlefield:${air.id}`,
         to: { kind: "anchor", anchor: "graveyard", seat: 1 },
         creature: true,
+        combat: false,
       },
     ]);
     const soldier = byName(a.snapshot.view!, "Soldier Token");
@@ -236,6 +240,84 @@ describe("moving cards", () => {
       v.battlefield = v.battlefield.filter((p) => p.id !== soldier.id);
     });
     expect(of(events(a, gone), "leave")[0].to).toEqual({ kind: "vanish" });
+  });
+
+  it("marks a creature that falls while attacking or blocking in combat (v0.7.0)", () => {
+    const a = fx("blockers");
+    const bears = byName(a.snapshot.view!, "Grizzly Bears");
+    const guide = byName(a.snapshot.view!, "Goblin Guide");
+    const elves = byName(a.snapshot.view!, "Llanowar Elves");
+    // Combat damage: the blocker and the attacker it blocked both die; an onlooker is destroyed.
+    const b = next(a, (v) => {
+      v.step = "combat_damage";
+      v.battlefield = v.battlefield.filter(
+        (p) => p.id !== bears.id && p.id !== guide.id && p.id !== elves.id,
+      );
+      v.you!.graveyard.push(
+        card(CARDS.grizzlyBears),
+        card(CARDS.llanowarElves),
+      );
+      v.opponents[0].graveyard.push(card(CARDS.goblinGuide));
+    });
+    const left = of(events(a, b), "leave");
+    const combat = (id: string) =>
+      left.find((e) => e.key === `battlefield:${id}`)?.combat;
+    expect(combat(bears.id)).toBe(true);
+    expect(combat(guide.id)).toBe(true);
+    expect(combat(elves.id)).toBe(false);
+    // The same deaths after combat (a new turn) are not combat deaths.
+    const later = next(a, (v) => {
+      v.turn += 1;
+      v.phase = "precombat_main";
+      v.step = "precombat_main";
+      v.battlefield = v.battlefield.filter((p) => p.id !== bears.id);
+      v.you!.graveyard.push(card(CARDS.grizzlyBears));
+    });
+    expect(of(events(a, later), "leave")[0].combat).toBe(false);
+  });
+
+  it("tells a commander cast and a big spell taking effect (v0.7.0)", () => {
+    const a = fx("duel");
+    const bolt = a.snapshot.view!.hand.find(
+      (c) => c.name === "Lightning Bolt",
+    )!;
+    const dragonCard = card(CARDS.shivanDragon);
+    // A six-mana spell cast from the hand: the stack shows no cost, so the cast is plain and
+    // the resolve, once the dragon is on the battlefield, is big and red.
+    const cast = next(a, (v) => {
+      v.hand = v.hand.filter((c) => c.id !== bolt.id);
+      v.hand.push(dragonCard);
+      v.you!.hand_count = v.hand.length;
+    });
+    const item: StackItem = {
+      id: "big1",
+      kind: "spell",
+      controller_seat: 0,
+      name: "Shivan Dragon",
+      text: null,
+      hidden: false,
+      targets: [],
+    };
+    const onStack = next(cast, (v) => {
+      v.hand = v.hand.filter((c) => c.id !== dragonCard.id);
+      v.you!.hand_count = v.hand.length;
+      v.stack.push(item);
+    });
+    expect(of(events(cast, onStack), "cast")[0].commander).toBe(false);
+    const dragon = permanent(0, CARDS.shivanDragon);
+    const resolved = next(onStack, (v) => {
+      v.stack = [];
+      v.battlefield.push(dragon);
+    });
+    expect(of(events(onStack, resolved), "resolve")).toEqual([
+      {
+        type: "resolve",
+        key: "stack:big1",
+        to: { kind: "node", key: `battlefield:${dragon.id}` },
+        big: true,
+        colours: ["R"],
+      },
+    ]);
   });
 
   it("returns a creature to your hand without calling it a draw", () => {
@@ -296,10 +378,13 @@ describe("moving cards", () => {
       v.you!.commanders[0].object_id = item.id;
       v.stack.push(item);
     });
-    expect(of(events(a, b), "cast")[0].from).toEqual({
+    const [cast] = of(events(a, b), "cast");
+    expect(cast.from).toEqual({
       kind: "node",
       key: `command:${krenko.id}`,
     });
+    // Cast from the command zone: the arcane burst and its chord (v0.7.0).
+    expect(cast.commander).toBe(true);
   });
 
   it("casts the last card of a spectator's anchored hand face down, as any before it", () => {
@@ -364,6 +449,7 @@ describe("moving cards", () => {
         key: `battlefield:${isamaru.id}`,
         to: { kind: "vanish" },
         creature: true,
+        combat: false,
       },
     ]);
   });
@@ -410,6 +496,7 @@ describe("a Two-Headed Giant teammate's hand (v0.5.1)", () => {
         key: `stack:${item.id}`,
         controllerSeat: 1,
         from: { kind: "node", key: `hand:${bolt.id}` },
+        commander: false,
       },
     ]);
     expect(of(list, "enter")[0].from).toEqual({

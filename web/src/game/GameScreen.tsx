@@ -657,6 +657,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
       frame={frame}
       fit={fit}
       motion={motion}
+      effects={settings.effects}
       ui={ui}
       onStatus={setSceneStatus}
     />

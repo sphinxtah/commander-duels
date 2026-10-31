@@ -32,7 +32,13 @@ export type Cue =
   // The menus (v0.4.5): a tile or link under the pointer, a choice made, and back to the menu.
   | "menuHover"
   | "menuSelect"
-  | "menuBack";
+  | "menuBack"
+  // The special effects (v0.7.0): a creature slain in combat, a commander cast or a big spell
+  // taking effect, a heavy blow to a player, and a player's elimination.
+  | "slash"
+  | "arcane"
+  | "impact"
+  | "shatter";
 
 interface Timing {
   /** When the part starts, from the cue's start (default 0). */
@@ -340,6 +346,121 @@ export const RECIPES: Record<Cue, Recipe> = {
         ms: 220,
       },
       note(A4, 100, 260, 0.6),
+    ],
+  },
+  // The special effects (v0.7.0). A creature slain in combat: two blade swipes, high noise cutting
+  // upward, the second landing on a metallic ring and a low thud as the body drops.
+  slash: {
+    ms: 460,
+    gain: 0.45,
+    parts: [
+      {
+        kind: "noise",
+        filter: "highpass",
+        hz: 2600,
+        toHz: 7000,
+        ms: 90,
+        level: 0.9,
+        clip: true,
+      },
+      {
+        kind: "noise",
+        filter: "highpass",
+        hz: 2200,
+        toHz: 6400,
+        atMs: 110,
+        ms: 100,
+        clip: true,
+      },
+      {
+        kind: "tone",
+        wave: "sine",
+        hz: 2400,
+        toHz: 1700,
+        atMs: 120,
+        ms: 200,
+        level: 0.3,
+      },
+      {
+        kind: "tone",
+        wave: "sine",
+        hz: 90,
+        toHz: 50,
+        atMs: 130,
+        ms: 300,
+        level: 0.8,
+      },
+    ],
+  },
+  // A commander cast, or a big spell taking effect: the cast's glide, then a bell chord ringing
+  // above it. With a cast or a resolve in the same diff, the ranking keeps this one.
+  arcane: {
+    ms: 820,
+    gain: 0.34,
+    parts: [
+      { kind: "tone", wave: "sine", hz: 392, toHz: 588, ms: 320 },
+      {
+        kind: "tone",
+        wave: "sine",
+        hz: 587.33,
+        toHz: 881,
+        ms: 320,
+        level: 0.8,
+      },
+      note(C5, 180, 560, 0.7),
+      note(G5, 260, 540, 0.6),
+      note(C6, 340, 480, 0.5),
+    ],
+  },
+  // A heavy blow to a player: a deeper, longer thud than damage, with a crack of clipped noise.
+  impact: {
+    ms: 380,
+    gain: 0.55,
+    parts: [
+      { kind: "tone", wave: "sine", hz: 70, toHz: 38, ms: 340 },
+      {
+        kind: "noise",
+        filter: "lowpass",
+        hz: 1800,
+        toHz: 300,
+        ms: 220,
+        level: 0.7,
+        clip: true,
+      },
+    ],
+  },
+  // A player eliminated: glass breaking high over a long falling rumble.
+  shatter: {
+    ms: 700,
+    gain: 0.5,
+    parts: [
+      {
+        kind: "noise",
+        filter: "highpass",
+        hz: 3000,
+        ms: 140,
+        level: 0.5,
+        clip: true,
+      },
+      {
+        kind: "noise",
+        filter: "bandpass",
+        hz: 1500,
+        toHz: 250,
+        q: 1,
+        atMs: 40,
+        ms: 560,
+        clip: true,
+      },
+      {
+        kind: "tone",
+        wave: "sine",
+        hz: 60,
+        toHz: 32,
+        atMs: 40,
+        ms: 620,
+        level: 0.9,
+      },
     ],
   },
 };

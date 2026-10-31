@@ -34,6 +34,7 @@ describe("the table's device settings", () => {
         effectsVolume: 140.6,
         muted: true,
         painter: "dom",
+        effects: "loud",
         somethingNew: 1,
       }),
     );
@@ -44,6 +45,8 @@ describe("the table's device settings", () => {
       muted: true,
       painter: "dom",
     });
+    expect(sanitizeTableSettings({ effects: "subtle" }).effects).toBe("subtle");
+    expect(sanitizeTableSettings({ effects: "off" }).effects).toBe("off");
     const timer = (value: unknown) =>
       sanitizeTableSettings({ responseTimerSeconds: value })
         .responseTimerSeconds;

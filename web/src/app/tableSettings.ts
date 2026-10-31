@@ -12,6 +12,7 @@ import {
 
 export const TIMER_SECONDS = [0, 5, 8, 15, 30, 90] as const;
 export const ANIMATION_SPEEDS = ["normal", "fast", "faster"] as const;
+export const EFFECTS_LEVELS = ["full", "subtle", "off"] as const;
 
 /** The allowed timer length closest to any number, so an old or edited value still means something. */
 function nearestSeconds(value: number): TableSettings["responseTimerSeconds"] {
@@ -50,6 +51,9 @@ export function sanitizeTableSettings(value: unknown): TableSettings {
       record.painter === "auto" || record.painter === "dom"
         ? record.painter
         : d.painter,
+    effects: EFFECTS_LEVELS.find((level) => level === record.effects)
+      ? (record.effects as TableSettings["effects"])
+      : d.effects,
   };
 }
 

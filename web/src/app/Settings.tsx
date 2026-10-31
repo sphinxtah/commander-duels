@@ -3,7 +3,11 @@ import type { Bootstrap } from "../api";
 import type { Preferences } from "../preferences";
 import app from "../App.module.css";
 import { InstallSettings } from "./InstallSettings";
-import { AnimationSpeedField, TableSettingsForm } from "./TableSettingsForm";
+import {
+  AnimationSpeedField,
+  EffectsField,
+  TableSettingsForm,
+} from "./TableSettingsForm";
 import styles from "./Settings.module.css";
 
 /**
@@ -58,6 +62,7 @@ export function Settings({
           />
         </label>
         <AnimationSpeedField />
+        <EffectsField />
         <p role="status">
           {saveMessage || "Preferences are stored on this device."}
         </p>

@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import type { TableSettings } from "../game/table/types";
 import {
   ANIMATION_SPEEDS,
+  EFFECTS_LEVELS,
   TIMER_SECONDS,
   useTableSettings,
 } from "./tableSettings";
@@ -44,6 +45,44 @@ const speedNames: Record<TableSettings["animationSpeed"], string> = {
   fast: "Fast",
   faster: "Faster",
 };
+
+const effectsNames: Record<TableSettings["effects"], string> = {
+  full: "Full",
+  subtle: "Subtle",
+  off: "Off",
+};
+
+/** Settings › Display & accessibility: the special effects (v0.7.0). Reduce motion turns them
+ * off whatever this says, as it does the animation. */
+export function EffectsField({ compact = false }: { compact?: boolean }) {
+  const [settings, update] = useTableSettings();
+  const id = useId();
+  return (
+    <Row
+      id={id}
+      name="Special effects"
+      description={
+        compact
+          ? undefined
+          : "Slashes, bursts, sparks and confetti when something big happens on the table. Subtle keeps the marks and leaves out the particles. Reduce motion turns them off."
+      }
+    >
+      <select
+        {...named(id, !compact)}
+        value={settings.effects}
+        onChange={(event) =>
+          update({ effects: event.target.value as TableSettings["effects"] })
+        }
+      >
+        {EFFECTS_LEVELS.map((level) => (
+          <option key={level} value={level}>
+            {effectsNames[level]}
+          </option>
+        ))}
+      </select>
+    </Row>
+  );
+}
 
 /** Settings › Display & accessibility: how fast the table moves (Reduce motion stops it). */
 export function AnimationSpeedField({
@@ -161,6 +200,9 @@ export function TableSettingsForm({ compact = false }: { compact?: boolean }) {
             <option value="dom">Plain table without WebGL</option>
           </select>
         </Row>
+        {/* The Settings page shows this under Display & accessibility, beside the animation
+            speed; the game's drawer has only this form, so it goes here. */}
+        {compact && <EffectsField compact />}
       </section>
       <section className={styles.panel} aria-labelledby={`${id}-sound`}>
         <Heading id={`${id}-sound`}>Sound</Heading>

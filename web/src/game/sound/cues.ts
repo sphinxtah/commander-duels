@@ -8,6 +8,7 @@ import {
   type TableLayout,
   type ZoneName,
 } from "../table/types";
+import { HEAVY_LOSS } from "../table/notable";
 import { clampPan, MAX_VOICES } from "./engine";
 import type { Cue } from "./recipes";
 
@@ -30,9 +31,13 @@ const RANK: Cue[] = [
   "victory",
   "defeat",
   "drawGame",
+  "shatter",
   "yourTurn",
+  "slash",
+  "arcane",
   "cast",
   "resolve",
+  "impact",
   "attack",
   "block",
   "damage",
@@ -127,6 +132,7 @@ function eventX(event: TableEvent, layout: TableLayout): number | null {
         : seatX(layout, event.seat);
     case "life":
     case "commanderDamage":
+    case "eliminated":
       return seatX(layout, event.seat);
     case "attack":
     case "block":
@@ -151,9 +157,12 @@ function cueOf(
     case "draw":
       return { cue: "draw" };
     case "cast":
-      return { cue: "cast" };
+      // A commander cast rings a chord above the cast (v0.7.0).
+      return { cue: event.commander ? "arcane" : "cast" };
     case "resolve":
-      // A permanent spell's bell; an instant's effect has its own sounds (damage, life).
+      // A big spell's chord as it takes effect (v0.7.0); otherwise a permanent spell's bell, and
+      // an instant's effect has its own sounds (damage, life).
+      if (event.big) return { cue: "arcane" };
       return event.to.kind === "node" && event.to.key.startsWith("battlefield:")
         ? { cue: "resolve" }
         : null;
@@ -162,9 +171,10 @@ function cueOf(
     case "leave":
       // A token that dies stops existing, so no graveyard grows and it only fades: a creature
       // that vanishes has died as far as the ear goes.
+      // Slain in combat, the blade is heard instead (v0.7.0).
       return event.creature &&
         (toGraveyard(event.to) || event.to.kind === "vanish")
-        ? { cue: "die" }
+        ? { cue: event.combat ? "slash" : "die" }
         : null;
     case "tap":
       return { cue: "tap" };
@@ -175,13 +185,18 @@ function cueOf(
     case "damage":
       return event.amount > 0 ? { cue: "damage" } : null;
     case "life":
-      return event.delta < 0
-        ? { cue: "damage" }
-        : event.delta > 0
-          ? { cue: "lifeGain" }
-          : null;
+      // A heavy blow (v0.7.0) lands deeper than damage.
+      return event.delta <= -HEAVY_LOSS
+        ? { cue: "impact" }
+        : event.delta < 0
+          ? { cue: "damage" }
+          : event.delta > 0
+            ? { cue: "lifeGain" }
+            : null;
     case "commanderDamage":
       return event.delta > 0 ? { cue: "damage" } : null;
+    case "eliminated":
+      return { cue: "shatter" };
     case "attack":
       return { cue: "attack" };
     case "block":

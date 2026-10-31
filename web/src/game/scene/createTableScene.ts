@@ -5,6 +5,7 @@ import type {
   CardNode as Placed,
   CreateTableScene,
   DropZone,
+  EffectsLevel,
   MotionLevel,
   Point as StagePoint,
   Rect,
@@ -35,6 +36,8 @@ import {
 import { roundCorners } from "./corners";
 import { drawPortrait } from "./drawPortrait";
 import { drawSigil } from "./drawSigil";
+import { EffectsNode, placeOf, SLASH_HOLD } from "./effects/EffectsNode";
+import { planEffects } from "./effects/plan";
 import { diamondPath } from "./icons";
 import { BandNode } from "./nodes/BandNode";
 import {
@@ -149,6 +152,8 @@ interface Exiting {
   ms: number;
   /** Into a hand or a library: it turns to our back on the way (design §14). */
   hides: boolean;
+  /** Slain in combat (v0.7.0): the card waits this long, under its X, before it leaves. */
+  delay: number;
 }
 
 interface Plan {
@@ -329,6 +334,7 @@ class PixiTableScene implements TableScene {
   private readonly portraitLoads = new Set<AbortController>();
   private fit: StageFit;
   private motion: MotionLevel;
+  private effects: EffectsLevel;
   private state: SceneStatus = {
     renderer: "starting",
     webgl: null,
@@ -394,6 +400,8 @@ class PixiTableScene implements TableScene {
   private readonly band: BandNode;
   private readonly hand: HandNode;
   private readonly emblem = new EmblemNode();
+  /** The special effects (v0.7.0), over the cards and under the emblem. */
+  private readonly fx: EffectsNode;
   private dragCurve: CurveNode | null = null;
   private dropZones: DropZone[] | null = null;
   private dropOver: DropZone | null = null;
@@ -406,13 +414,19 @@ class PixiTableScene implements TableScene {
   constructor(
     app: Application,
     canvasElement: HTMLCanvasElement,
-    init: { fit: StageFit; motion: MotionLevel; ui: TableUiStore },
+    init: {
+      fit: StageFit;
+      motion: MotionLevel;
+      ui: TableUiStore;
+      effects?: EffectsLevel;
+    },
   ) {
     this.app = app;
     this.canvas = canvasElement;
     this.ui = init.ui;
     this.fit = init.fit;
     this.motion = init.motion;
+    this.effects = init.effects ?? "full";
     this.lastUi = init.ui.get();
     const version = (
       app.renderer as unknown as { context?: { webGLVersion?: number } }
@@ -503,7 +517,12 @@ class PixiTableScene implements TableScene {
     this.dragShadow = new Sprite(this.art.shadow);
     this.dragShadow.visible = false;
     this.dropLayer.addChild(this.drops, this.dragShadow);
-    this.effectLayer.addChild(this.emblem.root);
+    this.fx = new EffectsNode({
+      clock: () => scene.timeline.now(),
+      texture: (c) => canvasTexture(c),
+      duration: (name) => duration(name, scene.motion),
+    });
+    this.effectLayer.addChild(this.fx.root, this.emblem.root);
     app.stage.eventMode = "none";
     this.chromeGroup.addChild(this.floor, this.bandLayer, this.tileLayer);
     this.boardGroup.addChild(this.boardUnder, this.boardLayer);
@@ -583,6 +602,15 @@ class PixiTableScene implements TableScene {
     }
   }
 
+  setEffects(effects: EffectsLevel): void {
+    if (effects === this.effects) return;
+    this.effects = effects;
+    if (effects === "off") {
+      this.fx.clear();
+      this.requestFrame();
+    }
+  }
+
   status(): SceneStatus {
     return this.state;
   }
@@ -619,6 +647,7 @@ class PixiTableScene implements TableScene {
     } catch {
       // A renderer that never finished starting has little to let go of.
     }
+    this.fx.destroy();
     this.textures.dispose();
     this.frames.dispose();
     for (const texture of [...Object.values(this.art), ...this.sigils.values()])
@@ -729,7 +758,8 @@ class PixiTableScene implements TableScene {
       this.frames.pending > 0 ||
       this.ghosts.size > 0 ||
       this.flyers.size > 0 ||
-      this.floats.size > 0
+      this.floats.size > 0 ||
+      this.fx.active
     );
   }
 
@@ -853,6 +883,7 @@ class PixiTableScene implements TableScene {
       for (const view of this.cards.values()) view.setGlowAlpha(alpha);
       if (breath >= 1) this.timeline.cancel("breath");
     }
+    this.fx.update(now);
     this.timeline.prune(now);
   }
 
@@ -886,6 +917,7 @@ class PixiTableScene implements TableScene {
     for (const curve of this.curves.values()) curve.setDrawn(1);
     for (const portrait of this.portraits.values()) portrait.pulseLife(1);
     this.landLosses();
+    this.fx.clear();
     this.emblem.setAlpha(0);
     for (const view of this.cards.values()) view.setGlowAlpha(1);
   }
@@ -1127,6 +1159,22 @@ class PixiTableScene implements TableScene {
 
   /** Where a card comes from or goes to when it is not another card: a zone tile, a hand count
    * diamond, your hand's edge or the band. */
+  /** Where a card will be once its tween lands: its rest pose, not its sampled one. */
+  private restVisual(key: string): Visual | null {
+    const view = this.cards.get(key);
+    const placed = this.placed.get(key);
+    if (!view || !placed) return null;
+    const pose = view.rest;
+    const o = centreOffset(placed.placement, pose.rotation, pose.scale);
+    return {
+      cx: pose.x + o.x,
+      cy: pose.y + o.y,
+      height: placed.placement.face.h * pose.scale,
+      rotation: pose.rotation,
+      alpha: pose.alpha,
+    };
+  }
+
   private anchorVisual(
     anchor: string,
     seat: Seat,
@@ -1200,14 +1248,21 @@ class PixiTableScene implements TableScene {
     const to = (
       exit: Extract<TableEvent, { type: "leave" }>["to"],
       time: number,
+      delay = 0,
     ): Exiting =>
       exit.kind === "anchor"
         ? {
             visual: this.anchorVisual(exit.anchor, exit.seat, layout, model),
             ms: time,
             hides: exit.anchor === "hand" || exit.anchor === "library",
+            delay,
           }
-        : { visual: null, ms: ms("fade"), hides: false };
+        : { visual: null, ms: ms("fade"), hides: false, delay };
+    // A creature slain in combat waits under its X before it goes (v0.7.0), when the X plays.
+    const slashHold =
+      this.effects !== "off" && this.motion !== "none"
+        ? Math.round(ms("slash") * SLASH_HOLD)
+        : 0;
     for (const event of diff.events)
       switch (event.type) {
         case "cast":
@@ -1229,7 +1284,15 @@ class PixiTableScene implements TableScene {
               faceDown: false,
               token: false,
             });
-          } else exits.set(event.key, to(event.to, ms(event.type)));
+          } else
+            exits.set(
+              event.key,
+              to(
+                event.to,
+                ms(event.type),
+                event.type === "leave" && event.combat ? slashHold : 0,
+              ),
+            );
           break;
         case "draw":
           if (event.keys.length > 0) {
@@ -1374,10 +1437,13 @@ class PixiTableScene implements TableScene {
         view.setPose(pose ?? target);
       }
     }
+    /** Where each departing card was drawn, for the effects that play over its ghost. */
+    const departed = new Map<string, Visual>();
     for (const [key, view] of this.cards) {
       if (seen.has(key)) continue;
       const exit = plan?.exits.get(key);
       const visual = animate ? this.visual(key) : null;
+      if (visual) departed.set(key, visual);
       const placed = this.placed.get(key);
       this.cards.delete(key);
       this.placed.delete(key);
@@ -1406,6 +1472,7 @@ class PixiTableScene implements TableScene {
       }
       this.timeline.to(`p:${ghostKey}`, now, end, time, {
         ease: exit?.visual && moving ? easeInOut : linear,
+        delay: exit?.delay ?? 0,
       });
       view.root.zIndex = view.root.zIndex + 1;
       this.ghosts.set(ghostKey, view);
@@ -1424,6 +1491,7 @@ class PixiTableScene implements TableScene {
     this.applyCurves(layout, ui, plan?.cast);
     this.applyDrag(ui);
     if (plan) this.playEffects(plan.effects, model, layout);
+    if (plan && !played) this.playFx(diff, model, layout, departed);
     if (model.promptId !== this.promptId) {
       this.promptId = model.promptId;
       if (animate && (this.motion === "normal" || this.motion === "fast"))
@@ -1827,6 +1895,116 @@ class PixiTableScene implements TableScene {
         default:
           break;
       }
+  }
+
+  /** The special effects of one diff (v0.7.0): planned from the events, placed on the stage
+   * here. None with reduced motion, or with the effects off; "subtle" leaves out the particles. */
+  private playFx(
+    diff: TableDiff,
+    model: TableModel,
+    layout: TableLayout,
+    departed: ReadonlyMap<string, Visual>,
+  ): void {
+    if (this.motion === "none" || this.effects === "off") return;
+    const plans = planEffects(diff, model, this.effects);
+    if (plans.length === 0) return;
+    const full = this.effects === "full";
+    const ms = (name: Parameters<typeof duration>[0]) =>
+      duration(name, this.motion);
+    const fit = this.fit;
+    const top = -fit.oy / fit.k;
+    const edges = {
+      left: this.span.left,
+      right: this.span.right,
+      top,
+      bottom: top + fit.designH,
+    };
+    const spot = (seat: Seat) => {
+      const p = layout.players.get(seat)?.portrait;
+      return p ? { cx: p.cx, cy: p.cy, side: p.side } : null;
+    };
+    const place = (v: Visual | null) => (v ? placeOf(v) : null);
+    for (const fx of plans)
+      switch (fx.kind) {
+        case "slash": {
+          const at = place(departed.get(fx.key) ?? null);
+          if (at) this.fx.slash(at, full);
+          break;
+        }
+        case "ash": {
+          const at = place(departed.get(fx.key) ?? null);
+          if (at) this.fx.ash(at);
+          break;
+        }
+        case "burst": {
+          const at = place(
+            fx.at.kind === "node"
+              ? this.restVisual(fx.at.key)
+              : fx.at.to.kind === "anchor"
+                ? this.anchorVisual(
+                    fx.at.to.anchor,
+                    fx.at.to.seat,
+                    layout,
+                    model,
+                  )
+                : null,
+          );
+          if (at)
+            this.fx.burst(
+              at,
+              fx.colours,
+              fx.commander,
+              full,
+              fx.afterFlight ? ms(fx.commander ? "cast" : "resolve") : 0,
+            );
+          break;
+        }
+        case "stomp": {
+          const at = place(this.restVisual(fx.key));
+          if (at) this.fx.stomp(at, full, fx.afterFlight ? ms("enter") : 0);
+          break;
+        }
+        case "embers":
+          for (const key of fx.keys) {
+            const at = place(this.restVisual(key));
+            if (at) this.fx.embers(at);
+          }
+          break;
+        case "shield":
+          for (const key of fx.keys) {
+            const at = place(this.restVisual(key));
+            if (at) this.fx.shield(at);
+          }
+          break;
+        case "impact": {
+          const at = spot(fx.seat);
+          if (at)
+            this.fx.impact(at, fx.heavy, full, fx.yours && full ? edges : null);
+          break;
+        }
+        case "glitter": {
+          const at = spot(fx.seat);
+          if (at) this.fx.glitter(at);
+          break;
+        }
+        case "shatter": {
+          const at = spot(fx.seat);
+          if (at) this.fx.shatter(at, full);
+          break;
+        }
+        case "confetti":
+          this.fx.confetti(edges);
+          break;
+        case "ashfall":
+          this.fx.ashfall(edges);
+          break;
+        case "shine":
+          this.fx.shine(layout.band.rect, this.span);
+          break;
+        default:
+          break;
+      }
+    this.requestFrame();
   }
 
   private showEmblem(

@@ -1,6 +1,7 @@
 import { isCreature, isLand } from "../model";
 import type { GameResultView, ObjectId, PlayerView, Seat } from "../types";
 import { isToken } from "./groups";
+import { isBigSpell, manaColours } from "./notable";
 import type {
   Anchor,
   DeriveEvents,
@@ -76,6 +77,17 @@ function zoneIndex(model: TableModel): Map<string, string> {
   }
   return index;
 }
+
+/** The steps in which a creature that leaves while attacking or blocking has fallen in combat
+ * (v0.7.0): combat damage, or a spell or ability in the middle of it. */
+const COMBAT_STEPS = new Set([
+  "begin_combat",
+  "declare_attackers",
+  "declare_blockers",
+  "first_combat_damage",
+  "combat_damage",
+  "end_combat",
+]);
 
 const hasAttackers = (m: TableModel) =>
   m.combat.some((group) => group.attackers.length > 0);
@@ -345,36 +357,59 @@ export const deriveEvents: DeriveEvents = (prev, next, ctx) => {
     events.push({ type: "step", phase: next.phase, step: next.step, emblem });
 
   for (const a of vanished)
-    if (a.zone === "stack")
+    if (a.zone === "stack") {
+      const became = pairs.get(a.key);
+      // The stack shows no cost: the card the spell became says how big it was, when it is seen
+      // (a permanent, or a card on a graveyard or exile tile), never a hidden one.
+      const card = became && !became.card.hidden ? became.card : null;
+      const big = card !== null && isBigSpell(card);
       events.push({
         type: "resolve",
         key: a.key,
-        to: pairs.has(a.key)
-          ? exitOf(pairs.get(a.key)!)
+        to: became
+          ? exitOf(became)
           : a.located.stack?.kind === "ability"
             ? { kind: "vanish" }
             : departure(a),
+        big,
+        colours: card && big ? manaColours(card.mana_cost) : [],
       });
+    }
   for (const b of appeared)
-    if (b.zone === "stack")
+    if (b.zone === "stack") {
+      const was = pairedFrom.get(b.key);
+      const spell = b.located.stack?.kind !== "ability";
       events.push({
         type: "cast",
         key: b.key,
         controllerSeat: b.controllerSeat ?? 0,
-        from: pairedFrom.has(b.key)
-          ? originOf(pairedFrom.get(b.key)!)
-          : b.located.stack?.kind === "ability"
-            ? { kind: "appear" }
-            : arrival(b, false),
+        from: was
+          ? originOf(was)
+          : spell
+            ? arrival(b, false)
+            : { kind: "appear" },
+        commander: spell && was?.zone === "command",
       });
+    }
+  // A creature in the fight when it left has fallen in combat: it was attacking or blocking in a
+  // combat step of the same turn. The step may have moved on by the time the view shows it gone,
+  // so the step before counts, not the one after.
+  const inCombat = sameTurn && COMBAT_STEPS.has(prev.step ?? "");
   for (const a of vanished)
-    if (a.zone === "battlefield")
+    if (a.zone === "battlefield") {
+      const creature = isCreature(a.card);
+      const permanent = a.located.permanent;
       events.push({
         type: "leave",
         key: a.key,
         to: pairs.has(a.key) ? exitOf(pairs.get(a.key)!) : departure(a),
-        creature: isCreature(a.card),
+        creature,
+        combat:
+          creature &&
+          inCombat &&
+          (permanent?.attacking === true || permanent?.blocking === true),
       });
+    }
   for (const b of appeared)
     if (b.zone === "battlefield")
       events.push({

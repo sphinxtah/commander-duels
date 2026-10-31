@@ -35,6 +35,28 @@ export const DURATIONS = {
   /** Between the cards of one draw, and the most a draw's stagger may add up to. */
   stagger: 60,
   staggerMax: 600,
+  // The special effects (v0.7.0). None of these run with motion "none": the layer is off.
+  /** The red X slashed over a creature slain in combat; its card waits for the strokes. */
+  slash: 760,
+  /** Ash rising off a creature that died another way. */
+  ash: 650,
+  /** The arcane burst of a commander cast or a big spell taking effect. */
+  burst: 650,
+  /** The dust ring under a big creature landing. */
+  stomp: 520,
+  /** Embers off the attackers, and the steel shimmer on the blockers. */
+  embers: 520,
+  shield: 420,
+  /** The shock ring of a heavy blow to a player, with the screen's edges flaring for your own. */
+  impact: 520,
+  /** Green glitter rising for a big life gain. */
+  glitter: 700,
+  /** A portrait shattering as its player is eliminated. */
+  shatter: 900,
+  /** Confetti for a victory, ash falling for a defeat. */
+  confetti: 2200,
+  /** A gold shine sweeping the band as your turn begins. */
+  shine: 700,
 } as const;
 
 export type Motion = keyof typeof DURATIONS;

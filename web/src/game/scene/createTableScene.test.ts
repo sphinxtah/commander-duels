@@ -10,6 +10,7 @@ import { layoutTable } from "../table/layout";
 import { stageFit } from "../table/stage";
 import { buildTableModel } from "../table/tableModel";
 import type {
+  EffectsLevel,
   MotionLevel,
   SceneFrame,
   TableEvent,
@@ -20,7 +21,7 @@ import type {
 import { createTableUi } from "../table/uiStore";
 import type { Snapshot } from "../types";
 import { createTableScene } from "./createTableScene";
-import { Texture, type Container, type Sprite } from "./pixi";
+import { Sprite, Texture, type Container } from "./pixi";
 
 // The scene itself, on PixiJS's real scene graph, with a stand-in for the renderer: jsdom has no
 // WebGL, so the stand-in only walks the stage as Pixi's renderer would and fails as it would on a
@@ -171,6 +172,7 @@ interface Internals {
   mores: Map<string, { root: Container; backs: Container }>;
   floats: Map<string, { root: Container }>;
   emblem: { root: Container; caption: { text: string } };
+  fx: { root: Container; active: boolean; count: number };
   frames: { size: number; bytesHeld: number; entries: Map<string, unknown> };
   textures: { bytesHeld: number };
   timeline: { has(key: string): boolean };
@@ -199,11 +201,15 @@ class Table {
     this.snapshot = structuredClone(this.fixture.snapshot);
   }
 
-  async start(motion: MotionLevel = "normal"): Promise<SceneFrame> {
+  async start(
+    motion: MotionLevel = "normal",
+    effects?: EffectsLevel,
+  ): Promise<SceneFrame> {
     this.scene = await createTableScene(document.createElement("canvas"), {
       fit: stageFit(1920, 1080, 1),
       motion,
       ui: this.ui,
+      ...(effects ? { effects } : {}),
     });
     const first = this.frame(true);
     this.scene.commit(first);
@@ -684,6 +690,112 @@ describe("animation", () => {
     expect(table.internals.floats.size).toBe(0);
     table.scene.commit({ ...frame });
     expect(table.internals.floats.size).toBe(0);
+    table.scene.destroy();
+  });
+});
+
+describe("the special effects (v0.7.0)", () => {
+  /** Grizzly Bears, blocking in the blockers fixture, dies in combat damage. */
+  function slay(table: Table): SceneFrame {
+    return table.next((s) => {
+      s.view!.step = "combat_damage";
+      s.view!.battlefield = s.view!.battlefield.filter(
+        (p) => p.card.name !== "Grizzly Bears",
+      );
+      s.view!.you!.graveyard.push({
+        id: "d-bears",
+        hidden: false,
+        name: "Grizzly Bears",
+        mana_cost: "{1}{G}",
+        type_line: "Creature — Bear",
+        power: "2",
+        toughness: "2",
+        rules: [],
+      });
+    });
+  }
+
+  it("slashes a creature slain in combat and holds its card under the X before it goes", async () => {
+    const table = new Table("blockers");
+    await table.start();
+    const frame = slay(table);
+    expect(frame.diff.events).toContainEqual(
+      expect.objectContaining({ type: "leave", combat: true }),
+    );
+    expect(table.internals.fx.count).toBe(1);
+    const [ghost] = [...table.internals.ghosts.values()];
+    const start = { x: ghost.root.x, y: ghost.root.y };
+    // Through the hold the card stays put under its X.
+    await run(300);
+    expect(ghost.root.x).toBe(start.x);
+    expect(ghost.root.y).toBe(start.y);
+    expect(table.internals.fx.active).toBe(true);
+    // Then it flies to the graveyard, and the X is gone soon after.
+    await run(600);
+    expect(table.internals.ghosts.size).toBe(0);
+    await run(300);
+    expect(table.internals.fx.active).toBe(false);
+    expect(table.internals.fx.root.children).toHaveLength(0);
+    table.scene.destroy();
+  });
+
+  it("plays none with the effects off, or with reduced motion, and the card leaves at once", async () => {
+    for (const [motion, effects] of [
+      ["normal", "off"],
+      ["none", "full"],
+    ] as const) {
+      const table = new Table("blockers");
+      await table.start(motion, effects);
+      slay(table);
+      expect(table.internals.fx.count).toBe(0);
+      if (motion === "normal") {
+        const [ghost] = [...table.internals.ghosts.values()];
+        const start = ghost.root.x;
+        await run(100);
+        expect(ghost.root.x).not.toBe(start);
+      } else expect(table.internals.ghosts.size).toBe(0);
+      table.scene.destroy();
+    }
+  });
+
+  it("stops at once when the effects are turned off, and keeps the marks when subtle", async () => {
+    const table = new Table("blockers");
+    await table.start("normal", "subtle");
+    slay(table);
+    expect(table.internals.fx.count).toBe(1);
+    // Subtle: the X without its sparks, so no sprite under the effect.
+    const slash = table.internals.fx.root.children[0] as Container;
+    expect(slash.children.some((c: unknown) => c instanceof Sprite)).toBe(
+      false,
+    );
+    table.scene.setEffects("off");
+    expect(table.internals.fx.active).toBe(false);
+    table.scene.destroy();
+  });
+
+  it("plays the others from their events: a burst, embers, a shock ring, confetti", async () => {
+    const table = new Table("blockers");
+    await table.start();
+    const dragon = table.keyOf("Shivan Dragon");
+    table.nextWith([
+      {
+        type: "resolve",
+        key: "stack:x",
+        to: { kind: "node", key: dragon },
+        big: true,
+        colours: ["R"],
+      },
+      { type: "attack", keys: [dragon] },
+      { type: "life", seat: 0, delta: -8 },
+      { type: "eliminated", seat: 1 },
+      { type: "result", outcome: "victory" },
+      { type: "turn", turn: 11, activeSeat: 0 },
+    ]);
+    expect(table.internals.fx.count).toBe(6);
+    await run(200);
+    expect(table.internals.fx.active).toBe(true);
+    await run(2400);
+    expect(table.internals.fx.active).toBe(false);
     table.scene.destroy();
   });
 });

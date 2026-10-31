@@ -45,6 +45,10 @@ export type Arrangement = "duel" | "three" | "four";
 export type Mark = "none" | "offered" | "playable" | "selected";
 export type Painter = "webgl" | "dom";
 export type MotionLevel = "none" | "normal" | "fast" | "faster";
+/** The special effects (v0.7.0): the whole layer, its marks and rings without the particles, or
+ * none of it. Reduce motion turns the layer off whatever this says. */
+export type EffectsLevel = "full" | "subtle" | "off";
+export type ManaColour = "W" | "U" | "B" | "R" | "G";
 export type CardImageSize = "normal" | "large" | "png";
 export type ZoneName = "graveyard" | "exile" | "command";
 export type DragKind = "play" | "attack" | "block";
@@ -432,10 +436,32 @@ export type Exit =
   | { kind: "vanish" };
 export type TableEvent =
   | { type: "draw"; seat: Seat; keys: string[]; count: number } // keys empty for an opponent
-  | { type: "cast"; key: string; controllerSeat: Seat; from: Origin }
-  | { type: "resolve"; key: string; to: Exit }
+  // commander: a spell cast from a command zone (v0.7.0)
+  | {
+      type: "cast";
+      key: string;
+      controllerSeat: Seat;
+      from: Origin;
+      commander: boolean;
+    }
+  // big: a spell of six or more mana, told by the card it became, with the colours of its cost
+  // (v0.7.0). The stack shows no cost, so a spell is big only once its card is seen.
+  | {
+      type: "resolve";
+      key: string;
+      to: Exit;
+      big: boolean;
+      colours: ManaColour[];
+    }
   | { type: "enter"; key: string; from: Origin; land: boolean; token: boolean }
-  | { type: "leave"; key: string; to: Exit; creature: boolean }
+  // combat: a creature that was attacking or blocking in a combat step when it left (v0.7.0)
+  | {
+      type: "leave";
+      key: string;
+      to: Exit;
+      creature: boolean;
+      combat: boolean;
+    }
   | { type: "tap"; key: string; tapped: boolean }
   | {
       type: "counters";
@@ -496,6 +522,7 @@ export interface TableScene {
   commit(frame: SceneFrame): void; // called in useLayoutEffect; renders one frame synchronously
   resize(fit: StageFit): void;
   setMotion(motion: MotionLevel): void;
+  setEffects(effects: EffectsLevel): void;
   status(): SceneStatus;
   subscribe(listener: (status: SceneStatus) => void): () => void;
   readonly stats: SceneStats;
@@ -503,12 +530,18 @@ export interface TableScene {
 }
 export type CreateTableScene = (
   canvas: HTMLCanvasElement,
-  init: { fit: StageFit; motion: MotionLevel; ui: TableUiStore },
+  init: {
+    fit: StageFit;
+    motion: MotionLevel;
+    ui: TableUiStore;
+    effects?: EffectsLevel; // default "full"
+  },
 ) => Promise<TableScene>;
 export interface SceneHostProps {
   frame: SceneFrame | null;
   fit: StageFit;
   motion: MotionLevel;
+  effects?: EffectsLevel; // default "full"
   ui: TableUiStore;
   create?: CreateTableScene; // injectable for tests; default lazy-imports createTableScene
   onStatus(status: SceneStatus): void;
@@ -601,6 +634,7 @@ export interface TableSettings {
   effectsVolume: number; // 0–100
   muted: boolean;
   painter: "auto" | "dom";
+  effects: EffectsLevel; // the special effects layer (v0.7.0)
 }
 export const TABLE_SETTINGS_KEY = "cd.table.v1";
 export const DEFAULT_TABLE_SETTINGS: TableSettings = {
@@ -610,6 +644,7 @@ export const DEFAULT_TABLE_SETTINGS: TableSettings = {
   effectsVolume: 70,
   muted: false,
   painter: "auto",
+  effects: "full",
 };
 
 /* ---------- app services used by the game screen ---------- */
