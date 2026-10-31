@@ -8,7 +8,7 @@ Built on October 31, 2026 in the same cloud workspace as v0.7.0, on the branch `
 |---|---|
 | Bots | `FairBot.java` and `FairBotTest.java` parsed by `javac` with XMage absent (only the expected "does not override" errors); not compiled or run locally: CI's engine job on the branch `reopen-0.7.0` was the first build and test of the habits |
 | Web | `tsc --noEmit` on `web/` on the owner's PC as above; Prettier on the changed files; the Vitest and journey changes (the folded sections opened before their rows are read) run in CI |
-| Hosted CI | runs #170 to #173 on the branch `reopen-0.7.0` failed in turn on a compile error and on the auctions journey's folded sections (the release notes); run #174 on 4bab331 green in 20 m 32 s (verify 17 m 3 s, engine 20 m 32 s). the runs on `main` and on the tag `v0.7.1` are in the release notes |
+| Hosted CI | runs #170 to #173 on the branch `reopen-0.7.0` failed in turn on a compile error and on the auctions journey's folded sections (the release notes); run #174 on 4bab331 green in 20 m 32 s (verify 17 m 3 s, engine 20 m 32 s). runs #176 and #177 on `main` and #178 on the tag `v0.7.1` (3c41ad6) green, #178 publishing the `0.7.1` images; the private engine image's run #34 built `commander-duels-engine-sphinx:0.7.1` |
 
 ## v0.7.0
 
