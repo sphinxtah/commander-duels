@@ -2,6 +2,7 @@ import type { RefObject } from "react";
 import type { Bootstrap } from "../api";
 import type { Preferences } from "../preferences";
 import app from "../App.module.css";
+import { MenuMusicSettings } from "../shell/music/MenuMusicSettings";
 import { InstallSettings } from "./InstallSettings";
 import {
   AnimationSpeedField,
@@ -12,7 +13,8 @@ import styles from "./Settings.module.css";
 
 /**
  * The Settings page (moved out of App in v0.3.0). Larger text and Reduce motion follow the
- * account, so App keeps them; the table, sound and install sections belong to this device.
+ * account, so App keeps them; the table, sound, menu music (v0.7.3) and install sections belong
+ * to this device.
  */
 export function Settings({
   preferences,
@@ -68,6 +70,7 @@ export function Settings({
         </p>
       </section>
       <TableSettingsForm />
+      <MenuMusicSettings />
       <section className={styles.panel} aria-labelledby="install-title">
         <h2 id="install-title">Install the app</h2>
         <InstallSettings />

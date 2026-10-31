@@ -51,6 +51,7 @@ import { useHud } from "./shell/hud";
 import { PageBand } from "./shell/PageBand";
 import { pages, type Page } from "./shell/pages";
 import { PlayPage } from "./shell/PlayPage";
+import { MusicBox } from "./shell/music/MusicBox";
 import { TopBar } from "./shell/TopBar";
 import {
   readPreferences,
@@ -706,6 +707,10 @@ export function App() {
         />
         {/* Friends and their conversations, on every page (v0.5.1). */}
         <ChatBar key={`chat-${me.id}`} chat={chat} />
+        {/* The menu music (v0.7.3), on every page but a game's: the game screen replaces this
+          whole shell, so the box unmounts and the playlist pauses as the game's own track starts,
+          and plays on from the same place when the player comes back. */}
+        <MusicBox />
         {/* A game the public queue finds opens from any page (v0.5.0). */}
         {me.permissions.includes("games.play") && <QueueFollower />}
       </div>

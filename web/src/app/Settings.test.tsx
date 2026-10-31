@@ -6,6 +6,10 @@ import {
   DEFAULT_TABLE_SETTINGS,
   TABLE_SETTINGS_KEY,
 } from "../game/table/types";
+import {
+  DEFAULT_MENU_MUSIC,
+  MENU_MUSIC_KEY,
+} from "../shell/music/menuMusicSettings";
 import { InstallBanner } from "./InstallBanner";
 import { INSTALL_KEY } from "./install";
 import { Settings } from "./Settings";
@@ -144,6 +148,33 @@ describe("the Settings page", () => {
       musicMuted: true,
     });
     expect(screen.getByText("Saved on this device.")).toBeInTheDocument();
+  });
+
+  it("stores the menu music's volume, mute and order on this device (v0.7.3)", () => {
+    settings();
+    const section = screen.getByRole("region", { name: "Menu music" });
+    const volume = within(section).getByRole<HTMLInputElement>("slider", {
+      name: "Menu music volume",
+    });
+    expect(volume.value).toBe("50");
+    expect(volume).toHaveAccessibleDescription(/every page but the table/);
+    fireEvent.change(volume, { target: { value: "25" } });
+    const mute = within(section).getByRole("checkbox", {
+      name: "Mute the menu music",
+    });
+    expect(mute).not.toBeChecked();
+    fireEvent.click(mute);
+    const shuffle = within(section).getByRole("checkbox", { name: "Shuffle" });
+    expect(shuffle).toBeChecked();
+    fireEvent.click(shuffle);
+    expect(JSON.parse(localStorage.getItem(MENU_MUSIC_KEY)!)).toEqual({
+      ...DEFAULT_MENU_MUSIC,
+      volume: 25,
+      muted: true,
+      shuffle: false,
+    });
+    // The table's music settings are untouched.
+    expect(localStorage.getItem(TABLE_SETTINGS_KEY)).toBeNull();
   });
 
   it("offers the same controls, compact, for the game's Options drawer", () => {

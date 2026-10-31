@@ -7,6 +7,7 @@ import {
   musicFile,
   musicFolder,
 } from "../../../plugins/music";
+import { PLAYLIST_URL, trackUrl } from "../../shell/music/playlist";
 import { GAME_MUSIC_URL } from "./gameMusic";
 
 // The dev server's music folder (web/plugins/music.ts) answers the addresses the player asks for,
@@ -24,6 +25,20 @@ describe("the music folder in dev", () => {
     expect(musicFile("/music/a%20b.mp3")).toBeUndefined();
     expect(musicFile("/musical.mp3")).toBeUndefined();
     expect(musicFile("/api/v1/music")).toBeUndefined();
+  });
+
+  it("serves the menu playlist's manifest and its songs' plain names (v0.7.3)", () => {
+    expect(musicFile(PLAYLIST_URL)).toBe("playlist.json");
+    expect(musicFile(trackUrl("01-Linkin.Park-Heavy.is.the.Crown.mp3"))).toBe(
+      "01-Linkin.Park-Heavy.is.the.Crown.mp3",
+    );
+    expect(
+      musicFile(
+        trackUrl("20-Lorien.Testard.and.Alice.Duport-Percier-Lumiere.mp3"),
+      ),
+    ).toBe("20-Lorien.Testard.and.Alice.Duport-Percier-Lumiere.mp3");
+    // An accented name is not served, so the manifest may not name one.
+    expect(musicFile("/music/20-Lumi%C3%A8re.mp3")).toBeUndefined();
   });
 
   it("reads one byte range as the browser sends it", () => {

@@ -1,5 +1,18 @@
 # Verification
 
+## v0.7.3
+
+Built on October 31, 2026 in a cloud workspace with GitHub access but, as for v0.7.0 to v0.7.2, no npm or PyPI access, on the branch `playlist-0.7.3`. The playlist is the browser's alone, so the checks are the web's.
+
+| Check | Result |
+|---|---|
+| TypeScript | `tsc --noEmit -p web --preserveSymlinks` (TypeScript 5.9.3) on the owner's PC, in its Linux shell, against a hoisted view of the workspace's pnpm store (`node_modules/.pnpm`, linked package by package: the store's junctions do not resolve there): no errors but `pixi.js` being absent on that PC, which leaves the scene's own Pixi types unchecked as before |
+| Prettier | 3.9.10 from the same store, `--write` on every new and changed file |
+| Contracts | the version only: `contracts/openapi.json` (three places) and `web/src/generated/api.d.ts` (two) edited by hand; CI's drift check regenerates both |
+| New tests | `shell/music/playlist.test.ts` (the manifest's reading and what it leaves out, the cap, the addresses and labels; the queue in order: round and round, unticked songs skipped and the last tick kept, Previous through what was heard then backwards, a chosen song whatever its tick, a new manifest keeping ticks and the current song, ticks given before the manifest; shuffled: each song once a round and no round opening on the song just heard, the dice, Previous, one ticked song), `shell/music/menuMusic.test.ts` (the player on a fake `<audio>`: the manifest read once and the first song fading in, unavailable without a manifest, with an empty one, with something else at the address, with no audio at all, the remembered song and when it is passed over, the next song at an end and a failed song skipped and tried again by hand, every song failing, the fade-out holding the place and the resume from the same second, the fade turning round, Pause and Play and a pause before the manifest, the level as (v/100)² and a mute pausing the stream and the unmute resuming it, a mute before the menus show, the wait for a gesture and its end, the wait ending with the menus, an unticked current song moving on and a chosen one left alone, forward and back shuffled or in order, nothing before the manifest, dispose, one player a page), `shell/music/menuMusicSettings.test.ts` (field-by-field fall-backs, read and save, the hook and another tab's change), `shell/music/MusicBox.test.tsx` (nothing without a manifest; the pill, the open player, its list and the remembered song; Pause and Play across a reload; Next, Previous, a song chosen and one chosen while paused, the end moving on; ticks, the last kept; Shuffle, the volume, the mute and the all-sound mute's words; the gesture's words; unmounting for a game and mounting again), the Settings page's Menu music section (`Settings.test.tsx`), and the dev server serving the manifest and plain song names (`devServer.test.ts`) |
+| Not run locally | Vitest, the production build, pytest and the browser journeys: the workspace's stores have no Linux build of esbuild or rolldown, and the cloud has no registry access; hosted CI runs them |
+| Hosted CI | the runs on the branch `playlist-0.7.3`, then on `main` and the tag, recorded here as they complete |
+
 ## v0.7.2
 
 Built on October 31, 2026 in the same cloud workspace as v0.7.0 and v0.7.1 (no npm or PyPI access), on the branch `music-0.7.2`. The music and the scroll lock are the browser's alone, so the checks are the web's.

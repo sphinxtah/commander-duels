@@ -236,7 +236,7 @@ export function TableSettingsForm({ compact = false }: { compact?: boolean }) {
           id={`${id}-music`}
           name="Music volume"
           description={said(
-            "The soundtrack during games, and only then: it starts from the beginning with each game and loops until the game ends. The menus have no music.",
+            "The soundtrack during games, and only then: it starts from the beginning with each game and loops until the game ends. The menus have their own playlist, below.",
           )}
         >
           <span className={styles.range}>
