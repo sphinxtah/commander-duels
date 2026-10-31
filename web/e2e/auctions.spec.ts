@@ -124,6 +124,9 @@ test.describe("Tivit's Auction House", () => {
         .getByRole("group", { name: "Confirm Buy Now" })
         .getByRole("button", { name: "Buy for 60 tokens" })
         .click();
+      // The panel stays open across the tabs; closed, so it takes no click meant for the sections.
+      await panel.getByRole("button", { name: "Close the auction" }).click();
+      await expect(panel).toBeHidden();
       await sysop.goto("/#auctions/targets");
       await sysop.getByRole("button", { name: /^Won \d+$/ }).click();
       await expect(sysop.getByRole("list", { name: "Won" })).toContainText(
