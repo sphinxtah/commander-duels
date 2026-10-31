@@ -27,6 +27,9 @@ export const QUIET: TableSettings = {
   painter: "auto",
   // The journeys check the table's state, not its sparks (v0.7.0).
   effects: "off",
+  // Nor its music (v0.7.2): the fake server has no track, and a muted player asks for none.
+  musicVolume: 0,
+  musicMuted: true,
 };
 
 export interface FakeTable {

@@ -216,16 +216,21 @@ def test_deploy_migrates_before_replacing_anything(tmp_path):
     assert (result["running"], result["env"], result["db"]) == ("0.1.1", "0.1.1", "r2")
 
 
-def test_the_engine_image_may_be_the_owners_private_one():
+def test_the_engine_and_web_images_may_be_the_owners_private_ones():
     # v0.4.0: CD_ENGINE_IMAGE in .env names another engine image (the one with the Godlike
     # tier's custom cards), tagged as the version like the others; unset, the public one.
+    # v0.7.2: CD_WEB_IMAGE likewise names the web image with the gameplay music.
     compose = (ROOT / "deploy" / "compose.yaml").read_text()
     images = dict(re.findall(r"^  (\w+):\n(?:    .*\n)*?    image: (\S+)", compose, re.M))
     assert images["engine"] == (
         "${CD_ENGINE_IMAGE:-${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/engine}"
         ":${CD_VERSION:?}"
     )
-    assert images["web"] == "${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/web:${CD_VERSION:?}"
+    assert images["web"] == (
+        "${CD_WEB_IMAGE:-${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/web}:${CD_VERSION:?}"
+    )
+    example = (ROOT / "deploy" / "env.example").read_text()
+    assert "\nCD_ENGINE_IMAGE=\n" in example and "\nCD_WEB_IMAGE=\n" in example
     api = re.search(r"^  image: (.+)$", compose, re.M)
     assert api and api[1] == (
         "${CD_REGISTRY:-ghcr.io/sphinxtah/commander-duels}/api:${CD_VERSION:?set by deploy.sh}"
@@ -256,6 +261,19 @@ def test_deploy_names_a_private_engine_and_stops_when_it_cannot_pull(tmp_path):
     # The public engine needs no login, and the message does not suggest one.
     public = deploy(tmp_path / "public", "0.1.0", "0.1.1", STUB_PULL_FAIL="0.1.1")
     assert public["status"] == "1" and "ghcr.io" not in public["stderr"]
+    # v0.7.2: the web image with the music, named the same way, alone or beside the engine's.
+    web = "CD_WEB_IMAGE=ghcr.io/sphinxtah/commander-duels-web-sphinx\n"
+    both = deploy(tmp_path / "both", "0.1.0", "0.1.1", settings=private + web)
+    assert both["status"] == "0"
+    assert "(engine: ghcr.io/sphinxtah/commander-duels-engine-sphinx:0.1.1)" in both["stdout"]
+    assert "(web: ghcr.io/sphinxtah/commander-duels-web-sphinx:0.1.1)" in both["stdout"]
+    web_only = deploy(
+        tmp_path / "web-only", "0.1.0", "0.1.1", settings=web, STUB_PULL_FAIL="0.1.1"
+    )
+    assert web_only["status"] == "1"
+    assert "web ghcr.io/sphinxtah/commander-duels-web-sphinx" in web_only["stderr"]
+    assert "logged in to ghcr.io" in web_only["stderr"]
+    assert "engine" not in web_only["stderr"]
 
 
 def games_max(tmp_path: Path) -> list[str]:
