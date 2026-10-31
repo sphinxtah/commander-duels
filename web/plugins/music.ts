@@ -6,7 +6,6 @@
 import { createReadStream, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 
 export const MUSIC_PREFIX = "/music/";
@@ -55,12 +54,14 @@ export function byteRange(
   return [start, end];
 }
 
-/** The repository's music folder, beside compose.yaml: web/plugins/../../music. */
-export function musicFolder(): string {
-  return fileURLToPath(new URL("../../music/", import.meta.url));
+/** The repository's music folder, beside compose.yaml: the web root's ../music. (Vite's root, or
+ * the working directory, web/, as Vitest has it; under jsdom import.meta.url is no file address.) */
+export function musicFolder(root: string = process.cwd()): string {
+  return resolve(root, "..", "music");
 }
 
 function serve(
+  root: string,
   request: IncomingMessage,
   response: ServerResponse,
   next: () => void,
@@ -72,7 +73,8 @@ function serve(
     response.end();
     return;
   }
-  const file = resolve(musicFolder(), name);
+  const folder = musicFolder(root);
+  const file = resolve(folder, name);
   let size: number;
   try {
     const stat = statSync(file);
@@ -82,7 +84,7 @@ function serve(
     response.statusCode = 404;
     response.setHeader("Content-Type", "text/plain; charset=utf-8");
     response.end(
-      `No ${name} in the music folder (${musicFolder()}). See docs/game-screen.md.`,
+      `No ${name} in the music folder (${folder}). See docs/game-screen.md.`,
     );
     return;
   }
@@ -116,13 +118,22 @@ function serve(
 }
 
 export function music(): Plugin {
+  let root = process.cwd();
+  const middleware = (
+    request: IncomingMessage,
+    response: ServerResponse,
+    next: () => void,
+  ) => serve(root, request, response, next);
   return {
     name: "commander-duels:music",
+    configResolved(config) {
+      root = config.root;
+    },
     configureServer(server) {
-      server.middlewares.use(serve);
+      server.middlewares.use(middleware);
     },
     configurePreviewServer(server) {
-      server.middlewares.use(serve);
+      server.middlewares.use(middleware);
     },
   };
 }
