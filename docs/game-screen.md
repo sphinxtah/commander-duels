@@ -34,7 +34,27 @@ Signed-out visitors, and accounts waiting for approval or not approved, never re
 
 **Animation (UI09).** Cards move between zones, tap and untap, and fly to the stack and back; damage and life changes float up as numbers; a loss cracks the player's portrait. Animation never holds back an answer: every control on screen is the newest prompt's, and a revision the tab missed while hidden is simply drawn. Settings › "Animation speed" (Normal, Fast, Faster) sets the pace, and Reduce motion stills it.
 
-**Sound.** Generated Web Audio effects for drawing, playing a land, casting, resolving, entering, dying, tapping, counters, damage, life, attacks, blocks, phases and your turn, and chimes for victory, defeat and a draw. Nothing sounds before the first click or key press on the page. Settings › "Sound effects volume" and "Mute all sound"; Mute is also in the Game menu.
+**Sound.** Generated Web Audio effects for drawing, playing a land, casting, resolving, entering, dying, tapping, counters, damage, life, attacks, blocks, phases and your turn, and chimes for victory, defeat and a draw. Since v0.7.0 a creature slain in combat is heard as a blade (`slash`), a commander cast or a big spell taking effect as a bell chord over the cast (`arcane`), a blow of five or more life as a deeper thud (`impact`) and a player's elimination as glass breaking over a rumble (`shatter`). Nothing sounds before the first click or key press on the page. Settings › "Sound effects volume" and "Mute all sound"; Mute is also in the Game menu.
+
+**Special effects (v0.7.0).** A layer over the cards, under the emblem, for the moments worth a flourish, drawn by the WebGL scene from the same events as the animation and the sound, never from the log, so nothing a seat may not see can show in it. The thresholds live in `web/src/game/table/notable.ts`, the plan in `web/src/game/scene/effects/plan.ts`, the drawing in `EffectsNode.ts`.
+
+| Moment | Effect |
+|---|---|
+| A creature slain in combat (attacking or blocking in a combat step when it left) | A jagged red X slashed over the card, corner to corner in two strokes, a red flash over its face, sparks as the second stroke lands; the card waits under its X (45% of the slash) before it flies to the graveyard |
+| A creature that died another way (destroyed, sacrificed, a token that dies) | Grey ash rising off the card |
+| A commander cast from a command zone | A gold burst at the stack: two rings and motes |
+| A spell of six or more mana taking effect (told by the card it became: a permanent, or a card on a graveyard or exile tile, never a hidden one) | A burst in the colour of its cost (white, blue, black, red or green; gold for several; steel for none) where the card lands |
+| A creature of power five or more entering | A dust ring and puffs at its foot as it lands |
+| Attacks declared | Embers rising off up to six attackers |
+| Blocks declared | A pale steel frame closing on up to six blockers |
+| A player loses five or more life at once | A red shock ring off the portrait and sparks; for your own life (or your team's) the screen's edges flare red once, never a strobe; ten or more makes it bigger |
+| A player gains five or more life at once | Green glitter rising off the portrait |
+| A player eliminated | Dark shards flung from the portrait and a dark ring, with the crack and the dimming the table already did |
+| Victory / defeat | Gold, white, red and teal confetti falling across the whole view / grey ash drifting down |
+| Your turn begins | A gold shine sweeping the band left to right |
+
+Everything is a few `Graphics` strokes and sprites of three small textures made once (a soft dot, a shard, a gradient), batched by PixiJS; no filters, no recorded audio, no new API or engine message. Particle counts are fixed and small (at most 56 for a victory's confetti). Each effect lives a fixed time on the scene's clock, scaled by the animation speed as the other motion is, and is drawn from that time alone. Settings › "Special effects" (also in the table's Options drawer, kept on the device): **Full**, **Subtle** (the X, the rings, the shield frame and the shine without any particle, no edge flare) or **Off**. Reduce motion turns the layer off whatever it says; the plain table has none.
+
 
 **The plain table.** Without WebGL, or with Settings › "Draw the table with" › "Plain table without WebGL", the same buttons paint the cards themselves on a plain stone and band. A WebGL context the graphics driver loses draws the plain table until it comes back (a new one is made after 3 seconds, at most three times in five minutes).
 
@@ -213,11 +233,11 @@ Both painters draw it: the plates, pills, prompt column and turn line are the DO
 - **Not colour alone.** Highlights also change the card's name ("Options: …"), and attacking and blocking are written in it.
 - **Focus.** Focus is always visible, at least 3 screen pixels however small the table is drawn.
 - **Live regions.** The turn line, the connection's state, the log (in its drawer, still announced when closed) and one polite announcer for the timer ("Bot 2's Lightning Bolt. Continuing in 8 seconds. Press Space or T to stop the timer.") and refused drops.
-- **Settings.** Larger text enlarges the table's text; Reduce motion stills the animation and shows the timer as seconds; forced colours keep the diamonds' edges. Since v0.6.5 only the account's Reduce motion does this, everywhere on the site: the system's reduced-motion setting (which Windows reports when its animation effects are off) no longer stills the page, the table, the pack's card flips or the foils' glow.
+- **Settings.** Larger text enlarges the table's text; Reduce motion stills the animation, turns the special effects off (v0.7.0) and shows the timer as seconds; forced colours keep the diamonds' edges. Since v0.6.5 only the account's Reduce motion does this, everywhere on the site: the system's reduced-motion setting (which Windows reports when its animation effects are off) no longer stills the page, the table, the pack's card flips or the foils' glow.
 
 ## Verification
 
-Unit tests (Vitest) cover the table's model and layout (every arrangement, piles, the hit-box invariants), the events between views, the scene's host, the DOM layer and its names, the pointer, drag and drop, the magnifier, the response timer and its keys, sound cues, the prompt column's diamonds, the drawers and Escape, settings, full screen, the install banner, the service worker's rules and the live-game lock.
+Unit tests (Vitest) cover the table's model and layout (every arrangement, piles, the hit-box invariants), the events between views, the scene's host, the DOM layer and its names, the pointer, drag and drop, the magnifier, the response timer and its keys, sound cues, the prompt column's diamonds, the drawers and Escape, settings, full screen, the install banner, the service worker's rules and the live-game lock. Since v0.7.0 also the special effects: which a diff plays at each level (`plan.test.ts`), the particles' paths and the slash's geometry (`effects.test.ts`, on PixiJS's scene graph with no renderer), and on the scene itself a slain creature's card holding under its X before it leaves, nothing with the effects off or motion reduced, and the layer stopping at once when turned off.
 
 Browser journeys:
 - **The fake table** (`web/e2e/table.spec.ts`, the verify job, Vite's dev server with no engine): the table from fixtures at 1280 × 720 (1× and 1.5×), 1366 × 768, 1920 × 1080 (1× and 2×), 2560 × 1440 and 3840 × 2160, two to four players, a 240-permanent board, a long stack, a 25-card hand and since v0.5.1 Two-Headed Giant with a teammate's hand and turn control ([above](#turn-control-v051)), with WebGL and with the plain table. At each: the scale, nothing scrolling, the canvas at the screen's pixels, and every card and option reachable where it is drawn (the element at its centre is itself). Also P and a card's option answering the prompt on screen, the timer passing once and Space stopping it, Escape closing one layer per press, the magnifier never taking a click, and a lost WebGL context.

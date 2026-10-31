@@ -1,5 +1,18 @@
 # Verification
 
+## v0.7.0
+
+Built on October 30, 2026 in a cloud workspace with no npm or PyPI access, from a clone of the repository: the Vitest suite, the production build and the browser journeys could not run there, and the owner's PC has no `pixi.js` installed, so hosted CI is this version's test run.
+
+| Check | Result |
+|---|---|
+| TypeScript | `tsc --noEmit` on `web/` ran on the owner's PC (its Linux shell, against the workspace's installed packages, hoisted and with `--preserveSymlinks`): no errors apart from `pixi.js` being absent there, which left the scene's own Pixi types unchecked |
+| Prettier | the new and changed files, with Prettier 3.8 (the repository pins 3.9; the two files whose unrelated lines it would have rewrapped were left as they were) |
+| Contracts | the version only: `contracts/openapi.json` (three places) and `web/src/generated/api.d.ts` (two) edited by hand; CI's drift check regenerates both |
+| New tests, run only in CI | `notable.test.ts` (mana values, big spells and creatures, colours), `scene/effects/plan.test.ts` (which effects each event plans at each level), `scene/effects/effects.test.ts` (the particles' paths, the slash's strokes, the node on PixiJS's scene graph with no renderer), two events tests (`combat`, `commander`, `big` and `colours`), new cue cases, the settings' `effects` field, and four scene tests (a slain card holding under its X, nothing off or with reduced motion, the layer stopping when turned off, the other effects playing out) |
+| Not run locally | pytest, Vitest, the production build and the browser journeys; hosted CI runs them |
+| Hosted CI | run #163 on the branch `effects-0.7.0` (9eec58e): see the release notes |
+
 ## v0.6.5
 
 Validated locally on Windows on October 25, 2026: the Power Nine and dual lands back at their real pull ratios. Python ran natively on 3.12 in the repository's virtual environment.
