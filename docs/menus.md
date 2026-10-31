@@ -54,6 +54,8 @@ A title band runs across the top of every other page: **Main menu**, the way bac
 
 **Play** keeps the owner's banner, now with the practice table below it and a button to the tables (since v0.5.0 "Find a game" first, the public queues, with buttons to it, the practice table and the tables), and the formats: Commander and Legacy, open to play, and Two-Headed Giant, coming soon (since v0.5.0 marked "Early": a practice game with a bot teammate against two bots, [Two-Headed Giant](engine/two-headed-giant.md); since v0.5.1 also at tables and in "Find a game", alone or with a friend, its details saying so and that a few cards do not follow the team rules yet). Each format's details say how many seats it takes.
 
+**Pop-ups (v0.7.2).** Every pop-up on the pages and at the table is a modal dialog (a card's details, a deck's import, a guided deck, a concession, a report, an auction's item and so on), and while one is open the page behind it does not scroll: the wheel over the backdrop moves nothing, and the room the page's scrollbar took stays, so nothing shifts as the pop-up opens or closes (`web/src/app/scrollLock.ts`, started with the app; `html[data-modal]` in `global.css`). Before, the browser let the page scroll under the backdrop (the owner, 2026-10-31: "When there's a pop up window … the background scrolls too").
+
 ## Gone in v0.4.5
 
 - **Campaign, Learn and Collection.** Placeholder pages since v0.0.1; a player's cards are on Cards → My library.

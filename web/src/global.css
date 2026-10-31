@@ -103,6 +103,14 @@ html {
   /* What scrolls into view (a focused field, an anchor) stops below the sticky top bar. */
   scroll-padding-top: 92px;
 }
+/* A pop-up locks the page behind it (v0.7.2): while a modal dialog is open (app/scrollLock.ts
+   watches for them and sets this), the page does not scroll under its backdrop, and the room
+   its scrollbar took stays as padding, so nothing behind the dialog shifts as it opens or
+   closes. The game route hides the overflow on its own (App.module.css). */
+html[data-modal] {
+  overflow: hidden;
+  padding-right: var(--cd-gutter, 0px);
+}
 @media (max-width: 1180px) {
   html {
     scroll-padding-top: 128px;
