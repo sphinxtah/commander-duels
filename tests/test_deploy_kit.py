@@ -267,9 +267,7 @@ def test_deploy_names_a_private_engine_and_stops_when_it_cannot_pull(tmp_path):
     assert both["status"] == "0"
     assert "(engine: ghcr.io/sphinxtah/commander-duels-engine-sphinx:0.1.1)" in both["stdout"]
     assert "(web: ghcr.io/sphinxtah/commander-duels-web-sphinx:0.1.1)" in both["stdout"]
-    web_only = deploy(
-        tmp_path / "web-only", "0.1.0", "0.1.1", settings=web, STUB_PULL_FAIL="0.1.1"
-    )
+    web_only = deploy(tmp_path / "web-only", "0.1.0", "0.1.1", settings=web, STUB_PULL_FAIL="0.1.1")
     assert web_only["status"] == "1"
     assert "web ghcr.io/sphinxtah/commander-duels-web-sphinx" in web_only["stderr"]
     assert "logged in to ghcr.io" in web_only["stderr"]
