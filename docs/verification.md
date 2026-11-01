@@ -10,7 +10,7 @@ Built on October 31, 2026 in the same cloud workspace as v0.8.0, on the branch `
 | TypeScript | `tsc --noEmit` on `web/`: no errors beyond the workspace's baseline |
 | Web tests | the new ones (`gameMusic.test.ts`: a player that goes on from where it stopped; `menuMusic.test.ts`: the playlist held during a cut scene, through the menus leaving and coming back, and a hold that ends after the menus left) use Vitest's fake clock, which the workspace's stand-in lacks: run in CI |
 | The track | `campaign.audio.mp3` from the owner's campaign folder, copied unchanged (MD5 5ac268d5…) to the private repository's `music/campaign.mp3` and to the owner's local `music/` folder: MP3, 44.1 kHz stereo, 156 kbps, 31 min 54 s, 37,337,375 bytes |
-| Hosted CI | recorded in the release notes as the runs finish |
+| Hosted CI | run #206 on the branch (5fa0a08) green: verify 17 m, engine 14 m; the private web image's run #8 served `/music/campaign.mp3` in its smoke test ([the release notes](releases/0.8.1.md#verification)) |
 
 ## v0.8.0
 
