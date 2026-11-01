@@ -319,7 +319,7 @@ class DeterminizerTest {
     }
 
     private static GameEvent turnFaceUp(Card card, UUID playerId) {
-        return GameEvent.getEvent(GameEvent.EventType.TURN_FACE_UP, card.getId(), playerId);
+        return GameEvent.getEvent(GameEvent.EventType.TURN_FACE_UP, card.getId(), null, playerId);
     }
 
     /** Five samples as card names: the opponent's hand, then the bot's library from the top. */
