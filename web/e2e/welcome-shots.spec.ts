@@ -16,6 +16,13 @@ async function signInSysop(page: Page) {
   await expect(page).toHaveURL(/#admin$/);
 }
 
+/** The friends' chat bar folds into a corner of every page: out of the pictures. */
+async function hideChatBar(page: Page) {
+  await page.addStyleTag({
+    content: "[data-chat-bar] { visibility: hidden !important; }",
+  });
+}
+
 /** Waits until every card picture on the page has loaded (or failed for good). */
 async function picturesSettled(page: Page) {
   await expect
@@ -58,6 +65,7 @@ test.describe("the welcome's screenshots", () => {
     await narration.evaluate((node) => {
       (node as HTMLElement).style.display = "none";
     });
+    await hideChatBar(page);
     await page.waitForTimeout(1_000);
     await page.screenshot({ path: `${OUT}/table.png` });
   });
@@ -82,7 +90,6 @@ test.describe("the welcome's screenshots", () => {
           "1 Birds of Paradise",
           "1 Grizzly Bears",
           "1 Hill Giant",
-          "1 Dockside Extortionist",
           "1 Lightning Bolt",
           "1 Swords to Plowshares",
           "1 Counterspell",
@@ -91,7 +98,7 @@ test.describe("the welcome's screenshots", () => {
           "1 Wrath of God",
           "1 Thoughtseize",
           "7 Seven Dwarves",
-          "31 Relentless Rats",
+          "32 Relentless Rats",
           "12 Forest",
           "12 Mountain",
           "8 Plains",
@@ -103,8 +110,11 @@ test.describe("the welcome's screenshots", () => {
     await importer.getByLabel("Deck name").fill("The Returned King");
     await importer.getByRole("button", { name: "Create the deck" }).click();
     await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
+    await hideChatBar(page);
+    // The commander and the first of the deck's pictures, under the deck's name.
+    await page.evaluate(() => window.scrollTo(0, 150));
     await picturesSettled(page);
-    await page.waitForTimeout(1_500);
+    await page.waitForTimeout(2_500);
     await page.screenshot({ path: `${OUT}/decks.png` });
   });
 
@@ -160,6 +170,11 @@ test.describe("the welcome's screenshots", () => {
       await cards.nth(n).click();
       await page.waitForTimeout(250);
     }
+    await hideChatBar(page);
+    await page
+      .locator('[data-tour="pack-opening"]')
+      .evaluate((node) => node.scrollIntoView({ block: "start" }));
+    await page.evaluate(() => window.scrollBy(0, -80));
     await page.waitForTimeout(2_000);
     await picturesSettled(page);
     await page.screenshot({ path: `${OUT}/shop.png` });
@@ -170,7 +185,9 @@ test.describe("the welcome's screenshots", () => {
     await page.getByRole("tab", { name: "Alliance" }).click();
     const alliance = page.locator("#alliance-title");
     await expect(alliance).toBeVisible();
-    await alliance.scrollIntoViewIfNeeded();
+    await hideChatBar(page);
+    await alliance.evaluate((node) => node.scrollIntoView({ block: "start" }));
+    await page.evaluate(() => window.scrollBy(0, -90));
     await picturesSettled(page);
     await page.waitForTimeout(1_500);
     await page.screenshot({ path: `${OUT}/alliance.png` });

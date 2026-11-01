@@ -70,7 +70,8 @@ jobs:
           echo "::add-mask::$password"
           printf '%s\n' "$password" | python -m api.cli sysop-password --stdin
           python scripts/load_fixture_catalog.py
-          CD_E2E_WELCOME_SHOTS=1 CD_E2E_SYSOP_PASSWORD="$password" \
+          mkdir -p /tmp/card-images
+          CD_CARD_IMAGE_DIR=/tmp/card-images CD_E2E_WELCOME_SHOTS=1 CD_E2E_SYSOP_PASSWORD="$password" \
             pnpm --dir web exec playwright test e2e/welcome-shots.spec.ts --reporter=line || true
           ls -la web/test-results/welcome || true
           python scripts/welcome_shots.py web/test-results/welcome || true

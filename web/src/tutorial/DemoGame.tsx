@@ -21,7 +21,7 @@ function readingMs(text: string): number {
 const BASE: Omit<GameState, "snapshot" | "log"> = {
   phase: "open",
   ended: null,
-  seat: 0,
+  seat: null,
   role: "observer",
   controlled: true,
   takenOver: false,
