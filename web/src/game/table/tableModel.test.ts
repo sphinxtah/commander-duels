@@ -249,16 +249,26 @@ describe("players", () => {
     expect(model(f).anchored!.sigil.seed).toBe("handle:alice");
   });
 
-  it("show a human's allied Planeswalker's portrait, never a bot's (v0.3.1)", () => {
+  it("show a human's allied Planeswalker's portrait, and a bot's only in the campaign (v0.3.1, v0.8.0)", () => {
     expect(fixtureModel("duel").anchored!.portrait).toBeNull();
     const f = tableFixture("duel");
     f.summarySeats = [
       { ...f.summarySeats[0], portrait: "rowan" },
-      { seat: 1, player: "bot", handle: null, deck: null, portrait: "jace" },
+      { seat: 1, player: "bot", handle: null, deck: null, portrait: null },
     ];
     let m = model(f);
     expect(m.anchored!.portrait).toBe("rowan");
     expect(m.opponents[0].portrait).toBeNull();
+    // A campaign opponent: the API names the warden and gives their portrait (only there).
+    f.summarySeats[1] = {
+      seat: 1,
+      player: "bot",
+      handle: "Tibalt",
+      deck: null,
+      portrait: "tibalt",
+    };
+    m = model(f);
+    expect(m.opponents[0].portrait).toBe("tibalt");
     f.summarySeats[1] = {
       seat: 1,
       player: "human",
@@ -730,8 +740,8 @@ describe("turn control (rule 723, v0.5.1)", () => {
       articleLabel: "Bot 2, seat 2, whose turn you control",
     });
     expect(m.anchored).toMatchObject({ controlledBy: null, controlPill: null });
-    const theirs = tableFixture("controlling").snapshot.view!.opponents[0]
-      .hand!;
+    const theirs =
+      tableFixture("controlling").snapshot.view!.opponents[0].hand!;
     expect(bot.hand).toEqual(theirs.map((card) => `hand:${card.id}`));
     const brainstorm = named(m, "Brainstorm", "hand");
     expect(brainstorm).toMatchObject({
@@ -748,9 +758,9 @@ describe("turn control (rule 723, v0.5.1)", () => {
       mark: "none",
     });
     // Your own hand has nothing to do in Bot 2's turn.
-    expect(
-      m.hand.every((key) => m.cards.get(key)!.offered.length === 0),
-    ).toBe(true);
+    expect(m.hand.every((key) => m.cards.get(key)!.offered.length === 0)).toBe(
+      true,
+    );
     // Its cards are laid out face up by its plate, every one in reach.
     const layout = layoutTable(m, { expandedSeat: null, textScale: 1 });
     expect(validateHits(layout, m)).toEqual([]);
