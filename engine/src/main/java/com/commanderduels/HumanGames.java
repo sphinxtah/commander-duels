@@ -27,13 +27,37 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * look the same (not found). At most {@code maxActive} games of both kinds run at once: each
  * holds a platform thread while it waits for a seat, and XMage's AI shares one search pool and one
  * random generator across games. Finished games stay readable for a while, then are dropped.
+ *
+ * <p>Since v0.8.3 the API may name a service game itself ({@link HumanGameRequest#gameId()}), so that a
+ * create it retries after a time-out cannot start a second game, and a close it sends for a game it
+ * gave up on cannot leave one running. A create naming an id that is in use is refused
+ * ({@link Refusal#GAME_EXISTS}). A service close for an id that matches no game records the id as
+ * cancelled, and a later create naming it is refused ({@link Refusal#GAME_CANCELLED}): the API's close
+ * wins over a create that reaches the engine after it. Both run under this registry's lock, as game
+ * registration does, so one always comes wholly before the other. Cancelled ids are kept for
+ * {@link #RETAIN_CANCELLED_MILLIS}, at most {@link #MAX_CANCELLED} of them, the oldest dropped first.
  */
 final class HumanGames {
     static final int DEFAULT_MAX_ACTIVE = 2;
     static final int MAX_ACTIVE_LIMIT = 64;
     static final long RETAIN_FINISHED_MILLIS = TimeUnit.MINUTES.toMillis(10);
     static final int MAX_FINISHED = 16;
+    static final long RETAIN_CANCELLED_MILLIS = TimeUnit.MINUTES.toMillis(15);
+    static final int MAX_CANCELLED = 1024;
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    /** Why no game was created. */
+    enum Refusal {
+        /** {@code maxActive} games are already running. */
+        BUSY,
+        /** A game with the requested id exists, running or finished and still readable. */
+        GAME_EXISTS,
+        /** The API closed the requested id before any game had it. */
+        GAME_CANCELLED
+    }
+
+    /** A created game, or why none was: exactly one of the two is set. */
+    record Creation(Created created, Refusal refusal) {}
 
     /**
      * @param seatTokens     each human seat's token, by seat, in seat order
@@ -68,6 +92,8 @@ final class HumanGames {
     private final Path deckDirectory;
     private final int maxActive;
     private final Map<String, Entry> games = new ConcurrentHashMap<>();
+    /** Ids the API closed before a game had them, with when, oldest first. Guarded by this. */
+    private final LinkedHashMap<String, Long> cancelled = new LinkedHashMap<>();
     private final ScheduledExecutorService watchdog;
 
     HumanGames(Path deckDirectory, int maxActive) {
@@ -91,15 +117,30 @@ final class HumanGames {
     }
 
     /**
-     * Starts a game, or returns empty when {@code maxActive} games are already running. A service
-     * game can be inspected.
+     * Starts a game, or returns empty when {@code maxActive} games are already running or the
+     * requested id is taken or cancelled. A service game can be inspected.
      */
-    synchronized Optional<Created> create(HumanGameRequest request, boolean service) {
+    Optional<Created> create(HumanGameRequest request, boolean service) {
+        return Optional.ofNullable(start(request, service).created());
+    }
+
+    /**
+     * Starts a game, or says why it did not. A service request's {@link HumanGameRequest#gameId()} is
+     * the game's id (v0.8.3); without one, and on the development route, the id is random.
+     */
+    synchronized Creation start(HumanGameRequest request, boolean service) {
         evict();
-        if (active() >= maxActive) {
-            return Optional.empty();
+        String requested = service ? request.gameId() : null;
+        if (requested != null && games.containsKey(requested)) {
+            return new Creation(null, Refusal.GAME_EXISTS);
         }
-        String id = UUID.randomUUID().toString();
+        if (requested != null && cancelled.containsKey(requested)) {
+            return new Creation(null, Refusal.GAME_CANCELLED);
+        }
+        if (active() >= maxActive) {
+            return new Creation(null, Refusal.BUSY);
+        }
+        String id = requested != null ? requested : UUID.randomUUID().toString();
         var game = new HumanGame(id, request, deckDirectory, this::finished);
         Map<Integer, String> tokens = new LinkedHashMap<>();
         Map<Integer, byte[]> hashes = new LinkedHashMap<>();
@@ -114,7 +155,7 @@ final class HumanGames {
         }
         games.put(id, new Entry(game, Map.copyOf(hashes), hash(spectatorToken), service));
         game.start();
-        return Optional.of(new Created(game, tokens, spectatorToken));
+        return new Creation(new Created(game, tokens, spectatorToken), null);
     }
 
     private static String newToken() {
@@ -155,6 +196,32 @@ final class HumanGames {
         return entry == null || !entry.service ? Optional.empty() : Optional.of(entry.game);
     }
 
+    /**
+     * The service game to close (v0.8.3): the game, if it is one; if no game has the id, the id is
+     * recorded as cancelled, so a create naming it that reaches the engine later is refused. The
+     * caller closes the game it gets outside the lock. An id that belongs to a development game is
+     * neither closed nor cancelled.
+     */
+    synchronized Optional<HumanGame> serviceOrCancel(String id) {
+        Entry entry = games.get(id);
+        if (entry != null) {
+            return entry.service ? Optional.of(entry.game) : Optional.empty();
+        }
+        evict();
+        // Removed first, so a repeated close counts from now and moves to the end of the order.
+        cancelled.remove(id);
+        cancelled.put(id, System.nanoTime());
+        while (cancelled.size() > MAX_CANCELLED) {
+            cancelled.remove(cancelled.keySet().iterator().next());
+        }
+        return Optional.empty();
+    }
+
+    /** Whether the id is recorded as cancelled; for tests. */
+    synchronized boolean cancelled(String id) {
+        return cancelled.containsKey(id);
+    }
+
     synchronized int active() {
         return (int) games.values().stream().filter(entry -> !entry.game.finished()).count();
     }
@@ -187,6 +254,7 @@ final class HumanGames {
     /** Caller holds the lock. */
     private void evict() {
         long now = System.nanoTime();
+        cancelled.values().removeIf(at -> TimeUnit.NANOSECONDS.toMillis(now - at) > RETAIN_CANCELLED_MILLIS);
         games.values().removeIf(entry -> entry.game.finished() && entry.finishedAtNanos != 0
             && TimeUnit.NANOSECONDS.toMillis(now - entry.finishedAtNanos) > RETAIN_FINISHED_MILLIS);
         var finished = games.values().stream()

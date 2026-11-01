@@ -99,11 +99,11 @@ final class SeatViews {
                 group.getBlocked()));
         }
         List<SeatView.CardGroup> revealed = new ArrayList<>();
-        state.getRevealed().forEach((name, cards) -> revealed.add(group(name, cards)));
+        state.getRevealed().forEach((name, cards) -> revealed.add(group(name, cards, viewer)));
         List<SeatView.CardGroup> lookedAt = new ArrayList<>();
         // The viewer's own, and (723.4, v0.5.1) those of each player whose turn the viewer controls.
         for (UUID player : Visibility.seesFor(game, viewer)) {
-            state.getLookedAt(player).forEach((name, cards) -> lookedAt.add(group(name, cards)));
+            state.getLookedAt(player).forEach((name, cards) -> lookedAt.add(group(name, cards, viewer)));
         }
 
         return new SeatView(
@@ -391,10 +391,17 @@ final class SeatViews {
         return permanent == null ? objectRef(id) : ref(permanent);
     }
 
-    private SeatView.CardGroup group(String name, Cards cards) {
+    /**
+     * A revealed or looked-at group. XMage keeps a card listed after it moves, and its id here is the
+     * card's current one, so since v0.8.3 a card that has since gone face down (exiled face down,
+     * turned or cast face down) is shown hidden, unless the seat may see it face down: naming it
+     * would tell the seat which face-down object it is.
+     */
+    private SeatView.CardGroup group(String name, Cards cards, UUID viewer) {
         List<SeatView.CardInfo> shown = new ArrayList<>();
         for (Card card : cards.getCards(game)) {
-            shown.add(card(card, true));
+            shown.add(card(card, !Visibility.faceDown(game, card.getId())
+                || Visibility.identityVisible(game, card.getId(), viewer)));
         }
         return new SeatView.CardGroup(plain(name), shown);
     }

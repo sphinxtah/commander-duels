@@ -271,6 +271,7 @@ class SeatChecks implements HumanGame.Hooks {
 
         Set<UUID> hidden = hiddenFrom(game, viewer);
         objectIds(game, refs, seat, EngineServer.JSON.toJson(view), hidden, "view");
+        faceDownNames(game, refs, seat, viewer, view, prompt);
         // A prompt made for a player whose turn the seat controls (723.5) is that player's request.
         UUID asked = prompt == null || prompt.forSeat() == null ? viewer : seatIds.get(prompt.forSeat());
         if (prompt != null) {
@@ -374,6 +375,94 @@ class SeatChecks implements HumanGame.Hooks {
                     "option seat in range");
             }
         }
+    }
+
+    /**
+     * A face-down object the seat may not see is never named, whatever XMage's revealed and looked-at
+     * lists still hold (v0.8.3): not in an exile list, a revealed or looked-at group, on the
+     * battlefield, on the stack, as a target or as a prompt option. The name check below cannot see
+     * this, as a name once revealed stays public for the log.
+     */
+    private void faceDownNames(Game game, ObjectRefs refs, int seat, UUID viewer, SeatView view, PromptView prompt) {
+        Set<UUID> viewers = viewersFor(game, viewer);
+        List<SeatView.CardInfo> cards = new ArrayList<>();
+        List<SeatView.PlayerState> players = new ArrayList<>(view.opponents());
+        if (view.you() != null) {
+            players.add(view.you());
+        }
+        for (SeatView.PlayerState player : players) {
+            cards.addAll(player.exile());
+            cards.addAll(player.graveyard());
+        }
+        view.revealed().forEach(group -> cards.addAll(group.cards()));
+        view.lookedAt().forEach(group -> cards.addAll(group.cards()));
+        view.battlefield().forEach(permanent -> cards.add(permanent.card()));
+        for (SeatView.CardInfo card : cards) {
+            if (!card.hidden() || card.name() != null) {
+                faceDownNamed(game, refs, seat, viewers, card.id(), card.name(), "view");
+            }
+        }
+        List<SeatView.TargetRef> targets = new ArrayList<>();
+        for (SeatView.StackItem item : view.stack()) {
+            if (!item.hidden() || item.name() != null) {
+                faceDownNamed(game, refs, seat, viewers, item.id(), item.name(), "stack");
+            }
+            targets.addAll(item.targets());
+        }
+        view.combat().forEach(group -> targets.add(group.defender()));
+        for (SeatView.TargetRef target : targets) {
+            if (target != null && target.objectId() != null && target.label() != null) {
+                faceDownNamed(game, refs, seat, viewers, target.objectId(), target.label(), "target");
+            }
+        }
+        if (prompt != null) {
+            for (PromptView.Option option : prompt.options()) {
+                if (option.objectId() != null && option.label() != null) {
+                    faceDownNamed(game, refs, seat, viewers, option.objectId(), option.label(),
+                        prompt.kind() + " prompt");
+                }
+            }
+        }
+    }
+
+    private void faceDownNamed(Game game, ObjectRefs refs, int seat, Set<UUID> viewers, String ref, String name,
+                               String where) {
+        UUID id = ref == null ? null : refs.resolve(ref).orElse(null);
+        // A placeholder such as XMage's face-down creature name is not the card's.
+        if (id != null && concealedFaceDown(game, id, viewers) && Objects.equals(name, realName(game, id))) {
+            fail("the face-down " + name + " (" + game.getState().getZone(id) + ") was named to seat " + seat
+                + " in " + where);
+        }
+    }
+
+    /** The name of the card behind an object, face down or not, from XMage's card. */
+    private static String realName(Game game, UUID id) {
+        if (game.getPermanent(id) == null && game.getStack().getStackObject(id) instanceof Spell spell) {
+            return spell.getCard().getName();
+        }
+        Card card = game.getCard(id);
+        return card == null ? null : card.getName();
+    }
+
+    /**
+     * Read from XMage apart from the engine's Visibility: a face-down permanent or spell whose
+     * controller is not among the viewers, or a face-down exiled card whose owner is not (XMage shows
+     * its owner a face-down exiled card).
+     */
+    private static boolean concealedFaceDown(Game game, UUID id, Set<UUID> viewers) {
+        Permanent permanent = game.getPermanent(id);
+        if (permanent != null) {
+            return permanent.isFaceDown(game) && !viewers.contains(permanent.getControllerId());
+        }
+        StackObject stackObject = game.getStack().getStackObject(id);
+        if (stackObject instanceof Spell spell) {
+            return spell.isFaceDown(game) && !viewers.contains(spell.getControllerId());
+        }
+        if (game.getState().getZone(id) == Zone.EXILED) {
+            Card card = game.getCard(id);
+            return card != null && card.isFaceDown(game) && !viewers.contains(card.getOwnerId());
+        }
+        return false;
     }
 
     private void objectIds(Game game, ObjectRefs refs, int seat, String json, Set<UUID> hidden, String where) {
@@ -667,9 +756,13 @@ class SeatChecks implements HumanGame.Hooks {
         for (CommandObject object : game.getState().getCommand()) {
             names.add(object.getName());
         }
+        // A revealed card is public while it is face up: once exiled, turned or cast face down, its
+        // name is no longer public through the revealed list (v0.8.3).
         for (Cards cards : game.getState().getRevealed().values()) {
             for (Card card : cards.getCards(game)) {
-                names.add(card.getName());
+                if (!concealedFaceDown(game, card.getId(), Set.of())) {
+                    names.add(card.getName());
+                }
             }
         }
         return names;

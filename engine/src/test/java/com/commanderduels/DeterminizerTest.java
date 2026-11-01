@@ -1,6 +1,7 @@
 package com.commanderduels;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -15,8 +16,11 @@ import mage.cards.CardsImpl;
 import mage.cards.decks.Deck;
 import mage.constants.RangeOfInfluence;
 import mage.constants.Zone;
+import mage.game.ExileZone;
 import mage.game.Game;
+import mage.game.events.GameEvent;
 import mage.game.match.Match;
+import mage.game.permanent.PermanentCard;
 import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.players.Player;
 import org.junit.jupiter.api.BeforeAll;
@@ -205,6 +209,117 @@ class DeterminizerTest {
             assertEquals(botTop, sim.getPlayer(table.bot().getId()).getLibrary().getCardList().get(0));
             assertEquals(opponentTop, sim.getPlayer(table.opponent().getId()).getLibrary().getCardList().get(0));
         }
+    }
+
+    /** The Elves, moved from the opponent's hand. */
+    private static Card takeElves(Game game, UUID opponentId) {
+        Player opponent = game.getPlayer(opponentId);
+        Card elves = opponent.getHand().getCards(game).stream().filter(card -> card.getName().equals(SINGLETON))
+            .findFirst().orElseThrow();
+        opponent.getHand().remove(elves);
+        return elves;
+    }
+
+    /** A player's face-down exiled cards. */
+    private static List<Card> faceDownExiled(Game game, UUID ownerId) {
+        List<Card> cards = new ArrayList<>();
+        for (ExileZone zone : game.getExile().getExileZones()) {
+            for (Card card : zone.getCards(game)) {
+                if (card.isOwnedBy(ownerId) && card.isFaceDown(game)) {
+                    cards.add(card);
+                }
+            }
+        }
+        return cards;
+    }
+
+    /** Puts a card onto the battlefield face down under its owner's control, as a manifest does. */
+    private static void faceDownOnTheBattlefield(Game game, Card card) {
+        card.setFaceDown(true, game);
+        PermanentCard permanent = new PermanentCard(card, card.getOwnerId(), game);
+        permanent.setFaceDown(true, game);
+        game.getBattlefield().addPermanent(permanent);
+        game.getState().setZone(card.getId(), Zone.BATTLEFIELD);
+    }
+
+    /**
+     * A face-down exiled card (foretold, say) joins its owner's pool: its slot in exile is dealt a
+     * card from the pool, face down, and the real card is dealt to the hand or library (v0.8.3).
+     */
+    @Test
+    void aFaceDownExiledCardIsDealtFromThePool() throws Exception {
+        Table table = table(12L);
+        Game game = table.game();
+        UUID opponentId = table.opponent().getId();
+        Card elves = takeElves(game, opponentId);
+        game.getExile().add(elves);
+        elves.setZone(Zone.EXILED, game);
+        elves.setFaceDown(true, game);
+        // Revealed before it was exiled: XMage still lists it, and the seat may not see it face down.
+        game.getState().getRevealed().add("Thoughtseize", new CardsImpl(elves));
+        Concealed real = concealed(game, opponentId);
+        List<UUID> realPool = pool(real);
+        realPool.add(elves.getId());
+
+        int elvesInExile = 0;
+        for (int i = 0; i < SAMPLES; i++) {
+            Game sim = table.bot().createSimulation(game);
+            List<Card> exiled = faceDownExiled(sim, opponentId);
+            assertEquals(1, exiled.size(), "one face-down card in exile, as in the real game");
+            Card slot = exiled.get(0);
+            assertEquals(Zone.EXILED, sim.getState().getZone(slot.getId()));
+            Concealed sample = concealed(sim, opponentId);
+            assertEquals(real.hand().size(), sample.hand().size());
+            assertEquals(real.library().size(), sample.library().size());
+            assertZonesMatch(sample);
+            List<UUID> samplePool = pool(sample);
+            samplePool.add(slot.getId());
+            assertEquals(names(game, realPool), names(sim, samplePool));
+            if (slot.getName().equals(SINGLETON)) {
+                elvesInExile++;
+            } else {
+                assertFalse(sim.getCard(elves.getId()).isFaceDown(sim), "the real card is face up in the hand or library");
+            }
+        }
+        // One card in 60: dealt to the exile slot about once in 60 samples, not every time.
+        assertTrue(elvesInExile < SAMPLES / 4, "the face-down card's identity leaked into the copies: " + elvesInExile);
+
+        // The real game is untouched.
+        assertEquals(real, concealed(game, opponentId));
+        assertEquals(List.of(elves.getId()), faceDownExiled(game, opponentId).stream().map(Card::getId).toList());
+        assertEquals(Zone.EXILED, game.getState().getZone(elves.getId()));
+    }
+
+    /**
+     * Another player's face-down permanent keeps its card in the copy but cannot be turned face up
+     * there, in the copy or in the copies the search makes of it; the bot's own can (v0.8.3).
+     */
+    @Test
+    void anOpponentsFaceDownPermanentStaysFaceDownInTheCopy() throws Exception {
+        Table table = table(13L);
+        Game game = table.game();
+        UUID botId = table.bot().getId();
+        UUID opponentId = table.opponent().getId();
+        Card elves = takeElves(game, opponentId);
+        faceDownOnTheBattlefield(game, elves);
+        Card own = game.getPlayer(botId).getHand().getCards(game).iterator().next();
+        game.getPlayer(botId).getHand().remove(own);
+        faceDownOnTheBattlefield(game, own);
+        assertFalse(Visibility.identityVisible(game, elves.getId(), botId));
+        assertTrue(Visibility.identityVisible(game, own.getId(), botId));
+
+        assertFalse(game.replaceEvent(turnFaceUp(elves, opponentId)), "the real game lets it be turned face up");
+        Game sim = table.bot().createSimulation(game);
+        assertTrue(sim.getPermanent(elves.getId()).isFaceDown(sim));
+        assertTrue(sim.replaceEvent(turnFaceUp(elves, opponentId)), "the copy does not");
+        assertFalse(sim.replaceEvent(turnFaceUp(own, botId)), "the bot's own face-down permanent");
+        Game node = sim.copy();
+        assertTrue(node.replaceEvent(turnFaceUp(elves, opponentId)), "a copy of the copy, as the search makes");
+        assertFalse(game.replaceEvent(turnFaceUp(elves, opponentId)), "the real game is untouched");
+    }
+
+    private static GameEvent turnFaceUp(Card card, UUID playerId) {
+        return GameEvent.getEvent(GameEvent.EventType.TURN_FACE_UP, card.getId(), playerId);
     }
 
     /** Five samples as card names: the opponent's hand, then the bot's library from the top. */

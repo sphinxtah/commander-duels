@@ -19,6 +19,14 @@ import mage.players.Player;
  * objects are visible to their controller only. Anything unrecognised is treated as hidden. A null
  * viewer is a spectator: no hand, face-down object or looked-at card is theirs.
  *
+ * <p>Since v0.8.3 the revealed and looked-at lists count only for a card in a hand, a library or
+ * outside the game, the zones they can reveal something in. XMage records neither the zone a card
+ * was revealed from nor its zone-change counter, and keeps a card listed after it moves, so a card
+ * revealed or looked at and then exiled face down (foretold, for instance), turned face down or cast
+ * face down stayed listed: its name was shown to every seat. A face-down object now follows the
+ * face-down rules alone, whatever lists it is in: a face-down permanent or spell is visible to its
+ * controller, a face-down exiled card to nobody.
+ *
  * <p>Since v0.5.1 a player who controls another player's turn sees what that player may see, for as
  * long as the control lasts (723.4): their hand, their face-down objects and the cards they looked
  * at. Without turn control every rule above reads exactly as before.
@@ -82,14 +90,17 @@ final class Visibility {
         if (objectId == null) {
             return false;
         }
-        if (game.getPlayer(objectId) != null || revealedTo(game, objectId, viewerId)) {
+        if (game.getPlayer(objectId) != null) {
             return true;
         }
         Zone zone = game.getState().getZone(objectId);
         if (zone == null) {
             // Stack objects (abilities and spells) are tracked by the stack rather than by zone.
             StackObject stackObject = game.getStack().getStackObject(objectId);
-            return stackObject != null && stackObjectVisible(game, stackObject, viewerId);
+            if (stackObject != null) {
+                return stackObjectVisible(game, stackObject, viewerId);
+            }
+            return revealedTo(game, objectId, viewerId);
         }
         switch (zone) {
             case BATTLEFIELD: {
@@ -105,17 +116,47 @@ final class Visibility {
             case COMMAND:
                 return true;
             case EXILED: {
+                // Face down, it stays hidden even while XMage still lists it as revealed (v0.8.3).
                 Card card = game.getCard(objectId);
                 return card != null && !card.isFaceDown(game);
             }
             case HAND: {
                 // 810.5: in a team game, teammates may look at each other's hands.
                 Card card = game.getCard(objectId);
-                return card != null && handVisible(game, card.getOwnerId(), viewerId);
+                return card != null && (handVisible(game, card.getOwnerId(), viewerId)
+                    || revealedTo(game, objectId, viewerId));
             }
+            case LIBRARY:
+            case OUTSIDE:
+                // A card revealed from a library (its top card, say) or from outside the game.
+                return revealedTo(game, objectId, viewerId);
             default:
                 return false;
         }
+    }
+
+    /**
+     * Whether the object is face down where it is now: a face-down permanent, spell or exiled card
+     * (v0.8.3). Its identity is then the controller's to see, whatever XMage's revealed and looked-at
+     * lists say.
+     */
+    static boolean faceDown(Game game, UUID objectId) {
+        if (objectId == null) {
+            return false;
+        }
+        Permanent permanent = game.getPermanent(objectId);
+        if (permanent != null) {
+            return permanent.isFaceDown(game);
+        }
+        StackObject stackObject = game.getStack().getStackObject(objectId);
+        if (stackObject instanceof Spell spell) {
+            return spell.isFaceDown(game);
+        }
+        if (game.getState().getZone(objectId) == Zone.EXILED) {
+            Card card = game.getCard(objectId);
+            return card != null && card.isFaceDown(game);
+        }
+        return false;
     }
 
     static boolean stackObjectVisible(Game game, StackObject stackObject, UUID viewerId) {
@@ -125,6 +166,11 @@ final class Visibility {
         return true;
     }
 
+    /**
+     * Whether XMage lists the object as revealed, or as looked at by the viewer or a player whose
+     * turn the viewer controls. The lists hold card ids only, so callers check the zone first: see
+     * {@link #identityVisible}.
+     */
     static boolean revealedTo(Game game, UUID objectId, UUID viewerId) {
         for (Cards cards : game.getState().getRevealed().values()) {
             if (cards.contains(objectId)) {

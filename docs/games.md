@@ -203,9 +203,9 @@ The engine serves the API's games under `/v1/service`, only when `CD_ENGINE_SERV
 
 | Route | Purpose |
 | --- | --- |
-| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit (256 KiB since v0.6.2, for stand-ins' descriptions). Unknown card names return 400 `unknown_cards`. Since v0.5.0 a Legacy deck list may carry its `sideboard`, kept outside the game for wishes, and the request may name the `starting_seat` ([matches](matches.md#the-engine)) |
+| `POST /v1/service/games` | As the development `POST /v1/games`, with deck lists allowed and a 64 KiB body limit (256 KiB since v0.6.2, for stand-ins' descriptions). Unknown card names return 400 `unknown_cards`. Since v0.5.0 a Legacy deck list may carry its `sideboard`, kept outside the game for wishes, and the request may name the `starting_seat` ([matches](matches.md#the-engine)). Since v0.8.3 the API names the game it asks for (`game_id`, a lower-case UUID): an id in use answers 409 `game_exists`, a cancelled one 409 `game_cancelled`, and neither starts a game |
 | `GET` and `POST` under `/v1/service/games/{id}/` (`view`, `commands`) | As the development routes; the seat token still selects the seat |
-| `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices |
+| `POST /v1/service/games/{id}/close` | Ends the game; the service token alone suffices. Since v0.8.3 a close for an id with no game cancels that id for 15 minutes (still 404 `not_found`), so a create that reaches the engine after it is refused |
 | `GET /v1/service/games/{id}/inspection` | The inspection view; `wait_ms` up to 30 000 |
 | `GET /v1/service/cards?q=&limit=` | Card names containing `q`, ignoring case: names starting with it first |
 | `GET /v1/service/implementations` | Since v0.2.0: every card the engine implements, with its gates, gzip-compressed, for [the catalog](catalog.md#the-engines-implementation-list) |
@@ -226,7 +226,7 @@ Migration `0022_queues` (v0.5.0) adds each practice game's request (`games.setti
 
 Migration `0024_two_headed_giant` (v0.5.0) lets a game's format be `two_headed_giant`. Its downgrade turns those games into Legacy ones, which their decks are, keeping their wins and tokens. Since v0.5.0 a game's result also keeps `winner_seats`; a result from an older engine gets the winner alone.
 
-One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Recovery and replay journals (NET08–NET09) remain later work.
+One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Since v0.8.3 the API creates each engine game under an id of its own, with 30 seconds to answer; when no answer comes it closes that id, so a game the engine made anyway (or makes later) is not left running with nothing following it, and a retry starts a new one. A game's end that cannot be written for any reason but an unreachable database (which is waited for) is logged and the game recorded `interrupted` instead, so it never stays active holding its players' running game; following a game that fails beyond recovery ends it the same way. Recovery and replay journals (NET08–NET09) remain later work.
 
 A short database outage cannot leave a game active and its owner blocked (since v0.1.1):
 - **At startup.** If the database cannot be reached, the check for active games retries in the background, waiting 1 second and doubling up to 30. It spares the games this process started meanwhile.

@@ -2,6 +2,8 @@ package com.commanderduels;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,6 +18,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import mage.cards.Card;
@@ -288,6 +291,84 @@ class ServiceGameHttpTest {
         List<String> values = new ArrayList<>();
         array.forEach(value -> values.add(value.getAsString()));
         return values;
+    }
+
+    /**
+     * The API may name its game (v0.8.3): a retried create finds the game it started, and a close sent
+     * before the engine created the game cancels it.
+     */
+    @Test
+    void theApiNamesItsGameSoRetriesAndEarlyClosesStartNoSecondGame() throws Exception {
+        start(false);
+        String id = UUID.randomUUID().toString();
+        String body = "{\"skill\":1,\"game_id\":\"" + id + "\"}";
+        var created = service("POST", GAMES, null, body);
+        assertEquals(201, created.statusCode(), created.body());
+        assertEquals(id, json(created).get("game_id").getAsString());
+        assertTrue(games.service(id).isPresent());
+
+        var retried = service("POST", GAMES, null, body);
+        assertEquals(409, retried.statusCode(), retried.body());
+        assertEquals("game_exists", json(retried).get("code").getAsString());
+        assertEquals(1, games.active(), "the retry started no game");
+
+        // Closed before the engine had created it: the close answers as for any unknown game, and the
+        // create that arrives afterwards is refused.
+        String abandoned = UUID.randomUUID().toString();
+        var early = service("POST", GAMES + "/" + abandoned + "/close", null, "");
+        assertEquals(404, early.statusCode(), early.body());
+        assertEquals("not_found", json(early).get("code").getAsString());
+        assertTrue(games.cancelled(abandoned));
+        var late = service("POST", GAMES, null, "{\"skill\":1,\"game_id\":\"" + abandoned + "\"}");
+        assertEquals(409, late.statusCode(), late.body());
+        assertEquals("game_cancelled", json(late).get("code").getAsString());
+        assertTrue(games.service(abandoned).isEmpty());
+        assertEquals(1, games.active(), "the late create started no game");
+        // Only a close cancels: another route, or another method, for an unknown id does not.
+        String other = UUID.randomUUID().toString();
+        assertEquals(404, service("GET", GAMES + "/" + other + "/inspection", null, null).statusCode());
+        assertEquals(404, service("GET", GAMES + "/" + other + "/close", null, null).statusCode());
+        assertFalse(games.cancelled(other));
+
+        for (String invalid : new String[]{"\"" + id.toUpperCase(Locale.ROOT) + "\"", "\"not-a-uuid\"", "\"\"",
+            "\"{" + id + "}\"", "42", "null"}) {
+            var response = service("POST", GAMES, null, "{\"skill\":1,\"game_id\":" + invalid + "}");
+            assertEquals(400, response.statusCode(), invalid + " -> " + response.body());
+            assertEquals("invalid_request", json(response).get("code").getAsString());
+        }
+        assertEquals(id, HumanGameRequest.parse(body, () -> 1L, true).gameId());
+        assertNull(HumanGameRequest.parse("{\"skill\":1}", () -> 1L, true).gameId());
+        assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(body, () -> 1L),
+            "the development route takes no game_id");
+
+        // Without a game_id the engine names the game, as before.
+        assertEquals(200, service("POST", GAMES + "/" + id + "/close", null, "").statusCode());
+        assertFalse(games.cancelled(id), "closing a game does not cancel its id");
+        var named = service("POST", GAMES, null, "{\"skill\":1}");
+        assertEquals(201, named.statusCode(), named.body());
+        String namedId = json(named).get("game_id").getAsString();
+        assertNotEquals(id, namedId);
+        assertEquals(200, service("POST", GAMES + "/" + namedId + "/close", null, "").statusCode());
+    }
+
+    /** Cancelled ids are bounded: past {@link HumanGames#MAX_CANCELLED} the oldest is dropped. */
+    @Test
+    void cancelledIdsAreBounded() {
+        var registry = new HumanGames(SeatChecks.DECKS, 1);
+        List<String> ids = new ArrayList<>();
+        for (int i = 0; i <= HumanGames.MAX_CANCELLED; i++) {
+            String id = UUID.randomUUID().toString();
+            ids.add(id);
+            assertTrue(registry.serviceOrCancel(id).isEmpty());
+        }
+        assertFalse(registry.cancelled(ids.get(0)), "the oldest is dropped");
+        assertTrue(registry.cancelled(ids.get(1)));
+        assertTrue(registry.cancelled(ids.get(ids.size() - 1)));
+        // Closed again, an id counts from then: it is now the newest.
+        assertTrue(registry.serviceOrCancel(ids.get(1)).isEmpty());
+        registry.serviceOrCancel(UUID.randomUUID().toString());
+        assertTrue(registry.cancelled(ids.get(1)));
+        assertFalse(registry.cancelled(ids.get(2)));
     }
 
     @Test

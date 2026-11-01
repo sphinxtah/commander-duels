@@ -173,7 +173,11 @@ public final class EngineServer {
                 gameRoute(exchange, games, gamePath, true);
                 return;
             }
-            Optional<HumanGame> game = games.service(matcher.group(1));
+            // A close for an id no game has records it as cancelled (v0.8.3): the API gave up on a
+            // create whose game it never heard of, and a late create with that id is refused.
+            boolean close = matcher.group(2).equals("close") && exchange.getRequestMethod().equals("POST");
+            Optional<HumanGame> game = close ? games.serviceOrCancel(matcher.group(1))
+                : games.service(matcher.group(1));
             if (game.isEmpty()) {
                 respond(exchange, 404, Map.of("code", "not_found"));
             } else if (matcher.group(2).equals("close")) {
@@ -333,7 +337,9 @@ public final class EngineServer {
 
     /**
      * Starts a development or service game and returns each human seat's token, once. Service games
-     * may seat deck lists; every name in them must be in the card database.
+     * may seat deck lists; every name in them must be in the card database. Since v0.8.3 a service
+     * request may name the game's id ({@code game_id}): an id already in use answers 409
+     * {@code game_exists}, and an id the API closed before any game had it 409 {@code game_cancelled}.
      */
     private static void createGame(HttpExchange exchange, Engine engine, boolean service) throws IOException {
         if (!exchange.getRequestMethod().equals("POST")) {
@@ -365,7 +371,18 @@ public final class EngineServer {
             return;
         }
         HumanGames games = engine.humanGames();
-        Optional<HumanGames.Created> created = games.create(request, service);
+        HumanGames.Creation creation = games.start(request, service);
+        if (creation.refusal() == HumanGames.Refusal.GAME_EXISTS) {
+            respond(exchange, 409, Map.of("code", "game_exists",
+                "message", "A game with this game_id already exists"));
+            return;
+        }
+        if (creation.refusal() == HumanGames.Refusal.GAME_CANCELLED) {
+            respond(exchange, 409, Map.of("code", "game_cancelled",
+                "message", "This game_id was closed before its game was created"));
+            return;
+        }
+        Optional<HumanGames.Created> created = Optional.ofNullable(creation.created());
         if (created.isEmpty()) {
             exchange.getResponseHeaders().set("Retry-After", "30");
             respond(exchange, 429, Map.of("code", "games_busy",

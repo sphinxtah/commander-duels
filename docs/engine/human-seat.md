@@ -80,8 +80,8 @@ Since v0.2.0 (UI07), on XMage's own human player, so XMage's rules for when a pa
 | Your hand | Full cards |
 | Battlefield, stack, graveyards | Public, except face-down objects, which only their controller sees (none in the fixture decks), and since v0.5.1 the player controlling that player's turn |
 | Exile | Face-up cards; face-down exiled cards are hidden |
-| Revealed cards | Everyone, while XMage keeps them revealed (it clears them at each human priority prompt) |
-| Looked-at cards | Only the player who looked, and since v0.5.1 the player controlling their turn |
+| Revealed cards | Everyone, while XMage keeps them revealed (it clears them at each human priority prompt). Since v0.8.3 only while the card is in a hand, a library or outside the game: a revealed card that has since been exiled, turned or cast face down follows the face-down rules above, in every exile list, target, prompt and the revealed group itself, where it is shown hidden |
+| Looked-at cards | Only the player who looked, and since v0.5.1 the player controlling their turn; since v0.8.3 face-down objects as for revealed cards |
 | Players | Life, counters, library and hand counts, mana pool, lost/won; since v0.5.1 `controlled_by`, the seat controlling the player's turn, for everyone to see |
 | Combat | Attackers, the defender and blockers |
 | Log | XMage's public log, with HTML and XMage's short object IDs removed, up to the entries that existed when the seat's current view was built (since v0.1.1), so it does not arrive with an older view. In the browser a line can still name a bot's card one view before the board shows it (CI run #30), which the browser check allows as the engine's does. The finished game's snapshot carries the whole log. Engine error lines stay in the engine's own log, because their details are not seat-safe. XMage's own recovery lines ("Auto-restored to … due game error: …" and "Game stopped due critical error …") are replaced by "The rules engine hit an internal error and rolled the game back" and "The rules engine stopped the game after an internal error"; the details stay in the engine's ERROR entries and in XMage's console log |
@@ -167,6 +167,18 @@ The snapshot's `status` is one of `starting`, `your_prompt`, `unsupported_prompt
 - for a completed game, also `winner_seat` and `draw`;
 - for an `error`, `error` says what happened in plain words: "The engine stopped the game after an internal error" when the engine's game thread failed (since v0.1.1; the stack trace goes to the engine's log), or "XMage ended the game after an internal error".
 
+### Service game ids (v0.8.3)
+
+The API's create, `POST /v1/service/games` ([games through the API](../games.md)), may carry `game_id`, a UUID in lower-case 8-4-4-4-12 form that the API chooses, so a create it retries after a time-out, or gives up on, cannot leave a second game or an orphaned one holding a slot until its idle timeout:
+- The game takes that id. Without `game_id` the engine chooses a random one, as before, and the 201 body, seat tokens, 429 `games_busy` and 400 `unknown_cards` are unchanged.
+- An id in use, by a running game or a finished one still readable, answers 409 `game_exists`; no game starts.
+- `POST /v1/service/games/{id}/close` for an id no game has still answers 404 `not_found`, and records the id as cancelled. A create naming a cancelled id answers 409 `game_cancelled`; no game starts. Only a `POST` to `close` cancels.
+- Registering a game and cancelling an id take the same lock, so a close that reaches the engine before a slow create always wins, and one that arrives after it closes the game. Cancelled ids are kept 15 minutes, at most 1,024 of them, the oldest dropped first.
+- Anything else in `game_id` (upper-case, braces, a number, null) is a 400 `invalid_request`. The development route `POST /v1/games` refuses the field as unknown.
+- An id is only refused while its game is listed: a finished game is dropped after 10 minutes, after which its id could start a new game.
+
+`ServiceGameHttpTest` covers each case: the requested id, a retry, a close before the create, malformed ids, the development route, and the bound on cancelled ids.
+
 ## Lifecycle and threads
 
 - **Seats.** Seats are in turn order, as the request lists them (in v0.0.3 the human always sat in seat 0). A seeded coin decides who chooses the starting player. The human seat uses XMage's default user settings: it stops in both main phases, at declare attackers and blockers, and whenever something new is on the stack, and it confirms before passing with mana in the pool. Configurable stops (UI07) are later work.
@@ -185,7 +197,8 @@ Leak checks run on the game thread for every published view, against XMage's own
 3. **Names.** A card name that only the opponent's deck contains appears in a payload only once a card of that name has been public. The fixture decks share no card names, so this catches a concealed card by name.
 4. **Log lines.** Every log line naming an opponent-only card must name a card that is public by the next event. XMage logs a discard just before moving the card. Since v0.1.1, every log line served to a seat may also name only cards that seat's views have already shown, checked at every new log line and every published view.
 5. **Counts.** Hand and library counts, and the human's hand contents, match XMage.
-6. **No hidden errors** (since v0.1.1). Any error XMage recovered from (a rollback) fails the checks, and so does a failure to build the final views. XMage plays on after most exceptions, so a game would otherwise still finish.
+6. **Face-down objects** (since v0.8.3). A face-down permanent or spell is named only to its controller (or the player controlling their turn), and a face-down exiled card only to its owner, read from XMage apart from the engine's rules: by its real name in an exile list, a revealed or looked-at group, the battlefield, the stack, a target or a prompt option. Check 3 cannot see this, as a name once revealed stays public for the log. A revealed card counts as public only while it is not face down. `RevealedFaceDownTest` reveals a card, or lets a seat look at it, then exiles it or puts it onto the battlefield face down, and checks that no other seat or spectator is told its name, and that a card revealed from a hand or a library's top stays visible there.
+7. **No hidden errors** (since v0.1.1). Any error XMage recovered from (a rollback) fails the checks, and so does a failure to build the final views. XMage plays on after most exceptions, so a game would otherwise still finish.
 
 Results:
 - **JUnit `HumanGameTest`:** 6 complete games, 3 with each deck, at AI skill 1. About 1,400 views checked per run, with no failures. Every fixture prompt family seen: `priority`, `mulligan`, `yes_no`, `choose_target`, `pay_mana`, `declare_attackers`, `declare_blockers` and `assign_amounts`, the last both suggested and custom. No unsupported request. The first answer of each game also probes a forged prompt, a stale revision, an unknown option, a repeated action ID and a reused action ID.

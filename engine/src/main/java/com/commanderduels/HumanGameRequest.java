@@ -22,9 +22,14 @@ import java.util.function.LongSupplier;
  * <p>Since v0.5.0 a request may name {@code starting_seat}, the seat that takes the first turn: the
  * API's best-of-three matches let the loser of a game choose to play or draw the next one (FMT06).
  * Without it a seat drawn at random chooses, in the game, who starts, as before.
+ *
+ * <p>Since v0.8.3 a service request may carry {@code game_id}, a lower-case UUID the API chooses, so
+ * that a create it retries, or cancels before the engine answered, names the same game (see
+ * {@link HumanGames}). The development route refuses the field as unknown.
  */
 public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
-                               int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat) {
+                               int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat,
+                               String gameId) {
     public static final int DEFAULT_SKILL = 4;
     public static final int MAX_SKILL = 6;
     public static final int DEFAULT_TURN_CAP = 60;
@@ -37,6 +42,9 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
     public static final String BOT = "bot";
     private static final Set<String> FIELDS = Set.of("seed", "format", "seats", "skill", "turn_cap",
         "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat");
+    /** The service route's fields: the development route's and the API's own game id (v0.8.3). */
+    private static final Set<String> SERVICE_FIELDS = Set.of("seed", "format", "seats", "skill", "turn_cap",
+        "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat", "game_id");
     private static final Set<String> SEAT_FIELDS = Set.of("player", "deck");
     private static final Set<String> SERVICE_SEAT_FIELDS = Set.of("player", "deck", "deck_list");
     /** What a seat's settings call a deck from a deck list. */
@@ -60,10 +68,16 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
         seats = List.copyOf(seats);
     }
 
+    /** A request whose game the engine names. */
+    public HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
+                            int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat) {
+        this(seed, format, seats, skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds, startingSeat, null);
+    }
+
     /** A request where the game chooses who starts. */
     public HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
                             int idleTimeoutSeconds, int spectatorDelaySeconds) {
-        this(seed, format, seats, skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds, null);
+        this(seed, format, seats, skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds, (Integer) null);
     }
 
     /** A request with no spectator delay. */
@@ -98,10 +112,14 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
         return parse(body, seedSource, false);
     }
 
-    /** @param deckLists whether seats may carry a {@code deck_list} (the service route) */
+    /**
+     * @param deckLists whether seats may carry a {@code deck_list} and the request a {@code game_id}
+     *                  (the service route)
+     */
     public static HumanGameRequest parse(String body, LongSupplier seedSource, boolean deckLists)
             throws JsonRequest.Invalid {
-        JsonObject json = JsonRequest.object(body, FIELDS);
+        JsonObject json = JsonRequest.object(body, deckLists ? SERVICE_FIELDS : FIELDS);
+        String gameId = json.has("game_id") ? JsonRequest.uuid(json, "game_id") : null;
         long seed = json.has("seed") ? JsonRequest.integer(json, "seed").longValueExact() : seedSource.getAsLong();
         GameFormat format = GameFormat.LEGACY;
         if (json.has("format")) {
@@ -181,7 +199,8 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
             JsonRequest.clamped(json, "idle_timeout_seconds", DEFAULT_IDLE_TIMEOUT_SECONDS, MIN_IDLE_TIMEOUT_SECONDS,
                 MAX_IDLE_TIMEOUT_SECONDS),
             JsonRequest.clamped(json, "spectator_delay_seconds", 0, 0, MAX_SPECTATOR_DELAY_SECONDS),
-            startingSeat);
+            startingSeat,
+            gameId);
     }
 
     private static String deck(JsonObject seat, GameFormat format) throws JsonRequest.Invalid {
