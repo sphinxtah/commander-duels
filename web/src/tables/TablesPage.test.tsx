@@ -11,6 +11,7 @@ const ada = {
   kind: "player",
   status: "active",
   onboarding: "complete",
+  tutorial: { path: null, stage: "done", skipped: false },
   handle: "ada",
   display_name: "Ada",
   email: null,

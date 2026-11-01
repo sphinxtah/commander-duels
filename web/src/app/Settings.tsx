@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
-import type { Bootstrap } from "../api";
+import type { Bootstrap, Me } from "../api";
+import { TutorialSettings } from "../tutorial/TutorialSettings";
 import type { Preferences } from "../preferences";
 import app from "../App.module.css";
 import { MenuMusicSettings } from "../shell/music/MenuMusicSettings";
@@ -22,12 +23,15 @@ export function Settings({
   saveMessage,
   bootstrap,
   heading,
+  account,
 }: {
   preferences: Preferences;
   onPreference(key: keyof Preferences, value: boolean): void;
   saveMessage: string;
   bootstrap: Bootstrap | undefined;
   heading: RefObject<HTMLHeadingElement | null>;
+  /** The signed-in account, for the tutorial's section (v0.8.4). */
+  account?: { me: Me; onChange: (me: Me) => void };
 }) {
   return (
     <>
@@ -71,6 +75,13 @@ export function Settings({
       </section>
       <TableSettingsForm />
       <MenuMusicSettings />
+      {account && (
+        <TutorialSettings
+          me={account.me}
+          onChange={account.onChange}
+          className={styles.panel}
+        />
+      )}
       <section className={styles.panel} aria-labelledby="install-title">
         <h2 id="install-title">Install the app</h2>
         <InstallSettings />

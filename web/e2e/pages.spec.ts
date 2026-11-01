@@ -156,6 +156,7 @@ test("the wait for approval and the app's footer carry the same links", async ({
   const change = await standIn(page, {
     status: "pending",
     onboarding: "handle",
+    tutorial: { path: null, stage: "done", skipped: false },
     handle: null,
     permissions: [],
     roles: [],
@@ -177,6 +178,7 @@ test("the wait for approval and the app's footer carry the same links", async ({
   change({
     status: "active",
     onboarding: "complete",
+    tutorial: { path: null, stage: "done", skipped: false },
     handle: "stand-in",
     roles: ["player"],
     permissions: ["profile.edit"],

@@ -296,6 +296,7 @@ export function ShopPage({
                         className={shell.primary}
                         disabled={busy}
                         aria-label={`Open a pack of ${item.product.name}`}
+                        data-tour="open-pack"
                         onClick={() => void open(item.next_pack)}
                       >
                         Open a pack
@@ -440,6 +441,7 @@ export function ShopPage({
                                 : undefined
                             }
                             aria-label={`Buy ${product.name}`}
+                            data-tour={short > 0 ? undefined : "buy"}
                             onClick={() => short <= 0 && choose(product)}
                           >
                             Buy

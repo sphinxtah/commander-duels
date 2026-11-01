@@ -53,6 +53,7 @@ def set_sysop_password(database_url: str, password: str) -> bool:
                     display_name="SysOp",
                     status="active",
                     onboarding="complete",
+                    tutorial="done",
                     created_at=now,
                 )
                 db.add(sysop)

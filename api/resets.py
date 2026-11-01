@@ -127,6 +127,7 @@ def reset_account(db: Session, user: User, actor: User, roster: dict[str, Planes
     )
     user.handle = user.normalized_handle = None
     user.onboarding = "handle"
+    user.tutorial, user.tutorial_path, user.tutorial_skipped = "choose", None, False
     user.starter_decks = None
     user.alliance = user.alliance_since = None
     user.reset_at = now

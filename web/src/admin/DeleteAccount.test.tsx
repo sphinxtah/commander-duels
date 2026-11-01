@@ -181,6 +181,7 @@ describe("deleting from the accounts list", () => {
     kind: "player",
     status: "active",
     onboarding: "complete",
+    tutorial: { path: null, stage: "done", skipped: false },
     handle: "me",
     display_name: "Me",
     email: "me@example.com",

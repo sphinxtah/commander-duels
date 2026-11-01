@@ -162,6 +162,33 @@ class SessionInfo(Contract):
     absolute_expires_at: datetime
 
 
+TutorialStage = Literal["choose", "demo", "overview", "setup", "tour_shop", "tour_auctions", "done"]
+TutorialPath = Literal["beginner", "novice", "advanced"]
+
+
+class Tutorial(Contract):
+    """The first-time tutorial (v0.8.4): how the player chose to learn, and how far they are."""
+
+    path: TutorialPath | None = Field(
+        description="beginner (a watched game, then the setup with tips and the main menu's "
+        "tour), novice (an overview, then the same), advanced (the setup alone); null until "
+        "chosen."
+    )
+    stage: TutorialStage = Field(
+        description="choose, then demo (beginner) or overview (novice), setup, tour_shop and "
+        "tour_auctions (the main menu's tour), done."
+    )
+    skipped: bool = Field(description="Whether the player skipped the rest of it.")
+
+
+class TutorialUpdate(Contract):
+    stage: TutorialStage
+    path: TutorialPath | None = Field(
+        default=None, description="Chosen with the first stage after choose; kept otherwise."
+    )
+    skipped: bool = Field(default=False, description="True when the player skips to done.")
+
+
 class Me(Contract):
     """The signed-in account, for its owner only. Email is private; the Google subject is never
     returned."""
@@ -179,6 +206,7 @@ class Me(Contract):
     alliance: str | None = Field(
         default=None, description="The allied Planeswalker's ID; its portrait is the account's."
     )
+    tutorial: Tutorial
     email: str | None
     roles: list[Role]
     permissions: list[Permission]

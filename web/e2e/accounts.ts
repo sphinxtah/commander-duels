@@ -18,6 +18,7 @@ export async function standIn(page: Page, changes: Partial<Me> = {}) {
     kind: "player",
     status: "active",
     onboarding: "complete",
+    tutorial: { path: null, stage: "done", skipped: false },
     alliance: null,
     handle: "stand-in",
     display_name: "Stand-in",

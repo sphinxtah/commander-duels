@@ -166,6 +166,7 @@ export async function openTable(
         kind: "sysop",
         status: "active",
         onboarding: "complete",
+        tutorial: { path: null, stage: "done", skipped: false },
         display_name: "Alice",
         handle: fixture.selfHandle ?? "alice",
         // The account's alliance: its portrait at its own seat until the summary says.

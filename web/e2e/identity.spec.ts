@@ -402,6 +402,7 @@ test("an account waiting for approval sees only its wait, and approval opens the
   const change = await standIn(page, {
     status: "pending",
     onboarding: "handle",
+    tutorial: { path: null, stage: "done", skipped: false },
     handle: null,
     permissions: [],
     roles: [],

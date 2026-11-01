@@ -25,6 +25,7 @@ import {
   type PulledCard,
 } from "./shop";
 import styles from "./shop.module.css";
+import { signalTutorial } from "../tutorial/tutorial";
 
 // Opening a pack card by card (v0.4.0): the pack tears open, its cards are dealt face
 // down and turn over one at a time (a click, or Space), rares and mythic rares glow in their
@@ -178,6 +179,10 @@ export function PackOpening({
     if (stage === "revealing") board.current?.focus();
     if (stage === "summary") heading.current?.focus();
   }, [stage]);
+  // A pack opened here, not one from the history, tells the tutorial's tour (v0.8.4).
+  useEffect(() => {
+    if (stage === "summary" && !startOpen) signalTutorial("pack_opened", cards);
+  }, [stage, startOpen, cards]);
   // Once every card is up, the summary follows after a moment to look at them.
   useEffect(() => {
     if (stage !== "revealing" || shown.size < cards.length) return;
@@ -350,6 +355,7 @@ export function PackOpening({
       className={styles.opening}
       aria-labelledby="opening-title"
       data-stage={stage}
+      data-tour="pack-opening"
     >
       <LengBackdrop />
       <span className={shell.eyebrow}>OPENING A PACK</span>
@@ -362,6 +368,7 @@ export function PackOpening({
             data-torn={stage === "tearing" || undefined}
             onClick={stage === "sealed" ? tear : undefined}
             aria-label={`Tear open the ${title}`}
+            data-tour="pack-tear"
           >
             {/* The same picture twice: the strip that tears off, and the rest of the pack. */}
             <span className={styles.packTop} aria-hidden="true">
@@ -441,6 +448,7 @@ export function PackOpening({
                 type="button"
                 className={shell.primary}
                 onClick={revealAll}
+                data-tour="pack-reveal"
               >
                 Reveal all
               </button>

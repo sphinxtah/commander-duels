@@ -14,6 +14,8 @@ import {
 import { CardArt, FinishChip, Price } from "./ItemViews";
 import type { AuctionItem, Duration, SellableItem } from "./types";
 import styles from "./auctions.module.css";
+import { suggestedPrices } from "../tutorial/tutorial";
+import { TourTip } from "../tutorial/Coach";
 
 // The Sell dialog (v0.6.0), Madden's "List on transfer market": a card in one edition and finish
 // from what the viewer may list, how many copies (each its own auction), the starting bid, an
@@ -26,6 +28,8 @@ export type SellRequest =
       mode: "sell";
       /** From My library: the edition chosen, its finishes offered. */
       preset?: { printingId: string; name: string };
+      /** The tutorial's tour (v0.8.4): each step explained, and the prices suggested. */
+      tutorial?: boolean;
     }
   | { mode: "relist"; item: AuctionItem };
 
@@ -61,6 +65,21 @@ export function SellDialog({
   const key = useRef("");
   const relist = request?.mode === "relist" ? request.item : null;
   const preset = request?.mode === "sell" ? request.preset : undefined;
+  const tutorial = request?.mode === "sell" && Boolean(request.tutorial);
+  // The tour suggests prices once for each card chosen; the player may change them.
+  const suggested = useMemo(
+    () =>
+      tutorial && chosen
+        ? suggestedPrices(chosen.card.rarity, chosen.finish)
+        : null,
+    [tutorial, chosen],
+  );
+  useEffect(() => {
+    if (!suggested) return;
+    setStartingBid(String(suggested.startingBid));
+    setUseBuyNow(true);
+    setBuyNow(String(suggested.buyNow));
+  }, [suggested]);
 
   useEffect(() => {
     if (request && !dialog.current?.open) dialog.current?.showModal?.();
@@ -209,6 +228,16 @@ export function SellDialog({
             </button>
           </header>
 
+          {tutorial && (
+            <TourTip step={1}>
+              {chosen
+                ? `This is the ${chosen.card.name} from your pack, chosen for you.`
+                : preset
+                  ? `Choose the ${preset.name} from your pack below.`
+                  : "Find a card from your pack by its name, then choose it below."}{" "}
+              Each edition and finish is listed apart; foils fetch more.
+            </TourTip>
+          )}
           {!relist && (
             <fieldset className={styles.picker}>
               <legend>The card</legend>
@@ -290,6 +319,16 @@ export function SellDialog({
             </div>
           )}
 
+          {tutorial && suggested && (
+            <TourTip step={2}>
+              For a {chosen?.card.rarity} card we suggest a starting bid of{" "}
+              {suggested.startingBid.toLocaleString("en-US")} tokens and a Buy
+              Now of {suggested.buyNow.toLocaleString("en-US")}. Bids start at
+              the starting bid and may climb; Buy Now sells at once for its
+              price. Change either if you like, then choose how long the
+              auction runs.
+            </TourTip>
+          )}
           <fieldset className={styles.pricing} disabled={!card}>
             <legend>The auction</legend>
             {!unlimited && (
@@ -394,6 +433,13 @@ export function SellDialog({
             <p className={styles.error} role="alert">
               {error}
             </p>
+          )}
+          {tutorial && ready && (
+            <TourTip step={3}>
+              Nothing is listed until you press List it. The card leaves your
+              library while it is on the market, and comes back if it doesn't
+              sell.
+            </TourTip>
           )}
           <div className={styles.bidActions}>
             <button

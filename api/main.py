@@ -36,6 +36,7 @@ from api import (
     social,
     stats,
     tables,
+    tutorial,
 )
 from api.config import Settings
 from api.database import build_engine, migration_head
@@ -347,6 +348,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(cards.router)
     app.include_router(decks.router)
     app.include_router(progression.router)
+    app.include_router(tutorial.router)
     app.include_router(custom_cards.router)
     app.include_router(economy.router)
     app.include_router(shop.router)

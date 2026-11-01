@@ -666,13 +666,18 @@ export class GameConnection {
 
 /** The game's live state, and the connection to act on it. */
 export function useGame(
-  gameId: string,
+  /** Null for a scripted game (the tutorial's, v0.8.4), which opens no connection. */
+  gameId: string | null,
   inspect: boolean,
 ): [GameState, GameConnection | null] {
   const [state, setState] = useState<GameState>(initial);
   const [connection, setConnection] = useState<GameConnection | null>(null);
   useEffect(() => {
     setState(initial);
+    if (gameId === null) {
+      setConnection(null);
+      return;
+    }
     const current = new GameConnection(gameId, inspect, setState);
     setConnection(current);
     current.start();

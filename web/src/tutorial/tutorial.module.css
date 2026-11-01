@@ -1,0 +1,318 @@
+/* The first-time tutorial (v0.8.4): the guided game's narration, the tour's coach and its ring,
+   the tips written into forms, and the Novice's overview. In the menus' own gold and green. */
+
+/* ---------- the guided game's narration, over the table ---------- */
+
+.narration {
+  position: fixed;
+  z-index: 3200;
+  right: clamp(12px, 2vw, 28px);
+  top: clamp(64px, 12vh, 140px);
+  width: min(380px, calc(100vw - 24px));
+  max-height: calc(100dvh - 160px);
+  overflow: auto;
+  padding: 18px 20px 16px;
+  color: var(--cd-text);
+  background: var(--cd-panel-bg);
+  border: 1px solid #d5b77c66;
+  border-radius: 10px;
+  box-shadow: var(--cd-frame), 0 0 40px #000a;
+}
+.narration h2 {
+  margin: 4px 0 10px;
+  font: 600 1.3rem/1.2 var(--cd-display);
+  color: var(--cd-gold-hi);
+  letter-spacing: 0.4px;
+}
+.narrationCount {
+  margin: 0;
+  color: var(--cd-gold);
+  font: 600 0.62rem/1.4 var(--cd-display);
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+}
+.narrationText {
+  margin: 0 0 16px;
+  color: #d4dacf;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+.narrationActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--cd-muted);
+  font-size: 0.78rem;
+}
+.quiet {
+  background: transparent;
+  border: 1px solid #ffffff2a;
+  color: #c9d0c6;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.quiet:hover {
+  border-color: var(--cd-gold);
+}
+
+@media (max-width: 760px) {
+  .narration {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    max-height: 46dvh;
+  }
+}
+
+/* ---------- a tip written into a form, its arrow pointing down at what follows ---------- */
+
+.tip {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 4px 0 18px;
+  padding: 12px 16px;
+  color: #e9e3d0;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  background: linear-gradient(165deg, #2a2a1c, #1b2219);
+  border: 1px solid #d5b77c8c;
+  border-radius: 8px;
+  box-shadow: 0 0 22px #e9b9602b;
+}
+.tip::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  bottom: -9px;
+  width: 16px;
+  height: 16px;
+  background: #1b2219;
+  border-right: 1px solid #d5b77c8c;
+  border-bottom: 1px solid #d5b77c8c;
+  transform: rotate(45deg);
+}
+.tipStep {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--cd-gold-fill);
+  box-shadow: var(--cd-gold-shadow);
+  color: #192220;
+  font: 700 0.72rem/1 var(--cd-display);
+}
+
+/* ---------- the tour's coach: a bubble with an arrow, and a ring around its target ---------- */
+
+.ring {
+  position: fixed;
+  z-index: 4400;
+  pointer-events: none;
+  border: 2px solid var(--cd-gold-hi);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 4px #e9b96040,
+    0 0 30px #e9b960aa;
+  animation: ring 1.6s ease-in-out infinite;
+}
+@keyframes ring {
+  50% {
+    box-shadow:
+      0 0 0 8px #e9b96020,
+      0 0 40px #e9b960cc;
+  }
+}
+.coach {
+  position: fixed;
+  z-index: 4500;
+  padding: 14px 16px 14px;
+  color: var(--cd-text);
+  background: linear-gradient(165deg, #2b2a1d, #172019);
+  border: 1px solid var(--cd-gold);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px #0008,
+    0 16px 40px #000c,
+    0 0 26px #e9b96040;
+  animation: coach-in 0.25s ease-out;
+}
+@keyframes coach-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+.coachArrow {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  background: #2b2a1d;
+  border: 1px solid var(--cd-gold);
+  transform: rotate(45deg);
+}
+.coachArrow[data-side="up"] {
+  top: -10px;
+  border-right: none;
+  border-bottom: none;
+}
+.coachArrow[data-side="down"] {
+  bottom: -10px;
+  background: #172019;
+  border-left: none;
+  border-top: none;
+}
+.coachTitle {
+  position: relative;
+  margin: 0 0 6px;
+  font: 600 1.02rem/1.25 var(--cd-display);
+  color: var(--cd-gold-hi);
+  letter-spacing: 0.4px;
+}
+.coachText {
+  position: relative;
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: #e3e2d4;
+}
+.coachActions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+}
+.coachPrimary {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 4px;
+  background: var(--cd-gold-fill);
+  box-shadow: var(--cd-gold-shadow);
+  color: #192220;
+  font: 700 0.72rem/1.2 var(--cd-display);
+  letter-spacing: 0.6px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.coachQuiet {
+  background: transparent;
+  border: none;
+  padding: 6px 2px;
+  color: var(--cd-muted);
+  font-size: 0.74rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.coachQuiet:hover {
+  color: var(--cd-text);
+}
+.coachError {
+  flex-basis: 100%;
+  color: #f0a08a;
+  font-size: 0.78rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring,
+  .coach {
+    animation: none;
+  }
+}
+:root[data-reduced-motion="true"] .ring,
+:root[data-reduced-motion="true"] .coach {
+  animation: none;
+}
+
+/* ---------- the Novice's overview ---------- */
+
+.overview h2 {
+  font:
+    clamp(1.8rem, 3.4vw, 2.6rem) / 1.12 Georgia,
+    "Times New Roman",
+    serif;
+  letter-spacing: -0.5px;
+  font-weight: 400;
+  margin: 10px 0 16px;
+}
+.overview h2:focus {
+  outline: none;
+}
+.points {
+  max-width: 760px;
+  margin: 0 0 20px;
+  padding-left: 1.2em;
+  color: #c3cbbf;
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+.points li + li {
+  margin-top: 8px;
+}
+.dots {
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+.dots li {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid #d5b77c88;
+}
+.dots li[data-part="rules"] {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(0.85);
+}
+.dots li[data-on] {
+  background: var(--cd-gold);
+  box-shadow: 0 0 10px #e9b96088;
+}
+.overviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid #ffffff12;
+}
+
+/* ---------- Settings › Tutorial ---------- */
+
+.replays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.replayDialog {
+  width: min(900px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px clamp(16px, 4vw, 36px) 28px;
+  overflow: auto;
+  color: var(--cd-text);
+  background: #16211e;
+  border: 1px solid #ad986555;
+  border-radius: 10px;
+  box-shadow: 0 30px 90px #0009;
+}
+.replayDialog::backdrop {
+  background: #050d0bed;
+}

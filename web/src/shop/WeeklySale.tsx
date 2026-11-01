@@ -70,6 +70,7 @@ export function WeeklySale({
                     short > 0 ? `You need ${tokens(short)} more.` : undefined
                   }
                   aria-label={`Buy ${product.name} for ${tokens(price)}`}
+                  data-tour={short > 0 ? undefined : "buy"}
                   onClick={() => short <= 0 && onBuy(product)}
                 >
                   Buy

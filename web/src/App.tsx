@@ -45,6 +45,9 @@ import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
 import { AuctionsPage } from "./auctions/AuctionsPage";
 import { GameScreen } from "./game/GameScreen";
+import { DemoGame } from "./tutorial/DemoGame";
+import { Tour } from "./tutorial/Tour";
+import { moveTutorial, tutorialPending } from "./tutorial/tutorial";
 import { QueueFollower } from "./queues/FindGame";
 import { TablesPage } from "./tables/TablesPage";
 import { MatchPage } from "./matches/MatchPage";
@@ -69,6 +72,11 @@ const DECK_ROUTE = /^#deck\/([0-9a-f-]{36})$/i;
 const SHARED_ROUTE = /^#shared\/([A-Za-z0-9_-]{8,32})$/;
 const TABLE_ROUTE = /^#tables\/([A-Za-z0-9_-]{8,32})$/;
 const MATCH_ROUTE = /^#match\/([0-9a-f-]{36})$/i;
+/** The tutorial's guided game (v0.8.4), full screen as a game is. */
+const DEMO_ROUTE = /^#tutorial\/demo$/i;
+function currentDemo(): boolean {
+  return DEMO_ROUTE.test(window.location.hash);
+}
 /** #game/<id> opens a game's table, full screen. */
 function currentGame(): string | undefined {
   return GAME_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -139,6 +147,7 @@ function currentPage(): Page {
 export function App() {
   const [page, setPage] = useState<Page>(currentPage);
   const [game, setGame] = useState(currentGame);
+  const [demo, setDemo] = useState(currentDemo);
   const [deckRoute, setDeckRoute] = useState(currentDeck);
   const [tableRoute, setTableRoute] = useState(currentTable);
   const [matchRoute, setMatchRoute] = useState(currentMatch);
@@ -176,7 +185,9 @@ export function App() {
       setSetup(null);
       return;
     }
-    if (!onboarding(me)) {
+    // Since v0.8.4 also an account still choosing how to learn the game, or in the middle of the
+    // tutorial before the main menu's tour.
+    if (!onboarding(me) && !tutorialPending(me)) {
       setupOpened.current = null;
       return;
     }
@@ -208,7 +219,7 @@ export function App() {
           : "sign-in";
   const shownBefore = useRef<string | undefined>(undefined);
   // A #game/<id> opens the table for an active account only; before then it is the landing page.
-  const atTable = Boolean(game) && admitted;
+  const atTable = (Boolean(game) || demo) && admitted;
   // What waits for SysOp and administrators (v0.4.1): on Admin in the navigation, on
   // Administration's tabs and in the tab's title, asked again every minute.
   const { counts, refresh: refreshCounts } = useAdminCounts(me);
@@ -270,7 +281,10 @@ export function App() {
         setMessagesRoute(messages);
         return;
       }
-      if (GAME_ROUTE.test(before) && !currentGame()) {
+      if (
+        (GAME_ROUTE.test(before) && !currentGame()) ||
+        (DEMO_ROUTE.test(before) && !currentDemo())
+      ) {
         // Leaving the table: its full screen ends, and the update the game screen said was
         // ready applies now. One that took over during the game loads at once instead of
         // drawing the next page with the old code.
@@ -280,6 +294,7 @@ export function App() {
       navigated.current = true;
       setPage(currentPage());
       setGame(currentGame());
+      setDemo(currentDemo());
       setDeckRoute(currentDeck());
       setTableRoute(currentTable());
       setMatchRoute(currentMatch());
@@ -551,6 +566,33 @@ export function App() {
     );
   }
 
+  // The tutorial's guided game (v0.8.4): a scripted game on the real table. At its end, or skipped,
+  // a player in the middle of the tutorial goes on to the setup; anyone else back to Settings.
+  if (demo) {
+    const learning = me.tutorial?.stage === "demo";
+    const leave = () => {
+      if (!learning) {
+        window.location.hash = "#settings";
+        return;
+      }
+      void moveTutorial({ stage: "setup" }).then((moved) => {
+        if ("me" in moved) accountChanged(moved.me);
+        window.location.hash = "#home";
+        setSetup("current");
+      });
+    };
+    return (
+      <ChatContext.Provider value={chat}>
+        <DemoGame
+          finishLabel={learning ? "Set up my game" : "Back to Settings"}
+          onFinish={leave}
+          onSkip={leave}
+        />
+        <ChatBar key={`chat-${me.id}-demo`} chat={chat} />
+      </ChatContext.Provider>
+    );
+  }
+
   // The account is known by now, with the CSRF token that the game's WebSocket needs. The chat bar
   // (v0.5.1) is there too, folded away into the band's diamond until the player brings it out.
   if (game)
@@ -699,6 +741,7 @@ export function App() {
                 saveMessage={saveMessage}
                 bootstrap={bootstrap}
                 heading={heading}
+                account={{ me, onChange: accountChanged }}
               />
             ) : (
               <HomeHub me={me} hud={hud} heading={heading} />
@@ -723,6 +766,8 @@ export function App() {
           open={setup}
           onClose={() => setSetup(null)}
         />
+        {/* The main menu's tour (v0.8.4), over every page while it lasts. */}
+        <Tour me={me} page={shown} onChange={accountChanged} />
         {/* Friends and their conversations, on every page (v0.5.1). */}
         <ChatBar key={`chat-${me.id}`} chat={chat} />
         {/* The menu music (v0.7.3), on every page but a game's: the game screen replaces this

@@ -253,6 +253,7 @@ export function HomeHub({
           className={styles.shopTile}
           icon="shop"
           title="Leng's Card Shop"
+          tour="shop"
           lead="Packs from every era, priced in tokens."
           meta="Five packs 20% off this week"
           index={2}
@@ -263,6 +264,7 @@ export function HomeHub({
           className={styles.auctionsTile}
           icon="auctions"
           title="Tivit's Auction House"
+          tour="auctions"
           lead="Bid on other players' cards, or sell your own."
           meta="No fee: a sale pays you in full"
           index={2.5}
@@ -314,6 +316,7 @@ function Tile({
   action,
   className,
   index,
+  tour,
 }: {
   href: string;
   icon: IconName;
@@ -323,10 +326,13 @@ function Tile({
   action?: string;
   className?: string;
   index: number;
+  /** What the tutorial's tour points at (v0.8.4). */
+  tour?: string;
 }) {
   return (
     <a
       href={href}
+      data-tour={tour}
       className={[styles.tile, className].filter(Boolean).join(" ")}
       style={{ "--i": index } as CSSProperties}
       onPointerEnter={() => hoverSound()}

@@ -60,6 +60,15 @@ class User(Base):
         CheckConstraint(
             "onboarding IN ('handle', 'starters', 'complete')", name="ck_users_onboarding"
         ),
+        CheckConstraint(
+            "tutorial IN ('choose', 'demo', 'overview', 'setup', 'tour_shop', 'tour_auctions', "
+            "'done')",
+            name="ck_users_tutorial",
+        ),
+        CheckConstraint(
+            "tutorial_path IS NULL OR tutorial_path IN ('beginner', 'novice', 'advanced')",
+            name="ck_users_tutorial_path",
+        ),
         CheckConstraint("privilege_version >= 0", name="ck_users_privilege_version"),
         CheckConstraint(
             "presence_visibility IN ('friends', 'everyone')", name="ck_users_presence_visibility"
@@ -80,6 +89,11 @@ class User(Base):
     kind: Mapped[str] = mapped_column(String(16), default="player")
     status: Mapped[str] = mapped_column(String(16), default="active")
     onboarding: Mapped[str] = mapped_column(String(16), default="handle")
+    # The first-time tutorial (v0.8.4, api/tutorial.py): the path chosen, the stage reached, and
+    # whether the player skipped the rest of it.
+    tutorial: Mapped[str] = mapped_column(String(16), default="choose")
+    tutorial_path: Mapped[str | None] = mapped_column(String(16))
+    tutorial_skipped: Mapped[bool] = mapped_column(default=False)
     avatar: Mapped[str] = mapped_column(String(32), default="sigil")
     locale: Mapped[str] = mapped_column(String(16), default="en")
     preferences: Mapped[dict[str, object]] = mapped_column(JsonType, default=dict)

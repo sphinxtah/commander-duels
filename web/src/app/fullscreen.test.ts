@@ -78,6 +78,7 @@ const alice: Me = {
   kind: "player",
   status: "active",
   onboarding: "complete",
+  tutorial: { path: null, stage: "done", skipped: false },
   handle: "alice",
   display_name: "Alice",
   email: "alice@example.com",

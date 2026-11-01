@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react";
 import { client, type Me } from "../api";
 import {
@@ -37,7 +38,7 @@ import { RematchPanel, useRematch } from "../queues/Rematch";
 import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
-import { useGame } from "./connection";
+import { useGame, type GameState } from "./connection";
 import { InspectionPanel } from "./Inspection";
 import {
   objectIndex,
@@ -139,12 +140,27 @@ const ended: Record<string, string> = {
 /** How long the band's "Full screen: F" chip stays when the table could not start in full screen. */
 const FULLSCREEN_HINT_MS = 6000;
 
-export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
-  const sysop = me?.permissions.includes("games.view_concealed") ?? false;
+export function GameScreen({
+  gameId,
+  me,
+  scripted = null,
+  overlay,
+}: {
+  gameId: string;
+  me: Me | null;
+  /** A scripted game's state (the tutorial's watched game, v0.8.4): drawn as a live game is, with
+   * no connection, no summary and nothing to answer. */
+  scripted?: GameState | null;
+  /** What a scripted game draws over the table: its narration. */
+  overlay?: ReactNode;
+}) {
+  const sysop =
+    !scripted && (me?.permissions.includes("games.view_concealed") ?? false);
   const [inspect, setInspect] = useState(
     () => sysop && remembered(`cd.inspect.${gameId}`),
   );
-  const [state, connection] = useGame(gameId, inspect);
+  const [liveState, connection] = useGame(scripted ? null : gameId, inspect);
+  const state = scripted ?? liveState;
   const [summary, setSummary] = useState<Summary>();
   const [zoomed, setZoomed] = useState<{
     card: CardView;
@@ -227,6 +243,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   // the tokens the game paid (v0.4.0).
   const [summaryTries, setSummaryTries] = useState(0);
   useEffect(() => {
+    if (scripted) return;
     let active = true;
     void loadSummary(gameId).then((game) => active && game && setSummary(game));
     return () => {
@@ -247,7 +264,10 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   // While the game is live in this tab, it holds its lock: an update waits for it, and the
   // browser's Back keeps the game on screen (v0.3.0, PWA04).
   const live = Boolean(snapshot) && !snapshot?.result && !state.ended;
-  useEffect(() => (live ? holdLiveGame(gameId) : undefined), [live, gameId]);
+  useEffect(
+    () => (live && !scripted ? holdLiveGame(gameId) : undefined),
+    [live, gameId, scripted],
+  );
 
   // A table that opened without full screen (a reload, a typed address, the app's launch) says
   // once how to get it: F, or the band's diamond.
@@ -696,7 +716,9 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                     ? "Two-Headed Giant"
                     : "Legacy"}
                 <span>
-                  {atTable
+                  {scripted
+                    ? " · Guided game"
+                    : atTable
                     ? " · Table game"
                     : campaign
                       ? ` · Campaign: ${campaign.title}`
@@ -1138,6 +1160,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                 onClose={() => setReportedLine(null)}
               />
             )}
+            {overlay}
           </div>
         </AllianceContext.Provider>
       </TableContext.Provider>

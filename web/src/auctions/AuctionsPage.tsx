@@ -25,6 +25,7 @@ import { SellDialog, type SellRequest } from "./SellDialog";
 import { TransferListView, TransferTargetsView } from "./Transfers";
 import type { AuctionItem, AuctionTargets, TransferList } from "./types";
 import styles from "./auctions.module.css";
+import { signalTutorial, tourCard } from "../tutorial/tutorial";
 
 // Tivit's Auction House (v0.6.0): cards between players, as Madden Ultimate Team's transfer market
 // works, in the app's dark and gold. The owner's painting is the banner, with the viewer's tokens
@@ -57,6 +58,17 @@ const tabIcons: Record<AuctionTab, ReactNode> = {
     </>
   ),
 };
+
+/** Sell's dialog: on the tutorial's tour (v0.8.4), with the card from the pack just opened. */
+function sellRequest(me: Me): SellRequest {
+  if (me.tutorial?.stage !== "tour_auctions") return { mode: "sell" };
+  const card = tourCard();
+  return {
+    mode: "sell",
+    tutorial: true,
+    preset: card ? { printingId: card.printingId, name: card.name } : undefined,
+  };
+}
 
 export function AuctionsPage({
   me,
@@ -296,7 +308,8 @@ export function AuctionsPage({
         <button
           type="button"
           className={styles.sellButton}
-          onClick={() => setSell({ mode: "sell" })}
+          data-tour="sell"
+          onClick={() => setSell(sellRequest(me))}
         >
           <span aria-hidden="true">＋</span> Sell a card
         </button>
@@ -331,7 +344,7 @@ export function AuctionsPage({
             onWithdraw={(item) => void withdraw(item)}
             onRelist={(item) => setSell({ mode: "relist", item })}
             onClear={(which) => void clear(which)}
-            onSell={() => setSell({ mode: "sell" })}
+            onSell={() => setSell(sellRequest(me))}
           />
         ) : (
           <TransferTargetsView
@@ -385,6 +398,7 @@ export function AuctionsPage({
           setMessage(said);
           setError("");
           changed();
+          signalTutorial("card_listed");
         }}
       />
     </div>

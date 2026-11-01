@@ -13,6 +13,7 @@ const sysop = {
   kind: "sysop",
   status: "active",
   onboarding: "complete",
+  tutorial: { path: null, stage: "done", skipped: false },
   handle: "sysop",
   display_name: "SysOp",
   email: null,

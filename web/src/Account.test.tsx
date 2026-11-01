@@ -80,6 +80,7 @@ function account(overrides: Partial<Me> = {}): Me {
     kind: "player",
     status: "active",
     onboarding: "complete",
+    tutorial: { path: null, stage: "done", skipped: false },
     handle: "alice",
     display_name: "Alice",
     email: "alice@example.com",
@@ -513,6 +514,7 @@ describe("the wait for approval", () => {
     account({
       status: "pending",
       onboarding: "handle",
+      tutorial: { path: null, stage: "done", skipped: false },
       handle: null,
       email: "new@example.com",
       permissions: [],

@@ -23,7 +23,7 @@ from starlette.requests import HTTPConnection
 from api.config import Settings
 from api.models import AuditEvent, ExternalIdentity, RoleGrant, User, UserSession
 from api.network import client_address, within
-from api.schemas import Me, Permission, Preferences, Role, SessionInfo
+from api.schemas import Me, Permission, Preferences, Role, SessionInfo, Tutorial
 
 SESSION_COOKIE = "cd_session"
 GOOGLE_COOKIE = "cd_google"
@@ -460,6 +460,11 @@ def me_of(db: Session, principal: Principal) -> Me:
         locale=user.locale,
         onboarding=user.onboarding,  # type: ignore[arg-type]
         alliance=user.alliance,
+        tutorial=Tutorial(
+            path=user.tutorial_path,  # type: ignore[arg-type]
+            stage=user.tutorial,  # type: ignore[arg-type]
+            skipped=user.tutorial_skipped,
+        ),
         email=None if user.kind == "sysop" else email_of(db, user),
         roles=cast(list[Role], principal.roles),
         permissions=cast(list[Permission], sorted(principal.permissions)),

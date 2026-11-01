@@ -136,6 +136,9 @@ def test_a_reset_account_starts_again_as_a_new_one(client):
     assert cara.get(f"/api/v1/shared-decks/{link['share_code']}").status_code == 200
     archived = deck(bob, client, title="Archived burn")
     assert bob.send("POST", f"/api/v1/decks/{archived}/archive").status_code == 200
+    # The tutorial, finished (v0.8.4).
+    bob.send("PUT", "/api/v1/me/tutorial", {"stage": "setup", "path": "advanced"})
+    assert bob.send("PUT", "/api/v1/me/tutorial", {"stage": "done"}).status_code == 200
     # What stays: a friend, settings and privacy settings.
     assert bob.send("PUT", f"/api/v1/friends/{cara.id}").status_code == 200
     assert cara.send("PUT", f"/api/v1/friends/{bob.id}").status_code == 200
@@ -174,6 +177,7 @@ def test_a_reset_account_starts_again_as_a_new_one(client):
     # Bob stays signed in, and his account is a new one's: the setup wizard's first step.
     me = bob.get("/api/v1/me").json()
     assert (me["handle"], me["onboarding"], me["alliance"]) == (None, "handle", None)
+    assert me["tutorial"] == {"path": None, "stage": "choose", "skipped": False}
     assert me["avatar"] == "moon" and me["preferences"]["large_text"] is True
     assert bob.get("/api/v1/library").json() == {"unlimited": False, "alliance": None, "cards": []}
     progress = bob.get("/api/v1/me/progress").json()
