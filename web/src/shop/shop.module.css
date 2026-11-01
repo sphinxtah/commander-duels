@@ -573,7 +573,8 @@
   background-size: 260% 100%;
   background-position: 100% 0;
   mix-blend-mode: screen;
-  animation: shimmer 2.6s linear infinite;
+  /* Across and back again, never jumping to the start (v0.8.2, the owner's word). */
+  animation: shimmer 2.6s ease-in-out infinite alternate;
 }
 @keyframes shimmer {
   to {

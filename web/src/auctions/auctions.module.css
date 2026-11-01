@@ -726,7 +726,8 @@
 .art[data-loaded] .artFrame {
   visibility: hidden;
 }
-/* A foil's sheen crosses it, slowly. */
+/* A foil's sheen crosses it, slowly, and back again: since v0.8.2 it turns at each end instead of
+   jumping back to the start (the owner's word). */
 .foil {
   position: absolute;
   inset: 0;
@@ -750,7 +751,7 @@
     100% 0,
     0 0;
   mix-blend-mode: screen;
-  animation: shimmer 3.4s linear infinite;
+  animation: shimmer 3.4s ease-in-out infinite alternate;
 }
 @keyframes shimmer {
   to {
