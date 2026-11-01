@@ -187,7 +187,7 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     addMountain();
     await waitFor(() => expect(drafts(api)).toHaveLength(1), SAVED);
     // A second edit while the first save is out: past the autosave's delay, nothing more is sent.
-    addMountain();
+    fireEvent.click(screen.getByRole("button", { name: "One more Mountain" }));
     await act(() => new Promise((resolve) => setTimeout(resolve, 1600)));
     expect(drafts(api)).toHaveLength(1);
     await act(async () => answerFirst());
