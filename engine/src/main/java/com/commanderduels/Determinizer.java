@@ -238,7 +238,7 @@ final class Determinizer {
      */
     static final class StaysFaceDown extends ContinuousRuleModifyingEffectImpl {
         private static final long serialVersionUID = 1L;
-        private final Set<UUID> concealed;
+        private final HashSet<UUID> concealed;
 
         StaysFaceDown(Set<UUID> concealed) {
             super(Duration.Custom, Outcome.Neutral, false, false);
