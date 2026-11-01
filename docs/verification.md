@@ -11,7 +11,7 @@ Built on November 1, 2026 in a cloud workspace with no package registry (no PyPI
 | The deploy kit | `bash -n` on every script; `tests/test_deploy_kit.py` locally as an unprivileged user, 51 passed (ShellCheck on hosted CI) |
 | The engine | type-checked against a partial checkout of XMage at the pinned commit with the nine patches applied; built and tested on hosted CI only |
 | The web | prettier locally; the tests and the build on hosted CI only |
-| Hosted CI | runs on the branch until run #41337302527 (cdd8702) passed both jobs: the Python tests, the web's tests and build, the browser journeys, ShellCheck, the contracts' drift check, the engine's tests, practice games through the API and in the browser. Two earlier runs failed on `-Xlint` warnings in the new engine code (a non-serializable field, a deprecated event factory), one on a deck editor test's ambiguous button, and one on the Playwright image's Node having lost corepack (the step now installs pnpm with npm) |
+| Hosted CI | runs on the branch until run #41337302527 (cdd8702) passed both jobs: the Python tests, the web's tests and build, the browser journeys, ShellCheck, the contracts' drift check, the engine's tests, practice games through the API and in the browser. Two earlier runs failed on `-Xlint` warnings in the new engine code (a non-serializable field, a deprecated event factory), one on a deck editor test's ambiguous button, and one on the Playwright image's Node having lost corepack (the step now installs pnpm with npm); run 41339344342 on the tag `v0.8.3` (84cab1b) green, publishing the `0.8.3` images; the private engine image's run #46 and web image's run #13 built them for `0.8.3` |
 
 ## v0.8.2
 
