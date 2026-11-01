@@ -6923,6 +6923,9 @@
             ],
             "title": "Status",
             "type": "string"
+          },
+          "tutorial": {
+            "$ref": "#/components/schemas/Tutorial"
           }
         },
         "required": [
@@ -6934,6 +6937,7 @@
           "avatar",
           "locale",
           "onboarding",
+          "tutorial",
           "email",
           "roles",
           "permissions",
@@ -12709,6 +12713,55 @@
         "title": "TransferList",
         "type": "object"
       },
+      "Tutorial": {
+        "additionalProperties": false,
+        "description": "The first-time tutorial (v0.8.4): how the player chose to learn, and how far they are.",
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "enum": [
+                  "beginner",
+                  "novice",
+                  "advanced"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "beginner (a watched game, then the setup with tips and the main menu's tour), novice (an overview, then the same), advanced (the setup alone); null until chosen.",
+            "title": "Path"
+          },
+          "skipped": {
+            "description": "Whether the player skipped the rest of it.",
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "stage": {
+            "description": "choose, then demo (beginner) or overview (novice), setup, tour_shop and tour_auctions (the main menu's tour), done.",
+            "enum": [
+              "choose",
+              "demo",
+              "overview",
+              "setup",
+              "tour_shop",
+              "tour_auctions",
+              "done"
+            ],
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "stage",
+          "skipped"
+        ],
+        "title": "Tutorial",
+        "type": "object"
+      },
       "TutorialChange": {
         "additionalProperties": false,
         "properties": {
@@ -12754,6 +12807,52 @@
           }
         },
         "title": "TutorialChange",
+        "type": "object"
+      },
+      "TutorialUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "enum": [
+                  "beginner",
+                  "novice",
+                  "advanced"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chosen with the first stage after choose; kept otherwise.",
+            "title": "Path"
+          },
+          "skipped": {
+            "default": false,
+            "description": "True when the player skips to done.",
+            "title": "Skipped",
+            "type": "boolean"
+          },
+          "stage": {
+            "enum": [
+              "choose",
+              "demo",
+              "overview",
+              "setup",
+              "tour_shop",
+              "tour_auctions",
+              "done"
+            ],
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage"
+        ],
+        "title": "TutorialUpdate",
         "type": "object"
       },
       "UnnamedPlayer": {
@@ -28539,6 +28638,115 @@
           }
         },
         "summary": "My Tokens"
+      }
+    },
+    "/api/v1/me/tutorial": {
+      "put": {
+        "description": "Moves the account's tutorial to a stage, choosing its path with the first one.",
+        "operationId": "update_tutorial_api_v1_me_tutorial_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TutorialUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Update Tutorial"
       }
     },
     "/api/v1/notifications": {

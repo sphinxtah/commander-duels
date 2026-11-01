@@ -17,9 +17,7 @@ down_revision = "0032_campaign"
 branch_labels = None
 depends_on = None
 
-STAGES = (
-    "tutorial IN ('choose', 'demo', 'overview', 'setup', 'tour_shop', 'tour_auctions', 'done')"
-)
+STAGES = "tutorial IN ('choose', 'demo', 'overview', 'setup', 'tour_shop', 'tour_auctions', 'done')"
 PATHS = "tutorial_path IS NULL OR tutorial_path IN ('beginner', 'novice', 'advanced')"
 
 
@@ -30,9 +28,7 @@ def upgrade() -> None:
         )
         users.add_column(sa.Column("tutorial_path", sa.String(16), nullable=True))
         users.add_column(
-            sa.Column(
-                "tutorial_skipped", sa.Boolean(), nullable=False, server_default=sa.false()
-            )
+            sa.Column("tutorial_skipped", sa.Boolean(), nullable=False, server_default=sa.false())
         )
         users.create_check_constraint("ck_users_tutorial", STAGES)
         users.create_check_constraint("ck_users_tutorial_path", PATHS)

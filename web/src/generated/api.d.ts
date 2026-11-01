@@ -2361,6 +2361,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/tutorial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Tutorial
+         * @description Moves the account's tutorial to a stage, choosing its path with the first one.
+         */
+        put: operations["update_tutorial_api_v1_me_tutorial_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications": {
         parameters: {
             query?: never;
@@ -5744,6 +5764,7 @@ export interface components {
              * @enum {string}
              */
             status: "active" | "pending" | "denied";
+            tutorial: components["schemas"]["Tutorial"];
         };
         /** MessageCreate */
         MessageCreate: {
@@ -8172,6 +8193,28 @@ export interface components {
              */
             unsold: components["schemas"]["AuctionItem"][];
         };
+        /**
+         * Tutorial
+         * @description The first-time tutorial (v0.8.4): how the player chose to learn, and how far they are.
+         */
+        Tutorial: {
+            /**
+             * Path
+             * @description beginner (a watched game, then the setup with tips and the main menu's tour), novice (an overview, then the same), advanced (the setup alone); null until chosen.
+             */
+            path: ("beginner" | "novice" | "advanced") | null;
+            /**
+             * Skipped
+             * @description Whether the player skipped the rest of it.
+             */
+            skipped: boolean;
+            /**
+             * Stage
+             * @description choose, then demo (beginner) or overview (novice), setup, tour_shop and tour_auctions (the main menu's tour), done.
+             * @enum {string}
+             */
+            stage: "choose" | "demo" | "overview" | "setup" | "tour_shop" | "tour_auctions" | "done";
+        };
         /** TutorialChange */
         TutorialChange: {
             /** Hints */
@@ -8186,6 +8229,25 @@ export interface components {
              * @description Skip the teaching (never the duel).
              */
             skip?: boolean | null;
+        };
+        /** TutorialUpdate */
+        TutorialUpdate: {
+            /**
+             * Path
+             * @description Chosen with the first stage after choose; kept otherwise.
+             */
+            path?: ("beginner" | "novice" | "advanced") | null;
+            /**
+             * Skipped
+             * @description True when the player skips to done.
+             * @default false
+             */
+            skipped: boolean;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "choose" | "demo" | "overview" | "setup" | "tour_shop" | "tour_auctions" | "done";
         };
         /**
          * UnnamedPlayer
@@ -20830,6 +20892,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Tokens"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    update_tutorial_api_v1_me_tutorial_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TutorialUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             /** @description Bad Request */
