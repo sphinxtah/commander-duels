@@ -450,6 +450,16 @@ export function CampaignPage({
           <label className={styles.setting}>
             <input
               type="checkbox"
+              checked={settings.music}
+              onChange={(event) =>
+                updateSettings({ music: event.target.checked })
+              }
+            />
+            <span>Music in the cut scenes</span>
+          </label>
+          <label className={styles.setting}>
+            <input
+              type="checkbox"
               checked={state.progress.tutorial.hints}
               onChange={(event) =>
                 void changeTutorial({ hints: event.target.checked }).then(

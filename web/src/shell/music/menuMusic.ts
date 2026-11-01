@@ -68,6 +68,9 @@ export interface MenuMusic {
   show(): void;
   /** The menus left the screen: fade out and hold the place. */
   hide(): void;
+  /** Something else plays on the menus (v0.8.1: a campaign cut scene's own track): fade out and
+   * hold the place while it lasts, and go on when it ends if the menus are still on screen. */
+  hold(on: boolean): void;
   setPaused(paused: boolean): void;
   /** The music volume, 0–100, and whether any mute is on. */
   setLevel(volume: number, muted: boolean): void;
@@ -121,6 +124,10 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
   let element: MenuMusicElement | null = null;
   /** The menus are on screen. */
   let shown = false;
+  /** Something else plays over the menus (hold). */
+  let held = false;
+  /** Heard where the menus are: on screen and not held. */
+  const visible = () => shown && !held;
   /** Stopped by hand. */
   let paused = false;
   /** The browser refused play() until a gesture; the next one tries again. */
@@ -152,8 +159,36 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
     if (unavailable) return "unavailable";
     if (loading !== "done") return "loading";
     if (paused) return "paused";
-    if (!shown) return "idle";
+    if (!visible()) return "idle";
     return waiting ? "waiting" : "playing";
+  }
+
+  /** The menus' music is heard again: from where it was, fading in. */
+  function appear() {
+    if (unavailable || loading !== "done") {
+      notify();
+      return;
+    }
+    begin();
+    if (wanted()) {
+      if (element?.paused !== false) fade = 0;
+      runFade(1, FADE_IN_MS);
+      tryPlay();
+    }
+    notify();
+  }
+
+  /** The menus' music falls silent, holding its place. */
+  function disappear() {
+    waiting = false;
+    stopListening();
+    const audio = element;
+    if (!audio || audio.paused) {
+      stopFade();
+      fade = 0;
+      apply();
+    } else runFade(0, FADE_OUT_MS, () => audio.pause());
+    notify();
   }
 
   function notify() {
@@ -172,7 +207,8 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
 
   const silent = () => level <= 0;
   /** Sound is wanted: the menus are on, nothing stopped it, and a song is there to play. */
-  const wanted = () => shown && !paused && !unavailable && queue.now !== null;
+  const wanted = () =>
+    visible() && !paused && !unavailable && queue.now !== null;
 
   function apply() {
     if (element) element.volume = Math.min(1, Math.max(0, level * fade));
@@ -380,7 +416,7 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
             byFile.clear();
             for (const track of list) byFile.set(track.file, track);
             queue.setTracks(list.map((track) => track.file));
-            if (shown) {
+            if (visible()) {
               begin();
               if (wanted()) {
                 fade = 0;
@@ -407,31 +443,23 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
     show() {
       if (shown) return;
       shown = true;
-      if (unavailable || loading !== "done") {
-        notify();
-        return;
-      }
-      begin();
-      if (wanted()) {
-        if (element?.paused !== false) fade = 0;
-        runFade(1, FADE_IN_MS);
-        tryPlay();
-      }
-      notify();
+      if (held) notify();
+      else appear();
     },
 
     hide() {
       if (!shown) return;
       shown = false;
-      waiting = false;
-      stopListening();
-      const audio = element;
-      if (!audio || audio.paused) {
-        stopFade();
-        fade = 0;
-        apply();
-      } else runFade(0, FADE_OUT_MS, () => audio.pause());
-      notify();
+      if (held) notify();
+      else disappear();
+    },
+
+    hold(on) {
+      if (held === on) return;
+      held = on;
+      if (!shown) notify();
+      else if (held) disappear();
+      else appear();
     },
 
     setPaused(value) {
@@ -443,7 +471,7 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
         stopListening();
         stopFade();
         audio?.pause();
-      } else if (shown && loading === "done" && !unavailable) {
+      } else if (visible() && loading === "done" && !unavailable) {
         begin();
         if (fadeTimer === null) {
           fade = 1;
@@ -505,6 +533,7 @@ export function createMenuMusic(options: MenuMusicOptions = {}): MenuMusic {
     dispose() {
       disposed = true;
       shown = false;
+      held = false;
       waiting = false;
       stopListening();
       stopFade();

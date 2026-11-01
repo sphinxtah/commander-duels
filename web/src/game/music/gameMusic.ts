@@ -56,6 +56,9 @@ export interface GameMusicOptions {
   /** Makes the element; null when the browser has no audio. Defaults to `new Audio()`. */
   element?: () => MusicElement | null;
   src?: string;
+  /** Whether start() begins the track again (the game's, true) or goes on from where the last
+   * stop left it (the campaign's cut scenes, v0.8.1: one long track across the scenes). */
+  restart?: boolean;
 }
 
 /** The presses that may start audio (the sound engine listens for the same). */
@@ -74,6 +77,7 @@ function windowAudio(): MusicElement | null {
 export function createGameMusic(options: GameMusicOptions = {}): GameMusic {
   const make = options.element ?? windowAudio;
   const src = options.src ?? GAME_MUSIC_URL;
+  const restart = options.restart ?? true;
   let element: MusicElement | null = null;
   let unavailable = false;
   /** A game is on: start() was called and stop() not yet. */
@@ -209,10 +213,12 @@ export function createGameMusic(options: GameMusicOptions = {}): GameMusic {
       // still falling (the next game of a match); a start while a game is on (React running an
       // effect twice) changes nothing.
       if (!resumed) {
-        try {
-          audio.currentTime = 0;
-        } catch {
-          // Nothing loaded yet: it starts at 0 anyway.
+        if (restart) {
+          try {
+            audio.currentTime = 0;
+          } catch {
+            // Nothing loaded yet: it starts at 0 anyway.
+          }
         }
         if (audio.paused) fade = 0;
       }

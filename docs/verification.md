@@ -1,5 +1,17 @@
 # Verification
 
+## v0.8.1
+
+Built on October 31, 2026 in the same cloud workspace as v0.8.0, on the branch `release-0.8.1`.
+
+| Check | Result |
+|---|---|
+| Python | `ruff check` and `ruff format --check` clean on the new test; `mypy` no issues; `tests/test_api_image.py` (2: the API image copies every content file the API reads, and the list names every content file the API's code opens) passed, with `test_campaign.py` |
+| TypeScript | `tsc --noEmit` on `web/`: no errors beyond the workspace's baseline |
+| Web tests | the new ones (`gameMusic.test.ts`: a player that goes on from where it stopped; `menuMusic.test.ts`: the playlist held during a cut scene, through the menus leaving and coming back, and a hold that ends after the menus left) use Vitest's fake clock, which the workspace's stand-in lacks: run in CI |
+| The track | `campaign.audio.mp3` from the owner's campaign folder, copied unchanged (MD5 5ac268d5…) to the private repository's `music/campaign.mp3` and to the owner's local `music/` folder: MP3, 44.1 kHz stereo, 156 kbps, 31 min 54 s, 37,337,375 bytes |
+| Hosted CI | recorded in the release notes as the runs finish |
+
 ## v0.8.0
 
 Built on October 31, 2026 in a cloud workspace with GitHub access and no npm, PyPI or Maven access, on the branch `campaign-0.8.0`. The workspace had Python 3.13 with the API's dependencies (from the owner's PC), a local PostgreSQL, TypeScript 5.9.3 and Prettier 3.9.10 from the web's store, Chromium with Playwright, and XMage's sources at the pinned commit; it had no esbuild, Vite, jsdom or Maven repository.

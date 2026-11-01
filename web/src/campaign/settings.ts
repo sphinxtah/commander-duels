@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 
 // The cut scenes' settings (v0.8.0): the device's, in localStorage, as the menu music's are. The
-// text speed, automatic advance and whether the opponents speak during duels (barks).
+// text speed, automatic advance, whether the opponents speak during duels (barks) and, since
+// v0.8.1, whether the cut scenes play their music.
 
 export type TextSpeed = "slow" | "normal" | "fast" | "instant";
 
@@ -9,6 +10,7 @@ export interface CampaignSettings {
   textSpeed: TextSpeed;
   auto: boolean;
   barks: boolean;
+  music: boolean;
 }
 
 export const KEY = "cd.campaign.v1";
@@ -16,6 +18,7 @@ export const DEFAULTS: CampaignSettings = {
   textSpeed: "normal",
   auto: false,
   barks: true,
+  music: true,
 };
 /** Characters a second for each text speed; instant shows the whole line at once. */
 export const CHARS_PER_SECOND: Record<TextSpeed, number> = {
@@ -37,6 +40,7 @@ export function readSettings(): CampaignSettings {
           : DEFAULTS.textSpeed,
       auto: typeof value.auto === "boolean" ? value.auto : DEFAULTS.auto,
       barks: typeof value.barks === "boolean" ? value.barks : DEFAULTS.barks,
+      music: typeof value.music === "boolean" ? value.music : DEFAULTS.music,
     };
   } catch {
     return DEFAULTS;

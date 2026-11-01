@@ -138,6 +138,27 @@ describe("the gameplay music", () => {
     expect(audio.volume).toBeCloseTo(defaultLevel, 5);
   });
 
+  it("goes on from where it stopped when asked not to restart (the campaign's, v0.8.1)", async () => {
+    const longer = createGameMusic({
+      element: () => audio,
+      src: "/music/campaign.mp3",
+      restart: false,
+    });
+    longer.start();
+    await settle();
+    expect(audio.src).toBe("/music/campaign.mp3");
+    vi.advanceTimersByTime(FADE_IN_MS + FADE_STEP_MS);
+    audio.currentTime = 300;
+    longer.stop();
+    vi.advanceTimersByTime(FADE_OUT_MS + FADE_STEP_MS);
+    expect(audio.paused).toBe(true);
+    longer.start();
+    await settle();
+    expect(audio.currentTime).toBe(300);
+    expect(audio.paused).toBe(false);
+    longer.dispose();
+  });
+
   it("starting again during a game changes nothing (an effect run twice)", async () => {
     music.start();
     await settle();

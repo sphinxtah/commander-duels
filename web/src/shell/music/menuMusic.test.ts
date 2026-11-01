@@ -310,6 +310,39 @@ describe("the menu music", () => {
     expect(audio.volume).toBeCloseTo(level);
   });
 
+  it("holds its place while a cut scene plays its own track (v0.8.1)", async () => {
+    make();
+    music.load();
+    music.show();
+    await settle();
+    vi.advanceTimersByTime(FADE_IN_MS + FADE_STEP_MS);
+    audio.currentTime = 42;
+    music.hold(true);
+    expect(music.snapshot.state).toBe("idle");
+    vi.advanceTimersByTime(FADE_OUT_MS + FADE_STEP_MS);
+    expect(audio.paused).toBe(true);
+    // The menus leaving and coming back while held: still silent.
+    music.hide();
+    music.show();
+    await settle();
+    expect(audio.paused).toBe(true);
+    expect(music.snapshot.state).toBe("idle");
+    // The hold ends: the same song, from the same second.
+    music.hold(false);
+    await settle();
+    expect(music.snapshot.state).toBe("playing");
+    expect(audio.paused).toBe(false);
+    expect(audio.currentTime).toBe(42);
+    // A hold that ends after the menus left (a game opened): nothing plays.
+    music.hold(true);
+    vi.advanceTimersByTime(FADE_OUT_MS + FADE_STEP_MS);
+    music.hide();
+    music.hold(false);
+    await settle();
+    expect(audio.paused).toBe(true);
+    expect(music.snapshot.state).toBe("idle");
+  });
+
   it("pauses by hand and plays again, at the level", async () => {
     make();
     music.load();

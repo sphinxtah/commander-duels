@@ -14,6 +14,7 @@ import { castOf, type CastMember, type PlayerFace } from "./cast";
 import { FigureArt } from "./Figures";
 import { Scenery, SCENERY_ACCENTS, SCENERY_NAMES } from "./scenery/Scenery";
 import type { Fx, Scene, Speaker } from "./script";
+import { useCampaignMusic } from "./campaignMusic";
 import { CHARS_PER_SECOND, useCampaignSettings } from "./settings";
 import {
   readingMs,
@@ -85,6 +86,8 @@ export function Cutscene({
   );
   const [index, setIndex] = useState(start);
   const [settings, updateSettings] = useCampaignSettings();
+  // The owner's track under the scene (v0.8.1), the menu playlist held meanwhile.
+  useCampaignMusic({ on: settings.music });
   const step = steps[index] ?? steps[steps.length - 1];
   const stage = stages[index] ?? stages[stages.length - 1];
   const words = step ? wordsOf(step) : "";
@@ -287,6 +290,14 @@ export function Cutscene({
           aria-label={`Text speed: ${settings.textSpeed}`}
         >
           Text: {settings.textSpeed}
+        </button>
+        <button
+          type="button"
+          className={styles.quiet}
+          aria-pressed={settings.music}
+          onClick={() => updateSettings({ music: !settings.music })}
+        >
+          Music
         </button>
         <button
           type="button"
