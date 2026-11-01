@@ -1,10 +1,17 @@
 """The first-time tutorial (v0.8.4, api/tutorial.py): its path and stage on the account."""
 
+import test_progression
 from sqlalchemy import update
 from sqlalchemy.orm import Session
-from test_progression import Account, client, content, engine, url  # noqa: F401
+from test_progression import Account
 
 from api.models import User
+
+# The progression tests' database, content and app, for this module's own accounts.
+url = test_progression.url
+content = test_progression.content
+engine = test_progression.engine
+client = test_progression.client
 
 
 def tutorial(account: Account) -> dict:

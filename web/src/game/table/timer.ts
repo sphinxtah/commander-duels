@@ -1,9 +1,4 @@
-import {
-  controllerOf,
-  playerName,
-  primaryOption,
-  teammateOf,
-} from "../model";
+import { controllerOf, playerName, primaryOption, teammateOf } from "../model";
 import type { TimerInput, TimerKey, TimerPhase, TimerView } from "./types";
 
 // The response timer (design §12). When the seat gets priority only to answer an opponent's spell,

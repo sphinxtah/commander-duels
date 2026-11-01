@@ -61,6 +61,26 @@ jobs:
             echo "::group::$failed"; grep -v '^\s*$' "assist-logs/$failed.txt" | tail -n 120; echo "::endgroup::"
           done
           ! grep -v ' 0$' assist-logs/status.txt
+      # The welcome's screenshots, on demand: a commit whose message says [shots].
+      - name: Welcome screenshots
+        if: always() && contains(github.event.head_commit.message, '[shots]')
+        run: |
+          pnpm --dir web exec playwright install --with-deps chromium
+          password="$(python -c 'import secrets; print(secrets.token_urlsafe(18))')"
+          echo "::add-mask::$password"
+          printf '%s\n' "$password" | python -m api.cli sysop-password --stdin
+          python scripts/load_fixture_catalog.py
+          CD_E2E_WELCOME_SHOTS=1 CD_E2E_SYSOP_PASSWORD="$password" \
+            pnpm --dir web exec playwright test e2e/welcome-shots.spec.ts --reporter=line || true
+          ls -la web/test-results/welcome || true
+          python scripts/welcome_shots.py web/test-results/welcome || true
+          if [ -n "$(git status --porcelain web/public/welcome)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add web/public/welcome
+            git commit -m "assist: the welcome's screenshots, taken from the game"
+            git pull --rebase && git push
+          fi
       - if: always()
         uses: actions/upload-artifact@v7
         with: {name: assist-logs, path: assist-logs, retention-days: 3}

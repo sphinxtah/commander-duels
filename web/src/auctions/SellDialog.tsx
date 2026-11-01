@@ -325,8 +325,8 @@ export function SellDialog({
               {suggested.startingBid.toLocaleString("en-US")} tokens and a Buy
               Now of {suggested.buyNow.toLocaleString("en-US")}. Bids start at
               the starting bid and may climb; Buy Now sells at once for its
-              price. Change either if you like, then choose how long the
-              auction runs.
+              price. Change either if you like, then choose how long the auction
+              runs.
             </TourTip>
           )}
           <fieldset className={styles.pricing} disabled={!card}>

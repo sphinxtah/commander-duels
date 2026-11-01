@@ -52,7 +52,9 @@ const BUBBLE = 340;
 const GAP = 18;
 
 function find(steps: CoachStep[]): Placed | null {
-  const open = [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")];
+  const open = [
+    ...document.querySelectorAll<HTMLDialogElement>("dialog[open]"),
+  ];
   for (const step of steps) {
     if (!step.target) {
       // A dialog over the page hides a bubble that points at nothing on it.
@@ -93,9 +95,7 @@ export function Coach({
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const found = find(latest.current);
-        setPlaced((before) =>
-          same(before, found) ? before : found,
-        );
+        setPlaced((before) => (same(before, found) ? before : found));
       });
     };
     measure();
@@ -135,9 +135,13 @@ export function Coach({
   let arrowLeft = 0;
   if (rect) {
     const centre = rect.left + rect.width / 2;
-    const left = Math.max(16, Math.min(centre - width / 2, window.innerWidth - width - 16));
+    const left = Math.max(
+      16,
+      Math.min(centre - width / 2, window.innerWidth - width - 16),
+    );
     arrowLeft = Math.max(18, Math.min(centre - left, width - 18));
-    const below = rect.bottom + GAP + 190 < window.innerHeight || rect.top < 220;
+    const below =
+      rect.bottom + GAP + 190 < window.innerHeight || rect.top < 220;
     arrow = below ? "up" : "down";
     style = below
       ? { left, top: rect.bottom + GAP, width }

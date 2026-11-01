@@ -43,6 +43,7 @@ def main(argv: list[str]) -> None:
                     kind="player",
                     status="active",
                     onboarding="complete",
+                    tutorial="done",
                     created_at=now,
                 )
                 db.add(user)

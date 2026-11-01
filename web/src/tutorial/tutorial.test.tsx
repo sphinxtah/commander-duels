@@ -1,6 +1,20 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import type { Me } from "../api";
 import { SetupWizard } from "../app/SetupWizard";
 import { buildDemo, MIRA, VOK } from "./demoScript";
@@ -21,6 +35,18 @@ vi.mock("./tutorial", async (original) => ({
   moveTutorial: vi.fn(),
 }));
 const move = vi.mocked(moveTutorial);
+
+beforeAll(() => {
+  // jsdom has no modal dialogs; the setup wizard is one.
+  const dialog = HTMLDialogElement.prototype;
+  dialog.showModal ??= function (this: HTMLDialogElement) {
+    this.setAttribute("open", "");
+  };
+  dialog.close ??= function (this: HTMLDialogElement) {
+    this.removeAttribute("open");
+    this.dispatchEvent(new Event("close"));
+  };
+});
 
 function account(tutorialState: Tutorial, overrides: Partial<Me> = {}): Me {
   return {
@@ -137,7 +163,9 @@ describe("the tutorial's helpers", () => {
       rarity: "rare",
       finish: "foil",
     });
-    expect(bestPulled([card("Forest", "common", "nonfoil", "Basic Land — Forest")])).toBeNull();
+    expect(
+      bestPulled([card("Forest", "common", "nonfoil", "Basic Land — Forest")]),
+    ).toBeNull();
   });
 
   it("suggests prices by rarity, foils at twice, Buy Now at three times the bid", () => {
@@ -220,7 +248,9 @@ describe("the welcome's three paths", () => {
     await screen.findByRole("heading", { name: OVERVIEW[0]!.title });
     expect(
       screen.getByRole("list", { name: "Setting up your game" }),
-    ).toHaveTextContent("1 Welcome2 Overview3 Your name4 Starter decks5 Alliance");
+    ).toHaveTextContent(
+      "1 Welcome2 Overview3 Your name4 Starter decks5 Alliance",
+    );
     fireEvent.click(screen.getByRole("button", { name: /Next/ }));
     expect(
       screen.getByRole("heading", { name: OVERVIEW[1]!.title }),
@@ -275,7 +305,14 @@ describe("the main menu's tour", () => {
     const element = document.createElement("a");
     element.dataset.tour = name;
     element.getBoundingClientRect = () =>
-      ({ left: 100, top: 100, right: 300, bottom: 200, width: 200, height: 100 }) as DOMRect;
+      ({
+        left: 100,
+        top: 100,
+        right: 300,
+        bottom: 200,
+        width: 200,
+        height: 100,
+      }) as DOMRect;
     document.body.append(element);
     return element;
   }
@@ -323,7 +360,10 @@ describe("the main menu's tour", () => {
       ]),
     );
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(after));
-    expect(move).toHaveBeenCalledWith({ stage: "tour_auctions", skipped: false });
+    expect(move).toHaveBeenCalledWith({
+      stage: "tour_auctions",
+      skipped: false,
+    });
     expect(tourCard()).toMatchObject({ name: "Shivan Dragon" });
   });
 
@@ -340,7 +380,9 @@ describe("the main menu's tour", () => {
       { onboarding: "complete", handle: "alice" },
     );
     render(<Tour me={me} page="Home" onChange={onChange} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Skip the tour" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Skip the tour" }),
+    );
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(done));
     expect(move).toHaveBeenCalledWith({ stage: "done", skipped: true });
   });

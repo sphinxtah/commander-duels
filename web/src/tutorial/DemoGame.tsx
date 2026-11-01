@@ -72,10 +72,7 @@ export function DemoGame({
   // On its own: the next lesson once this one has been read.
   useEffect(() => {
     if (!auto || !framesDone || last) return;
-    const timer = window.setTimeout(
-      () => go(beat + 1),
-      readingMs(lesson.text),
-    );
+    const timer = window.setTimeout(() => go(beat + 1), readingMs(lesson.text));
     return () => window.clearTimeout(timer);
   }, [auto, framesDone, last, beat, lesson.text]);
   // The narration takes the keyboard once the table has drawn, and keeps it from lesson to lesson.

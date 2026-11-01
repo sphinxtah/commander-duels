@@ -212,7 +212,10 @@ describe("the lobby", () => {
     await settle();
     const opened = api.calls.find((c) => c.route === "POST /api/v1/tables")!;
     expect(opened.options).toMatchObject({
-      body: { rules: { banned: false, not_legal: false, stand_in: false }, deck_id: "deck-1" },
+      body: {
+        rules: { banned: false, not_legal: false, stand_in: false },
+        deck_id: "deck-1",
+      },
     });
     // Unticking Tournament rules goes back to casual.
     await act(async () =>
@@ -378,7 +381,10 @@ describe("a table", () => {
   it("says the table's rules, and greys the decks they do not take", async () => {
     const api = mockApi();
     api.on("GET /api/v1/tables/{code}", () =>
-      reply(200, table({ rules: { banned: false, not_legal: false, stand_in: false } })),
+      reply(
+        200,
+        table({ rules: { banned: false, not_legal: false, stand_in: false } }),
+      ),
     );
     api.on("GET /api/v1/decks", () =>
       reply(200, [

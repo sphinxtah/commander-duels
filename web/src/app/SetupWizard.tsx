@@ -37,12 +37,7 @@ import styles from "./SetupWizard.module.css";
  * of the setup, and leave the wizard for the main menu's tour.
  */
 export type SetupStep =
-  | "welcome"
-  | "overview"
-  | "handle"
-  | "starters"
-  | "alliance"
-  | "done";
+  "welcome" | "overview" | "handle" | "starters" | "alliance" | "done";
 
 type Listed = Exclude<SetupStep, "done">;
 
@@ -82,7 +77,12 @@ function currentStep(me: Me): SetupStep {
   if (stage === "choose" || stage === "demo") return "welcome";
   if (stage === "overview") return "overview";
   // A guided player who closed the wizard at its end comes back to it, for the tour.
-  if (stage === "setup" && guided(tutorialOf(me)) && me.alliance && !setupStep(me))
+  if (
+    stage === "setup" &&
+    guided(tutorialOf(me)) &&
+    me.alliance &&
+    !setupStep(me)
+  )
     return "done";
   return setupStep(me) ?? "alliance";
 }
@@ -448,8 +448,8 @@ function Welcome({
       ) : stage === "demo" ? (
         <div className={styles.next}>
           <p>
-            Your guided game is waiting: two bots play Commander while each
-            move is explained.
+            Your guided game is waiting: two bots play Commander while each move
+            is explained.
           </p>
           <div className={styles.links}>
             <button

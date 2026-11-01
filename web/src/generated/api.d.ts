@@ -3687,7 +3687,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.8.3
+             * @default 0.8.4
              */
             version: string;
         };
@@ -5295,7 +5295,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.8.3
+             * @default 0.8.4
              */
             version: string;
         };
@@ -19551,7 +19551,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;

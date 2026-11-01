@@ -169,7 +169,12 @@ class Table {
 
   card(made: Face): CardView {
     this.n += 1;
-    return { id: `demo-${this.n}`, hidden: false, ...made, rules: [...made.rules] };
+    return {
+      id: `demo-${this.n}`,
+      hidden: false,
+      ...made,
+      rules: [...made.rules],
+    };
   }
 
   commander(seat: Seat, made: Face): CardView {
@@ -413,7 +418,12 @@ class Table {
     }
     this.combat = attackers.map((attacker) => ({
       attackers: [attacker.id],
-      defender: { kind: "player", seat: defender, object_id: null, label: null },
+      defender: {
+        kind: "player",
+        seat: defender,
+        object_id: null,
+        label: null,
+      },
       blockers: [],
       blocked: false,
     }));
@@ -796,11 +806,7 @@ export function buildDemo(): DemoBeat[] {
     t.own(VOK, card);
     const permanent = t.permanent(VOK, card);
     // Judith's +1/+0.
-    t.setPower(
-      permanent,
-      Number(made.power) + 1,
-      Number(made.toughness),
-    );
+    t.setPower(permanent, Number(made.power) + 1, Number(made.toughness));
   }
   for (const land of [CARDS.forest, CARDS.plains, CARDS.forest])
     t.permanent(MIRA, t.card(land));

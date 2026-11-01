@@ -49,9 +49,9 @@ export function TutorialSettings({
     <section className={className} aria-labelledby="tutorial-title">
       <h2 id="tutorial-title">Tutorial</h2>
       <p>
-        Watch the guided game between two bots again, read the overview of
-        the game and its rules, or take the main menu's tour to Leng's Card
-        Shop and Tivit's Auction House.
+        Watch the guided game between two bots again, read the overview of the
+        game and its rules, or take the main menu's tour to Leng's Card Shop and
+        Tivit's Auction House.
       </p>
       <div className={styles.replays}>
         <a className={shell.primary} href={DEMO_ROUTE}>

@@ -719,10 +719,10 @@ export function GameScreen({
                   {scripted
                     ? " · Guided game"
                     : atTable
-                    ? " · Table game"
-                    : campaign
-                      ? ` · Campaign: ${campaign.title}`
-                      : " · Practice game"}
+                      ? " · Table game"
+                      : campaign
+                        ? ` · Campaign: ${campaign.title}`
+                        : " · Practice game"}
                 </span>
               </h1>
 
