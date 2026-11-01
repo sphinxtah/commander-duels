@@ -1,5 +1,18 @@
 # Verification
 
+## v0.8.3
+
+Built on November 1, 2026 in a cloud workspace with no package registry (no PyPI, npm or Maven Central), on the branch `fixes-0.8.3`.
+
+| Check | Result |
+|---|---|
+| The deck import's patterns | timed on Python 3.13 before the fix: 0.19 s at 4,000 spaces in one line, 0.88 s at 8,000, 3.36 s at 16,000 (doubling the run quadrupled the time); after it, the same line reads at once as "a b" (`tests/test_deck_list_limits.py`) |
+| Python | `ruff check` and `ruff format --check` locally; the type checks and tests on hosted CI only |
+| The deploy kit | `bash -n` on every script; `tests/test_deploy_kit.py` locally as an unprivileged user, 51 passed (ShellCheck on hosted CI) |
+| The engine | type-checked against a partial checkout of XMage at the pinned commit with the nine patches applied; built and tested on hosted CI only |
+| The web | prettier locally; the tests and the build on hosted CI only |
+| Hosted CI | runs on the branch until run #41337302527 (cdd8702) passed both jobs: the Python tests, the web's tests and build, the browser journeys, ShellCheck, the contracts' drift check, the engine's tests, practice games through the API and in the browser. Two earlier runs failed on `-Xlint` warnings in the new engine code (a non-serializable field, a deprecated event factory), one on a deck editor test's ambiguous button, and one on the Playwright image's Node having lost corepack (the step now installs pnpm with npm) |
+
 ## v0.8.2
 
 Built on October 31, 2026 in the same cloud workspace, on the branch `foil-0.8.2`.
