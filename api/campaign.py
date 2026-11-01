@@ -769,6 +769,10 @@ async def start_encounter(
         raise ApiError(422, "invalid_seat", "Choose your deck or the loaner, not both.")
     if body.deck_id is None and not (body.loaner or body.learn):
         raise ApiError(422, "invalid_seat", "Choose a deck for the duel.")
+    if body.learn and number != 1:
+        # Learn Commander's seed is disclosed and fixes the shuffles (v0.8.3): on any other ward it
+        # would let a player learn both decks' order and replay the same game for its spoils.
+        raise ApiError(422, "invalid_seat", "Learn Commander is for the first ward only.")
 
     def plan() -> tuple[SeatPlan, CampaignProgress]:
         progress = progress_of(db, user, campaign)

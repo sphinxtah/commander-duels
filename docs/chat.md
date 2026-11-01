@@ -115,7 +115,7 @@ Who receives a line: every connection of the game for the table's; for an allies
 - No control characters except line breaks and tabs (`422`); NUL is refused everywhere.
 - Unicode's direction overrides and isolates (U+202A–U+202E, U+2066–U+2069) are dropped, so a message cannot draw itself backwards to pass for someone else's words. Emoji, accents and joiners stay.
 - The page shows every message as text, never as HTML or a link (SEC01's chat injection).
-- **How fast.** An account sends at most 5 messages in 5 seconds and 30 a minute, friends' messages, table lines and emotes together (`429 chat_limited`, or the socket's error, with the seconds to wait). The counts live in the API process's memory. SysOp has no limit.
+- **How fast.** An account sends at most 5 messages in 5 seconds and 30 a minute, friends' messages, table lines and emotes together (`429 chat_limited`, or the socket's error, with the seconds to wait). Since v0.8.3 a table's alliance messages (offer, accept, decline, withdraw, end) and votes on an away player have limits of their own, because each is said to every connection at the table: 12 in 5 seconds and 60 a minute (the socket's `chat_limited` error, with `retry_after` and the `seat`). An offer made again while it stands changes nothing and is said to nobody. The counts live in the API process's memory. SysOp has no limit.
 
 ## Reports of a message
 

@@ -1021,6 +1021,50 @@ def test_an_end_the_database_missed_is_recorded_later(
     assert ada.post("/api/v1/practice-games", {}).status_code == 201
 
 
+def test_a_create_that_gets_no_answer_is_closed_by_its_id() -> None:
+    """v0.8.3: the API names the game it asks for. When the engine does not answer, the API closes
+    that id, so a game the engine made anyway (or makes later) is not left running unfollowed."""
+    calls: list[tuple[str, str, Any]] = []
+
+    class Unanswering:
+        async def request(self, method: str, path: str, *, body: Any = None, **_: Any) -> Any:
+            calls.append((method, path, body))
+            if path == "/games":
+                raise games.EngineUnavailable("timed out")
+            return 404, {"code": "not_found"}
+
+    engine: Any = Unanswering()
+    with pytest.raises(games.EngineUnavailable):
+        asyncio.run(games.create_in_engine(engine, {"format": "commander"}))
+    create, close = calls
+    game_id = create[2]["game_id"]
+    assert str(uuid.UUID(game_id)) == game_id and create[2]["format"] == "commander"
+    assert close == ("POST", f"/games/{game_id}/close", {})
+
+
+def test_an_end_that_cannot_be_written_interrupts_the_game(
+    client: TestClient, app: FastAPI, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.8.3: an end whose writing fails for a reason waiting cannot cure (here a bug in a hook)
+    is logged and the game recorded interrupted, so it stops holding its owner's only game."""
+    record_end = games.record_end
+    refused: list[str] = []
+
+    def broken(database: Any, game_id: Any, status: str, *args: Any) -> None:
+        if status == "finished":
+            refused.append(status)
+            raise RuntimeError("a hook failed")
+        record_end(database, game_id, status, *args)
+
+    monkeypatch.setattr(games, "record_end", broken)
+    ada = Account(client, "ada")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    closed_now = ada.post(f"/api/v1/games/{game_id}/close").json()
+    assert refused == ["finished"]
+    assert closed_now["status"] == "interrupted"
+    assert ada.post("/api/v1/practice-games", {}).status_code == 201
+
+
 def test_closing_a_game_nothing_follows_interrupts_it(
     database: str, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
 ) -> None:

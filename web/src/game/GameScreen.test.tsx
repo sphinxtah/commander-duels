@@ -254,6 +254,45 @@ describe("the game screen", () => {
     ]);
   });
 
+  it("P held down answers one prompt, not each one its repeats meet (v0.8.3)", () => {
+    render(<GameScreen gameId="g1" me={null} />);
+    const socket = FakeSocket.made[0];
+    act(() => {
+      socket.accept();
+      socket.deliver(welcome(0, false));
+      socket.deliver({
+        type: "lease",
+        role: "controller",
+        controlled: true,
+        reason: "granted",
+      });
+      socket.deliver({
+        type: "snapshot",
+        snapshot: snapshot(5, priority("A")),
+      });
+    });
+    fireEvent.keyDown(document.body, { key: "p" });
+    expect(socket.commands()).toHaveLength(1);
+    // The answer lands and the next prompt is drawn while the key is still down.
+    const [answered] = socket.commands();
+    act(() => {
+      socket.deliver({
+        type: "command_result",
+        action_id: answered!.action_id,
+        status: 200,
+        body: {},
+      });
+      socket.deliver({
+        type: "snapshot",
+        snapshot: snapshot(7, priority("B")),
+      });
+    });
+    expect(screen.getByText("Prompt B")).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: "p", repeat: true });
+    fireEvent.keyDown(document.body, { key: "p", repeat: true });
+    expect(socket.commands()).toHaveLength(1);
+  });
+
   it("P answers a prompt the moment it is drawn, before later effects run", () => {
     // Presses P during the commit that draws a new prompt: after the page shows it, before the
     // effects React runs once the commit is done.

@@ -84,6 +84,10 @@ MESSAGE_LINES = 12
 BURST = 5
 BURST_SECONDS = 5.0
 PER_MINUTE = 30
+# Alliance offers and answers, and votes on an away seat, at a table (v0.8.3): each is said to every
+# connection there, so they have limits of their own, looser than chat's.
+ACTION_BURST = 12
+ACTION_PER_MINUTE = 60
 DIRECT_DAYS = 365
 TABLE_DAYS = 30
 PAGE = 50
@@ -190,21 +194,26 @@ class ReaderTranscript(Contract):
 
 @dataclass
 class ChatLimits:
+    # None reads the module's BURST and PER_MINUTE when a message is counted.
+    burst: int | None = None
+    per_minute: int | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
     sent: dict[UUID, deque[float]] = field(default_factory=dict)
 
     def wait(self, user_id: UUID, now: float | None = None) -> int:
         """Takes a message's place, or how many seconds until one is free (and none is taken)."""
         moment = time.monotonic() if now is None else now
+        burst = BURST if self.burst is None else self.burst
+        per_minute = PER_MINUTE if self.per_minute is None else self.per_minute
         with self.lock:
             sent = self.sent.setdefault(user_id, deque())
             while sent and sent[0] <= moment - 60:
                 sent.popleft()
             recent = [at for at in sent if at > moment - BURST_SECONDS]
-            if len(recent) >= BURST:
-                return max(1, int(recent[-BURST] + BURST_SECONDS - moment + 0.999))
-            if len(sent) >= PER_MINUTE:
-                return max(1, int(sent[-PER_MINUTE] + 60 - moment + 0.999))
+            if len(recent) >= burst:
+                return max(1, int(recent[-burst] + BURST_SECONDS - moment + 0.999))
+            if len(sent) >= per_minute:
+                return max(1, int(sent[-per_minute] + 60 - moment + 0.999))
             sent.append(moment)
             return 0
 
@@ -259,6 +268,7 @@ class ChatHub:
         self.loop = loop
         self.connections: dict[UUID, dict[str, ChatConnection]] = {}
         self.limits = ChatLimits()
+        self.table_actions = ChatLimits(burst=ACTION_BURST, per_minute=ACTION_PER_MINUTE)
 
     def tell(self, user_id: UUID, message: dict[str, Any]) -> None:
         """Sends to every tab of the account; from any thread (routes run in the thread pool)."""

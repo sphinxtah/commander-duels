@@ -332,6 +332,21 @@ def test_learn_commander_uses_the_training_seed(client: TestClient, engine: Fake
     assert refused.status_code == 422
 
 
+def test_learn_commander_is_refused_after_the_first_ward(
+    client: TestClient, engine: FakeEngine
+) -> None:
+    """v0.8.3: the disclosed seed fixes the shuffles, so on a later ward, the finale above all, it
+    would show both decks' order to a player who lost once."""
+    ada = Account(client, "ada")
+    play(ada, engine, 1, won())
+    created = len(engine.created)
+    for number in (2, 14):
+        refused = start(ada, number, learn=True)
+        assert (refused.status_code, refused.json()["code"]) == (422, "invalid_seat")
+    assert len(engine.created) == created
+    assert start(ada, 2, loaner=True).status_code == 201
+
+
 def test_a_choice_of_two_decks_is_refused(client: TestClient) -> None:
     ada = Account(client, "ada")
     both = start(ada, 1, loaner=True, deck_id=str(uuid.uuid4()))

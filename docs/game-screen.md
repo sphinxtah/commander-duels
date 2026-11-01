@@ -140,7 +140,7 @@ The band's first diamond opens it, above the HUD: **Table** (back to the Play pa
 | Arrow keys, Home, End | Move between the cards of a zone |
 | Enter or Space | Answers a card's option, or opens its menu |
 | Z | Zooms the focused card |
-| P | Answers the primary option: pass priority, done, keep or yes |
+| P | Answers the primary option: pass priority, done, keep or yes. One press, one answer: a held key's repeats answer nothing (v0.8.3) |
 | T or Space | Stops the response timer while it runs (Space then presses nothing) |
 | F | Full screen on and off |
 | Mouse wheel over a card | Magnifies it more, or less |

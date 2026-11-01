@@ -46,9 +46,18 @@ from catalog.text import normalize
 MAX_TEXT_BYTES = 64 * 1024
 MAX_JSON_BYTES = 256 * 1024
 MAX_LINES = 600
+# A line's length once its runs of spaces are one space (v0.8.3): card names are at most 200
+# characters, so a longer line is no deck line. The limit comes before any pattern below, which
+# would otherwise take time growing with the square of a long line's length.
+MAX_LINE_CHARS = 300
+# Lines whose card is not found get suggestions, one database search each; past this many, the
+# rest of an import's unknown lines get none.
+MAX_SUGGESTION_LOOKUPS = 40
 MAX_SUGGESTIONS = 5
 JSON_FORMAT = "commander-duels-deck"
 JSON_VERSION = 1
+
+SPACES = re.compile(r"\s+")
 
 LINE = re.compile(r"^(?:(?P<count>\d{1,4})\s*[xX]?\s+)?(?P<name>.+?)\s*$")
 PRINTING = re.compile(
@@ -148,7 +157,9 @@ def parse_text(text: str, game_format: str) -> ParsedDeck:
     section: Location | None = "main"
     seen_cards = False
     for number, raw in enumerate(raw_lines, 1):
-        line = raw.strip()
+        line = SPACES.sub(" ", raw).strip()
+        if len(line) > MAX_LINE_CHARS:
+            raise invalid(f"Line {number}: a line is at most {MAX_LINE_CHARS} characters.")
         if not line:
             if not headed and seen_cards and game_format == "legacy" and section == "main":
                 section = "sideboard"
@@ -325,6 +336,7 @@ def resolve(
     exact = candidates_by_name(db, names)
     withdrawn = candidates_by_name(db, {name for name, cards in exact.items() if not cards}, False)
     resolved: list[ImportLine] = []
+    lookups = 0
     for line in parsed.lines:
         concept = by_oracle.get(line.oracle_id) if line.oracle_id else None
         options: list[CardConcept] = []
@@ -383,7 +395,10 @@ def resolve(
             )
             continue
         status: Literal["ambiguous", "unresolved"] = "ambiguous" if options else "unresolved"
-        shown = options or suggestions(db, line.name)
+        shown = options
+        if not shown and lookups < MAX_SUGGESTION_LOOKUPS:
+            lookups += 1
+            shown = suggestions(db, line.name)
         resolved.append(
             ImportLine(
                 line=line.line,

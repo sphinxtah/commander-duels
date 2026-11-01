@@ -368,6 +368,8 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // A held key repeats: each repeat would answer the next prompt as it appears (v0.8.3).
+      if (event.repeat) return;
       if (
         event.key.toLowerCase() !== "p" ||
         event.ctrlKey ||

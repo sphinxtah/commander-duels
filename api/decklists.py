@@ -29,12 +29,14 @@ MAX_COUNT = 250
 MAX_CARDS = 1000
 MAX_NAME = 200
 MAX_COMMANDERS = 2
+MAX_LINE = 300
 
 LINE = re.compile(r"^(?:(?P<count>\d{1,4})\s*[xX]?\s+)?(?P<name>.+)$")
 SET_ANNOTATION = re.compile(r"\s+\([A-Za-z0-9]{2,8}\)(?:\s+[A-Za-z0-9-]+)?(?:\s+\*[A-Z]\*)?$")
 MAIN_HEADINGS = {"deck", "main", "maindeck", "main deck", "library", "mainboard"}
 SKIPPED_HEADINGS = {"sideboard", "maybeboard", "considering", "tokens"}
 COMMANDER_HEADINGS = {"commander", "commanders"}
+SPACES = re.compile(r"\s+")
 
 
 def invalid(line: int, message: str) -> ApiError:
@@ -48,7 +50,11 @@ def parse_deck_list(text: str, game_format: str) -> dict[str, object]:
     commanders: list[str] = []
     section = "main"
     for number, raw in enumerate(text.splitlines(), 1):
-        line = raw.strip()
+        # Runs of spaces as one, and a bound on the length, before any pattern (v0.8.3): the
+        # patterns below take time growing with the square of a long run of spaces.
+        line = SPACES.sub(" ", raw).strip()
+        if len(line) > MAX_LINE:
+            raise invalid(number, f"a line has at most {MAX_LINE} characters.")
         if not line or line.startswith(("#", "//")):
             continue
         heading = line.rstrip(":").strip().casefold()

@@ -118,7 +118,12 @@ def test_a_practice_game_plays_again_with_the_same_settings(client, engine):
     replay = again.json()
     assert replay["status"] == "started" and replay["game_id"] not in (None, game_id)
     # The same request: deck, bots, skill, turn cap and rules.
-    assert engine.created[-1] == engine.created[-2]
+    # Each create names a new game id of the API's (v0.8.3); the rest is the same.
+    first, second = (
+        {k: v for k, v in body.items() if k != "game_id"} for body in engine.created[-2:]
+    )
+    assert first == second
+    assert engine.created[-1]["game_id"] != engine.created[-2]["game_id"]
     assert engine.created[-1]["skill"] == 2 and len(engine.created[-1]["seats"]) == 3
     with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
         old, new = (db.get(Game, uuid.UUID(found)) for found in (game_id, replay["game_id"]))

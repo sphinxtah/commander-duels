@@ -169,6 +169,63 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     expect(await screen.findByText("All changes saved")).toBeInTheDocument();
   });
 
+  it("sends the next save only once the one under way answers, so its own edits never conflict (v0.8.3)", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deck(3)));
+    let answerFirst = () => {};
+    api.on(
+      DRAFT,
+      (options) =>
+        new Promise((resolve) => {
+          answerFirst = () => resolve(saved(4)(options));
+        }),
+      saved(5),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    addMountain();
+    await waitFor(() => expect(drafts(api)).toHaveLength(1), SAVED);
+    // A second edit while the first save is out: past the autosave's delay, nothing more is sent.
+    addMountain();
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1600)));
+    expect(drafts(api)).toHaveLength(1);
+    await act(async () => answerFirst());
+    await waitFor(() => expect(drafts(api)).toHaveLength(2), SAVED);
+    expect(drafts(api)[1]).toEqual({
+      version: 4,
+      entries: [entry(bolt, 4), entry(mountain, 2)],
+    });
+    expect(
+      await screen.findByText("All changes saved", undefined, SAVED),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", {
+        name: "This deck changed somewhere else",
+      }),
+    ).toBeNull();
+  });
+
+  it("sends an edit not yet saved when the player leaves the editor (v0.8.3)", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deck(3)));
+    api.on(DRAFT, saved(4));
+    finding(api);
+    const { unmount } = render(
+      <DeckEditor deckId="deck-1" heading={createRef()} />,
+    );
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    addMountain();
+    unmount();
+    await waitFor(() => expect(drafts(api)).toHaveLength(1));
+    expect(drafts(api)[0]).toEqual({
+      version: 3,
+      entries: [entry(bolt, 4), entry(mountain, 1)],
+    });
+    const sent = api.calls.find((call) => call.route === DRAFT)!;
+    expect((sent.options as { keepalive?: boolean }).keepalive).toBe(true);
+  });
+
   it("takes the saved version without sending anything", async () => {
     const api = mockApi();
     api.on(

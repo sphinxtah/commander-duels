@@ -54,6 +54,7 @@ from api.games import (
     LiveGame,
     LiveSeat,
     Player,
+    create_in_engine,
     engine_deck_list,
     engine_names,
     full_access,
@@ -769,10 +770,11 @@ async def next_game(hub: GameHub, match_id: UUID) -> None:
                 return
             try:
                 try:
-                    status, created = await engine.request("POST", "/games", body=plan.body)
+                    status, created = await create_in_engine(engine, plan.body)
                 except EngineUnavailable:
+                    # Closed by its id already (v0.8.3), so the retry cannot leave two games.
                     status, created = 503, None
-                if status == 429 or status >= 500 or (status == 201 and not created):
+                if status in (409, 429) or status >= 500 or (status == 201 and not created):
                     waiting_of(hub)[match_id] = BUSY if status == 429 else AWAY
                     retry(hub, match_id, BUSY_RETRY_SECONDS if status == 429 else RETRY_SECONDS)
                     return

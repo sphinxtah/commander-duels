@@ -113,39 +113,66 @@ export function DeckEditor({
     };
   }, [load]);
 
-  const save = useCallback(async () => {
-    const sent = changes.current;
-    setSaveState("saving");
-    const { data, error, response } = await client.PUT(
-      "/api/v1/decks/{deck_id}/draft",
-      {
-        params: { path: { deck_id: deckId } },
-        body: { version: version.current, entries },
-      },
-    );
-    if (data) {
-      version.current = data.version;
-      setValidation(data.validation);
-      setCards((current) => ({ ...current, ...data.cards }));
-      // The draft as the server saved it (v0.5.0: copies naming no edition take one the library
-      // holds), unless the player changed it meanwhile: then the next save sends theirs.
-      if (changes.current === sent) setEntries(data.entries);
-      setSaveState(changes.current === sent ? "saved" : "dirty");
-      setSaveError("");
-      return;
-    }
-    if (response.status === 409) {
-      const server = await load();
-      if (server) {
-        setConflict(server);
-        setSaveState("conflict");
-        conflictDialog.current?.showModal();
-      }
-      return;
-    }
-    setSaveState("error");
-    setSaveError(describe(error));
-  }, [deckId, entries, load]);
+  // The newest entries and save state, for saves that run later than the render that asked.
+  const latest = useRef({ entries, saveState });
+  useEffect(() => {
+    latest.current = { entries, saveState };
+  }, [entries, saveState]);
+  // The save under way. Saves run one after another (v0.8.3): a second sent while the first is
+  // out would carry the version the first is replacing, and the server would call the player's
+  // own edit a conflict from another tab.
+  const inFlight = useRef<Promise<boolean> | null>(null);
+
+  const save = useCallback(
+    (options: { keepalive?: boolean } = {}): Promise<boolean> => {
+      const run = async (): Promise<boolean> => {
+        const sent = changes.current;
+        setSaveState("saving");
+        const { data, error, response } = await client.PUT(
+          "/api/v1/decks/{deck_id}/draft",
+          {
+            params: { path: { deck_id: deckId } },
+            body: { version: version.current, entries: latest.current.entries },
+            ...(options.keepalive ? { keepalive: true } : {}),
+          },
+        );
+        if (data) {
+          version.current = data.version;
+          setValidation(data.validation);
+          setCards((current) => ({ ...current, ...data.cards }));
+          // The draft as the server saved it (v0.5.0: copies naming no edition take one the
+          // library holds), unless the player changed it meanwhile: then the next save sends
+          // theirs.
+          if (changes.current === sent) setEntries(data.entries);
+          setSaveState(changes.current === sent ? "saved" : "dirty");
+          setSaveError("");
+          return true;
+        }
+        if (response.status === 409) {
+          const server = await load();
+          if (server) {
+            setConflict(server);
+            setSaveState("conflict");
+            conflictDialog.current?.showModal();
+          }
+          return false;
+        }
+        setSaveState("error");
+        setSaveError(describe(error));
+        return false;
+      };
+      const previous = inFlight.current;
+      const next = previous ? previous.then(run, run) : run();
+      inFlight.current = next;
+      void next
+        .finally(() => {
+          if (inFlight.current === next) inFlight.current = null;
+        })
+        .catch(() => undefined);
+      return next;
+    },
+    [deckId, load],
+  );
 
   useEffect(() => {
     if (saveState !== "dirty") return;
@@ -153,9 +180,28 @@ export function DeckEditor({
     return () => window.clearTimeout(timer);
   }, [saveState, save, entries]);
 
+  // Leaving the editor inside the app (v0.8.3): edits the autosave had not sent yet, or whose
+  // save failed, are sent now instead of being dropped with the timer.
+  const saveOnLeave = useRef(save);
+  useEffect(() => {
+    saveOnLeave.current = save;
+  }, [save]);
+  useEffect(
+    () => () => {
+      const { saveState: state } = latest.current;
+      if (state === "dirty" || state === "error")
+        void saveOnLeave.current({ keepalive: true }).catch(() => undefined);
+    },
+    [],
+  );
+
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
-      if (saveState === "dirty" || saveState === "saving")
+      if (
+        saveState === "dirty" ||
+        saveState === "saving" ||
+        saveState === "error"
+      )
         event.preventDefault();
     };
     window.addEventListener("beforeunload", warn);
@@ -244,7 +290,14 @@ export function DeckEditor({
   }
 
   async function saveVersion() {
-    if (saveState === "dirty" || saveState === "saving") await save();
+    // The edits go first; a version without them would not be the deck on screen (v0.8.3).
+    if (
+      (saveState === "dirty" ||
+        saveState === "saving" ||
+        saveState === "error") &&
+      !(await save())
+    )
+      return;
     const { data, error } = await client.POST(
       "/api/v1/decks/{deck_id}/revisions",
       {

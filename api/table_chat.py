@@ -259,6 +259,14 @@ def allies_of(game: "LiveGame", seat: int) -> list[int]:
     )
 
 
+def acting_too_fast(websocket: "WebSocket", connection: "Connection") -> int:
+    """Takes an alliance message's or a vote's place under the table's limits (v0.8.3), or how many
+    seconds until one is free. SysOp's connections are not counted."""
+    if not connection.counted:
+        return 0
+    return chat_hub_of(websocket).table_actions.wait(connection.user_id)
+
+
 async def receive(
     hub: "GameHub",
     game: "LiveGame",
@@ -281,6 +289,15 @@ async def receive(
         refuse("invalid_message", "That message cannot be sent.", client_id=client_id)
         return
     if isinstance(parsed, AllianceIn):
+        # Limited apart from chat (v0.8.3): each alliance message is said to the whole table.
+        if wait := acting_too_fast(websocket, connection):
+            refuse(
+                "chat_limited",
+                "You are sending messages very fast. Wait a moment.",
+                seat=parsed.seat,
+                retry_after=wait,
+            )
+            return
         alliance(hub, game, connection, parsed, refuse)
         return
     # SysOp's connections are the ones not counted against the limits (api/games.py crowded).
@@ -371,6 +388,9 @@ def alliance(
     if action == "offer" and (wanted.seat, seat) in game.offers:
         # Offering one back is accepting it, as adding a friend back is.
         action = "accept"
+    if action == "offer" and (seat, wanted.seat) in game.offers:
+        # Offered already: nothing changes, so nothing is said to the table (v0.8.3).
+        return
     if action == "offer":
         if other.left is not None:
             refuse("not_in_game", "That player is out of the game.", seat=wanted.seat)

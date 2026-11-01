@@ -46,7 +46,7 @@ import httpx
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 from sqlalchemy import Engine, func, select, update
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -152,6 +152,9 @@ INSPECTION_WAIT_MS = 3_000
 RETAIN_FINISHED_SECONDS = 600.0
 # How long closing a game waits for its result to be recorded, so the reply shows it.
 CLOSE_WAIT_SECONDS = 5.0
+# Creating a game waits this long for the engine (v0.8.3; other requests wait 10 s): its decks load
+# before it answers. Read when a game is created.
+CREATE_TIMEOUT_SECONDS = 30.0
 # Database writes that must land (a game's end, the restart sweep) retry, doubling the wait.
 RETRY_SECONDS = 1.0
 RETRY_MAX_SECONDS = 30.0
@@ -469,7 +472,13 @@ class GameHub:
     def spawn(self, work: Coroutine[Any, Any, None]) -> None:
         task = asyncio.get_running_loop().create_task(work)
         self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+        task.add_done_callback(self.task_done)
+
+    def task_done(self, task: asyncio.Task[None]) -> None:
+        """A task's failure is logged when it happens (v0.8.3), not when the task is collected."""
+        self.tasks.discard(task)
+        if not task.cancelled() and (error := task.exception()) is not None:
+            log.error("A game task failed", exc_info=error)
 
     def running(self) -> int:
         return sum(not game.finished for game in self.games.values())
@@ -534,7 +543,20 @@ class GameHub:
 
     async def follow(self, game: LiveGame, seat: LiveSeat) -> None:
         """Long-polls one seat's view and publishes every new revision to the connections that see
-        that seat, until the game finishes; then records the result, once for the game."""
+        that seat, until the game finishes; then records the result, once for the game. If
+        following fails in a way it cannot recover from, the game ends as interrupted (v0.8.3)
+        rather than staying active with nothing to follow it."""
+        try:
+            await self.following(game, seat)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception(
+                "Following game %s, seat %d, failed; it ends interrupted", game.id, seat.seat
+            )
+            await self.end(game, None)
+
+    async def following(self, game: LiveGame, seat: LiveSeat) -> None:
         engine = self.require_engine()
         since, log_from, failures = -1, 0, 0
         while True:
@@ -552,6 +574,16 @@ class GameHub:
                 await self.end(game, None)
                 return
             if status != 200 or not isinstance(snapshot, dict):
+                failures += 1
+                await asyncio.sleep(min(30.0, 0.5 * 2 ** min(failures, 6)))
+                continue
+            if (
+                not isinstance(snapshot.get("revision"), int)
+                or not isinstance(snapshot.get("log"), list)
+                or not isinstance(snapshot.get("log_from"), int)
+            ):
+                # A view the API cannot read (v0.8.3): tried again, as an unreachable engine is.
+                log.warning("Game %s sent a view without its revision or log", game.id)
                 failures += 1
                 await asyncio.sleep(min(30.0, 0.5 * 2 ** min(failures, 6)))
                 continue
@@ -583,29 +615,52 @@ class GameHub:
         status = "finished" if result is not None else "interrupted"
         if result is None:
             self.broadcast(game, {"type": "interrupted", "game_id": str(game.id)})
-        await retried(
-            partial(
-                record_end,
-                self.database,
-                game.id,
-                status,
-                result,
-                self.settings.content_dir,
-            ),
-            f"record the end of game {game.id}",
-        )
+        await self.record(game, status, result)
         game.recorded.set()
         self.presence_changed(game)
         # A match's game (v0.5.0): sideboarding for the next one starts its clock. Imported here:
         # api.matches imports this module.
         from api import matches
 
-        with suppress(SQLAlchemyError):
+        try:
             await matches.after_game(self, game.id)
+        except SQLAlchemyError:
+            pass
+        except Exception:
+            # Logged, and the game is still forgotten after its time (v0.8.3).
+            log.exception("The match of game %s could not go on", game.id)
         await asyncio.sleep(RETAIN_FINISHED_SECONDS)
         for connection in list(game.connections.values()):
             connection.close(1000)
         self.games.pop(game.id, None)
+
+    async def record(self, game: LiveGame, status: str, result: dict[str, Any] | None) -> None:
+        """Writes the game's end, retried while the database is unreachable. A write that fails for
+        any other reason (v0.8.3) is logged, and the game is recorded interrupted instead, with no
+        result; if even that fails, the game alone is marked interrupted. Either way the game
+        stops counting as its players' running game."""
+        what = f"record the end of game {game.id}"
+        content_dir = self.settings.content_dir
+        try:
+            await retried(
+                partial(record_end, self.database, game.id, status, result, content_dir), what
+            )
+            return
+        except Exception:
+            log.exception("Could not %s; recording it interrupted", what)
+        if status != "interrupted" or result is not None:
+            try:
+                await retried(
+                    partial(record_end, self.database, game.id, "interrupted", None, content_dir),
+                    what,
+                )
+                return
+            except Exception:
+                log.exception("Could not record game %s interrupted", game.id)
+        try:
+            await retried(partial(force_interrupted, self.database, game.id), what)
+        except Exception:
+            log.exception("Could not mark game %s interrupted", game.id)
 
     def broadcast(self, game: LiveGame, message: dict[str, Any]) -> None:
         for connection in list(game.connections.values()):
@@ -926,12 +981,14 @@ def hub_of(request: Request | WebSocket) -> GameHub:
 
 
 async def retried[T](work: Callable[[], T], what: str) -> T:
-    """Database work that must land, run until it does: the database may be restarting."""
+    """Database work that must land, run until it does: the database may be restarting. Since
+    v0.8.3 only an unreachable or restarting database is waited for; any other error (a constraint,
+    bad data, a bug) would fail every time, so it is raised to the caller."""
     delay = RETRY_SECONDS
     while True:
         try:
             return await run_in_threadpool(work)
-        except SQLAlchemyError:
+        except (OperationalError, InterfaceError):
             log.warning("Could not %s; trying again in %.0f s", what, delay, exc_info=True)
         await asyncio.sleep(delay)
         delay = min(RETRY_MAX_SECONDS, delay * 2)
@@ -1005,6 +1062,18 @@ def record_end(
                 settle(db, game)
                 matches.game_ended(db, game)
             db.commit()
+
+
+def force_interrupted(database: Engine, game_id: UUID) -> None:
+    """The last resort when a game's end cannot be recorded (v0.8.3): the game alone marked
+    interrupted, so it no longer counts as its players' running game. Nothing else is written."""
+    with Session(database) as db:
+        db.execute(
+            update(Game)
+            .where(Game.id == game_id, Game.status == "active")
+            .values(status="interrupted", finished_at=utcnow())
+        )
+        db.commit()
 
 
 def recorded(result: dict[str, Any]) -> dict[str, Any]:
@@ -1632,13 +1701,31 @@ def record_game(
     return game
 
 
+async def create_in_engine(engine: EngineClient, body: dict[str, object]) -> tuple[int, Any]:
+    """POST /games under an id the API chooses (v0.8.3). When no answer comes, the game is closed
+    by that id, which also stops a create that reaches the engine later (it answers 409): no game
+    is left running that nothing follows, and a retry starts a new one."""
+    game_id = str(uuid4())
+    try:
+        return await engine.request(
+            "POST",
+            "/games",
+            body={**body, "game_id": game_id},
+            timeout=CREATE_TIMEOUT_SECONDS,
+        )
+    except EngineUnavailable:
+        with suppress(EngineUnavailable):
+            await engine.request("POST", f"/games/{game_id}/close", body={})
+        raise
+
+
 async def engine_game(
     engine: EngineClient, body: dict[str, object], request: Request
 ) -> dict[str, Any]:
     """Asks the engine for a service game; its refusals become the API's. The answer holds each
     human seat's token, once."""
     try:
-        status, created = await engine.request("POST", "/games", body=body)
+        status, created = await create_in_engine(engine, body)
     except EngineUnavailable as error:
         raise unavailable() from error
     if status == 400 and created.get("code") == "unknown_cards":
@@ -2139,6 +2226,20 @@ async def receive_loop(
             seat, remove = message.get("seat"), message.get("remove", True)
             if not isinstance(seat, int) or isinstance(seat, bool) or not isinstance(remove, bool):
                 connection.send({"type": "error", "code": "invalid_message"})
+                continue
+            from api import table_chat  # Imported here: see GameHub.seat_left.
+
+            # Every vote is said to the whole table, so votes are limited (v0.8.3).
+            if wait := table_chat.acting_too_fast(websocket, connection):
+                connection.send(
+                    {
+                        "type": "error",
+                        "code": "chat_limited",
+                        "message": "You are voting very fast. Wait a moment.",
+                        "seat": seat,
+                        "retry_after": wait,
+                    }
+                )
                 continue
             refused = await hub.vote(game, connection, websocket, seat, remove)
             if refused is not None:

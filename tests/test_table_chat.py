@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from test_games import Tab
 from test_tables import Account, TableEngine, commander_table, concede, deck, opened, served
 
-from api.chat import BURST
+from api.chat import ACTION_BURST, BURST
 from api.models import AuditEvent, TableMessage
 
 # The human tables' fixtures: their database, content and fake engine.
@@ -204,6 +204,27 @@ def test_the_table_talks_and_allies_talk_apart(client, engine):
     assert "Let's take out Cara first" in [line["body"] for line in transcript["lines"]]
     assert {p["handle"] for p in transcript["players"]} == {"ada", "bob", "cara"}
     assert ada.get(f"/api/v1/admin/chats/games/{game_id}").status_code == 403
+
+
+def test_alliance_messages_have_their_own_limit(client, engine):
+    """v0.8.3: each alliance message is said to the whole table, so a loop of them is stopped, and
+    an offer made again says nothing new."""
+    ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
+    game_id = table(client, [ada, bob])
+    with ExitStack() as stack:
+        tab = opened(ada, game_id, [], stack)
+        ally(tab, "offer", 1)
+        alliances(tab, offers=[{"from": 0, "to": 1}])
+        ally(tab, "offer", 1)
+        tab.socket.send_json({"type": "ping"})
+        between = []
+        while (message := tab.receive())["type"] != "pong":
+            between.append(message["type"])
+        assert "alliances" not in between and "error" not in between
+        for _ in range(ACTION_BURST):
+            ally(tab, "accept", 1)
+        refusal = tab.until("error", code="chat_limited")
+        assert refusal["seat"] == 1 and refusal["retry_after"] >= 1
 
 
 def test_alliance_refusals_and_the_rate_limit(client, engine):
