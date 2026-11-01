@@ -1424,6 +1424,7 @@
    "tokens": 8192000,
    "commander": null,
    "fallback_commander": "Morophon, the Boundless",
+   "private_commander_title": "The High Priest",
    "private": "campaign-finale",
    "cards": [
     {"name": "Black Lotus", "count": 1},

@@ -594,16 +594,26 @@ final class Prompts {
     }
 
     /**
-     * Every way to pay that XMage counted when it listed the spell as castable: mana abilities on the
-     * battlefield and in the hand (Simian Spirit Guide's, for instance), the pool, and special
-     * payments such as convoke, delve and improvise. Sources and pool mana that cannot pay any of
-     * the unpaid cost are left out: XMage would tap the source anyway, and answers it with pool mana
-     * it cannot use by asking again, forever. With nothing that can pay, cancel is the only option
+     * Every way to pay that XMage counted when it listed the spell as castable: the pool first (since
+     * v0.8.0), mana abilities on the battlefield and in the hand (Simian Spirit Guide's, for
+     * instance), and special payments such as convoke, delve and improvise. Sources and pool mana
+     * that cannot pay any of the unpaid cost are left out: XMage would tap the source anyway, and
+     * answers it with pool mana it cannot use by asking again, forever. With nothing that can pay, cancel is the only option
      * (Chain Lightning's "Pay {R}{R} to copy the spell?" answered yes by a player with only Forests).
      *
      * @param unpaid the cost still to pay, or null when it is unknown (then nothing is left out)
      */
     private void payMana(ManaCost unpaid) {
+        // Mana already in the pool leads (v0.8.0, the owner's word): mana added on purpose before
+        // casting is the first choice, ahead of the sources still to tap.
+        ManaPool pool = player.getManaPool();
+        for (ManaType type : ManaType.values()) {
+            int amount = pool.get(type);
+            if (amount > 0 && (unpaid == null || one(type) == null || unpaid.testPay(one(type)))) {
+                add("use_pool", amount + " " + type + " mana in pool", null, null, false,
+                    new ManaAnswer(player.getId(), type));
+            }
+        }
         List<Permanent> sources = new ArrayList<>();
         for (Permanent permanent : game.getBattlefield().getAllActivePermanents(player.getId())) {
             if (canProduceMana(permanent, unpaid)) {
@@ -628,14 +638,6 @@ final class Prompts {
             String rule = SeatViews.plain(handManaAbilities(card).get(0).getRule(card.getName()));
             add("tap_source", rule.isEmpty() ? card.getName() : rule, views.ref(card), null, false,
                 new UuidAnswer(card.getId()));
-        }
-        ManaPool pool = player.getManaPool();
-        for (ManaType type : ManaType.values()) {
-            int amount = pool.get(type);
-            if (amount > 0 && (unpaid == null || one(type) == null || unpaid.testPay(one(type)))) {
-                add("use_pool", amount + " " + type + " mana in pool", null, null, false,
-                    new ManaAnswer(player.getId(), type));
-            }
         }
         // XMage's own condition for its Special button. XMage then asks which special payment, and
         // which creatures, cards or artifacts it uses.

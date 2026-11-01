@@ -4762,7 +4762,7 @@
         "additionalProperties": false,
         "properties": {
           "commander": {
-            "description": "That deck's commander.",
+            "description": "That deck's commander; for the private finale's, what the story calls it.",
             "title": "Commander",
             "type": "string"
           },
@@ -22271,6 +22271,7 @@
     },
     "/api/v1/custom-cards/{card_id}/image": {
       "get": {
+        "description": "A custom card's image, for a Godlike account or, since v0.8.0, one that holds the card for\ngood (the campaign finale's commander); to anyone else, the 404 of a missing route.",
         "operationId": "custom_card_image_api_v1_custom_cards__card_id__image_get",
         "parameters": [
           {

@@ -1357,7 +1357,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Custom Card Image */
+        /**
+         * Custom Card Image
+         * @description A custom card's image, for a Godlike account or, since v0.8.0, one that holds the card for
+         *     good (the campaign finale's commander); to anyone else, the 404 of a missing route.
+         */
         get: operations["custom_card_image_api_v1_custom_cards__card_id__image_get"];
         put?: never;
         post?: never;
@@ -4870,7 +4874,7 @@ export interface components {
         EncounterSpoils: {
             /**
              * Commander
-             * @description That deck's commander.
+             * @description That deck's commander; for the private finale's, what the story calls it.
              */
             commander: string;
             /**

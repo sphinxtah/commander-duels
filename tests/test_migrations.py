@@ -47,6 +47,7 @@ def test_migration_upgrade_and_downgrade(tmp_path, monkeypatch):
         "campaign_progress",
         "campaign_games",
         "campaign_rewards",
+        "custom_card_grants",
         "external_identities",
         "rules_bundles",
         "scheduled_jobs",

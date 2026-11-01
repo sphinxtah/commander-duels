@@ -71,6 +71,7 @@ from api.models import (
     CardConcept,
     CardPrinting,
     CustomCard,
+    CustomCardGrant,
     LibraryGrant,
     ProgressEntry,
     User,
@@ -116,6 +117,9 @@ class Library:
     editions: dict[UUID, Edition] = field(default_factory=dict)
     # One-of-a-kind printings (v0.5.1) this account holds no copy of: no deck of its may hold them.
     withheld: frozenset[UUID] = frozenset()
+    # Custom cards granted to the account for good (v0.8.0, the campaign finale's commander): it
+    # sees and plays them whatever its tier.
+    won_custom: frozenset[UUID] = frozenset()
     # The editions by card, made the first time they are asked for.
     by_card: dict[UUID, list[Edition]] | None = field(default=None, repr=False, compare=False)
     # By edition (v0.6.0): the copies held in each finish (an alliance's are nonfoil), and those
@@ -127,6 +131,7 @@ class Library:
         return Collection(
             None if self.unlimited else {**self.copies, **self.custom},
             godlike=self.godlike,
+            won=self.won_custom,
             loaded=self.loaded,
             editions=None if self.unlimited else self.editions,
             withheld=self.withheld,
@@ -280,9 +285,22 @@ def library_of(
 ) -> Library:
     godlike = at_godlike(db, user.id)
     withheld = withheld_from(db, user)
+    won = won_custom(db, user)
     if UNLIMITED in permissions:
-        return Library(unlimited=True, alliance=user.alliance, godlike=godlike, withheld=withheld)
-    library = Library(unlimited=False, alliance=user.alliance, godlike=godlike, withheld=withheld)
+        return Library(
+            unlimited=True,
+            alliance=user.alliance,
+            godlike=godlike,
+            withheld=withheld,
+            won_custom=frozenset(won),
+        )
+    library = Library(
+        unlimited=False,
+        alliance=user.alliance,
+        godlike=godlike,
+        withheld=withheld,
+        won_custom=frozenset(won),
+    )
     copies: dict[str, int] = defaultdict(int)
     sources: dict[str, set[str]] = defaultdict(set)
     # By edition: each printing's copies and sources, and the printing as validation names it.
@@ -367,6 +385,10 @@ def library_of(
             select(CustomCard.id).where(CustomCard.planeswalker == planeswalker.id)
         ):
             library.custom[custom_key(card_id)] = ALLIANCE_COPIES
+    # Custom cards won (v0.8.0), on top of an alliance's playset.
+    for card_id, quantity in won.items():
+        key = custom_key(card_id)
+        library.custom[key] = library.custom.get(key, 0) + quantity
     library.copies, library.sources = (
         dict(copies),
         {key: set(found) for key, found in sources.items()},
@@ -391,6 +413,22 @@ def library_of(
     return library
 
 
+def won_custom(db: Session, user: User) -> dict[UUID, int]:
+    """The custom cards granted to the account for good since any reset (v0.8.0), with their
+    copies."""
+    return {
+        card_id: int(quantity)
+        for card_id, quantity in db.execute(
+            select(CustomCardGrant.custom_card_id, func.sum(CustomCardGrant.quantity))
+            .where(
+                CustomCardGrant.user_id == user.id,
+                since_reset(user, CustomCardGrant.created_at),
+            )
+            .group_by(CustomCardGrant.custom_card_id)
+        ).all()
+    }
+
+
 def custom_names(db: Session) -> list[str]:
     return list(db.scalars(select(CustomCard.name)))
 
@@ -401,7 +439,7 @@ async def current_library(request: Request, principal: Active, db: Db) -> Librar
     library = await run_in_threadpool(
         library_of, db, principal.user, principal.permissions, roster_of(request)
     )
-    if library.godlike or principal.can("custom_cards.manage"):
+    if library.godlike or library.won_custom or principal.can("custom_cards.manage"):
         names = await run_in_threadpool(custom_names, db)
         cards = engine_cards_of(request)
         library.loaded = await cards.loaded(names) if cards is not None and names else None

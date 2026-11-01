@@ -29,6 +29,8 @@ from api.models import (
     CampaignProgress,
     CampaignReward,
     CardConcept,
+    CustomCard,
+    CustomCardGrant,
     Deck,
     LibraryGrant,
     ProgressEntry,
@@ -221,10 +223,11 @@ def test_a_wardens_first_defeat_gives_their_deck_and_tokens(
         "earned": False,
     }
     # 1,000 tokens for the first warden, doubling with each: 8,192,000 for The Sphinx, whose deck
-    # comes with its public commander.
+    # comes with the commander he plays.
     amounts = [encounter["spoils"]["tokens"] for encounter in state(ada)["encounters"]]
     assert amounts == [1000 * 2**index for index in range(14)]
-    assert state(ada)["encounters"][13]["spoils"]["commander"] == "Morophon, the Boundless"
+    # Before the engine is asked, the finale's commander by the story's word.
+    assert state(ada)["encounters"][13]["spoils"]["commander"] == "The High Priest"
 
     play(ada, engine, 1, won())
     assert state(ada)["encounters"][0]["spoils"]["earned"] is True
@@ -350,6 +353,8 @@ def test_the_finale_without_the_owners_content_plays_the_stand_in(
     assert bot["commanders"] == ["Morophon, the Boundless"]
     assert "reserve" not in bot
     assert engine.created[-1]["skill"] == 6
+    # Without the owner's content, the deck the win gives comes with the stand-in.
+    assert state(ada)["encounters"][13]["spoils"]["commander"] == "Morophon, the Boundless"
 
 
 class FinaleEngine(FakeEngine):
@@ -370,10 +375,33 @@ class FinaleEngine(FakeEngine):
 
 
 def test_the_finale_takes_the_owners_content_from_the_engine(database: str) -> None:
+    from api.identity import utcnow
+
     engine = FinaleEngine()
     with connect(build(database, engine)) as client:
         app: FastAPI = client.app  # type: ignore[assignment]
         ada = Account(client, "ada")
+        # The owner's commander, as SysOp uploaded it (a made-up stand-in here).
+        with Session(app.state.database) as db:
+            priest = CustomCard(
+                name="Test Priest Commander",
+                planeswalker="the-sphinx",
+                mana_cost="{W}{U}{B}{R}{G}",
+                type_line="Legendary Creature — Human Cleric",
+                oracle_text="",
+                power="5",
+                toughness="5",
+                rarity="mythic",
+                image=b"\x89PNG",
+                image_type="image/png",
+                image_sha256="0" * 64,
+                uploaded_by=ada.id,
+                created_at=utcnow(),
+                updated_at=utcnow(),
+            )
+            db.add(priest)
+            db.commit()
+            priest_id = priest.id
         state(ada)
         unlock(app, ada, 14)
         started = start(ada, 14)
@@ -386,7 +414,40 @@ def test_the_finale_takes_the_owners_content_from_the_engine(database: str) -> N
         # Winning the finale completes the campaign; its scene records the ending seen.
         end(engine, started.json()["id"], won())
         until_status(ada, started.json()["id"], "finished")
-        assert state(ada)["chapters"][5]["complete"] is True
+        after = state(ada)
+        assert after["chapters"][5]["complete"] is True
+        # The spoils: The Sphinx's deck, led by the commander he played (the owner's word), which
+        # the winner now holds for good and sees by name, below the Godlike tier.
+        assert after["encounters"][13]["spoils"] == {
+            "tokens": 8192000,
+            "deck": "The Sphinx's Deck",
+            "commander": "The High Priest",
+            "earned": True,
+        }
+        with Session(app.state.database) as db:
+            grants = list(
+                db.scalars(select(CustomCardGrant).where(CustomCardGrant.user_id == ada.id))
+            )
+            assert [(grant.custom_card_id, grant.quantity) for grant in grants] == [(priest_id, 1)]
+            deck = db.scalars(select(Deck).where(Deck.owner_id == ada.id)).one()
+            leaders = [entry for entry in deck.draft["entries"] if entry["location"] == "commander"]
+            assert leaders == [
+                {
+                    "card_id": str(priest_id),
+                    "printing_id": None,
+                    "quantity": 1,
+                    "location": "commander",
+                }
+            ]
+            assert not deck.collection_locked
+        decks = ada.get("/api/v1/decks").json()
+        assert [(d["title"], d["commanders"]) for d in decks] == [
+            ("The Sphinx's Deck", ["Test Priest Commander"])
+        ]
+        detail = ada.get(f"/api/v1/decks/{decks[0]['id']}").json()
+        named = {card["name"] for card in detail["cards"].values()}
+        assert "Test Priest Commander" in named and "Godlike card" not in named
+        assert ada.get(f"/api/v1/custom-cards/{priest_id}/image").status_code == 200
         seen = ada.post("/api/v1/campaign/scenes", {"scene": "FC.END.WIN"}).json()
         assert seen["progress"]["ending"] == "standard"
 

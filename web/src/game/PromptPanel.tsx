@@ -37,7 +37,8 @@ import screenStyles from "./table/screen.module.css";
 const groups: { title: string; actions: PromptOption["action"][] }[] = [
   { title: "Play and cast", actions: ["play_land", "cast"] },
   { title: "Abilities", actions: ["activate", "activate_mana", "use_ability"] },
-  { title: "Mana", actions: ["tap_source", "use_pool", "special_payment"] },
+  // Mana already in the pool leads (v0.8.0, the owner's word): the first choice when paying.
+  { title: "Mana", actions: ["use_pool", "tap_source", "special_payment"] },
   {
     title: "Combat",
     actions: ["toggle_attacker", "all_attack", "toggle_blocker"],
@@ -408,9 +409,15 @@ export function PromptPanel({
     const grouped = groups
       .map((group) => ({
         ...group,
-        options: others.filter((option) =>
-          group.actions.includes(option.action),
-        ),
+        options: others
+          .filter((option) => group.actions.includes(option.action))
+          // The pool's mana first, whatever order the engine listed it in (v0.8.0).
+          .sort((a, b) =>
+            group.title === "Mana"
+              ? Number(b.action === "use_pool") -
+                Number(a.action === "use_pool")
+              : 0,
+          ),
       }))
       .filter((group) => group.options.length > 0);
     const rest = others.filter(

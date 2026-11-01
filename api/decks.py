@@ -78,6 +78,7 @@ from api.library import (
     starter_entries,
     starters_in,
     with_owned_editions,
+    won_custom,
 )
 from api.models import (
     CardConcept,
@@ -327,7 +328,7 @@ def entries_of(deck: Deck) -> list[DeckEntry]:
 
 def commanders_of(db: Session, entries: list[DeckEntry], owner_id: UUID | None = None) -> list[str]:
     """The commanders' names; a custom commander's only while the deck's owner is at the Godlike
-    tier."""
+    tier or, since v0.8.0, holds it for good."""
     ids = [entry.card_id for entry in entries if entry.location == "commander"]
     if not ids:
         return []
@@ -343,8 +344,13 @@ def commanders_of(db: Session, entries: list[DeckEntry], owner_id: UUID | None =
         else {}
     )
     if custom:
-        shown = owner_id is not None and at_godlike(db, owner_id)
-        names |= {card_id: name if shown else HIDDEN_NAME for card_id, name in custom.items()}
+        owner = db.get(User, owner_id) if owner_id is not None else None
+        godlike = owner is not None and at_godlike(db, owner.id)
+        won = won_custom(db, owner) if owner is not None and not godlike else {}
+        names |= {
+            card_id: name if godlike or card_id in won else HIDDEN_NAME
+            for card_id, name in custom.items()
+        }
     return [names[card_id] for card_id in ids if card_id in names]
 
 

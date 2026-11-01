@@ -1811,9 +1811,34 @@ class CampaignGame(Base):
     # Whether the final encounter ran with the private finale (its own commander and the
     # incarnation's reserve) or the public stand-in.
     finale: Mapped[str | None] = mapped_column(String(16))
+    # The private finale's commander as a custom card (the owner's word): the deck its win gives
+    # comes with it. No foreign key, as for a deck's custom cards: SysOp may remove the card.
+    prize_card: Mapped[UUID | None]
     outcome: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class CustomCardGrant(Base):
+    """Copies of one of the Godlike tier's custom cards granted to an account for good (v0.8.0):
+    the campaign finale's commander, with the deck its win gives (the owner's word). The account
+    sees and plays the card whatever its tier, as it does its other cards; a reset counts only the
+    grants after it, as for library_grants. No foreign key to the card, as for a deck's."""
+
+    __tablename__ = "custom_card_grants"
+    __table_args__ = (
+        UniqueConstraint("user_id", "grant_key", name="uq_custom_card_grants_key"),
+        CheckConstraint("quantity > 0", name="ck_custom_card_grants_quantity"),
+        CheckConstraint("source IN ('campaign')", name="ck_custom_card_grants_source"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    custom_card_id: Mapped[UUID]
+    quantity: Mapped[int]
+    source: Mapped[str] = mapped_column(String(16))
+    # campaign:<campaign>:<encounter>:<progress>, as the deck's library grant.
+    grant_key: Mapped[str] = mapped_column(String(96))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
 class CampaignReward(Base):

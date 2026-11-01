@@ -61,7 +61,7 @@ from api.games import (
     retried,
 )
 from api.identity import ApiError, Db, Principal, not_found, utcnow
-from api.library import at_godlike, library_of
+from api.library import at_godlike, library_of, won_custom
 from api.models import (
     CardConcept,
     CatalogRevision,
@@ -654,9 +654,11 @@ def plan_next(db: Session, match_id: UUID) -> NextGame | None:
         else:
             revision = db.get(DeckRevision, player.deck_revision_id)
             entries = arranged(player.arrangement)
-            godlike = player.user_id is not None and at_godlike(db, player.user_id)
+            owner = db.get(User, player.user_id) if player.user_id is not None else None
+            godlike = owner is not None and at_godlike(db, owner.id)
+            won = frozenset(won_custom(db, owner)) if owner is not None else frozenset()
             deck_list = engine_deck_list(
-                db, entries, engine_names(db, entries, godlike), match.format
+                db, entries, engine_names(db, entries, godlike, won), match.format
             )
             if deck_list is None or revision is None:
                 raise ApiError(

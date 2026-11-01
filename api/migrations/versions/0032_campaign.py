@@ -7,6 +7,8 @@ its encounters and the rewards earned.
   their deck and their tokens.
 - token_ledger takes the kind 'campaign' (a warden's tokens) and library_grants the source
   'campaign' (the cards of a warden's deck).
+- custom_card_grants: a custom card granted to an account for good (the finale's commander, with
+  The Sphinx's deck).
 
 New tables and two wider checks: v0.7.3, still serving while this migrates, never reads the
 tables and never writes the new kind or source.
@@ -72,6 +74,7 @@ def upgrade() -> None:
         sa.Column("deck", sa.String(16), nullable=False),
         sa.Column("hints", sa.Boolean(), nullable=False),
         sa.Column("finale", sa.String(16)),
+        sa.Column("prize_card", sa.Uuid()),
         sa.Column("outcome", sa.String(16)),
         sa.Column("created_at", TIMESTAMP, nullable=False),
         sa.Column("finished_at", TIMESTAMP),
@@ -92,6 +95,20 @@ def upgrade() -> None:
         sa.Column("created_at", TIMESTAMP, nullable=False),
     )
     op.create_index("ix_campaign_rewards_user_id", "campaign_rewards", ["user_id"])
+    op.create_table(
+        "custom_card_grants",
+        sa.Column("id", sa.Uuid(), primary_key=True),
+        sa.Column("user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("custom_card_id", sa.Uuid(), nullable=False),
+        sa.Column("quantity", sa.Integer(), nullable=False),
+        sa.Column("source", sa.String(16), nullable=False),
+        sa.Column("grant_key", sa.String(96), nullable=False),
+        sa.Column("created_at", TIMESTAMP, nullable=False),
+        sa.UniqueConstraint("user_id", "grant_key", name="uq_custom_card_grants_key"),
+        sa.CheckConstraint("quantity > 0", name="ck_custom_card_grants_quantity"),
+        sa.CheckConstraint("source IN ('campaign')", name="ck_custom_card_grants_source"),
+    )
+    op.create_index("ix_custom_card_grants_user_id", "custom_card_grants", ["user_id"])
     with op.batch_alter_table("token_ledger") as ledger:
         ledger.drop_constraint("ck_token_ledger_kind", type_="check")
         ledger.create_check_constraint("ck_token_ledger_kind", TOKENS)
@@ -101,6 +118,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index("ix_custom_card_grants_user_id", table_name="custom_card_grants")
+    op.drop_table("custom_card_grants")
     # The ledger and the grants are append-only on PostgreSQL: their triggers are set aside while
     # the campaign's rows go.
     postgres = op.get_bind().dialect.name == "postgresql"

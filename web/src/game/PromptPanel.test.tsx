@@ -231,6 +231,34 @@ describe("paying mana", () => {
       ),
     ).toEqual(["Tap", "Special payment"]);
   });
+
+  it("puts the pool's mana first, ahead of the sources to tap (v0.8.0)", () => {
+    const prompt: Prompt = {
+      id: "p",
+      kind: "pay_mana",
+      message: "Pay {1}{G}",
+      detail: null,
+      options: [
+        option("1", "tap_source"),
+        option("2", "tap_source"),
+        option("3", "use_pool"),
+        option("4", "cancel"),
+      ],
+      amounts: null,
+      piles: null,
+      xmage_query: null,
+    };
+    render(<Panel game={state(snapshot(5, prompt))} />);
+    const mana = screen.getByRole("heading", {
+      level: 3,
+      name: "Mana",
+    }).parentElement!;
+    expect(
+      Array.from(mana.querySelectorAll("[data-option]")).map((button) =>
+        button.getAttribute("data-option"),
+      ),
+    ).toEqual(["3", "1", "2"]);
+  });
 });
 
 describe("the prompt on screen", () => {

@@ -20,8 +20,9 @@ the owner's handoff is in the gitignored campaign/ folder beside compose.yaml.
 - **The spoils** (the owner, 2026-10-31): a warden's first defeat gives the player that warden's
   deck, a deck of their own with every copy of its cards granted to their library, and tokens,
   1,000 for the first warden and doubling with each (content/campaign.json names each amount).
-  The Sphinx's deck is given with its public commander: the Godlike tier's custom cards are never
-  granted.
+  The Sphinx's deck comes with the commander he played: the owner's High Priest, a Godlike custom
+  card, when the private finale ran (granted for good: custom_card_grants, so its winner sees and
+  plays it whatever their tier), else the public stand-in.
 - **Progress** is campaign_progress: the furthest encounter open, those won, the scenes seen and
   the tutorial. Account wins and tiers never gate it.
 """
@@ -42,7 +43,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api.auth import INPUT_ERRORS
-from api.custom_play import custom_in_seats
+from api.custom_play import custom_in_seats, custom_named
 from api.decks import refresh_decks, store_draft
 from api.economy import reward as pay_reward
 from api.games import (
@@ -68,6 +69,8 @@ from api.models import (
     CampaignProgress,
     CampaignReward,
     CardConcept,
+    CustomCard,
+    CustomCardGrant,
     Deck,
     Game,
     User,
@@ -114,11 +117,13 @@ class Encounter:
     private: str | None = None
     # The tokens the first win pays (the spoils, with the deck).
     tokens: int = 0
+    # What the spoils call the private finale's commander, whose name this repository never holds.
+    private_commander_title: str | None = None
 
     @property
     def prize_commander(self) -> str:
-        """The commander of the deck the first win gives: the opponent's own, or for the finale
-        its public stand-in (the Godlike tier's custom cards are never granted)."""
+        """The catalog commander of the deck the first win gives: the opponent's own, or for the
+        finale its public stand-in (the private finale gives its own commander instead)."""
         return self.commander or self.fallback_commander or "Morophon, the Boundless"
 
     @property
@@ -213,6 +218,7 @@ def campaign_in(folder: str) -> Campaign | None:
                 fallback_commander=encounter.get("fallback_commander"),
                 private=encounter.get("private"),
                 tokens=int(encounter.get("tokens", 0)),
+                private_commander_title=encounter.get("private_commander_title"),
             )
             for encounter in data["encounters"]
         ),
@@ -232,7 +238,9 @@ def campaign_of(request: Request) -> Campaign:
 class EncounterSpoils(Contract):
     tokens: int = Field(description="Tokens the first win pays.")
     deck: str = Field(description="The title of the deck the first win gives.")
-    commander: str = Field(description="That deck's commander.")
+    commander: str = Field(
+        description="That deck's commander; for the private finale's, what the story calls it."
+    )
     earned: bool
 
 
@@ -421,7 +429,18 @@ def running_of(db: Session, user_id: UUID) -> UUID | None:
     )
 
 
-def state_of(db: Session, user: User, campaign: Campaign) -> CampaignState:
+def spoils_commander(encounter: Encounter, finale: "FinaleCache | None") -> str:
+    """The commander the spoils name: the finale's private one by the story's word while the
+    running engine serves the owner's finale (or has not been asked yet), else the stand-in."""
+    if encounter.private and encounter.private_commander_title:
+        if finale is None or not finale.at or finale.content is not None:
+            return encounter.private_commander_title
+    return encounter.prize_commander
+
+
+def state_of(
+    db: Session, user: User, campaign: Campaign, finale: "FinaleCache | None" = None
+) -> CampaignState:
     progress = progress_of(db, user, campaign)
     db.commit()
     done = set(progress.completed)
@@ -453,7 +472,7 @@ def state_of(db: Session, user: User, campaign: Campaign) -> CampaignState:
                 spoils=EncounterSpoils(
                     tokens=encounter.tokens,
                     deck=encounter.deck_title,
-                    commander=encounter.prize_commander,
+                    commander=spoils_commander(encounter, finale),
                     earned=f"spoils:{encounter.number:02d}" in rewards,
                 ),
             )
@@ -531,7 +550,9 @@ def game_ended(
     progress.updated_at = utcnow()
     reward(db, user.id, campaign, progress, f"seal:{number:02d}", game.id)
     if reward(db, user.id, campaign, progress, f"spoils:{number:02d}", game.id):
-        give_spoils(db, user, campaign, progress, campaign.encounter(number), content_dir)
+        give_spoils(
+            db, user, campaign, progress, campaign.encounter(number), content_dir, link.prize_card
+        )
     done = set(progress.completed)
     for chapter in campaign.chapters:
         if number in chapter.encounters and all(n in done for n in chapter.encounters):
@@ -539,10 +560,20 @@ def game_ended(
                 reward(db, user.id, campaign, progress, id_, game.id)
 
 
-def prize_entries(db: Session, encounter: Encounter) -> list[DeckEntry]:
-    """The deck a warden's first defeat gives, as entries: each card the catalog has, in its
-    default edition, the commander first."""
-    wanted = [(encounter.prize_commander, 1, "commander")]
+def prize_entries(
+    db: Session, encounter: Encounter, custom_commander: UUID | None = None
+) -> list[DeckEntry]:
+    """The deck a warden's first defeat gives, as entries: the commander first (the private
+    finale's own, a custom card, when given), then each card the catalog has, in its default
+    edition."""
+    entries: list[DeckEntry] = []
+    wanted: list[tuple[str, int, str]] = []
+    if custom_commander is not None:
+        entries.append(
+            DeckEntry(card_id=custom_commander, printing_id=None, quantity=1, location="commander")
+        )
+    else:
+        wanted.append((encounter.prize_commander, 1, "commander"))
     wanted += [(name, count, "main") for name, count in encounter.cards]
     concepts = {
         concept.normalized_name: concept
@@ -554,7 +585,6 @@ def prize_entries(db: Session, encounter: Encounter) -> list[DeckEntry]:
             )
         )
     }
-    entries: list[DeckEntry] = []
     for name, count, location in wanted:
         concept = concepts.get(normalize(name))
         if concept is not None:
@@ -576,14 +606,32 @@ def give_spoils(
     progress: CampaignProgress,
     encounter: Encounter,
     content_dir: str | None,
+    prize_card: UUID | None = None,
 ) -> None:
     """A warden's spoils, in the transaction recording the win: their deck's cards granted to the
     library for good, the deck itself among the player's own (past the deck limit if need be:
-    a prize is never refused), and their tokens. Keyed by the progress, so once per campaign and
-    once more after an account reset."""
+    a prize is never refused), and their tokens. The private finale's commander, a custom card
+    (prize_card), is granted for good with The Sphinx's deck (the owner's word). Keyed by the
+    progress, so once per campaign and once more after an account reset."""
     number = f"{encounter.number:02d}"
-    entries = prize_entries(db, encounter)
-    grant_deck(db, user, f"campaign:{campaign.id}:{number}:{epoch(progress)}", entries, "campaign")
+    key = f"campaign:{campaign.id}:{number}:{epoch(progress)}"
+    custom: UUID | None = None
+    if prize_card is not None and db.get(CustomCard, prize_card) is not None:
+        custom = prize_card
+    entries = prize_entries(db, encounter, custom)
+    catalog = [entry for entry in entries if entry.card_id != custom]
+    grant_deck(db, user, key, catalog, "campaign")
+    if custom is not None:
+        db.add(
+            CustomCardGrant(
+                user_id=user.id,
+                custom_card_id=custom,
+                quantity=1,
+                source="campaign",
+                grant_key=key,
+                created_at=utcnow(),
+            )
+        )
     db.flush()
     library = (
         library_of(db, user, permissions_for(user, roles_of(db, user)), load_roster(content_dir))
@@ -628,6 +676,11 @@ def give_spoils(
 class FinaleCache:
     content: dict[str, Any] | None = None
     at: float = 0.0
+
+
+def finale_of(request: Request) -> FinaleCache | None:
+    """What the running engine last said of the owner's finale, if it was asked."""
+    return getattr(request.app.state, "campaign_finale", None)
 
 
 async def finale_content(request: Request, engine: EngineClient) -> dict[str, Any] | None:
@@ -680,7 +733,7 @@ def finale_seat(
 @router.get("/campaign", response_model=CampaignState)
 def get_campaign(request: Request, principal: Player, db: Db) -> CampaignState:
     """The campaign and your way through it."""
-    return state_of(db, principal.user, campaign_of(request))
+    return state_of(db, principal.user, campaign_of(request), finale_of(request))
 
 
 @router.post(
@@ -736,8 +789,14 @@ async def start_encounter(
     human, progress = await run_in_threadpool(plan)
     await require_loaded(request, [human])
     finale: str | None = None
+    prize_card: UUID | None = None
     if encounter.private:
         deck_list, finale = finale_seat(encounter, await finale_content(request, engine))
+        if finale == "private":
+            # The private commander as a custom card, for the deck the win gives.
+            commanders = cast(list[str], deck_list["commanders"])
+            found = await run_in_threadpool(custom_named, db, commanders[0])
+            prize_card = found.id if found is not None else None
     else:
         deck_list = encounter.deck_list(encounter.commander or "")
     bot = SeatPlan(
@@ -789,6 +848,7 @@ async def start_encounter(
                         deck="learn" if body.learn else "loaner" if body.loaner else "own",
                         hints=hints,
                         finale=finale,
+                        prize_card=prize_card,
                         created_at=utcnow(),
                     )
                 )
@@ -822,7 +882,7 @@ def scene_seen(body: SceneSeen, request: Request, principal: Player, db: Db) -> 
             progress.ending = "early"
     progress.updated_at = utcnow()
     db.commit()
-    return state_of(db, principal.user, campaign)
+    return state_of(db, principal.user, campaign, finale_of(request))
 
 
 @router.put("/campaign/tutorial", response_model=CampaignState)
@@ -841,4 +901,4 @@ def change_tutorial(
         progress.lessons = sorted({*progress.lessons, *body.lessons})
     progress.updated_at = utcnow()
     db.commit()
-    return state_of(db, principal.user, campaign)
+    return state_of(db, principal.user, campaign, finale_of(request))

@@ -39,7 +39,7 @@ from api.identity import (
     require_permission,
     utcnow,
 )
-from api.library import CurrentLibrary, Library
+from api.library import CurrentLibrary, Library, won_custom
 from api.models import CustomCard
 from api.progression import godlike
 from api.roster import roster_of
@@ -171,9 +171,12 @@ def custom_cards(principal: Active, library: CurrentLibrary, db: Db) -> list[Cus
     responses={200: {"content": {"image/webp": {}, "image/png": {}, "image/jpeg": {}}}},
 )
 def custom_card_image(card_id: UUID, principal: Active, db: Db) -> Response:
-    require_godlike(db, principal)
+    """A custom card's image, for a Godlike account or, since v0.8.0, one that holds the card for
+    good (the campaign finale's commander); to anyone else, the 404 of a missing route."""
     card = db.get(CustomCard, card_id)
-    if card is None:
+    if card is None or not (
+        godlike(db, principal.user) or card.id in won_custom(db, principal.user)
+    ):
         raise not_found()
     # Kept out of every shared cache and of the installed app's offline copies.
     return Response(

@@ -8,6 +8,8 @@ this repository holds no name, text or image of them, and its tests use made-up 
   validation (api/validation.py), statistics, import by name and export of its own decks. Copies
   follow the library (api/library.py). Below Godlike a deck holding one is collection-locked and
   shows it only as a hidden "Godlike card".
+- **Won for good** (v0.8.0): the campaign finale's commander comes with the deck its win gives,
+  and its winner sees and plays that card whatever their tier (api/library.py won_custom).
 - **Nobody else** sees them in a deck list: shared decks, their exports and copies leave them out.
   Bots never play them.
 - **At the table** they are public on the stack and the battlefield, so the image route serves a
@@ -24,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from api.cards import CardSummary, mark_owned, summaries_by_id
 from api.identity import Principal, utcnow
-from api.library import Library, at_godlike
+from api.library import Library, at_godlike, won_custom
 from api.models import CustomCard, Game, GameSeat
 from api.validation import (
     CUSTOM_LEGAL,
@@ -147,7 +149,9 @@ def deck_cards(db: Session, ids: set[UUID], library: Library) -> dict[UUID, Card
     if rest:
         for card in db.scalars(select(CustomCard).where(CustomCard.id.in_(rest))):
             cards[card.id] = (
-                custom_summary(card, library) if library.godlike else hidden_summary(card.id)
+                custom_summary(card, library)
+                if library.godlike or card.id in library.won_custom
+                else hidden_summary(card.id)
             )
     return cards
 
@@ -214,7 +218,7 @@ def may_see(db: Session, principal: Principal, card: CustomCard, game_id: UUID |
     """Whether the account may see the card's image: at the Godlike tier, or seated in (or, for
     SysOp, observing) a game where some seat's deck holds it. Without a game named, the account's
     running games and those that ended in the last day count."""
-    if at_godlike(db, principal.user.id):
+    if at_godlike(db, principal.user.id) or card.id in won_custom(db, principal.user):
         return True
     games = select(Game.id)
     if game_id is not None:

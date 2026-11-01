@@ -207,6 +207,8 @@ class Collection:
     - editions: since v0.5.0, the copies of each edition they own, by printing: a deck may hold
       only those, copy by copy. None counts copies by card alone (a list checked without them).
     - godlike: the owner is at the Godlike tier, which opens the custom cards to them (v0.4.0).
+    - won: custom cards granted to the owner for good (v0.8.0, the campaign finale's commander),
+      open to them whatever their tier.
     - loaded: by custom card name, case aside, whether the running engine has loaded it; None
       when the engine was not asked.
     - withheld: since v0.5.1, one-of-a-kind printings someone else owns the only copy of
@@ -214,6 +216,7 @@ class Collection:
 
     copies: Mapping[str, int] | None
     godlike: bool = False
+    won: frozenset[UUID] = frozenset()
     loaded: Mapping[str, bool] | None = None
     editions: Mapping[UUID, Edition] | None = None
     withheld: frozenset[UUID] = frozenset()
@@ -387,17 +390,19 @@ def custom_cards_of(
     session: Session, ids: set[UUID], collection: Collection | None
 ) -> tuple[dict[UUID, Card], frozenset[UUID]]:
     """The custom cards among ids: as validation reads them while the deck's owner is at the
-    Godlike tier; below it, only their IDs, which hold the deck back without naming them."""
+    Godlike tier, or holds them for good (v0.8.0); otherwise only their IDs, which hold the deck
+    back without naming them."""
     if not ids:
         return {}, frozenset()
     rows = session.scalars(select(CustomCard).where(CustomCard.id.in_(ids))).all()
-    if collection is None or not collection.godlike:
+    if collection is None:
         return {}, frozenset(row.id for row in rows)
+    open_ = [row for row in rows if collection.godlike or row.id in collection.won]
     loaded = collection.loaded
     return {
         row.id: custom_rules(row, None if loaded is None else loaded.get(row.name.casefold()))
-        for row in rows
-    }, frozenset()
+        for row in open_
+    }, frozenset(row.id for row in rows) - {row.id for row in open_}
 
 
 def rules_of(session: Session, fmt: str) -> Rules:

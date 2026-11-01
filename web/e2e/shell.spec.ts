@@ -67,11 +67,11 @@ test("connected shell, the main menu, all navigation, format dialog and saved pr
   // The title band's way back to the main menu.
   await page.getByRole("link", { name: "Main menu" }).click();
   await expect(page).toHaveURL(/#home$/);
-  // Decks and Cards have their own journeys, as SysOp, in decks.spec.ts. Campaign, Learn and
-  // Collection are gone; their old addresses open the main menu.
-  for (const name of ["Campaign", "Learn", "Collection"])
+  // Decks and Cards have their own journeys, as SysOp, in decks.spec.ts. Learn and Collection
+  // are gone; their old addresses open the main menu. (Since v0.8.0 #campaign is the campaign's.)
+  for (const name of ["Learn", "Collection"])
     await expect(page.getByRole("link", { name, exact: true })).toHaveCount(0);
-  await page.goto("/#campaign");
+  await page.goto("/#learn");
   await expect(
     page.getByRole("heading", { name: "Welcome back, stand-in" }),
   ).toBeVisible();

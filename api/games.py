@@ -1303,7 +1303,7 @@ def own_deck(
         datetime.now(UTC).date(),
         library.collection(),
     )
-    names = engine_names(db, entries, library.godlike)
+    names = engine_names(db, entries, library.godlike, library.won_custom)
     if not validation.playable:
         sysop_ok = "cards.any" in permissions and all(names.get(e.card_id) for e in entries)
         locked = any(problem.kind == "collection_locked" for problem in validation.errors)
@@ -1330,10 +1330,13 @@ def own_deck(
     return {"deck_list": deck_list}, revision.id, deck.title[:64]
 
 
-def engine_names(db: Session, entries: list[DeckEntry], godlike: bool) -> dict[UUID, str | None]:
+def engine_names(
+    db: Session, entries: list[DeckEntry], godlike: bool, won: frozenset[UUID] = frozenset()
+) -> dict[UUID, str | None]:
     """The engine's name of each card in the game the entries hold: a certified catalog card's,
     since v0.6.2 a stand-in's name in the game (api/stand_ins.py), and the Godlike tier's custom
-    cards by their own names (v0.4.0)."""
+    cards by their own names (v0.4.0), for a Godlike owner or, since v0.8.0, those the owner
+    holds for good (won)."""
     held = {entry.card_id for entry in entries}
     names: dict[UUID, str | None] = dict(
         db.execute(
@@ -1343,11 +1346,12 @@ def engine_names(db: Session, entries: list[DeckEntry], godlike: bool) -> dict[U
         ).all()
     )
     names |= {card: str(data["name"]) for card, data in stand_ins(db, held - names.keys()).items()}
-    if godlike:
+    if godlike or won:
+        wanted = {entry.card_id for entry in entries} - names.keys()
         names |= dict(
             db.execute(
                 select(CustomCard.id, CustomCard.name).where(
-                    CustomCard.id.in_({entry.card_id for entry in entries} - names.keys())
+                    CustomCard.id.in_(wanted if godlike else wanted & won)
                 )
             ).all()
         )
