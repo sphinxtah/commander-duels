@@ -94,28 +94,28 @@ const SHOTS = [
     title: "The table",
     caption:
       "Commander and Legacy at a 16:9 table, against bots or other players.",
-    alt: "A Commander game at the table: creatures on both sides, the opponent's hand and both libraries face down, the player's hand along the bottom.",
+    alt: "A Commander game at the table: Sigarda attacks across the red band for 5 commander damage, creatures and lands on both sides, both libraries face down showing the card back.",
   },
   {
     name: "decks",
     title: "The deck builder",
     caption:
       "Build decks from your own library; each format's rules are checked as you go.",
-    alt: "The deck builder: a starter deck open, with its commander's card, rules, legality and printings.",
+    alt: "The deck builder: a Commander deck led by Kenrith, the Returned King, ready to play, its cards shown as pictures beside the card search.",
   },
   {
     name: "shop",
     title: "Leng's card shop",
     caption:
       "Wins earn tokens: spend them on packs from Revised to today, and on more decks.",
-    alt: "Leng's card shop: a booster pack opened at the counter, its cards turning over one by one.",
+    alt: "Leng's card shop: a Zendikar Rising pack opened at the counter, half its cards turned over and the rest still face down.",
   },
   {
     name: "alliance",
     title: "The Planeswalker Alliance",
     caption:
       "Ally with a Planeswalker for their cards and portrait; more open as you win.",
-    alt: "The Planeswalker Alliance: the Planeswalkers' portraits to choose an ally from.",
+    alt: "The Planeswalker Alliance on Profile: allied with Chandra, with the Bronze tier's Planeswalker portraits to choose from.",
   },
 ] as const;
 

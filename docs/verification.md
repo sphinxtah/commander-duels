@@ -1,5 +1,18 @@
 # Verification
 
+## v0.8.4
+
+Built on November 1, 2026 in a cloud workspace, on the branch `tutorial-0.8.4`. The package registries opened partway through (the owner allowed every domain); before that, the branch's checks ran on hosted CI through a temporary helper workflow (`assist.yml`, removed before the merge) that regenerated the contracts with Python 3.12, formatted, and ran the quick checks.
+
+| Check | Result |
+|---|---|
+| Python | `ruff check` and `ruff format --check` clean; `pytest` locally on Python 3.13 against PostgreSQL 16: 447 passed, 28 skipped, one failure that is the workspace's alone (`test_upgrade_needs_a_set_up_vm` runs as root, which the deploy kit refuses on purpose); the whole suite with `mypy` on hosted CI (Python 3.12). New: `tests/test_tutorial.py` (paths and stages, a skip, inactive accounts), the reset starting the tutorial again |
+| Migrations | `alembic upgrade head` and `alembic check` against PostgreSQL 16 locally, with migration 0033 |
+| Contracts | regenerated on Python 3.12 (3.13's Starlette names a 422 "Unprocessable Content", 3.12's "Unprocessable Entity"; the committed document is 3.12's, as CI's drift check expects) |
+| Web | `tsc -b`, 1,358 Vitest tests in 108 files and the production build passed locally. New: `web/src/tutorial/tutorial.test.tsx` (the guided game's script: rising revisions, unique objects, the stack, the end by 25 commander damage; the best card of a pack and the suggested prices; the three paths in the wizard; the tour's first bubble, its move on after a pack and its skip) |
+| The welcome's screenshots | `web/e2e/welcome-shots.spec.ts` in Chromium at 1280 x 800, locally (without card pictures: the API asks Scryfall directly, and this workspace reaches it only through a proxy) and on hosted CI with them, against the test catalog; looked at: the guided game's board with both libraries face down in the real card back, the deck builder, a pack half turned over with the real card back, the Alliance. The first look also found the guided game played from Mira's seat said "Your turn" and "Another tab is playing this seat"; it is now watched from no seat |
+| Hosted CI | on the branch: run 41347979621 (d66c31a) green in both jobs (the Python checks and tests, the contracts' drift check, the web's tests, build and browser journeys, ShellCheck; the engine's build and tests, practice games through the API and in the browser), after a run whose contracts were exported on Python 3.13. The helper workflow took the screenshots of the table, the deck builder and the pack with card pictures (run 41347979646); the Alliance's was taken locally, its portraits being the site's own. The final commit's run, with the helper removed, is in the release notes |
+
 ## v0.8.3
 
 Built on November 1, 2026 in a cloud workspace with no package registry (no PyPI, npm or Maven Central), on the branch `fixes-0.8.3`.

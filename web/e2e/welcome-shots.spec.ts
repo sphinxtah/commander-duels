@@ -181,15 +181,44 @@ test.describe("the welcome's screenshots", () => {
   });
 
   test("the Alliance", async ({ page }) => {
+    // Allied with a Planeswalker, the picker open on the others.
+    const allied = await page.evaluate(async () => {
+      const me = (await (await fetch("/api/v1/me")).json()) as {
+        csrf_token: string;
+      };
+      const roster = (await (await fetch("/api/v1/planeswalkers")).json()) as {
+        id: string;
+        open: boolean;
+        custom: boolean;
+      }[];
+      const ally =
+        roster.find((item) => item.id === "chandra" && item.open) ??
+        roster.find((item) => item.open && !item.custom);
+      const response = await fetch("/api/v1/me/alliance", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": me.csrf_token,
+        },
+        body: JSON.stringify({ planeswalker: ally!.id }),
+      });
+      return response.status;
+    });
+    expect(allied).toBe(200);
     await page.goto("/#profile");
+    // The account as the server has it now, with its ally.
+    await page.reload();
     await page.getByRole("tab", { name: "Alliance" }).click();
     const alliance = page.locator("#alliance-title");
     await expect(alliance).toBeVisible();
+    await page.locator('[aria-controls="alliance-picker"]').click();
+    await expect(page.locator("#alliance-picker img").first()).toBeVisible();
     await hideChatBar(page);
+    await picturesSettled(page);
+    await page.waitForTimeout(1_000);
     await alliance.evaluate((node) => node.scrollIntoView({ block: "start" }));
     await page.evaluate(() => window.scrollBy(0, -90));
-    await picturesSettled(page);
-    await page.waitForTimeout(1_500);
+    await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/alliance.png` });
   });
 });
