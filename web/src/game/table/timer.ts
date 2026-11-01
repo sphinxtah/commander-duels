@@ -7,7 +7,7 @@ import {
 import type { TimerInput, TimerKey, TimerPhase, TimerView } from "./types";
 
 // The response timer (design §12). When the seat gets priority only to answer an opponent's spell,
-// ability or attack, a short countdown runs and then continues for the player, as Magic Duels does;
+// ability or attack, a short countdown runs and then continues for the player;
 // Stop Timer, T, Space or anything else the player does stops it for that moment. Everything here
 // is pure: useResponseTimer.ts feeds it inputs, clock ticks and engagements. The timer only ever
 // asks for the prompt's pass, and that answer goes through the screen's ordinary answer path.

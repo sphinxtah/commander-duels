@@ -229,7 +229,7 @@ export function Cutscene({
         finish(true);
       }}
       onClick={(event) => {
-        // A click on the picture (not on a control) reads on, as in Magic Duels.
+        // A click on the picture (not on a control) reads on.
         if ((event.target as HTMLElement).closest("button, a")) return;
         advance();
       }}

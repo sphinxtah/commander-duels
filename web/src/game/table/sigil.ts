@@ -16,7 +16,7 @@ export interface SigilLayer {
 export interface SigilSpec {
   hue: number;
   symmetry: 3 | 4 | 5 | 6 | 7 | 8;
-  /** Opponents' sigils are drawn grey, as Magic Duels drew their portraits. */
+  /** Opponents' sigils are drawn grey, as their portraits are. */
   grey: boolean;
   layers: SigilLayer[];
 }

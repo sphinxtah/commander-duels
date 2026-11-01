@@ -4,7 +4,7 @@ import { canvas } from "./art";
 // A player's sigil painted for the table: the portrait inside each diamond frame. The spec comes
 // from sigil.ts, so this picture and the DOM's SVG show the same sigil. It is painted already
 // cut to the diamond on a canvas of its own, so the scene needs no mask; opponents' sigils are
-// grey, as Magic Duels drew their portraits.
+// grey, as opponents' portraits are.
 
 function colour(spec: SigilSpec, lightness: number, alpha = 1): string {
   return spec.grey

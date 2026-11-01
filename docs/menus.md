@@ -1,6 +1,6 @@
 # The menus (v0.4.5)
 
-Since v0.4.5 the app's menus and pages take the look of Magic Duels' front end, as v0.3.0 did for the table ([the game screen](game-screen.md)): a title screen, a main menu of large tiles under a game-style top bar, and a title band over every page. The owner's decisions are in [the v0.4.5 plan](plans/0.4.5.md#decisions-at-the-start-of-v045). The art is the owner's own: the Planeswalker portraits, the banner, the mark, Leng's painting and, since v0.5.1, the paintings behind four of the main menu's tiles. Card art never appears in the menus.
+Since v0.4.5 the app's menus and pages take the look of a title-screen front end, as v0.3.0 did for the table ([the game screen](game-screen.md)): a title screen, a main menu of large tiles under a game-style top bar, and a title band over every page. The owner's decisions are in [the v0.4.5 plan](plans/0.4.5.md#decisions-at-the-start-of-v045). The art is the owner's own: the Planeswalker portraits, the banner, the mark, Leng's painting and, since v0.5.1, the paintings behind four of the main menu's tiles. Card art never appears in the menus.
 
 ## The look
 
@@ -35,7 +35,7 @@ Along the bottom of every page: the friends list at the right end, "Friends · 3
 
 ## The main menu
 
-The app opens on the main menu (`#home`; any address that names no page, the old Learn and Collection ones included, opens it too, and so does the installed app; since v0.8.0 `#campaign` is the campaign again). As in Magic Duels, the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a word to choose an ally on Profile. Since v0.6.0 (the owner's request) the whole greeting is a link to the profile. Beside it, the tiles:
+The app opens on the main menu (`#home`; any address that names no page, the old Learn and Collection ones included, opens it too, and so does the installed app; since v0.8.0 `#campaign` is the campaign again). the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a word to choose an ally on Profile. Since v0.6.0 (the owner's request) the whole greeting is a link to the profile. Beside it, the tiles:
 - **Play**, the largest, over the owner's banner: practice games against the bots, and since v0.5.0 the public queues. When one of the account's games is still running, it says so and leads back to it; while the account waits in a queue, it says "Looking for a Legacy game" and leads to the wait ([queues](queues.md)).
 - **Campaign** (v0.8.0), under the greeting in the left column (the owner's layout: the greeting takes about 70% of the column's height, the Campaign tile the rest; on a narrow window both stack above the tiles): The Final Concordance, the story campaign, over the owner's painting of the throne, with the account's seals ("3 of 13 seals claimed") ([the campaign](campaign.md)).
 - **Tables**, with the number of open tables.

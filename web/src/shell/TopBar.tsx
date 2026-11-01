@@ -31,7 +31,7 @@ function badge(count: number) {
 }
 
 /**
- * The top bar (v0.4.5), as in Magic Duels' menus: the mark that leads home, the player search,
+ * The top bar (v0.4.5): the mark that leads home, the player search,
  * centred over the main menu's tiles, and the account's corner (its tokens, Friends, the bell and
  * its own menu). Its links to the main menu's six pages, and the phone's bar of them, went in
  * v0.6.1: the tiles lead to every page, and every other page's band back to them. Messages, beside

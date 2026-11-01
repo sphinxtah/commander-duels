@@ -7,7 +7,7 @@ import type { Diamond, Rect } from "./types";
 // - the portrait stands upright in front of the diamond's frame, scaled to fit whole: never
 //   cropped, to a circle or to the diamond, so horns, hoods and hair may rise past the frame;
 // - the life badge is drawn over its foot, and stays the player's life, never loyalty;
-// - opponents' are grey and yours is in colour, as Magic Duels drew its portraits (the owner's
+// - opponents' are grey and yours is in colour (the owner's
 //   v0.3.0 brief; the portraits are the owner's art, not card images, so greying them is ours);
 // - a portrait that is missing (an unknown ID, or one with no image yet) or does not load keeps
 //   the sigil.

@@ -40,7 +40,7 @@ import type { CardView, PermanentView, Snapshot, StackItem } from "../types";
 // The table lab (development only, at /table-lab.html under Vite's dev server; never built):
 // the PixiJS table drawn from the fixtures at two, three and four seats, with either painter, a
 // short scripted turn to watch the animation, and a bench that times commits on the stress
-// board. It is the owner's look-and-feel check against the Magic Duels screenshots, so beside the
+// board. It is the owner's look-and-feel check against the design's reference screenshots, so beside the
 // canvas it draws a rough stand-in for the DOM layer's text (names, life, the band's words and
 // the prompt's diamonds) that the game screen draws for real.
 //

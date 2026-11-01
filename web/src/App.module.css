@@ -1,4 +1,4 @@
-/* The app's frame and the styles every page shares (v0.4.5, after Magic Duels' menus): the main
+/* The app's frame and the styles every page shares (v0.4.5, the menus' gold-framed look): the main
    column under the top bar, the footer, and the shared pieces pages take from here (titles, the
    gold buttons, tags, notices, dialogs). The top bar, the main menu and the title band are in
    shell/shell.module.css. */
@@ -24,7 +24,7 @@
 .main:focus {
   outline: none;
 }
-/* A page comes in from below as it opens, as Magic Duels' screens did. */
+/* A page comes in from below as it opens. */
 .stage {
   animation: stageIn 380ms cubic-bezier(0.2, 0.8, 0.25, 1) backwards;
 }

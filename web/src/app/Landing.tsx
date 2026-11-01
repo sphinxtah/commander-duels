@@ -4,7 +4,7 @@ import styles from "./Landing.module.css";
 import { SiteLinks } from "./SiteLinks";
 
 /**
- * The page before the app (v0.3.0), since v0.4.5 a title screen in Magic Duels' manner. Until an
+ * The page before the app (v0.3.0), since v0.4.5 a title screen. Until an
  * account is active, every address shows only this: the owner's wordless mark in the middle of
  * the window, haloed over the banner's battlefield dimmed behind it, with embers rising, and
  * below it the sign-in, SysOp's entrance or the account's wait for approval. No top bar, menus or

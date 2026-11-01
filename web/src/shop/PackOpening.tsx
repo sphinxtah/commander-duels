@@ -26,7 +26,7 @@ import {
 } from "./shop";
 import styles from "./shop.module.css";
 
-// Opening a pack in the Magic Duels style (v0.4.0): the pack tears open, its cards are dealt face
+// Opening a pack card by card (v0.4.0): the pack tears open, its cards are dealt face
 // down and turn over one at a time (a click, or Space), rares and mythic rares glow in their
 // rarity's color and foils shimmer, each with its generated sound; "Reveal all" turns the rest.
 // A summary follows, with new cards marked and each card's details a click away. The server drew

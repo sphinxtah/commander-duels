@@ -30,7 +30,7 @@ import { drawRibbon } from "./StackNode";
 
 // One card on the table: its text frame, its printed image over it, the glow behind it and the
 // marks around it (design §8.10). The image is only ever scaled evenly and turned: never
-// stretched, skewed, tinted, filtered or masked, and nothing is drawn over it but Magic Duels'
+// stretched, skewed, tinted, filtered or masked, and nothing is drawn over it but the table's
 // power and toughness tag over the printed box and the ◆/✓ badge on the frame's corner. Glows
 // and rings lie behind or outside the picture.
 //

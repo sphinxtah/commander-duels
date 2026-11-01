@@ -48,7 +48,7 @@ const poolColours: [keyof ManaPool, string][] = [
   ["colorless", "C"],
 ];
 
-/** The phase beside your portrait, as Magic Duels names it. */
+/** The phase beside your portrait, in the table's short words. */
 const phaseCaptions: Record<string, string> = {
   precombat_main: "First main",
   postcombat_main: "Second main",

@@ -3108,7 +3108,7 @@ export interface components {
         AchievementView: {
             /**
              * Addition
-             * @description A Commander or Legacy addition (PROG07), not one of Magic Duels' own.
+             * @description A Commander or Legacy addition (PROG07), not one from the reference inventory.
              */
             addition: boolean;
             /** Description */
@@ -4816,7 +4816,7 @@ export interface components {
         EarnedBadge: {
             /**
              * Addition
-             * @description A Commander or Legacy addition (PROG07), not one of Magic Duels' own.
+             * @description A Commander or Legacy addition (PROG07), not one from the reference inventory.
              */
             addition: boolean;
             /** Description */

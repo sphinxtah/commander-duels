@@ -3,7 +3,7 @@ import { Icon, pageNames, type Page } from "./pages";
 import styles from "./shell.module.css";
 
 /**
- * The band above every page but the main menu (v0.4.5), as in Magic Duels: the way back to the
+ * The band above every page but the main menu (v0.4.5): the way back to the
  * main menu, and the page's name large across the band. The page's own heading follows it.
  */
 export function PageBand({ page }: { page: Page }) {

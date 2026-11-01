@@ -75,7 +75,7 @@ function layer(
 }
 
 export function SigilSvg({ spec, size }: { spec: SigilSpec; size: number }) {
-  // Opponents' sigils are grey, as Magic Duels drew their portraits; yours keeps its colour.
+  // Opponents' sigils are grey, as their portraits are; yours keeps its colour.
   const ink = spec.grey ? "hsl(0 0% 74%)" : `hsl(${spec.hue} 72% 64%)`;
   const ground = spec.grey ? "hsl(0 0% 12%)" : `hsl(${spec.hue} 40% 12%)`;
   return (

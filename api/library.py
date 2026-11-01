@@ -8,7 +8,7 @@ Players build from their own library; administrators and SysOp from the whole ca
 - while an alliance lasts, a playset of each of that Planeswalker's cards (api/roster.py);
 - until v0.6.0 basic lands without limit; since then a library holds the basic lands granted to it
   (packs and starter decks give them by printing), like any card.
-Copies count, as in Magic Duels: a deck may hold no more copies of a card than the library does,
+Copies count: a deck may hold no more copies of a card than the library does,
 counting every printing and Oracle version of the card together. Copies are a limit per deck, not
 spent by one: two decks may each hold the same owned card.
 

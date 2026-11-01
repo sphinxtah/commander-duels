@@ -4,7 +4,7 @@ import type { CardView } from "../types";
 
 // The table's own art, generated on canvases when the scene starts (design §11): the scratched
 // stone, the red band, the card back, the glows and the crack over a lost player's sigil, and
-// the text frame drawn under every card face. Nothing is a picture from Magic Duels or Wizards:
+// the text frame drawn under every card face. Nothing is a picture from another game or from Wizards:
 // the layout and the shapes follow the screenshots, the art is ours. These are 2D canvases the
 // scene wraps as textures; a lost WebGL context re-uploads them, since they stay in memory.
 
@@ -42,7 +42,7 @@ function noiseTile(size: number, random: () => number): HTMLCanvasElement {
 /**
  * The tabletop: grey, scratched stone, lighter where the light falls on the middle and darker
  * towards the rims. It is drawn flat; the scene lays it on the table plane in perspective, so its
- * grain and scratches shrink away from the player as Magic Duels' table did.
+ * grain and scratches shrink away from the player, for depth.
  */
 export function stone(
   width = 2048,

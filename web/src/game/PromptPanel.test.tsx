@@ -368,7 +368,7 @@ describe("the lead diamonds", () => {
     view.rerender(<Panel game={state(snapshot(6, priority("A")))} />);
     const first = document.querySelector("[data-first]")!;
     expect(first).toHaveAccessibleName("Continue (Pass priority)");
-    // The words beside the diamond are only Magic Duels' own.
+    // The words beside the diamond are only the table's own short ones.
     expect(
       first.querySelector("span:not([aria-hidden])")?.firstChild,
     ).toHaveProperty("textContent", "Continue");

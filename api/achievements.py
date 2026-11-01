@@ -18,7 +18,7 @@ decisions are in docs/plans/0.5.0.md; docs/quests.md describes them for players 
 - **After a reset** (users.reset_at) the account starts again: only what happened since counts,
   and what it earned before stays recorded but no longer shows.
 
-Magic Duels' own achievements are not inventoried yet (docs/reference_inventory.csv), so none of
+The reference game's own achievements are not inventoried yet (docs/reference_inventory.csv), so none of
 these maps to one of them; those about Commander and Legacy are marked as additions (PROG07).
 """
 
@@ -237,7 +237,7 @@ class Badge(Contract):
     description: str
     group: Group
     addition: bool = Field(
-        description="A Commander or Legacy addition (PROG07), not one of Magic Duels' own."
+        description="A Commander or Legacy addition (PROG07), not one from the reference inventory."
     )
     tokens: int = Field(description="Its one-time reward.")
 

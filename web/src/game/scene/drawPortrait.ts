@@ -1,7 +1,7 @@
 import { canvas } from "./art";
 
 // A Planeswalker's portrait made ready for the table (v0.3.1): copied onto a canvas of its own
-// size with its transparency kept, and greyed for an opponent, as Magic Duels drew theirs. The
+// size with its transparency kept, and greyed for an opponent. The
 // portraits are the owner's art, not card images, so greying them is ours to do (the v0.3.0
 // brief, docs/plans/0.3.0.md). The dom painter greys its picture with CSS's grayscale(), whose
 // weights these are.

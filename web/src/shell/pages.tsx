@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-// The menus' pages (v0.4.5). The top bar holds the main six, as Magic Duels' main menu did; the
+// The menus' pages (v0.4.5). The top bar holds the main six; the
 // account's menu opens Profile, Settings and Administration, and Friends has its icon beside the
 // bell. SysOp's entrance has no link: it opens only from the SysOp networks. The notifications'
 // history opens from the bell. Learn and Collection, placeholders since v0.0.1, are gone: their

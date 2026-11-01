@@ -99,7 +99,7 @@ import type {
 import styles from "./game.module.css";
 import screen from "./table/screen.module.css";
 
-// The game screen (v0.3.0, design §6): one 16:9 table in the manner of Magic Duels. The PixiJS
+// The game screen (v0.3.0, design §6): one 16:9 table. The PixiJS
 // scene draws the table behind a DOM layer of real, named buttons, which paint the faces
 // themselves when WebGL is not there. Around the table: the band's HUD with the Game menu, the
 // prompt column at the left, the drawers at the right, the magnifier, and the dialogs on top.

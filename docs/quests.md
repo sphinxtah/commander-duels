@@ -55,7 +55,7 @@ The pool (`QUESTS` in `api/quests.py`):
 - **Earned when checked, so nothing is missed:** in the transaction that records a game's end, for the winner (only wins earn); when a pack is opened, for its opener; and whenever the account looks at its achievements on Profile. A friend made counts at the next of these.
 - **Players with a history.** Migration 0021 pays nothing. A player whose games from before v0.5.0 already qualify earns those achievements at the first check (their next win, or opening Profile), paid then and told by the bell. The same check would give an achievement added in a later version to everyone who already qualifies.
 - **Pinned badges.** On Profile a player pins up to three earned badges, in order, to show first on their profile; pinning again replaces them, and none unpins all.
-- **Magic Duels' own achievements are not inventoried** (the scope's reference inventory, `docs/reference_inventory.csv`, has none yet), so none of these maps to one of them. Those about Commander and Legacy are marked as additions (PROG07, `addition`), and Profile labels them "Commander and Legacy addition". When the original list is inventoried, its mapped achievements join this list with IDs of their own.
+- **The reference game's own achievements are not inventoried** (the scope's reference inventory, `docs/reference_inventory.csv`, has none yet), so none of these maps to one of them. Those about Commander and Legacy are marked as additions (PROG07, `addition`), and Profile labels them "Commander and Legacy addition". When the original list is inventoried, its mapped achievements join this list with IDs of their own.
 
 The first set, 29 achievements worth 6,450 tokens in all:
 

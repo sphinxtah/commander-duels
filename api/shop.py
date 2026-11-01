@@ -1,5 +1,5 @@
-"""Leng's card shop (v0.4.0; PROG02, PROG03, SEC03): booster packs bought with tokens, opened in
-the Magic Duels style, their cards the player's for good.
+"""Leng's card shop (v0.4.0; PROG02, PROG03, SEC03): booster packs bought with tokens, opened
+card by card, their cards the player's for good.
 
 - **Products and prices** are api/products.py's; collations come from catalog/boosters.py.
   Players never see a price in dollars, only in tokens.

@@ -104,7 +104,7 @@ function climb(progress: Progress): number {
 }
 
 /**
- * The main menu (v0.4.5), the app's home as Magic Duels' was: the account's ally greets it beside
+ * The main menu (v0.4.5), the app's home: the account's ally greets it beside
  * the way to play, and large tiles lead to every part of the game, each with what waits there.
  */
 export function HomeHub({

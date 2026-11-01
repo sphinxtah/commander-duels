@@ -1,4 +1,4 @@
-/* The site's look since v0.4.5, after Magic Duels' front end: deep green-black, burnished gold,
+/* The site's look since v0.4.5, a title screen's: deep green-black, burnished gold,
    an ember accent, and Cinzel for titles and buttons. Every page reads its colours from these. */
 :root {
   --cd-bg: #0a1213;

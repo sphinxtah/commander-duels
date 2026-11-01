@@ -3,7 +3,7 @@ import styles from "./shell.module.css";
 
 /**
  * Sparks drifting up the window behind the main menu and the title screen, as embers rose over
- * Magic Duels' menus (v0.4.5). Decoration only; still under Reduce motion.
+ * the menus (v0.4.5). Decoration only; still under Reduce motion.
  */
 export function Embers({ count = 18 }: { count?: number }) {
   return (

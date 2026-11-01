@@ -1,6 +1,6 @@
 import type { Graphics } from "./pixi";
 
-// The table's icons as vector paths, ours rather than Magic Duels': crossed swords for combat, a
+// The table's icons as vector paths, all our own: crossed swords for combat, a
 // shield for blocks, a burst for damage, the attack arrow, the check of a chosen card and the
 // rest. Each is drawn into a Graphics centred on (cx, cy) within a square of `size` stage units,
 // so it is sharp at every scale.

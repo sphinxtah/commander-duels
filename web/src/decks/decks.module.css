@@ -1019,7 +1019,7 @@ a.deckTitle:hover {
   line-height: 1.6;
 }
 
-/* The facelift (v0.4.5): Magic Duels' tabs, and rows and panels in the menus' gold frame. */
+/* The facelift (v0.4.5): gold-edged tabs, and rows and panels in the menus' gold frame. */
 .tabs button {
   font: 600 0.82rem/1 var(--cd-display);
   letter-spacing: 1.4px;

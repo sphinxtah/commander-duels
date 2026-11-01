@@ -1,6 +1,6 @@
 import type { Prompt, PromptOption } from "../types";
 
-// The prompt column's diamond buttons (design §10): Magic Duels' words for the moment's main
+// The prompt column's diamond buttons (design §10): the table's short words for the moment's main
 // choices, with an icon each. A label that says less than the option does keeps the option's
 // own words in its accessible name, as a visually hidden suffix, so "Continue" is still heard
 // as passing priority.
@@ -68,7 +68,7 @@ function selected(prompt: Prompt, action: PromptOption["action"]): boolean {
 }
 
 /** An option's diamond: its label, icon and hidden suffix. `text` is the option in words
- * (optionText), used wherever Magic Duels has no word of its own. */
+ * (optionText), used wherever the table has no short word of its own. */
 export function duelsLabel(
   option: PromptOption,
   prompt: Prompt,

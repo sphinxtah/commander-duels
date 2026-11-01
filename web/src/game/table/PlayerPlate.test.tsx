@@ -286,7 +286,7 @@ describe("a player's plate", () => {
     expect(bars()).toHaveLength(0);
   });
 
-  it("names the phase beside your portrait, as Magic Duels does", () => {
+  it("names the phase beside your portrait, in the table's words", () => {
     const { unmount } = plate("duel", 0);
     expect(screen.getByText("First main")).toHaveAttribute(
       "aria-hidden",

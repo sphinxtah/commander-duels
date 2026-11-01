@@ -1,4 +1,4 @@
-/* The menus (v0.4.5), after Magic Duels' front end: the top bar, the phone's bar of pages, the
+/* The menus (v0.4.5), in a title screen's look: the top bar, the phone's bar of pages, the
    title band over each page, the main menu's tiles and the Play page. Colours and the frame come
    from global.css; motion stops under Reduce motion and the system's setting. */
 
@@ -449,8 +449,7 @@
     transform: translate(40px, -95vh);
   }
 }
-/* The ally's corner: their portrait standing in a pool of light, as Magic Duels' Planeswalkers
-   stood beside its menu. */
+/* The ally's corner: their portrait standing in a pool of light, beside the menu. */
 .welcome {
   position: relative;
   display: flex;

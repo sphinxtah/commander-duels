@@ -611,7 +611,7 @@ export function App() {
               </button>
             </p>
           )}
-          {/* Each page comes in as Magic Duels' screens did; its own heading takes focus. */}
+          {/* Each page comes in from below; its own heading takes focus. */}
           <div key={shown} className={styles.stage}>
             {page === "Profile" ? (
               <Account

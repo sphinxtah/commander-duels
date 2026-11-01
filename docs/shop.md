@@ -1,6 +1,6 @@
 # Leng's card shop (v0.4.0)
 
-Since v0.4.0 players spend the tokens their wins earn on booster packs in Leng's card shop. A pack opens at Leng's counter in the Magic Duels style, and its cards join the player's library for good. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). There is no real money anywhere: tokens are play money, and no price in dollars is ever shown to a player (PROG03, PAR18).
+Since v0.4.0 players spend the tokens their wins earn on booster packs in Leng's card shop. A pack opens at Leng's counter in the card-by-card style, and its cards join the player's library for good. The owner's decisions are in [the v0.4.0 plan](plans/0.4.0.md#decisions-at-the-start-of-v040). There is no real money anywhere: tokens are play money, and no price in dollars is ever shown to a player (PROG03, PAR18).
 
 ## Products
 

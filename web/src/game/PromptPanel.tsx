@@ -30,7 +30,7 @@ import screenStyles from "./table/screen.module.css";
 
 // The open prompt (UI04, UI08): every option the engine offers, and nothing it does not. Options
 // tied to a card or a player are also answered on the board; this panel lists them all, so the
-// keyboard reaches every one. As in Magic Duels (v0.3.0, design §10), the moment's main choices
+// keyboard reaches every one. Since v0.3.0 (design §10), the moment's main choices
 // lead as big diamonds with an icon and a word: the primary (Continue, Attack, Keep Hand…),
 // Attack With All when it is offered, and Stop Timer while the response timer runs.
 

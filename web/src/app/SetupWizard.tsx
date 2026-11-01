@@ -46,7 +46,7 @@ const SHOTS = [
     name: "table",
     title: "The table",
     caption:
-      "Commander and Legacy at a Magic Duels-style table, against bots or other players.",
+      "Commander and Legacy at a 16:9 table, against bots or other players.",
     alt: "A Commander game at the table on turn 16: a green deck's creatures against a bot's red and blue army, three cards in hand along the bottom.",
   },
   {

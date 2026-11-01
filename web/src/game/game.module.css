@@ -454,7 +454,7 @@ button.life[data-selected] {
   font-size: 0.85rem;
 }
 
-/* The prompt sits in the table's left column with no panel of its own (as in Magic Duels): a
+/* The prompt sits in the table's left column with no panel of its own: a
    shade behind its words keeps them readable over the table. */
 .prompt {
   padding: 8px 10px 10px;

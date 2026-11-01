@@ -3,7 +3,7 @@ import type { CardView, ObjectId, PermanentView, PromptOption } from "../types";
 import { fnv1a } from "./sigil";
 import type { TableUnit } from "./types";
 
-// Token groups and land piles (UI02, design §15). Magic Duels stacks identical lands into one
+// Token groups and land piles (UI02, design §15). The table stacks identical lands into one
 // fanned pile; tokens get the same treatment. Two permanents share a pile only when nothing a
 // player could want to tell apart differs: anything selected, attached, fighting or commanding
 // stays on its own, and every member keeps its own button and options.
