@@ -415,7 +415,9 @@ class GameSeat(Contract):
     player: Literal["human", "bot"]
     handle: str | None
     portrait: str | None = Field(
-        default=None, description="A player's allied Planeswalker, whose portrait stands for them."
+        default=None,
+        description="A player's allied Planeswalker, whose portrait stands for them; since v0.8.0 "
+        "also a campaign opponent's (a bot seat, whose handle is then the opponent's name).",
     )
     deck: str | None = Field(
         description="Your own seat's deck (\"custom\" for a deck list); other seats' decks are "
@@ -444,6 +446,24 @@ class GameResult(Contract):
 
 
 MatchStatus = Literal["playing", "sideboarding", "finished", "closed"]
+
+
+class CampaignRef(Contract):
+    """The campaign encounter a game was played for (v0.8.0, api/campaign.py)."""
+
+    encounter: int
+    opponent: str = Field(description="The opponent's roster ID, which names their portrait.")
+    name: str = Field(description="The opponent's name.")
+    title: str = Field(description="The encounter's title.")
+    hints: bool = Field(description="Whether the tutorial's hints are on in this duel.")
+    deck: Literal["own", "loaner", "learn"]
+    finale: Literal["private", "public"] | None = Field(
+        description="The final encounter's opponent: the owner's own finale (its commander and "
+        "the incarnation in reserve), or the public stand-in; null before the finale."
+    )
+    outcome: Literal["won", "lost", "draw", "unfinished"] | None = Field(
+        description="How the duel ended for you, once its end is recorded."
+    )
 
 
 class GameMatch(Contract):
@@ -479,6 +499,10 @@ class GameSummary(Contract):
     )
     match: GameMatch | None = Field(
         default=None, description="Its best-of-three match (v0.5.0); null for a single game."
+    )
+    campaign: CampaignRef | None = Field(
+        default=None,
+        description="The campaign encounter it was played for (v0.8.0); null for any other game.",
     )
 
 

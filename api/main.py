@@ -17,6 +17,7 @@ from api import (
     admin,
     auctions,
     auth,
+    campaign,
     card_images,
     cards,
     chat,
@@ -341,6 +342,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(matches.router)
     app.include_router(queues.router)
     app.include_router(rematches.router)
+    app.include_router(campaign.router)
     app.include_router(card_images.router)
     app.include_router(cards.router)
     app.include_router(decks.router)

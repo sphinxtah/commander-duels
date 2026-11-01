@@ -56,7 +56,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Depends, Request
@@ -95,7 +95,7 @@ LOCATION_ORDER = ("commander", "companion", "main", "sideboard")
 FINISHES = ("nonfoil", "foil", "etched")
 # The grants whose copies may be listed at the auction house (v0.6.0), and the auctions whose copy
 # is out of the seller's library: while it runs, and once it sold.
-SELLABLE_SOURCES = frozenset({"starter", "grandfathered", "pack", "auction"})
+SELLABLE_SOURCES = frozenset({"starter", "grandfathered", "pack", "auction", "campaign"})
 LISTED = ("active", "sold")
 
 
@@ -551,7 +551,18 @@ def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckE
     card's default printing where the catalog lacks the owner's choice), so the deck plays at once;
     the grant is keyed by the deck, so it is made once whatever retries (once more after a reset).
     Since v0.6.0 its basic lands too, in their own editions, nonfoil."""
-    key = reset_key(user, f"starter:{starter.id}")
+    grant_deck(db, user, reset_key(user, f"starter:{starter.id}"), entries, "starter")
+
+
+def grant_deck(
+    db: Session,
+    user: User,
+    key: str,
+    entries: list[DeckEntry],
+    source: Literal["starter", "campaign"],
+) -> None:
+    """Every copy of a deck's cards, for good, under one key, so the grant is made once whatever
+    retries: a starter deck's, or since v0.8.0 a campaign warden's deck won."""
     done = db.scalar(
         select(LibraryGrant.id).where(
             LibraryGrant.user_id == user.id, LibraryGrant.grant_key == key
@@ -576,7 +587,7 @@ def grant_starter(db: Session, user: User, starter: Starter, entries: list[DeckE
                 concept_id=card_id,
                 printing_id=printing_id,
                 quantity=quantity,
-                source="starter",
+                source=source,
                 grant_key=key,
                 created_at=now,
             )

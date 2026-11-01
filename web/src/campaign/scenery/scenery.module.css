@@ -1,0 +1,1291 @@
+/* The campaign's cut-scene backdrops (v0.8.0). Each scene is a stack of full-bleed SVG layers
+   drifting slowly at their own pace, a few particle fields and two shared overlays: a vignette
+   and a darkening toward the bottom edge, so speech and gold text stay readable over any scene.
+   Phases switch through [data-phase] with transitions of about 1.2 to 2 seconds. Only transform,
+   opacity and filter are animated. Under the account's Reduce motion setting (html
+   [data-reduced-motion="true"], the app's own switch) nothing moves and phases fade briefly. */
+
+@property --amp {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+.scenery {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--cd-bg, #0a1213);
+  isolation: isolate;
+  contain: strict;
+  pointer-events: none;
+  user-select: none;
+}
+
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------ layers */
+
+.layer {
+  position: absolute;
+  left: -4%;
+  top: -4%;
+  width: 108%;
+  height: 108%;
+  display: block;
+  transform-origin: 50% 60%;
+  will-change: transform;
+  animation: drift 60s ease-in-out infinite alternate;
+  --tx: 0.6%;
+  --ty: 0.3%;
+  --sc: 1.02;
+}
+
+.sky {
+  animation-duration: 64s;
+}
+
+.far {
+  animation-duration: 52s;
+  animation-delay: -13s;
+  --tx: -1%;
+  --ty: -0.4%;
+  --sc: 1.025;
+}
+
+.mid {
+  animation-duration: 42s;
+  animation-delay: -21s;
+  --tx: 1.4%;
+  --ty: 0.5%;
+  --sc: 1.03;
+}
+
+.near {
+  animation-duration: 34s;
+  animation-delay: -8s;
+  --tx: -2%;
+  --ty: -0.6%;
+  --sc: 1.04;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(calc(var(--tx) * -1), 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(var(--tx), var(--ty), 0) scale(var(--sc));
+  }
+}
+
+.vignette,
+.floor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vignette {
+  background: radial-gradient(
+    ellipse 82% 78% at 50% 40%,
+    transparent 44%,
+    #02040580 78%,
+    #020405d0 100%
+  );
+}
+
+.floor {
+  top: auto;
+  height: 40%;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    #03050673 42%,
+    #030506e6 100%
+  );
+}
+
+/* ------------------------------------------------------------ particles */
+
+.field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transition: opacity 1.6s ease;
+}
+
+.field > i {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--s);
+  height: var(--s);
+  border-radius: 50%;
+  opacity: var(--o);
+  animation-name: rise;
+  animation-duration: var(--t);
+  animation-delay: var(--d);
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+  will-change: transform, opacity;
+}
+
+@keyframes rise {
+  0% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  18%,
+  78% {
+    opacity: var(--o);
+  }
+  100% {
+    transform: translate3d(var(--dx), var(--dy), 0);
+    opacity: 0;
+  }
+}
+
+.field .mote {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--scene-accent) 50%, white) 0,
+    var(--scene-accent) 35%,
+    transparent 70%
+  );
+}
+
+.field .twinkle {
+  background: radial-gradient(circle, #ffffff 0, #d6e4ff 32%, transparent 70%);
+  animation-name: twinkle;
+  animation-timing-function: ease-in-out;
+  animation-direction: alternate;
+}
+
+@keyframes twinkle {
+  from {
+    opacity: 0.12;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: var(--o);
+    transform: scale(1.15);
+  }
+}
+
+.field .ember {
+  background: radial-gradient(
+    circle,
+    #fff1c4 0,
+    #ffb35a 32%,
+    #e9893a 52%,
+    transparent 74%
+  );
+}
+
+[data-scenery="names"] .field .ember {
+  background: radial-gradient(circle, #f2e8ff 0, #b48cff 36%, transparent 72%);
+}
+
+[data-scenery="amphitheater"] .field .ember {
+  background: radial-gradient(circle, #ffc0a0 0, #c8443a 40%, transparent 72%);
+}
+
+.field .spark {
+  background: #ffe2a0;
+  box-shadow: 0 0 6px 2px #ff8a2acc;
+  animation-name: spark;
+  animation-timing-function: cubic-bezier(0.2, 0.6, 0.6, 1);
+}
+
+@keyframes spark {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: var(--o);
+  }
+  55% {
+    transform: translate3d(calc(var(--dx) * 0.6), var(--dy), 0) scale(0.8);
+    opacity: var(--o);
+  }
+  100% {
+    transform: translate3d(var(--dx), calc(var(--dy) * 0.3), 0) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.field .soot {
+  background: #2a1a1a;
+  border-radius: 30% 60%;
+  animation-name: tumble;
+}
+
+@keyframes tumble {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0);
+    opacity: 0;
+  }
+  15%,
+  80% {
+    opacity: var(--o);
+  }
+  100% {
+    transform: translate3d(var(--dx), var(--dy), 0) rotate(420deg);
+    opacity: 0;
+  }
+}
+
+.field .dust {
+  background: radial-gradient(
+    circle,
+    #ecd4a8 0,
+    #c9a36b66 40%,
+    transparent 72%
+  );
+}
+
+.field .firefly {
+  background: radial-gradient(circle, #fff3c0 0, #f0b35e 40%, transparent 72%);
+  animation-name: wander;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes wander {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.15;
+  }
+  25% {
+    transform: translate3d(calc(var(--dx) * 0.5), var(--dy), 0);
+    opacity: var(--o);
+  }
+  50% {
+    transform: translate3d(var(--dx), calc(var(--dy) * 0.3), 0);
+    opacity: 0.25;
+  }
+  75% {
+    transform: translate3d(calc(var(--dx) * 0.3), calc(var(--dy) * 0.8), 0);
+    opacity: var(--o);
+  }
+}
+
+.field .petal {
+  height: calc(var(--s) * 0.55);
+  border-radius: 60% 0;
+  background: linear-gradient(135deg, #f2f8f4, #a9c4b6);
+  animation-name: petal;
+}
+
+@keyframes petal {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0);
+    opacity: 0;
+  }
+  12%,
+  80% {
+    opacity: var(--o);
+  }
+  100% {
+    transform: translate3d(var(--dx), var(--dy), 0) rotate(560deg);
+    opacity: 0;
+  }
+}
+
+.field .paper {
+  width: calc(var(--s) * 0.72);
+  border-radius: 1px;
+  background: linear-gradient(#e8ecf1, #b6bfcc);
+  animation-name: paper;
+  animation-timing-function: ease-in-out;
+  animation-direction: alternate;
+}
+
+.field .paper:nth-child(3n)::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 58%;
+  height: 18%;
+  background: #b3262a;
+  transform: rotate(-12deg);
+}
+
+@keyframes paper {
+  from {
+    transform: translate3d(0, -12px, 0) rotate(-3deg);
+  }
+  to {
+    transform: translate3d(0, 12px, 0) rotate(3deg);
+  }
+}
+
+.field .prMote {
+  --c: #f4f1e6;
+  background: radial-gradient(circle, #ffffff 0, var(--c) 36%, transparent 72%);
+}
+
+.field .prMote:nth-child(5n + 1) {
+  --c: #6fb6ff;
+}
+
+.field .prMote:nth-child(5n + 2) {
+  --c: #a77ae8;
+}
+
+.field .prMote:nth-child(5n + 3) {
+  --c: #ff7a4a;
+}
+
+.field .prMote:nth-child(5n + 4) {
+  --c: #7ad48a;
+}
+
+/* ------------------------------------------------------------ shared motions */
+
+@keyframes breathe {
+  from {
+    opacity: var(--lo, 0.72);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  38% {
+    opacity: 0.94;
+  }
+  40% {
+    opacity: 0.7;
+  }
+  43% {
+    opacity: 0.96;
+  }
+  68% {
+    opacity: 0.84;
+  }
+  72% {
+    opacity: 1;
+  }
+}
+
+@keyframes sway {
+  from {
+    transform: rotate(calc(var(--a, 3deg) * -1));
+  }
+  to {
+    transform: rotate(var(--a, 3deg));
+  }
+}
+
+@keyframes bob {
+  from {
+    transform: translateY(calc(var(--b, 10px) * -1));
+  }
+  to {
+    transform: translateY(var(--b, 10px));
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ------------------------------------------------------------ 1. refuge */
+
+.rfAura {
+  --lo: 0.78;
+  animation: breathe 7s ease-in-out infinite alternate;
+}
+
+.rfShimmer {
+  animation: rfRise 8s linear infinite;
+}
+
+@keyframes rfRise {
+  to {
+    transform: translateY(-200px);
+  }
+}
+
+.rfCandleGlow {
+  animation: flicker 3.2s linear infinite;
+}
+
+.rfFlame {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: flame 2.4s ease-in-out infinite alternate;
+}
+
+@keyframes flame {
+  0% {
+    transform: scale(1, 1) rotate(-2deg);
+  }
+  30% {
+    transform: scale(0.9, 1.1) rotate(2deg);
+  }
+  60% {
+    transform: scale(1.06, 0.92) rotate(-1deg);
+  }
+  100% {
+    transform: scale(0.95, 1.05) rotate(1.5deg);
+  }
+}
+
+/* ------------------------------------------------------------ 2. village */
+
+.vgStars {
+  opacity: 0.22;
+  transition: opacity 2.4s ease 1s;
+}
+
+.vgSuns,
+.vgNight {
+  transition: opacity 2.4s ease;
+}
+
+.vgNight {
+  opacity: 0;
+}
+
+.vgThread {
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+
+.vgLamp {
+  transition: opacity 1.4s ease;
+}
+
+.vgFlicker {
+  animation: flicker 4.6s linear infinite;
+}
+
+.vgLamp:nth-child(3n) .vgFlicker {
+  animation-duration: 3.4s;
+  animation-delay: -1.2s;
+}
+
+.vgFireflies {
+  transition: opacity 2s ease 2s;
+}
+
+.scenery[data-phase="dark"] .vgStars {
+  opacity: 0.85;
+}
+
+.scenery[data-phase="dark"] .vgSuns {
+  opacity: 0.1;
+}
+
+.scenery[data-phase="dark"] .vgNight {
+  opacity: 1;
+}
+
+.scenery[data-phase="dark"] .vgThread {
+  opacity: 1;
+  transition-delay: 4.2s;
+}
+
+.scenery[data-phase="dark"] .vgFireflies {
+  opacity: 0.15;
+}
+
+/* The lamps fail one by one, each with a sputter, in the order of their --i. */
+.scenery[data-phase="dark"] .vgLamp {
+  opacity: 0.04;
+  animation: vgSputter 1.8s ease-in both;
+  animation-delay: calc(var(--i) * 0.5s + 0.3s);
+}
+
+@keyframes vgSputter {
+  0% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.35;
+  }
+  26% {
+    opacity: 0.9;
+  }
+  40% {
+    opacity: 0.2;
+  }
+  48% {
+    opacity: 0.6;
+  }
+  62% {
+    opacity: 0.1;
+  }
+  70% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0.04;
+  }
+}
+
+/* ------------------------------------------------------------ 3. fairground */
+
+.fgWheel {
+  transform-box: fill-box;
+  transform-origin: 50% 48%;
+  --a: 1.6deg;
+  animation: sway 11s ease-in-out infinite alternate;
+}
+
+.fgBob {
+  --b: 12px;
+  animation: bob 2.6s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+.fgShadow {
+  --amp: 16px;
+  transform: translate(var(--sx), var(--sy));
+  transition:
+    transform 2s ease,
+    opacity 2s ease,
+    --amp 2s ease;
+}
+
+.fgDrift {
+  animation: fgWander 9s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+@keyframes fgWander {
+  0% {
+    transform: translate(calc(var(--amp) * -1), 0);
+  }
+  50% {
+    transform: translate(var(--amp), calc(var(--amp) * 0.5));
+  }
+  100% {
+    transform: translate(calc(var(--amp) * -0.4), calc(var(--amp) * -0.4));
+  }
+}
+
+.fgTrapped {
+  --amp: 10px;
+  transition:
+    transform 2.2s ease-in-out,
+    opacity 1.4s ease 1.2s,
+    --amp 1.4s ease;
+}
+
+.fgReturned {
+  opacity: 0;
+  transition: opacity 1.4s ease 1.6s;
+}
+
+.fgBulb {
+  animation: breathe 2.4s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+  --lo: 0.45;
+}
+
+.fgBulbSmall {
+  animation: flicker 2.8s linear infinite;
+  animation-delay: var(--d);
+}
+
+.fgLamps {
+  transition: filter 2s ease;
+}
+
+.scenery[data-phase="free"] .fgShadow {
+  --amp: 0px;
+  transform: translate(0, 0);
+  opacity: 0.55;
+}
+
+.scenery[data-phase="free"] .fgTrapped {
+  --amp: 0px;
+  transform: translate(380px, 200px);
+  opacity: 0;
+}
+
+.scenery[data-phase="free"] .fgReturned {
+  opacity: 1;
+}
+
+.scenery[data-phase="free"] .fgLamps {
+  filter: saturate(0.5) hue-rotate(16deg) brightness(0.85);
+}
+
+/* ------------------------------------------------------------ 4. foundry */
+
+.fdConveyor {
+  animation: fdSlide 13s linear infinite;
+}
+
+@keyframes fdSlide {
+  to {
+    transform: translateX(300px);
+  }
+}
+
+.fdPulse {
+  --lo: 0.78;
+  animation: breathe 3.8s ease-in-out infinite alternate;
+}
+
+/* ------------------------------------------------------------ 5. streets */
+
+.stPulse {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 40% 30% at 50% 58%,
+    #e8a8603a,
+    transparent 70%
+  );
+  opacity: 0;
+  animation: stDrums 1.5s ease-out infinite;
+}
+
+/* Two beats and a rest: the drums of the rooted district, far off. */
+@keyframes stDrums {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  28% {
+    opacity: 0.1;
+  }
+  40% {
+    opacity: 0;
+  }
+  46% {
+    opacity: 0.75;
+  }
+  68% {
+    opacity: 0.05;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.stWind {
+  animation: stGust 4.5s linear infinite;
+}
+
+@keyframes stGust {
+  0% {
+    transform: translate(-160px, -64px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(260px, 104px);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ 6. tribunal */
+
+.tbFloatA {
+  animation: tbFloat 14s ease-in-out infinite alternate;
+  --b: 8px;
+}
+
+.tbFloatB {
+  animation: tbFloat 11s ease-in-out infinite alternate;
+  animation-delay: -5s;
+  --b: -12px;
+}
+
+@keyframes tbFloat {
+  from {
+    transform: translate3d(0, calc(var(--b) * -1), 0);
+  }
+  to {
+    transform: translate3d(0, var(--b), 0);
+  }
+}
+
+.tbBob {
+  --b: 9px;
+  animation: bob 6s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+/* ------------------------------------------------------------ 7. garden */
+
+.gdSheen {
+  animation: gdSheen 11s ease-in-out infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes gdSheen {
+  0% {
+    transform: translateX(0);
+  }
+  28%,
+  100% {
+    transform: translateX(var(--len));
+  }
+}
+
+/* ------------------------------------------------------------ 8. revel */
+
+.rvGoldWash,
+.rvStarWash,
+.rvMotes {
+  transition: opacity 2s ease;
+}
+
+.rvStarWash {
+  opacity: 0;
+}
+
+.rvDecor,
+.rvFloor,
+.rvArches {
+  transition: filter 2s ease;
+}
+
+.rvBanner {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: rvFlutter 7s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+@keyframes rvFlutter {
+  from {
+    transform: skewX(-1.6deg);
+  }
+  to {
+    transform: skewX(1.6deg);
+  }
+}
+
+.rvLantern {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  --a: 3deg;
+  animation: sway 3.6s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+.rvDancer {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: rvDance 3.2s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+@keyframes rvDance {
+  0% {
+    transform: rotate(-5deg) translateX(-6px);
+  }
+  50% {
+    transform: rotate(2deg) translateX(4px) scaleY(0.97);
+  }
+  100% {
+    transform: rotate(5deg) translateX(8px);
+  }
+}
+
+.scenery[data-phase="silent"] .rvGoldWash {
+  opacity: 0;
+}
+
+.scenery[data-phase="silent"] .rvStarWash {
+  opacity: 1;
+}
+
+.scenery[data-phase="silent"] .rvDecor {
+  filter: saturate(0.3) hue-rotate(105deg) brightness(0.62);
+}
+
+.scenery[data-phase="silent"] .rvArches {
+  filter: saturate(0.25) hue-rotate(110deg) brightness(0.55);
+}
+
+.scenery[data-phase="silent"] .rvFloor {
+  filter: saturate(0.3) brightness(0.65);
+}
+
+.scenery[data-phase="silent"] .rvDancer,
+.scenery[data-phase="silent"] .rvLantern,
+.scenery[data-phase="silent"] .rvBanner {
+  animation-play-state: paused;
+}
+
+.scenery[data-phase="silent"] .rvMotes {
+  opacity: 0.12;
+}
+
+/* ------------------------------------------------------------ 9. transit */
+
+.trArc {
+  animation: trArc 2.2s steps(1, end) infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes trArc {
+  0% {
+    opacity: 1;
+  }
+  12% {
+    opacity: 0.2;
+  }
+  18% {
+    opacity: 0.9;
+  }
+  30% {
+    opacity: 0;
+  }
+  62% {
+    opacity: 0.7;
+  }
+  70% {
+    opacity: 1;
+  }
+  84% {
+    opacity: 0.1;
+  }
+}
+
+.trPulse {
+  --lo: 0.35;
+  animation: breathe 3.4s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+.trRing {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 40s linear infinite;
+}
+
+.trFlicker {
+  animation: trFlicker 5s linear infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes trFlicker {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  46% {
+    opacity: 0.9;
+  }
+  48% {
+    opacity: 0.25;
+  }
+  52% {
+    opacity: 0.8;
+  }
+  54% {
+    opacity: 0.35;
+  }
+  58% {
+    opacity: 0.9;
+  }
+}
+
+/* ------------------------------------------------------------ 10. prism */
+
+.prBreathe {
+  --lo: 0.7;
+  animation: breathe 6s ease-in-out infinite alternate;
+}
+
+/* Two eased motions a quarter turn apart trace each world's ellipse around the prism. */
+/* Each world also rests where its orbit has it at the start, for when nothing moves. */
+.prOrbitX {
+  transform: translateX(var(--bx, 0px));
+  animation: prX 40s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+.prOrbitY {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: translateY(var(--by, 0px)) scale(var(--bs, 1));
+  animation: prY 40s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+@keyframes prX {
+  from {
+    transform: translateX(-640px);
+  }
+  to {
+    transform: translateX(640px);
+  }
+}
+
+@keyframes prY {
+  from {
+    transform: translateY(-160px) scale(0.68);
+  }
+  to {
+    transform: translateY(160px) scale(1.08);
+  }
+}
+
+.prShard {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: prShard 7s ease-in-out infinite alternate;
+}
+
+@keyframes prShard {
+  from {
+    transform: translate(0, -8px) rotate(-4deg);
+  }
+  to {
+    transform: translate(8px, 10px) rotate(5deg);
+  }
+}
+
+/* ------------------------------------------------------------ 11. nightmare */
+
+.nmWarp {
+  transform-origin: 50% 40%;
+  animation: nmWarp 9s ease-in-out infinite alternate;
+}
+
+@keyframes nmWarp {
+  0% {
+    transform: translate3d(-0.6%, 0, 0) skewX(-1.4deg) scale(1.03, 1);
+  }
+  50% {
+    transform: translate3d(0.3%, -0.4%, 0) skewX(1deg) scale(1.01, 1.04);
+  }
+  100% {
+    transform: translate3d(0.7%, 0.2%, 0) skewX(-0.6deg) scale(1.04, 1.02);
+  }
+}
+
+.nmDrift {
+  animation: nmDrift 36s ease-in-out infinite alternate;
+}
+
+@keyframes nmDrift {
+  from {
+    transform: translate3d(-3%, 0, 0) scale(1.04);
+  }
+  to {
+    transform: translate3d(3%, -1%, 0) scale(1.08);
+  }
+}
+
+.nmClap {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nmClap 0.42s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+@keyframes nmClap {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.3);
+  }
+}
+
+/* ------------------------------------------------------------ 12. amphitheater */
+
+.amBanner {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: rvFlutter 8s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+/* Distant footsteps: dust lifts where each one lands, in turn. */
+.amStep {
+  opacity: 0.3;
+  animation: amStep 7.2s ease-out infinite;
+  animation-delay: calc(var(--i) * 0.9s);
+}
+
+@keyframes amStep {
+  0% {
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.9;
+  }
+  20%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------ 13. gallery */
+
+.glSway {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  --a: 0.7deg;
+  animation: sway 9s ease-in-out infinite alternate;
+  animation-delay: var(--d);
+}
+
+.glShafts {
+  --lo: 0.6;
+  animation: breathe 10s ease-in-out infinite alternate;
+}
+
+/* ------------------------------------------------------------ 14. citadel */
+
+.ctRays {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 240s linear infinite;
+}
+
+.ctFlicker {
+  opacity: 0.05;
+  animation: ctFlicker 6s steps(1, end) infinite;
+}
+
+@keyframes ctFlicker {
+  0%,
+  100% {
+    opacity: 0.05;
+  }
+  71% {
+    opacity: 0.12;
+  }
+  73% {
+    opacity: 0.02;
+  }
+  75% {
+    opacity: 0.1;
+  }
+  77% {
+    opacity: 0.05;
+  }
+}
+
+/* ------------------------------------------------------------ 15. names */
+
+.nzScript,
+.nzGlow,
+.nzEmbers {
+  transition:
+    opacity 2s ease,
+    filter 2s ease;
+}
+
+.nzFlicker {
+  animation: nzBurn 5s linear infinite;
+  animation-delay: var(--d);
+}
+
+@keyframes nzBurn {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  23% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.82;
+  }
+  58% {
+    opacity: 0.55;
+  }
+  62% {
+    opacity: 0.95;
+  }
+}
+
+.nzExitGlow {
+  --lo: 0.75;
+  animation: breathe 6s ease-in-out infinite alternate;
+}
+
+.scenery[data-phase="dim"] .nzScript {
+  opacity: 0.32;
+  filter: saturate(0.6);
+}
+
+.scenery[data-phase="dim"] .nzGlow,
+.scenery[data-phase="dim"] .nzEmbers {
+  opacity: 0;
+}
+
+.scenery[data-phase="dim"] .nzFlicker {
+  animation-play-state: paused;
+}
+
+/* ------------------------------------------------------------ 16. throne */
+
+.thRadiance,
+.thWindows,
+.thCracks,
+.thSeat,
+.thMotes {
+  transition:
+    opacity 2s ease,
+    filter 2s ease;
+}
+
+.thWindows {
+  opacity: 0.78;
+}
+
+.thRays {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spin 180s linear infinite;
+}
+
+.thCrack {
+  opacity: 0;
+  transition: opacity 1.4s ease;
+  transition-delay: calc(var(--i) * 0.32s);
+}
+
+.thDark {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, #050302b3, #020101e6);
+  opacity: 0;
+  transition: opacity 2.2s ease;
+}
+
+.scenery[data-phase="fractured"] .thRadiance {
+  opacity: 0.72;
+}
+
+.scenery[data-phase="fractured"] .thCrack,
+.scenery[data-phase="empty"] .thCrack {
+  opacity: 1;
+}
+
+.scenery[data-phase="empty"] .thRadiance,
+.scenery[data-phase="empty"] .thMotes {
+  opacity: 0;
+}
+
+.scenery[data-phase="empty"] .thCracks {
+  opacity: 0.35;
+  filter: saturate(0.2) brightness(0.6);
+}
+
+.scenery[data-phase="empty"] .thSeat {
+  filter: brightness(0.4) saturate(0.25);
+}
+
+.scenery[data-phase="empty"] .thWindows {
+  opacity: 0.3;
+}
+
+.scenery[data-phase="empty"] .thDark {
+  opacity: 0.6;
+}
+
+/* The chamber is still once its light has gone. */
+.scenery[data-phase="empty"] * {
+  animation-play-state: paused;
+}
+
+/* ------------------------------------------------------------ 17. dawn */
+
+/* Each village's lamps come back in turn, left to right, then glimmer. */
+.dwLights {
+  animation:
+    dwRelight 2.4s ease-out both,
+    dwGlimmer 5s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * 0.42s + 0.4s), calc(var(--i) * 0.42s + 2.8s);
+}
+
+@keyframes dwRelight {
+  0% {
+    opacity: 0.04;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes dwGlimmer {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0.68;
+  }
+}
+
+.dwBand {
+  animation: dwBand 12s ease-in-out infinite;
+}
+
+@keyframes dwBand {
+  0% {
+    transform: translateX(-1100px);
+    opacity: 0;
+  }
+  20%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(1100px);
+    opacity: 0;
+  }
+}
+
+.dwBirds {
+  animation: dwBirds 70s linear infinite;
+}
+
+@keyframes dwBirds {
+  from {
+    transform: translate(-900px, 40px);
+  }
+  to {
+    transform: translate(1700px, -60px);
+  }
+}
+
+/* ------------------------------------------------------------ reduced motion */
+
+/* The app's Reduce motion switch: every scene holds still, and phases change by a short fade.
+   (global.css turns transitions off with !important; this more specific rule keeps the fade.) */
+html[data-reduced-motion="true"] .scenery,
+html[data-reduced-motion="true"] .scenery *,
+html[data-reduced-motion="true"] .scenery *::before,
+html[data-reduced-motion="true"] .scenery *::after {
+  animation: none !important;
+  transition: opacity 0.4s ease !important;
+}

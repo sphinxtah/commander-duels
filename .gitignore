@@ -30,3 +30,7 @@ Commander_Duels_Starter_Decks.xlsx
 # playlist's songs and their manifest, music/playlist.json, beside it; the live site takes them from
 # the private web image (docs/deployment.md).
 /music/
+
+# The owner's campaign handoff (v0.8.0): the guide and deck builds name the Godlike tier's custom
+# cards. content/campaign.json and web/src/campaign/script.ts are made from them (docs/campaign.md).
+/campaign/

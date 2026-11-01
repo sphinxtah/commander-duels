@@ -48,6 +48,9 @@ public final class EngineServer {
     private static final String GAME_ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
     private static final Pattern GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close)");
     private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection)");
+    /** Content a plugin carries for the API (v0.8.0): {@code /v1/service/content/<name>}. */
+    private static final Pattern CONTENT_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
+    static final String CONTENT_RESOURCES = "commander-duels/content/";
     static final Gson JSON = new GsonBuilder()
         .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
         .serializeNulls()
@@ -161,6 +164,8 @@ public final class EngineServer {
             cards(exchange, engine);
         } else if (rest.equals("implementations")) {
             implementations(exchange, implementations);
+        } else if (rest.startsWith("content/")) {
+            content(exchange, rest.substring("content/".length()));
         } else if (rest.startsWith("games/")) {
             String gamePath = rest.substring("games/".length());
             Matcher matcher = SERVICE_GAME_PATH.matcher(gamePath);
@@ -199,6 +204,45 @@ public final class EngineServer {
         exchange.sendResponseHeaders(200, Files.size(list.get()));
         try (var stream = exchange.getResponseBody()) {
             Files.copy(list.get(), stream);
+        }
+    }
+
+    /**
+     * Content a plugin on the classpath carries for the API (v0.8.0): the JSON resource
+     * {@code commander-duels/content/<name>.json}, as it is. The owner's private image carries the
+     * campaign finale's this way, so this repository names none of its cards; the public image has
+     * none, and every name answers 404.
+     */
+    private static void content(HttpExchange exchange, String name) throws IOException {
+        if (!exchange.getRequestMethod().equals("GET")) {
+            methodNotAllowed(exchange, "GET");
+            return;
+        }
+        Optional<String> found = CONTENT_NAME.matcher(name).matches() ? contentResource(name) : Optional.empty();
+        if (found.isEmpty()) {
+            respond(exchange, 404, Map.of("code", "not_found"));
+            return;
+        }
+        byte[] bytes = found.get().getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(200, bytes.length);
+        try (var stream = exchange.getResponseBody()) {
+            stream.write(bytes);
+        }
+    }
+
+    /** A content resource's JSON, when the classpath has it and it is an object. */
+    static Optional<String> contentResource(String name) {
+        ClassLoader loader = EngineServer.class.getClassLoader();
+        try (InputStream stream = loader.getResourceAsStream(CONTENT_RESOURCES + name + ".json")) {
+            if (stream == null) {
+                return Optional.empty();
+            }
+            String text = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+            return com.google.gson.JsonParser.parseString(text).isJsonObject() ? Optional.of(text) : Optional.empty();
+        } catch (IOException | com.google.gson.JsonParseException e) {
+            return Optional.empty();
         }
     }
 

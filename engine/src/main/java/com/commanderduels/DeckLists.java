@@ -35,6 +35,9 @@ import mage.game.GameException;
  * loyalty and defense. Any entry or commander naming one is made as a {@link StandInCard} from its
  * description, never looked up in XMage's database, so a card XMage implements but the site's checks
  * held back plays as a stand-in too. A list without {@code stand_ins} reads as before.
+ *
+ * <p>Since v0.8.0 a Commander list may name a {@code reserve}: one card and its threshold, the campaign
+ * finale's incarnation, kept out of the deck and brought into the game by {@link CampaignReserve}.
  */
 final class DeckLists {
     static final int MAX_ENTRIES = 250;
@@ -45,7 +48,10 @@ final class DeckLists {
     static final int MAX_SEARCH = 50;
     /** XMage refuses a deck entry above 99 copies; larger counts become several entries. */
     private static final int XMAGE_MAX_PER_ENTRY = 99;
-    private static final Set<String> FIELDS = Set.of("cards", "commanders", "sideboard", "stand_ins");
+    private static final Set<String> FIELDS = Set.of("cards", "commanders", "sideboard", "stand_ins", "reserve");
+    private static final Set<String> RESERVE_FIELDS = Set.of("name", "threshold");
+    /** A reserve card's threshold: the life at or below which it first crosses (v0.8.0). */
+    static final int MAX_THRESHOLD = 999;
     private static final Set<String> ENTRY_FIELDS = Set.of("name", "count");
     private static final Set<String> STAND_IN_FIELDS = Set.of("name", "mana_cost", "types", "subtypes", "supertypes",
         "colors", "power", "toughness", "loyalty", "defense");
@@ -56,17 +62,26 @@ final class DeckLists {
 
     record Entry(String name, int count) {}
 
+    /** A campaign finale's incarnation (v0.8.0): its card, and the life at which it first crosses. */
+    record Reserve(String name, int threshold) {}
+
     /**
      * A deck as named in a request, before resolution; the sideboard is Legacy's only. Since v0.6.2
      * the stand-ins it describes, by name.
      */
     record CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard,
-                      Map<String, StandInCard.Description> standIns) {
+                      Map<String, StandInCard.Description> standIns, List<Reserve> reserve) {
         CustomDeck {
             cards = List.copyOf(cards);
             commanders = List.copyOf(commanders);
             sideboard = List.copyOf(sideboard);
             standIns = Map.copyOf(standIns);
+            reserve = List.copyOf(reserve);
+        }
+
+        CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard,
+                   Map<String, StandInCard.Description> standIns) {
+            this(cards, commanders, sideboard, standIns, List.of());
         }
 
         CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard) {
@@ -144,7 +159,38 @@ final class DeckLists {
         }
         Map<String, StandInCard.Description> standIns = json.has("stand_ins") ? standIns(json.get("stand_ins"))
             : Map.of();
-        return new CustomDeck(entries, commanders, sideboard, standIns);
+        List<Reserve> reserve = List.of();
+        if (json.has("reserve")) {
+            if (format != GameFormat.COMMANDER) {
+                throw new JsonRequest.Invalid("only Commander deck lists have a reserve");
+            }
+            reserve = reserve(json.get("reserve"));
+        }
+        return new CustomDeck(entries, commanders, sideboard, standIns, reserve);
+    }
+
+    /** The {@code reserve}: at most one card, with its threshold (v0.8.0). */
+    private static List<Reserve> reserve(JsonElement list) throws JsonRequest.Invalid {
+        if (list == null || !list.isJsonArray() || list.getAsJsonArray().size() > 1) {
+            throw new JsonRequest.Invalid("seats[].deck_list.reserve must list at most one card");
+        }
+        List<Reserve> found = new ArrayList<>();
+        for (JsonElement item : list.getAsJsonArray()) {
+            if (!item.isJsonObject()) {
+                throw new JsonRequest.Invalid("a reserve card must be an object");
+            }
+            JsonObject card = item.getAsJsonObject();
+            JsonRequest.onlyFields(card, RESERVE_FIELDS, "seats[].deck_list.reserve[].");
+            String name = JsonRequest.string(card, "name", MAX_NAME).strip();
+            BigDecimal threshold = card.has("threshold") ? JsonRequest.integer(card, "threshold")
+                : BigDecimal.valueOf(15);
+            if (name.isEmpty() || threshold.signum() <= 0
+                || threshold.compareTo(BigDecimal.valueOf(MAX_THRESHOLD)) > 0) {
+                throw new JsonRequest.Invalid("a reserve card needs a name and a threshold from 1 to " + MAX_THRESHOLD);
+            }
+            found.add(new Reserve(name, threshold.intValueExact()));
+        }
+        return found;
     }
 
     /** The {@code stand_ins} a list describes, by name. */
@@ -307,6 +353,7 @@ final class DeckLists {
         deck.cards().forEach(entry -> names.add(entry.name()));
         names.addAll(deck.commanders());
         deck.sideboard().forEach(entry -> names.add(entry.name()));
+        deck.reserve().forEach(reserve -> names.add(reserve.name()));
         return names;
     }
 

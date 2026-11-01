@@ -44,6 +44,10 @@ const sourceNotes: [Source, string][] = [
     "grandfathered",
     "The cards your decks held when libraries began, so none of them stopped working.",
   ],
+  [
+    "campaign",
+    "Every copy of each warden's deck you won in the campaign, yours for good.",
+  ],
 ];
 /** Editions drawn at a time (v0.6.5): a library of thousands drawn whole was slow to scroll, and
  * its pictures, asked for all at once, outran the server's downloads and kept their text frames. */

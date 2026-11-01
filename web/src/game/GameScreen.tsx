@@ -31,6 +31,8 @@ import {
   matchLink,
   useFollowMatch,
 } from "../matches/GameMatch";
+import { campaignLink } from "../campaign/campaign";
+import { CampaignLayer } from "../campaign/CampaignLayer";
 import { RematchPanel, useRematch } from "../queues/Rematch";
 import { AwayPlayers } from "./AwayPlayers";
 import { GameContext, boxStyle, type GameContextValue } from "./Board";
@@ -614,14 +616,18 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
   const matchGoesOn =
     match !== null &&
     (match.status === "playing" || match.status === "sideboarding");
-  // A public queue's game (v0.5.0) leads back to the queue, as its rematch does.
-  const back = match
-    ? matchLink(match)
-    : rematch.view?.origin === "queue"
-      ? { href: "#find", text: "Find another game" }
-      : atTable
-        ? { href: "#tables", text: "Back to the lobby" }
-        : { href: "#play", text: "Back to the table" };
+  // A public queue's game (v0.5.0) leads back to the queue, as its rematch does; a campaign duel
+  // (v0.8.0) back to the campaign, to its scene.
+  const campaign = summary?.campaign ?? null;
+  const back = campaign
+    ? { href: campaignLink(gameId), text: "Back to the campaign" }
+    : match
+      ? matchLink(match)
+      : rematch.view?.origin === "queue"
+        ? { href: "#find", text: "Find another game" }
+        : atTable
+          ? { href: "#tables", text: "Back to the lobby" }
+          : { href: "#play", text: "Back to the table" };
   const paid =
     summary?.status === "finished" && summary.tokens ? summary.tokens : null;
   const tokensLine =
@@ -687,7 +693,13 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   : format === "two_headed_giant"
                     ? "Two-Headed Giant"
                     : "Legacy"}
-                <span>{atTable ? " · Table game" : " · Practice game"}</span>
+                <span>
+                  {atTable
+                    ? " · Table game"
+                    : campaign
+                      ? ` · Campaign: ${campaign.title}`
+                      : " · Practice game"}
+                </span>
               </h1>
 
               <BandHud
@@ -867,7 +879,9 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                           following={following}
                         />
                       )}
-                      {!matchGoesOn && <RematchPanel rematch={rematch} />}
+                      {!matchGoesOn && !campaign && (
+                        <RematchPanel rematch={rematch} />
+                      )}
                       <a
                         href={back.href}
                         className={styles.secondaryButton}
@@ -999,6 +1013,17 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
               </p>
               <TimerStatus />
 
+              {campaign && state.seat !== null && (
+                <CampaignLayer
+                  gameId={gameId}
+                  campaign={campaign}
+                  view={view}
+                  prompt={canAnswer ? prompt : null}
+                  log={state.log}
+                  over={over}
+                />
+              )}
+
               {model && layout && (
                 <Magnifier
                   model={model}
@@ -1083,7 +1108,7 @@ export function GameScreen({ gameId, me }: { gameId: string; me: Me | null }) {
                   following={following}
                 />
               )}
-              {!matchGoesOn && <RematchPanel rematch={rematch} />}
+              {!matchGoesOn && !campaign && <RematchPanel rematch={rematch} />}
               <form method="dialog" className={styles.confirmButtons}>
                 <button
                   type="submit"
@@ -1126,11 +1151,22 @@ function withHandles(
   summary: Summary | undefined,
   seat: Seat | null,
 ): Snapshot | null {
-  if (!snapshot?.view || summary?.kind !== "table" || seat === null)
+  // A campaign duel (v0.8.0): the bot is the encounter's opponent, by name.
+  const campaign = Boolean(summary?.campaign);
+  if (
+    !snapshot?.view ||
+    !summary ||
+    (summary.kind !== "table" && !campaign) ||
+    seat === null
+  )
     return snapshot;
   const handles = new Map<Seat, string>();
   for (const entry of summary.seats)
-    if (entry.player === "human" && entry.handle && entry.seat !== seat)
+    if (
+      (entry.player === "human" || campaign) &&
+      entry.handle &&
+      entry.seat !== seat
+    )
       handles.set(entry.seat, entry.handle);
   if (handles.size === 0) return snapshot;
   return {

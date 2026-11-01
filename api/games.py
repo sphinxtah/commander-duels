@@ -75,6 +75,7 @@ from api.identity import (
 )
 from api.library import Library, Starter, library_of, starter_entries
 from api.models import (
+    CampaignGame,
     CardConcept,
     CatalogRevision,
     CustomCard,
@@ -90,6 +91,7 @@ from api.models import (
 from api.progression import count_win
 from api.roster import roster_of
 from api.schemas import (
+    CampaignRef,
     CardNames,
     Error,
     FixtureDeck,
@@ -582,7 +584,14 @@ class GameHub:
         if result is None:
             self.broadcast(game, {"type": "interrupted", "game_id": str(game.id)})
         await retried(
-            partial(record_end, self.database, game.id, status, result),
+            partial(
+                record_end,
+                self.database,
+                game.id,
+                status,
+                result,
+                self.settings.content_dir,
+            ),
             f"record the end of game {game.id}",
         )
         game.recorded.set()
@@ -943,9 +952,14 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
                 .where(Game.id.in_(ids))
                 .values(status="interrupted", finished_at=utcnow())
             )
-            # Each player's history shows the game, with no result (v0.5.0).
+            # Each player's history shows the game, with no result (v0.5.0); a campaign duel
+            # (v0.8.0) is the campaign's, which records it unfinished.
             for game in db.scalars(select(Game).where(Game.id.in_(ids))):
-                settle(db, game)
+                link = db.get(CampaignGame, game.id)
+                if link is not None:
+                    link.outcome, link.finished_at = "unfinished", utcnow()
+                else:
+                    settle(db, game)
             # Their matches (v0.5.0) count them as games without a result.
             from api import matches  # Imported here: api.matches imports this module.
 
@@ -954,14 +968,23 @@ def interrupt_active(database: Engine, before: datetime | None = None) -> list[U
         return ids
 
 
-def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, Any] | None) -> None:
+def record_end(
+    database: Engine,
+    game_id: UUID,
+    status: str,
+    result: dict[str, Any] | None,
+    content_dir: str | None = None,
+) -> None:
     """Records how the game ended and, in the same transaction, the win of a player's seat that
     won it (api/progression.py), the tokens it pays (api/economy.py), and since v0.5.0 the
     players' results with the winner's quests and achievements (api/awards.py), so a result is
     never recorded without its win, its pay and its rewards, or twice. Since v0.5.0 a match's
-    game also counts in its match (api/matches.py), which ends or goes on to its next game."""
-    # Imported here, as above; api.matches imports this module.
-    from api import matches
+    game also counts in its match (api/matches.py), which ends or goes on to its next game.
+    Since v0.8.0 a campaign duel's end is the campaign's instead (api/campaign.py): no win and no
+    quests, and for a win the encounter and its rewards (a first win's spoils: the warden's deck
+    and tokens), in this same transaction."""
+    # Imported here, as above; api.matches and api.campaign import this module.
+    from api import campaign, matches
     from api.awards import settle
 
     with Session(database) as db:
@@ -972,10 +995,15 @@ def record_end(database: Engine, game_id: UUID, status: str, result: dict[str, A
             # Engine error details stay in the engine's log.
             game.result = recorded(result) if result else None
             db.flush()
-            count_win(db, game)
-            pay_game(db, game)
-            settle(db, game)
-            matches.game_ended(db, game)
+            link = db.get(CampaignGame, game.id)
+            if link is not None:
+                content = campaign.campaign_in(content_dir) if content_dir else None
+                campaign.game_ended(db, game, link, content, content_dir)
+            else:
+                count_win(db, game)
+                pay_game(db, game)
+                settle(db, game)
+                matches.game_ended(db, game)
             db.commit()
 
 
@@ -1091,6 +1119,9 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
         handles[user_id], alliances[user_id] = handle, alliance
     everything = full_access(principal)
     your_seat = next((row.seat for row in rows if row.user_id == principal.user.id), None)
+    # A campaign duel (v0.8.0): the bot is the encounter's opponent, by name and portrait.
+    link = db.get(CampaignGame, game.id)
+    opponent = (link.opponent_name, link.opponent) if link is not None else None
     return GameSummary(
         id=game.id,
         kind=game.kind,  # type: ignore[arg-type]
@@ -1100,8 +1131,20 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
             SeatSummary(
                 seat=row.seat,
                 player=row.player,  # type: ignore[arg-type]
-                handle=handles.get(row.user_id) if row.user_id else None,
-                portrait=alliances.get(row.user_id) if row.user_id else None,
+                handle=(
+                    handles.get(row.user_id)
+                    if row.user_id
+                    else opponent[0]
+                    if opponent and row.player == "bot"
+                    else None
+                ),
+                portrait=(
+                    alliances.get(row.user_id)
+                    if row.user_id
+                    else opponent[1]
+                    if opponent and row.player == "bot"
+                    else None
+                ),
                 deck=row.deck if everything or row.user_id == principal.user.id else None,
                 left=row.left_reason,  # type: ignore[arg-type]
             )
@@ -1119,6 +1162,20 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
             else None
         ),
         match=match_ref(db, game),
+        campaign=(
+            CampaignRef(
+                encounter=link.encounter,
+                opponent=link.opponent,
+                name=link.opponent_name,
+                title=link.title,
+                hints=link.hints,
+                deck=link.deck,  # type: ignore[arg-type]
+                finale=link.finale,  # type: ignore[arg-type]
+                outcome=link.outcome,  # type: ignore[arg-type]
+            )
+            if link is not None
+            else None
+        ),
     )
 
 

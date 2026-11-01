@@ -174,7 +174,8 @@ def custom_by_name(db: Session) -> dict[str, tuple[UUID, str]]:
 
 
 def names_in(deck_list: object) -> set[str]:
-    """The card names a seat's deck list holds, case aside, its sideboard's (v0.5.0) included."""
+    """The card names a seat's deck list holds, case aside, its sideboard's (v0.5.0) and a
+    campaign finale's reserve (v0.8.0) included."""
     if not isinstance(deck_list, Mapping):
         return set()
     found: set[str] = set()
@@ -184,6 +185,10 @@ def names_in(deck_list: object) -> set[str]:
     for commander in deck_list.get("commanders") or []:
         if isinstance(commander, str):
             found.add(commander.casefold())
+    # A campaign finale's incarnation in reserve (v0.8.0), outside the deck but in the game.
+    for card in deck_list.get("reserve") or []:
+        if isinstance(card, Mapping) and isinstance(card.get("name"), str):
+            found.add(card["name"].casefold())
     return found
 
 

@@ -36,6 +36,8 @@ import {
   type Format,
   type Me,
 } from "./api";
+import { returningGame } from "./campaign/campaign";
+import { CampaignPage } from "./campaign/CampaignPage";
 import { CardsPage } from "./catalog/CardsPage";
 import { DeckEditor } from "./decks/DeckEditor";
 import { DecksPage } from "./decks/DecksPage";
@@ -106,6 +108,11 @@ function currentMatch(): string | undefined {
 function currentMessages(): string | undefined {
   return oldMessagesRoute(window.location.hash);
 }
+/** #campaign/game/<id> comes back to the campaign from one of its duels (v0.8.0), to tell its
+ * story: the victory's scene, or the retreat. */
+function currentCampaign(): string | undefined {
+  return returningGame(window.location.hash);
+}
 /** #player/<id> opens a player's profile (v0.4.3), under Friends. */
 function currentPlayer(): string | undefined {
   return PLAYER_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -119,11 +126,13 @@ function currentPage(): Page {
   // Tivit's Auction House's tabs (v0.6.0): #auctions/search, #auctions/list, #auctions/targets.
   if (path.startsWith("auctions/")) return "Auctions";
   if (path.startsWith("match/")) return "Play";
+  // The campaign (v0.8.0), and its way back from a duel.
+  if (path.startsWith("campaign/")) return "Campaign";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
   // The Play page's own anchors: "Find a game" (v0.5.0), its practice table and its formats.
   if (path === "find" || path === "practice" || path === "formats")
     return "Play";
-  // Any other address, Campaign, Learn and Collection's old ones included, is the main menu.
+  // Any other address, Learn and Collection's old ones included, is the main menu.
   return pages.find((page) => page.toLowerCase() === path) ?? "Home";
 }
 
@@ -134,6 +143,7 @@ export function App() {
   const [tableRoute, setTableRoute] = useState(currentTable);
   const [matchRoute, setMatchRoute] = useState(currentMatch);
   const [playerRoute, setPlayerRoute] = useState(currentPlayer);
+  const [campaignRoute, setCampaignRoute] = useState(currentCampaign);
   const [messagesRoute, setMessagesRoute] = useState(currentMessages);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [formats, setFormats] = useState<Format[]>([]);
@@ -274,6 +284,7 @@ export function App() {
       setTableRoute(currentTable());
       setMatchRoute(currentMatch());
       setPlayerRoute(currentPlayer());
+      setCampaignRoute(currentCampaign());
       setMessagesRoute(currentMessages());
     };
     window.addEventListener("hashchange", change);
@@ -660,6 +671,13 @@ export function App() {
               />
             ) : page === "SysOp" && entrance ? (
               <SysopSignIn onSignedIn={accountChanged} heading={heading} />
+            ) : page === "Campaign" ? (
+              <CampaignPage
+                key={campaignRoute ?? "map"}
+                me={me}
+                heading={heading}
+                returning={campaignRoute}
+              />
             ) : page === "Play" && matchRoute ? (
               <MatchPage
                 key={matchRoute}

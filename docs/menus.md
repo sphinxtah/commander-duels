@@ -35,8 +35,9 @@ Along the bottom of every page: the friends list at the right end, "Friends · 3
 
 ## The main menu
 
-The app opens on the main menu (`#home`; any address that names no page, the old Campaign, Learn and Collection ones included, opens it too, and so does the installed app). As in Magic Duels, the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a word to choose an ally on Profile. Since v0.6.0 (the owner's request) the whole greeting is a link to the profile. Beside it, the tiles:
+The app opens on the main menu (`#home`; any address that names no page, the old Learn and Collection ones included, opens it too, and so does the installed app; since v0.8.0 `#campaign` is the campaign again). As in Magic Duels, the account's ally greets it: the allied Planeswalker's portrait stands large in a pool of light, with "Welcome back" and the account's handle, its tier, its wins and a bar of the way to the next tier. With no alliance, the owner's mark stands there, with a word to choose an ally on Profile. Since v0.6.0 (the owner's request) the whole greeting is a link to the profile. Beside it, the tiles:
 - **Play**, the largest, over the owner's banner: practice games against the bots, and since v0.5.0 the public queues. When one of the account's games is still running, it says so and leads back to it; while the account waits in a queue, it says "Looking for a Legacy game" and leads to the wait ([queues](queues.md)).
+- **Campaign** (v0.8.0), under the greeting in the left column (the owner's layout: the greeting takes about 70% of the column's height, the Campaign tile the rest; on a narrow window both stack above the tiles): The Final Concordance, the story campaign, over the owner's painting of the throne, with the account's seals ("3 of 13 seals claimed") ([the campaign](campaign.md)).
 - **Tables**, with the number of open tables.
 - **Leng's Card Shop**, over Leng's painting, with the week's sale.
 - **Tivit's Auction House** (v0.6.0), over the owner's painting of Tivit at the auctioneer's desk, beside the shop ([the auction house](auctions.md)).
@@ -58,7 +59,7 @@ A title band runs across the top of every other page: **Main menu**, the way bac
 
 ## The music (v0.7.3)
 
-The owner's playlist, twenty songs, plays on every page of the signed-in app but a game's, from a small player fixed in the lower left corner of the window (the chat bar keeps the lower right). Folded, it is a pill with the song's name, Play or Pause, and the player opens from it: the song playing, Previous and Next, Shuffle or In order, the volume and its mute, and the list of songs, each with a tick to leave it out (the last ticked song stays ticked, so there is always something to play; a song chosen from the list plays whatever its tick, and the ticked songs go on after it). Shuffle plays each ticked song once before any repeats and never opens a round on the song just heard; In order plays them down the list and round again; Previous walks back through what was heard.
+The owner's playlist, twenty-one songs since v0.8.0 (Falling In Reverse's All My Life the newest), plays on every page of the signed-in app but a game's, from a small player fixed in the lower left corner of the window (the chat bar keeps the lower right). Folded, it is a pill with the song's name, Play or Pause, and the player opens from it: the song playing, Previous and Next, Shuffle or In order, the volume and its mute, and the list of songs, each with a tick to leave it out (the last ticked song stays ticked, so there is always something to play; a song chosen from the list plays whatever its tick, and the ticked songs go on after it). Shuffle plays each ticked song once before any repeats and never opens a round on the song just heard; In order plays them down the list and round again; Previous walks back through what was heard.
 
 The box's settings are the device's (`cd.menuMusic.v1` in localStorage, `web/src/shell/music/menuMusicSettings.ts`): the volume (50 by default, the level (volume/100)² as the other sounds'), its own mute, the order, the ticks, whether it is open, whether it was paused by hand (a paused player stays paused through a reload until Play), and the song playing, which the next visit begins with again. Settings › **Menu music** offers the volume, the mute and Shuffle among the other sound settings; **Mute all sound** silences the playlist too, and the box says so. The game track's volume and mute are separate (Settings › The table).
 
@@ -68,6 +69,6 @@ Which songs there are is the manifest's business: `/music/playlist.json`, `{"tra
 
 ## Gone in v0.4.5
 
-- **Campaign, Learn and Collection.** Placeholder pages since v0.0.1; a player's cards are on Cards → My library.
+- **Campaign, Learn and Collection.** Placeholder pages since v0.0.1; a player's cards are on Cards → My library. The Campaign came back in v0.8.0 as the story campaign ([the campaign](campaign.md)).
 - **A test build's words.** "Testing preview", the milestone labels over page titles ("M1 · CARD CATALOG"), "planned" formats and the "foundation is taking shape" section. Settings' list of what the site offers is now "In this version", and says "Coming later" for what it does not offer yet.
 - **The sidebar.**

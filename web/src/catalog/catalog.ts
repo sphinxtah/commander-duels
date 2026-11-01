@@ -138,6 +138,8 @@ export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
   unique: "One of a kind",
   // Won at Tivit's Auction House (v0.6.0).
   auction: "Bought at auction",
+  // A campaign warden's deck, won by beating them (v0.8.0).
+  campaign: "Won in the campaign",
 };
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */

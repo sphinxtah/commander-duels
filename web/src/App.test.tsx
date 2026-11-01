@@ -280,6 +280,10 @@ beforeEach(() => {
   on("GET /api/v1/me/history", () => reply(200, history()));
   // The account's place in a public queue (v0.5.0): none.
   on("GET /api/v1/queue", () => reply(200, { status: "none" }));
+  // The campaign (v0.8.0): its tile on the main menu reads the progress.
+  on("GET /api/v1/campaign", () =>
+    reply(503, { code: "campaign_unavailable", message: "", request_id: "" }),
+  );
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -1188,14 +1192,14 @@ describe("the main menu (v0.4.5)", () => {
     expect(screen.queryByRole("link", { name: "Main menu" })).toBeNull();
   });
 
-  it("sends Campaign, Learn and Collection's old addresses to the main menu, and every other page has a way back", async () => {
+  it("sends Learn and Collection's old addresses to the main menu, and every other page has a way back", async () => {
     on("GET /api/v1/me", () => reply(200, alice));
-    for (const old of ["#campaign", "#learn", "#collection"]) {
+    for (const old of ["#learn", "#collection"]) {
       window.location.hash = old;
       const shown = render(<App />);
       await screen.findByRole("heading", { name: "Welcome back, alice" });
       expect(document.body).not.toHaveTextContent(
-        /Campaign|Learn\b|Collection|on the horizon|NOT AVAILABLE/,
+        /Learn\b|Collection|on the horizon|NOT AVAILABLE/,
       );
       shown.unmount();
     }

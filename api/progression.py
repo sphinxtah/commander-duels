@@ -138,9 +138,9 @@ class LibraryCard(Contract):
     )
     edition: LibraryEdition = Field(description="The edition these copies are (v0.5.0).")
     copies: int | None = Field(description="Copies owned of this edition.")
-    sources: list[Literal["starter", "grandfathered", "alliance", "pack", "unique", "auction"]] = (
-        Field(description="Where this edition's copies came from.")
-    )
+    sources: list[
+        Literal["starter", "grandfathered", "alliance", "pack", "unique", "auction", "campaign"]
+    ] = Field(description="Where this edition's copies came from.")
     finishes: LibraryFinishes = Field(
         description="The copies held now in each finish (v0.6.0), after the auction house: "
         "those listed or sold are out, those bought are in; an alliance's are nonfoil.",

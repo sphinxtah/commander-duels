@@ -67,7 +67,7 @@ BOT_CAP = "economy.bot_daily_cap"
 MAX_GRANT = 100_000_000
 MAX_BOT_CAP = 100_000
 LEDGER_SHOWN = 50
-EARNED = ("bot_win", "human_win", "back_pay", "quest", "achievement")
+EARNED = ("bot_win", "human_win", "back_pay", "quest", "achievement", "campaign")
 GIVEN = ("welcome", "grant")
 AUCTIONS = ("bid", "bid_return", "sale")
 
@@ -83,6 +83,7 @@ TokenKind = Literal[
     "bid",
     "bid_return",
     "sale",
+    "campaign",
 ]
 
 
@@ -388,15 +389,16 @@ def grant(db: Session, user: User, amount: int, reason: str, actor: User) -> Tok
 def reward(
     db: Session,
     user_id: UUID,
-    kind: Literal["quest", "achievement"],
+    kind: Literal["quest", "achievement", "campaign"],
     amount: int,
     key: str,
     reason: str,
     policy: str,
 ) -> bool:
-    """A daily quest's or an achievement's reward (v0.5.0), in the caller's transaction, once per
-    key: a replayed end, a retry or a second look finds the key taken and pays nothing. The
-    reason names the quest or the achievement; the entry records the rule it was paid under."""
+    """A daily quest's or an achievement's reward (v0.5.0), or since v0.8.0 a campaign warden's
+    tokens, in the caller's transaction, once per key: a replayed end, a retry or a second look
+    finds the key taken and pays nothing. The reason names the quest, the achievement or the
+    warden; the entry records the rule it was paid under."""
     if db.scalar(select(TokenEntry.id).where(TokenEntry.key == key)) is not None:
         return False
     db.add(

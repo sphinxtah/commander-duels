@@ -42,6 +42,9 @@ export function lineWords(line: TokenLine): string {
       return line.reason ?? "A bid returned";
     case "sale":
       return line.reason ?? "A card sold at Tivit's Auction House";
+    // A campaign warden's first defeat (v0.8.0): the reason names the warden and their ward.
+    case "campaign":
+      return `Campaign: beat ${line.reason ?? "a warden"}`;
   }
 }
 
@@ -53,6 +56,7 @@ export function namedByReason(line: TokenLine): boolean {
     line.kind === "achievement" ||
     line.kind === "bid" ||
     line.kind === "bid_return" ||
-    line.kind === "sale"
+    line.kind === "sale" ||
+    line.kind === "campaign"
   );
 }

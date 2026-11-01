@@ -448,7 +448,11 @@ export const buildTableModel: BuildTableModel = (input) => {
         : sysop && summary?.deck
           ? deckTitle(summary.deck)
           : kind === "bot"
-            ? "Bot"
+            ? summary?.portrait === "the-sphinx"
+              ? "Author of the Archive"
+              : summary?.portrait
+                ? "Warden of the Archive"
+                : "Bot"
             : kind === "human"
               ? "Player"
               : null;
@@ -461,11 +465,10 @@ export const buildTableModel: BuildTableModel = (input) => {
           ? `handle:${handle}`
           : `seat:${seat}`;
     // A human's portrait is their allied Planeswalker's (v0.3.1): the summary's, or your own
-    // account's until the summary arrives. Bots have none.
+    // account's until the summary arrives. Bots have none, but a campaign opponent (v0.8.0), whose
+    // portrait the summary gives.
     const portrait = summary
-      ? summary.player === "human"
-        ? (summary.portrait ?? null)
-        : null
+      ? (summary.portrait ?? null)
       : self
         ? selfPortrait
         : null;

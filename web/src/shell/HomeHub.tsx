@@ -19,6 +19,8 @@ interface HubData {
   decks?: number;
   online?: number;
   ally?: Planeswalker;
+  /** The campaign's seals claimed, and whether its story has begun (v0.8.0). */
+  campaign?: { seals: number; begun: boolean; complete: boolean };
 }
 
 function useHubData(me: Me): HubData {
@@ -62,6 +64,21 @@ function useHubData(me: Me): HubData {
           ).length,
         });
     });
+    // The campaign's progress (v0.8.0), for its tile.
+    if (me.permissions.includes("games.play"))
+      void client
+        .GET("/api/v1/campaign")
+        .then(({ data }) => {
+          if (data)
+            merge({
+              campaign: {
+                seals: data.progress.completed.filter((n) => n < 14).length,
+                begun: data.progress.scenes_seen.length > 0,
+                complete: data.progress.completed.includes(14),
+              },
+            });
+        })
+        .catch(() => undefined);
     if (me.alliance)
       void client.GET("/api/v1/planeswalkers").then(({ data }) => {
         if (data) merge({ ally: data.find((pw) => pw.id === me.alliance) });
@@ -105,74 +122,94 @@ export function HomeHub({
   return (
     <div className={styles.hub}>
       <Embers />
-      <section className={styles.welcome} aria-labelledby="hub-title">
-        {/* The whole greeting opens the profile (v0.6.0, the owner's request). */}
-        <a
-          className={styles.welcomeLink}
-          href="#profile"
-          aria-label="Your profile"
-        />
-        <div className={styles.allyStage}>
-          {me.alliance ? (
-            <Portrait
-              id={me.alliance}
-              name={data.ally?.name}
-              description={data.ally?.description}
-              portrait={data.ally?.portrait}
-              size={320}
-              className={styles.ally}
-            />
-          ) : (
-            <img
-              className={styles.allyMark}
-              src="/brand/mark-384.webp"
-              alt=""
-              width={192}
-              height={192}
-            />
-          )}
-        </div>
-        <div className={styles.welcomeWords}>
-          <span className={styles.kicker}>
-            {data.ally
-              ? `Allied with ${data.ally.name}`
-              : "Welcome, planeswalker"}
-          </span>
-          <h1 id="hub-title" ref={heading} tabIndex={-1}>
-            Welcome back, <em>{name}</em>
-          </h1>
-          {progress && me.kind !== "sysop" && (
-            <div className={styles.tier}>
-              <span className={styles.tierName}>{progress.tier.name}</span>
-              <span>
-                {progress.wins.toLocaleString("en-US")}{" "}
-                {progress.wins === 1 ? "win" : "wins"}
-                {progress.next_tier &&
-                  ` · ${progress.next_tier.name} at ${progress.next_tier.wins.toLocaleString("en-US")}`}
-              </span>
-              <span
-                className={styles.tierBar}
-                role="progressbar"
-                aria-label={
-                  progress.next_tier
-                    ? `Wins towards ${progress.next_tier.name}`
-                    : "The highest tier"
-                }
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(climb(progress) * 100)}
-              >
-                <span style={{ width: `${climb(progress) * 100}%` }} />
-              </span>
-            </div>
-          )}
-          {!me.alliance && (
-            <span className={styles.quiet}>
-              Choose an ally on your profile <span aria-hidden="true">→</span>
+      {/* The left column (v0.8.0, the owner's layout): the greeting above, the campaign below. */}
+      <div className={styles.side}>
+        <section className={styles.welcome} aria-labelledby="hub-title">
+          {/* The whole greeting opens the profile (v0.6.0, the owner's request). */}
+          <a
+            className={styles.welcomeLink}
+            href="#profile"
+            aria-label="Your profile"
+          />
+          <div className={styles.allyStage}>
+            {me.alliance ? (
+              <Portrait
+                id={me.alliance}
+                name={data.ally?.name}
+                description={data.ally?.description}
+                portrait={data.ally?.portrait}
+                size={320}
+                className={styles.ally}
+              />
+            ) : (
+              <img
+                className={styles.allyMark}
+                src="/brand/mark-384.webp"
+                alt=""
+                width={192}
+                height={192}
+              />
+            )}
+          </div>
+          <div className={styles.welcomeWords}>
+            <span className={styles.kicker}>
+              {data.ally
+                ? `Allied with ${data.ally.name}`
+                : "Welcome, planeswalker"}
             </span>
-          )}
-        </div>
-      </section>
+            <h1 id="hub-title" ref={heading} tabIndex={-1}>
+              Welcome back, <em>{name}</em>
+            </h1>
+            {progress && me.kind !== "sysop" && (
+              <div className={styles.tier}>
+                <span className={styles.tierName}>{progress.tier.name}</span>
+                <span>
+                  {progress.wins.toLocaleString("en-US")}{" "}
+                  {progress.wins === 1 ? "win" : "wins"}
+                  {progress.next_tier &&
+                    ` · ${progress.next_tier.name} at ${progress.next_tier.wins.toLocaleString("en-US")}`}
+                </span>
+                <span
+                  className={styles.tierBar}
+                  role="progressbar"
+                  aria-label={
+                    progress.next_tier
+                      ? `Wins towards ${progress.next_tier.name}`
+                      : "The highest tier"
+                  }
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(climb(progress) * 100)}
+                >
+                  <span style={{ width: `${climb(progress) * 100}%` }} />
+                </span>
+              </div>
+            )}
+            {!me.alliance && (
+              <span className={styles.quiet}>
+                Choose an ally on your profile <span aria-hidden="true">→</span>
+              </span>
+            )}
+          </div>
+        </section>
+        {/* The Final Concordance (v0.8.0): the story campaign, under the greeting, over the
+          owner's painting of the throne. */}
+        <Tile
+          href="#campaign"
+          className={styles.campaignTile}
+          icon="campaign"
+          title="Campaign"
+          lead="Fourteen duels through the Archive's wards, to the Sphinx's throne."
+          meta={
+            data.campaign?.complete
+              ? "The Concordance is revoked"
+              : data.campaign?.begun
+                ? `${data.campaign.seals} of 13 seals claimed`
+                : "A new story begins"
+          }
+          index={0.5}
+        />
+      </div>
       <section className={styles.tiles} aria-label="Main menu">
         <Tile
           href={

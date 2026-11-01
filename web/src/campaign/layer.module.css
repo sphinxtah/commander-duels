@@ -1,0 +1,212 @@
+/* A campaign duel's voices at the table (v0.8.0), in the stage's own units (1920 × 1080, scaled
+   with the table). Above the cards, the HUD and the prompt column; below the drawers, the
+   magnifier and the menus. Barks take no clicks; lessons and the tooltip do. */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2600;
+  pointer-events: none;
+}
+
+.bark {
+  position: absolute;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  max-width: 560px;
+  animation:
+    barkIn 0.35s cubic-bezier(0.2, 1.4, 0.4, 1),
+    barkOut 0.5s ease-in calc(var(--hold) - 0.5s) forwards;
+}
+/* The opponent speaks from beside their portrait at the top right. */
+.foe {
+  top: 64px;
+  right: 270px;
+  flex-direction: row-reverse;
+}
+/* Kaya (and the player) from the upper left. */
+.ally {
+  top: 64px;
+  left: 380px;
+}
+@keyframes barkIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+}
+@keyframes barkOut {
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+.bark p {
+  position: relative;
+  margin: 0;
+  padding: 16px 22px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fffdf6, #efe5cf);
+  color: #1d1a14;
+  font-size: 22px;
+  line-height: 1.4;
+  box-shadow:
+    0 0 0 2px #2a2116,
+    0 0 0 4px #d5b77c,
+    0 14px 30px #000000b3;
+}
+.bark strong {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--cd-display);
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7b5a26;
+}
+.bark p::after {
+  content: "";
+  position: absolute;
+  bottom: 14px;
+  width: 22px;
+  height: 18px;
+  background: #efe5cf;
+}
+.foe p::after {
+  right: -18px;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.ally p::after {
+  left: -18px;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+.barkPortrait {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px #000) drop-shadow(0 0 10px #d5b77c66);
+}
+.foe .barkPortrait {
+  transform: scaleX(-1);
+}
+.veiled {
+  filter: brightness(0) drop-shadow(0 0 4px #f4dca6)
+    drop-shadow(0 0 18px #e9b960);
+}
+
+/* The Sphinx crossing into the duel: gold fractures run over the table, then fade. */
+.crossing {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      118deg,
+      transparent 47%,
+      #fff2c8 49.6%,
+      #f4c76a 50%,
+      transparent 52.5%
+    ),
+    linear-gradient(62deg, transparent 58%, #fff2c8cc 59.4%, transparent 61%),
+    linear-gradient(160deg, transparent 30%, #fff2c8aa 31%, transparent 32.4%),
+    radial-gradient(
+      circle at 1802px 168px,
+      #fff6d6 0,
+      #f4dca6aa 120px,
+      transparent 420px
+    );
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: crossing 3.2s ease-out;
+}
+@keyframes crossing {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.tip,
+.hint {
+  position: absolute;
+  pointer-events: auto;
+  border-radius: 14px;
+  background:
+    radial-gradient(ellipse at 0% 0%, #d5b77c26, transparent 60%),
+    linear-gradient(165deg, #1a2926f2, #0f1817f2);
+  box-shadow:
+    inset 0 0 0 1px #d5b77c55,
+    0 18px 40px #000000b3;
+  color: #ebece6;
+}
+.tip {
+  top: 240px;
+  left: 560px;
+  width: 800px;
+  display: grid;
+  gap: 8px;
+  padding: 18px 22px;
+  font-size: 22px;
+  line-height: 1.45;
+  border-left: 4px solid #f4dca6;
+}
+.tip strong {
+  font-family: var(--cd-display);
+  color: #f4dca6;
+  letter-spacing: 0.08em;
+}
+.tip button,
+.hintButtons button {
+  justify-self: start;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 18px;
+  background: var(--cd-gold-fill);
+  color: #2a1d0a;
+  font-family: var(--cd-display);
+  font-weight: 700;
+  font-size: 17px;
+}
+.hint {
+  top: 230px;
+  left: 16px;
+  width: 470px;
+  display: flex;
+  gap: 14px;
+  padding: 16px 18px;
+  font-size: 19px;
+  line-height: 1.45;
+  animation: barkIn 0.4s ease-out;
+}
+.hint img {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px #b9d6ff66);
+}
+.hint p {
+  margin: 4px 0 10px;
+}
+.hintKicker {
+  font-family: var(--cd-display);
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f4dca6;
+}
+.hintButtons {
+  display: flex;
+  gap: 10px;
+}
+.hintButtons .hintQuiet {
+  background: transparent;
+  color: #f4dca6;
+  box-shadow: inset 0 0 0 1px #d5b77c66;
+}

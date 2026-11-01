@@ -1039,13 +1039,14 @@ class ProgressEntry(Base):
 
 
 class LibraryGrant(Base):
-    """Copies of a card granted into an account's library for good: a starter deck's cards, or
-    the cards of decks saved before libraries existed. An alliance's cards are not granted: they
-    are in the library while the alliance lasts. Append-only, like the ledger: a reset (v0.4.5)
-    leaves the grants before it recorded, and the library counts only those after it. Since
-    v0.5.0 every grant names the edition (printing) it gives, and one grant gives one edition;
-    since v0.6.0 one finish of it too. A copy listed at the auction house is still granted: the
-    library subtracts the copies on its live and sold listings (api/library.py)."""
+    """Copies of a card granted into an account's library for good: a starter deck's cards, the
+    cards of decks saved before libraries existed, or (v0.8.0) a campaign warden's deck won. An
+    alliance's cards are not granted: they are in the library while the alliance lasts.
+    Append-only, like the ledger: a reset (v0.4.5) leaves the grants before it recorded, and the
+    library counts only those after it. Since v0.5.0 every grant names the edition (printing) it
+    gives, and one grant gives one edition; since v0.6.0 one finish of it too. A copy listed at
+    the auction house is still granted: the library subtracts the copies on its live and sold
+    listings (api/library.py)."""
 
     __tablename__ = "library_grants"
     __table_args__ = (
@@ -1054,7 +1055,7 @@ class LibraryGrant(Base):
         ),
         CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
         CheckConstraint(
-            "source IN ('starter', 'grandfathered', 'pack', 'unique', 'auction')",
+            "source IN ('starter', 'grandfathered', 'pack', 'unique', 'auction', 'campaign')",
             name="ck_library_grants_source",
         ),
         CheckConstraint("finish IN ('nonfoil', 'foil', 'etched')", name="ck_library_grants_finish"),
@@ -1071,7 +1072,8 @@ class LibraryGrant(Base):
     source: Mapped[str] = mapped_column(String(16))
     # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,
     # pack:<opening>, unique:<Scryfall ID> (a one-of-a-kind card, v0.5.1), auction:<auction> (a
-    # card bought at Tivit's Auction House, v0.6.0); after a reset, a
+    # card bought at Tivit's Auction House, v0.6.0), campaign:<campaign>:<encounter>:<progress> (a
+    # warden's deck won, v0.8.0); after a reset, a
     # starter deck's carries the reset's time (starter:<deck>:<time>), so the deck can be granted
     # again.
     grant_key: Mapped[str] = mapped_column(String(96))
@@ -1082,14 +1084,15 @@ class TokenEntry(Base):
     """The economy ledger (PROG03, v0.4.0): tokens paid for wins, each from a committed result,
     the welcome grant, back pay for wins before v0.4.0, SysOp's grants, and packs bought; since
     v0.5.0 the rewards of daily quests and achievements; since v0.6.0 the auction house's bids
-    held and returned and its sales. Append-only: PostgreSQL refuses updates and deletes. A
+    held and returned and its sales; since v0.8.0 the campaign's tokens for each warden beaten,
+    once. Append-only: PostgreSQL refuses updates and deletes. A
     balance is the sum of its entries."""
 
     __tablename__ = "token_ledger"
     __table_args__ = (
         CheckConstraint(
             "kind IN ('bot_win', 'human_win', 'back_pay', 'welcome', 'grant', 'pack', 'quest', "
-            "'achievement', 'bid', 'bid_return', 'sale')",
+            "'achievement', 'bid', 'bid_return', 'sale', 'campaign')",
             name="ck_token_ledger_kind",
         ),
         CheckConstraint(
@@ -1110,7 +1113,8 @@ class TokenEntry(Base):
     # Unique per fact, so retries and replays write nothing twice: tokens:<game>:<seat>:<beaten
     # seat>, welcome:<account>, grant:<id>, pack:<opening>; since v0.5.0 quest:<account>:<day>:
     # <quest> and achievement:<account>:<achievement>, each with a reset's time after one; since
-    # v0.6.0 bid:<bid>, bid_return:<bid> and sale:<auction> (Tivit's Auction House).
+    # v0.6.0 bid:<bid>, bid_return:<bid> and sale:<auction> (Tivit's Auction House); since v0.8.0
+    # campaign:<account>:<campaign>:<progress>:tokens:<encounter>.
     key: Mapped[str] = mapped_column(String(128), unique=True)
     game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"), index=True)
     # The seat beaten, and its player when a human sat there.
@@ -1739,4 +1743,89 @@ class AuctionWatch(Base):
     )
     watching: Mapped[bool] = mapped_column(default=True)
     cleared_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class CampaignProgress(Base):
+    """An account's way through a campaign (v0.8.0, api/campaign.py): the encounters it has won and
+    the furthest one open, the story scenes it has seen (for its journal and its first-time
+    scenes), and the tutorial's settings and lessons. One row an account and campaign, made the
+    first time the account opens the campaign. A reset of the account (users.reset_at) after
+    started_at starts it again, as the library starts again."""
+
+    __tablename__ = "campaign_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "campaign_id"),
+        CheckConstraint("highest_unlocked BETWEEN 1 AND 99", name="ck_campaign_progress_unlocked"),
+        CheckConstraint(
+            "ending IS NULL OR ending IN ('standard', 'early')", name="ck_campaign_progress_ending"
+        ),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    campaign_id: Mapped[str] = mapped_column(String(48))
+    # The content version the progress was last written under.
+    content_version: Mapped[int] = mapped_column(SmallInteger)
+    highest_unlocked: Mapped[int] = mapped_column(SmallInteger, default=1)
+    # The encounters won at least once, ascending: their seals are the account's.
+    completed: Mapped[list[int]] = mapped_column(JsonType, default=list)
+    # The ending scene seen once the last encounter is won: the standard one, or the early one
+    # (a win before the final opponent crossed into the duel).
+    ending: Mapped[str | None] = mapped_column(String(16))
+    # The story scenes seen, by their keys (FC.OPEN, FC.E01.PRE…), at most SCENES_KEPT.
+    scenes_seen: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    # The tutorial: hints on or off, skipped, and the lessons (T01…T12) seen.
+    hints: Mapped[bool] = mapped_column(default=True)
+    tutorial_skipped: Mapped[bool] = mapped_column(default=False)
+    lessons: Mapped[list[str]] = mapped_column(JsonType, default=list)
+    started_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
+class CampaignGame(Base):
+    """A game played for a campaign encounter (v0.8.0): a practice game against the encounter's
+    opponent, whose end the campaign reads (api/campaign.py game_ended) instead of counting a win,
+    paying tokens or advancing quests. The outcome is written in the transaction that records the
+    game's end."""
+
+    __tablename__ = "campaign_games"
+    __table_args__ = (
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN ('won', 'lost', 'draw', 'unfinished')",
+            name="ck_campaign_games_outcome",
+        ),
+    )
+    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    campaign_id: Mapped[str] = mapped_column(String(48))
+    encounter: Mapped[int] = mapped_column(SmallInteger)
+    # The opponent as the content named them when the duel began: the roster ID of their portrait,
+    # their name and the encounter's title, for the game's summary and the table.
+    opponent: Mapped[str] = mapped_column(String(64))
+    opponent_name: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(120))
+    # The deck the player chose: their own deck, the campaign's loaner, or the loaner with the
+    # tutorial's training seed and hints ("learn").
+    deck: Mapped[str] = mapped_column(String(16))
+    hints: Mapped[bool] = mapped_column(default=False)
+    # Whether the final encounter ran with the private finale (its own commander and the
+    # incarnation's reserve) or the public stand-in.
+    finale: Mapped[str | None] = mapped_column(String(16))
+    outcome: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+
+
+class CampaignReward(Base):
+    """A campaign reward earned (v0.8.0): an encounter's seal, or a chapter's card back or title.
+    Keyed by the account, the campaign, the progress it was earned under and the reward, so a
+    replayed result or a repeated request earns nothing twice."""
+
+    __tablename__ = "campaign_rewards"
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    campaign_id: Mapped[str] = mapped_column(String(48))
+    key: Mapped[str] = mapped_column(String(160), unique=True)
+    reward: Mapped[str] = mapped_column(String(64))
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())

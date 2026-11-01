@@ -1002,6 +1002,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/campaign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Campaign
+         * @description The campaign and your way through it.
+         */
+        get: operations["get_campaign_api_v1_campaign_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaign/encounters/{number}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Encounter
+         * @description Starts an encounter's duel: you in seat 0, with your deck or the loaner, against the
+         *     encounter's opponent. An encounter opens once the one before it is won; one won may be played
+         *     again, for no new reward.
+         */
+        post: operations["start_encounter_api_v1_campaign_encounters__number__start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaign/scenes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scene Seen
+         * @description A story scene seen to its end or skipped, for the journal; the ending's scene records
+         *     which ending was seen.
+         */
+        post: operations["scene_seen_api_v1_campaign_scenes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/campaign/tutorial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change Tutorial
+         * @description The tutorial's hints on or off, its teaching skipped (which never wins the duel), and the
+         *     lessons seen.
+         */
+        put: operations["change_tutorial_api_v1_campaign_tutorial_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/card-images": {
         parameters: {
             query?: never;
@@ -3579,7 +3663,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.7.3
+             * @default 0.8.0
              */
             version: string;
         };
@@ -3587,6 +3671,163 @@ export interface components {
         BuyNowRequest: {
             /** Key */
             key: string;
+        };
+        /** CampaignChapter */
+        CampaignChapter: {
+            /** Complete */
+            complete: boolean;
+            /** Encounters */
+            encounters: number[];
+            /** Name */
+            name: string;
+            /** Rewards */
+            rewards: components["schemas"]["ChapterReward"][];
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "bronze" | "silver" | "gold" | "platinum" | "mythic" | "godlike";
+        };
+        /** CampaignEncounter */
+        CampaignEncounter: {
+            /**
+             * Commander
+             * @description The opponent's commander; null for the finale's, which is the owner's own.
+             */
+            commander: string | null;
+            /** Location */
+            location: string;
+            /** Name */
+            name: string;
+            /** Number */
+            number: number;
+            /**
+             * Opponent
+             * @description The opponent's roster ID, which names their portrait.
+             */
+            opponent: string;
+            /** Seal */
+            seal: string;
+            /**
+             * Skill
+             * @description The bot's skill, 1 to 6.
+             */
+            skill: number;
+            /** @description What the first win gives: the warden's deck and tokens. */
+            spoils: components["schemas"]["EncounterSpoils"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "locked" | "open" | "won";
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "bronze" | "silver" | "gold" | "platinum" | "mythic" | "godlike";
+            /** Title */
+            title: string;
+        };
+        /** CampaignProgressView */
+        CampaignProgressView: {
+            /**
+             * Completed
+             * @description The encounters won, whose seals are yours.
+             */
+            completed: number[];
+            /** Ending */
+            ending: ("standard" | "early") | null;
+            /** Highest Unlocked */
+            highest_unlocked: number;
+            /** Scenes Seen */
+            scenes_seen: string[];
+            tutorial: components["schemas"]["CampaignTutorial"];
+        };
+        /**
+         * CampaignRef
+         * @description The campaign encounter a game was played for (v0.8.0, api/campaign.py).
+         */
+        CampaignRef: {
+            /**
+             * Deck
+             * @enum {string}
+             */
+            deck: "own" | "loaner" | "learn";
+            /** Encounter */
+            encounter: number;
+            /**
+             * Finale
+             * @description The final encounter's opponent: the owner's own finale (its commander and the incarnation in reserve), or the public stand-in; null before the finale.
+             */
+            finale: ("private" | "public") | null;
+            /**
+             * Hints
+             * @description Whether the tutorial's hints are on in this duel.
+             */
+            hints: boolean;
+            /**
+             * Name
+             * @description The opponent's name.
+             */
+            name: string;
+            /**
+             * Opponent
+             * @description The opponent's roster ID, which names their portrait.
+             */
+            opponent: string;
+            /**
+             * Outcome
+             * @description How the duel ended for you, once its end is recorded.
+             */
+            outcome: ("won" | "lost" | "draw" | "unfinished") | null;
+            /**
+             * Title
+             * @description The encounter's title.
+             */
+            title: string;
+        };
+        /** CampaignState */
+        CampaignState: {
+            /** Chapters */
+            chapters: components["schemas"]["CampaignChapter"][];
+            /** Content Version */
+            content_version: number;
+            /** Encounters */
+            encounters: components["schemas"]["CampaignEncounter"][];
+            /** Id */
+            id: string;
+            /**
+             * Loaner
+             * @description The campaign's loaner deck, Learn Commander's.
+             */
+            loaner: string;
+            /** Loaner Commander */
+            loaner_commander: string;
+            progress: components["schemas"]["CampaignProgressView"];
+            /**
+             * Running
+             * @description Your campaign duel still running, to go back to.
+             */
+            running: string | null;
+            /** Title */
+            title: string;
+        };
+        /** CampaignTutorial */
+        CampaignTutorial: {
+            /**
+             * Complete
+             * @description The first encounter won, or the teaching skipped.
+             */
+            complete: boolean;
+            /** Hints */
+            hints: boolean;
+            /**
+             * Lessons
+             * @description The tutorial's lessons seen, T01 to T12.
+             */
+            lessons: string[];
+            /** Skipped */
+            skipped: boolean;
         };
         /** Cancellation */
         Cancellation: {
@@ -3917,6 +4158,15 @@ export interface components {
             revision: components["schemas"]["RevisionInfo"] | null;
             /** Stale */
             stale: boolean;
+        };
+        /** ChapterReward */
+        ChapterReward: {
+            /** Earned */
+            earned: boolean;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
         };
         /**
          * ChatLine
@@ -4616,6 +4866,26 @@ export interface components {
             /** Set Name */
             set_name: string;
         };
+        /** EncounterSpoils */
+        EncounterSpoils: {
+            /**
+             * Commander
+             * @description That deck's commander.
+             */
+            commander: string;
+            /**
+             * Deck
+             * @description The title of the deck the first win gives.
+             */
+            deck: string;
+            /** Earned */
+            earned: boolean;
+            /**
+             * Tokens
+             * @description Tokens the first win pays.
+             */
+            tokens: number;
+        };
         /**
          * EngineStatus
          * @description Engine /health, passed through. "unavailable" means the engine is unreachable or invalid.
@@ -4856,7 +5126,7 @@ export interface components {
             player: "human" | "bot";
             /**
              * Portrait
-             * @description A player's allied Planeswalker, whose portrait stands for them.
+             * @description A player's allied Planeswalker, whose portrait stands for them; since v0.8.0 also a campaign opponent's (a bot seat, whose handle is then the opponent's name).
              */
             portrait?: string | null;
             /** Seat */
@@ -4877,6 +5147,8 @@ export interface components {
         GameSummary: {
             /** Bot Skill */
             bot_skill: number;
+            /** @description The campaign encounter it was played for (v0.8.0); null for any other game. */
+            campaign?: components["schemas"]["CampaignRef"] | null;
             /**
              * Created At
              * Format: date-time
@@ -4999,7 +5271,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.7.3
+             * @default 0.8.0
              */
             version: string;
         };
@@ -5202,7 +5474,7 @@ export interface components {
              * Sources
              * @description Where this edition's copies came from.
              */
-            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign")[];
         };
         /**
          * LibraryEdition
@@ -7072,6 +7344,11 @@ export interface components {
              */
             starts_at: string;
         };
+        /** SceneSeen */
+        SceneSeen: {
+            /** Scene */
+            scene: string;
+        };
         /** SeatChange */
         SeatChange: {
             /**
@@ -7352,6 +7629,26 @@ export interface components {
             sideboard: number;
             /** Type Line */
             type_line: string;
+        };
+        /** StartEncounter */
+        StartEncounter: {
+            /**
+             * Deck Id
+             * @description One of your Commander decks.
+             */
+            deck_id?: string | null;
+            /**
+             * Learn
+             * @description Learn Commander: the loaner deck with the training seed and the hints.
+             * @default false
+             */
+            learn: boolean;
+            /**
+             * Loaner
+             * @description The campaign's loaner deck instead.
+             * @default false
+             */
+            loaner: boolean;
         };
         /** StarterChoice */
         StarterChoice: {
@@ -7803,7 +8100,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "bot_win" | "human_win" | "back_pay" | "welcome" | "grant" | "pack" | "quest" | "achievement" | "bid" | "bid_return" | "sale";
+            kind: "bot_win" | "human_win" | "back_pay" | "welcome" | "grant" | "pack" | "quest" | "achievement" | "bid" | "bid_return" | "sale" | "campaign";
             /**
              * Opponent
              * @description Whom the win beat: a bot by its skill, or a handle.
@@ -7870,6 +8167,21 @@ export interface components {
              * @description Expired, withdrawn or cancelled, not relisted or cleared.
              */
             unsold: components["schemas"]["AuctionItem"][];
+        };
+        /** TutorialChange */
+        TutorialChange: {
+            /** Hints */
+            hints?: boolean | null;
+            /**
+             * Lessons
+             * @description Lessons seen, added to those already seen.
+             */
+            lessons?: string[] | null;
+            /**
+             * Skip
+             * @description Skip the teaching (never the duel).
+             */
+            skip?: boolean | null;
         };
         /**
          * UnnamedPlayer
@@ -13501,6 +13813,388 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Bootstrap"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_campaign_api_v1_campaign_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignState"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    start_encounter_api_v1_campaign_encounters__number__start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartEncounter"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    scene_seen_api_v1_campaign_scenes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SceneSeen"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignState"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_tutorial_api_v1_campaign_tutorial_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TutorialChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignState"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Service Unavailable */

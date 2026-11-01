@@ -343,6 +343,15 @@ final class HumanGame {
             LegacyDuel.seat(created, match, players.get(index), decks.get(index));
         }
         format.seatTeams(created, seatIds);
+        // A campaign finale's incarnation in reserve (v0.8.0): its rules for the seat's player.
+        for (int index = 0; index < request.seats().size(); index++) {
+            DeckLists.CustomDeck custom = request.seats().get(index).custom();
+            if (custom != null) {
+                for (DeckLists.Reserve reserve : custom.reserve()) {
+                    CampaignReserve.apply(created, seatIds.get(index), reserve.name(), reserve.threshold());
+                }
+            }
+        }
         views = new SeatViews(created, seatIds, refs);
         log.attach(created, seatIds);
         created.addTableEventListener(event -> {

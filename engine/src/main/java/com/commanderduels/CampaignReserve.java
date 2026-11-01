@@ -1,0 +1,259 @@
+package com.commanderduels;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import mage.MageObject;
+import mage.abilities.Ability;
+import mage.abilities.StateTriggeredAbility;
+import mage.abilities.common.SimpleStaticAbility;
+import mage.abilities.effects.OneShotEffect;
+import mage.abilities.effects.ReplacementEffectImpl;
+import mage.cards.Card;
+import mage.cards.repository.CardInfo;
+import mage.constants.Duration;
+import mage.constants.Outcome;
+import mage.constants.Zone;
+import mage.game.Game;
+import mage.game.command.Commander;
+import mage.game.command.Emblem;
+import mage.game.events.GameEvent;
+import mage.game.events.ZoneChangeEvent;
+import mage.game.stack.Spell;
+import mage.players.Player;
+import mage.util.CardUtil;
+
+/**
+ * A campaign encounter's incarnation in reserve (v0.8.0): the rule the owner's finale gives its
+ * opponent, written for any card, so this repository names none. A deck list's {@code reserve}
+ * names the card and its threshold; before the game starts the seat's player gets an emblem that:
+ *
+ * <ul>
+ *   <li>the first time the player is at the threshold's life or less (any life loss, payments
+ *   included; healing later does not undo it), puts a trigger on the stack that brings the card
+ *   into the game in the player's reserve and casts it from there without paying its mana cost,
+ *   whatever the timing, as a spell that can be answered. The permission is spent if the trigger or
+ *   the spell is countered;
+ *   <li>whenever the card would leave the battlefield or the stack for anywhere but the battlefield
+ *   (it dies, is exiled, bounced, tucked, or its spell is countered), returns it to the reserve
+ *   instead, without restoring any life;
+ *   <li>lets the player cast it from the reserve again, for its own mana cost, with its normal
+ *   timing and no commander tax.
+ * </ul>
+ *
+ * <p>The reserve is the command zone: the card waits there as XMage keeps a commander card, and is
+ * cast from there by the same rules, but it is not a commander: no tax, no commander damage, and
+ * none of the commander's own replacements. Only one copy ever exists. Its loyalty, its abilities
+ * and its ultimate are the card's own, and every result the game reaches stands.
+ */
+final class CampaignReserve {
+    /** The emblem's name, as the command zone shows it. */
+    static final String NAME = "Incarnation in reserve";
+    private static final String CARD = "commander-duels:reserve-card:";
+    private static final String UNLOCKED = "commander-duels:reserve-unlocked:";
+
+    private CampaignReserve() {}
+
+    /** Game thread, before the game starts: the reserve's rules for the seat's player. */
+    static void apply(Game game, UUID playerId, String cardName, int threshold) {
+        game.addEmblem(new ReserveEmblem(cardName, threshold), null, playerId);
+    }
+
+    /** The reserve card in the game, once it has been brought in. */
+    static Card card(Game game, UUID emblemId) {
+        Object id = game.getState().getValue(CARD + emblemId);
+        return id instanceof UUID ? game.getCard((UUID) id) : null;
+    }
+
+    /** Whether the reserve's threshold has been reached once. */
+    static boolean unlocked(Game game, UUID emblemId) {
+        return Boolean.TRUE.equals(game.getState().getValue(UNLOCKED + emblemId));
+    }
+
+    static final class ReserveEmblem extends Emblem {
+        private static final long serialVersionUID = 1L;
+
+        ReserveEmblem(String cardName, int threshold) {
+            super(NAME);
+            this.getAbilities().add(new Unlock(cardName, threshold));
+            this.getAbilities().add(new SimpleStaticAbility(Zone.COMMAND, new BackToReserve()));
+        }
+
+        private ReserveEmblem(final ReserveEmblem emblem) {
+            super(emblem);
+        }
+
+        @Override
+        public ReserveEmblem copy() {
+            return new ReserveEmblem(this);
+        }
+
+        /** XMage looks an emblem's image up by class name and throws when it has none: this one
+         * takes no image. */
+        @Override
+        public void setSourceObjectAndInitImage(MageObject sourceObject) {
+            this.sourceObject = sourceObject;
+            this.setUsesVariousArt(false);
+            this.setCardNumber("");
+            this.setImageFileName("");
+            this.setImageNumber(0);
+        }
+    }
+
+    /** The threshold: a state trigger that fires once in the game. */
+    static final class Unlock extends StateTriggeredAbility {
+        private static final long serialVersionUID = 1L;
+
+        private final int threshold;
+
+        Unlock(String cardName, int threshold) {
+            super(Zone.COMMAND, new Incarnate(cardName));
+            this.threshold = threshold;
+        }
+
+        private Unlock(final Unlock ability) {
+            super(ability);
+            this.threshold = ability.threshold;
+        }
+
+        @Override
+        public Unlock copy() {
+            return new Unlock(this);
+        }
+
+        @Override
+        public boolean checkTrigger(GameEvent event, Game game) {
+            if (unlocked(game, getSourceId())) {
+                return false;
+            }
+            Player player = game.getPlayer(getControllerId());
+            return player != null && player.isInGame() && !player.hasLost() && player.getLife() <= threshold;
+        }
+
+        @Override
+        public void trigger(Game game, UUID controllerId, GameEvent triggeringEvent) {
+            // Latched: the threshold unlocks the reserve once, whatever the life does afterwards.
+            game.getState().setValue(UNLOCKED + getSourceId(), Boolean.TRUE);
+            super.trigger(game, controllerId, triggeringEvent);
+        }
+
+        @Override
+        public String getRule() {
+            return "When you have " + threshold + " or less life for the first time, cast your incarnation from "
+                + "your reserve without paying its mana cost. If it would leave the battlefield or the stack for "
+                + "anywhere but the battlefield, it returns to your reserve instead; you may cast it from there "
+                + "for its mana cost.";
+        }
+    }
+
+    /** Brings the card into the reserve, the first time, and casts it from there for free. */
+    static final class Incarnate extends OneShotEffect {
+        private static final long serialVersionUID = 1L;
+
+        private final String cardName;
+
+        Incarnate(String cardName) {
+            super(Outcome.PutCardInPlay);
+            this.cardName = cardName;
+            this.staticText = "cast your incarnation from your reserve without paying its mana cost";
+        }
+
+        private Incarnate(final Incarnate effect) {
+            super(effect);
+            this.cardName = effect.cardName;
+        }
+
+        @Override
+        public Incarnate copy() {
+            return new Incarnate(this);
+        }
+
+        @Override
+        public boolean apply(Game game, Ability source) {
+            Player controller = game.getPlayer(source.getControllerId());
+            if (controller == null) {
+                return false;
+            }
+            Card card = card(game, source.getSourceId());
+            if (card == null) {
+                CardInfo info = DeckLists.find(cardName);
+                card = info == null ? null : info.createCard();
+                if (card == null) {
+                    return false;
+                }
+                Set<Card> cards = new HashSet<>();
+                cards.add(card);
+                game.loadCards(cards, controller.getId());
+                game.getState().setValue(CARD + source.getSourceId(), card.getId());
+                game.addCommander(new Commander(card));
+                game.informPlayers(controller.getLogName() + "'s incarnation waits in reserve: "
+                    + card.getLogName() + ".");
+            }
+            if (game.getState().getZone(card.getId()) != Zone.COMMAND) {
+                // Already out of the reserve: nothing more to cast.
+                return true;
+            }
+            return CardUtil.castSpellWithAttributesForFree(controller, source, game, card);
+        }
+    }
+
+    /** Back to the reserve, from the battlefield or the stack, instead of any other zone. */
+    static final class BackToReserve extends ReplacementEffectImpl {
+        private static final long serialVersionUID = 1L;
+
+        BackToReserve() {
+            super(Duration.EndOfGame, Outcome.Benefit);
+            this.staticText = "If your incarnation would leave the battlefield or the stack for anywhere but the "
+                + "battlefield, it returns to your reserve instead";
+        }
+
+        private BackToReserve(final BackToReserve effect) {
+            super(effect);
+        }
+
+        @Override
+        public BackToReserve copy() {
+            return new BackToReserve(this);
+        }
+
+        @Override
+        public boolean checksEventType(GameEvent event, Game game) {
+            return event.getType() == GameEvent.EventType.ZONE_CHANGE;
+        }
+
+        @Override
+        public boolean applies(GameEvent event, Ability source, Game game) {
+            Card reserve = card(game, source.getSourceId());
+            if (reserve == null) {
+                return false;
+            }
+            ZoneChangeEvent change = (ZoneChangeEvent) event;
+            Zone from = change.getFromZone();
+            Zone to = change.getToZone();
+            if ((from != Zone.BATTLEFIELD && from != Zone.STACK)
+                || to == Zone.BATTLEFIELD || to == Zone.STACK || to == Zone.COMMAND) {
+                return false;
+            }
+            UUID moving = event.getTargetId();
+            if (from == Zone.STACK) {
+                Spell spell = game.getStack().getSpell(moving);
+                if (spell != null) {
+                    moving = spell.getSourceId();
+                }
+            }
+            Card card = game.getCard(moving);
+            UUID main = card == null ? moving : card.getMainCard().getId();
+            return reserve.getId().equals(main);
+        }
+
+        @Override
+        public boolean replaceEvent(GameEvent event, Ability source, Game game) {
+            ((ZoneChangeEvent) event).setToZone(Zone.COMMAND);
+            Card reserve = card(game, source.getSourceId());
+            if (reserve != null && !game.isSimulation()) {
+                game.informPlayers(reserve.getLogName() + " returns to its reserve.");
+            }
+            return false;
+        }
+    }
+}

@@ -1557,7 +1557,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.7.3",
+            "default": "0.8.0",
             "title": "Version",
             "type": "string"
           }
@@ -1584,6 +1584,380 @@
           "key"
         ],
         "title": "BuyNowRequest",
+        "type": "object"
+      },
+      "CampaignChapter": {
+        "additionalProperties": false,
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "encounters": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Encounters",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rewards": {
+            "items": {
+              "$ref": "#/components/schemas/ChapterReward"
+            },
+            "title": "Rewards",
+            "type": "array"
+          },
+          "tier": {
+            "enum": [
+              "bronze",
+              "silver",
+              "gold",
+              "platinum",
+              "mythic",
+              "godlike"
+            ],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tier",
+          "name",
+          "encounters",
+          "complete",
+          "rewards"
+        ],
+        "title": "CampaignChapter",
+        "type": "object"
+      },
+      "CampaignEncounter": {
+        "additionalProperties": false,
+        "properties": {
+          "commander": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The opponent's commander; null for the finale's, which is the owner's own.",
+            "title": "Commander"
+          },
+          "location": {
+            "title": "Location",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "opponent": {
+            "description": "The opponent's roster ID, which names their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "seal": {
+            "title": "Seal",
+            "type": "string"
+          },
+          "skill": {
+            "description": "The bot's skill, 1 to 6.",
+            "title": "Skill",
+            "type": "integer"
+          },
+          "spoils": {
+            "$ref": "#/components/schemas/EncounterSpoils",
+            "description": "What the first win gives: the warden's deck and tokens."
+          },
+          "status": {
+            "enum": [
+              "locked",
+              "open",
+              "won"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tier": {
+            "enum": [
+              "bronze",
+              "silver",
+              "gold",
+              "platinum",
+              "mythic",
+              "godlike"
+            ],
+            "title": "Tier",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "opponent",
+          "name",
+          "title",
+          "tier",
+          "location",
+          "seal",
+          "commander",
+          "skill",
+          "status",
+          "spoils"
+        ],
+        "title": "CampaignEncounter",
+        "type": "object"
+      },
+      "CampaignProgressView": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": {
+            "description": "The encounters won, whose seals are yours.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Completed",
+            "type": "array"
+          },
+          "ending": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standard",
+                  "early"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ending"
+          },
+          "highest_unlocked": {
+            "title": "Highest Unlocked",
+            "type": "integer"
+          },
+          "scenes_seen": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Scenes Seen",
+            "type": "array"
+          },
+          "tutorial": {
+            "$ref": "#/components/schemas/CampaignTutorial"
+          }
+        },
+        "required": [
+          "highest_unlocked",
+          "completed",
+          "ending",
+          "scenes_seen",
+          "tutorial"
+        ],
+        "title": "CampaignProgressView",
+        "type": "object"
+      },
+      "CampaignRef": {
+        "additionalProperties": false,
+        "description": "The campaign encounter a game was played for (v0.8.0, api/campaign.py).",
+        "properties": {
+          "deck": {
+            "enum": [
+              "own",
+              "loaner",
+              "learn"
+            ],
+            "title": "Deck",
+            "type": "string"
+          },
+          "encounter": {
+            "title": "Encounter",
+            "type": "integer"
+          },
+          "finale": {
+            "anyOf": [
+              {
+                "enum": [
+                  "private",
+                  "public"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The final encounter's opponent: the owner's own finale (its commander and the incarnation in reserve), or the public stand-in; null before the finale.",
+            "title": "Finale"
+          },
+          "hints": {
+            "description": "Whether the tutorial's hints are on in this duel.",
+            "title": "Hints",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The opponent's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "opponent": {
+            "description": "The opponent's roster ID, which names their portrait.",
+            "title": "Opponent",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "won",
+                  "lost",
+                  "draw",
+                  "unfinished"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How the duel ended for you, once its end is recorded.",
+            "title": "Outcome"
+          },
+          "title": {
+            "description": "The encounter's title.",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "encounter",
+          "opponent",
+          "name",
+          "title",
+          "hints",
+          "deck",
+          "finale",
+          "outcome"
+        ],
+        "title": "CampaignRef",
+        "type": "object"
+      },
+      "CampaignState": {
+        "additionalProperties": false,
+        "properties": {
+          "chapters": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignChapter"
+            },
+            "title": "Chapters",
+            "type": "array"
+          },
+          "content_version": {
+            "title": "Content Version",
+            "type": "integer"
+          },
+          "encounters": {
+            "items": {
+              "$ref": "#/components/schemas/CampaignEncounter"
+            },
+            "title": "Encounters",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "loaner": {
+            "description": "The campaign's loaner deck, Learn Commander's.",
+            "title": "Loaner",
+            "type": "string"
+          },
+          "loaner_commander": {
+            "title": "Loaner Commander",
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/CampaignProgressView"
+          },
+          "running": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Your campaign duel still running, to go back to.",
+            "title": "Running"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "content_version",
+          "loaner",
+          "loaner_commander",
+          "encounters",
+          "chapters",
+          "progress",
+          "running"
+        ],
+        "title": "CampaignState",
+        "type": "object"
+      },
+      "CampaignTutorial": {
+        "additionalProperties": false,
+        "properties": {
+          "complete": {
+            "description": "The first encounter won, or the teaching skipped.",
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "hints": {
+            "title": "Hints",
+            "type": "boolean"
+          },
+          "lessons": {
+            "description": "The tutorial's lessons seen, T01 to T12.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Lessons",
+            "type": "array"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "complete",
+          "hints",
+          "skipped",
+          "lessons"
+        ],
+        "title": "CampaignTutorial",
         "type": "object"
       },
       "Cancellation": {
@@ -2628,6 +3002,30 @@
           "cards"
         ],
         "title": "CatalogStatus",
+        "type": "object"
+      },
+      "ChapterReward": {
+        "additionalProperties": false,
+        "properties": {
+          "earned": {
+            "title": "Earned",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "earned"
+        ],
+        "title": "ChapterReward",
         "type": "object"
       },
       "ChatLine": {
@@ -4360,6 +4758,38 @@
         "title": "EditionCopies",
         "type": "object"
       },
+      "EncounterSpoils": {
+        "additionalProperties": false,
+        "properties": {
+          "commander": {
+            "description": "That deck's commander.",
+            "title": "Commander",
+            "type": "string"
+          },
+          "deck": {
+            "description": "The title of the deck the first win gives.",
+            "title": "Deck",
+            "type": "string"
+          },
+          "earned": {
+            "title": "Earned",
+            "type": "boolean"
+          },
+          "tokens": {
+            "description": "Tokens the first win pays.",
+            "title": "Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tokens",
+          "deck",
+          "commander",
+          "earned"
+        ],
+        "title": "EncounterSpoils",
+        "type": "object"
+      },
       "EngineStatus": {
         "additionalProperties": false,
         "description": "Engine /health, passed through. \"unavailable\" means the engine is unreachable or invalid.",
@@ -4944,7 +5374,7 @@
                 "type": "null"
               }
             ],
-            "description": "A player's allied Planeswalker, whose portrait stands for them.",
+            "description": "A player's allied Planeswalker, whose portrait stands for them; since v0.8.0 also a campaign opponent's (a bot seat, whose handle is then the opponent's name).",
             "title": "Portrait"
           },
           "seat": {
@@ -4994,6 +5424,17 @@
           "bot_skill": {
             "title": "Bot Skill",
             "type": "integer"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CampaignRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The campaign encounter it was played for (v0.8.0); null for any other game."
           },
           "created_at": {
             "format": "date-time",
@@ -5333,7 +5774,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.7.3",
+            "default": "0.8.0",
             "title": "Version",
             "type": "string"
           }
@@ -5783,7 +6224,8 @@
                 "alliance",
                 "pack",
                 "unique",
-                "auction"
+                "auction",
+                "campaign"
               ],
               "type": "string"
             },
@@ -10414,6 +10856,22 @@
         "title": "SaleInfo",
         "type": "object"
       },
+      "SceneSeen": {
+        "additionalProperties": false,
+        "properties": {
+          "scene": {
+            "maxLength": 48,
+            "pattern": "^FC\\.[A-Z0-9]+(\\.[A-Z0-9]+){0,3}$",
+            "title": "Scene",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scene"
+        ],
+        "title": "SceneSeen",
+        "type": "object"
+      },
       "SeatChange": {
         "additionalProperties": false,
         "properties": {
@@ -11110,6 +11568,38 @@
           "sideboard"
         ],
         "title": "SideboardCard",
+        "type": "object"
+      },
+      "StartEncounter": {
+        "additionalProperties": false,
+        "properties": {
+          "deck_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "One of your Commander decks.",
+            "title": "Deck Id"
+          },
+          "learn": {
+            "default": false,
+            "description": "Learn Commander: the loaner deck with the training seed and the hints.",
+            "title": "Learn",
+            "type": "boolean"
+          },
+          "loaner": {
+            "default": false,
+            "description": "The campaign's loaner deck instead.",
+            "title": "Loaner",
+            "type": "boolean"
+          }
+        },
+        "title": "StartEncounter",
         "type": "object"
       },
       "StarterChoice": {
@@ -12062,7 +12552,8 @@
               "achievement",
               "bid",
               "bid_return",
-              "sale"
+              "sale",
+              "campaign"
             ],
             "title": "Kind",
             "type": "string"
@@ -12216,6 +12707,53 @@
           "unsold"
         ],
         "title": "TransferList",
+        "type": "object"
+      },
+      "TutorialChange": {
+        "additionalProperties": false,
+        "properties": {
+          "hints": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hints"
+          },
+          "lessons": {
+            "anyOf": [
+              {
+                "items": {
+                  "pattern": "^T(0[1-9]|1[0-2])$",
+                  "type": "string"
+                },
+                "maxItems": 12,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Lessons seen, added to those already seen.",
+            "title": "Lessons"
+          },
+          "skip": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Skip the teaching (never the duel).",
+            "title": "Skip"
+          }
+        },
+        "title": "TutorialChange",
         "type": "object"
       },
       "UnnamedPlayer": {
@@ -12558,7 +13096,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.7.3"
+    "version": "0.8.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -19432,6 +19970,443 @@
           }
         },
         "summary": "Bootstrap"
+      }
+    },
+    "/api/v1/campaign": {
+      "get": {
+        "description": "The campaign and your way through it.",
+        "operationId": "get_campaign_api_v1_campaign_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Campaign"
+      }
+    },
+    "/api/v1/campaign/encounters/{number}/start": {
+      "post": {
+        "description": "Starts an encounter's duel: you in seat 0, with your deck or the loaner, against the\nencounter's opponent. An encounter opens once the one before it is won; one won may be played\nagain, for no new reward.",
+        "operationId": "start_encounter_api_v1_campaign_encounters__number__start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartEncounter"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Start Encounter"
+      }
+    },
+    "/api/v1/campaign/scenes": {
+      "post": {
+        "description": "A story scene seen to its end or skipped, for the journal; the ending's scene records\nwhich ending was seen.",
+        "operationId": "scene_seen_api_v1_campaign_scenes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SceneSeen"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Scene Seen"
+      }
+    },
+    "/api/v1/campaign/tutorial": {
+      "put": {
+        "description": "The tutorial's hints on or off, its teaching skipped (which never wins the duel), and the\nlessons seen.",
+        "operationId": "change_tutorial_api_v1_campaign_tutorial_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TutorialChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Tutorial"
       }
     },
     "/api/v1/card-images": {

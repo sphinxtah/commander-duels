@@ -405,6 +405,13 @@
   gap: 22px;
   min-height: calc(100vh - 220px);
 }
+/* The left column (v0.8.0): the greeting takes about 70% of it, the Campaign tile the rest. */
+.side {
+  display: grid;
+  grid-template-rows: minmax(0, 7fr) minmax(0, 3fr);
+  gap: 22px;
+  min-width: 0;
+}
 .embers {
   position: fixed;
   inset: 0;
@@ -449,7 +456,7 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: 520px;
+  min-height: 420px;
   padding: 26px;
   border: 1px solid var(--cd-gold-line);
   border-radius: 10px;
@@ -642,6 +649,52 @@
 .playTile .tileLead {
   max-width: 300px;
   font-size: 0.95rem;
+}
+/* The Campaign (v0.8.0): under the greeting in the left column, about a third of it (the
+   owner's layout), over the owner's painting of the throne, darkened where its words lie, and
+   the throne's light breathing. */
+.campaignTile {
+  --tile-art:
+    radial-gradient(ellipse 22% 34% at 76% 26%, #fff1c94d, transparent 70%),
+    linear-gradient(90deg, #0b1312f2 0%, #0b1312b3 38%, #0b131226 72%),
+    linear-gradient(180deg, transparent 45%, #0b1312cc 100%),
+    image-set(
+      url("/menu/campaign-640.webp") 1x,
+      url("/menu/campaign-1280.webp") 2x
+    );
+  grid-column: auto;
+  min-height: 0;
+  padding: 18px 22px;
+  background-position: 70% 35%;
+}
+.campaignTile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(
+    ellipse 18% 30% at 76% 26%,
+    #fff1c9 0%,
+    #e9b96055 40%,
+    transparent 75%
+  );
+  mix-blend-mode: screen;
+  opacity: 0.35;
+  animation: campaignGlow 6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes campaignGlow {
+  to {
+    opacity: 0.7;
+  }
+}
+.campaignTile .tileWords,
+.campaignTile .tileIcon {
+  position: relative;
+  z-index: 2;
+}
+.campaignTile .tileWords {
+  max-width: 300px;
 }
 /* Since v0.6.0 three across: Tables, Leng's shop and Tivit's Auction House. */
 .tablesTile,
@@ -958,6 +1011,12 @@
   }
   .welcome {
     min-height: 380px;
+  }
+  .side {
+    grid-template-rows: auto auto;
+  }
+  .campaignTile {
+    min-height: 210px;
   }
   .allyStage {
     inset: 12px 0 130px;

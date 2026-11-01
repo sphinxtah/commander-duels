@@ -3,13 +3,16 @@ import type { ReactNode } from "react";
 // The menus' pages (v0.4.5). The top bar holds the main six, as Magic Duels' main menu did; the
 // account's menu opens Profile, Settings and Administration, and Friends has its icon beside the
 // bell. SysOp's entrance has no link: it opens only from the SysOp networks. The notifications'
-// history opens from the bell. Campaign, Learn and Collection, placeholders since v0.0.1, are
-// gone: their old addresses open the main menu. Messages, a page until v0.5.1, are on the chat
-// bar; its old addresses open the bar (App.tsx).
+// history opens from the bell. Learn and Collection, placeholders since v0.0.1, are gone: their
+// old addresses open the main menu; Campaign, gone with them in v0.4.5, came back in v0.8.0 as
+// the story campaign (web/src/campaign). Messages, a page until v0.5.1, are on the chat bar; its
+// old addresses open the bar (App.tsx).
 
 export const pages = [
   "Home",
   "Play",
+  // The Final Concordance (v0.8.0): its main menu tile leads there.
+  "Campaign",
   "Tables",
   "Decks",
   "Cards",
@@ -27,6 +30,7 @@ export type Page = (typeof pages)[number] | "SysOp" | "Notifications";
 export const pageNames: Record<Page, string> = {
   Home: "Main menu",
   Play: "Play",
+  Campaign: "Campaign",
   Tables: "Tables",
   Decks: "Decks",
   Cards: "Cards",
@@ -43,6 +47,7 @@ export const pageNames: Record<Page, string> = {
 export type IconName =
   | "home"
   | "play"
+  | "campaign"
   | "tables"
   | "decks"
   | "cards"
@@ -92,6 +97,14 @@ const icons: Record<IconName, ReactNode> = {
     <>
       <path d="M5 4l9.5 9.5M4 5l1-1M13 16l3-3M15 18l3 3M18 15l3 3" />
       <path d="M19 4L9.5 13.5M20 5l-1-1M11 16l-3-3M9 18l-3 3M6 15l-3 3" />
+    </>
+  ),
+  // A throne on its steps, a light above it (v0.8.0).
+  campaign: (
+    <>
+      <path d="M12 2.5l1.2 2.3 2.3 1.2-2.3 1.2L12 9.5l-1.2-2.3L8.5 6l2.3-1.2z" />
+      <path d="M8 21v-7.5l-2-1V10h12v2.5l-2 1V21" />
+      <path d="M9 13.5h6M3 21h18M5 18.5h14" />
     </>
   ),
   // A round table and its four seats.

@@ -54,6 +54,7 @@ from api.games import (
 from api.identity import ApiError, Db, Principal, permissions_for, roles_of, settings_of, utcnow
 from api.library import library_of
 from api.models import (
+    CampaignGame,
     DeckRevision,
     Game,
     GameSeat,
@@ -679,6 +680,9 @@ async def rematch(game_id: UUID, request: Request, principal: Player, db: Db) ->
     accepts the one offered, and the last player to accept starts it."""
     hub = hub_of(request)
     game = await run_in_threadpool(player_game, db, game_id, principal)
+    if await run_in_threadpool(db.get, CampaignGame, game.id) is not None:
+        # A campaign duel (v0.8.0) is played again from the campaign, with its own opponent.
+        raise ApiError(409, "campaign_game", "Play this duel again from the campaign.")
     if game.kind == "practice":
         async with hub.locks[game.id]:
             if await run_in_threadpool(rematch_of, db, game.id) is None:
