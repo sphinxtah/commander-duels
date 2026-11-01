@@ -37,13 +37,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from api.auth import INPUT_ERRORS
-from api.custom_play import custom_in_seats, custom_named
+from api.custom_play import custom_in_seats
 from api.decks import refresh_decks, store_draft
 from api.economy import reward as pay_reward
 from api.games import (
@@ -560,6 +560,14 @@ def game_ended(
                 reward(db, user.id, campaign, progress, id_, game.id)
 
 
+def prize_card_named(db: Session, name: str) -> UUID | None:
+    """The custom card SysOp uploaded under the name the engine serves for the finale's commander,
+    case and surrounding spaces aside, as the engine reads names."""
+    return db.scalar(
+        select(CustomCard.id).where(func.lower(func.trim(CustomCard.name)) == name.strip().lower())
+    )
+
+
 def prize_entries(
     db: Session, encounter: Encounter, custom_commander: UUID | None = None
 ) -> list[DeckEntry]:
@@ -795,8 +803,7 @@ async def start_encounter(
         if finale == "private":
             # The private commander as a custom card, for the deck the win gives.
             commanders = cast(list[str], deck_list["commanders"])
-            found = await run_in_threadpool(custom_named, db, commanders[0])
-            prize_card = found.id if found is not None else None
+            prize_card = await run_in_threadpool(prize_card_named, db, commanders[0])
     else:
         deck_list = encounter.deck_list(encounter.commander or "")
     bot = SeatPlan(
