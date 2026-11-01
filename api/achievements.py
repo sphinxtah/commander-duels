@@ -18,8 +18,9 @@ decisions are in docs/plans/0.5.0.md; docs/quests.md describes them for players 
 - **After a reset** (users.reset_at) the account starts again: only what happened since counts,
   and what it earned before stays recorded but no longer shows.
 
-The reference game's own achievements are not inventoried yet (docs/reference_inventory.csv), so none of
-these maps to one of them; those about Commander and Legacy are marked as additions (PROG07).
+The reference game's own achievements are not inventoried yet (docs/reference_inventory.csv), so
+none of these maps to one of them; those about Commander and Legacy are marked as additions
+(PROG07).
 """
 
 from dataclasses import dataclass

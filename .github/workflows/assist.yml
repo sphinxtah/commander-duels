@@ -57,6 +57,9 @@ jobs:
           pnpm test > assist-logs/vitest.txt 2>&1; echo "vitest $?" >> assist-logs/status.txt
           pnpm build > assist-logs/build.txt 2>&1; echo "build $?" >> assist-logs/status.txt
           cat assist-logs/status.txt
+          for failed in $(grep -v ' 0$' assist-logs/status.txt | cut -d' ' -f1); do
+            echo "::group::$failed"; grep -v '^\s*$' "assist-logs/$failed.txt" | tail -n 120; echo "::endgroup::"
+          done
           ! grep -v ' 0$' assist-logs/status.txt
       - if: always()
         uses: actions/upload-artifact@v7
