@@ -3,7 +3,9 @@
 #   ./update.sh            the newest version tag (v0.1.1 deploys the images tagged 0.1.1)
 #   ./update.sh 0.1.1      that version
 #   ./update.sh main       the newest build of main (its kit, and the images CI tagged main)
-#   ./update.sh -n 0.1.1   only fetch the kit, so it can be read before ./deploy.sh 0.1.1
+#   ./update.sh -n 0.1.1   only fetch the kit into kits/0.1.1, so it can be read before deploying it
+# Since 0.8.3 the kit goes into kits/<version>/ and nothing else here changes: deploy.sh makes it
+# this folder's own (compose.yaml and the scripts) once the version is deployed.
 # The repository is public, so this needs no GitHub sign-in. deploy.sh then pulls the images
 # from GHCR as before, with the VM's existing docker login.
 set -euo pipefail
@@ -24,12 +26,15 @@ if [ "$version" = latest ]; then
 fi
 case "$version" in
   main) ref=refs/heads/main ;;
-  [0-9]*.[0-9]*.[0-9]*) ref="refs/tags/v$version" ;;
+  [0-9]*.[0-9]*.[0-9]*)
+    [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+      || { echo "Not a version: $version (use 0.1.1, main or nothing for the newest)" >&2; exit 2; }
+    ref="refs/tags/v$version" ;;
   *) echo "Not a version: $version (use 0.1.1, main or nothing for the newest)" >&2; exit 2 ;;
 esac
 
-# One archive of the ref, so the files all come from the same commit. Unpacked beside the kit,
-# on the same disk, so each file is replaced in one step.
+# One archive of the ref, so the files all come from the same commit. Unpacked beside the kits,
+# on the same disk, and moved into kits/ whole.
 tmp="$(mktemp -d .update.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 curl -fsSL "https://codeload.github.com/$repo/tar.gz/$ref" \
@@ -37,19 +42,33 @@ curl -fsSL "https://codeload.github.com/$repo/tar.gz/$ref" \
 for file in compose.yaml deploy.sh backup.sh; do
   [ -s "$tmp/$file" ] || { echo "$ref has no deploy/$file; nothing was changed" >&2; exit 1; }
 done
-# A replaced update.sh is a new file: this run keeps reading the old one to its end.
+mkdir "$tmp/kit"
 for file in compose.yaml deploy.sh backup.sh restore.sh update.sh env.example; do
   [ -f "$tmp/$file" ] || continue
   case "$file" in *.sh) chmod 0750 "$tmp/$file" ;; *) chmod 0640 "$tmp/$file" ;; esac
-  mv -f "$tmp/$file" "$file"
+  mv "$tmp/$file" "$tmp/kit/$file"
 done
-echo "Deploy kit of $version ($ref) is in place."
+# Since 0.8.3 a deploy.sh deploys with kits/<tag>/. An older version's own does not, so this
+# folder's deploy.sh (0.8.3's or newer) deploys it.
+if grep -qsF 'kits/<tag>/' "$tmp/kit/deploy.sh"; then
+  deployer="kits/$version/deploy.sh"
+elif grep -qsF 'kits/<tag>/' deploy.sh; then
+  deployer=./deploy.sh
+else
+  echo "The kits of $version and of $PWD are older than 0.8.3: deploy 0.8.3 or newer first." >&2
+  echo "Nothing was changed." >&2
+  exit 1
+fi
+mkdir -p kits
+rm -rf "kits/$version"
+mv "$tmp/kit" "kits/$version"
+echo "Deploy kit of $version ($ref) is in kits/$version."
 # exec skips the EXIT trap.
 rm -rf "$tmp"
 trap - EXIT
 
 if "$fetch_only"; then
-  echo "Deploy it with: ./deploy.sh $version"
+  echo "Deploy it with: cd $PWD && $deployer $version"
   exit 0
 fi
-exec ./deploy.sh "$version"
+exec "$deployer" "$version"

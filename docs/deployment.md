@@ -173,7 +173,7 @@ CI publishes the images to `ghcr.io/sphinxtah/commander-duels/{api,web,engine}` 
 - every push to `main` as `sha-<12-character commit>` and `main`;
 - every version tag as its version (`v0.1.0` → `0.1.0`).
 
-Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, the backup pools, `update.sh` and `upgrade.sh` (against a real Git clone), and the web container re-resolving the API, limiting sign-in challenges and serving the public pages (since v0.4.1). Its bash tests run in CI's Linux pytest and are skipped on Windows.
+Since v0.1.1 the verify job also checks the kit's scripts (`deploy/*.sh`) with ShellCheck (`koalaman/shellcheck:v0.10.0`, warnings and errors). `tests/test_deploy_kit.py` covers `restore.sh`, `deploy.sh`'s migrate-first and fall-back steps, its pre-deploy dump (since v0.8.3, also of a stopped database) and its per-version kits, the backup pools, `update.sh`, `upgrade.sh` and `push.sh` (against a real Git clone), and the web container re-resolving the API, limiting sign-in challenges and serving the public pages (since v0.4.1). Its bash tests run in CI's Linux pytest and are skipped on Windows.
 
 **Pushing.** On the deploying computer, `git push` sends `main` and, because this checkout sets `push.followTags`, any new version tag with it. CI then publishes the images.
 
@@ -191,8 +191,8 @@ git clone https://github.com/sphinxtah/commander-duels.git ~/commander-duels
 ```
 
 `git pull` brings `main` and the version tags on it. `deploy/upgrade.sh` then reads the deploy kit of the newest version tag from the clone and deploys that version, the images CI tagged with it:
-- **Other versions.** `bash deploy/upgrade.sh 0.2.0` takes a given version. `bash deploy/upgrade.sh main` takes the commit the clone is on, with the images CI published for that commit (`sha-<12 characters>`); CI publishes them a few minutes after the push, once its checks pass. `bash deploy/upgrade.sh -n 0.2.0` only puts the kit in place, for reading before `./deploy.sh 0.2.0` in `/srv/commander-duels`.
-- **What it replaces.** In `/srv/commander-duels`: `compose.yaml`, `deploy.sh`, `backup.sh`, `restore.sh`, `update.sh` and `env.example`, all from that one commit. `.env`, `web-access.conf` and `backups/` are never touched. If the tag lacks `compose.yaml`, `deploy.sh` or `backup.sh`, nothing changes.
+- **Other versions.** `bash deploy/upgrade.sh 0.2.0` takes a given version. `bash deploy/upgrade.sh main` takes the commit the clone is on, with the images CI published for that commit (`sha-<12 characters>`); CI publishes them a few minutes after the push, once its checks pass. `bash deploy/upgrade.sh -n 0.2.0` only puts the kit in `kits/0.2.0/`, for reading before deploying it with the command it prints (`kits/0.2.0/deploy.sh 0.2.0` in `/srv/commander-duels`).
+- **What it changes.** Since v0.8.3 it puts the kit (`compose.yaml`, `deploy.sh`, `backup.sh`, `restore.sh`, `update.sh` and `env.example`, all from that one commit) into `/srv/commander-duels/kits/<image tag>/` and runs that kit's `deploy.sh`; nothing else in the folder changes until the version is deployed (see [One kit per version](#one-kit-per-version-since-v083)). `.env`, `web-access.conf` and `backups/` are never touched. If the tag lacks `compose.yaml`, `deploy.sh` or `backup.sh`, nothing changes.
 - **The clone stays on `main`.** The kit is read from the tag with Git, so nothing is checked out and the next `git pull` works. Change nothing in the clone.
 - **No sudo needed.** The deploy user runs Docker. With `sudo` it runs itself again as the user who called it, so the backups and the kit keep their owner; as root without sudo it refuses.
 
@@ -202,35 +202,45 @@ git clone https://github.com/sphinxtah/commander-duels.git ~/commander-duels
 cd /srv/commander-duels && ./update.sh
 ```
 
-`update.sh` brings the deploy kit of the newest version tag from GitHub and deploys that version. `./update.sh 0.1.1` takes a given version, `./update.sh main` the newest build of `main` (the images CI tags `main`), and `./update.sh -n 0.1.1` only fetches the kit, for reading before `./deploy.sh 0.1.1`. It needs no GitHub sign-in: it downloads one archive of the tag from GitHub, which keeps the files of one commit together, and replaces `compose.yaml`, `deploy.sh`, `backup.sh`, `restore.sh`, `update.sh` and `env.example`. A tag that lacks one of them (`update.sh` in v0.1.1 and older, for instance) leaves the VM's copy in place. `.env`, `web-access.conf` and `backups/` are never touched. If the archive cannot be fetched, or lacks `compose.yaml`, `deploy.sh` or `backup.sh`, nothing changes. A tag never changes after it is pushed; `main` can lag a few minutes behind a push on GitHub's side.
+`update.sh` brings the deploy kit of the newest version tag from GitHub and deploys that version. `./update.sh 0.1.1` takes a given version, `./update.sh main` the newest build of `main` (the images CI tags `main`), and `./update.sh -n 0.1.1` only fetches the kit, for reading before deploying it with the command it prints. It needs no GitHub sign-in: it downloads one archive of the tag from GitHub, which keeps the files of one commit together, and since v0.8.3 puts `compose.yaml`, `deploy.sh`, `backup.sh`, `restore.sh`, `update.sh` and `env.example` into `kits/<version>/`, like `upgrade.sh`. A tag that lacks one of them (`update.sh` in v0.1.1 and older, for instance) has none in its kit. `.env`, `web-access.conf` and `backups/` are never touched. If the archive cannot be fetched, or lacks `compose.yaml`, `deploy.sh` or `backup.sh`, nothing changes. A tag never changes after it is pushed; `main` can lag a few minutes behind a push on GitHub's side.
 
 The images still come from GHCR with the VM's `docker login`.
 
-**Or from the deploying computer:** `deploy/push.sh 0.1.0` copies the same files from the checkout and runs `deploy.sh 0.1.0` on the VM.
+**Or from the deploying computer:** `deploy/push.sh 0.1.0` (or `deploy/push.sh sha-<12-character commit>`) puts the kit of that tag, as committed in it, into `kits/0.1.0/` on the VM and runs its `deploy.sh 0.1.0` there. Since v0.8.3 it never copies the checkout's own files, so uncommitted edits stay on the deploying computer, and it checks the tag before it connects: one the checkout does not have (`git fetch --tags` first) stops it with nothing copied.
 
 Either way, `deploy.sh 0.1.0`:
 1. writes the web container's allow list (the proxy and loopback);
 2. pulls the tag's images;
-3. dumps the database (`backups/commander-<time>-pre-0.1.0.dump`) when it is already running;
-4. runs the tag's migrations on their own (`docker compose run migrate`) while the running version keeps serving. Alembic runs them in one transaction, so if they fail the database is unchanged, and `deploy.sh` stops with nothing replaced;
-5. starts everything and waits for every health check;
-6. records the tag in `.env` as `CD_VERSION`;
-7. checks `/api/v1/ready` (for up to about 10 seconds), `/health` and the engine's status through the web container, and removes unused images.
+3. starts the database if it is not running (after `docker compose stop` or `down`, say), as the running version's `compose.yaml` has it. If it does not start, `deploy.sh` stops with nothing replaced;
+4. dumps the database (`backups/commander-<time>-pre-0.1.0.dump`) whenever it has any table, so on every deploy but the first. If the dump fails, `deploy.sh` stops with nothing replaced. (Until v0.8.2 it dumped only a database container that was running, so after a `docker compose stop` the next deploy migrated the data without a dump.);
+5. runs the tag's migrations on their own (`docker compose run migrate`) while the running version keeps serving. Alembic runs them in one transaction, so if they fail the database is unchanged, and `deploy.sh` stops with nothing replaced;
+6. starts everything and waits for every health check;
+7. records the tag in `.env` as `CD_VERSION`;
+8. checks `/api/v1/ready` (for up to about 10 seconds), `/health` and the engine's status through the web container;
+9. makes the tag's kit the folder's own (below), and removes unused images.
 
-**A failed start.** If the tag does not start (step 5) or is not ready (step 7), `deploy.sh` brings the previous tag back and says so. It does this only when the previous tag was running and the database is still at the migration it ran on, because starting a tag runs its migrations. Otherwise it replaces nothing more:
-- If the new tag's migrations moved the database, it prints the commands that roll back (below), with the dump it took in step 3.
+Steps 2, 5, 6 and 8 use the tag's own kit, `kits/0.1.0/compose.yaml`, with the folder's `.env`, `web-access.conf`, project name and volumes.
+
+<a id="one-kit-per-version-since-v083"></a>**One kit per version (since v0.8.3).** `/srv/commander-duels/kits/<image tag>/` holds each version's `compose.yaml` and scripts as that tag shipped them. `upgrade.sh`, `update.sh` and `push.sh` put a tag's kit there and change nothing else; `deploy.sh` deploys the tag with it, and brings the previous version back with the previous version's kit. Only once the tag is deployed and ready does its kit replace the folder's own `compose.yaml`, `backup.sh`, `restore.sh`, `env.example`, `deploy.sh` and `update.sh`, the files the nightly backup, `restore.sh` and you (`docker compose ...` in the folder) use. So a failed pull, dump or migration leaves the folder exactly as it was, and a new required setting in a newer `compose.yaml` cannot break the nightly backup before that version runs. (Until v0.8.2 the kit replaced the folder's files before anything was pulled, so the previous version came back, and rollbacks ran, under the new version's `compose.yaml`.) `deploy.sh` keeps the kits of the five tags deployed or brought last, and the previous tag's.
+
+- **The first deploy of v0.8.3** runs as always (`cd ~/commander-duels && git pull && bash deploy/upgrade.sh`). It finds no `kits/0.8.2/`, so it copies the folder's own files there first: they are still 0.8.2's. Nothing needs doing by hand. Use `upgrade.sh` for it, not the VM's `./update.sh`, which is still 0.8.2's until then and copies the kit over the folder's files; if that happens anyway, 0.8.3 still deploys, but a failed start cannot bring 0.8.2 back by itself (`deploy.sh` says how).
+- **A version from before v0.8.3** (`upgrade.sh 0.8.2`, `push.sh 0.8.2`) has a `deploy.sh` that knows nothing of `kits/`, so the folder's own `deploy.sh` (0.8.3's or newer) deploys it with its kit, and it stays the folder's `deploy.sh` and `update.sh` afterwards.
+- **A tag with no kit in `kits/`** (pruned, or never brought): `deploy.sh` refuses it and says how to bring it (`bash deploy/upgrade.sh -n <version>` in the clone, or `./update.sh -n <version>`).
+
+**A failed start.** If the tag does not start (step 6) or is not ready (step 8), `deploy.sh` brings the previous tag back, with the previous tag's own kit, and says so. It does this only when the previous tag was running and the database is still at the migration it ran on, because starting a tag runs its migrations. Otherwise it replaces nothing more:
+- If the new tag's migrations moved the database, it prints the commands that roll back (below), with the dump it took in step 4.
 - If no version was running, as after `restore.sh`, it starts nothing. Bringing back the tag in `.env` would migrate the restored database forward again.
 
 The site stays down until you run those commands or deploy a fixed tag.
 
-**Migrations keep the previous version working.** From step 4 until step 5 replaces them, a few seconds, the running API and worker use the newly migrated database. So a migration only adds what the previous version can ignore: tables, columns that are nullable or have a default, indexes. Dropping or renaming a table or column the previous version uses, or a backfill of data it keeps writing, waits for a later version that no longer uses it (expand, then contract).
+**Migrations keep the previous version working.** From step 5 until step 6 replaces them, a few seconds, the running API and worker use the newly migrated database. So a migration only adds what the previous version can ignore: tables, columns that are nullable or have a default, indexes. Dropping or renaming a table or column the previous version uses, or a backfill of data it keeps writing, waits for a later version that no longer uses it (expand, then contract).
 
 **The card catalog (since v0.2.0).** The worker keeps Scryfall's bulk files in the `catalog_data` volume, which the first deploy of v0.2.0 creates; nothing in `.env` changes. Its first sync is due as soon as it starts: it downloads about 115 MB and takes about two minutes, during which the Cards page says the catalog is not imported yet and the deck builder finds no cards. If the engine is still loading, the sync waits for it and retries. The database grows by about 450 MB. After that the sync runs daily at 10:00 UTC (plus up to 30 minutes), and an unchanged day downloads nothing. Administration → Card catalog shows each run, and "Run the catalog sync now" queues one.
 
 **Running games end.** Restarting the API interrupts every running game (recovery journals, NET08–NET09, are later work). Deploy when no one is playing.
 
 **Rolling back.** A version runs only on a database at its own last migration. Its migrate step cannot find a newer revision, and its API reports ready only at its own. So:
-- If the version you are leaving added no migration (compare `api/migrations/versions` between the two tags), deploy the previous tag: `deploy/push.sh <previous tag>`.
+- If the version you are leaving added no migration (compare `api/migrations/versions` between the two tags), deploy the previous tag: on the VM `cd /srv/commander-duels && ./deploy.sh <previous tag>`, or `deploy/push.sh <previous tag>` from the deploying computer. Either way it runs with the previous tag's own kit from `kits/` (since v0.8.3; `push.sh` brings it from the tag again). A tag whose kit is no longer in `kits/` comes back with `bash deploy/upgrade.sh <previous tag>` in the clone.
 - If it added one, first restore the dump taken just before it was deployed, then deploy the previous tag. On the VM:
 
   ```sh
@@ -239,13 +249,13 @@ The site stays down until you run those commands or deploy a fixed tag.
   ./deploy.sh <previous tag>
   ```
 
-  Everything written since that deploy is lost (`restore.sh` keeps it in a `pre-restore` dump first). Pick the dump by its tag, not by its age: every later deploy attempt writes a newer `pre-<tag>` dump, and an attempt to roll back writes one that already has the newer schema.
+  `./deploy.sh` deploys the previous tag with its kit in `kits/` (since v0.8.3); if it says there is none, bring it first with `bash deploy/upgrade.sh -n <previous tag>` in the clone. Everything written since that deploy is lost (`restore.sh` keeps it in a `pre-restore` dump first). Pick the dump by its tag, not by its age: every later deploy attempt writes a newer `pre-<tag>` dump, and an attempt to roll back writes one that already has the newer schema.
 
 Without the restore, `deploy.sh` refuses the previous tag at its migrate step, before anything is replaced.
 
 ## Backups
 
-- **Nightly** at about 04:30 (`commander-duels-backup.timer`), **before every deploy** and **before every restore**: `pg_dump -Fc` into `/srv/commander-duels/backups`. The newest 14 nightly, 10 pre-deploy and 5 pre-restore dumps are kept. Each kind is counted on its own, so restores never push out the pre-deploy dumps a rollback needs. The first nightly dump ran on 2026-10-20 at 04:41 (the timer adds a random delay).
+- **Nightly** at about 04:30 (`commander-duels-backup.timer`), **before every deploy** (of any database with a table, started first if it is stopped, since v0.8.3) and **before every restore**: `pg_dump -Fc` into `/srv/commander-duels/backups`. The newest 14 nightly, 10 pre-deploy and 5 pre-restore dumps are kept. Each kind is counted on its own, so restores never push out the pre-deploy dumps a rollback needs. The first nightly dump ran on 2026-10-20 at 04:41 (the timer adds a random delay).
 - **Off the VM.** The owner backs up the whole VM to the NAS with Proxmox VE's own scheduled backups, set up on Hathor (since v0.1.1; nothing on the VM copies dumps itself). A snapshot of a running database is only crash-consistent. The dumps in `backups/` are consistent, and every VM backup carries them, so restore from a dump, not from the snapshot's database files. A fuller backup arrangement may come later.
 - **Restoring** a dump replaces the database with it. On the VM:
 

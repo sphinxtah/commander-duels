@@ -3,12 +3,13 @@
 #
 #   cd ~/commander-duels && git pull && bash deploy/upgrade.sh
 #
-# Puts a version's deploy kit into /srv/commander-duels (CD_DIR), keeping .env,
-# web-access.conf and backups/, and deploys that version with its deploy.sh.
+# Puts a version's deploy kit into kits/<image tag>/ in /srv/commander-duels (CD_DIR) and deploys
+# that version with it. Nothing else there changes: deploy.sh makes the kit the folder's own
+# (compose.yaml and the scripts beside .env) once the version is deployed.
 #   bash deploy/upgrade.sh          the newest version tag in the clone (v0.2.0 deploys the images tagged 0.2.0)
 #   bash deploy/upgrade.sh 0.2.0    that version
 #   bash deploy/upgrade.sh main     the commit the clone is on: its kit, and the images CI tagged sha-<commit>
-#   bash deploy/upgrade.sh -n 0.2.0 only put the kit in place, to read it before deploy.sh
+#   bash deploy/upgrade.sh -n 0.2.0 only put the kit in kits/0.2.0, to read it before deploy.sh
 # The kit is read from the tag with git, so the clone stays on main and the next git pull works.
 # With sudo it runs again as the user who called it: deploy.sh uses Docker as that user.
 set -euo pipefail
@@ -49,27 +50,42 @@ case "$version" in
   *) echo "Not a version: $version (use 0.2.0, main or nothing for the newest)" >&2; exit 2 ;;
 esac
 
-# The kit of that one commit, unpacked beside the VM's folder on the same disk, so each file is
-# replaced in one step.
+# The kit of that one commit, unpacked beside the VM's folder on the same disk and moved into
+# kits/ whole.
 tmp="$(mktemp -d "$app/.upgrade.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 git -C "$repo" archive --format=tar "$ref" deploy | tar -x -C "$tmp" --strip-components=1
 for file in compose.yaml deploy.sh backup.sh; do
   [ -s "$tmp/$file" ] || { echo "$ref has no deploy/$file; nothing was changed" >&2; exit 1; }
 done
+mkdir "$tmp/kit"
 for file in compose.yaml deploy.sh backup.sh restore.sh update.sh env.example; do
   [ -f "$tmp/$file" ] || continue
   case "$file" in *.sh) chmod 0750 "$tmp/$file" ;; *) chmod 0640 "$tmp/$file" ;; esac
-  mv -f "$tmp/$file" "$app/$file"
+  mv "$tmp/$file" "$tmp/kit/$file"
 done
-echo "Deploy kit of $version ($(git -C "$repo" log -1 --format='%h %s' "$ref")) is in place."
+# Since 0.8.3 a deploy.sh deploys with kits/<tag>/. An older version's own does not, so the
+# folder's deploy.sh (0.8.3's or newer) deploys it.
+if grep -qsF 'kits/<tag>/' "$tmp/kit/deploy.sh"; then
+  deployer="kits/$image/deploy.sh"
+elif grep -qsF 'kits/<tag>/' "$app/deploy.sh"; then
+  deployer=./deploy.sh
+else
+  echo "The kits of $version and of $app are older than 0.8.3: deploy 0.8.3 or newer first." >&2
+  echo "Nothing was changed." >&2
+  exit 1
+fi
+cd "$app"
+mkdir -p kits
+rm -rf "kits/$image"
+mv "$tmp/kit" "kits/$image"
+echo "Deploy kit of $version ($(git -C "$repo" log -1 --format='%h %s' "$ref")) is in $app/kits/$image."
 # exec skips the EXIT trap.
 rm -rf "$tmp"
 trap - EXIT
 
 if "$fetch_only"; then
-  echo "Deploy it with: cd $app && ./deploy.sh $image"
+  echo "Deploy it with: cd $app && $deployer $image"
   exit 0
 fi
-cd "$app"
-exec ./deploy.sh "$image"
+exec "$deployer" "$image"
