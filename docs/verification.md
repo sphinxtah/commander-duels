@@ -8,7 +8,7 @@ Built on October 31, 2026 in the same cloud workspace, on the branch `foil-0.8.2
 |---|---|
 | The sheen | the auction house's `.foil` rule and its keyframes rendered in Chromium (Playwright), its background position sampled every 0.3 s for 9 s: 100% down to −160% and back to 100% and down again, with no jump at either end; `animation-direction` is `alternate`. The pack opening's `.shimmer` is the same rule, at 2.6 s |
 | Contracts | the version only, regenerated as CI does |
-| Hosted CI | recorded in the release notes as the runs finish |
+| Hosted CI | run #212 on the branch (c8790dd): verify green ([the release notes](releases/0.8.2.md#verification)) |
 
 ## v0.8.1
 
