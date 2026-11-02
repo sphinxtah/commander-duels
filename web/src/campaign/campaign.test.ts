@@ -1,3 +1,4 @@
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type {
   GameView,
@@ -16,6 +17,13 @@ import {
 import { stepsAfterWin } from "./campaign";
 import { castOf, finaleScene } from "./cast";
 import { STORY, type Scene } from "./script";
+import {
+  DEFAULTS,
+  KEY,
+  readSettings,
+  sanitizeSettings,
+  useCampaignSettings,
+} from "./settings";
 import { stagesOf, stepsOf } from "./stage";
 
 // The campaign's pure parts (v0.8.0): the script holds every scene of the handoff with unique
@@ -396,5 +404,42 @@ describe("lessons", () => {
       true,
     );
     expect(lesson("T11", null, now, null, shown)).toBe(false);
+  });
+});
+
+describe("the story settings", () => {
+  const stored = () => JSON.parse(localStorage.getItem(KEY)!);
+
+  it("fall back field by field", () => {
+    expect(sanitizeSettings(undefined)).toEqual(DEFAULTS);
+    expect(
+      sanitizeSettings({ textSpeed: "toString", auto: true, barks: "no" }),
+    ).toEqual({ ...DEFAULTS, auto: true });
+    localStorage.setItem(KEY, "not json");
+    expect(readSettings()).toEqual(DEFAULTS);
+  });
+
+  it("are one set for every reader, so a change in the cut scene stays when the map changes another", () => {
+    // The cut scene and the map's Story settings, both open.
+    const scene = renderHook(() => useCampaignSettings());
+    const map = renderHook(() => useCampaignSettings());
+    act(() => scene.result.current[1]({ auto: true }));
+    expect(map.result.current[0].auto).toBe(true);
+    act(() => map.result.current[1]({ textSpeed: "fast" }));
+    expect(scene.result.current[0]).toEqual({
+      ...DEFAULTS,
+      auto: true,
+      textSpeed: "fast",
+    });
+    expect(stored()).toEqual({ ...DEFAULTS, auto: true, textSpeed: "fast" });
+  });
+
+  it("show another tab's change", () => {
+    const { result } = renderHook(() => useCampaignSettings());
+    act(() => {
+      localStorage.setItem(KEY, JSON.stringify({ ...DEFAULTS, music: false }));
+      window.dispatchEvent(new StorageEvent("storage", { key: KEY }));
+    });
+    expect(result.current[0].music).toBe(false);
   });
 });

@@ -14,7 +14,7 @@ import {
 import { changeTutorial, rememberArrival, type CampaignRef } from "./campaign";
 import { speakerName, speakerPortrait } from "./cast";
 import { STORY, type Line, type Speaker } from "./script";
-import { readSettings } from "./settings";
+import { useCampaignSettings } from "./settings";
 import styles from "./layer.module.css";
 
 // A campaign duel's voices at the table (v0.8.0). The opponent's barks and Kaya's, as speech
@@ -49,7 +49,7 @@ export function CampaignLayer({
   /** The game has ended: barks stop, the queue empties. */
   over: boolean;
 }) {
-  const [settings] = useState(readSettings);
+  const [settings] = useCampaignSettings();
   const [spoken, setSpoken] = useState<Spoken | null>(null);
   const [queue, setQueue] = useState<Line[]>([]);
   const [hint, setHint] = useState<{ id: string; text: string } | null>(null);

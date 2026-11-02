@@ -6,11 +6,15 @@ import { DEFAULT_TABLE_SETTINGS } from "../table/types";
 // table settings' music volume and its mutes (the music's own, and Mute all sound). A mute pauses
 // the stream rather than silencing it, so a muted player costs the site nothing; unmuting goes on
 // from where it stopped. The track is not in the public repository: the owner's private web image
-// carries it, and the public image answers 404, which leaves the table quiet. Browsers allow
+// carries it, and the public image answers 404, which leaves the table quiet for the visit. A network
+// or decoding failure is not taken as a missing track: the music stops, and the next start tries a
+// fresh element (from where it stopped, for a track that goes on across starts). Browsers allow
 // play() only after a gesture: the click that started or resumed the game is one, remembered by the
 // page, and a table opened by a reload waits for the first click or key press.
 
 export const GAME_MUSIC_URL = "/music/game.mp3";
+/** MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: no track at the address, or none the browser plays. */
+const MEDIA_ERR_SRC_NOT_SUPPORTED = 4;
 /** The track rises to its level over this long as a game opens. */
 export const FADE_IN_MS = 2500;
 /** And falls to silence over this long as the game ends or the player leaves. */
@@ -34,6 +38,8 @@ export interface MusicElement {
   volume: number;
   currentTime: number;
   readonly paused: boolean;
+  /** Why the last load failed; absent or null when nothing says. */
+  readonly error?: { readonly code: number } | null;
   /** jsdom's returns nothing: treated as allowed. */
   play(): Promise<void> | undefined;
   pause(): void;
@@ -98,13 +104,36 @@ export function createGameMusic(options: GameMusicOptions = {}): GameMusic {
     if (element) element.volume = Math.min(1, Math.max(0, level * fade));
   }
 
+  /** Where a track that goes on across starts stood when its element failed, for the next. */
+  let resumeAt: number | null = null;
+
   function onError() {
-    // 404 and the like: MEDIA_ERR_SRC_NOT_SUPPORTED. Nothing else is tried; the table stays quiet.
-    unavailable = true;
+    const audio = element;
+    if (!audio) return;
     wanted = false;
+    waiting = false;
     stopListening();
     stopFade();
-    element?.pause();
+    audio.pause();
+    const code = audio.error?.code;
+    // 404 and the like: MEDIA_ERR_SRC_NOT_SUPPORTED, and a failure that names no reason. Nothing
+    // else is tried this visit; the table stays quiet.
+    if (code === undefined || code === MEDIA_ERR_SRC_NOT_SUPPORTED) {
+      unavailable = true;
+      return;
+    }
+    // A dropped connection or a bad stretch of the file: this element is spent, and the next
+    // start makes another.
+    if (!restart) resumeAt = audio.currentTime;
+    release(audio);
+    element = null;
+    fade = 0;
+  }
+
+  function release(audio: MusicElement) {
+    audio.removeEventListener("error", onError);
+    // Releases the stream.
+    audio.src = "";
   }
 
   function ensure(): MusicElement | null {
@@ -118,6 +147,14 @@ export function createGameMusic(options: GameMusicOptions = {}): GameMusic {
     made.loop = true;
     made.src = src;
     made.addEventListener("error", onError);
+    if (resumeAt !== null) {
+      try {
+        made.currentTime = resumeAt;
+      } catch {
+        // Not settable yet: it starts at the beginning.
+      }
+      resumeAt = null;
+    }
     element = made;
     apply();
     return element;
@@ -165,7 +202,7 @@ export function createGameMusic(options: GameMusicOptions = {}): GameMusic {
         if (name === "NotAllowedError") {
           waiting = true;
           listen();
-        } else if (name === "NotSupportedError") onError();
+        } else if (name === "NotSupportedError" && audio === element) onError();
         // AbortError: a pause() came first; the next start or unmute plays again.
       },
     );
@@ -263,11 +300,10 @@ export function createGameMusic(options: GameMusicOptions = {}): GameMusic {
       stopFade();
       if (element) {
         element.pause();
-        element.removeEventListener("error", onError);
-        // Releases the stream.
-        element.src = "";
+        release(element);
       }
       element = null;
+      resumeAt = null;
       fade = 0;
       fadeTo = 0;
       unavailable = false;

@@ -46,6 +46,7 @@ const mountain = card("Mountain", {
 });
 const DECK = "GET /api/v1/decks/{deck_id}";
 const DRAFT = "PUT /api/v1/decks/{deck_id}/draft";
+const REVISIONS = "POST /api/v1/decks/{deck_id}/revisions";
 // The editor saves a moment after the last change.
 const SAVED = { timeout: 4000 };
 // Its search asks a moment after the deck arrives, and the first results wait on that and on the
@@ -224,6 +225,78 @@ describe("the deck editor", { timeout: 15_000 }, () => {
     });
     const sent = api.calls.find((call) => call.route === DRAFT)!;
     expect((sent.options as { keepalive?: boolean }).keepalive).toBe(true);
+  });
+
+  it("saves a version only once the latest edits are saved", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deck(3)));
+    api.on(DRAFT, saved(4));
+    api.on(REVISIONS, () => reply(201, { number: 2 }));
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    addMountain();
+    fireEvent.click(screen.getByRole("button", { name: "Save a version" }));
+    expect(
+      await screen.findByText("Saved as version 2.", undefined, SAVED),
+    ).toBeInTheDocument();
+    const routes = api.calls.map((call) => call.route);
+    expect(routes.indexOf(DRAFT)).toBeLessThan(routes.indexOf(REVISIONS));
+    expect(drafts(api)).toEqual([
+      { version: 3, entries: [entry(bolt, 4), entry(mountain, 1)] },
+    ]);
+  });
+
+  it("saves no version when the latest edits did not save, and says so", async () => {
+    const api = mockApi();
+    api.on(DECK, () => reply(200, deck(3)));
+    api.on(DRAFT, () =>
+      reply(503, { code: "unavailable", message: "Try again later." }),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    addMountain();
+    fireEvent.click(screen.getByRole("button", { name: "Save a version" }));
+    expect(
+      await screen.findByText(
+        "Not saved as a version: your latest changes did not save.",
+        undefined,
+        SAVED,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Not saved: Try again later\./),
+    ).toBeInTheDocument();
+    expect(api.calls.some((call) => call.route === REVISIONS)).toBe(false);
+  });
+
+  it("saves no version while another tab's save waits on the player's choice", async () => {
+    const api = mockApi();
+    api.on(
+      DECK,
+      () => reply(200, deck(3)),
+      () => reply(200, deck(4, [entry(bolt, 2)])),
+    );
+    api.on(DRAFT, () =>
+      reply(409, { code: "draft_conflict", message: "Changed." }),
+    );
+    finding(api);
+    render(<DeckEditor deckId="deck-1" heading={createRef()} />);
+    await screen.findByRole("button", { name: /^Mountain/ }, FOUND);
+    addMountain();
+    fireEvent.click(screen.getByRole("button", { name: "Save a version" }));
+    const dialog = await screen.findByRole(
+      "dialog",
+      { name: "This deck changed somewhere else" },
+      SAVED,
+    );
+    // Closed without a choice, and asked again: it opens again, and still nothing is posted.
+    act(() => (dialog as HTMLDialogElement).close());
+    fireEvent.click(screen.getByRole("button", { name: "Save a version" }));
+    expect((dialog as HTMLDialogElement).open).toBe(true);
+    expect(drafts(api)).toHaveLength(1);
+    expect(api.calls.some((call) => call.route === REVISIONS)).toBe(false);
   });
 
   it("takes the saved version without sending anything", async () => {

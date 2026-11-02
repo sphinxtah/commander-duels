@@ -22,6 +22,7 @@ class FakeAudio implements MusicElement {
   volume = 1;
   currentTime = 0;
   paused = true;
+  error: { code: number } | null = null;
   plays = 0;
   pauses = 0;
   /** What the next play() does. */
@@ -36,6 +37,7 @@ class FakeAudio implements MusicElement {
       );
     if (this.answer === "missing") {
       // The browser reports the failed load through the error event and rejects play().
+      this.error = { code: 4 }; // MEDIA_ERR_SRC_NOT_SUPPORTED
       queueMicrotask(() => this.fire("error"));
       return Promise.reject(
         Object.assign(new Error("no source"), { name: "NotSupportedError" }),
@@ -248,6 +250,47 @@ describe("the gameplay music", () => {
     await settle();
     expect(audio.plays).toBe(1);
     expect(made).toBe(1);
+  });
+
+  it("tries again at the next game after the connection drops mid-track", async () => {
+    music.start();
+    await settle();
+    expect(audio.paused).toBe(false);
+    // MEDIA_ERR_NETWORK: the stream broke off, as after a laptop's sleep.
+    audio.error = { code: 2 };
+    audio.fire("error");
+    expect(audio.paused).toBe(true);
+    expect(music.state).toBe("idle");
+    audio.error = null;
+    music.start();
+    await settle();
+    expect(made).toBe(2);
+    expect(audio.src).toBe(GAME_MUSIC_URL);
+    expect(audio.paused).toBe(false);
+    expect(music.state).toBe("playing");
+  });
+
+  it("tries again after a track that would not decode, going on from where it was when asked not to restart", async () => {
+    const longer = createGameMusic({
+      element: () => audio,
+      src: "/music/campaign.mp3",
+      restart: false,
+    });
+    longer.start();
+    await settle();
+    audio.currentTime = 200;
+    // MEDIA_ERR_DECODE.
+    audio.error = { code: 3 };
+    audio.fire("error");
+    expect(longer.state).toBe("idle");
+    expect(audio.src).toBe("");
+    audio.error = null;
+    longer.start();
+    await settle();
+    expect(audio.src).toBe("/music/campaign.mp3");
+    expect(audio.currentTime).toBe(200);
+    expect(audio.paused).toBe(false);
+    longer.dispose();
   });
 
   it("is unavailable without audio at all", () => {

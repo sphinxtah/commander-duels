@@ -290,14 +290,23 @@ export function DeckEditor({
   }
 
   async function saveVersion() {
-    // The edits go first; a version without them would not be the deck on screen (v0.8.3).
+    // While another tab's save waits on the player's choice, the saved draft is not the deck on
+    // screen: the choice comes first.
+    if (saveState === "conflict") {
+      conflictDialog.current?.showModal();
+      return;
+    }
+    // The edits go first; a version without them would not be the deck on screen (v0.8.3). A
+    // save that fails says why where the save status shows, or asks what to keep.
     if (
       (saveState === "dirty" ||
         saveState === "saving" ||
         saveState === "error") &&
       !(await save())
-    )
+    ) {
+      setMessage("Not saved as a version: your latest changes did not save.");
       return;
+    }
     const { data, error } = await client.POST(
       "/api/v1/decks/{deck_id}/revisions",
       {

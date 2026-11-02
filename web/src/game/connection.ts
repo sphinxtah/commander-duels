@@ -120,6 +120,11 @@ const ALLIANCE_REFUSALS = new Set([
   "not_allied",
 ]);
 const LOG_KEPT = 400;
+/** An open socket is pinged this often, and as the tab is shown again: a connection that died
+ * while the computer slept may still look open, and only an unanswered ping tells. */
+export const PING_EVERY_MS = 25_000;
+/** A ping unanswered this long closes the socket, and the tab reconnects. */
+export const PONG_WITHIN_MS = 10_000;
 /** The chat lines a tab keeps: a reconnect's history holds the latest 200. */
 const CHAT_KEPT = 500;
 const UNSENT = "This message may not have reached the table. Try again.";
@@ -197,6 +202,12 @@ export class GameConnection {
   private readonly sentOn = new Map<string, number>();
   // A vote and an alliance request share two refusals; they answer the one asked for last.
   private asked: "vote" | "alliance" | null = null;
+  // The socket opening now was opened with a token fetched after the last one was refused: a
+  // second refusal ends the game's connection rather than asking again.
+  private renewedToken = false;
+  // The heartbeat of the open socket, and the deadline of the ping it is waiting on.
+  private pinger: number | undefined;
+  private pongDeadline: number | undefined;
 
   constructor(
     private readonly gameId: string,
@@ -206,13 +217,16 @@ export class GameConnection {
 
   start(): void {
     window.addEventListener("online", this.online);
+    document.addEventListener("visibilitychange", this.shown);
     this.open();
   }
 
   stop(): void {
     this.stopped = true;
     window.removeEventListener("online", this.online);
+    document.removeEventListener("visibilitychange", this.shown);
     window.clearTimeout(this.timer);
+    this.stopHeartbeat();
     this.socket?.close(1000);
     this.socket = null;
   }
@@ -395,8 +409,48 @@ export class GameConnection {
     }
   };
 
-  private open(): void {
+  // The tab is shown again, perhaps after the computer slept: the socket is checked at once.
+  private readonly shown = () => {
+    if (document.visibilityState === "visible") this.ping();
+  };
+
+  /** Pings the open, welcomed socket unless a ping is already out. */
+  private ping(): void {
+    const socket = this.socket;
+    if (
+      this.state.phase !== "open" ||
+      socket?.readyState !== WebSocket.OPEN ||
+      this.pongDeadline !== undefined
+    )
+      return;
+    socket.send(JSON.stringify({ type: "ping" }));
+    this.pongDeadline = window.setTimeout(() => {
+      this.pongDeadline = undefined;
+      if (this.socket !== socket) return;
+      // No answer: the connection is gone even if the browser has not noticed. Closing a dead
+      // socket may not report its close for a long while, so the tab reconnects now.
+      socket.onopen = socket.onmessage = socket.onclose = null;
+      socket.close(1000);
+      void this.closed(1006);
+    }, PONG_WITHIN_MS);
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.pinger = window.setInterval(() => this.ping(), PING_EVERY_MS);
+  }
+
+  private stopHeartbeat(): void {
+    window.clearInterval(this.pinger);
+    window.clearTimeout(this.pongDeadline);
+    this.pinger = undefined;
+    this.pongDeadline = undefined;
+  }
+
+  private open({ renewedToken = false } = {}): void {
     if (this.stopped) return;
+    this.renewedToken = renewedToken;
+    this.stopHeartbeat();
     const previous = this.socket;
     if (previous) {
       previous.onopen = previous.onmessage = previous.onclose = null;
@@ -448,6 +502,7 @@ export class GameConnection {
           controlled: message.controlled,
           crowded: false,
         });
+        this.startHeartbeat();
         if (message.seat !== null && !message.controlled && !this.yielded)
           this.send({ type: "take_control" });
         break;
@@ -597,12 +652,15 @@ export class GameConnection {
         break;
       }
       case "pong":
+        window.clearTimeout(this.pongDeadline);
+        this.pongDeadline = undefined;
         break;
     }
   }
 
   private async closed(code: number): Promise<void> {
     this.socket = null;
+    this.stopHeartbeat();
     if (this.stopped) return;
     // A message still waiting will not come back now.
     const end = (reason: EndReason) =>
@@ -631,10 +689,15 @@ export class GameConnection {
     }
     if (code === 4401) return end("signed_out");
     if (code === 4403) {
-      if (this.lastError === "csrf_failed" && this.attempts === 0) {
-        this.attempts += 1;
-        await loadMe().catch(() => null);
-        this.open();
+      // The token expired, perhaps while the tab was reconnecting: a fresh one, once for each
+      // socket. Refused again with the fresh token, the tab stops.
+      if (this.lastError === "csrf_failed" && !this.renewedToken) {
+        let reached = true;
+        await loadMe().catch(() => (reached = false));
+        if (this.stopped) return;
+        // The service did not answer: the next attempt asks again, after the backoff.
+        if (!reached) return this.reconnect(() => this.open());
+        this.open({ renewedToken: true });
         return;
       }
       return end("forbidden");

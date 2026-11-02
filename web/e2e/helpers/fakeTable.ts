@@ -354,6 +354,7 @@ export async function openTable(
         message({ type: "snapshot", snapshot: latest });
       } else if (parsed.type === "resync")
         message({ type: "snapshot", snapshot: latest });
+      else if (parsed.type === "ping") message({ type: "pong" });
       else if (parsed.type === "command" && parsed.command) {
         commands.push(parsed.command);
         message({

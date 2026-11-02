@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GameConnection, type GameState } from "./connection";
+import {
+  GameConnection,
+  PING_EVERY_MS,
+  PONG_WITHIN_MS,
+  type GameState,
+} from "./connection";
 import type { Prompt, Snapshot } from "./types";
 
 const api = vi.hoisted(() => ({ loadMe: vi.fn() }));
@@ -264,6 +269,100 @@ describe("a session refresh", () => {
     third.drop(4401);
     await vi.advanceTimersByTimeAsync(0);
     expect(FakeSocket.made).toHaveLength(4);
+  });
+});
+
+describe("an expired CSRF token", () => {
+  it("is fetched again when a reconnect is refused for it, once for each socket", async () => {
+    api.loadMe.mockResolvedValue(null);
+    const first = playing();
+    // The network drops, and the token expires before the tab is back.
+    first.drop(1006);
+    vi.advanceTimersByTime(1000);
+    const second = FakeSocket.made[1];
+    second.accept();
+    second.deliver({ type: "error", code: "csrf_failed" });
+    second.drop(4403);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.loadMe).toHaveBeenCalledTimes(1);
+    expect(FakeSocket.made).toHaveLength(3);
+    expect(state.phase).toBe("reconnecting");
+
+    // With the fresh token the table is back.
+    const third = FakeSocket.made[2];
+    third.accept();
+    third.deliver(welcome(0, true));
+    expect(state.phase).toBe("open");
+  });
+
+  it("ends the connection when the fresh token is refused too", async () => {
+    api.loadMe.mockResolvedValue(null);
+    connection = new GameConnection("g1", false, (next) => (state = next));
+    connection.start();
+    const first = FakeSocket.made[0];
+    first.accept();
+    first.deliver({ type: "error", code: "csrf_failed" });
+    first.drop(4403);
+    await vi.advanceTimersByTimeAsync(0);
+    const second = FakeSocket.made[1];
+    second.accept();
+    second.deliver({ type: "error", code: "csrf_failed" });
+    second.drop(4403);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(api.loadMe).toHaveBeenCalledTimes(1);
+    expect(FakeSocket.made).toHaveLength(2);
+    expect(state).toMatchObject({ phase: "ended", ended: "forbidden" });
+  });
+});
+
+describe("the heartbeat", () => {
+  it("pings the open socket, and reconnects when no pong comes back", () => {
+    const first = playing();
+    connection.answer({ promptId: "A", revision: 5 }, { option_id: "1" });
+    const [command] = first.commands();
+    expect(first.count("ping")).toBe(0);
+    vi.advanceTimersByTime(PING_EVERY_MS);
+    expect(first.count("ping")).toBe(1);
+    expect(first.sent.at(-1)).toEqual({ type: "ping" });
+    first.deliver({ type: "pong" });
+    vi.advanceTimersByTime(PONG_WITHIN_MS);
+    expect(state.phase).toBe("open");
+    expect(first.closedWith).toBeNull();
+
+    // The computer slept: the next ping goes unanswered.
+    vi.advanceTimersByTime(PING_EVERY_MS - PONG_WITHIN_MS);
+    expect(first.count("ping")).toBe(2);
+    vi.advanceTimersByTime(PONG_WITHIN_MS);
+    expect(first.closedWith).toBe(1000);
+    expect(state.phase).toBe("reconnecting");
+    vi.advanceTimersByTime(1000);
+    const second = FakeSocket.made[1];
+    second.accept();
+    second.deliver(welcome(0, false));
+    second.deliver(lease("controller", true, "granted"));
+    // The move left waiting goes again on the new socket.
+    expect(second.commands()).toEqual([command]);
+  });
+
+  it("pings at once when the tab is shown again, and not while another ping is out", () => {
+    const first = playing();
+    const shown = () => document.dispatchEvent(new Event("visibilitychange"));
+    shown();
+    expect(first.count("ping")).toBe(1);
+    shown();
+    expect(first.count("ping")).toBe(1);
+    first.deliver({ type: "pong" });
+    shown();
+    expect(first.count("ping")).toBe(2);
+  });
+
+  it("stops with the connection", () => {
+    const first = playing();
+    connection.stop();
+    vi.advanceTimersByTime(PING_EVERY_MS * 3);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(first.count("ping")).toBe(0);
+    expect(FakeSocket.made).toHaveLength(1);
   });
 });
 
