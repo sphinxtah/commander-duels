@@ -62,17 +62,27 @@ function overlap(a: Box, b: Box) {
 async function expectPlaced(page: Page, target: string) {
   const coach = page.locator('[data-tutorial="coach"]');
   await expect(coach).toHaveAttribute("data-target", target);
-  // Settled: the page has scrolled the tile into view and the bubble has followed.
+  // Settled: the page has scrolled the tile into view and the bubble has followed. A scroll
+  // can pause between two samples on a busy machine, so the bubble must also be on screen.
+  const { width, height } = page.viewportSize()!;
   let last = "";
   await expect
-    .poll(async () => {
-      const now = JSON.stringify(await measure(page));
-      const still = now === last;
-      last = now;
-      return still;
-    })
+    .poll(
+      async () => {
+        const box = await measure(page);
+        const now = JSON.stringify(box);
+        const still = now === last;
+        last = now;
+        return (
+          still &&
+          inside(box.coach, width, height) &&
+          inside(box.arrow, width, height) &&
+          inside(box.ring, width, height)
+        );
+      },
+      { timeout: 15_000 },
+    )
     .toBe(true);
-  const { width, height } = page.viewportSize()!;
   const placed = await measure(page);
   expect(inside(placed.coach, width, height)).toBe(true);
   expect(inside(placed.arrow, width, height)).toBe(true);
