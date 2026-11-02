@@ -38,10 +38,20 @@ export function guided(tutorial: Tutorial): boolean {
   return tutorial.path === "beginner" || tutorial.path === "novice";
 }
 
+/** The main menu's tour's stages, in order: Leng's shop, Tivit's, then (v0.8.5) Decks and the
+ * Play page. */
+export const TOUR_STAGES = [
+  "tour_shop",
+  "tour_auctions",
+  "tour_decks",
+  "tour_play",
+] as const satisfies readonly TutorialStage[];
+export type TourStage = (typeof TOUR_STAGES)[number];
+
 /** Whether the main menu's tour is on. */
 export function touring(me: Me | null | undefined): boolean {
   const stage = me?.tutorial?.stage;
-  return stage === "tour_shop" || stage === "tour_auctions";
+  return (TOUR_STAGES as readonly string[]).includes(stage ?? "");
 }
 
 /** Whether the wizard should open by itself for the tutorial: before the setup's own steps, and

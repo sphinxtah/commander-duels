@@ -1,22 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMotionLevel } from "../app/motion";
+import { useTableSettings } from "../app/tableSettings";
 import type { GameState } from "../game/connection";
 import { GameScreen } from "../game/GameScreen";
 import { buildDemo } from "./demoScript";
+import { autoWaitMs, frameHolds } from "./pacing";
 import shell from "../App.module.css";
 import styles from "./tutorial.module.css";
 
 // The Beginner's watched game (v0.8.4): the scripted game of demoScript.ts on the real table,
 // with its narration in a panel over it. Next goes on a lesson; "Play on its own" goes on by
-// itself after time to read; the frames inside a lesson play as the table's own animation.
-
-/** How long a frame stays before the next inside one lesson. */
-const FRAME_MS = 1100;
-
-/** Time to read a lesson's words before "Play on its own" goes on. */
-function readingMs(text: string): number {
-  return Math.min(18_000, Math.max(6_000, text.length * 55));
-}
+// itself once the words have had time to be read; the frames inside a lesson play as the table's
+// own animation. Since v0.8.5 each frame stays as long as its animation takes, at the table's
+// animation speed (still pictures with motion reduced), and the reading time grows with the
+// lesson's words (pacing.ts).
 
 const BASE: Omit<GameState, "snapshot" | "log"> = {
   phase: "open",
@@ -54,27 +51,36 @@ export function DemoGame({
   const [beat, setBeat] = useState(0);
   const [frame, setFrame] = useState(0);
   const [auto, setAuto] = useState(false);
-  const instant = useMotionLevel("normal") === "none";
+  const [settings] = useTableSettings();
+  const motion = useMotionLevel(settings.animationSpeed);
+  const holds = useMemo(() => frameHolds(beats, motion), [beats, motion]);
   const next = useRef<HTMLButtonElement>(null);
+  /** When the lesson on screen opened, for its reading time. */
+  const opened = useRef(Date.now());
   const lesson = beats[beat]!;
   const last = beat === beats.length - 1;
   const framesDone = frame >= lesson.frames.length - 1;
 
-  // The frames inside a lesson play one after another.
+  // The frames inside a lesson play one after another, each once its animation has finished.
   useEffect(() => {
     if (framesDone) return;
     const timer = window.setTimeout(
       () => setFrame((n) => n + 1),
-      instant ? 0 : FRAME_MS,
+      holds[beat]![frame]!,
     );
     return () => window.clearTimeout(timer);
-  }, [beat, frame, framesDone, instant]);
-  // On its own: the next lesson once this one has been read.
+  }, [beat, frame, framesDone, holds]);
+  // On its own: the next lesson once the last frame has settled and the words have been read.
   useEffect(() => {
     if (!auto || !framesDone || last) return;
-    const timer = window.setTimeout(() => go(beat + 1), readingMs(lesson.text));
+    const wait = autoWaitMs(
+      lesson.text,
+      holds[beat]![frame]!,
+      Date.now() - opened.current,
+    );
+    const timer = window.setTimeout(() => go(beat + 1), wait);
     return () => window.clearTimeout(timer);
-  }, [auto, framesDone, last, beat, lesson.text]);
+  }, [auto, framesDone, last, beat, frame, holds, lesson.text]);
   // The narration takes the keyboard once the table has drawn, and keeps it from lesson to lesson.
   useEffect(() => {
     const timer = window.setTimeout(() => next.current?.focus(), 50);
@@ -82,7 +88,8 @@ export function DemoGame({
   }, []);
 
   function go(to: number) {
-    setBeat(Math.min(to, beats.length - 1));
+    opened.current = Date.now();
+    setBeat(Math.max(0, Math.min(to, beats.length - 1)));
     setFrame(0);
   }
 

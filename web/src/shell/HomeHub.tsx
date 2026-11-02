@@ -218,6 +218,7 @@ export function HomeHub({
           className={styles.playTile}
           icon="play"
           title="Play"
+          tour="play"
           lead="Find a game, or battle the bots in Legacy or Commander."
           meta={
             data.game
@@ -274,6 +275,7 @@ export function HomeHub({
           className={styles.decksTile}
           icon="decks"
           title="Decks"
+          tour="decks"
           lead="Build, tune and share your decks."
           meta={count(data.decks, "deck", "decks")}
           index={3}
@@ -326,7 +328,7 @@ function Tile({
   action?: string;
   className?: string;
   index: number;
-  /** What the tutorial's tour points at (v0.8.4). */
+  /** What the tutorial's tour points at (v0.8.4; Decks and Play since v0.8.5). */
   tour?: string;
 }) {
   return (

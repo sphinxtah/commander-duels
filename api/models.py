@@ -62,7 +62,7 @@ class User(Base):
         ),
         CheckConstraint(
             "tutorial IN ('choose', 'demo', 'overview', 'setup', 'tour_shop', 'tour_auctions', "
-            "'done')",
+            "'tour_decks', 'tour_play', 'done')",
             name="ck_users_tutorial",
         ),
         CheckConstraint(

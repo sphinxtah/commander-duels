@@ -557,8 +557,8 @@ function Done({
           <p className={styles.lead}>
             Your two starter decks are in Decks, and their cards in your
             library. One more thing: you have 1,000 tokens to spend. Let's look
-            around the main menu, open your first pack at Leng's Card Shop and
-            list a card at Tivit's Auction House.
+            around: open your first pack at Leng's Card Shop, list a card at
+            Tivit's Auction House, then see your decks and where to play.
           </p>
           <div className={styles.links}>
             <button

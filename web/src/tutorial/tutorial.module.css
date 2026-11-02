@@ -3,13 +3,16 @@
 
 /* ---------- the guided game's narration, over the table ---------- */
 
+/* At the lower right, over the player's own piles and the end of her hand (v0.8.5): until then
+   it lay at the upper right, over Vok's portrait, life and commander damage, which the lessons
+   ask the reader to look at. */
 .narration {
   position: fixed;
   z-index: 3200;
   right: clamp(12px, 2vw, 28px);
-  top: clamp(64px, 12vh, 140px);
+  bottom: 12px;
   width: min(380px, calc(100vw - 24px));
-  max-height: calc(100dvh - 160px);
+  max-height: calc(100dvh - 24px);
   overflow: auto;
   padding: 18px 20px 16px;
   color: var(--cd-text);
@@ -67,9 +70,7 @@
 
 @media (max-width: 760px) {
   .narration {
-    top: auto;
     right: 12px;
-    bottom: 12px;
     max-height: 46dvh;
   }
 }
@@ -175,6 +176,24 @@
   background: #172019;
   border-left: none;
   border-top: none;
+}
+/* Beside its target (a phone turned sideways, v0.8.5): the arrow on the bubble's left or right
+   edge, its top set where the target's middle is. */
+.coachArrow[data-side="left"],
+.coachArrow[data-side="right"] {
+  margin-left: 0;
+  margin-top: -9px;
+  background: #222519;
+}
+.coachArrow[data-side="left"] {
+  left: -10px;
+  border-top: none;
+  border-right: none;
+}
+.coachArrow[data-side="right"] {
+  right: -10px;
+  border-bottom: none;
+  border-left: none;
 }
 .coachTitle {
   position: relative;

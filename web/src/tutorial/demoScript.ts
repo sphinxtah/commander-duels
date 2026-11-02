@@ -509,7 +509,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "A game of Commander",
-    "You're watching two bots play Commander: Mira, green and white, at the bottom with her hand showing, and Vok, black and red, across the table. Each starts at 40 life with a 99-card deck shuffled into their library, seven cards in hand, and a commander waiting in the command zone beside their portrait. Nothing here is yours to answer: press Next to watch each move.",
+    "Two bots are playing Commander. Mira (green and white) sits at the bottom, her hand shown to you; Vok (black and red) sits across the table. Each has 40 life and a 100-card deck: a commander, waiting in the command zone by their portrait, and 99 other cards, shuffled to make their library. Each drew seven to start. You only watch: press Next for each move.",
   );
 
   t.at("beginning", "upkeep");
@@ -518,14 +518,14 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "The steps of a turn",
-    "Every turn goes through the same steps: untap, upkeep and draw (the beginning), the first main phase, combat, the second main phase, and the end. The band across the middle of the table shows whose turn it is and the step. Whoever goes first skips their first draw, so Mira goes straight to her main phase.",
+    "Every turn runs in the same order. First the beginning: untap, upkeep, draw a card. Then a main phase, combat, a second main phase, and the end. The red band across the middle shows whose turn it is and the step. In a two-player game, whoever goes first skips their first draw, so Mira goes straight to her main phase.",
   );
 
   const f1 = t.playLand(MIRA, forest1!);
   t.frame();
   beat(
     "Lands and mana",
-    "Once in each of their own turns, in a main phase, a player may play a land from their hand. Lands make mana, which pays for spells: Mira's Forest taps for one green mana, {G}. Plains make white {W}, Islands blue {U}, Swamps black {B} and Mountains red {R}.",
+    "Once in each of their turns, in a main phase, a player may play one land from their hand. Lands make mana, which pays for spells: tapping Mira's Forest (turning it sideways) gives one green mana, {G}. Plains give white {W}, Islands blue {U}, Swamps black {B} and Mountains red {R}.",
   );
 
   // Turn 2: Vok.
@@ -541,7 +541,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Taking turns",
-    "With nothing more to do, Mira ends her turn. Vok untaps, draws a card, and plays a Swamp. A player's hand and library stay hidden from the others: you see only the backs of Vok's cards.",
+    "Mira has nothing more to do, so she ends her turn. Vok's turn begins: he untaps, draws a card and plays a Swamp. Hands and libraries are hidden from the other players, so you see only the backs of Vok's cards.",
   );
 
   // Turn 3: Mira casts Grizzly Bears.
@@ -560,7 +560,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Casting a spell",
-    "To cast a spell, a player pays the mana cost printed at its top right. Grizzly Bears costs {1}{G}: one green and one of any kind. Mira taps her Forest and Plains (a tapped card turns sideways) and casts it. A creature arrives with summoning sickness: it can't attack, or use an ability with {T} in its cost, until its controller's next turn.",
+    "Mira draws and plays a Plains. To cast a spell, a player pays the mana cost at its top right. Grizzly Bears costs {1}{G}: one green mana and one of any kind, so Mira taps her Forest and Plains. A new creature has summoning sickness: it can't attack, or use an ability with {T} (tap) in its cost, until its controller's next turn.",
   );
 
   // Turn 4: Vok casts a creature with haste and attacks.
@@ -581,7 +581,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Haste",
-    "Vok plays a Mountain and casts Raging Goblin for {R}. It has haste, which lets it ignore summoning sickness: it can attack this very turn.",
+    "Vok draws, plays a Mountain and casts Raging Goblin for {R}. It has haste, so summoning sickness doesn't hold it back: it can attack this very turn.",
   );
 
   t.at("combat", "begin_combat");
@@ -590,7 +590,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Attacking",
-    "In combat, the player whose turn it is chooses which of their creatures attack, and whom. Attacking taps a creature. Raging Goblin, a 1/1 (power 1, toughness 1), attacks Mira.",
+    "In combat, the player whose turn it is picks which of their creatures attack, and whom. Attacking taps a creature. Raging Goblin is a 1/1: power 1, the damage it deals, and toughness 1, the damage that destroys it. It attacks Mira.",
   );
 
   t.block(bears, goblin);
@@ -605,7 +605,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Blocking",
-    "The defending player may block with any untapped creature, even one that just arrived. Mira's Grizzly Bears, a 2/2, blocks. A blocked creature and its blocker deal their power in damage to each other: the Goblin deals 1, the Bears deal 2. Damage equal to a creature's toughness destroys it, so the Goblin goes to Vok's graveyard. The Bears' damage wears off at the end of the turn.",
+    "The defender may block with any untapped creature, even one that arrived this turn. Mira blocks with her Grizzly Bears, a 2/2. The two deal their power in damage to each other: 1 to the Bears, 2 to the Goblin. Damage at least equal to its toughness destroys a creature, so the Goblin goes to Vok's graveyard, his pile of used cards. Damage on the Bears wears off at the end of the turn.",
   );
 
   // Turn 5: Mira attacks; Vok takes damage.
@@ -630,7 +630,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Damage to a player",
-    "Mira casts Llanowar Elves, a creature that will tap for mana from her next turn, then attacks Vok with her Bears. Vok has no creature to block with, so he takes the Bears' 2 damage: his 40 life becomes 38. A player at 0 life loses the game.",
+    "Mira plays a Forest and casts Llanowar Elves, which can tap for {G} once its summoning sickness wears off. Then she attacks Vok with her Bears. With no creature to block, Vok takes their 2 damage: his 40 life becomes 38. A player at 0 life or less loses the game.",
   );
 
   // Turn 6: Vok keeps his mana for Mira's turn.
@@ -646,7 +646,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Mana kept back",
-    "Vok plays a Swamp and casts nothing, leaving his lands untapped. A land untaps only in its controller's own untap step, so mana kept back now can pay for an instant during Mira's turn.",
+    "Vok plays a Swamp and casts nothing, so his lands stay untapped as his turn ends. Untapped lands can still make mana in Mira's turn, for an instant: a spell that can be cast at any time, even in another player's turn.",
   );
 
   // Turn 7: the stack.
@@ -667,7 +667,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "The stack",
-    "A spell doesn't happen at once: it goes on the stack, and each player gets a chance to respond. Mira attacks with her Bears, and Vok taps his Mountain for Lightning Bolt, an instant (castable even in another player's turn), aimed at them. Its 3 damage would destroy them. The stack shows in the middle of the band.",
+    "Mira plays a Plains and attacks with her Bears. Vok answers: he taps a Mountain for Lightning Bolt, aimed at the Bears, and its 3 damage would destroy them. A spell doesn't happen at once. It waits on the stack, in the middle of the band, and each player may respond before it resolves (takes effect).",
   );
 
   t.tap(elves);
@@ -675,7 +675,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Responding",
-    "Mira responds with Giant Growth, an instant of her own, tapping her Elves for {G}. It goes on the stack on top of the Bolt. The stack resolves from the top down: the last spell cast happens first.",
+    "Mira responds: she taps her Elves for {G} and casts Giant Growth, an instant of her own, on the Bears. It goes on the stack on top of the Bolt. The stack resolves from the top down, so the last spell cast happens first.",
   );
 
   t.resolve(growth!);
@@ -713,7 +713,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "The commander",
-    "Vok casts his commander, Judith, the Scourge Diva, straight from the command zone, as he could cast a card from his hand. A commander is the legendary creature a deck is built around: every card in the deck must share its colors. Judith gives Vok's other creatures +1/+0.",
+    "Vok casts his commander, Judith, the Scourge Diva, straight from the command zone, paying {1}{B}{R} as for any spell. A commander is the legendary creature a deck is built around, and every card in the deck may use only its colors. Judith gives Vok's other creatures +1/+0: one more power each.",
   );
 
   // Turn 9: removal, and Mira's commander.
@@ -735,7 +735,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Back to the command zone",
-    "Mira casts Swords to Plowshares on Judith. When a commander would go to the graveyard or into exile, its owner may put it back in the command zone instead, and Vok does. Swords gives him life equal to Judith's power: he is at 35.",
+    "Mira casts Swords to Plowshares on Judith, exiling her: she is removed from the game. But a commander that goes to the graveyard or into exile may be moved back to the command zone, and Vok moves Judith there. Swords gives him life equal to her power, 2: he is at 35.",
   );
 
   t.tap(f1, f2, p2, p3, elves);
@@ -764,7 +764,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "The commander tax",
-    "Each time a player casts their commander from the command zone, it costs {2} more for the rest of the game: the commander tax. Judith's {1}{B}{R} now costs five mana, and Vok taps all five of his lands to bring her back.",
+    "A commander costs {2} more for each time it has already been cast from the command zone: the commander tax. Judith's second cast costs her {1}{B}{R} and {2} more, five mana in all, and Vok taps all five of his lands to bring her back.",
   );
 
   // Turn 11: commander damage.
@@ -787,7 +787,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "Commander damage",
-    "Mira casts Savannah Lions, then attacks with Sigarda, and nothing of Vok's can fly to block her. Combat damage a commander deals to a player is also counted apart, on that player's plate: whatever their life, a player dealt 21 combat damage by the same commander loses the game. Sigarda has dealt Vok 5, and he is at 30.",
+    "Mira casts Savannah Lions, then attacks with Sigarda. Nothing of Vok's can fly, so nothing can block her. Combat damage from a commander is also counted on its own, by the player's portrait: a player dealt 21 combat damage by one commander loses, whatever their life. Sigarda has dealt Vok 5, and he is at 30.",
   );
 
   // A few turns later: Sigarda has hit on turns 13, 15 and 17.
@@ -819,7 +819,7 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "A few turns later",
-    "Skipping ahead to turn 18: Sigarda has hit Vok three more times, for 20 commander damage in all. Vok is still at 15 life, and Mira at 26 after his attacks, but one more hit from Sigarda ends the game however much life Vok has left.",
+    "Skipping ahead to the end of turn 18: Sigarda has hit Vok three more times, 20 commander damage in all. Vok still has 15 life, and Mira 26 after his attacks, but one more hit from Sigarda ends the game, however much life he has left.",
   );
 
   // Turn 19: the last attack.
@@ -844,13 +844,13 @@ export function buildDemo(): DemoBeat[] {
   t.frame();
   beat(
     "The end of the game",
-    "Sigarda attacks once more: 25 commander damage, and Vok loses with 10 life left. With three or four players, the others would play on until one was left. That was a whole game of Commander, from the first land to the last attack.",
+    "Sigarda attacks once more: 25 commander damage, and Vok loses with 10 life left. With three or four players, the rest would play on until one was left. That was a whole game of Commander, from the first land to the last attack.",
   );
 
   t.frame();
   beat(
     "Your turn at the table",
-    "In your own games, the big diamonds at the table's left are your choices: Continue to pass, Attack, Block and the rest, with every other option listed under them. Play a card by dragging it from your hand, or by clicking it. Each card shows large as you point at it. The diamonds above the band open the log and the Game menu, which has the options and Concede.",
+    "In your own games, your choices are the big diamonds at the table's left: Continue (to let the game go on), Attack, Block and the like, with every other choice listed below them. Play a card from your hand by dragging it onto the table, or click it. Any card shows large as you point at it. The small diamonds on the band open the Game menu (options, Concede) and the log.",
   );
   return beats;
 }

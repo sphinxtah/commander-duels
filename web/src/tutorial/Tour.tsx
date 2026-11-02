@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Me } from "../api";
 import type { Page } from "../shell/pages";
 import { Coach, type CoachStep } from "./Coach";
@@ -8,14 +8,47 @@ import {
   rememberTourCard,
   tourCard,
   useTutorialSignal,
+  type TourStage,
 } from "./tutorial";
 import styles from "./tutorial.module.css";
 
 // The main menu's tour (v0.8.4), for Beginner and Novice players once their game is set up:
 // first to Leng's Card Shop to buy and open a pack, then to Tivit's Auction House to list a card
-// from it. Each page it passes through says what happened with a tutorial signal; the stage is
-// the account's, so a reload or another device picks up where the player was. "Skip the tour"
-// ends it at once.
+// from it; since v0.8.5 on to Decks (the starter decks, and building one) and to the Play page,
+// where it ends at the practice table. Each page it passes through says what happened with a
+// tutorial signal, or the player presses Next; the stage is the account's, so a reload or another
+// device picks up where the player was. "Skip the tour" ends it at once, from any bubble.
+
+/** The practice table's start button, which the Play page marks with no data-tour name. */
+function startButton(): HTMLElement | null {
+  const table = document.getElementById("practice");
+  if (!table) return null;
+  return (
+    [
+      ...table.querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
+    ].find((button) =>
+      /Start the game|Shuffling/.test(button.textContent ?? ""),
+    ) ?? null
+  );
+}
+
+/** The first of the player's decks on the Decks page (the list itself can be taller than a
+ * phone's window). */
+function firstDeck(): HTMLElement | null {
+  return (
+    document
+      .querySelector<HTMLElement>("main ul li a[href^='#deck/']")
+      ?.closest("li") ?? null
+  );
+}
+
+function buildButton(): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLButtonElement>("main button")].find(
+      (button) => button.textContent?.trim() === "Build one with help",
+    ) ?? null
+  );
+}
 
 export function Tour({
   me,
@@ -26,17 +59,27 @@ export function Tour({
   page: Page;
   onChange: (me: Me) => void;
 }) {
-  const [finished, setFinished] = useState<string | null>(null);
+  /** The last bubble, once the tour has ended at the practice table. */
+  const [finished, setFinished] = useState(false);
+  /** Where on Decks the player is: the decks, then building one. */
+  const [decksStep, setDecksStep] = useState(0);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const stage = me.tutorial?.stage;
 
-  async function move(stage: "tour_auctions" | "done", skipped = false) {
-    const moved = await moveTutorial({ stage, skipped });
-    if ("me" in moved) {
-      setError("");
-      onChange(moved.me);
-    } else setError(moved.error);
-    return "me" in moved;
+  async function move(stage: TourStage | "done", skipped = false) {
+    if (busy) return false;
+    setBusy(true);
+    try {
+      const moved = await moveTutorial({ stage, skipped });
+      if ("me" in moved) {
+        setError("");
+        onChange(moved.me);
+      } else setError(moved.error);
+      return "me" in moved;
+    } finally {
+      setBusy(false);
+    }
   }
 
   useTutorialSignal((signal, cards) => {
@@ -45,16 +88,30 @@ export function Tour({
       void move("tour_auctions");
     }
     if (signal === "card_listed" && stage === "tour_auctions") {
-      const card = tourCard();
-      void move("done").then((ok) => {
-        if (ok) {
-          setFinished(card?.name ?? "card");
-          rememberTourCard(null);
-        }
-      });
+      setDecksStep(0);
+      void move("tour_decks");
     }
   });
 
+  // A practice game started from the Play page ends the tour: the table takes the screen.
+  useEffect(() => {
+    if (stage !== "tour_play") return;
+    const started = () => {
+      if (/^#game\//i.test(window.location.hash)) void move("done");
+    };
+    window.addEventListener("hashchange", started);
+    return () => window.removeEventListener("hashchange", started);
+  });
+
+  const close = (
+    <button
+      type="button"
+      className={styles.coachPrimary}
+      onClick={() => setFinished(false)}
+    >
+      Close
+    </button>
+  );
   if (finished)
     return (
       <Coach
@@ -62,26 +119,25 @@ export function Tour({
         steps={[
           {
             title: "You're all set",
-            text: `Your ${finished} is on the market. When the auction ends with a bid, the tokens are yours, in full. That's the tour: win games for more tokens, open packs, build decks, and have fun.`,
+            text: "That's the tour. Win games for tokens, open packs, build decks, and have fun. Settings › Tutorial has the tour and the guided game again whenever you want them.",
           },
         ]}
-        actions={
-          <button
-            type="button"
-            className={styles.coachPrimary}
-            onClick={() => setFinished(null)}
-          >
-            Close
-          </button>
-        }
+        actions={close}
       />
     );
-  if (stage !== "tour_shop" && stage !== "tour_auctions") return null;
+  if (
+    stage !== "tour_shop" &&
+    stage !== "tour_auctions" &&
+    stage !== "tour_decks" &&
+    stage !== "tour_play"
+  )
+    return null;
 
   const skip = (
     <button
       type="button"
       className={styles.coachQuiet}
+      disabled={busy}
       onClick={() => void move("done", true)}
     >
       Skip the tour
@@ -91,6 +147,16 @@ export function Tour({
     <a className={styles.coachPrimary} href={href}>
       {words}
     </a>
+  );
+  const next = (onClick: () => void, words = "Next") => (
+    <button
+      type="button"
+      className={styles.coachPrimary}
+      disabled={busy}
+      onClick={onClick}
+    >
+      {words} <span aria-hidden="true">▸</span>
+    </button>
   );
   const card = tourCard();
   let steps: CoachStep[];
@@ -109,7 +175,7 @@ export function Tour({
         {
           target: "pack-reveal",
           title: "Turn them over",
-          text: "Click each card to turn it over, or Reveal all. Rares and mythics glow, and foils shimmer. Every card joins your library for good.",
+          text: "Click each card to turn it over, or press Reveal all. Rares and mythics glow, and foils shimmer. Every card joins your library for good.",
         },
         {
           target: "pack-tear",
@@ -129,7 +195,7 @@ export function Tour({
         {
           target: "buy",
           title: "Buy a pack",
-          text: "Every pack here is priced in tokens, and you started with 1,000. Pick any pack you like (the weekly sale has five at 20% off, and every era is listed below), press Buy, then confirm.",
+          text: "Packs cost tokens, and you start with 1,000. Pick any pack (the weekly sale has five at 20% off, and every era is listed below), press Buy, then confirm.",
         },
         {
           title: "Buy a pack",
@@ -145,7 +211,7 @@ export function Tour({
       ];
       lead = go("#shop", "Go to Leng's shop");
     }
-  } else {
+  } else if (stage === "tour_auctions") {
     if (page === "Home")
       steps = [
         {
@@ -174,6 +240,101 @@ export function Tour({
         },
       ];
       lead = go("#auctions/search", "Go to Tivit's Auction House");
+    }
+  } else if (stage === "tour_decks") {
+    if (page === "Decks")
+      steps =
+        decksStep === 0
+          ? [
+              {
+                target: "deck-list",
+                locate: firstDeck,
+                title: "Your decks",
+                text: "A deck is the cards you bring to a game. Your two starter decks are already here, ready to play, and every card in them is in your library for good. Open one to see its cards.",
+                actions: next(() => setDecksStep(1)),
+              },
+              {
+                title: "Your decks",
+                text: "A deck is the cards you bring to a game. Your two starter decks are here, ready to play, and every card in them is in your library for good.",
+                actions: next(() => setDecksStep(1)),
+              },
+            ]
+          : [
+              {
+                target: "deck-build",
+                locate: buildButton,
+                title: "Build your own",
+                text: "When you want a deck of your own, Build one with help picks a commander and cards from your library, or New deck starts an empty one. Each card you pull from a pack can go in.",
+                actions: next(() => void move("tour_play"), "On to Play"),
+              },
+              {
+                title: "Build your own",
+                text: "When you want a deck of your own, Build one with help picks a commander and cards from your library, or New deck starts an empty one.",
+                actions: next(() => void move("tour_play"), "On to Play"),
+              },
+            ];
+    else if (page === "Home" || page === "Auctions")
+      steps = [
+        {
+          target: "decks",
+          title: "Decks",
+          text: card
+            ? `Your ${card.name} is listed: if the auction ends with a bid, the tokens are yours, in full. Next, the decks you play with.`
+            : "Your card is listed: if the auction ends with a bid, the tokens are yours, in full. Next, the decks you play with.",
+        },
+        {
+          title: "Decks",
+          text: card
+            ? `Your ${card.name} is listed: if the auction ends with a bid, the tokens are yours, in full. Next, the decks you play with.`
+            : "Your card is listed: if the auction ends with a bid, the tokens are yours, in full. Next, the decks you play with.",
+          actions: go("#decks", "Go to Decks"),
+        },
+      ];
+    else {
+      steps = [
+        {
+          title: "The tour",
+          text: "The tour goes on at Decks, where your starter decks are.",
+        },
+      ];
+      lead = go("#decks", "Go to Decks");
+    }
+  } else {
+    if (page === "Play")
+      steps = [
+        {
+          target: "practice-start",
+          locate: startButton,
+          title: "Play a practice game",
+          text: "At the practice table you play against bots. Pick Commander and one of your starter decks, choose how many bots and how good they are, then press Start the game. Wins against bots earn tokens too.",
+          actions: next(() => {
+            void move("done").then((ok) => ok && setFinished(true));
+          }, "Finish the tour"),
+        },
+        {
+          title: "Play a practice game",
+          text: "At the practice table you play against bots with one of your decks. Wins against bots earn tokens too.",
+          actions: next(() => {
+            void move("done").then((ok) => ok && setFinished(true));
+          }, "Finish the tour"),
+        },
+      ];
+    else if (page === "Home")
+      steps = [
+        {
+          target: "play",
+          title: "Play",
+          text: "Last stop: Play, where you can start a practice game against the bots with one of your decks.",
+        },
+      ];
+    else {
+      steps = [
+        {
+          title: "Play",
+          text: "Last stop: the Play page, where you can start a practice game against the bots with one of your decks.",
+        },
+      ];
+      lead = go("#practice", "Go to Play");
     }
   }
   return (

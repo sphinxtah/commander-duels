@@ -5,11 +5,13 @@ game, and how far they are, kept on the account so it picks up after a reload an
   up their game with tips and gets the main menu's tour; Novice reads an overview of the site with
   a refresher on Magic's rules, then the same; Advanced goes straight to the setup.
 - **Stages.** choose, then demo (Beginner) or overview (Novice), setup, the tour's tour_shop (to
-  Leng's card shop and a first pack) and tour_auctions (to Tivit's Auction House and a first
-  listing), done. The browser moves the stage along: the tutorial is guidance only, and nothing
-  in it is paid for or granted. Skipping goes to done and says so.
+  Leng's card shop and a first pack), tour_auctions (to Tivit's Auction House and a first
+  listing), tour_decks (to Decks and the starter decks; v0.8.5) and tour_play (to the Play page's
+  practice table; v0.8.5), done. The browser moves the stage along: the tutorial is guidance
+  only, and nothing in it is paid for or granted. Skipping goes to done and says so.
 - **Again later.** Settings › Tutorial plays the scripted game or the overview again without
-  changing anything here, and starts the tour again from tour_shop.
+  changing anything here, and starts the tour again from tour_shop, or from tour_decks for Decks
+  and the Play page alone.
 """
 
 from fastapi import APIRouter
@@ -20,12 +22,14 @@ from api.schemas import Me, TutorialUpdate
 
 router = APIRouter(prefix="/api/v1")
 
+# The main menu's tour, in order (tour_decks and tour_play since v0.8.5).
+TOUR = {"tour_shop", "tour_auctions", "tour_decks", "tour_play"}
 # The stages each path passes through; done is open to every path, as a skip, and so is the tour,
 # which Settings starts again for anyone.
 STAGES = {
-    "beginner": {"demo", "setup", "tour_shop", "tour_auctions", "done"},
-    "novice": {"overview", "setup", "tour_shop", "tour_auctions", "done"},
-    "advanced": {"setup", "tour_shop", "tour_auctions", "done"},
+    "beginner": {"demo", "setup", *TOUR, "done"},
+    "novice": {"overview", "setup", *TOUR, "done"},
+    "advanced": {"setup", *TOUR, "done"},
 }
 
 

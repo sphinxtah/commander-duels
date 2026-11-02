@@ -18,8 +18,19 @@ import {
 import type { Me } from "../api";
 import { SetupWizard } from "../app/SetupWizard";
 import { buildDemo, MIRA, VOK } from "./demoScript";
+import { placeCoach, VISIBLE } from "./Coach";
 import { OVERVIEW } from "./Overview";
+import {
+  autoWaitMs,
+  frameHolds,
+  readingMs,
+  READ_MAX_MS,
+  READ_MIN_MS,
+  STILL_MS,
+  wordCount,
+} from "./pacing";
 import { Tour } from "./Tour";
+import { TutorialSettings } from "./TutorialSettings";
 import {
   bestPulled,
   moveTutorial,
@@ -83,7 +94,7 @@ describe("the guided game's script", () => {
   const last = frames[frames.length - 1]!;
 
   it("has words and at least one frame for every lesson, in rising revisions", () => {
-    expect(beats.length).toBeGreaterThan(12);
+    expect(beats.length).toBe(21);
     for (const beat of beats) {
       expect(beat.title).not.toBe("");
       expect(beat.text.length).toBeGreaterThan(60);
@@ -131,6 +142,137 @@ describe("the guided game's script", () => {
       "Lightning Bolt",
       "Giant Growth",
     ]);
+  });
+});
+
+describe("the guided game's pace", () => {
+  const beats = buildDemo();
+
+  it("gives each lesson time to read by its words, within bounds", () => {
+    expect(wordCount("Grizzly Bears costs {1}{G}: one green mana.")).toBe(7);
+    expect(readingMs("A few words.")).toBe(READ_MIN_MS);
+    expect(readingMs("word ".repeat(400))).toBe(READ_MAX_MS);
+    const times = beats.map((beat) => readingMs(beat.text));
+    // Longer lessons read longer; none rushes, none stalls.
+    const short = beats.findIndex((beat) => beat.title === "Haste");
+    const long = beats.findIndex((beat) => beat.title === "Blocking");
+    expect(times[long]!).toBeGreaterThan(times[short]!);
+    for (const time of times) {
+      expect(time).toBeGreaterThanOrEqual(READ_MIN_MS);
+      expect(time).toBeLessThanOrEqual(READ_MAX_MS);
+    }
+  });
+
+  it("keeps each lesson short, in plain words", () => {
+    for (const beat of beats) {
+      expect(wordCount(beat.text)).toBeLessThanOrEqual(75);
+      // No other game named, and no engine words.
+      expect(beat.text).not.toMatch(/priority|ETB|\bCMC\b|XMage/i);
+    }
+  });
+
+  it("holds a frame until its animation has finished, and still pictures with motion reduced", () => {
+    const normal = frameHolds(beats, "normal");
+    const faster = frameHolds(beats, "faster");
+    const still = frameHolds(beats, "none");
+    expect(normal.map((holds) => holds.length)).toEqual(
+      beats.map((beat) => beat.frames.length),
+    );
+    const blocking = beats.findIndex((beat) => beat.title === "Blocking");
+    // The Goblin dies in the lesson's last frame: the slash, then the card leaving.
+    const dying = normal[blocking]!.at(-1)!;
+    expect(dying).toBeGreaterThanOrEqual(760 + 450);
+    expect(faster[blocking]!.at(-1)!).toBeLessThan(dying);
+    // The end: the result's emblem and the confetti.
+    expect(normal.at(-2)!.at(-1)!).toBeGreaterThanOrEqual(2200);
+    for (const holds of still)
+      for (const hold of holds) expect(hold).toBe(STILL_MS);
+  });
+
+  it("goes on by itself once the words are read and the board has settled", () => {
+    const text = "word ".repeat(40);
+    expect(autoWaitMs(text, 900, 0)).toBe(readingMs(text));
+    // Time already spent on the lesson's frames counts toward its reading.
+    expect(autoWaitMs(text, 900, 4_000)).toBe(readingMs(text) - 4_000);
+    // A long last animation waits for itself.
+    expect(autoWaitMs(text, 3_000, 60_000)).toBe(3_000);
+  });
+});
+
+describe("the tour's bubble placement", () => {
+  const phone = { width: 360, height: 740 };
+  const target = { left: 16, top: 120, width: 328, height: 150 };
+
+  it("sits below its target when there is room, inside the window", () => {
+    const place = placeCoach(target, 200, phone);
+    expect(place.side).toBe("below");
+    expect(place.top).toBe(120 + 150 + 18);
+    expect(place.left).toBeGreaterThanOrEqual(12);
+    expect(place.left + place.width).toBeLessThanOrEqual(360 - 12);
+    expect(place.arrow).toBeGreaterThanOrEqual(22);
+    expect(place.arrow!).toBeLessThanOrEqual(place.width - 22);
+  });
+
+  it("flips above a target near the window's foot, never over it", () => {
+    const low = { ...target, top: 560 };
+    const place = placeCoach(low, 220, phone);
+    expect(place.side).toBe("above");
+    expect(place.top + 220).toBeLessThanOrEqual(low.top);
+    expect(place.top).toBeGreaterThanOrEqual(12);
+  });
+
+  it("stays in the window with no room on any side, leaving the target's top in view", () => {
+    const tall = { left: 0, top: 60, width: 360, height: 640 };
+    const place = placeCoach(tall, 240, phone);
+    expect(place.side).toBe("over");
+    expect(place.top).toBeGreaterThanOrEqual(60 + VISIBLE);
+    expect(place.top + 240).toBeLessThanOrEqual(740 - 12);
+    // A phone turned sideways: the Play tile fills the window under the bar.
+    const sideways = { width: 740, height: 360, top: 118 };
+    const tile = { left: 16, top: 130, width: 708, height: 260 };
+    const low = placeCoach(tile, 150, sideways);
+    expect(low.top).toBeGreaterThanOrEqual(130 + VISIBLE);
+    expect(low.top + 150).toBeLessThanOrEqual(360 - 12);
+  });
+
+  it("keeps the arrow under a target at the window's edge", () => {
+    const corner = { left: 300, top: 20, width: 50, height: 40 };
+    const place = placeCoach(corner, 180, phone);
+    expect(place.left + place.arrow!).toBeGreaterThan(300);
+    expect(place.left + place.arrow!).toBeLessThan(350);
+  });
+
+  it("goes beside its target on a phone turned sideways", () => {
+    const sideways = { width: 740, height: 360, top: 118 };
+    const button = { left: 33, top: 160, width: 157, height: 39 };
+    const place = placeCoach(button, 208, sideways);
+    expect(place.side).toBe("right");
+    expect(place.left).toBe(33 + 157 + 18);
+    expect(place.left + place.width).toBeLessThanOrEqual(740 - 12);
+    expect(place.top).toBeGreaterThanOrEqual(118 + 12);
+    expect(place.top + 208).toBeLessThanOrEqual(360 - 12);
+    // The arrow is level with the button's middle.
+    expect(place.top + place.arrow!).toBeCloseTo(160 + 39 / 2, 0);
+  });
+
+  it("keeps below the sticky top bar, unless its target is in the bar", () => {
+    const bar = { ...phone, top: 118 };
+    const low = { ...target, top: 400, height: 300 };
+    const place = placeCoach(low, 240, bar);
+    expect(place.side).toBe("above");
+    expect(place.top).toBeGreaterThanOrEqual(118 + 12);
+    expect(place.top + 240).toBeLessThanOrEqual(400);
+    // A target in the bar itself: the bubble goes below it.
+    const button = { left: 300, top: 20, width: 44, height: 44 };
+    expect(placeCoach(button, 180, bar).top).toBe(20 + 44 + 18);
+  });
+
+  it("is the same 340-pixel bubble on a desktop", () => {
+    const desk = { width: 1280, height: 800 };
+    const tile = { left: 700, top: 300, width: 300, height: 180 };
+    const place = placeCoach(tile, 190, desk);
+    expect(place).toMatchObject({ side: "below", width: 340, top: 498 });
+    expect(place.left).toBe(700 + 150 - 170);
   });
 });
 
@@ -385,5 +527,123 @@ describe("the main menu's tour", () => {
     );
     await waitFor(() => expect(onChange).toHaveBeenCalledWith(done));
     expect(move).toHaveBeenCalledWith({ stage: "done", skipped: true });
+  });
+
+  const at = (stage: Tutorial["stage"]) =>
+    account(
+      { path: "beginner", stage, skipped: false },
+      { onboarding: "complete", handle: "alice" },
+    );
+
+  it("goes on to Decks once the card is listed", async () => {
+    const onChange = vi.fn();
+    move.mockResolvedValue({ me: at("tour_decks") });
+    render(
+      <Tour me={at("tour_auctions")} page="Auctions" onChange={onChange} />,
+    );
+    act(() => signalTutorial("card_listed"));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(at("tour_decks")),
+    );
+    expect(move).toHaveBeenCalledWith({ stage: "tour_decks", skipped: false });
+  });
+
+  it("points at Decks from the main menu, then explains the decks and building one", async () => {
+    target("decks");
+    const { rerender } = render(
+      <Tour me={at("tour_decks")} page="Home" onChange={() => {}} />,
+    );
+    expect(
+      await screen.findByText(/Next, the decks you play with/),
+    ).toBeInTheDocument();
+    expect(document.querySelector('[data-tutorial="coach"]')).toHaveAttribute(
+      "data-target",
+      "decks",
+    );
+    // On Decks: the starter decks first, Next, then building one.
+    target("deck-list");
+    target("deck-build");
+    rerender(<Tour me={at("tour_decks")} page="Decks" onChange={() => {}} />);
+    expect(
+      await screen.findByText(/Your two starter decks are already here/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Next/ }));
+    expect(
+      await screen.findByText(/Build one with help picks a commander/),
+    ).toBeInTheDocument();
+    expect(document.querySelector('[data-tutorial="coach"]')).toHaveAttribute(
+      "data-target",
+      "deck-build",
+    );
+    move.mockResolvedValue({ me: at("tour_play") });
+    fireEvent.click(screen.getByRole("button", { name: /On to Play/ }));
+    await waitFor(() =>
+      expect(move).toHaveBeenCalledWith({ stage: "tour_play", skipped: false }),
+    );
+  });
+
+  it("ends at the practice table, with a last bubble", async () => {
+    target("practice-start");
+    const onChange = vi.fn();
+    move.mockResolvedValue({ me: at("done") });
+    render(<Tour me={at("tour_play")} page="Play" onChange={onChange} />);
+    expect(
+      await screen.findByText(/At the practice table you play against bots/),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Finish the tour/ }));
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(at("done")));
+    expect(move).toHaveBeenCalledWith({ stage: "done", skipped: false });
+    expect(
+      await screen.findByRole("heading", { name: "You're all set" }),
+    ).toBeInTheDocument();
+  });
+
+  it("skips the tour from its last bubbles too", async () => {
+    target("play");
+    move.mockResolvedValue({ me: at("done") });
+    render(<Tour me={at("tour_play")} page="Home" onChange={() => {}} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Skip the tour" }),
+    );
+    await waitFor(() =>
+      expect(move).toHaveBeenCalledWith({ stage: "done", skipped: true }),
+    );
+  });
+
+  it("ends when a practice game starts from the Play page", async () => {
+    target("practice-start");
+    move.mockResolvedValue({ me: at("done") });
+    render(<Tour me={at("tour_play")} page="Play" onChange={() => {}} />);
+    await screen.findByText(/At the practice table/);
+    act(() => {
+      window.location.hash = "#game/00000000-0000-4000-8000-0000000000aa";
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    await waitFor(() =>
+      expect(move).toHaveBeenCalledWith({ stage: "done", skipped: false }),
+    );
+    window.location.hash = "";
+  });
+
+  it("is taken again from Settings: all of it, or Decks and Play alone", async () => {
+    const onChange = vi.fn();
+    move.mockResolvedValue({ me: at("tour_decks") });
+    render(<TutorialSettings me={at("done")} onChange={onChange} />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Tour Decks and Play" }),
+    );
+    await waitFor(() => expect(window.location.hash).toBe("#decks"));
+    expect(move).toHaveBeenCalledWith({
+      stage: "tour_decks",
+      path: "beginner",
+    });
+    move.mockResolvedValue({ me: at("tour_shop") });
+    fireEvent.click(screen.getByRole("button", { name: "Take the tour" }));
+    await waitFor(() => expect(window.location.hash).toBe("#home"));
+    expect(move).toHaveBeenLastCalledWith({
+      stage: "tour_shop",
+      path: "beginner",
+    });
+    window.location.hash = "";
   });
 });
