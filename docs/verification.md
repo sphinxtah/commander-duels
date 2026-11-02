@@ -1,5 +1,21 @@
 # Verification
 
+## v0.8.5
+
+Built on November 1, 2026 in a cloud workspace, on the branch `fixes-0.8.5`, with Docker, PostgreSQL 16, Node 22 and Python 3.13 and 3.12.
+
+| Check | Result |
+|---|---|
+| Python | `ruff check`, `ruff format --check` and `mypy` clean; `pytest` on Python 3.12 against PostgreSQL 16: 504 passed, 6 skipped, one failure that is the workspace's alone (`test_upgrade_needs_a_set_up_vm` runs as root, which the deploy kit refuses on purpose; the upgrade and push tests skipped as root passed as `nobody`). New tests for every fix: game starts the API can't follow, a new tab's whole log, the lock map, a second API process, signed-out tabs; the finale's waiting spoils, settlement one auction at a time, print runs for SysOp, grant keys; rotation against sign out everywhere, the cookie's name; concurrent version saves, `year:`, long imports, unknown cards, suspensions during an import; the deploy record, dump checks and the worker's heartbeat; the tutorial's new stages and migration 0034 |
+| Migrations | `alembic upgrade head` and `alembic check` against PostgreSQL 16, with migration 0034 (its downgrade checked too) |
+| Contracts | regenerated on Python 3.12, as CI's drift check expects |
+| Web | `tsc -b`, 1,389 Vitest tests in 108 files and the production build passed |
+| Browser journeys | `pnpm test:e2e` in Chromium: 55 passed, 31 skipped (the SysOp and game journeys, which need SysOp's password or the engine). New: `web/e2e/tour.spec.ts`, the main menu's tour bubbles at 360×740, 390×844 and 1280×800, turned sideways and scrolled; its placement check first failed once under the full suite's load, and now waits for a settled bubble on screen (12 of 12 on repeat) |
+| The tour on screen | every bubble screenshotted at 360×740, 390×844 and 1280×800, plus a phone turned sideways, and looked at: on screen, clear of its target (but for the Play tile on a sideways phone, where the bubble covers only the tile's lower part), below the top bar, no sideways scroll |
+| Engine | XMage built from the pin with the ten patches, then the engine's 191 JUnit tests (one skipped, the opt-in Two-Headed Giant pairing run), real bot games included. New: `PerGameRandomTest` (a second game's seed leaves the first game's stream alone), `RevealedFaceDownTest.aFaceDownExiledCardIsSeenByThePlayerAllowedToLookAtIt` |
+| Deploy kit | ShellCheck 0.10.0 (`--severity=warning`) and actionlint clean; `docker compose config --quiet` on the development file and on the production file with a filled environment; `scripts/copy_dev_volumes.py` rehearsed with real volumes made by the v0.8.4 Compose file: the data came across, the renamed stack's database started healthy, and a second run refused |
+| Hosted CI | on the branch: run 41388766593 (the release commit, before its authorship was corrected) green in both jobs; the final commit's run is in the release notes |
+
 ## v0.8.4
 
 Built on November 1, 2026 in a cloud workspace, on the branch `tutorial-0.8.4`. The package registries opened partway through (the owner allowed every domain); before that, the branch's checks ran on hosted CI through a temporary helper workflow (`assist.yml`, removed before the merge) that regenerated the contracts with Python 3.12, formatted, and ran the quick checks.
