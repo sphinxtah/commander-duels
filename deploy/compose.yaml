@@ -62,6 +62,20 @@ services:
     command: ["python", "-m", "catalog.worker"]
     stop_grace_period: 10s
     volumes: ["catalog_data:/var/lib/commander-duels/catalog"]
+    environment:
+      <<: *api_environment
+      # Touched once the worker has started and after every iteration that succeeds (v0.8.5).
+      CD_WORKER_HEARTBEAT: /tmp/worker-heartbeat
+    # Healthy once the worker has started, and while its loop goes on: one job (a day's catalog
+    # import, a few minutes) runs between two beats, so a beat may be up to 30 minutes old.
+    # deploy.sh waits for it.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, sys, time; sys.exit(time.time() - os.stat('/tmp/worker-heartbeat').st_mtime > 1800)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+      start_interval: 2s
     depends_on:
       migrate: {condition: service_completed_successfully}
   engine:

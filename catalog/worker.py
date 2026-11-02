@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import time
 from datetime import UTC, datetime, timedelta
@@ -146,7 +147,22 @@ def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
         withdraw_unplayable(engine, config)
 
 
+def beat(path: str) -> None:
+    """The heartbeat for the container's health check (v0.8.5): CD_WORKER_HEARTBEAT names a file
+    touched once the worker has started and after each iteration that succeeded. Unset, none."""
+    if path:
+        with open(path, "a"):
+            os.utime(path)
+
+
 def main() -> None:
+    heartbeat = os.environ.get("CD_WORKER_HEARTBEAT", "")
+    if heartbeat:
+        # A restarted container keeps its files: only this run's beats count.
+        try:
+            os.remove(heartbeat)
+        except FileNotFoundError:
+            pass
     config = Settings()
     logging.basicConfig(level=config.log_level)
     engine = build_engine(config.database_url)
@@ -163,7 +179,9 @@ def main() -> None:
                     if not started:
                         start(engine, config)
                         started = True
+                        beat(heartbeat)
                     work(engine, config, client)
+                    beat(heartbeat)
                 except Exception:
                     logger.exception(
                         "Worker iteration failed; check database connectivity and migrations"

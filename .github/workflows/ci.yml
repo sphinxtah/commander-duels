@@ -1,5 +1,9 @@
 name: Framework checks
 on: [push, pull_request]
+# Every job reads the repository only, unless it asks for more itself (publish). The actions are
+# pinned to commits, with the release each one is in the comment.
+permissions:
+  contents: read
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -19,12 +23,12 @@ jobs:
           --health-cmd "pg_isready -U commander"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with: {python-version: '3.12'}
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: {node-version: '24.19.0'}
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with: {version: '11.25.0'}
       - run: pip install -r requirements.lock && pip install --no-deps -e .
       - run: ruff check api catalog tests scripts && ruff format --check api catalog tests scripts && mypy && pytest
@@ -48,7 +52,7 @@ jobs:
       # a failed journey's trace and error context. The attempt keeps the name unique on a re-run.
       - name: Keep the browser evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-journeys-${{ github.run_attempt }}
           path: web/test-results
@@ -56,21 +60,30 @@ jobs:
           retention-days: 14
       # The engine image is built (with its XMage cache) by the engine job.
       - run: docker compose config --quiet && docker compose build migrate api worker web
+      # The live site's Compose file, with every required setting of env.example filled in.
+      - name: Production Compose file
+        run: |
+          env_file="$RUNNER_TEMP/deploy.env"
+          sed -e 's/^CD_VERSION=.*/CD_VERSION=0.0.0/' \
+              -e 's/^CD_GOOGLE_CLIENT_ID=.*/CD_GOOGLE_CLIENT_ID=ci.apps.googleusercontent.com/' \
+              -e 's/__GENERATED__/ci-placeholder/' deploy/env.example > "$env_file"
+          docker compose -f deploy/compose.yaml --env-file "$env_file" config --quiet
   engine:
     runs-on: ubuntu-24.04
     # About 15 minutes warm and 25 cold.
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       # XMage layers depend only on engine/xmage (the pin, build script and patches), so they come
       # from the Actions cache unless the pin changes. The build runs Maven and the JUnit suite.
+      # Tagged as Compose names the dev stack's engine image (project commander-duels-dev, v0.8.5).
       - name: Build engine image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: engine/Dockerfile
-          tags: commander-duels-engine:latest
+          tags: commander-duels-dev-engine:latest
           load: true
           cache-from: type=gha,scope=engine
           cache-to: type=gha,scope=engine,mode=max
@@ -155,34 +168,45 @@ jobs:
       # As in verify; a failed game's error also lists the test player's last answers.
       - name: Keep the browser games' evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: browser-games-${{ github.run_attempt }}
           path: web/test-results
           if-no-files-found: ignore
           retention-days: 14
   # Images for the live site, once both jobs pass: every push to main as sha-<commit> and main,
-  # every version tag as its version (v0.1.0 -> 0.1.0). deploy/push.sh deploys one by its tag.
+  # every version tag as its version (v0.1.0 -> 0.1.0). deploy/push.sh deploys one by its tag;
+  # the kit deploys a build of main by its sha- tag, never by main, which moves.
   publish:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: [verify, engine]
     runs-on: ubuntu-24.04
     permissions: {contents: read, packages: write}
+    # One publish of a ref at a time, none cancelled halfway (GitHub keeps one waiting per ref).
+    # With the check in Image tags, an older commit never takes main's tag from a newer one.
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
       - name: Image tags
         id: tags
         run: |
           base=ghcr.io/sphinxtah/commander-duels
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then label="${GITHUB_REF#refs/tags/v}"; else label=main; fi
+          # A run whose checks ended after a newer push's publish pushes only its sha- tag.
+          if [ "$label" = main ] && [ "$(git ls-remote origin refs/heads/main | cut -f1)" != "$GITHUB_SHA" ]; then
+            echo "main has moved past $GITHUB_SHA: publishing sha-${GITHUB_SHA::12} only"
+            label=""
+          fi
           for image in api web engine; do
-            echo "$image=$base/$image:sha-${GITHUB_SHA::12},$base/$image:$label" >> "$GITHUB_OUTPUT"
+            echo "$image=$base/$image:sha-${GITHUB_SHA::12}${label:+,$base/$image:$label}" >> "$GITHUB_OUTPUT"
           done
       - name: Publish the API image (API, migrations and worker)
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: api/Dockerfile
@@ -190,7 +214,7 @@ jobs:
           tags: ${{ steps.tags.outputs.api }}
           labels: org.opencontainers.image.source=https://github.com/sphinxtah/commander-duels
       - name: Publish the web image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: web/Dockerfile
@@ -199,7 +223,7 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/sphinxtah/commander-duels
       # The engine job's cache holds every layer of this commit's engine build.
       - name: Publish the engine image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: engine/Dockerfile

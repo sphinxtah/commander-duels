@@ -39,7 +39,8 @@ fi
 case "$version" in
   main)
     ref=HEAD
-    image="sha-$(git -C "$repo" rev-parse --short=12 HEAD)" ;;
+    # Exactly 12 characters, as CI tags it (--short=12 may give more).
+    image="sha-$(git -C "$repo" rev-parse HEAD | cut -c 1-12)" ;;
   [0-9]*.[0-9]*.[0-9]*)
     [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] \
       || { echo "Not a version: $version (use 0.2.0, main or nothing for the newest)" >&2; exit 2; }

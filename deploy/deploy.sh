@@ -3,7 +3,10 @@
 # for a build of main. Backs up the database, migrates, restarts and checks the site.
 # Restarting the API interrupts running games (no recovery journal yet).
 # Failed migrations change nothing. A tag that does not start or answer is replaced by the
-# previous one again, if that was running and the database is still at its last migration.
+# previous one again, if the database is still at the migration that one ran on.
+# Since 0.8.5 deployed.env (no secrets) records the tag and the migration of the last deploy that
+# succeeded, and the dump to restore before going back to it; the previous tag is the one it names,
+# never whatever API happens to run. A redeploy of the running tag on its own database takes no dump.
 # Since 0.8.3 each tag deploys with its own kit, kits/<tag>/ in the VM's folder (upgrade.sh,
 # update.sh and push.sh put it there), and the previous one comes back with its own. Only a
 # deployed tag's kit replaces the folder's compose.yaml and scripts, which the nightly backup,
@@ -15,12 +18,54 @@ cd "$(dirname "$0")"
 if [ "$(basename "$(dirname "$PWD")")" = kits ]; then cd ../..; fi
 tag="${1:?usage: deploy.sh <image tag>}"
 [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "Not an image tag: $tag" >&2; exit 2; }
+# main and latest move with every publish (and the private images have neither): a build of main
+# deploys by its commit, which upgrade.sh main and update.sh main work out.
+case "$tag" in
+  main | latest)
+    echo "$tag is not a fixed image tag. Deploy a version, or a build of main as sha-<commit>:" >&2
+    echo "  cd ~/commander-duels && git pull && bash deploy/upgrade.sh main" >&2
+    exit 2 ;;
+esac
 setting() { sed -n "s/^$1=//p" .env | tail -n 1; }
 [ -n "$(setting CD_GOOGLE_CLIENT_ID)" ] || { echo "Set CD_GOOGLE_CLIENT_ID in .env first" >&2; exit 2; }
 grep -q __GENERATED__ .env && { echo ".env still has placeholders; run bootstrap-vm.sh" >&2; exit 2; }
 previous="$(setting CD_VERSION)"
 [[ -z "$previous" || "$previous" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
   || { echo "CD_VERSION in .env is not an image tag: $previous" >&2; exit 2; }
+# deployed.env: the last deploy that succeeded (CD_TAG, on migration CD_REVISION), the tag before it
+# (CD_PREVIOUS_TAG) with the dump to restore before going back to that one (CD_ROLLBACK_DUMP), and
+# while a deploy of CD_ATTEMPT has not succeeded, the dump of CD_TAG's database it took (CD_DUMP).
+# backup.sh never prunes CD_DUMP or CD_ROLLBACK_DUMP.
+recorded() { [ ! -f deployed.env ] || sed -n "s/^$1=//p" deployed.env | tail -n 1; }
+last_tag="$(recorded CD_TAG)"
+last_revision="$(recorded CD_REVISION)"
+previous_tag="$(recorded CD_PREVIOUS_TAG)"
+rollback_dump="$(recorded CD_ROLLBACK_DUMP)"
+held_dump="$(recorded CD_DUMP)"
+attempt="$(recorded CD_ATTEMPT)"
+for value in "$last_tag" "$previous_tag" "$attempt"; do
+  [[ -z "$value" || "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] \
+    || { echo "deployed.env names something that is not an image tag: $value" >&2; exit 2; }
+done
+[[ -z "$held_dump" || "$held_dump" =~ ^backups/[A-Za-z0-9._-]+\.dump$ ]] || held_dump=""
+[[ -z "$rollback_dump" || "$rollback_dump" =~ ^backups/[A-Za-z0-9._-]+\.dump$ ]] || rollback_dump=""
+# .env names the tag of the last deploy, or of an attempt that got as far as starting. Any other
+# tag there means a kit older than 0.8.5 deployed since: the record is not about this database.
+if [ -n "$last_tag" ] && [ "$previous" != "$last_tag" ] && [ "$previous" != "$attempt" ]; then
+  echo "deployed.env names $last_tag, but .env $previous: deployed.env is set aside." >&2
+  last_tag="" last_revision="" previous_tag="" rollback_dump="" held_dump=""
+fi
+record() {
+  local new
+  new="$(mktemp .deployed.XXXXXX)"
+  {
+    echo "# Written by deploy.sh: the last deploy that succeeded. No secrets."
+    printf '%s\n' "CD_TAG=$last_tag" "CD_REVISION=$last_revision" "CD_PREVIOUS_TAG=$previous_tag" \
+      "CD_ROLLBACK_DUMP=$rollback_dump" "CD_DUMP=$held_dump" "CD_ATTEMPT=$attempt"
+  } > "$new"
+  chmod 0640 "$new"
+  mv -f "$new" deployed.env
+}
 # Copies this folder's kit (compose.yaml and the scripts) into kits/<$1>/.
 keep_kit() {
   local seed
@@ -87,45 +132,106 @@ then
   echo "The database could not be read, so $tag was not deployed. Nothing was replaced." >&2
   exit 1
 fi
-dump="backups/<the pre-$tag dump>"
-if [ "$tables" != 0 ]; then
-  ./backup.sh "pre-$tag" \
-    || { echo "The dump before $tag failed, so it was not deployed. Nothing was replaced." >&2; exit 1; }
-  # The newest one: the names start with the time.
-  dumps=(backups/*-pre-"$tag".dump)
-  dump="${dumps[-1]}"
-fi
-
 # The database's last migration; empty when it cannot be read.
 revision() {
   docker compose exec -T db psql -U commander -d commander -tAc \
     'SELECT version_num FROM alembic_version' 2>/dev/null || true
 }
-# The last migration under the version running now. Empty when no API runs: on a first deploy,
-# or after restore.sh, which may have left the database older than the previous tag.
-before=""
-if [ -n "$(docker compose ps -q api 2>/dev/null)" ]; then before="$(revision)"; fi
+start_revision="$(revision)"
+# The first deploy with a kit that keeps deployed.env: the API running now is CD_VERSION if its
+# image says so, and its database is at the migration that version ran on.
+if [ -z "$last_tag" ] && [ -n "$previous" ]; then
+  running_image="$(docker compose ps --format '{{.Image}}' api 2>/dev/null || true)"
+  if [ "${running_image##*:}" = "$previous" ]; then
+    last_tag="$previous"
+    last_revision="$start_revision"
+  fi
+fi
 
-# Brings the previous tag back after $tag failed, then stops. Only onto the database it ran on:
+dump=""
+if [ "$tables" = 0 ]; then
+  :
+elif [ "$tag" = "$last_tag" ] && [ "$start_revision" = "$last_revision" ]; then
+  # Its migrations have nothing to do, and a dump would only push an older one out.
+  echo "$tag runs on this database already (migration $start_revision): no pre-deploy dump."
+else
+  backup="$(./backup.sh "pre-$tag")" \
+    || { echo "The dump before $tag failed, so it was not deployed. Nothing was replaced." >&2; exit 1; }
+  echo "$backup"
+  dump="$(sed -n 's/^Backup: \([^ ]*\) .*/\1/p' <<< "$backup" | tail -n 1)"
+  if [ -z "$dump" ]; then
+    # The newest one: the names start with the time.
+    dumps=(backups/*-pre-"$tag".dump)
+    dump="${dumps[-1]}"
+  fi
+  # A dump of the last deployed tag's own database is the way back to it, kept until a deploy
+  # succeeds. A dump of a database a failed attempt already migrated is not, and leaves it alone.
+  if [ -n "$last_tag" ] && [ -n "$dump" ] && [ "$start_revision" = "$last_revision" ]; then
+    held_dump="$dump"
+  fi
+fi
+if [ -n "$last_tag" ]; then
+  attempt="$tag"
+  record
+fi
+
+# How to put back the database $last_tag ran on, when the dump of it is known.
+restore_hint() {
+  if [ -n "$held_dump" ] && [ -f "$held_dump" ]; then
+    echo "To go back to $last_tag, restore the dump of its database taken before any migration" >&2
+    echo "of $tag ran, and deploy it, on the VM:" >&2
+    echo "  cd $PWD && ./restore.sh $held_dump && ./deploy.sh $last_tag" >&2
+  else
+    echo "No dump of $last_tag's database (migration $last_revision) is on record. The dumps are in" >&2
+    echo "$PWD/backups; restore.sh names the last migration of the one it restores." >&2
+  fi
+  # The database was elsewhere when this deploy started (after restore.sh, say): its own dump.
+  if [ -n "$dump" ] && [ "$dump" != "$held_dump" ] && [ "$(revision)" != "$start_revision" ]; then
+    echo "The database as this deploy found it (migration $start_revision) is in $dump:" >&2
+    echo "  cd $PWD && ./restore.sh $dump" >&2
+  fi
+}
+# Brings the last deployed tag back after $tag failed, then stops. Only onto the database it ran on:
 # starting it runs its migrations, which would move a database restored for $tag forward again.
 fall_back() {
   echo "$1" >&2
-  if [ -z "$previous" ] || [ "$previous" = "$tag" ]; then
-    echo "There is no previous version to go back to." >&2
-  elif [ -z "$before" ]; then
-    echo "No version was running before $tag, so $previous is not started again." >&2
-  elif [ "$(revision)" != "$before" ]; then
-    echo "The migrations of $tag changed the database, so $previous cannot run on it." >&2
-    echo "To go back to $previous, restore the dump taken before them and deploy it, on the VM:" >&2
-    echo "  cd $PWD && ./restore.sh $dump && ./deploy.sh $previous" >&2
-  elif [ ! -f "kits/$previous/compose.yaml" ]; then
-    echo "There is no kit of $previous in $PWD/kits, so it is not started again. Deploy it with" >&2
-    echo "  cd ~/commander-duels && bash deploy/upgrade.sh $previous" >&2
-  elif CD_VERSION="$previous" kit "$previous" up -d --wait --remove-orphans; then
-    sed -i "s/^CD_VERSION=.*/CD_VERSION=$previous/" .env
-    echo "$previous is running again." >&2
+  local now
+  now="$(revision)"
+  if [ -z "$last_tag" ]; then
+    if [ -n "$previous" ] && [ "$previous" != "$tag" ]; then
+      echo "No version was running before $tag, so $previous is not started again." >&2
+    else
+      echo "There is no previous version to go back to." >&2
+    fi
+    if [ -n "$dump" ] && [ "$now" != "$start_revision" ]; then
+      echo "The database before the migrations of $tag is in $dump:" >&2
+      echo "  cd $PWD && ./restore.sh $dump" >&2
+    fi
+  elif [ "$last_tag" = "$tag" ]; then
+    echo "$tag is also the last version deployed, so it is not started again." >&2
+    if [ -n "$previous_tag" ] && [ "$previous_tag" != "$tag" ]; then
+      if [ -n "$rollback_dump" ] && [ -f "$rollback_dump" ]; then
+        echo "The version before it, $previous_tag, comes back with its dump, on the VM:" >&2
+        echo "  cd $PWD && ./restore.sh $rollback_dump && ./deploy.sh $previous_tag" >&2
+      else
+        echo "The version before it, $previous_tag, ran on the same migration:" >&2
+        echo "  cd $PWD && ./deploy.sh $previous_tag" >&2
+      fi
+    fi
+  elif [ "$now" != "$last_revision" ]; then
+    echo "$last_tag ran on migration $last_revision and the database is now at ${now:-an unknown one}," >&2
+    echo "so $last_tag is not started again: its own migrations would run on a database not its own." >&2
+    restore_hint
+  elif [ ! -f "kits/$last_tag/compose.yaml" ]; then
+    echo "There is no kit of $last_tag in $PWD/kits, so it is not started again. Deploy it with" >&2
+    echo "  cd ~/commander-duels && bash deploy/upgrade.sh $last_tag" >&2
+  elif CD_VERSION="$last_tag" kit "$last_tag" up -d --wait --remove-orphans; then
+    sed -i "s/^CD_VERSION=.*/CD_VERSION=$last_tag/" .env
+    echo "$last_tag is running again." >&2
   else
-    echo "$previous did not start either." >&2
+    echo "$last_tag did not start either, on its own database (migration $last_revision)." >&2
+    echo "Look at docker compose logs, then deploy it again or a fixed tag, on the VM:" >&2
+    echo "  cd $PWD && ./deploy.sh $last_tag" >&2
   fi
   exit 1
 }
@@ -167,6 +273,36 @@ echo "ready:  $ready"
 echo "health: $health"
 echo "engine: $(printf '%s' "$engine" | head -c 200)"
 case "$ready" in *'"status":"ready"'*) ;; *) fall_back "The API is not ready" ;; esac
+# A worker that keeps restarting fails the deploy too: it must be running, healthy, and not have
+# restarted over a few seconds. Since 0.8.5 its health check reads the heartbeat its loop writes; a
+# kit without one reports none, and running without restarts has to do.
+worker_status() {
+  local id
+  id="$(kit "$tag" ps -q worker 2>/dev/null || true)"
+  [ -z "$id" ] || docker inspect -f \
+    '{{.State.Status}} {{.RestartCount}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+    "$id" 2>/dev/null || true
+}
+read -r _ restarts_before _ <<< "$(worker_status)"
+sleep 5
+worker="$(worker_status)"
+read -r worker_state restarts worker_health <<< "$worker"
+echo "worker: ${worker:-not running}"
+if [ "$worker_state" != running ] || [ "$restarts" != "$restarts_before" ] \
+    || { [ "$worker_health" != healthy ] && [ "$worker_health" != none ]; }; then
+  fall_back "The worker is not running and healthy (${worker:-no container}; docker compose logs worker)."
+fi
+
+# The deploy succeeded: the way back to the version before is the dump of its database, unless
+# this tag runs on the same migration.
+revision_now="$(revision)"
+if [ -n "$last_tag" ] && [ "$last_tag" != "$tag" ]; then
+  previous_tag="$last_tag"
+  rollback_dump=""
+  [ "$revision_now" = "$last_revision" ] || rollback_dump="$held_dump"
+fi
+last_tag="$tag" last_revision="$revision_now" held_dump="" attempt=""
+record
 
 # The tag's kit becomes this folder's own, each file replaced in one step (a running script keeps
 # reading the file it started with). A kit from before 0.8.3 leaves deploy.sh and update.sh, which
@@ -182,7 +318,7 @@ done
 touch "kits/$tag"
 find kits -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' | sort -rn | tail -n +6 \
   | cut -d' ' -f2- | while read -r old; do
-    [ "$old" = "$previous" ] || rm -rf -- "kits/$old"
+    [ "$old" = "$previous" ] || [ "$old" = "$last_tag" ] || rm -rf -- "kits/$old"
   done
 docker image prune -f >/dev/null
 echo "Deployed $tag"

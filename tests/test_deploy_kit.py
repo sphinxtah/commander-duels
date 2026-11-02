@@ -136,7 +136,9 @@ def install(tmp_path: Path, stub: str, *scripts: str) -> tuple[Path, dict[str, s
 # The tags in STUB_NEWER end at migration r2, the others at r1; like Alembic, a migrate step fails
 # on a database past its tag's last migration. Steps also fail for the tags in STUB_MIGRATE_FAIL,
 # STUB_UP_FAIL or STUB_READY_FAIL, the database's start with STUB_DB_FAIL and its dump with
-# STUB_DUMP_FAIL. Like Compose, `up` replaces the running containers before its migrate step runs.
+# STUB_DUMP_FAIL (STUB_DUMP_BAD: a dump pg_restore cannot read). Like Compose, `up` replaces the
+# running containers before its migrate step runs. The worker of a tag in STUB_WORKER_FAIL keeps
+# restarting, and STUB_RESTARTS counts its restarts.
 DEPLOY_STUB = r"""#!/usr/bin/env bash
 kit=top
 if [ "$1" = compose ] && [ "${2:-}" = --project-directory ]; then
@@ -161,7 +163,27 @@ migrate() {
 case "$*" in
   "compose up -d --wait db") [ -z "${STUB_DB_FAIL:-}" ] || exit 1 ;;
   "compose ps -q api") [ "$(cat "$STUB_RUNNING")" = none ] || echo 0123456789ac ;;
+  "compose ps --format {{.Image}} api")
+    running="$(cat "$STUB_RUNNING")"
+    [ "$running" = none ] || echo "ghcr.io/sphinxtah/commander-duels/api:$running" ;;
+  "compose ps -q worker") [ "$(cat "$STUB_RUNNING")" = none ] || echo 0123456789ad ;;
+  "inspect -f "*" 0123456789ad")
+    if fails "${STUB_WORKER_FAIL:-}" "$(cat "$STUB_RUNNING")"; then
+      echo $(( $(cat "$STUB_RESTARTS" 2>/dev/null || echo 0) + 1 )) > "$STUB_RESTARTS"
+      echo "restarting $(cat "$STUB_RESTARTS") starting"
+    else
+      echo "running 0 healthy"
+    fi ;;
   "compose exec -T db pg_dump"*) [ -z "${STUB_DUMP_FAIL:-}" ] || exit 1; echo dump ;;
+  "compose exec -T db pg_restore --list")
+    cat > /dev/null
+    printf '%s\n' "217; 1259 16385 TABLE public alembic_version commander" \
+      "3421; 0 16385 TABLE DATA public alembic_version commander" ;;
+  "compose exec -T db pg_restore -f /dev/null")
+    if [ -n "${STUB_DUMP_BAD:-}" ]; then
+      echo "pg_restore: error: could not read from input file: end of file" >&2; exit 1
+    fi
+    cat > /dev/null ;;
   "compose exec -T db psql"*"FROM pg_tables"*) [ -s "$STUB_DB" ] && echo 31 || echo 0 ;;
   "compose exec -T db psql"*"FROM alembic_version") cat "$STUB_DB" ;;
   "compose run --rm -T migrate") migrate || exit 1 ;;
@@ -226,8 +248,29 @@ def deploy(
     (tmp_path / "running").write_text(running or previous)
     newer = stub.get("STUB_NEWER", "").split()
     (tmp_path / "db").write_text(("r2" if previous in newer else "r1") if db is None else db)
-    env |= {"STUB_RUNNING": str(tmp_path / "running"), "STUB_DB": str(tmp_path / "db"), **stub}
     script_path = kit / "deploy.sh" if script == "top" else kit / "kits" / tag / "deploy.sh"
+    return run_deploy(tmp_path, script_path, tag, env | stub)
+
+
+def again(tmp_path: Path, tag: str, **stub: str) -> dict[str, str]:
+    """Runs deploy.sh <tag> once more in the folder an earlier deploy() left, as a retry or the
+    next deploy would, with the kit of <tag> in kits/ (staged if it is not there yet)."""
+    kit = tmp_path / "kit"
+    if not (kit / "kits" / tag).exists():
+        stage(kit, tag)
+    env = {"PATH": f"{tmp_path / 'bin'}:/usr/bin:/bin", "STUB_LOG": str(tmp_path / "docker.log")}
+    (tmp_path / "docker.log").unlink(missing_ok=True)
+    return run_deploy(tmp_path, kit / "kits" / tag / "deploy.sh", tag, env | stub)
+
+
+def run_deploy(tmp_path: Path, script_path: Path, tag: str, env: dict[str, str]) -> dict[str, str]:
+    kit = tmp_path / "kit"
+    env = {
+        "STUB_RUNNING": str(tmp_path / "running"),
+        "STUB_DB": str(tmp_path / "db"),
+        "STUB_RESTARTS": str(tmp_path / "restarts"),
+        **env,
+    }
     result = subprocess.run(
         ["bash", str(script_path), tag], env=env, capture_output=True, text=True
     )
@@ -241,7 +284,16 @@ def deploy(
         "db": (tmp_path / "db").read_text().strip(),
         "env": re.findall(r"^CD_VERSION=(.*)$", (kit / ".env").read_text(), re.M)[0],
         "compose": (kit / "compose.yaml").read_text(),
+        "deployed": recorded(kit),
     }
+
+
+def recorded(kit: Path) -> dict[str, str]:
+    """deployed.env, which deploy.sh keeps since 0.8.5: the last deploy that succeeded."""
+    path = kit / "deployed.env"
+    if not path.exists():
+        return {}
+    return dict(re.findall(r"^(CD_[A-Z_]+)=(.*)$", path.read_text(), re.M))
 
 
 @needs_bash
@@ -517,6 +569,7 @@ RESTORE_STUB = r"""#!/usr/bin/env bash
 echo "$*" >> "$STUB_LOG"
 case "$*" in
   "compose exec -T db pg_restore --list") cat > /dev/null ;;
+  "compose exec -T db pg_restore -f /dev/null") cat > /dev/null ;;
   "compose exec -T db pg_dump"*) echo "the replaced database" ;;
   "compose exec -T db pg_restore -U commander -d commander"*) cat > "$STUB_RESTORED" ;;
   "compose exec -T db psql -U commander -d commander"*) echo r1 ;;
@@ -550,13 +603,18 @@ def test_restore_keeps_the_dump_it_restores_when_its_backup_prunes(tmp_path, tar
     assert len([name for name in kept if name.endswith("-pre-restore.dump")]) == 5
 
 
-# Stands in for curl on the VM: GitHub's tag list (STUB_TAGS) and its archives of a ref, one
-# .tar.gz per ref in STUB_ARCHIVES, named after the ref with / as _. Unknown refs answer 404.
+# Stands in for curl on the VM: GitHub's tag list (STUB_TAGS), the commit main is on (STUB_MAIN)
+# and its archives of a ref, one .tar.gz per ref in STUB_ARCHIVES, named after the ref with / as _.
+# Unknown refs answer 404.
 CURL_STUB = r"""#!/usr/bin/env bash
 url="${*: -1}"
 echo "$url" >> "$STUB_LOG"
 case "$url" in
   https://api.github.com/repos/sphinxtah/commander-duels/tags*) cat "$STUB_TAGS" ;;
+  https://api.github.com/repos/sphinxtah/commander-duels/commits/main)
+    if [ -z "${STUB_MAIN:-}" ]; then
+      echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; fi
+    printf '%s' "$STUB_MAIN" ;;
   https://codeload.github.com/sphinxtah/commander-duels/tar.gz/*)
     archive="$STUB_ARCHIVES/$(printf '%s' "${url##*/tar.gz/}" | tr / _).tar.gz"
     if [ -f "$archive" ]; then cat "$archive"; else
@@ -591,7 +649,9 @@ def kit_of(version: str, kits: bool = True) -> dict[str, str]:
     }
 
 
-def update(tmp_path: Path, *args: str, tags: tuple[str, ...] = ()) -> dict[str, str]:
+def update(
+    tmp_path: Path, *args: str, tags: tuple[str, ...] = (), main: str = ""
+) -> dict[str, str]:
     """Runs update.sh from a VM folder holding an older kit, a .env and a backup."""
     kit = tmp_path / "kit"
     (kit / "backups").mkdir(parents=True)
@@ -612,6 +672,7 @@ def update(tmp_path: Path, *args: str, tags: tuple[str, ...] = ()) -> dict[str, 
         "STUB_TAGS": str(tmp_path / "tags.json"),
         "STUB_ARCHIVES": str(tmp_path / "archives"),
         "STUB_DEPLOYED": str(tmp_path / "deployed"),
+        "STUB_MAIN": main,
     }
     result = subprocess.run(
         ["bash", str(kit / "update.sh"), *args], env=env, capture_output=True, text=True
@@ -655,19 +716,46 @@ def test_update_brings_the_newest_versions_kit_and_deploys_it(tmp_path):
     assert not list(kit.glob(".update.*"))
 
 
+MAIN = "0123456789abcdef0123456789abcdef01234567"
+
+
 @needs_bash
 def test_update_can_fetch_main_without_deploying(tmp_path):
+    # v0.8.5: main is resolved to its commit, whose kit and sha- images go together; the main
+    # image tag moves with every publish, and the private images have none.
     files = kit_of("main") | {"update.sh": "#!/usr/bin/env bash\n# a newer update.sh\n"}
-    archive(tmp_path, "refs/heads/main", files)
-    result = update(tmp_path, "-n", "main")
+    archive(tmp_path, MAIN, files)
+    result = update(tmp_path, "-n", "main", main=MAIN)
     assert result["status"] == "0", result["stderr"]
     assert result["deployed"] == ""
-    assert "kits/main/deploy.sh main" in result["stdout"]
-    kit = tmp_path / "kit"
-    assert (kit / "kits" / "main" / "compose.yaml").read_text() == "# compose of main\n"
-    assert (kit / "kits" / "main" / "update.sh").read_text().endswith("# a newer update.sh\n")
-    assert (kit / "compose.yaml").read_text() == "old\n"
-    assert "api.github.com" not in result["urls"]
+    assert "kits/sha-0123456789ab/deploy.sh sha-0123456789ab" in result["stdout"]
+    kit = tmp_path / "kit" / "kits" / "sha-0123456789ab"
+    assert (kit / "compose.yaml").read_text() == "# compose of main\n"
+    assert (kit / "update.sh").read_text().endswith("# a newer update.sh\n")
+    assert (tmp_path / "kit" / "compose.yaml").read_text() == "old\n"
+    assert f"tar.gz/{MAIN}" in result["urls"] and "refs/heads/main" not in result["urls"]
+
+
+@needs_bash
+def test_update_deploys_main_by_its_commit(tmp_path):
+    archive(tmp_path, MAIN, kit_of("main"))
+    result = update(tmp_path, "main", main=MAIN)
+    assert result["status"] == "0", result["stderr"]
+    assert result["deployed"] == "main sha-0123456789ab"
+    # GitHub not naming a commit changes nothing.
+    refused = update(tmp_path / "refused", "main", main="not a commit")
+    assert refused["status"] != "0" and refused["deployed"] == ""
+    assert "nothing was changed" in refused["stderr"]
+    assert not (tmp_path / "refused" / "kit" / "kits").exists()
+
+
+@needs_bash
+@pytest.mark.parametrize("tag", ["main", "latest"])
+def test_deploy_refuses_a_moving_image_tag(tmp_path, tag):
+    result = deploy(tmp_path, "0.1.0", tag)
+    assert result["status"] == "2"
+    assert "upgrade.sh main" in result["stderr"]
+    assert result["log"] == ""
 
 
 @needs_bash
@@ -955,3 +1043,177 @@ def test_push_checks_the_tag_before_reaching_the_vm(tmp_path, clone, tag):
     result = push(tmp_path, clone, tag)
     assert result["status"] != "0"
     assert result["ssh"] == "" and result["deployed"] == ""
+
+
+def pre_dumps(tmp_path: Path) -> list[str]:
+    return sorted(p.name for p in (tmp_path / "kit" / "backups").glob("*-pre-*.dump"))
+
+
+@needs_bash
+def test_deploy_records_the_tag_and_migration_it_ran_on(tmp_path):
+    # v0.8.5: deployed.env (no secrets) says what the last deploy that succeeded ran, and where
+    # the way back to the version before it is.
+    first = deploy(tmp_path, "0.1.0", "0.1.1", STUB_NEWER="0.1.1")
+    assert first["status"] == "0", first["stderr"]
+    [dump] = pre_dumps(tmp_path)
+    assert first["deployed"] == {
+        "CD_TAG": "0.1.1",
+        "CD_REVISION": "r2",
+        "CD_PREVIOUS_TAG": "0.1.0",
+        "CD_ROLLBACK_DUMP": f"backups/{dump}",
+        "CD_DUMP": "",
+        "CD_ATTEMPT": "",
+    }
+    assert "PASSWORD" not in (tmp_path / "kit" / "deployed.env").read_text()
+    # A version on the same migration needs no dump to go back.
+    second = again(tmp_path, "0.1.2", STUB_NEWER="0.1.1 0.1.2")
+    assert second["status"] == "0", second["stderr"]
+    assert second["deployed"]["CD_PREVIOUS_TAG"] == "0.1.1"
+    assert second["deployed"]["CD_ROLLBACK_DUMP"] == ""
+
+
+@needs_bash
+def test_a_retry_after_migrations_names_the_dump_from_before_them(tmp_path):
+    # The first attempt migrated the database to r2 and its API started but never became ready,
+    # so .env names 0.1.1. The retry must not take 0.1.1 for the version to go back to.
+    first = deploy(tmp_path, "0.1.0", "0.1.1", STUB_NEWER="0.1.1", STUB_READY_FAIL="0.1.1")
+    assert first["status"] == "1"
+    assert (first["running"], first["env"], first["db"]) == ("0.1.1", "0.1.1", "r2")
+    [before] = pre_dumps(tmp_path)
+    assert first["deployed"]["CD_TAG"] == "0.1.0"
+    assert first["deployed"]["CD_DUMP"] == f"backups/{before}"
+    assert first["deployed"]["CD_ATTEMPT"] == "0.1.1"
+    retry = again(tmp_path, "0.1.1", STUB_NEWER="0.1.1", STUB_READY_FAIL="0.1.1")
+    assert retry["status"] == "1"
+    assert "CD_VERSION=0.1.0 compose up" not in retry["log"]
+    assert f"./restore.sh backups/{before} && ./deploy.sh 0.1.0" in retry["stderr"]
+    # The retry's own dump, which has 0.1.1's schema, is not the way back.
+    assert len(pre_dumps(tmp_path)) == 2
+    assert retry["deployed"]["CD_DUMP"] == f"backups/{before}"
+
+
+@needs_bash
+def test_a_redeploy_of_the_running_tag_takes_no_dump(tmp_path):
+    first = deploy(tmp_path, "0.1.0", "0.1.1", STUB_NEWER="0.1.1")
+    assert first["status"] == "0", first["stderr"]
+    same = again(tmp_path, "0.1.1", STUB_NEWER="0.1.1")
+    assert same["status"] == "0", same["stderr"]
+    assert "pg_dump" not in same["log"]
+    assert "no pre-deploy dump" in same["stdout"]
+    assert len(pre_dumps(tmp_path)) == 1
+
+
+@needs_bash
+def test_the_dump_to_roll_back_to_outlives_ten_newer_ones(tmp_path):
+    first = deploy(tmp_path, "0.1.0", "0.1.1", STUB_NEWER="0.1.1")
+    assert first["status"] == "0", first["stderr"]
+    rollback = first["deployed"]["CD_ROLLBACK_DUMP"]
+    backups = tmp_path / "kit" / "backups"
+    os.utime(tmp_path / "kit" / rollback, (1_790_000_000,) * 2)
+    for n in range(12):
+        newer = backups / f"commander-202611{n + 1:02}T000000Z-pre-sha-{n}.dump"
+        newer.write_text("dump")
+        os.utime(newer, (1_790_000_000 + (n + 1) * 3600,) * 2)
+    later = again(tmp_path, "0.1.2", STUB_NEWER="0.1.1 0.1.2")
+    assert later["status"] == "0", later["stderr"]
+    kept = pre_dumps(tmp_path)
+    assert Path(rollback).name in kept
+    assert len(kept) == 11
+
+
+@needs_bash
+def test_a_dump_that_does_not_read_back_keeps_the_older_ones(tmp_path):
+    kit, env = install(tmp_path, DEPLOY_STUB, "backup.sh")
+    backups = kit / "backups"
+    for n in range(10):
+        old = backups / f"commander-202610{n + 1:02}T000000Z-pre-0.1.{n}.dump"
+        old.write_text("dump")
+        os.utime(old, (1_790_000_000 + n * 3600,) * 2)
+    (backups / "commander-20261001T000000Z-nightly.dump.partial").write_text("killed")
+    os.utime(backups / "commander-20261001T000000Z-nightly.dump.partial", (1_790_000_000,) * 2)
+    env |= {"STUB_DUMP_BAD": "1", "STUB_RUNNING": str(tmp_path / "running")}
+    (tmp_path / "running").write_text("0.1.9")
+    bad = subprocess.run(
+        ["bash", str(kit / "backup.sh"), "pre-0.2.0"], env=env, capture_output=True, text=True
+    )
+    assert bad.returncode == 1
+    assert "did not pass its check" in bad.stderr
+    # The ten stay, and neither this run's partial file nor an old one is left.
+    assert len(list(backups.glob("*-pre-*.dump"))) == 10
+    assert not list(backups.glob("*.partial"))
+    del env["STUB_DUMP_BAD"]
+    good = subprocess.run(
+        ["bash", str(kit / "backup.sh"), "pre-0.2.0"], env=env, capture_output=True, text=True
+    )
+    assert good.returncode == 0, good.stderr
+    names = sorted(p.name for p in backups.glob("*-pre-*.dump"))
+    assert len(names) == 10 and names[-1].endswith("-pre-0.2.0.dump")
+
+
+@needs_bash
+def test_a_deploy_whose_dump_does_not_read_back_replaces_nothing(tmp_path):
+    result = deploy(tmp_path, "0.1.0", "0.1.1", STUB_DUMP_BAD="1")
+    assert result["status"] == "1"
+    assert "migrate" not in result["log"]
+    assert (result["running"], result["env"]) == ("0.1.0", "0.1.0")
+    assert not list((tmp_path / "kit" / "backups").iterdir())
+
+
+@needs_bash
+def test_a_worker_that_keeps_restarting_fails_the_deploy(tmp_path):
+    result = deploy(tmp_path, "0.1.0", "0.1.1", STUB_WORKER_FAIL="0.1.1")
+    assert result["status"] == "1"
+    assert "The worker is not running and healthy" in result["stderr"]
+    assert "CD_VERSION=0.1.0 compose up -d --wait --remove-orphans [0.1.0]" in result["log"]
+    assert (result["running"], result["env"]) == ("0.1.0", "0.1.0")
+    assert result["compose"] == "# compose of 0.1.0\n"
+
+
+def test_the_worker_reports_its_health():
+    compose = (ROOT / "deploy" / "compose.yaml").read_text()
+    worker = compose[compose.index("\n  worker:\n") : compose.index("\n  engine:\n")]
+    assert "CD_WORKER_HEARTBEAT: /tmp/worker-heartbeat" in worker
+    assert "healthcheck:" in worker and "/tmp/worker-heartbeat" in worker.split("healthcheck:")[1]
+
+
+def test_the_dev_stack_never_shares_the_live_sites_names():
+    # v0.8.5: both were the project commander-duels, so docker compose in the VM's clone could
+    # replace the live containers, and down -v delete its database volume.
+    dev = re.search(r"^name: (\S+)$", (ROOT / "compose.yaml").read_text(), re.M)
+    live = re.search(r"^name: (\S+)$", (ROOT / "deploy" / "compose.yaml").read_text(), re.M)
+    assert dev and live and (dev[1], live[1]) == ("commander-duels-dev", "commander-duels")
+
+
+def test_bootstrap_never_replaces_an_installed_kit():
+    script = (ROOT / "deploy" / "bootstrap-vm.sh").read_text()
+    install_kit = script.index('install -o "$user" -g "$user" -m 0750 "$here/$file"')
+    assert script.index('if [ "${#installed[@]}" = 0 ]; then') < install_kit
+    assert "upgrade.sh" in script[install_kit:]
+
+
+def test_the_workflows_pin_their_actions_and_read_only_by_default():
+    for workflow in (ROOT / ".github" / "workflows").glob("*.yml"):
+        text = workflow.read_text()
+        assert re.search(r"^permissions:\n  contents: read$", text, re.M), workflow.name
+        for use in re.findall(r"uses: (\S+)", text):
+            assert re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", use), (workflow.name, use)
+        assert not re.search(r"uses: \S+@[0-9a-f]{40}$", text, re.M), "every pin names its release"
+
+
+@needs_bash
+def test_a_record_left_by_an_older_kits_deploy_is_set_aside(tmp_path):
+    # 0.8.5 recorded 0.1.1; then a kit from before 0.8.5 deployed 0.1.2, which deployed.env does
+    # not know. Going back by deployed.env would start 0.1.1 on 0.1.2's database.
+    first = deploy(tmp_path, "0.1.0", "0.1.1")
+    assert first["status"] == "0", first["stderr"]
+    env = tmp_path / "kit" / ".env"
+    env.write_text(env.read_text().replace("CD_VERSION=0.1.1", "CD_VERSION=0.1.2"))
+    (tmp_path / "running").write_text("0.1.2")
+    (tmp_path / "db").write_text("r2")
+    stage(tmp_path / "kit", "0.1.2")
+    later = again(tmp_path, "0.1.3", STUB_NEWER="0.1.2 0.1.3", STUB_UP_FAIL="0.1.3")
+    assert later["status"] == "1"
+    assert "deployed.env is set aside" in later["stderr"]
+    # 0.1.2 runs (its image says so) on its own r2: it comes back, never 0.1.1.
+    assert "CD_VERSION=0.1.2 compose up -d --wait --remove-orphans [0.1.2]" in later["log"]
+    assert "CD_VERSION=0.1.1 compose up" not in later["log"]

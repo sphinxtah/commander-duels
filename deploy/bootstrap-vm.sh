@@ -3,7 +3,8 @@
 #   sudo bash bootstrap-vm.sh sphinx
 # Installs Docker Engine from Docker's repository, lets the named user run it, creates
 # /srv/commander-duels with a .env whose secrets are generated here, and adds the nightly backup.
-# Safe to run again: it never replaces an existing .env.
+# Safe to run again: it never replaces an existing .env, and since 0.8.5 it installs the deploy kit
+# only into a folder that has none. Later versions' kits come with upgrade.sh (docs/deployment.md).
 set -euo pipefail
 user="${1:?usage: bootstrap-vm.sh <deploy user>}"
 id "$user" >/dev/null
@@ -30,9 +31,22 @@ systemctl enable --now docker qemu-guest-agent
 usermod -aG docker "$user"
 
 install -d -o "$user" -g "$user" -m 0750 "$app" "$app/backups"
-for file in compose.yaml deploy.sh backup.sh restore.sh update.sh; do
-  install -o "$user" -g "$user" -m 0750 "$here/$file" "$app/$file"
+kit_files=(compose.yaml deploy.sh backup.sh restore.sh update.sh)
+installed=()
+for file in "${kit_files[@]}"; do
+  [ ! -e "$app/$file" ] || installed+=("$file")
 done
+if [ "${#installed[@]}" = 0 ]; then
+  for file in "${kit_files[@]}"; do
+    install -o "$user" -g "$user" -m 0750 "$here/$file" "$app/$file"
+  done
+  echo "Installed the deploy kit in $app"
+else
+  # The kit there is the running version's: replacing it with this one would run the nightly
+  # backup and restore.sh with another version's files.
+  echo "$app already has a deploy kit (${installed[*]}); it stays as it is. Deploy a version with"
+  echo "  cd ~/commander-duels && git pull && bash deploy/upgrade.sh"
+fi
 if [ ! -f "$app/.env" ]; then
   # Letters and digits only, so they need no quoting in .env or the database URL.
   secret() { head -c 96 /dev/urandom | base64 -w0 | tr -dc 'A-Za-z0-9' | cut -c "1-$1"; }

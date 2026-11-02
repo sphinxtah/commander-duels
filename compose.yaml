@@ -1,4 +1,8 @@
-name: commander-duels
+# The development stack. Since v0.8.5 its project is commander-duels-dev, apart from the live
+# site's commander-duels (deploy/compose.yaml): its containers and volumes, such as
+# commander-duels-dev_postgres_data, never share a name with the live ones, so docker compose here
+# cannot replace or delete them. README.md (Start with Docker) copies an older local database.
+name: commander-duels-dev
 services:
   db:
     image: postgres:17.5-alpine

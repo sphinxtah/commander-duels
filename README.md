@@ -26,6 +26,26 @@ The first build compiles XMage from source inside the engine image (about 3–4 
 
 Open http://localhost:8080 and start a practice game from the Play page once you are signed in. API documentation is at http://localhost:8000/api/v1/docs. Card images need outbound HTTPS to Scryfall; without it, cards show their text frames.
 
+**The stack's name (since v0.8.5).** This Compose project is `commander-duels-dev`; the live site's (`deploy/compose.yaml`) is `commander-duels`. Until v0.8.5 both were `commander-duels`, so a `docker compose up` or `down -v` here on the live site's VM would have replaced or deleted the live containers and database. The new name gives the local stack new volumes, so after updating it starts with an empty database. To keep your local data, copy the old volumes once, before the first `docker compose up` of v0.8.5, with Docker running, from this directory:
+
+```sh
+python scripts/copy_dev_volumes.py
+```
+
+It stops the old stack's containers (`docker compose -p commander-duels stop`), creates each new volume and copies the old one into it: `commander-duels_postgres_data` (the database) to `commander-duels-dev_postgres_data`, `commander-duels_card_images` (the card image cache, which would otherwise download again from Scryfall) and `commander-duels_catalog_data` (Scryfall's bulk files, about 115 MB, which the worker would otherwise download again). A new volume that already holds files is left alone, and so is every old one. Without Python, the same by hand (the same lines in PowerShell and in a Linux or macOS shell; each `docker run` copies one volume, and fails without copying if the new volume already holds files):
+
+```sh
+docker compose -p commander-duels stop
+docker volume create --label com.docker.compose.project=commander-duels-dev --label com.docker.compose.volume=postgres_data commander-duels-dev_postgres_data
+docker volume create --label com.docker.compose.project=commander-duels-dev --label com.docker.compose.volume=card_images commander-duels-dev_card_images
+docker volume create --label com.docker.compose.project=commander-duels-dev --label com.docker.compose.volume=catalog_data commander-duels-dev_catalog_data
+docker run --rm -v commander-duels_postgres_data:/from:ro -v commander-duels-dev_postgres_data:/to --entrypoint sh postgres:17.5-alpine -c '! ls -A /to | grep -q . && cp -a /from/. /to/'
+docker run --rm -v commander-duels_card_images:/from:ro -v commander-duels-dev_card_images:/to --entrypoint sh postgres:17.5-alpine -c '! ls -A /to | grep -q . && cp -a /from/. /to/'
+docker run --rm -v commander-duels_catalog_data:/from:ro -v commander-duels-dev_catalog_data:/to --entrypoint sh postgres:17.5-alpine -c '! ls -A /to | grep -q . && cp -a /from/. /to/'
+```
+
+(Skip a line whose old volume does not exist: `docker volume ls` lists them.) Then `docker compose up`. Once the stack works, remove the old project's containers and volumes: `docker compose -p commander-duels down`, then `docker volume rm commander-duels_postgres_data commander-duels_card_images commander-duels_catalog_data`. The engine's Maven cache, `commander-duels-m2`, is not the stack's and keeps its name. Never run any of this on the live site's VM, where `commander-duels` is the live project.
+
 - **The campaign's handoff (v0.8.0).** The owner's campaign guide and deck builds sit in a gitignored `campaign/` folder beside `compose.yaml`: they name the Godlike tier's custom cards. The game reads `content/campaign.json` and `web/src/campaign/script.ts`, made from them ([the campaign](docs/campaign.md)).
 - **Music (v0.7.2, the playlist v0.7.3).** The tracks are not in the repository. Copy the gameplay track to `music/game.mp3` (a gitignored folder beside `compose.yaml`; Compose mounts it into the web container, and the dev server serves it too) and the table plays it during games; put the menu playlist's songs beside it with `music/playlist.json` naming them (`{"tracks": [{"file", "title", "artist"}, …]}`, plain ASCII file names) and the menus play them. Without the track the table is quiet; without the manifest the menus show no player.
 
@@ -134,7 +154,7 @@ Add `--format commander --bots 3` for a four-seat Commander game, `--deck-list F
 
 ### Deploying
 
-CI publishes the images to GitHub's container registry. `deploy/push.sh <tag>` deploys one to the live VM over SSH: it backs up the database, migrates before replacing anything, restarts and checks the site. If the new tag does not start or is not ready, the previous one comes back when the database still allows it. On the VM, `restore.sh` restores a backup into an emptied database. The one-time setup of the VM and the TSH proxy, backups, restores, rolling back and the live checks are in [the live site](docs/deployment.md).
+CI publishes the images to GitHub's container registry. On the VM, `cd ~/commander-duels && git pull && bash deploy/upgrade.sh` deploys the newest version, and `deploy/push.sh <tag>` deploys one from the deploying computer over SSH: either backs up the database (checking that the dump reads back), migrates before replacing anything, restarts and checks the API and the worker. If the new tag does not start, is not ready or its worker keeps restarting, the version deployed before comes back when the database still allows it; otherwise `deploy.sh` prints the restore command for the dump taken before the migrations. On the VM, `restore.sh` restores a backup into an emptied database. The one-time setup of the VM and the TSH proxy, backups, restores, rolling back and the live checks are in [the live site](docs/deployment.md).
 
 ## Verify changes
 
