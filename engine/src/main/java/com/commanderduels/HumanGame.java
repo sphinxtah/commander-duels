@@ -207,6 +207,8 @@ final class HumanGame {
     private final ObjectRefs refs = new ObjectRefs();
     private final MatchLog log = new MatchLog();
     private final Thread thread;
+    /** An event fired off the game thread asked for a refresh the game thread has not yet made. */
+    private volatile boolean missedRefresh;
 
     // Game thread only.
     private SeatViews views;
@@ -327,7 +329,8 @@ final class HumanGame {
     }
 
     private void play() throws Exception {
-        // XMage's only seed control: one process-wide generator for shuffles, coin flips and AI ties.
+        // XMage's only seed control: since v0.8.5 (patch 0010) it seeds this game thread's own generator
+        // for shuffles, coin flips and AI ties, which no other game draws from or reseeds.
         RandomUtil.setSeed(request.seed());
         GameFormat format = request.format();
         List<Deck> decks = new ArrayList<>();
@@ -397,6 +400,9 @@ final class HumanGame {
         if (event.getQueryType() == PlayerQueryEvent.QueryType.PERSONAL_MESSAGE) {
             message(event);
             return;
+        }
+        if (missedRefresh) {
+            refresh();
         }
         UUID asking = asking(event);
         endLostControl();
@@ -584,11 +590,22 @@ final class HumanGame {
         refresh();
     }
 
-    /** Game thread: the state changed without a request to a human seat. */
+    /**
+     * Game thread: the state changed without a request to a human seat. XMage can also fire its
+     * events on the thread that called it (a concession applied from a request thread, when the game
+     * has no player to hand it to); the views are the game thread's alone ({@link SeatViews}), so
+     * such a call only marks them stale, and the game thread publishes at its next event or prompt
+     * (v0.8.5).
+     */
     private void refresh() {
         if (views == null) {
             return;
         }
+        if (Thread.currentThread() != thread) {
+            missedRefresh = true;
+            return;
+        }
+        missedRefresh = false;
         endLostControl();
         for (Seat seat : humans) {
             publish(seat);

@@ -125,8 +125,8 @@ public final class BotMatchRunner {
     }
 
     private Report play(BotMatchRequest request, MatchLog log) throws GameException {
-        // XMage draws every random number (shuffles, coin flips, AI tie-breaks) from one
-        // process-wide generator; seeding it is the only seed control XMage offers.
+        // XMage's only seed control: since v0.8.5 (patch 0010) it seeds this thread's own generator for
+        // every random number the game draws (shuffles, coin flips, AI tie-breaks), apart from other games.
         RandomUtil.setSeed(request.seed());
         List<Deck> decks = new ArrayList<>();
         for (String deck : DECKS) {

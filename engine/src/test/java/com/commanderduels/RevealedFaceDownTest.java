@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.UUID;
 import mage.cards.Card;
+import mage.abilities.effects.common.asthought.MayLookAtTargetCardEffect;
 import mage.cards.CardsImpl;
 import mage.constants.RangeOfInfluence;
 import mage.constants.Zone;
@@ -17,6 +18,7 @@ import mage.game.permanent.PermanentCard;
 import mage.player.ai.ComputerPlayerControllableProxy;
 import mage.players.Player;
 import mage.players.net.UserData;
+import mage.target.targetpointer.FixedTarget;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -176,5 +178,32 @@ class RevealedFaceDownTest {
         SeatView view = views(table).build(0, List.of());
         assertEquals(SECRET, view.revealed().stream().filter(group -> group.name().equals("Thoughtseize"))
             .findFirst().orElseThrow().cards().get(0).name());
+    }
+
+    @Test
+    void aFaceDownExiledCardIsSeenByThePlayerAllowedToLookAtIt() throws Exception {
+        // v0.8.5: foretell, hideaway and "you may look at it" exiles let a player look at the card.
+        Table table = table();
+        Game game = table.game();
+        UUID viewer = table.viewer().getId();
+        UUID owner = table.owner().getId();
+        UUID secret = table.secret().getId();
+        exileFaceDown(table);
+        assertFalse(Visibility.identityVisible(game, secret, owner), "no permission yet");
+
+        MayLookAtTargetCardEffect look = new MayLookAtTargetCardEffect(owner);
+        look.setTargetPointer(new FixedTarget(secret, game));
+        game.addEffect(look, table.secret().getSpellAbility());
+        assertTrue(Visibility.identityVisible(game, secret, owner), "the owner may look at it");
+        assertFalse(Visibility.identityVisible(game, secret, viewer), "the opponent may not");
+        assertFalse(Visibility.identityVisible(game, secret, null), "nor may spectators");
+
+        SeatViews views = views(table);
+        SeatView ownerView = views.build(1, List.of());
+        assertEquals(SECRET, ownerView.you().exile().get(0).name());
+        for (SeatView view : List.of(views.build(0, List.of()), views.buildPublic())) {
+            assertTrue(owner(view).exile().get(0).hidden());
+            assertFalse(EngineServer.JSON.toJson(view).contains(SECRET));
+        }
     }
 }

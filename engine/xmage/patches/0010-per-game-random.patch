@@ -1,0 +1,75 @@
+A random generator for each game (Commander Duels v0.8.5), in every format.
+
+Reason: XMage draws every random number (shuffles, coin flips, random choices, AI tie-breaks) from
+one process-wide java.util.Random, and RandomUtil.setSeed reseeds it. With several games in one
+process, starting a game reset the stream the others were drawing from, so a seed no longer
+repeated a game, and a game started with a known seed put every running game on a known stream.
+With this patch setSeed gives the calling thread a generator of its own; that thread's draws come
+from it alone, and threads that never seeded one share an unseeded generator as before. A game's
+loop runs on the thread that started it, which is the thread the engine seeds.
+Upstream: none.
+Remove when: XMage keeps a random generator per game.
+
+diff --git a/Mage/src/main/java/mage/util/RandomUtil.java b/Mage/src/main/java/mage/util/RandomUtil.java
+index b0424863..13f7e2ae 100644
+--- a/Mage/src/main/java/mage/util/RandomUtil.java
++++ b/Mage/src/main/java/mage/util/RandomUtil.java
+@@ -11,37 +11,51 @@ import java.util.UUID;
+  */
+ public final class RandomUtil {
+ 
+-    private static final Random random = new Random(); // thread safe with seed support
++    // Commander Duels: one generator for each thread that seeded one (a game seeds its own game
++    // thread), and a shared one for every other thread, so games in one process never draw from,
++    // or reseed, each other's generator.
++    private static final Random shared = new Random(); // thread safe
++    private static final ThreadLocal<Random> seeded = new ThreadLocal<>();
+ 
+     private RandomUtil() {
+     }
+ 
+     public static Random getRandom() {
+-        return random;
++        Random random = seeded.get();
++        return random != null ? random : shared;
+     }
+ 
+     public static int nextInt() {
+-        return random.nextInt();
++        return getRandom().nextInt();
+     }
+ 
+     public static int nextInt(int max) {
+-        return random.nextInt(max);
++        return getRandom().nextInt(max);
+     }
+ 
+     public static boolean nextBoolean() {
+-        return random.nextBoolean();
++        return getRandom().nextBoolean();
+     }
+ 
+     public static double nextDouble() {
+-        return random.nextDouble();
++        return getRandom().nextDouble();
+     }
+ 
+     public static Color nextColor() {
+         return new Color(RandomUtil.nextInt(256), RandomUtil.nextInt(256), RandomUtil.nextInt(256));
+     }
+ 
++    /**
++     * Seeds the calling thread's own generator: everything this thread draws from now on comes from
++     * it, and no other thread's draws are affected.
++     */
+     public static void setSeed(long newSeed) {
+-        random.setSeed(newSeed);
++        seeded.set(new Random(newSeed));
++    }
++
++    /** Returns the calling thread to the shared generator. */
++    public static void clearSeed() {
++        seeded.remove();
+     }
+ 
+     public static <T> T randomFromCollection(Collection<T> collection) {

@@ -79,7 +79,7 @@ Since v0.2.0 (UI07), on XMage's own human player, so XMage's rules for when a pa
 | --- | --- |
 | Your hand | Full cards |
 | Battlefield, stack, graveyards | Public, except face-down objects, which only their controller sees (none in the fixture decks), and since v0.5.1 the player controlling that player's turn |
-| Exile | Face-up cards; face-down exiled cards are hidden |
+| Exile | Face-up cards; face-down exiled cards are hidden, except (since v0.8.5) from a player XMage lets look at one: the owner of a foretold card, the controller of a hidden-away card, any "you may look at it" exile |
 | Revealed cards | Everyone, while XMage keeps them revealed (it clears them at each human priority prompt). Since v0.8.3 only while the card is in a hand, a library or outside the game: a revealed card that has since been exiled, turned or cast face down follows the face-down rules above, in every exile list, target, prompt and the revealed group itself, where it is shown hidden |
 | Looked-at cards | Only the player who looked, and since v0.5.1 the player controlling their turn; since v0.8.3 face-down objects as for revealed cards |
 | Players | Life, counters, library and hand counts, mana pool, lost/won; since v0.5.1 `controlled_by`, the seat controlling the player's turn, for everyone to see |

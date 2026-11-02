@@ -167,6 +167,8 @@ After every match the response reports the heap after an explicit GC, the live t
 
 XMage has one seed control: `RandomUtil.setSeed(long)` on its single process-wide `Random`. It drives shuffles, coin flips, random printing selection and AI tie-breaks.
 
+Since v0.8.5 the engine patches it (`0010-per-game-random.patch`): `setSeed` seeds the calling thread's own `Random`, and each game seeds the thread it runs on, so games in one process keep separate streams. The observations below are the spike's, from before.
+
 Observed with seed 42, repeated six times each at skills 1, 4 and 6:
 
 1. **As XMage ships it:** the same starting player every time, then different games. Six of six log digests differed at every skill, and the winner changed (skill 4: seats 1, 1, 0, 1, 1, 1). The first divergence was the second player's mulligan decision on turn 1, before any AI search, so the opening hands were already different.

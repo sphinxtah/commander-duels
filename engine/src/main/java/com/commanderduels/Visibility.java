@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.UUID;
 import mage.cards.Card;
 import mage.cards.Cards;
+import mage.constants.AsThoughEffectType;
 import mage.constants.Zone;
 import mage.game.Game;
 import mage.game.permanent.Permanent;
@@ -25,7 +26,11 @@ import mage.players.Player;
  * revealed or looked at and then exiled face down (foretold, for instance), turned face down or cast
  * face down stayed listed: its name was shown to every seat. A face-down object now follows the
  * face-down rules alone, whatever lists it is in: a face-down permanent or spell is visible to its
- * controller, a face-down exiled card to nobody.
+ * controller, a face-down exiled card to nobody but a player the rules let look at it.
+ *
+ * <p>Since v0.8.5 a face-down exiled card is visible to a player XMage lets look at it (its
+ * look-at-face-down permission): the owner of a foretold card, the controller of a hideaway, any
+ * "you may look at it" exile. Before, it was hidden from them too.
  *
  * <p>Since v0.5.1 a player who controls another player's turn sees what that player may see, for as
  * long as the control lasts (723.4): their hand, their face-down objects and the cards they looked
@@ -116,9 +121,10 @@ final class Visibility {
             case COMMAND:
                 return true;
             case EXILED: {
-                // Face down, it stays hidden even while XMage still lists it as revealed (v0.8.3).
+                // Face down, it stays hidden even while XMage still lists it as revealed (v0.8.3),
+                // except from a player who may look at it (v0.8.5).
                 Card card = game.getCard(objectId);
-                return card != null && !card.isFaceDown(game);
+                return card != null && (!card.isFaceDown(game) || mayLookAtFaceDown(game, objectId, viewerId));
             }
             case HAND: {
                 // 810.5: in a team game, teammates may look at each other's hands.
@@ -155,6 +161,20 @@ final class Visibility {
         if (game.getState().getZone(objectId) == Zone.EXILED) {
             Card card = game.getCard(objectId);
             return card != null && card.isFaceDown(game);
+        }
+        return false;
+    }
+
+    /**
+     * Whether the viewer, or a player whose turn the viewer controls, may look at this face-down card:
+     * XMage's look-at-face-down permission, as foretell, hideaway and "you may look at it" exiles grant.
+     */
+    static boolean mayLookAtFaceDown(Game game, UUID objectId, UUID viewerId) {
+        for (UUID player : seesFor(game, viewerId)) {
+            if (!game.getContinuousEffects()
+                    .asThough(objectId, AsThoughEffectType.LOOK_AT_FACE_DOWN, null, player, game).isEmpty()) {
+                return true;
+            }
         }
         return false;
     }
