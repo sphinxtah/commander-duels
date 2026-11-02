@@ -20,14 +20,18 @@ the owner's handoff is in the gitignored campaign/ folder beside compose.yaml.
 - **The spoils** (the owner, 2026-10-31): a warden's first defeat gives the player that warden's
   deck, a deck of their own with every copy of its cards granted to their library, and tokens,
   1,000 for the first warden and doubling with each (content/campaign.json names each amount).
-  The Sphinx's deck comes with the commander he played: the owner's High Priest, a Godlike custom
+  The deck given is the list the duel served the opponent (its bot seat's, in game_seats). The
+  Sphinx's deck comes with the commander he played: the owner's High Priest, a Godlike custom
   card, when the private finale ran (granted for good: custom_card_grants, so its winner sees and
-  plays it whatever their tier), else the public stand-in.
+  plays it whatever their tier), else the public stand-in. A private finale won while no custom
+  card carries its commander's name gives no spoils yet: the win, its seal and its chapter count,
+  and the first win after SysOp uploads the card gives them.
 - **Progress** is campaign_progress: the furthest encounter open, those won, the scenes seen and
   the tutorial. Account wins and tiers never gate it.
 """
 
 import json
+import logging
 import time
 from dataclasses import dataclass
 from functools import lru_cache
@@ -38,7 +42,7 @@ from uuid import UUID
 from fastapi import APIRouter, Request
 from pydantic import Field
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -55,11 +59,13 @@ from api.games import (
     SeatPlan,
     active_games_of,
     engine_game,
+    followed_or_closed,
     full_access,
     hub_of,
     own_deck,
     record_game,
     require_loaded,
+    seat_tokens,
     summary_of,
 )
 from api.identity import ApiError, Db, permissions_for, roles_of, settings_of, utcnow
@@ -73,6 +79,7 @@ from api.models import (
     CustomCardGrant,
     Deck,
     Game,
+    GameSeat,
     User,
 )
 from api.progression import winning_seats
@@ -83,6 +90,7 @@ from api.validation import DeckEntry
 from catalog.text import normalize
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
+log = logging.getLogger("api.campaign")
 
 CAMPAIGN_FILE = "campaign.json"
 # The engine's route for the owner's private finale (its plugin's resource), and how long the
@@ -549,15 +557,71 @@ def game_ended(
     progress.content_version = campaign.content_version
     progress.updated_at = utcnow()
     reward(db, user.id, campaign, progress, f"seal:{number:02d}", game.id)
-    if reward(db, user.id, campaign, progress, f"spoils:{number:02d}", game.id):
+    served = served_list(db, game)
+    prize_card = link.prize_card
+    ready = True
+    if link.finale == "private":
+        # The private finale's spoils come with its commander, a custom card. Without one under
+        # the commander's name, the spoils wait: a later win gives them once SysOp uploads it.
+        prize_card = finale_prize(db, link, served)
+        ready = prize_card is not None
+        if not ready:
+            log.warning(
+                "Campaign finale won without its commander's custom card; spoils wait (game %s)",
+                game.id,
+            )
+    if ready and reward(db, user.id, campaign, progress, f"spoils:{number:02d}", game.id):
         give_spoils(
-            db, user, campaign, progress, campaign.encounter(number), content_dir, link.prize_card
+            db,
+            user,
+            campaign,
+            progress,
+            campaign.encounter(number),
+            content_dir,
+            prize_card,
+            served,
         )
     done = set(progress.completed)
     for chapter in campaign.chapters:
         if number in chapter.encounters and all(n in done for n in chapter.encounters):
             for id_, _ in chapter.rewards:
                 reward(db, user.id, campaign, progress, id_, game.id)
+
+
+def served_list(db: Session, game: Game) -> dict[str, Any] | None:
+    """The opponent's deck list as the duel served it to the engine (the bot seat's)."""
+    found = db.scalar(
+        select(GameSeat.deck_list).where(GameSeat.game_id == game.id, GameSeat.player == "bot")
+    )
+    return found if isinstance(found, dict) else None
+
+
+def served_commander(served: dict[str, Any] | None) -> str | None:
+    commanders = (served or {}).get("commanders")
+    if isinstance(commanders, list) and commanders and isinstance(commanders[0], str):
+        return commanders[0]
+    return None
+
+
+def served_cards(served: dict[str, Any] | None) -> tuple[tuple[str, int], ...] | None:
+    """The 99 the duel served, or None when the seat recorded no list."""
+    cards = (served or {}).get("cards")
+    if not isinstance(cards, list) or not cards:
+        return None
+    return tuple(
+        (card["name"], int(card.get("count", 1)))
+        for card in cards
+        if isinstance(card, dict) and isinstance(card.get("name"), str)
+    )
+
+
+def finale_prize(db: Session, link: CampaignGame, served: dict[str, Any] | None) -> UUID | None:
+    """The private finale's commander as a custom card: the one found when the duel began, or
+    else one SysOp uploaded since under the name the engine served."""
+    if link.prize_card is not None and db.get(CustomCard, link.prize_card) is not None:
+        return link.prize_card
+    name = served_commander(served)
+    return prize_card_named(db, name) if name else None
 
 
 def prize_card_named(db: Session, name: str) -> UUID | None:
@@ -569,11 +633,15 @@ def prize_card_named(db: Session, name: str) -> UUID | None:
 
 
 def prize_entries(
-    db: Session, encounter: Encounter, custom_commander: UUID | None = None
+    db: Session,
+    encounter: Encounter,
+    custom_commander: UUID | None = None,
+    served: dict[str, Any] | None = None,
 ) -> list[DeckEntry]:
     """The deck a warden's first defeat gives, as entries: the commander first (the private
     finale's own, a custom card, when given), then each card the catalog has, in its default
-    edition."""
+    edition. The deck is the one the duel served (served), when the seat recorded it: the
+    private finale's own list when the owner's content gives one; else the content's."""
     entries: list[DeckEntry] = []
     wanted: list[tuple[str, int, str]] = []
     if custom_commander is not None:
@@ -581,8 +649,12 @@ def prize_entries(
             DeckEntry(card_id=custom_commander, printing_id=None, quantity=1, location="commander")
         )
     else:
-        wanted.append((encounter.prize_commander, 1, "commander"))
-    wanted += [(name, count, "main") for name, count in encounter.cards]
+        commander = encounter.prize_commander
+        if not encounter.private:
+            commander = served_commander(served) or commander
+        wanted.append((commander, 1, "commander"))
+    cards = served_cards(served) or encounter.cards
+    wanted += [(name, count, "main") for name, count in cards]
     concepts = {
         concept.normalized_name: concept
         for concept in db.scalars(
@@ -615,6 +687,7 @@ def give_spoils(
     encounter: Encounter,
     content_dir: str | None,
     prize_card: UUID | None = None,
+    served: dict[str, Any] | None = None,
 ) -> None:
     """A warden's spoils, in the transaction recording the win: their deck's cards granted to the
     library for good, the deck itself among the player's own (past the deck limit if need be:
@@ -626,7 +699,7 @@ def give_spoils(
     custom: UUID | None = None
     if prize_card is not None and db.get(CustomCard, prize_card) is not None:
         custom = prize_card
-    entries = prize_entries(db, encounter, custom)
+    entries = prize_entries(db, encounter, custom, served)
     catalog = [entry for entry in entries if entry.card_id != custom]
     grant_deck(db, user, key, catalog, "campaign")
     if custom is not None:
@@ -866,13 +939,10 @@ async def start_encounter(
                 db.commit()
                 return game
 
-            try:
+            async with followed_or_closed(hub, created, db):
                 game = await run_in_threadpool(record)
-            except SQLAlchemyError:
-                await engine.request("POST", f"/games/{created['game_id']}/close", body={})
-                raise
-            token = created["seats"][0]["seat_token"]
-            hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
+                token = seat_tokens(created)[0]
+                hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
         finally:
             hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal)

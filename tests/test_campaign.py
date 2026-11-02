@@ -104,7 +104,7 @@ def state(account: Account) -> dict[str, Any]:
 
 
 def put(account: Account, path: str, body: object) -> httpx.Response:
-    headers = {"cookie": f"cd_session={account.token}", "x-csrf-token": account.csrf}
+    headers = {"cookie": f"__Host-cd_session={account.token}", "x-csrf-token": account.csrf}
     return account.http.put(path, json=body, headers=headers)
 
 
@@ -465,6 +465,81 @@ def test_the_finale_takes_the_owners_content_from_the_engine(database: str) -> N
         assert ada.get(f"/api/v1/custom-cards/{priest_id}/image").status_code == 200
         seen = ada.post("/api/v1/campaign/scenes", {"scene": "FC.END.WIN"}).json()
         assert seen["progress"]["ending"] == "standard"
+
+
+class FinaleListEngine(FakeEngine):
+    """An engine whose plugin serves the owner's finale with a deck list of its own."""
+
+    async def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/v1/service/content/campaign-finale":
+            return httpx.Response(
+                200,
+                json={
+                    "commander": "Test Priest Commander",
+                    "cards": [
+                        {"name": "Sol Ring", "count": 1},
+                        {"name": "Lightning Bolt", "count": 1},
+                        {"name": "Mountain", "count": 97},
+                    ],
+                },
+            )
+        return await super().__call__(request)
+
+
+def test_the_finales_spoils_wait_for_its_commander_and_give_the_deck_served(
+    database: str, tmp_path: Path
+) -> None:
+    from api.identity import utcnow
+
+    import_bulk(create_engine(database), tmp_path / "files", bulk(), engine_list())
+    engine = FinaleListEngine()
+    with connect(build(database, engine)) as client:
+        app: FastAPI = client.app  # type: ignore[assignment]
+        ada = Account(client, "ada")
+        state(ada)
+        unlock(app, ada, 14)
+        # No custom card carries the commander's name yet: the win counts, the spoils wait.
+        play(ada, engine, 14, won())
+        after = state(ada)
+        assert after["encounters"][13]["status"] == "won"
+        assert after["encounters"][13]["spoils"]["earned"] is False
+        with Session(app.state.database) as db:
+            assert db.scalar(select(func.count()).select_from(Deck)) == 0
+            assert db.scalar(select(func.count()).select_from(CustomCardGrant)) == 0
+            priest = CustomCard(
+                name="Test Priest Commander",
+                planeswalker="the-sphinx",
+                mana_cost="{W}{U}{B}{R}{G}",
+                type_line="Legendary Creature — Human Cleric",
+                oracle_text="",
+                power="5",
+                toughness="5",
+                rarity="mythic",
+                image=b"\x89PNG",
+                image_type="image/png",
+                image_sha256="0" * 64,
+                uploaded_by=ada.id,
+                created_at=utcnow(),
+                updated_at=utcnow(),
+            )
+            db.add(priest)
+            db.commit()
+            priest_id = priest.id
+        # Won again once the card is there: the spoils, with the commander and the list served.
+        play(ada, engine, 14, won())
+        assert state(ada)["encounters"][13]["spoils"]["earned"] is True
+        with Session(app.state.database) as db:
+            grants = list(db.scalars(select(CustomCardGrant.custom_card_id)))
+            assert grants == [priest_id]
+            granted = dict(
+                db.execute(
+                    select(CardConcept.name, func.sum(LibraryGrant.quantity))
+                    .join(CardConcept, CardConcept.id == LibraryGrant.concept_id)
+                    .where(LibraryGrant.user_id == ada.id, LibraryGrant.source == "campaign")
+                    .group_by(CardConcept.name)
+                ).all()
+            )
+        assert granted == {"Sol Ring": 1, "Lightning Bolt": 1, "Mountain": 97}
 
 
 def test_scenes_and_the_tutorial_are_remembered(client: TestClient) -> None:

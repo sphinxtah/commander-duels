@@ -23,18 +23,20 @@ marked with their seat, in the controlling seat's own views, so the controller's
 with its own seat's token and lease, and the controlled player's tab is told who controls its turn.
 
 One API process holds the games: a restart marks the running ones interrupted and closes them in
-the engine, because their seat tokens are gone.
+the engine, because their seat tokens are gone. On PostgreSQL the process holds an advisory lock
+for its lifetime, so a second API process on the same database fails to start (GameHub.hold).
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import random
 import secrets
 import time
 from collections import defaultdict
-from collections.abc import Callable, Coroutine
-from contextlib import suppress
+from collections.abc import AsyncIterator, Callable, Coroutine, Hashable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
@@ -45,7 +47,8 @@ import anyio
 import httpx
 from fastapi import APIRouter, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
-from sqlalchemy import Engine, func, select, update
+from sqlalchemy import Connection as DatabaseConnection
+from sqlalchemy import Engine, func, select, text, update
 from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -337,9 +340,19 @@ class Connection:
     revision: int = -1
     close_code: int | None = None
     ended: anyio.Event = field(default_factory=anyio.Event)
+    # Until its first page of the log is queued (opened), the snapshots published to a new
+    # connection wait here: each carries only the log lines new since the one before, so one
+    # reaching the client first would make it drop the page as a revision it already holds.
+    held: list[dict[str, Any]] | None = field(default_factory=list)
 
     def send(self, message: dict[str, Any]) -> None:
         if self.close_code is not None:
+            return
+        if self.held is not None and message["type"] == "snapshot":
+            if len(self.held) >= QUEUE_LIMIT:
+                self.close(CLOSE_TOO_SLOW)
+            else:
+                self.held.append(message)
             return
         try:
             self.queue.put_nowait(message)
@@ -358,6 +371,14 @@ class Connection:
                 self.queue.put_nowait({"type": "error", "code": error})
             self.queue.put_nowait(None)
             self.ended.set()
+
+    def opened(self, page: dict[str, Any] | None) -> None:
+        """Queues the connection's first page (None when the client holds its revision already),
+        then the snapshots published meanwhile, which the writer skips when the page covers them.
+        Later snapshots go straight to the queue."""
+        held, self.held = self.held, None
+        for message in ([page] if page is not None else []) + (held or []):
+            self.send(message)
 
 
 @dataclass(eq=False)
@@ -447,6 +468,51 @@ def covers(page: dict[str, Any] | None, latest: dict[str, Any] | None) -> bool:
     )
 
 
+@dataclass(eq=False)
+class Held:
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # The tasks holding the lock or waiting for it.
+    users: int = 0
+
+
+class KeyedLocks:
+    """asyncio locks by key: an account's, a table's, a game's or a match's id. A key's lock is
+    kept only while a task holds it or waits for it, so the map does not grow with every id ever
+    locked. ``async with locks[key]`` holds it."""
+
+    def __init__(self) -> None:
+        self.held: dict[Hashable, Held] = {}
+
+    def __getitem__(self, key: Hashable) -> AbstractAsyncContextManager[None]:
+        return self.hold(key)
+
+    def __len__(self) -> int:
+        return len(self.held)
+
+    def locked(self, key: Hashable) -> bool:
+        """Whether a task holds the key's lock. Asking keeps nothing."""
+        found = self.held.get(key)
+        return found is not None and found.lock.locked()
+
+    @asynccontextmanager
+    async def hold(self, key: Hashable) -> AsyncIterator[None]:
+        held = self.held.setdefault(key, Held())
+        held.users += 1
+        try:
+            async with held.lock:
+                yield
+        finally:
+            held.users -= 1
+            if not held.users:
+                del self.held[key]
+
+
+def lock_key(schema: str) -> int:
+    """The advisory lock a process running the games holds: one for each database schema."""
+    digest = hashlib.blake2b(f"commander-duels.games:{schema}".encode(), digest_size=8).digest()
+    return int.from_bytes(digest, "big", signed=True)
+
+
 class GameHub:
     """The games this API process is running, and the tasks that follow them."""
 
@@ -455,8 +521,10 @@ class GameHub:
         self.database = database
         self.engine = engine
         self.games: dict[UUID, LiveGame] = {}
-        self.locks: defaultdict[UUID, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self.locks = KeyedLocks()
         self.tasks: set[asyncio.Task[None]] = set()
+        # The connection holding the advisory lock on running the games (PostgreSQL only).
+        self.holder: DatabaseConnection | None = None
         # Games being created in the engine: they hold a slot under CD_GAMES_MAX already.
         self.starting = 0
 
@@ -486,7 +554,9 @@ class GameHub:
     async def start(self) -> None:
         """Games left active by an earlier process cannot be played: their tokens are gone. While
         the database cannot be reached (it may still be starting), the check retries in the
-        background."""
+        background. On PostgreSQL the process first takes the lock on running the games (hold),
+        waiting while the database cannot be reached."""
+        await retried(self.hold, "take the lock on running the games")
         started = utcnow()
         try:
             orphans = await run_in_threadpool(interrupt_active, self.database)
@@ -513,10 +583,45 @@ class GameHub:
                     pass
             log.info("Marked %d games interrupted after a restart", len(orphans))
 
+    def hold(self) -> None:
+        """Takes PostgreSQL's session-level advisory lock on running the games, on a connection of
+        its own, held until the process stops. The running games, their seat tokens, the queues'
+        claims and the limits live in this process's memory, so the API runs as one process: a
+        second one would mark this one's games interrupted as it starts and reset its queues'
+        claims. A second process therefore fails to start. Other databases (SQLite, in tests)
+        take no lock."""
+        if self.database.dialect.name != "postgresql" or self.holder is not None:
+            return
+        connection = self.database.connect()
+        try:
+            schema: str = connection.execute(text("SELECT current_schema()")).scalar_one()
+            taken: bool = connection.execute(
+                text("SELECT pg_try_advisory_lock(:key)"), {"key": lock_key(schema)}
+            ).scalar_one()
+            connection.commit()
+        except BaseException:
+            connection.close()
+            raise
+        if not taken:
+            connection.close()
+            log.critical(
+                "Another API process is running the games of this database (schema %s): the API "
+                "runs as one process. Stop the other process, or run one worker (no --workers, "
+                "WEB_CONCURRENCY unset or 1).",
+                schema,
+            )
+            raise RuntimeError("A second API process is running on this database")
+        # Out of the pool: the pool may replace it, and closing it ends the session and the lock.
+        connection.detach()
+        self.holder = connection
+
     async def stop(self) -> None:
         for task in list(self.tasks):
             task.cancel()
         await asyncio.gather(*self.tasks, return_exceptions=True)
+        if self.holder is not None:
+            holder, self.holder = self.holder, None
+            await run_in_threadpool(holder.close)
 
     def reserve(self) -> None:
         """Takes a game slot under CD_GAMES_MAX for a game about to be created; the caller gives it
@@ -1701,21 +1806,114 @@ def record_game(
     return game
 
 
+def malformed(created: object, body: dict[str, object]) -> str | None:
+    """What is missing from the engine's answer to a create, or None. The API records and follows
+    a game by its id, each human seat's token and each seat's deck, so it checks them all before
+    it records anything."""
+    if not isinstance(created, dict):
+        return "the answer is not an object"
+    try:
+        UUID(str(created.get("game_id")))
+    except ValueError:
+        return "no game id"
+    asked = body.get("seats")
+    asked = asked if isinstance(asked, list) else []
+    humans = [
+        index
+        for index, seat in enumerate(asked)
+        if isinstance(seat, dict) and seat.get("player") == "human"
+    ]
+    seats = created.get("seats")
+    if not isinstance(seats, list) or not all(isinstance(entry, dict) for entry in seats):
+        return "no seats"
+    tokens = {entry.get("seat"): entry.get("seat_token") for entry in seats}
+    if any(not isinstance(tokens.get(index), str) or not tokens[index] for index in humans):
+        return "a human seat without its token"
+    settings = created.get("settings")
+    decks = settings.get("seats") if isinstance(settings, dict) else None
+    if not isinstance(decks, list) or not all(isinstance(entry, dict) for entry in decks):
+        return "no seat settings"
+    named = {entry.get("seat"): entry.get("deck") for entry in decks}
+    if any(not isinstance(named.get(index), str) for index in range(len(asked))):
+        return "a seat without its deck"
+    return None
+
+
+def seat_tokens(created: dict[str, Any]) -> dict[int, str]:
+    """Each human seat's token from the engine's answer to a create (checked by malformed)."""
+    return {
+        entry["seat"]: entry["seat_token"]
+        for entry in created["seats"]
+        if isinstance(entry.get("seat"), int) and isinstance(entry.get("seat_token"), str)
+    }
+
+
+async def close_in_engine(engine: EngineClient, game_id: str) -> None:
+    """Closes a game the API will not follow. A close that fails is logged, never raised: it must
+    not hide the failure that made the API give the game up."""
+    try:
+        await engine.request("POST", f"/games/{game_id}/close", body={})
+    except Exception:
+        log.warning("Could not close game %s in the engine", game_id, exc_info=True)
+
+
 async def create_in_engine(engine: EngineClient, body: dict[str, object]) -> tuple[int, Any]:
     """POST /games under an id the API chooses (v0.8.3). When no answer comes, the game is closed
     by that id, which also stops a create that reaches the engine later (it answers 409): no game
-    is left running that nothing follows, and a retry starts a new one."""
+    is left running that nothing follows, and a retry starts a new one. An answer the API cannot
+    follow the game from (no id, a human seat without its token) is treated the same way."""
     game_id = str(uuid4())
     try:
-        return await engine.request(
+        status, created = await engine.request(
             "POST",
             "/games",
             body={**body, "game_id": game_id},
             timeout=CREATE_TIMEOUT_SECONDS,
         )
+        if status == 201 and (problem := malformed(created, body)) is not None:
+            log.warning(
+                "The engine created game %s with an answer the API cannot use: %s", game_id, problem
+            )
+            answered = created.get("game_id") if isinstance(created, dict) else None
+            if isinstance(answered, str) and answered != game_id:
+                await close_in_engine(engine, answered)
+            raise EngineUnavailable(f"unusable answer to a create: {problem}")
+        return status, created
     except EngineUnavailable:
-        with suppress(EngineUnavailable):
-            await engine.request("POST", f"/games/{game_id}/close", body={})
+        await close_in_engine(engine, game_id)
+        raise
+
+
+@asynccontextmanager
+async def followed_or_closed(
+    hub: "GameHub", created: dict[str, Any], db: Session | None = None
+) -> AsyncIterator[None]:
+    """Around recording and registering a game the engine has just created. When that fails, for
+    any reason, the request's transaction (db) is rolled back, the game is closed in the engine
+    and, if it was recorded, recorded interrupted, so no game is left running or active with
+    nothing following it. The failure is raised; the cleanup cannot hide it. A cancellation only
+    arrives once the database work in its thread has finished, so it is cleaned up the same way."""
+    try:
+        yield
+    except BaseException:
+        game_id = UUID(str(created["game_id"]))
+        if game_id not in hub.games:
+            with anyio.CancelScope(shield=True):
+                if db is not None:
+                    with suppress(Exception):
+                        await run_in_threadpool(db.rollback)
+                await close_in_engine(hub.require_engine(), str(game_id))
+                try:
+                    await run_in_threadpool(
+                        record_end,
+                        hub.database,
+                        game_id,
+                        "interrupted",
+                        None,
+                        hub.settings.content_dir,
+                    )
+                except Exception:
+                    log.exception("Could not record game %s interrupted", game_id)
         raise
 
 
@@ -1728,6 +1926,8 @@ async def engine_game(
         status, created = await create_in_engine(engine, body)
     except EngineUnavailable as error:
         raise unavailable() from error
+    if status != 201 and not isinstance(created, dict):
+        created = {}
     if status == 400 and created.get("code") == "unknown_cards":
         # Custom cards it was thought to have loaded are asked about again.
         if (cards := engine_cards_of(request)) is not None:
@@ -1798,15 +1998,12 @@ async def create_practice_game(
                 {"format": fmt, "seats": seats, "skill": body.bot_skill, "turn_cap": body.turn_cap},
                 request,
             )
-            try:
+            async with followed_or_closed(hub, created, db):
                 game = await run_in_threadpool(
                     record_game, db, request, principal, created, body, plans
                 )
-            except SQLAlchemyError:
-                await engine.request("POST", f"/games/{created['game_id']}/close", body={})
-                raise
-            token = created["seats"][0]["seat_token"]
-            hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
+                token = seat_tokens(created)[0]
+                hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
         finally:
             hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal)
@@ -2178,14 +2375,15 @@ def claim(hub: GameHub, game: LiveGame, connection: Connection) -> None:
 
 
 async def resync(hub: GameHub, game: LiveGame, connection: Connection, since: int) -> None:
-    """Sends the seat's current snapshot unless the client already has that revision."""
+    """Sends the seat's current snapshot unless the client already has that revision. A new
+    connection's first page goes ahead of the snapshots published while it was fetched."""
     seat = game.viewed(connection)
     try:
         snapshot = await hub.page(game, seat)
     except EngineUnavailable:
         snapshot = seat.snapshot
-    if snapshot is not None and (since < 0 or snapshot["revision"] != since):
-        connection.send({"type": "snapshot", "snapshot": snapshot})
+    sent = snapshot is not None and (since < 0 or snapshot["revision"] != since)
+    connection.opened({"type": "snapshot", "snapshot": snapshot} if sent else None)
 
 
 async def receive_loop(
@@ -2245,13 +2443,23 @@ async def receive_loop(
             if refused is not None:
                 code, text = refused
                 connection.send({"type": "error", "code": code, "message": text, "seat": seat})
-        elif kind == "take_control":
-            claim(hub, game, connection)
-        elif kind == "release_control":
-            hub.release(game, connection, "released")
-        elif kind == "resync":
-            since = message.get("since", -1)
-            await resync(hub, game, connection, since if isinstance(since, int) else -1)
+        elif kind in ("take_control", "release_control", "resync"):
+            # These check that the session still stands too, without counting as activity (the
+            # page sends them on its own): a tab whose session ended cannot take the seat's lease
+            # until the minute's check.
+            ended = await run_in_threadpool(
+                session_ended, hub.database, websocket, connection.session_id
+            )
+            if ended is not None:
+                connection.close(CLOSE_UNAUTHENTICATED, ended)
+                return
+            if kind == "take_control":
+                claim(hub, game, connection)
+            elif kind == "release_control":
+                hub.release(game, connection, "released")
+            else:
+                since = message.get("since", -1)
+                await resync(hub, game, connection, since if isinstance(since, int) else -1)
         elif kind == "ping":
             connection.send({"type": "pong"})
         else:

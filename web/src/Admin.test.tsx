@@ -91,6 +91,7 @@ function user(
     handle,
     display_name: handle.toUpperCase(),
     email: `${handle}@example.com`,
+    email_verified: true,
     created_at: "2026-10-19T10:00:00Z",
     last_seen_at: null,
     roles: ["player"],
@@ -284,6 +285,21 @@ describe("email addresses", () => {
     expect(
       screen.getByLabelText("Search handle, name or email"),
     ).toBeInTheDocument();
+  });
+
+  it("mark an address Google has not verified", async () => {
+    on(USERS, () =>
+      page([
+        user("ann", "active"),
+        { ...user("bob", "pending"), email_verified: false },
+      ]),
+    );
+    render(<Admin me={administrator} heading={createRef()} />);
+    const ann = await screen.findByRole("listitem", { name: "ann" });
+    expect(ann).not.toHaveTextContent(/unverified/i);
+    expect(screen.getByRole("listitem", { name: "bob" })).toHaveTextContent(
+      "bob@example.com unverified · joined",
+    );
   });
 });
 
@@ -677,7 +693,11 @@ describe("tokens (v0.4.0)", () => {
       "/api/v1/admin/users/{user_id}/tokens",
       {
         params: { path: { user_id: "id-ann" } },
-        body: { amount: 500, reason: "Testing the shop" },
+        body: {
+          amount: 500,
+          reason: "Testing the shop",
+          key: expect.stringMatching(/^[0-9a-f]{32}$/),
+        },
       },
     );
     expect(screen.getByRole("listitem", { name: "ann" })).toHaveTextContent(

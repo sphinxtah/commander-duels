@@ -304,7 +304,7 @@ def signed_in(app: FastAPI, status: str = "active", kind: str = "player") -> dic
             )
         )
         db.commit()
-    return {"cookie": f"cd_session={token}"}
+    return {"cookie": f"__Host-cd_session={token}"}
 
 
 def entry(app: FastAPI, name: str) -> CardImage | None:
@@ -673,7 +673,7 @@ def test_a_session_rotated_by_an_image_request_keeps_its_cookie(
     the new cookie exactly once, or the player is signed out when the old token's grace ends.
     The routes once copied it across themselves; only the correlation middleware adds it now."""
     cache: CardImageCache = app.state.card_images
-    token = signed_in(app)["cookie"].removeprefix("cd_session=")
+    token = signed_in(app)["cookie"].removeprefix("__Host-cd_session=")
 
     def session_of(secret: str) -> UserSession | None:
         with Session(app.state.database) as db:
@@ -691,13 +691,13 @@ def test_a_session_rotated_by_an_image_request_keeps_its_cookie(
             db.execute(update(User).values(privilege_version=User.privilege_version + 1))
             db.commit()
         response = client.get(
-            path, params={"name": name}, headers={"cookie": f"cd_session={token}"}
+            path, params={"name": name}, headers={"cookie": f"__Host-cd_session={token}"}
         )
         [cookie] = response.headers.get_list("set-cookie")
         pair, *attributes = (part.strip() for part in cookie.split(";"))
         key, _, new = pair.partition("=")
-        assert key == "cd_session" and new and new != token
-        assert {"path=/api", "httponly", "secure", "samesite=lax"} <= {
+        assert key == "__Host-cd_session" and new and new != token
+        assert {"path=/", "httponly", "secure", "samesite=lax"} <= {
             attribute.lower() for attribute in attributes
         }
         # The cookie is the session the rotation issued, and the old one is over.
@@ -735,7 +735,7 @@ def test_a_session_rotated_by_an_image_request_keeps_its_cookie(
     assert scryfall.api_calls == ["Lightning Bolt", "Goblin Token", "Counterspell"]
 
     # The last cookie signs the player in, and sets nothing more.
-    me = client.get("/api/v1/me", headers={"cookie": f"cd_session={token}"})
+    me = client.get("/api/v1/me", headers={"cookie": f"__Host-cd_session={token}"})
     assert me.status_code == 200 and "set-cookie" not in me.headers
 
 

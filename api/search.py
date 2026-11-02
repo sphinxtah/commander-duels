@@ -30,6 +30,7 @@ Since v0.4.5 every card a search can find is one a game can play (api/cards.py),
 playability any more: is:playable, is:unsupported and status: are refused as unknown.
 """
 
+import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -505,7 +506,11 @@ class Compiler:
         return found
 
     def year(self, leaf: Leaf) -> ColumnElement[bool]:
-        year = int(number(leaf.value, "year"))
+        value = number(leaf.value, "year")
+        # A calendar year: a whole number from 1 to 9999, as dates are.
+        if not (math.isfinite(value) and value == int(value) and 1 <= value <= 9999):
+            raise SearchError(f"“year” takes a year from 1 to 9999, not “{leaf.value}”.")
+        year = int(value)
         start, end = date(year, 1, 1), date(year, 12, 31)
         column = CardConcept.first_released_at
         return {

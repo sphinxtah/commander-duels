@@ -23,7 +23,6 @@ from sqlalchemy.orm import Session
 from api.google import ISSUER, GoogleVerifier, InvalidToken, ProviderUnavailable
 from api.identity import (
     GOOGLE_COOKIE,
-    SESSION_COOKIE,
     Active,
     ApiError,
     Db,
@@ -39,6 +38,7 @@ from api.identity import (
     permissions_for,
     revoke_sessions,
     roles_of,
+    session_token,
     set_session_cookie,
     settings_of,
     source_of,
@@ -295,7 +295,7 @@ def new_account(
 
 def end_presented_session(db: Session, request: Request, reason: str) -> None:
     """A sign-in always starts a new session; one the browser already holds ends (AUTH03)."""
-    token = request.cookies.get(SESSION_COOKIE)
+    token = session_token(request)
     if token:
         db.execute(
             update(UserSession)

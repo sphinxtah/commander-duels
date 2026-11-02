@@ -390,6 +390,27 @@ def test_a_save_gives_copies_naming_no_edition_one_the_library_holds(client):
     assert [item["printing_id"] for item in card["editions"]] == [str(first.id), str(second.id)]
 
 
+def test_editions_are_not_split_past_a_decks_entries(client, monkeypatch):
+    first, second, _ = bolts(client)
+    ada = Account(client, "ada")
+    grant(client, ada.id, first, 2, "pack:one")
+    grant(client, ada.id, second, 1, "pack:two")
+    lands(client, ada.id)
+    bolt = concept(client, "Lightning Bolt")
+    # Splitting four Bolts across the editions held would take four entries; a deck of at most
+    # three keeps them as they were sent, and validation says which editions to choose.
+    monkeypatch.setattr(decks_api, "MAX_ENTRIES", 3)
+    made = ada.send(
+        "POST",
+        "/api/v1/decks",
+        {"title": "Burn", "format": "legacy", "entries": burn(client, (4, None))},
+    )
+    assert made.status_code == 201, made.text
+    held = editions(made.json()["draft"]["entries"])
+    assert held[(str(bolt.id), None)] == 4
+    assert len(made.json()["draft"]["entries"]) == 2
+
+
 def test_starter_decks_are_granted_in_their_editions_and_play_at_once(client):
     ada = Account(client, "ada", onboarding="starters")
     chosen = ada.send(

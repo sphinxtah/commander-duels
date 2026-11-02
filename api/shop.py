@@ -49,7 +49,7 @@ import secrets
 from collections import defaultdict
 from datetime import date, datetime
 from typing import Annotated, Literal
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import Field
@@ -139,6 +139,8 @@ RARITY_ORDER = {"common": 0, "uncommon": 1, "rare": 2, "mythic": 3}
 Finish = Literal["nonfoil", "foil", "etched"]
 RequestKey = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 Reason = Annotated[StoredText, Field(min_length=3, max_length=200)]
+# The namespace of SysOp's pack grants' IDs made from the client's key (a retry finds its grant).
+PACK_GRANTS = UUID("6f4c8e0a-3f8e-5b1d-9a57-0c2d7e6b4a91")
 
 
 class EraInfo(Contract):
@@ -385,6 +387,11 @@ class PackGrant(Contract):
     product: UUID
     count: int = Field(ge=1, le=MAX_GRANT)
     reason: Reason
+    key: RequestKey | None = Field(
+        default=None,
+        description="The client's own key for this grant: a retry with it grants once. Without "
+        "one, each request grants.",
+    )
 
 
 class PacksGranted(Contract):
@@ -1038,7 +1045,9 @@ def opening(opening_id: UUID, request: Request, principal: Active, db: Db) -> Op
 def give_packs(
     user_id: UUID, body: PackGrant, request: Request, principal: EconomyManager, db: Db
 ) -> PacksGranted:
-    """SysOp gives unopened packs to any account, its own included: with a reason, audited."""
+    """SysOp gives unopened packs to any account, its own included: with a reason, audited. A
+    retry with the same key grants once: the key names the grant (its grant_id), looked for
+    under the account's row lock, so a retry sent at once waits for the request it repeats."""
     ensured(request)
     user = target(db, user_id, principal)
     refuse_deleted(user)
@@ -1049,7 +1058,23 @@ def give_packs(
         raise ApiError(
             409, "pack_unavailable", f"{product.name} has no booster data yet; it cannot be opened."
         )
-    grant = uuid4()
+    grant = uuid5(PACK_GRANTS, f"{user.id}:{body.key}") if body.key else uuid4()
+    if body.key is not None:
+        lock_account(db, user.id)
+        earlier = list(
+            db.scalars(select(Pack).where(Pack.user_id == user.id, Pack.grant_id == grant))
+        )
+        if earlier:
+            if (earlier[0].product_id, len(earlier), earlier[0].reason) != (
+                product.id,
+                body.count,
+                body.reason,
+            ):
+                raise ApiError(409, "key_reused", "That grant key gave a different grant.")
+            db.commit()
+            return PacksGranted(
+                granted=len(earlier), inventory=inventory_of(db, user, art_of(request))
+            )
     now = utcnow()
     for _ in range(body.count):
         db.add(

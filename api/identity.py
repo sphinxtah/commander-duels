@@ -25,7 +25,19 @@ from api.models import AuditEvent, ExternalIdentity, RoleGrant, User, UserSessio
 from api.network import client_address, within
 from api.schemas import Me, Permission, Preferences, Role, SessionInfo, Tutorial
 
-SESSION_COOKIE = "cd_session"
+# The session cookie (v0.8.5): host-only, for the whole site, Secure. The __Host- prefix makes the
+# browser refuse a cookie of this name from anywhere else, such as a sibling site setting one for
+# the parent domain or for a narrower path to shadow it. Browsers take a Secure cookie on
+# http://localhost too, so this is the name everywhere CD_COOKIE_SECURE is true (always in
+# production).
+SESSION_COOKIE = "__Host-cd_session"
+# With CD_COOKIE_SECURE false (plain HTTP on a host other than localhost, for development only;
+# production refuses it), no browser keeps a __Host- cookie: the cookie is this one, for the whole
+# site, not Secure. Its own name, so it never meets the old cookie below.
+INSECURE_SESSION_COOKIE = "cd_session_http"
+# The cookie before v0.8.5, at path /api: expired on every sign-in and sign-out.
+OLD_SESSION_COOKIE = "cd_session"
+OLD_SESSION_PATH = "/api"
 GOOGLE_COOKIE = "cd_google"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 TOUCH_INTERVAL = timedelta(minutes=1)
@@ -223,35 +235,67 @@ def issue_session(
     return session, token
 
 
-def set_session_cookie(
-    response: Response, request: Request, token: str, session: UserSession
-) -> None:
-    settings = settings_of(request)
-    seconds = int((session.absolute_expires_at - utcnow()).total_seconds())
-    response.set_cookie(
-        SESSION_COOKIE,
-        token,
-        max_age=max(seconds, 0),
-        path="/api",
-        secure=settings.cookie_secure,
-        httponly=True,
-        samesite="lax",
-    )
+def session_cookie_name(settings: Settings) -> str:
+    """The session cookie's name under these settings (see SESSION_COOKIE)."""
+    return SESSION_COOKIE if settings.cookie_secure else INSECURE_SESSION_COOKIE
 
 
-def clear_session_cookie(response: Response, request: Request) -> None:
+def session_token(conn: HTTPConnection) -> str | None:
+    """The session token the browser presents, from the session cookie alone: never from a
+    cookie of the old name or path."""
+    return conn.cookies.get(session_cookie_name(settings_of(conn)))
+
+
+def expire_old_cookie(response: Response, request: Request) -> None:
+    """Expires the session cookie of before v0.8.5 (cd_session at path /api)."""
     response.delete_cookie(
-        SESSION_COOKIE,
-        path="/api",
+        OLD_SESSION_COOKIE,
+        path=OLD_SESSION_PATH,
         secure=settings_of(request).cookie_secure,
         httponly=True,
         samesite="lax",
     )
 
 
+def set_session_cookie(
+    response: Response,
+    request: Request,
+    token: str,
+    session: UserSession,
+    *,
+    expire_old: bool = True,
+) -> None:
+    """The session cookie, and on a sign-in (expire_old) the old one expired."""
+    settings = settings_of(request)
+    seconds = int((session.absolute_expires_at - utcnow()).total_seconds())
+    response.set_cookie(
+        session_cookie_name(settings),
+        token,
+        max_age=max(seconds, 0),
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    if expire_old:
+        expire_old_cookie(response, request)
+
+
+def clear_session_cookie(response: Response, request: Request, *, expire_old: bool = True) -> None:
+    response.delete_cookie(
+        session_cookie_name(settings_of(request)),
+        path="/",
+        secure=settings_of(request).cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    if expire_old:
+        expire_old_cookie(response, request)
+
+
 def clearing_headers(request: Request) -> dict[str, str]:
     response = Response()
-    clear_session_cookie(response, request)
+    clear_session_cookie(response, request, expire_old=False)
     return {"set-cookie": response.headers["set-cookie"]}
 
 
@@ -262,7 +306,7 @@ def add_rotated_cookie(request: Request, response: Response) -> None:
     cookie: str | None = getattr(request.state, "rotated_cookie", None)
     if cookie is None:
         return
-    own = f"{SESSION_COOKIE}="
+    own = f"{session_cookie_name(settings_of(request))}="
     if any(value.startswith(own) for value in response.headers.getlist("set-cookie")):
         return
     response.headers.append("set-cookie", cookie)
@@ -304,7 +348,7 @@ def live_session(conn: HTTPConnection, db: Session) -> tuple[UserSession, User] 
     sessions count as signed out, as do sessions of disabled and deleted accounts (a deletion
     removes them all; one in flight meanwhile still counts for nothing). A token rotated moments
     ago stands for its successor (see successor_of), and marks the connection via_grace."""
-    token = conn.cookies.get(SESSION_COOKIE)
+    token = session_token(conn)
     if not token:
         return None
     now = utcnow()
@@ -345,7 +389,18 @@ def optional_principal(request: Request, db: Db) -> Principal | None:
     # whoever holds a stale token could take a fresh one. Only the successor's own cookie does.
     due = session.privilege_version != user.privilege_version
     if due and not getattr(request.state, "via_grace", False):
-        session.revoked_at, session.revoked_reason = now, "rotated"
+        # Only a session still live is rotated: a sign-out everywhere (or any revocation) that
+        # committed since the session was read wins, and the request counts as signed out.
+        ended = db.execute(
+            update(UserSession)
+            .where(UserSession.id == session.id, UserSession.revoked_at.is_(None))
+            .values(revoked_at=now, revoked_reason="rotated")
+            .execution_options(synchronize_session=False)
+        )
+        if ended.rowcount != 1:  # type: ignore[attr-defined]
+            db.rollback()
+            request.state.stale_session = True
+            return None
         session, token = issue_session(
             db,
             request,
@@ -357,7 +412,7 @@ def optional_principal(request: Request, db: Db) -> Principal | None:
         )
         db.commit()
         cookie = Response()
-        set_session_cookie(cookie, request, token, session)
+        set_session_cookie(cookie, request, token, session, expire_old=False)
         request.state.rotated_cookie = cookie.headers["set-cookie"]
     elif not asked_on_its_own(request):
         keep_alive(request, db, session, user)
@@ -440,12 +495,20 @@ def require_recent_sign_in(request: Request, principal: Principal) -> None:
 
 
 def email_of(db: Session, user: User) -> str | None:
-    return db.scalar(
-        select(ExternalIdentity.email)
+    return verified_email_of(db, user)[0]
+
+
+def verified_email_of(db: Session, user: User) -> tuple[str | None, bool]:
+    """The account's email, from its latest Google sign-in, and whether Google verified it."""
+    found = db.execute(
+        select(ExternalIdentity.email, ExternalIdentity.email_verified)
         .where(ExternalIdentity.user_id == user.id)
         .order_by(ExternalIdentity.last_login_at.desc())
         .limit(1)
-    )
+    ).first()
+    if found is None or found.email is None:
+        return None, False
+    return found.email, bool(found.email_verified)
 
 
 def me_of(db: Session, principal: Principal) -> Me:

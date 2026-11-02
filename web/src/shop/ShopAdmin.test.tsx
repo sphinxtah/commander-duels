@@ -277,7 +277,12 @@ describe("the card shop in Administration", () => {
     ).toBeInTheDocument();
     expect(sent).toEqual({
       params: { path: { user_id: "ada-id" } },
-      body: { product: draft.id, count: 3, reason: "Testing the shop" },
+      body: {
+        product: draft.id,
+        count: 3,
+        reason: "Testing the shop",
+        key: expect.stringMatching(/^[0-9a-f]{32}$/),
+      },
     });
   });
 });

@@ -35,12 +35,14 @@ test.describe("Tivit's Auction House", () => {
     ]);
     await playerContext.addCookies([
       {
-        name: "cd_session",
+        name: "__Host-cd_session",
         value: playerSession!,
         domain: new URL(testInfo.project.use.baseURL!).hostname,
-        path: "/api",
+        path: "/",
         httpOnly: true,
-        secure: false,
+        // The __Host- prefix needs Secure and the whole site; browsers keep Secure
+        // cookies on http://localhost and 127.0.0.1.
+        secure: true,
         sameSite: "Lax",
       },
     ]);

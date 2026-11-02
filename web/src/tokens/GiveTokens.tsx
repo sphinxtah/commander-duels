@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { client, describe, type Tokens } from "../api";
+import { requestKey } from "../auctions/auctions";
 import account from "../Account.module.css";
 import shell from "../App.module.css";
 import { hudChanged } from "../shell/hud";
@@ -31,6 +32,9 @@ export function GiveTokens({
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
+  // The key of the grant last sent and what it asked for: sent again unchanged (a retry after
+  // a lost answer), it grants once; anything else is a new grant with a new key.
+  const pending = useRef<{ key: string; asked: string } | null>(null);
   const own = subject === "your";
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -51,15 +55,19 @@ export function GiveTokens({
     setBusy(true);
     setError("");
     setSaved("");
+    const asked = JSON.stringify([userId, value, why]);
+    if (pending.current?.asked !== asked)
+      pending.current = { key: requestKey(), asked };
     try {
       const { data, error: refused } = await client.POST(
         "/api/v1/admin/users/{user_id}/tokens",
         {
           params: { path: { user_id: userId } },
-          body: { amount: value, reason: why },
+          body: { amount: value, reason: why, key: pending.current.key },
         },
       );
       if (!data) return setError(describe(refused));
+      pending.current = null;
       // SysOp's own balance is in the top bar.
       if (own) hudChanged();
       setAmount("");

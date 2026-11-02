@@ -203,10 +203,18 @@ def test_google_sign_in_creates_one_account_with_a_private_session(app: FastAPI)
     # Every new account starts with the welcome grant of tokens (v0.4.0).
     assert client.get("/api/v1/me/tokens").json()["balance"] == 1_000
     cookie = next(
-        value for value in response.headers.get_list("set-cookie") if "cd_session=" in value
+        value for value in response.headers.get_list("set-cookie") if "__Host-cd_session=" in value
     )
     assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=lax" in cookie
-    assert "Path=/api" in cookie
+    # __Host-: the whole site, Secure, and no Domain, so no sibling site can shadow it.
+    assert "Path=/;" in cookie and "Domain" not in cookie
+    # The cookie of before v0.8.5 is expired at its own path.
+    old = [
+        value
+        for value in response.headers.get_list("set-cookie")
+        if value.startswith("cd_session=")
+    ]
+    assert len(old) == 1 and "Path=/api" in old[0] and "Max-Age=0" in old[0]
 
     # State changes need the session's CSRF token.
     csrf = client.headers.pop("X-CSRF-Token")
@@ -355,6 +363,38 @@ def test_without_a_client_id_google_sign_in_is_unavailable(database: str, certs:
         assert response.status_code == 503 and response.json()["code"] == "sign_in_unavailable"
 
 
+def test_the_old_session_cookie_signs_nothing_in(app: FastAPI) -> None:
+    """Only the __Host- cookie carries the session: a cd_session cookie, such as a sibling site
+    could set for the parent domain, is never read."""
+    ada = browser(app)
+    sign_in(ada)
+    token = ada.cookies["__Host-cd_session"]
+    other = browser(app)
+    other.cookies.set("cd_session", token)
+    assert other.get("/api/v1/me").status_code == 401
+
+
+def test_plain_http_development_uses_a_cookie_without_the_prefix(
+    database: str, certs: Certs
+) -> None:
+    """With CD_COOKIE_SECURE false, which production refuses, the cookie is cd_session_http: no
+    browser keeps a __Host- cookie without Secure."""
+    app = build(database, certs, cookie_secure=False)
+    with TestClient(app, base_url="http://testserver"):
+        start(app)
+        client = TestClient(app, base_url="http://testserver", client=OUTSIDE)
+        signed_in = sign_in(client)
+        names = [value.split("=", 1)[0] for value in signed_in.headers.get_list("set-cookie")]
+        assert "cd_session_http" in names and "__Host-cd_session" not in names
+        cookie = next(
+            value
+            for value in signed_in.headers.get_list("set-cookie")
+            if value.startswith("cd_session_http=")
+        )
+        assert "Secure" not in cookie and "Path=/;" in cookie
+        assert client.get("/api/v1/me").status_code == 200
+
+
 def test_sessions_end_on_sign_out_expiry_and_revocation(
     app: FastAPI, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -369,7 +409,13 @@ def test_sessions_end_on_sign_out_expiry_and_revocation(
     assert phone.get("/api/v1/me").status_code == 401
     assert laptop.delete(f"/api/v1/me/sessions/{phone_session}").status_code == 404
 
-    assert laptop.post("/api/v1/auth/logout").status_code == 204
+    signed_out = laptop.post("/api/v1/auth/logout")
+    assert signed_out.status_code == 204
+    # The session cookie and the one of before v0.8.5 both expire.
+    expired = {value.split("=", 1)[0]: value for value in signed_out.headers.get_list("set-cookie")}
+    assert set(expired) == {"__Host-cd_session", "cd_session"}
+    assert all("Max-Age=0" in value for value in expired.values())
+    assert "Path=/api" in expired["cd_session"]
     assert laptop.get("/api/v1/me").status_code == 401
 
     sign_in(laptop)
@@ -381,7 +427,7 @@ def test_sessions_end_on_sign_out_expiry_and_revocation(
     sign_in(laptop)
     clock.offset = timedelta(days=15)
     stale = laptop.get("/api/v1/me")
-    assert stale.status_code == 401 and 'cd_session=""' in stale.headers["set-cookie"]
+    assert stale.status_code == 401 and '__Host-cd_session=""' in stale.headers["set-cookie"]
     clock.offset = timedelta()
     sign_in(laptop)
     for day in range(1, 31):
@@ -402,9 +448,18 @@ def test_approval_mode_keeps_new_accounts_pending(database: str, certs: Certs) -
         refused = client.get("/api/v1/admin/users")
         assert refused.status_code == 403 and refused.json()["code"] == "account_pending"
 
+        # An account whose email Google has not verified is shown as such to its approver.
+        unverified = sign_in(
+            browser(app), sub="4004", email="eve@example.com", email_verified=False
+        ).json()
+
         root = sysop(app)
         pending = root.get("/api/v1/admin/users", params={"status": "pending"}).json()["items"]
-        assert [user["handle"] for user in pending] == ["Waiting"]
+        assert {user["id"]: (user["email"], user["email_verified"]) for user in pending} == {
+            me["id"]: ("ada@example.com", True),
+            unverified["id"]: ("eve@example.com", False),
+        }
+        assert [user["handle"] for user in pending if user["id"] == me["id"]] == ["Waiting"]
         approved = root.post(
             f"/api/v1/admin/users/{me['id']}/status", json={"status": "active"}
         ).json()
@@ -413,7 +468,7 @@ def test_approval_mode_keeps_new_accounts_pending(database: str, certs: Certs) -
         rotated = client.get("/api/v1/me")
         assert rotated.json()["status"] == "active"
         assert rotated.json()["session"]["id"] != me["session"]["id"]
-        assert "cd_session=" in rotated.headers["set-cookie"]
+        assert "__Host-cd_session=" in rotated.headers["set-cookie"]
         assert client.get("/api/v1/me").status_code == 200
 
         denied = sign_in(browser(app), sub="3003").json()
@@ -583,7 +638,7 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     granted = root.put(f"/api/v1/admin/users/{ada_id}/roles/administrator").json()
     assert granted["roles"] == ["player", "administrator"]
     promoted = ada.get("/api/v1/me")
-    assert "cd_session=" in promoted.headers["set-cookie"]  # rotated on the privilege change
+    assert "__Host-cd_session=" in promoted.headers["set-cookie"]  # rotated on the privilege change
     assert "admin.users.manage" in promoted.json()["permissions"]
     assert "games.view_concealed" not in promoted.json()["permissions"]
 

@@ -1222,9 +1222,15 @@ def test_sysop_gives_packs(client):
     unread = str(fixture_product(client, "set").id)
     refused = root.send("POST", path, gift | {"product": unread})
     assert (refused.status_code, refused.json()["code"]) == (409, "pack_unavailable")
-    given = root.send("POST", path, gift)
+    given = root.send("POST", path, gift | {"key": "pack-grant-1"})
     assert given.status_code == 201
     assert given.json()["granted"] == 3 and given.json()["inventory"][0]["count"] == 3
+    # A retry with the same key grants nothing more; the key with another grant is refused.
+    again = root.send("POST", path, gift | {"key": "pack-grant-1"})
+    assert again.status_code == 201
+    assert again.json()["granted"] == 3 and again.json()["inventory"][0]["count"] == 3
+    reused = root.send("POST", path, gift | {"key": "pack-grant-1", "count": 2})
+    assert (reused.status_code, reused.json()["code"]) == (409, "key_reused")
     assert root.send("POST", f"/api/v1/admin/users/{root.id}/packs", gift).status_code == 201
     assert root.get(path).json()[0]["count"] == 3
     inventory = ada.get("/api/v1/shop").json()["inventory"]

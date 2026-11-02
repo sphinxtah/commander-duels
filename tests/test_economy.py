@@ -11,7 +11,7 @@ from alembic import command
 from alembic.config import Config
 from catalog_fixtures import bulk, engine_list, import_bulk
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.orm import Session
 from test_progression import Account, completed
 
@@ -211,6 +211,28 @@ def test_sysop_gives_tokens_and_spending_stops_at_zero(client):
         db.commit()
     tokens = ada.get("/api/v1/me/tokens").json()
     assert (tokens["balance"], tokens["spent"]) == (0, 500)
+
+
+def test_a_token_grant_with_a_key_grants_once(client):
+    ada = Account(client, "ada")
+    root = Account(client, "sysop", kind="sysop")
+    path = f"/api/v1/admin/users/{ada.id}/tokens"
+    gift = {"amount": 500, "reason": "Testing the shop", "key": "grant-key-1"}
+    assert root.send("POST", path, gift).json()["balance"] == 500
+    again = root.send("POST", path, gift)
+    assert again.status_code == 200 and again.json()["balance"] == 500
+    other = root.send("POST", path, gift | {"amount": 600})
+    assert (other.status_code, other.json()["code"]) == (409, "key_reused")
+    # The key is the account's: the same key for another account is a grant of its own.
+    assert root.send("POST", f"/api/v1/admin/users/{root.id}/tokens", gift).json()["balance"] == 500
+    assert root.send("POST", path, gift | {"key": "grant-key-2"}).json()["balance"] == 1000
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        audited = db.scalar(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(AuditEvent.action == "economy.tokens_granted")
+        )
+    assert audited == 3
 
 
 def test_every_account_is_welcomed_once(client):

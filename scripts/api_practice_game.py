@@ -71,8 +71,8 @@ class Api:
     def remember(self, cookies: list[str]) -> None:
         for header in cookies:
             name, _, rest = header.partition("=")
-            if name == "cd_session":
-                self.cookie = f"cd_session={rest.split(';', 1)[0]}"
+            if name == "__Host-cd_session":
+                self.cookie = f"__Host-cd_session={rest.split(';', 1)[0]}"
 
     def sign_in(self, password: str) -> dict[str, Any]:
         status, me = self.call(

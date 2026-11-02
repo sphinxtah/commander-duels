@@ -57,9 +57,11 @@ from api.games import (
     create_in_engine,
     engine_deck_list,
     engine_names,
+    followed_or_closed,
     full_access,
     hub_of,
     retried,
+    seat_tokens,
 )
 from api.identity import ApiError, Db, Principal, not_found, utcnow
 from api.library import at_godlike, library_of, won_custom
@@ -784,25 +786,27 @@ async def next_game(hub: GameHub, match_id: UUID) -> None:
                     await run_in_threadpool(fail, hub.database, match_id)
                     return
                 try:
-                    game = await run_in_threadpool(record_next, db, plan, created)
-                except (ApiError, SQLAlchemyError):
-                    await run_in_threadpool(db.rollback)
-                    with suppress(EngineUnavailable):
-                        await engine.request("POST", f"/games/{created['game_id']}/close", body={})
+                    async with followed_or_closed(hub, created, db):
+                        game = await run_in_threadpool(record_next, db, plan, created)
+                        tokens = seat_tokens(created)
+                        hub.register(
+                            LiveGame(
+                                id=game.id,
+                                kind=plan.kind,
+                                seats={
+                                    index: LiveSeat(index, seat.user_id, tokens[index])
+                                    for index, seat in enumerate(plan.seats)
+                                    if seat.user_id is not None
+                                },
+                            )
+                        )
+                except ApiError:
+                    # The match changed meanwhile: nothing to retry.
+                    return
+                except SQLAlchemyError:
+                    log.warning("Could not record match %s's next game", match_id, exc_info=True)
                     return
                 waiting_of(hub).pop(match_id, None)
-                tokens = {entry["seat"]: entry["seat_token"] for entry in created["seats"]}
-                hub.register(
-                    LiveGame(
-                        id=game.id,
-                        kind=plan.kind,
-                        seats={
-                            index: LiveSeat(index, seat.user_id, tokens[index])
-                            for index, seat in enumerate(plan.seats)
-                            if seat.user_id is not None
-                        },
-                    )
-                )
             finally:
                 hub.starting -= 1
 
@@ -904,7 +908,7 @@ async def get_match(match_id: UUID, request: Request, principal: Player, db: Db)
     match, _ = await run_in_threadpool(visible, db, match_id, principal)
     # Its timer may have gone with an earlier process. A start under way, or one already asked to
     # run again, is not asked twice.
-    starting = hub.locks[match.id].locked() or match.id in retrying_of(hub)
+    starting = hub.locks.locked(match.id) or match.id in retrying_of(hub)
     if overdue(match) and hub.engine is not None and not starting:
         hub.spawn(next_game(hub, match.id))
     return await run_in_threadpool(

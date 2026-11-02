@@ -300,9 +300,26 @@ function Users({
                       </small>
                     ) : (
                       <small>
-                        {manage
-                          ? `${user.email ?? "No email"} · joined`
-                          : "Joined"}{" "}
+                        {manage ? (
+                          <>
+                            {user.email ?? "No email"}
+                            {/* Google did not verify the address: it proves nothing. */}
+                            {user.email && !user.email_verified && (
+                              <>
+                                {" "}
+                                <span
+                                  className={admin.unverified}
+                                  title="Google has not verified this email address"
+                                >
+                                  unverified
+                                </span>
+                              </>
+                            )}{" "}
+                            · joined
+                          </>
+                        ) : (
+                          "Joined"
+                        )}{" "}
                         {when(user.created_at)} · last seen{" "}
                         {when(user.last_seen_at)}
                       </small>

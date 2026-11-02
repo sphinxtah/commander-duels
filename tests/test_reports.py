@@ -372,7 +372,7 @@ def test_only_active_accounts_send_reports(client):
     unsigned = client.post(
         "/api/v1/reports",
         json={"summary": "x", "description": "y", "context": context()},
-        headers={"cookie": f"cd_session={ada.token}"},
+        headers={"cookie": f"__Host-cd_session={ada.token}"},
     )
     assert unsigned.status_code == 403 and unsigned.json()["code"] == "csrf_failed"
 

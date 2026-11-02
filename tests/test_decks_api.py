@@ -81,7 +81,7 @@ class Account:
         self.http = client
 
     def headers(self) -> dict[str, str]:
-        return {"cookie": f"cd_session={self.token}", "x-csrf-token": self.csrf}
+        return {"cookie": f"__Host-cd_session={self.token}", "x-csrf-token": self.csrf}
 
     def get(self, path: str, **params: Any) -> httpx.Response:
         return self.http.get(path, params=params, headers=self.headers())
@@ -245,6 +245,12 @@ def test_card_search_and_details(client):
     assert refused.status_code == 422 and refused.json()["code"] == "invalid_search"
     assert "Supported:" in refused.json()["message"]
     assert ada.get("/api/v1/cards", q="(t:elf").json()["code"] == "invalid_search"
+    # A year is a whole number from 1 to 9999.
+    for term in ("year:0", "year:10000", "year:nan", "year:inf", "year>=-inf", "year:1999.5"):
+        refused = ada.get("/api/v1/cards", q=term)
+        assert (refused.status_code, refused.json()["code"]) == (422, "invalid_search"), term
+    assert ada.get("/api/v1/cards", q="year:1993").status_code == 200
+    assert ada.get("/api/v1/cards", q="year>=2020.0").status_code == 200
     detail = ada.get(f"/api/v1/cards/{card_id(client, 'Lurrus of the Dream-Den')}").json()
     assert detail["rulings"] and detail["printings"] and detail["companion"] is True
     assert detail["all_legalities"]["legacy"] == "banned"
@@ -371,6 +377,27 @@ def test_deck_lifecycle_drafts_and_revisions(client):
     assert [d["title"] for d in ada.get("/api/v1/decks", view="trash").json()] == ["Red Deck Wins"]
     assert ada.send("POST", f"{path}/restore").json()["deleted_at"] is None
     assert len(ada.get("/api/v1/decks").json()) == 2
+
+
+def test_a_draft_naming_an_unknown_card_or_edition_is_refused(client):
+    ada = Account(client, "ada", admin=True)
+    deck = ada.send("POST", "/api/v1/decks", {"title": "Burn", "format": "legacy"}).json()
+    path = f"/api/v1/decks/{deck['id']}"
+    bolt = entry(client, "Lightning Bolt", 4)
+    for wrong in ({**bolt, "card_id": str(uuid4())}, {**bolt, "printing_id": str(uuid4())}):
+        refused = ada.send("PUT", f"{path}/draft", {"version": 1, "entries": [wrong]})
+        assert (refused.status_code, refused.json()["code"]) == (422, "unknown_card")
+    made = ada.send(
+        "POST",
+        "/api/v1/decks",
+        {"title": "Ghost", "format": "legacy", "entries": [{**bolt, "card_id": str(uuid4())}]},
+    )
+    assert (made.status_code, made.json()["code"]) == (422, "unknown_card")
+    # Nothing was saved, and a revision of the deck as it stands is made.
+    assert ada.get(path).json()["draft"]["version"] == 1
+    saved = ada.send("PUT", f"{path}/draft", {"version": 1, "entries": [bolt]})
+    assert saved.status_code == 200, saved.text
+    assert ada.send("POST", f"{path}/revisions").status_code == 201
 
 
 def test_decks_keep_the_table_options_they_need(client):
@@ -720,6 +747,26 @@ def test_import_preview_resolves_names_and_round_trips(client):
         ).json()["code"]
         == "invalid_deck_list"
     )
+    # More lines than a deck has entries: each edition of each card in four sections.
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        named = db.execute(
+            select(CardConcept.name, CardPrinting.set_code, CardPrinting.collector_number).join(
+                CardPrinting, CardPrinting.concept_id == CardConcept.id
+            )
+        ).all()
+    lines = [
+        line
+        for section in ("Deck", "Sideboard", "Maybeboard", "Companion")
+        for line in [
+            section,
+            *(f"1 {name} ({code.upper()}) {number}" for name, code, number in named),
+        ]
+    ][:600]
+    wide = ada.send(
+        "POST", "/api/v1/decks/import/preview", {"format": "legacy", "text": "\n".join(lines)}
+    )
+    assert (wide.status_code, wide.json()["code"]) == (422, "invalid_deck_list")
+    assert "at most 400" in wide.json()["message"]
 
 
 def test_commander_import_and_starters(client):

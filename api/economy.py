@@ -50,6 +50,8 @@ from api.models import Game, GameSeat, SiteSetting, TokenEntry, User
 from api.progression import total_wins, winning_seats
 from api.schemas import Contract, StoredText
 
+RequestKey = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
+
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Reader = Annotated[Principal, Depends(require_permission("admin.users.read"))]
 EconomyManager = Annotated[Principal, Depends(require_permission("economy.manage"))]
@@ -116,6 +118,11 @@ class TokenGrant(Contract):
         ge=-MAX_GRANT, le=MAX_GRANT, description="Tokens to give; negative takes back."
     )
     reason: Annotated[StoredText, Field(min_length=3, max_length=200)]
+    key: RequestKey | None = Field(
+        default=None,
+        description="The client's own key for this grant: a retry with it grants once. Without "
+        "one, each request grants.",
+    )
 
 
 class EconomySettings(Contract):
@@ -361,9 +368,36 @@ def credit(
     return True
 
 
-def grant(db: Session, user: User, amount: int, reason: str, actor: User) -> TokenEntry:
-    """SysOp's grant, in the caller's transaction: tokens given, or taken back down to zero."""
+def grant_key(user_id: UUID, key: str | None) -> str:
+    """A grant's ledger key: the client's key for this account, or a fresh one."""
+    return f"grant:{user_id}:{key}" if key else f"grant:{uuid4()}"
+
+
+def granted(db: Session, user: User, amount: int, reason: str, key: str) -> bool:
+    """Whether the client's key granted already (a retry), with the account's row locked so a
+    retry sent at once waits for the request it repeats. A key that granted something else is
+    refused."""
     lock_account(db, user.id)
+    earlier = db.scalar(select(TokenEntry).where(TokenEntry.key == grant_key(user.id, key)))
+    if earlier is None:
+        return False
+    if (earlier.amount, earlier.reason) != (amount, reason):
+        raise ApiError(409, "key_reused", "That grant key gave a different grant.")
+    return True
+
+
+def grant(
+    db: Session,
+    user: User,
+    amount: int,
+    reason: str,
+    actor: User,
+    key: str | None = None,
+) -> TokenEntry:
+    """SysOp's grant, in the caller's transaction: tokens given, or taken back down to zero. The
+    ledger key is the client's key for this account, if given (see granted)."""
+    lock_account(db, user.id)
+    ledger_key = grant_key(user.id, key)
     balance = balance_of(db, user.id)
     if amount == 0:
         raise ApiError(422, "invalid_amount", "Give or take back at least one token.")
@@ -375,7 +409,7 @@ def grant(db: Session, user: User, amount: int, reason: str, actor: User) -> Tok
         user_id=user.id,
         kind="grant",
         amount=amount,
-        key=f"grant:{uuid4()}",
+        key=ledger_key,
         policy=POLICY,
         reason=reason,
         actor_id=actor.id,
@@ -499,10 +533,14 @@ def give_tokens(
     user_id: UUID, body: TokenGrant, request: Request, principal: EconomyManager, db: Db
 ) -> Tokens:
     """SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of
-    its own, apart from tokens earned, with the reason, and audited (PROG03)."""
+    its own, apart from tokens earned, with the reason, and audited (PROG03). A retry with the
+    same key grants once."""
     user = target(db, user_id, principal)
     refuse_deleted(user)
-    entry = grant(db, user, body.amount, body.reason, principal.user)
+    if body.key is not None and granted(db, user, body.amount, body.reason, body.key):
+        db.commit()
+        return tokens_of(db, user.id)
+    entry = grant(db, user, body.amount, body.reason, principal.user, body.key)
     audit(
         db,
         request,

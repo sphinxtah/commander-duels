@@ -630,7 +630,8 @@ class Apply:
                 CardConcept.capabilities,
             ).where(CardConcept.id.in_(list(by_id)))
         )
-        updates: list[dict[str, Any]] = []
+        # By the status read: a card the staff suspended, or one they had not.
+        updates: dict[bool, list[dict[str, Any]]] = {True: [], False: []}
         changes: list[dict[str, Any]] = []
         for row in rows:
             card = by_id[row.id]
@@ -638,7 +639,7 @@ class Apply:
             values = decision.values()
             current = {key: getattr(row, key) for key in values}
             if current != values:
-                updates.append({**values, "id": row.id})
+                updates[row.status == "suspended"].append({**values, "id": row.id})
                 if row.status != decision.status and row.id not in self.added:
                     changes.append(
                         self.change(
@@ -652,6 +653,34 @@ class Apply:
                             },
                         )
                     )
-        for batch in batches(updates):
-            self.session.execute(update(CardConcept), batch)
+        # The staff may suspend or restore a card while this runs: each update applies only to
+        # a card whose suspension is still as it was read, so their decision stands (the next
+        # import decides the card from it).
+        quiet = {"synchronize_session": None}
+        for suspended, rows_of in updates.items():
+            guard = (
+                CardConcept.status == "suspended"
+                if suspended
+                else CardConcept.status != "suspended"
+            )
+            for batch in batches(rows_of):
+                self.session.execute(
+                    update(CardConcept).where(guard).execution_options(**quiet), batch
+                )
+        if changes:
+            # A change the staff's decision overtook is not this revision's.
+            now = dict(
+                self.session.execute(
+                    select(CardConcept.id, CardConcept.status).where(
+                        CardConcept.id.in_([change["concept_id"] for change in changes])
+                    )
+                ).all()
+            )
+            standing = [
+                change
+                for change in changes
+                if now.get(change["concept_id"]) == change["details"]["to"]
+            ]
+            self.changes["status_changed"] -= len(changes) - len(standing)
+            changes = standing
         self.write_changes(changes)

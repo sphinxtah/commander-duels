@@ -502,6 +502,11 @@ def test_a_late_bid_pushes_the_end_and_the_end_settles_on_a_read(client):
     assert (seen["status"], seen["buyer"], seen["sold_price"]) == ("sold", "bob", 150)
     with database(client) as db:
         assert auctions_api.settle_due(db, {}) == 0
+        # The sale is the clock's: its audit entry has the buyer as actor, and neither the
+        # address nor the request of the read that settled it.
+        sold = db.scalars(select(AuditEvent).where(AuditEvent.action == "auction.sold")).one()
+        assert sold.actor_id == bob.id
+        assert (sold.source_address, sold.request_id) == (None, None)
         assert (
             db.scalar(select(func.count()).select_from(TokenEntry).where(TokenEntry.kind == "sale"))
             == 1
@@ -551,6 +556,52 @@ def test_the_worker_settles_and_an_unsold_copy_comes_back(client, content):  # n
     # A sold copy cannot be relisted.
     refused = ada.send("POST", f"/api/v1/auctions/{sold}/relist", {**body, "key": key()})
     assert (refused.status_code, refused.json()["code"]) == (409, "not_relistable")
+
+
+def test_an_auction_that_fails_to_settle_holds_up_no_other(client, monkeypatch):
+    first, second, _ = bolts(client)
+    ada = Account(client, "ada")
+    finished(client, ada.id, first, "nonfoil", 1)
+    finished(client, ada.id, second, "nonfoil", 1)
+    broken = sell(ada, first)["id"]
+    fine = sell(ada, second)["id"]
+    ends_in(client, broken, -10)
+    ends_in(client, fine, -5)
+    real = auctions_api.finish_auction
+
+    def finish(db, auction, now, roster):
+        if str(auction.id) == broken:
+            raise RuntimeError("settlement failed")
+        real(db, auction, now, roster)
+
+    monkeypatch.setattr(auctions_api, "finish_auction", finish)
+    with database(client) as db:
+        assert auctions_api.settle_due(db, {}) == 1
+        statuses = {
+            str(found.id): found.status
+            for found in db.scalars(select(Auction).where(Auction.seller_id == ada.id))
+        }
+    assert statuses == {broken: "active", fine: "expired"}
+    # Once it settles, it is settled on the next pass.
+    monkeypatch.undo()
+    with database(client) as db:
+        assert auctions_api.settle_due(db, {}) == 1
+
+
+def test_sysop_lists_a_printing_with_a_print_run_only_from_copies_granted(client, monkeypatch):
+    first, second, _ = bolts(client)
+    monkeypatch.setattr(print_runs, "runs_in", lambda folder: {first.scryfall_id: 100})
+    root = sysop(client)
+    refused = root.send("POST", "/api/v1/auctions", listing(first))
+    assert (refused.status_code, refused.json()["code"]) == (422, "not_sellable")
+    assert "100 copies" in refused.json()["message"]
+    offered = root.get("/api/v1/auctions/sellable", q="lightning bolt", limit=60).json()["items"]
+    limits = {item["card"]["printing_id"]: item["sellable"] for item in offered}
+    assert limits[str(first.id)] == 0 and limits[str(second.id)] == auctions_api.MAX_QUANTITY
+    # A copy granted to SysOp was dealt, and may be sold as a player's.
+    finished(client, root.id, first, "nonfoil", 1)
+    assert sell(root, first)["seller"] == "root"
+    assert sell(root, second)["seller"] == "root"
 
 
 def test_the_transfer_targets(client):

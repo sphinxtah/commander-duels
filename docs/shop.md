@@ -98,7 +98,7 @@ The shop's second tab, beside the packs, sells the ten Commander starter decks (
 
 ## SysOp gives packs
 
-SysOp gives unopened packs to any account, its own included (permission `economy.manage`): 1 to 100 of one product at a time, with a reason, audited (`shop.packs_granted`). Administration's Card shop tab has the form. Administrators see the shop's data but give nothing.
+SysOp gives unopened packs to any account, its own included (permission `economy.manage`): 1 to 100 of one product at a time, with a reason, audited (`shop.packs_granted`). Since v0.8.5 a grant may carry the client's `key`, as a purchase does: a retry with it (a double click, a lost answer) grants once, and the key with another grant is refused (`409 key_reused`). Administration's Card shop tab has the form, and sends a key with each grant. Administrators see the shop's data but give nothing.
 
 ## The scope's notes
 

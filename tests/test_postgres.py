@@ -2,7 +2,7 @@
 
 import os
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -519,6 +519,162 @@ def test_account_deletion_on_postgresql(monkeypatch):
             gone = connection.execute(text("SELECT to_regproc('deck_revisions_redactable')"))
             assert gone.scalar() is None
         command.upgrade(config, "head")
+    finally:
+        engine.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_two_revisions_saved_at_once_are_numbered_in_turn(monkeypatch, tmp_path):
+    """Saving a revision locks the deck's row: two saves at once (a double click, or a save
+    racing a table's start) never take the same number. The second, of the same draft, finds the
+    first's revision."""
+    import threading
+
+    from catalog_fixtures import bulk, engine_list, import_bulk
+
+    from api import decks
+    from api.library import Library
+    from api.models import CardConcept, Deck, DeckRevision
+    from api.validation import DeckEntry
+
+    url = os.environ["CD_TEST_POSTGRES_URL"]
+    schema = f"test_{uuid4().hex}"
+    admin = create_engine(url, connect_args={"connect_timeout": 3})
+    with admin.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    scoped = (
+        make_url(url)
+        .update_query_dict({"options": f"-csearch_path={schema}"})
+        .render_as_string(hide_password=False)
+    )
+    monkeypatch.setenv("CD_DATABASE_URL", scoped)
+    engine = create_engine(scoped, connect_args={"connect_timeout": 3})
+    try:
+        command.upgrade(Config("alembic.ini"), "head")
+        import_bulk(engine, tmp_path / "files", bulk(), engine_list())
+        user, deck_id = uuid4(), uuid4()
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id, display_name, kind, status, onboarding, avatar, "
+                    "locale, preferences, privilege_version, created_at) VALUES (:id, 'Ada', "
+                    "'player', 'active', 'complete', 'sigil', 'en', '{}', 0, now())"
+                ),
+                {"id": user},
+            )
+        with Session(engine) as session:
+            bolt = session.scalar(
+                select(CardConcept.id).where(CardConcept.name == "Lightning Bolt")
+            )
+            assert bolt is not None
+            deck = Deck(
+                id=deck_id,
+                owner_id=user,
+                title="Burn",
+                format="legacy",
+                visibility="private",
+                notes="",
+                draft={"entries": [DeckEntry(card_id=bolt, quantity=4).model_dump(mode="json")]},
+                draft_version=1,
+                draft_hash="",
+                source="empty",
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+            session.add(deck)
+            session.commit()
+        library = Library(unlimited=True)
+        start = threading.Barrier(2)
+
+        def save() -> int:
+            with Session(engine) as session:
+                deck = session.get_one(Deck, deck_id)
+                start.wait()
+                revision = decks.publish(session, deck, library)
+                session.commit()
+                return revision.number
+
+        with ThreadPoolExecutor(max_workers=2) as workers:
+            numbers = list(workers.map(lambda _: save(), range(2)))
+        assert numbers == [1, 1]
+        with Session(engine) as session:
+            assert session.scalars(select(DeckRevision.number)).all() == [1]
+    finally:
+        engine.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin.dispose()
+
+
+@pytest.mark.skipif(not os.getenv("CD_TEST_POSTGRES_URL"), reason="PostgreSQL URL not supplied")
+def test_a_suspension_during_an_import_stands(monkeypatch, tmp_path):
+    """The staff suspend a card while the daily import decides the cards' statuses: the import's
+    update leaves the suspended card alone."""
+    from catalog_fixtures import NOW, bulk, engine_list, import_bulk
+
+    from api.models import CardConcept, CatalogChange
+    from catalog import statuses
+
+    url = os.environ["CD_TEST_POSTGRES_URL"]
+    schema = f"test_{uuid4().hex}"
+    admin = create_engine(url, connect_args={"connect_timeout": 3})
+    with admin.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    scoped = (
+        make_url(url)
+        .update_query_dict({"options": f"-csearch_path={schema}"})
+        .render_as_string(hide_password=False)
+    )
+    monkeypatch.setenv("CD_DATABASE_URL", scoped)
+    engine = create_engine(scoped, connect_args={"connect_timeout": 3})
+    try:
+        command.upgrade(Config("alembic.ini"), "head")
+        import_bulk(engine, tmp_path / "a", bulk(), engine_list())
+        with Session(engine) as session:
+            giant = session.scalars(
+                select(CardConcept).where(CardConcept.name == "Hill Giant")
+            ).one()
+            assert giant.status == "certified"
+            giant_id = giant.id
+        # The next import finds the engine's Hill Giant differs: it would no longer be certified.
+        export = engine_list()
+        for card in export["cards"]:
+            if card["name"] == "Hill Giant":
+                card["power"] = "4"
+        decide = statuses.decide
+
+        def and_meanwhile(card, current, cards):
+            if current.id == giant_id:
+                with engine.begin() as connection:
+                    connection.execute(
+                        text(
+                            "UPDATE card_concepts SET status = 'suspended', "
+                            "status_reason = 'suspended_by_staff', status_detail = 'Rules bug' "
+                            "WHERE id = :id"
+                        ),
+                        {"id": giant_id},
+                    )
+            return decide(card, current, cards)
+
+        monkeypatch.setattr(statuses, "decide", and_meanwhile)
+        applied = import_bulk(engine, tmp_path / "b", bulk(), export, NOW + timedelta(days=1))
+        with Session(engine) as session:
+            giant = session.get_one(CardConcept, giant_id)
+            assert (giant.status, giant.status_reason, giant.status_detail) == (
+                "suspended",
+                "suspended_by_staff",
+                "Rules bug",
+            )
+            assert not session.scalars(
+                select(CatalogChange).where(
+                    CatalogChange.revision_id == applied.revision_id,
+                    CatalogChange.concept_id == giant_id,
+                    CatalogChange.kind == "status_changed",
+                )
+            ).all()
     finally:
         engine.dispose()
         with admin.begin() as connection:

@@ -162,7 +162,17 @@ class SessionInfo(Contract):
     absolute_expires_at: datetime
 
 
-TutorialStage = Literal["choose", "demo", "overview", "setup", "tour_shop", "tour_auctions", "done"]
+TutorialStage = Literal[
+    "choose",
+    "demo",
+    "overview",
+    "setup",
+    "tour_shop",
+    "tour_auctions",
+    "tour_decks",
+    "tour_play",
+    "done",
+]
 TutorialPath = Literal["beginner", "novice", "advanced"]
 
 
@@ -175,8 +185,8 @@ class Tutorial(Contract):
         "chosen."
     )
     stage: TutorialStage = Field(
-        description="choose, then demo (beginner) or overview (novice), setup, tour_shop and "
-        "tour_auctions (the main menu's tour), done."
+        description="choose, then demo (beginner) or overview (novice), setup, tour_shop, "
+        "tour_auctions, tour_decks and tour_play (the main menu's tour), done."
     )
     skipped: bool = Field(description="Whether the player skipped the rest of it.")
 
@@ -259,6 +269,11 @@ class AdminUser(Contract):
     handle: str | None
     display_name: str
     email: str | None
+    email_verified: bool = Field(
+        default=False,
+        description="Whether Google said the email is verified (v0.8.5); false when no email is "
+        "shown.",
+    )
     status: AccountStatus
     roles: list[Role]
     created_at: datetime

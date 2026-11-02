@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import importlib.util
 import json
+import os
 import secrets
 import sys
 import threading
@@ -98,6 +99,11 @@ class FakeEngine:
         # A slow engine: creating a game takes this long, and so does stopping one ("closing").
         self.create_delay = 0.0
         self.close_delay = 0.0
+        # A view asked for without waiting (a page) is answered only once the game has reached
+        # this revision, and a moment later, when set.
+        self.page_at: int | None = None
+        # The answer to the next create is changed by this, when set.
+        self.mangle: Any = None
 
     def game(self, game_id: str) -> FakeGame:
         return self.games[game_id]
@@ -111,7 +117,12 @@ class FakeEngine:
             return httpx.Response(200, json={"names": ["Lightning Bolt", "Lightning Helix"]})
         if parts == ["games"]:
             await asyncio.sleep(self.create_delay)
-            return self.create(body)
+            created = self.create(body)
+            if self.mangle is not None and created.status_code == 201:
+                answer = json.loads(created.content)
+                self.mangle(answer)
+                return httpx.Response(201, json=answer)
+            return created
         game = self.games.get(parts[1])
         if game is None:
             return httpx.Response(404, json={"code": "not_found"})
@@ -181,6 +192,10 @@ class FakeEngine:
         log_from = int(params["log_from"]) if "log_from" in params else None
         if "wait_ms" not in params:
             self.pages += 1
+            if self.page_at is not None:
+                while game.revision < self.page_at:
+                    await asyncio.sleep(0.01)
+                await asyncio.sleep(0.2)
         while True:
             with self.lock:
                 if game.revision > since or game.result or time.monotonic() >= deadline:
@@ -330,16 +345,18 @@ class Account:
         self.http = client
 
     def get(self, path: str, **params: str) -> httpx.Response:
-        return self.http.get(path, params=params, headers={"cookie": f"cd_session={self.token}"})
+        return self.http.get(
+            path, params=params, headers={"cookie": f"__Host-cd_session={self.token}"}
+        )
 
     def post(self, path: str, body: object = None, csrf: bool = True) -> httpx.Response:
-        headers = {"cookie": f"cd_session={self.token}"}
+        headers = {"cookie": f"__Host-cd_session={self.token}"}
         if csrf:
             headers["x-csrf-token"] = self.csrf
         return self.http.post(path, json=body, headers=headers)
 
     def socket(self, game_id: str, origin: str | None = ORIGIN) -> Any:
-        headers = {"cookie": f"cd_session={self.token}"}
+        headers = {"cookie": f"__Host-cd_session={self.token}"}
         if origin:
             headers["origin"] = origin
         return self.http.websocket_connect(f"/api/v1/games/{game_id}/events", headers=headers)
@@ -429,9 +446,14 @@ def renew(account: Account) -> str:
     the browser keeps the new cookie. Returns the old token."""
     response = account.get("/api/v1/me")
     assert response.status_code == 200, response.text
-    cookies = [c for c in response.headers.get_list("set-cookie") if c.startswith("cd_session=")]
+    cookies = [
+        c for c in response.headers.get_list("set-cookie") if c.startswith("__Host-cd_session=")
+    ]
     assert cookies, "the session was not rotated"
-    old, account.token = account.token, cookies[-1].split(";", 1)[0].removeprefix("cd_session=")
+    old, account.token = (
+        account.token,
+        cookies[-1].split(";", 1)[0].removeprefix("__Host-cd_session="),
+    )
     return old
 
 
@@ -1219,3 +1241,242 @@ def test_a_typed_name_goes_to_the_engine_as_text() -> None:
             games.GameCommand.model_validate(base | {"payload": payload})
     with pytest.raises(ValidationError):
         games.GameCommand.model_validate(base | {"type": "concede", "payload": {"text": "Island"}})
+
+
+def test_a_new_tab_gets_the_whole_log_while_the_game_moves_on(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """A tab that connects while the game moves on gets a whole page of the log first. Snapshots
+    the follow task publishes while that page is fetched carry only their new lines: they wait
+    for the page, which covers them, rather than reach the tab before it."""
+    ada = Account(client, "ada")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    with ada.socket(game_id) as first, ada.socket(game_id) as second:
+        playing = Tab(first, [])
+        first.send_json(ada.hello(control=True))
+        playing.command(playing.snapshot(1))
+        moved = playing.snapshot(2)
+        # The page of revision 2 was never asked for, so the new tab's page is fetched: the
+        # engine answers it only after the next revision, which the follow task publishes first.
+        engine.page_at = 3
+        late = Tab(second, [])
+        second.send_json(ada.hello())
+        late.until("welcome")
+        playing.command(moved)
+        assert playing.until("command_result")["status"] == 200
+        opening = late.snapshot(1)
+        assert opening["revision"] == 3 and opening["log_from"] == 0
+        assert [line["text"] for line in opening["log"]] == [
+            "The game begins.",
+            "Answer 1",
+            "Answer 2",
+        ]
+        assert "snapshot" not in drained(late)
+
+
+def test_a_signed_out_tab_cannot_take_control_or_resync(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """Taking control and asking to resync check the session as a command does, so a tab whose
+    session ended cannot hold the seat's lease until the minute's check."""
+    ada = Account(client, "ada")
+    game_id = ada.post("/api/v1/practice-games", {}).json()["id"]
+    hub: games.GameHub = app.state.games
+    with ada.socket(game_id) as first, ada.socket(game_id) as second:
+        taking, syncing = Tab(first, []), Tab(second, [])
+        for socket, tab in ((first, taking), (second, syncing)):
+            socket.send_json(ada.hello())
+            tab.snapshot(1)
+        assert ada.post("/api/v1/auth/logout-all").status_code == 204
+        first.send_json({"type": "take_control"})
+        assert ended_with(taking, games.CLOSE_UNAUTHENTICATED) == "authentication_required"
+        assert hub.games[uuid.UUID(game_id)].seats[0].controller is None
+        second.send_json({"type": "resync", "since": -1})
+        assert ended_with(syncing, games.CLOSE_UNAUTHENTICATED) == "authentication_required"
+
+
+def test_a_create_answer_the_api_cannot_follow_is_closed(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """An engine answer without a human seat's token, or without the seats' decks, would leave
+    a game running that nothing follows, or one recorded active that nobody can play. The API
+    checks the answer before it records anything: the game is closed in the engine, nothing is
+    recorded, the slot is given back and the player may start again."""
+    ada = Account(client, "ada")
+    hub: games.GameHub = app.state.games
+
+    def tokenless(answer: dict[str, Any]) -> None:
+        answer["seats"][0].pop("seat_token")
+
+    def deckless(answer: dict[str, Any]) -> None:
+        answer["settings"]["seats"][1].pop("deck")
+
+    for mangle in (tokenless, deckless):
+        engine.mangle = mangle
+        refused = ada.post("/api/v1/practice-games", {})
+        assert (refused.status_code, refused.json()["code"]) == (503, "engine_unavailable")
+        made = list(engine.games)[-1]
+        assert made in engine.closed
+        assert hub.starting == 0 and hub.running() == 0
+    with Session(app.state.database) as db:
+        assert db.scalars(select(Game)).all() == []
+    engine.mangle = None
+    assert ada.post("/api/v1/practice-games", {}).status_code == 201
+    assert not hub.locks
+
+
+def test_a_game_that_cannot_be_recorded_is_closed_and_interrupted(
+    client: TestClient, app: FastAPI, engine: FakeEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Recording a created game may fail for any reason, not only the database's (here a bug),
+    and registering it may fail after the record's commit. Either way the game is closed in the
+    engine and, if it was recorded, recorded interrupted, so it holds no slot and no player's
+    limit; the request fails with its own error (the test client raises it)."""
+    ada = Account(client, "ada")
+    hub: games.GameHub = app.state.games
+
+    def broken(*args: Any) -> games.Game:
+        raise KeyError("seats")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(games, "record_game", broken)
+        with pytest.raises(KeyError, match="seats"):
+            ada.post("/api/v1/practice-games", {})
+    assert list(engine.games)[-1] in engine.closed
+    assert hub.starting == 0 and hub.running() == 0
+
+    def unregistrable(game: games.LiveGame) -> None:
+        raise RuntimeError("registering failed")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(hub, "register", unregistrable)
+        with pytest.raises(RuntimeError, match="registering failed"):
+            ada.post("/api/v1/practice-games", {})
+    made = list(engine.games)[-1]
+    assert made in engine.closed
+    with Session(app.state.database) as db:
+        assert db.get(Game, uuid.UUID(made)).status == "interrupted"  # type: ignore[union-attr]
+    assert hub.starting == 0 and hub.running() == 0
+    assert ada.post("/api/v1/practice-games", {}).status_code == 201
+
+
+def test_a_close_that_fails_does_not_hide_the_failure() -> None:
+    """Giving up a created game closes it in the engine; a close the engine does not answer is
+    logged, and the error that made the API give the game up is the one raised."""
+
+    class Silent:
+        async def request(self, method: str, path: str, **_: Any) -> Any:
+            raise games.EngineUnavailable("no answer")
+
+    hub: Any = argparse.Namespace(
+        games={},
+        database=None,
+        settings=argparse.Namespace(content_dir=None),
+        require_engine=lambda: Silent(),
+    )
+
+    async def failing() -> None:
+        async with games.followed_or_closed(hub, {"game_id": str(uuid.uuid4())}):
+            raise KeyError("seat_token")
+
+    with pytest.raises(KeyError, match="seat_token"):
+        asyncio.run(failing())
+
+
+def test_locks_are_kept_only_while_held_or_awaited() -> None:
+    """The hub's locks by account, table, game and match id: one is dropped once no task holds
+    or waits for it, and asking whether one is held keeps nothing."""
+    locks = games.KeyedLocks()
+    key, other = uuid.uuid4(), uuid.uuid4()
+    order: list[str] = []
+
+    async def holding(name: str, wait: float) -> None:
+        async with locks[key]:
+            order.append(name)
+            await asyncio.sleep(wait)
+
+    async def run() -> None:
+        assert not locks.locked(other) and not locks
+        first = asyncio.create_task(holding("first", 0.05))
+        await asyncio.sleep(0)
+        second = asyncio.create_task(holding("second", 0))
+        await asyncio.sleep(0.01)
+        assert locks.locked(key) and len(locks) == 1 and order == ["first"]
+        await asyncio.gather(first, second)
+        assert order == ["first", "second"] and not locks
+
+        async def cancelled() -> None:
+            async with locks[key]:
+                await asyncio.sleep(10)
+
+        task = asyncio.create_task(cancelled())
+        await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert not locks
+
+    asyncio.run(run())
+
+
+def test_a_second_api_process_on_postgresql_does_not_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The games live in one process's memory, so on PostgreSQL a process takes an advisory lock
+    on running them before it marks earlier games interrupted. A second process on the same
+    database (another worker) fails to start and leaves the first one's games alone; once the
+    first stops, the lock is free again."""
+    url = os.environ.get("CD_TEST_POSTGRES_URL")
+    if not url:
+        pytest.skip("PostgreSQL URL not supplied")
+    from sqlalchemy import create_engine, make_url, text
+
+    from api.models import Base
+
+    schema = f"test_{uuid.uuid4().hex}"
+    admin = create_engine(url, connect_args={"connect_timeout": 3})
+    with admin.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    scoped = (
+        make_url(url)
+        .update_query_dict({"options": f"-csearch_path={schema}"})
+        .render_as_string(hide_password=False)
+    )
+    settings = Settings(database_url=scoped)
+    database = create_engine(scoped, connect_args={"connect_timeout": 3})
+    try:
+        Base.metadata.create_all(database)
+        checked: list[games.GameHub] = []
+        interrupt_active = games.interrupt_active
+
+        def checking(hub: games.GameHub) -> None:
+            monkeypatch.setattr(
+                games,
+                "interrupt_active",
+                lambda *args: checked.append(hub) or interrupt_active(*args),
+            )
+
+        async def run() -> None:
+            first = games.GameHub(settings, database, None)
+            second = games.GameHub(settings, database, None)
+            checking(first)
+            await first.start()
+            checking(second)
+            with pytest.raises(RuntimeError, match="second API process"):
+                await second.start()
+            assert checked == [first]
+            assert first.holder is not None and second.holder is None
+            await first.stop()
+            assert first.holder is None
+            again = games.GameHub(settings, database, None)
+            checking(again)
+            await again.start()
+            assert again.holder is not None and checked == [first, again]
+            await again.stop()
+
+        asyncio.run(run())
+    finally:
+        database.dispose()
+        with admin.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        admin.dispose()

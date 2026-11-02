@@ -30,7 +30,6 @@ from api.identity import (
     Db,
     Principal,
     audit,
-    email_of,
     not_found,
     refuse_deleted,
     require_permission,
@@ -38,6 +37,7 @@ from api.identity import (
     revoke_sessions,
     roles_of,
     utcnow,
+    verified_email_of,
 )
 from api.models import AuditEvent, ExternalIdentity, RoleGrant, User
 from api.progression import admin_progress
@@ -89,12 +89,17 @@ def granted_roles(db: Session, user: User) -> list[str]:
 
 def admin_user(db: Session, user: User, viewer: Principal) -> AdminUser:
     wins, tier = admin_progress(db, user)
+    # Email identifies the accounts administrators approve; moderators approve none. Whether
+    # Google verified it goes with it, so an unverified address is not taken as proof.
+    email, verified = (
+        verified_email_of(db, user) if viewer.can("admin.users.manage") else (None, False)
+    )
     return AdminUser(
         id=user.id,
         handle=user.handle,
         display_name=user.display_name,
-        # Email identifies the accounts administrators approve; moderators approve none.
-        email=email_of(db, user) if viewer.can("admin.users.manage") else None,
+        email=email,
+        email_verified=verified,
         status=cast(AccountStatus, user.status),
         # An inactive account shows the grants it would get back, so an administrator's row
         # stays locked to those who may not change administrators.

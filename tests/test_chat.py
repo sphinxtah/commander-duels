@@ -90,7 +90,7 @@ def bell(who: Any) -> list[dict[str, Any]]:
 
 
 def socket(who: Any) -> Any:
-    headers = {"cookie": f"cd_session={who.token}", "origin": ORIGIN}
+    headers = {"cookie": f"__Host-cd_session={who.token}", "origin": ORIGIN}
     return who.http.websocket_connect("/api/v1/chat/events", headers=headers)
 
 
@@ -261,7 +261,7 @@ def test_the_socket_needs_a_session_its_csrf_token_and_our_origin(client):
         assert anon.receive_json()["code"] == "authentication_required"
     with client.websocket_connect(
         "/api/v1/chat/events",
-        headers={"cookie": f"cd_session={ada.token}", "origin": "https://evil.example"},
+        headers={"cookie": f"__Host-cd_session={ada.token}", "origin": "https://evil.example"},
     ) as foreign:
         assert foreign.receive_json()["code"] == "origin_refused"
     with socket(ada) as forged:

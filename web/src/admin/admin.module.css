@@ -159,6 +159,16 @@
   font-weight: 700;
   letter-spacing: 0.6px;
 }
+/* v0.8.5: an email address Google has not verified, beside it in the account list. */
+.unverified {
+  padding: 0 5px;
+  border: 1px solid #d5b77c88;
+  border-radius: 4px;
+  color: #dec38b;
+  font-size: 0.7rem;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
 .shortcut {
   display: flex;
   flex-wrap: wrap;

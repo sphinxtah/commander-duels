@@ -90,7 +90,7 @@ class Account:
         self.http = client
 
     def headers(self) -> dict[str, str]:
-        return {"cookie": f"cd_session={self.token}", "x-csrf-token": self.csrf}
+        return {"cookie": f"__Host-cd_session={self.token}", "x-csrf-token": self.csrf}
 
     def get(self, path: str, **params: Any) -> httpx.Response:
         return self.http.get(path, params=params, headers=self.headers())

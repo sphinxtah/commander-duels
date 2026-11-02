@@ -91,7 +91,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 - The profile also holds the display name, locale, onboarding state and the accessibility preferences, which follow the account across devices.
 - Email and the Google subject are private:
   - The subject is never returned.
-  - Email goes to its owner, and to administrators (`admin.users.manage`), who need it to identify accounts they approve. Moderators see the account list without email and cannot search by it.
+  - Email goes to its owner, and to administrators (`admin.users.manage`), who need it to identify accounts they approve. Since v0.8.5 the account list also says whether Google verified that address (`email_verified`), and marks an unverified one "unverified" beside it: an address Google has not verified proves nothing about who signed in. Moderators see the account list without email and cannot search by it.
 
 **Failures.**
 - **Without a challenge.** A post without one of our challenges (no `cd_google` cookie, or a cookie for a challenge the server never issued) is refused 401 `invalid_sign_in` without an audit entry, so a bot cannot fill the trail.
@@ -114,7 +114,9 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 ## Sessions (AUTH03)
 
 - **Token and cookie.**
-  - The browser holds a random 256-bit token in `cd_session`: HttpOnly, Secure, SameSite=Lax, path `/api`.
+  - The browser holds a random 256-bit token in `__Host-cd_session` (since v0.8.5): HttpOnly, Secure, SameSite=Lax, path `/`, no Domain. The `__Host-` prefix makes the browser refuse that name from anywhere but this host with exactly those attributes, so a sibling site under the same parent domain cannot set or shadow it. Only this cookie is read: the API, the WebSockets and the CSRF check all take the session from it alone.
+  - **Before v0.8.5** the cookie was `cd_session` at path `/api`. It is no longer read, so everyone signs in once more after the v0.8.5 deploy. Every sign-in and sign-out (sign-out, sign-out everywhere, ending the current session) also expires the old cookie at `/api`, so it does not linger.
+  - **Plain HTTP for development.** Browsers keep `Secure` cookies on `http://localhost` and `http://127.0.0.1`, so local stacks (Vite, Compose) keep `CD_COOKIE_SECURE=true` and the same `__Host-` cookie. Only a stack served over plain HTTP on another host name needs `CD_COOKIE_SECURE=false` (production refuses it); the cookie is then `cd_session_http`, path `/`, not Secure, since no browser keeps a `__Host-` cookie without Secure.
   - The database holds only its SHA-256 hash.
   - Nothing goes in localStorage or in a URL.
 - **CSRF.**
@@ -130,7 +132,7 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
   Activity extends the idle limit at most once a minute. Administration's counts, which the page asks for every minute on its own (v0.4.1), are not activity: a tab left open still reaches the idle limit. Nor, since v0.5.1, is a GET the page marks as its own with `X-Background: 1` (`identity.BACKGROUND_HEADER`): the chat bar's timed and socket-driven reads of the friends and the conversations, and the Friends page's 30 seconds' refresh ([chat](chat.md#friends-messages)). The API honours the mark on a GET only, since a change is always the person's doing; the person's own clicks and a page's first load go unmarked and count. The web app also leaves marked requests out of a problem report's latest requests ([reports](reports.md)).
 - **Rotation.**
   - Every sign-in issues a new session and ends any session the browser presented.
-  - Every role or status change raises the account's privilege version. The account's next request swaps its session for a new identifier, with the same sign-in time, limits and CSRF token.
+  - Every role or status change raises the account's privilege version. The account's next request swaps its session for a new identifier, with the same sign-in time, limits and CSRF token. The swap ends the old session only if it is still live (`UPDATE … WHERE id = … AND revoked_at IS NULL`), and issues the new one only then: a sign-out everywhere, or any other revocation, that commits after the request read its session wins, and the request counts as signed out.
   - **The new cookie** (since v0.1.1) is sent on every response to the request that rotated the session, errors and empty responses included. The correlation middleware adds it, so no route copies it, except when the response sets or clears the session cookie itself: sign-out, sign-out everywhere, ending the current session, a new sign-in, or SysOp's password change.
   - **The old token's grace.** For 60 seconds the old token still signs requests in, as the newest session in its chain. This covers requests the browser sent before it read the new cookie. Rotation keeps the CSRF token, and that token, which sessions never otherwise share, links the old session to the new one. Such a request sets no cookie and never rotates the session it stands for, even if that session is itself due for rotation. Only the new cookie's own next request rotates it, so a stale token can never mint a fresh session.
   - **The grace ends** as soon as the chain has no live session: sign-out, sign-out everywhere, an administrator's sign-out, a new sign-in that replaces the session, or SysOp's password change, which issues a new CSRF token. A disabled account is refused by the status check, as always.

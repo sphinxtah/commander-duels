@@ -45,9 +45,8 @@ import asyncio
 import logging
 import random
 import secrets
-from collections import defaultdict
 from collections.abc import Callable
-from contextlib import AsyncExitStack, suppress
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import partial
@@ -69,18 +68,20 @@ from api.games import (
     DECK_FORMATS,
     FORMAT_NAMES,
     TABLE_IDLE_SECONDS,
-    EngineUnavailable,
     GameHub,
+    KeyedLocks,
     LiveGame,
     LiveSeat,
     Player,
     SeatPlan,
     active_games_of,
     engine_game,
+    followed_or_closed,
     full_access,
     own_deck,
     require_loaded,
     retried,
+    seat_tokens,
     starter_seat,
 )
 from api.identity import (
@@ -1048,7 +1049,7 @@ class QueueHub:
 
     def __init__(self, app: FastAPI) -> None:
         self.app = app
-        self.locks: defaultdict[QueueKey, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self.locks = KeyedLocks()
         self.clock: Callable[[], datetime] = utcnow
 
     @property
@@ -1161,29 +1162,29 @@ class QueueHub:
                     )
                     return False
                 try:
-                    game, users = await run_in_threadpool(
-                        record_group, self.database, group, created, plans, now
-                    )
-                except (Gone, SQLAlchemyError) as failure:
-                    with suppress(EngineUnavailable):
-                        await engine.request("POST", f"/games/{created['game_id']}/close", body={})
-                    if isinstance(failure, SQLAlchemyError):
-                        await run_in_threadpool(put_back, self.database, group.users, now)
-                        raise
+                    async with followed_or_closed(hub, created):
+                        game, users = await run_in_threadpool(
+                            record_group, self.database, group, created, plans, now
+                        )
+                        tokens = seat_tokens(created)
+                        hub.register(
+                            LiveGame(
+                                id=game.id,
+                                kind="table" if table else "practice",
+                                seats={
+                                    seat: LiveSeat(seat, user_id, tokens[seat])
+                                    for seat, user_id in enumerate(users)
+                                    if user_id is not None
+                                },
+                                teams=table and group.key.format == TEAM_FORMAT,
+                            )
+                        )
+                except Gone:
                     return True
-                tokens = {entry["seat"]: entry["seat_token"] for entry in created["seats"]}
-                hub.register(
-                    LiveGame(
-                        id=game.id,
-                        kind="table" if table else "practice",
-                        seats={
-                            seat: LiveSeat(seat, user_id, tokens[seat])
-                            for seat, user_id in enumerate(users)
-                            if user_id is not None
-                        },
-                        teams=table and group.key.format == TEAM_FORMAT,
-                    )
-                )
+                except Exception:
+                    # Places already matched to the game stay matched: it is recorded interrupted.
+                    await run_in_threadpool(put_back, self.database, group.users, now)
+                    raise
                 log.info(
                     "A %s queue's game started: %d players, %d bots",
                     queue_name(group.key),

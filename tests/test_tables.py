@@ -39,7 +39,7 @@ TABLES = ("table_seats", "game_tables", "token_ledger", "progress_ledger", "game
 
 class Account(test_progression.Account):
     def socket(self, game_id: str) -> Any:
-        headers = {"cookie": f"cd_session={self.token}", "origin": ORIGIN}
+        headers = {"cookie": f"__Host-cd_session={self.token}", "origin": ORIGIN}
         return self.http.websocket_connect(f"/api/v1/games/{game_id}/events", headers=headers)
 
     def hello(self, **fields: Any) -> dict[str, Any]:

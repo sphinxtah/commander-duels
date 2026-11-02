@@ -44,7 +44,7 @@ from uuid import UUID
 from fastapi import APIRouter, Path, Request
 from pydantic import Field
 from sqlalchemy import delete, func, select
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
@@ -63,10 +63,12 @@ from api.games import (
     active_games_of,
     engine_game,
     engine_names,
+    followed_or_closed,
     full_access,
     hub_of,
     own_deck,
     require_loaded,
+    seat_tokens,
     starter_seat,
 )
 from api.identity import (
@@ -1023,27 +1025,23 @@ async def start_table(code: Code, request: Request, principal: Player, db: Db) -
                     },
                     request,
                 )
-                try:
+                async with followed_or_closed(hub, created, db):
                     game = await run_in_threadpool(
                         record_table_game, db, table.id, created, plans, users
                     )
-                except (ApiError, SQLAlchemyError):
-                    await run_in_threadpool(db.rollback)
-                    await engine.request("POST", f"/games/{created['game_id']}/close", body={})
-                    raise
-                tokens = {entry["seat"]: entry["seat_token"] for entry in created["seats"]}
-                hub.register(
-                    LiveGame(
-                        id=game.id,
-                        kind="table",
-                        seats={
-                            seat: LiveSeat(seat, user_id, tokens[seat])
-                            for seat, user_id in enumerate(users)
-                            if user_id is not None
-                        },
-                        teams=table.format == TEAM_FORMAT,
+                    tokens = seat_tokens(created)
+                    hub.register(
+                        LiveGame(
+                            id=game.id,
+                            kind="table",
+                            seats={
+                                seat: LiveSeat(seat, user_id, tokens[seat])
+                                for seat, user_id in enumerate(users)
+                                if user_id is not None
+                            },
+                            teams=table.format == TEAM_FORMAT,
+                        )
                     )
-                )
             finally:
                 hub.starting -= 1
     await run_in_threadpool(db.refresh, table)

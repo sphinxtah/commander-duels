@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -9,7 +10,7 @@ import { client, describe, type AdminUser, type Me } from "../api";
 import account from "../Account.module.css";
 import shell from "../App.module.css";
 import type { components } from "../generated/api";
-import { kindLabels, tokens } from "./shop";
+import { kindLabels, purchaseKey, tokens } from "./shop";
 import styles from "./shop.module.css";
 
 // Leng's card shop in Administration (v0.4.0): the price list, with each product's market price,
@@ -506,6 +507,9 @@ function GivePacks({ me, products }: { me: Me; products: AdminProduct[] }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   const [busy, setBusy] = useState(false);
+  // The key of the grant last sent and what it asked for: sent again unchanged (a retry after
+  // a lost answer), it grants once; anything else is a new grant with a new key.
+  const pending = useRef<{ key: string; asked: string } | null>(null);
 
   useEffect(() => {
     const term = q.trim();
@@ -533,15 +537,24 @@ function GivePacks({ me, products }: { me: Me; products: AdminProduct[] }) {
     setBusy(true);
     setError("");
     setDone("");
+    const asked = JSON.stringify([target.id, productId, amount, why]);
+    if (pending.current?.asked !== asked)
+      pending.current = { key: purchaseKey(), asked };
     try {
       const { data, error: refused } = await client.POST(
         "/api/v1/admin/users/{user_id}/packs",
         {
           params: { path: { user_id: target.id } },
-          body: { product: productId, count: amount, reason: why },
+          body: {
+            product: productId,
+            count: amount,
+            reason: why,
+            key: pending.current.key,
+          },
         },
       );
       if (!data) return setError(describe(refused));
+      pending.current = null;
       const name = openable.find((item) => item.id === productId)?.name ?? "";
       setDone(
         `${target.label} received ${data.granted} ${name} ${data.granted === 1 ? "pack" : "packs"}.`,

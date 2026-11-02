@@ -34,7 +34,7 @@ Daily quests pay 100 to 250 tokens each, and each achievement a one-time reward 
 
 ## SysOp and administrators
 
-- **SysOp gives tokens** to any account, its own included, or takes them back with a negative amount, never below zero (permission `economy.manage`, SysOp's alone). Each grant needs a reason, is audited (`economy.tokens_granted`) and is kept apart from tokens won: the profile counts won, given and spent separately.
+- **SysOp gives tokens** to any account, its own included, or takes them back with a negative amount, never below zero (permission `economy.manage`, SysOp's alone). Each grant needs a reason, is audited (`economy.tokens_granted`) and is kept apart from tokens won: the profile counts won, given and spent separately. Since v0.8.5 a grant may carry the client's `key` (8 to 64 letters, digits, `-` or `_`), as a shop purchase does: a retry with it grants once (ledger key `grant:<account>:<key>`), and the key with another amount or reason is refused (`409 key_reused`). The give-tokens form sends one with each grant.
 - **A reset** (v0.4.5, [resetting an account](identity.md#resetting-an-account-v045)) brings the balance back to the welcome's 1,000 with a grant of the difference, given or taken back, whose reason is "Account reset by SysOp"; it is audited with the reset. The earlier entries stay, so the profile's totals of won, given and spent keep counting them.
 - **Administrators** see every account's balance in Administration and its latest entries through the API, and read the economy's settings; they cannot change them.
 

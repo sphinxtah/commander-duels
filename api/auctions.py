@@ -6,8 +6,9 @@ transfer market does (docs/auctions.md). The owner's rules are in the v0.6.0 pla
   one bought here), never an alliance's, a custom card, an unopened pack or a one-of-a-kind
   printing (library.sellable_copies). Basic lands are real copies like any card since v0.6.0 and
   are sold like any. SysOp, whose library is the whole catalog, may list any printing in any
-  finish it was printed in; an administrator, whose library is unlimited too, lists only the
-  copies granted to it.
+  finish it was printed in, but a printing with a print run only from the copies granted to it
+  (a copy listed from nothing would be one more than was printed); an administrator, whose
+  library is unlimited too, lists only the copies granted to it.
 - **Listing** takes the copy out of the seller's library at once (the library subtracts its live
   and sold listings), so a deck that used it is collection-locked; the seller's decks are
   revalidated. Unsold, withdrawn or cancelled, the copy comes back; sold, the buyer's library is
@@ -36,6 +37,7 @@ transfer market does (docs/auctions.md). The owner's rules are in the v0.6.0 pla
   log of every auction, sold ones with their seller, buyer and price.
 """
 
+import logging
 import math
 from collections.abc import Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -62,6 +64,7 @@ from api.identity import (
     permissions_for,
     require_permission,
     roles_of,
+    settings_of,
     utcnow,
 )
 from api.library import ONE_OF_A_KIND, library_of, sellable_copies, since_reset
@@ -76,6 +79,7 @@ from api.models import (
     LibraryGrant,
     User,
 )
+from api.print_runs import limited
 from api.roster import Planeswalker, roster_of
 from api.schemas import Contract, StoredText
 from api.social import AuctionKind, notify_auction
@@ -87,6 +91,7 @@ AuctionManager = Annotated[Principal, Depends(require_permission("auctions.manag
 # Cancelling a live auction is SysOp's: economy.manage is SysOp's alone.
 Canceller = Annotated[Principal, Depends(require_permission("economy.manage"))]
 Roster = Mapping[str, Planeswalker]
+log = logging.getLogger("api.auctions")
 
 Finish = Literal["nonfoil", "foil", "etched"]
 Duration = Literal["1h", "3h", "12h", "24h", "3d", "7d", "30d", "unlimited"]
@@ -553,10 +558,10 @@ def sell(
     refresh_library(db, bid.bidder_id, roster)
 
 
-def finish_auction(
-    db: Session, request: Request | None, auction: Auction, now: datetime, roster: Roster | None
-) -> None:
-    """An auction past its end, its row locked: sold to the leading bid, or unsold with none."""
+def finish_auction(db: Session, auction: Auction, now: datetime, roster: Roster | None) -> None:
+    """An auction past its end, its row locked: sold to the leading bid, or unsold with none.
+    Its end is the clock's doing, not that of whichever request noticed it, so the sale's audit
+    entry is the system's (no address or request ID), with the buyer as its actor."""
     bid = leading_bid(db, auction)
     if bid is None:
         auction.status = "expired"
@@ -567,17 +572,15 @@ def finish_auction(
         refresh_library(db, auction.seller_id, roster)
         return
     lock_accounts(db, (auction.seller_id, bid.bidder_id))
-    sell(db, request, auction, bid, now, roster)
+    sell(db, None, auction, bid, now, roster)
 
 
-def settle(
-    db: Session, auction_id: UUID, now: datetime, roster: Roster | None, request: Request | None
-) -> bool:
+def settle(db: Session, auction_id: UUID, now: datetime, roster: Roster | None) -> bool:
     """Settles the auction if it ended and is not settled yet: under its lock, so twice is once."""
     auction = locked(db, auction_id)
     if auction is None or auction.status != "active" or not ended(auction, now):
         return False
-    finish_auction(db, request, auction, now, roster)
+    finish_auction(db, auction, now, roster)
     return True
 
 
@@ -593,13 +596,10 @@ def any_due(db: Session) -> bool:
     )
 
 
-def settle_due(
-    db: Session,
-    roster: Roster | None,
-    request: Request | None = None,
-    ids: Iterable[UUID] | None = None,
-) -> int:
-    """Settles the ended auctions (among ids, if given), each in a transaction of its own."""
+def settle_due(db: Session, roster: Roster | None, ids: Iterable[UUID] | None = None) -> int:
+    """Settles the ended auctions (among ids, if given), each in a transaction of its own. One
+    that fails is rolled back and logged, and the others still settle; it is tried again on the
+    next pass."""
     now = utcnow()
     query = select(Auction.id).where(Auction.status == "active", Auction.ends_at <= now)
     if ids is not None:
@@ -608,12 +608,12 @@ def settle_due(
     settled = 0
     for auction_id in due:
         try:
-            if settle(db, auction_id, now, roster, request):
+            if settle(db, auction_id, now, roster):
                 settled += 1
             db.commit()
         except Exception:
             db.rollback()
-            raise
+            log.exception("Auction %s could not be settled; the others go on", auction_id)
     return settled
 
 
@@ -697,7 +697,7 @@ def end_auctions_of(
         touched += 1
         if ended(auction, now):
             if roster is not None:
-                finish_auction(db, request, auction, now, roster)
+                finish_auction(db, auction, now, roster)
         elif auction.seller_id == user.id:
             cancel(db, request, auction, now, reason, None, None)
         elif auction.high_bidder_id == user.id:
@@ -743,10 +743,18 @@ def not_sellable(message: str) -> ApiError:
 
 
 def listable(
-    db: Session, user: User, printing_id: UUID, finish: str, quantity: int, roster: Roster | None
+    db: Session,
+    user: User,
+    printing_id: UUID,
+    finish: str,
+    quantity: int,
+    roster: Roster | None,
+    content_dir: str,
 ) -> tuple[CardConcept, CardPrinting]:
     """The edition, if the account may list this many copies of it in this finish; refuses
-    otherwise. The account's row is locked by the caller."""
+    otherwise. The account's row is locked by the caller. SysOp lists any edition without holding
+    a copy, except one with a print run (api/print_runs.py): a copy sold from nothing would be one
+    more than was printed, so of those SysOp lists only the copies granted to it, as a player."""
     printing = db.get(CardPrinting, printing_id)
     if printing is None:
         if db.get(CustomCard, printing_id) is not None:
@@ -755,7 +763,8 @@ def listable(
     concept = db.get_one(CardConcept, printing.concept_id)
     if printing.scryfall_id in ONE_OF_A_KIND:
         raise not_sellable(f"{concept.name} from {printing.set_name} is one of a kind: it stays.")
-    if user.kind == "sysop":
+    run = limited(db, content_dir, {printing.id}).get(printing.id) if user.kind == "sysop" else None
+    if user.kind == "sysop" and run is None:
         # SysOp's library is the whole catalog: in the finishes the edition was printed in. A
         # player sells the copies granted, in the finish granted.
         printed = list(printing.finishes or []) or ["nonfoil"]
@@ -765,6 +774,11 @@ def listable(
     available = sellable_copies(db, user, {printing.id}).get((printing.id, finish), 0)
     if available >= quantity:
         return concept, printing
+    if run is not None:
+        raise not_sellable(
+            f"{concept.name} from {printing.set_name} was printed in {run:,} copies: only the "
+            "copies granted to you can be listed."
+        )
     if available == 0 and finish == "nonfoil" and roster is not None:
         # An alliance's playset is in the library while the alliance lasts, and is never sold.
         permissions = permissions_for(user, roles_of(db, user))
@@ -925,7 +939,7 @@ def market(
 ) -> AuctionPage:
     """The transfer market: live auctions, never the viewer's own unless asked, filtered and
     sorted; bids count as the current bid, else the starting bid."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     start = offset_of(cursor)
     now = utcnow()
     query = (
@@ -979,7 +993,7 @@ def compare(
     printing_id: UUID, finish: Finish, request: Request, principal: Active, db: Db
 ) -> Comparison:
     """The same edition and finish's live listings, the lowest price first, and its last sales."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     price = func.coalesce(Auction.current_bid, Auction.starting_bid)
     live = list(
         db.scalars(
@@ -1053,7 +1067,7 @@ def target_auctions(db: Session, user: User) -> tuple[list[Auction], list[Auctio
 @router.get("/auctions/targets", response_model=Targets)
 def targets(request: Request, principal: Active, db: Db) -> Targets:
     """The transfer targets: auctions the viewer watches or bid on, live, won and lost."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     active, won, lost = target_auctions(db, principal.user)
     return Targets(
         active=items_of(db, principal.user, active),
@@ -1065,7 +1079,7 @@ def targets(request: Request, principal: Active, db: Db) -> Targets:
 @router.post("/auctions/targets/clear", status_code=204)
 def clear_targets(body: ClearTargets, request: Request, principal: Active, db: Db) -> Response:
     """Hides the won or the lost auctions from the transfer targets."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     _, won, lost = target_auctions(db, principal.user)
     now = utcnow()
     for auction in won if body.which == "won" else lost:
@@ -1118,7 +1132,7 @@ def own_auctions(db: Session, user: User) -> tuple[list[Auction], list[Auction],
 @router.get("/auctions/mine", response_model=TransferList)
 def transfer_list(request: Request, principal: Active, db: Db) -> TransferList:
     """The transfer list: the viewer's auctions, live, sold, and unsold ones to relist."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     active, sold, unsold = own_auctions(db, principal.user)
     return TransferList(
         active=items_of(db, principal.user, active),
@@ -1130,7 +1144,7 @@ def transfer_list(request: Request, principal: Active, db: Db) -> TransferList:
 @router.post("/auctions/mine/clear", status_code=204)
 def clear_list(body: ClearList, request: Request, principal: Active, db: Db) -> Response:
     """Hides the sold or the unsold auctions from the transfer list."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     _, sold, unsold = own_auctions(db, principal.user)
     now = utcnow()
     for auction in sold if body.which == "sold" else unsold:
@@ -1141,6 +1155,7 @@ def clear_list(body: ClearList, request: Request, principal: Active, db: Db) -> 
 
 @router.get("/auctions/sellable", response_model=SellablePage)
 def sellable(
+    request: Request,
     principal: Active,
     db: Db,
     q: Annotated[str | None, Query(max_length=100)] = None,
@@ -1148,7 +1163,8 @@ def sellable(
     limit: Annotated[int, Query(ge=1, le=PAGE_MAX)] = PAGE,
 ) -> SellablePage:
     """What the viewer may list, by edition and finish, by name: copies granted to it, less those
-    listed; for SysOp, any printing the game can play, in each finish it was printed in."""
+    listed; for SysOp, any printing the game can play, in each finish it was printed in (one
+    with a print run: the copies granted to it)."""
     user = principal.user
     start = offset_of(cursor)
     wanted = normalize(q) if q else ""
@@ -1166,14 +1182,18 @@ def sellable(
         if wanted:
             query = query.where(CardConcept.normalized_name.contains(wanted, autoescape=True))
         rows = db.execute(query.offset(start).limit(limit + 1)).all()
-        held = sellable_copies(db, user, {printing.id for printing, _ in rows})
+        shown = {printing.id for printing, _ in rows}
+        held = sellable_copies(db, user, shown)
+        runs = limited(db, settings_of(request).content_dir, shown)
         return SellablePage(
             items=[
                 SellableItem(
                     card=card_of(printing, concept),
                     finish=finish,  # type: ignore[arg-type]
                     copies=held.get((printing.id, finish), 0),
-                    sellable=MAX_QUANTITY,
+                    sellable=min(held.get((printing.id, finish), 0), MAX_QUANTITY)
+                    if printing.id in runs
+                    else MAX_QUANTITY,
                 )
                 for printing, concept in rows[:limit]
                 for finish in list(printing.finishes or []) or ["nonfoil"]
@@ -1241,7 +1261,7 @@ def held_by_finish(
 @router.get("/auctions/{auction_id}", response_model=AuctionItem)
 def auction(auction_id: UUID, request: Request, principal: Active, db: Db) -> AuctionItem:
     """One auction, in any state."""
-    settle_due(db, roster_of(request), request, ids=[auction_id])
+    settle_due(db, roster_of(request), ids=[auction_id])
     found = db.get(Auction, auction_id)
     if found is None:
         raise not_found()
@@ -1263,7 +1283,13 @@ def list_cards(body: Listing, request: Request, principal: Active, db: Db) -> Au
     if earlier:
         return AuctionList(items=items_of(db, user, earlier))
     concept, printing = listable(
-        db, user, body.printing_id, body.finish, body.quantity, roster_of(request)
+        db,
+        user,
+        body.printing_id,
+        body.finish,
+        body.quantity,
+        roster_of(request),
+        settings_of(request).content_dir,
     )
     now = utcnow()
     made = [
@@ -1318,7 +1344,7 @@ def place(
     if earlier is not None:
         if earlier.auction_id != auction_id:
             raise ApiError(409, "key_reused", "That key placed a bid on another auction.")
-        settle_due(db, roster, request, ids=[auction_id])
+        settle_due(db, roster, ids=[auction_id])
         return item_of(db, user, db.get_one(Auction, auction_id))
     if amount is not None and not 1 <= amount <= MAX_PRICE:
         raise ApiError(422, "invalid_price", f"A bid is 1 to {MAX_PRICE:,} tokens.")
@@ -1330,7 +1356,7 @@ def place(
         return item_of(db, user, auction)
     now = utcnow()
     if auction.status == "active" and ended(auction, now):
-        finish_auction(db, request, auction, now, roster)
+        finish_auction(db, auction, now, roster)
         db.commit()
     if auction.status != "active":
         raise ApiError(409, "auction_ended", "This auction has ended.")
@@ -1419,7 +1445,7 @@ def own_locked(db: Session, request: Request, user: User, auction_id: UUID) -> A
         raise ApiError(403, "not_your_auction", "Only its seller can do that.")
     now = utcnow()
     if auction.status == "active" and ended(auction, now):
-        finish_auction(db, request, auction, now, roster_of(request))
+        finish_auction(db, auction, now, roster_of(request))
         db.commit()
         auction = locked(db, auction_id)
         assert auction is not None
@@ -1470,7 +1496,15 @@ def relist(
         raise ApiError(409, "not_relistable", "Only an unsold auction can be relisted.")
     if db.scalar(select(Auction.id).where(Auction.relisted_from == old.id)) is not None:
         raise ApiError(409, "not_relistable", "This auction was relisted already.")
-    concept, printing = listable(db, user, old.printing_id, old.finish, 1, roster_of(request))
+    concept, printing = listable(
+        db,
+        user,
+        old.printing_id,
+        old.finish,
+        1,
+        roster_of(request),
+        settings_of(request).content_dir,
+    )
     now = utcnow()
     made = put_up(
         db,
@@ -1535,7 +1569,7 @@ def auction_log(
 ) -> AuctionPage:
     """Every auction, newest first: with status=sold the log of sales (seller, buyer, card,
     edition, finish, price, time); cancelled ones with their reason in the audit trail."""
-    settle_due(db, roster_of(request), request)
+    settle_due(db, roster_of(request))
     start = offset_of(cursor)
     query = select(Auction)
     counted = select(func.count()).select_from(Auction)
@@ -1564,7 +1598,7 @@ def cancel_auction(
         raise not_found()
     now = utcnow()
     if auction.status == "active" and ended(auction, now):
-        finish_auction(db, request, auction, now, roster)
+        finish_auction(db, auction, now, roster)
         db.commit()
     if auction.status != "active":
         raise ApiError(409, "auction_ended", "This auction has ended.")

@@ -453,6 +453,40 @@ def note_switched(deck: Deck, moved: list[Switch]) -> None:
     ]
 
 
+def unknown_ids(db: Session, entries: Iterable[DeckEntry]) -> tuple[set[UUID], set[UUID]]:
+    """The entries' card IDs that are neither a catalog card nor a custom card, and their
+    printing IDs that are no catalog printing."""
+    listed = list(entries)
+    cards = {entry.card_id for entry in listed}
+    printings = {entry.printing_id for entry in listed if entry.printing_id is not None}
+    if cards:
+        cards -= set(db.scalars(select(CardConcept.id).where(CardConcept.id.in_(cards))))
+        cards -= custom_ids(db, cards)
+    if printings:
+        printings -= set(db.scalars(select(CardPrinting.id).where(CardPrinting.id.in_(printings))))
+    return cards, printings
+
+
+def unknown_card() -> ApiError:
+    return ApiError(
+        422,
+        "unknown_card",
+        "A card or edition in this deck is not in the catalog. Choose it again from the catalog.",
+    )
+
+
+def owned_editions(
+    db: Session, entries: list[DeckEntry], library: Library, *, switch: bool = False
+) -> tuple[list[DeckEntry], list[Switch]]:
+    """library.with_owned_editions, within a deck's MAX_ENTRIES: splitting copies across the
+    editions the library holds adds entries, and where that would pass the limit the copies keep
+    the editions they named (or none), as validation then says."""
+    owned, moved = with_owned_editions(db, entries, library, switch=switch)
+    if len(normalized(owned)) > MAX_ENTRIES:
+        return entries, []
+    return owned, moved
+
+
 def store_draft(
     db: Session,
     deck: Deck,
@@ -463,10 +497,19 @@ def store_draft(
 ) -> Validation:
     """Saves the draft: only cards the game can play (v0.4.5), and for a player's deck the
     editions their library holds where a copy names none (v0.5.0); switch also moves copies of an
-    edition the library holds too few of, and notes it (switch_editions)."""
+    edition the library holds too few of, and notes it (switch_editions). A card or printing ID
+    that is in neither the catalog nor the custom cards is refused (422 unknown_card), unless the
+    draft holds it already (a custom card SysOp removed since: validation names it)."""
+    cards, printings = unknown_ids(db, entries)
+    if cards or printings:
+        held = entries_of(deck) if deck.draft else []
+        cards -= {entry.card_id for entry in held}
+        printings -= {entry.printing_id for entry in held if entry.printing_id is not None}
+        if cards or printings:
+            raise unknown_card()
     clean = without_unplayable(db, deck, normalized(entries))
     if library is not None:
-        owned, moved = with_owned_editions(db, clean, library, switch=switch)
+        owned, moved = owned_editions(db, clean, library, switch=switch)
         clean = normalized(owned)
         if moved:
             note_switched(deck, moved)
@@ -685,7 +728,7 @@ def switch_editions(db: Session, roster: dict[str, Planeswalker]) -> int | None:
         if library.unlimited:
             continue
         entries = entries_of(deck)
-        owned, _ = with_owned_editions(db, normalized(entries), library, switch=True)
+        owned, _ = owned_editions(db, normalized(entries), library, switch=True)
         if content_hash(deck.format, owned) == content_hash(deck.format, entries):
             revalidate(db, [deck], library)
             continue
@@ -699,7 +742,17 @@ def switch_editions(db: Session, roster: dict[str, Planeswalker]) -> int | None:
 
 def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
     """The draft as an immutable revision; the latest one when the draft has not changed. Its
-    flags record the deck as it stood then; a game revalidates it against the library."""
+    flags record the deck as it stood then; a game revalidates it against the library. The deck's
+    row is locked and read again first, so two saves at once (a double click, a save racing a
+    table's start) number their revisions one after the other, and the second finds the first's
+    when the draft is the same."""
+    # The query flushes the caller's changes first, then reads the row again under its lock.
+    db.scalar(
+        select(Deck)
+        .where(Deck.id == deck.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     entries = normalized(entries_of(deck))
     digest = content_hash(deck.format, entries)
     if deck.latest_revision is not None:
@@ -710,6 +763,9 @@ def publish(db: Session, deck: Deck, library: Library) -> DeckRevision:
         )
         if latest is not None and latest.content_hash == digest and latest.title == deck.title:
             return latest
+    if any(unknown_ids(db, entries)):
+        # A custom card SysOp removed since the draft was saved: it cannot be kept in a revision.
+        raise unknown_card()
     validation = validate_deck(
         db,
         DeckContent(format=deck.format, entries=entries),  # type: ignore[arg-type]
@@ -1029,7 +1085,7 @@ def guided_deck(
     """A proposed starting deck (DECK06), from the cards the player's library holds, in the
     editions it holds (v0.5.0). Nothing is saved: create a deck from its entries."""
     proposal = guided.propose(db, body, library)
-    proposal.entries, _ = with_owned_editions(db, proposal.entries, library)
+    proposal.entries, _ = owned_editions(db, proposal.entries, library)
     validation = validate_deck(
         db,
         DeckContent(format=body.format, entries=proposal.entries),
@@ -1061,7 +1117,14 @@ def import_preview(
         fmt = cast(GameFormatName, parsed.game_format)
     # A Godlike owner's list may name custom cards; nobody else's ever matches one.
     lines = deckio.resolve(db, parsed, custom_by_name(db) if library.godlike else None)
-    entries, _ = with_owned_editions(db, deckio.merged(lines), library)
+    merged = deckio.merged(lines)
+    if len(merged) > MAX_ENTRIES:
+        # A list may have more lines than a deck has entries (a line per edition, say).
+        raise deckio.invalid(
+            f"This deck list names {len(merged)} different cards and editions; a deck holds at "
+            f"most {MAX_ENTRIES}."
+        )
+    entries, _ = owned_editions(db, merged, library)
     validation = validate_deck(
         db, DeckContent(format=fmt, entries=entries), today(), library.collection()
     )

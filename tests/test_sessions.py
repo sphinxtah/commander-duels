@@ -98,7 +98,7 @@ def account(app: FastAPI, handle: str) -> dict[str, str]:
         )
         db.add(session)
         db.commit()
-        return {"cookie": f"cd_session={token}", "x-csrf-token": session.csrf_token}
+        return {"cookie": f"__Host-cd_session={token}", "x-csrf-token": session.csrf_token}
 
 
 Call = tuple[str, str, dict[str, Any], float]  # method, path, options, delay
@@ -201,7 +201,7 @@ def session_cookies(response: httpx.Response) -> list[str]:
     return [
         value
         for value in response.headers.get_list("set-cookie")
-        if value.startswith("cd_session=")
+        if value.startswith("__Host-cd_session=")
     ]
 
 
@@ -209,20 +209,20 @@ def new_token(response: httpx.Response) -> str:
     """The session token a response hands the browser; exactly one, and not a clearing one."""
     cookies = session_cookies(response)
     assert len(cookies) == 1, cookies
-    token = cookies[0].split(";")[0].removeprefix("cd_session=")
+    token = cookies[0].split(";")[0].removeprefix("__Host-cd_session=")
     assert token and token != '""' and "Max-Age=0" not in cookies[0]
     return token
 
 
 def clears(response: httpx.Response) -> bool:
     cookies = session_cookies(response)
-    return len(cookies) == 1 and cookies[0].startswith('cd_session=""')
+    return len(cookies) == 1 and cookies[0].startswith('__Host-cd_session=""')
 
 
 def holding(app: FastAPI, token: str, csrf: str | None = None) -> TestClient:
     """A browser that presents this token, as one whose request left before a new cookie came."""
     client = browser(app)
-    client.headers["cookie"] = f"cd_session={token}"
+    client.headers["cookie"] = f"__Host-cd_session={token}"
     if csrf:
         client.headers["x-csrf-token"] = csrf
     return client
@@ -248,7 +248,7 @@ def test_a_rotated_cookie_reaches_the_browser_on_errors_and_returned_responses(
     me = sign_in(laptop).json()
     phone_session = sign_in(phone).json()["session"]["id"]
     csrf = me["csrf_token"]
-    token = laptop.cookies["cd_session"]
+    token = laptop.cookies["__Host-cd_session"]
     attempts: list[tuple[str, str, dict[str, Any], int]] = [
         # An error raised by a dependency after the rotation.
         ("GET", "/api/v1/admin/users", {}, 403),
@@ -289,7 +289,7 @@ def test_a_rotated_cookie_survives_an_unexpected_error(
     me = sign_in(ada).json()
     raise_privileges(app, me["id"])
     client = TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
-    client.headers["cookie"] = f"cd_session={ada.cookies['cd_session']}"
+    client.headers["cookie"] = f"__Host-cd_session={ada.cookies['__Host-cd_session']}"
     response = client.get("/api/v1/broken")
     assert response.status_code == 500
     body = response.json()
@@ -333,13 +333,41 @@ def test_a_rotation_neither_doubles_a_cookie_nor_undoes_a_sign_out(
     assert live_sessions(app) == 1
 
 
+def test_a_rotation_racing_a_sign_out_everywhere_signs_nothing_in(
+    app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sign-out everywhere that commits after a request read its session, and before the
+    request rotates it, wins: the request is signed out and no successor is issued."""
+    from api import identity
+
+    ada = browser(app)
+    me = sign_in(ada).json()
+    raise_privileges(app, me["id"])
+    read = identity.live_session
+
+    def then_signed_out_everywhere(conn: Any, db: Session) -> Any:
+        found = read(conn, db)
+        with Session(app.state.database) as other:
+            identity.revoke_sessions(other, UUID(me["id"]), "logout_all")
+            other.commit()
+        return found
+
+    monkeypatch.setattr(identity, "live_session", then_signed_out_everywhere)
+    response = ada.get("/api/v1/me")
+    assert response.status_code == 401
+    assert all("Max-Age=0" in cookie or '=""' in cookie for cookie in session_cookies(response))
+    assert live_sessions(app) == 0
+    monkeypatch.setattr(identity, "live_session", read)
+    assert ada.get("/api/v1/me").status_code == 401
+
+
 def test_requests_sent_with_the_old_cookie_neither_fail_nor_erase_the_new_one(
     app: FastAPI, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     clock = Clock(monkeypatch)
     ada = browser(app)
     me = sign_in(ada).json()
-    old, csrf = ada.cookies["cd_session"], me["csrf_token"]
+    old, csrf = ada.cookies["__Host-cd_session"], me["csrf_token"]
     raise_privileges(app, me["id"])
     rotated = holding(app, old).get("/api/v1/me")
     new = new_token(rotated)
@@ -394,7 +422,7 @@ def test_the_grace_ends_with_the_session_it_stands_for(
 
     def rotate(client: TestClient, **claims: Any) -> tuple[str, str, dict[str, Any]]:
         me = sign_in(client, **claims).json()
-        old = client.cookies["cd_session"]
+        old = client.cookies["__Host-cd_session"]
         raise_privileges(app, me["id"])
         response = client.get("/api/v1/me")
         assert response.status_code == 200
