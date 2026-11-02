@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from api.campaign import CAMPAIGN_FILE
+from api.how_to_play import CARDS_FILE
 
 # Every file the API reads from its content folder (settings.content_dir, /app/content in the
 # image): add a file here when the API starts reading it.
@@ -16,6 +17,8 @@ READ_BY_THE_API = {
     "pack-art.json",
     "print-runs.json",
     CAMPAIGN_FILE,
+    # How to play's example cards (v0.8.6).
+    CARDS_FILE,
 }
 
 
@@ -34,4 +37,5 @@ def test_the_list_names_every_content_file_the_api_opens() -> None:
         text = source.read_text(encoding="utf-8")
         named |= set(re.findall(r'Path\(folder\) / "([\w.-]+\.json)"', text))
     named.add(CAMPAIGN_FILE)
+    named.add(CARDS_FILE)
     assert named <= READ_BY_THE_API, sorted(named - READ_BY_THE_API)

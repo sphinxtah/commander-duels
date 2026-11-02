@@ -16,6 +16,7 @@ Built on November 2, 2026 in a cloud workspace, on `main`, with PostgreSQL 16, N
 | Passive bots, live | the engine built here and the API: SysOp's practice game, the switch in the Inspection drawer, "Bots set to passive." in the log, the summary's `passive_bots`, and a bot that played no land on its turn |
 | Private repository | `scripts/rules_update.py` against Wizards' live page: found and downloaded `MagicCompRules 20260925.txt`, byte for byte the file on the page, then "Up to date" on a second run; the private web image's layering built with nginx's real image and a named context: `/rules/comprehensive-rules.txt` served as UTF-8, gzip-compressed, byte for byte, a missing file 404; ShellCheck clean on the smoke test |
 | Deploy kit | ShellCheck 0.10.0 (`--severity=warning`) clean; `docker compose config --quiet` |
+| Hosted CI | run 41518242336 (0630b74) failed in both jobs on one cause: the web image's build had no `content/how-to-play-cards.json` (the guide imports it), and the API image would have lacked it too. Both Dockerfiles now copy it, and `tests/test_api_image.py` lists it; the web build was rehearsed in a copy of the image's build context. The next run is in the release notes |
 
 ## v0.8.5
 
