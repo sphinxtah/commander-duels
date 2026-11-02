@@ -26,6 +26,7 @@ function account(
     handle,
     display_name: handle ? handle.toUpperCase() : "Pat Doe",
     email: `${handle ?? "pat"}@example.com`,
+    email_verified: true,
     created_at: "2026-10-19T10:00:00Z",
     last_seen_at: null,
     roles: ["player"],

@@ -511,7 +511,9 @@ export interface paths {
         put?: never;
         /**
          * Give Packs
-         * @description SysOp gives unopened packs to any account, its own included: with a reason, audited.
+         * @description SysOp gives unopened packs to any account, its own included: with a reason, audited. A
+         *     retry with the same key grants once: the key names the grant (its grant_id), looked for
+         *     under the account's row lock, so a retry sent at once waits for the request it repeats.
          */
         post: operations["give_packs_api_v1_admin_users__user_id__packs_post"];
         delete?: never;
@@ -612,7 +614,8 @@ export interface paths {
         /**
          * Give Tokens
          * @description SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of
-         *     its own, apart from tokens earned, with the reason, and audited (PROG03).
+         *     its own, apart from tokens earned, with the reason, and audited (PROG03). A retry with the
+         *     same key grants once.
          */
         post: operations["give_tokens_api_v1_admin_users__user_id__tokens_post"];
         delete?: never;
@@ -738,7 +741,8 @@ export interface paths {
         /**
          * Sellable
          * @description What the viewer may list, by edition and finish, by name: copies granted to it, less those
-         *     listed; for SysOp, any printing the game can play, in each finish it was printed in.
+         *     listed; for SysOp, any printing the game can play, in each finish it was printed in (one
+         *     with a print run: the copies granted to it).
          */
         get: operations["sellable_api_v1_auctions_sellable_get"];
         put?: never;
@@ -3313,6 +3317,12 @@ export interface components {
             display_name: string;
             /** Email */
             email: string | null;
+            /**
+             * Email Verified
+             * @description Whether Google said the email is verified (v0.8.5); false when no email is shown.
+             * @default false
+             */
+            email_verified: boolean;
             /** Handle */
             handle: string | null;
             /**
@@ -3687,7 +3697,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.8.4
+             * @default 0.8.5
              */
             version: string;
         };
@@ -5295,7 +5305,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.8.4
+             * @default 0.8.5
              */
             version: string;
         };
@@ -5959,6 +5969,11 @@ export interface components {
         PackGrant: {
             /** Count */
             count: number;
+            /**
+             * Key
+             * @description The client's own key for this grant: a retry with it grants once. Without one, each request grants.
+             */
+            key?: string | null;
             /**
              * Product
              * Format: uuid
@@ -8107,6 +8122,11 @@ export interface components {
              * @description Tokens to give; negative takes back.
              */
             amount: number;
+            /**
+             * Key
+             * @description The client's own key for this grant: a retry with it grants once. Without one, each request grants.
+             */
+            key?: string | null;
             /** Reason */
             reason: string;
         };
@@ -8210,10 +8230,10 @@ export interface components {
             skipped: boolean;
             /**
              * Stage
-             * @description choose, then demo (beginner) or overview (novice), setup, tour_shop and tour_auctions (the main menu's tour), done.
+             * @description choose, then demo (beginner) or overview (novice), setup, tour_shop, tour_auctions, tour_decks and tour_play (the main menu's tour), done.
              * @enum {string}
              */
-            stage: "choose" | "demo" | "overview" | "setup" | "tour_shop" | "tour_auctions" | "done";
+            stage: "choose" | "demo" | "overview" | "setup" | "tour_shop" | "tour_auctions" | "tour_decks" | "tour_play" | "done";
         };
         /** TutorialChange */
         TutorialChange: {
@@ -8247,7 +8267,7 @@ export interface components {
              * Stage
              * @enum {string}
              */
-            stage: "choose" | "demo" | "overview" | "setup" | "tour_shop" | "tour_auctions" | "done";
+            stage: "choose" | "demo" | "overview" | "setup" | "tour_shop" | "tour_auctions" | "tour_decks" | "tour_play" | "done";
         };
         /**
          * UnnamedPlayer

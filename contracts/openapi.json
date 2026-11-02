@@ -593,6 +593,12 @@
             ],
             "title": "Email"
           },
+          "email_verified": {
+            "default": false,
+            "description": "Whether Google said the email is verified (v0.8.5); false when no email is shown.",
+            "title": "Email Verified",
+            "type": "boolean"
+          },
           "handle": {
             "anyOf": [
               {
@@ -1557,7 +1563,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.8.4",
+            "default": "0.8.5",
             "title": "Version",
             "type": "string"
           }
@@ -5774,7 +5780,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.8.4",
+            "default": "0.8.5",
             "title": "Version",
             "type": "string"
           }
@@ -7383,6 +7389,21 @@
             "minimum": 1.0,
             "title": "Count",
             "type": "integer"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 8,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The client's own key for this grant: a retry with it grants once. Without one, each request grants.",
+            "title": "Key"
           },
           "product": {
             "format": "uuid",
@@ -12506,6 +12527,21 @@
             "title": "Amount",
             "type": "integer"
           },
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 8,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The client's own key for this grant: a retry with it grants once. Without one, each request grants.",
+            "title": "Key"
+          },
           "reason": {
             "maxLength": 200,
             "minLength": 3,
@@ -12740,7 +12776,7 @@
             "type": "boolean"
           },
           "stage": {
-            "description": "choose, then demo (beginner) or overview (novice), setup, tour_shop and tour_auctions (the main menu's tour), done.",
+            "description": "choose, then demo (beginner) or overview (novice), setup, tour_shop, tour_auctions, tour_decks and tour_play (the main menu's tour), done.",
             "enum": [
               "choose",
               "demo",
@@ -12748,6 +12784,8 @@
               "setup",
               "tour_shop",
               "tour_auctions",
+              "tour_decks",
+              "tour_play",
               "done"
             ],
             "title": "Stage",
@@ -12843,6 +12881,8 @@
               "setup",
               "tour_shop",
               "tour_auctions",
+              "tour_decks",
+              "tour_play",
               "done"
             ],
             "title": "Stage",
@@ -13195,7 +13235,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.8.4"
+    "version": "0.8.5"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -16465,7 +16505,7 @@
         "summary": "Account Packs"
       },
       "post": {
-        "description": "SysOp gives unopened packs to any account, its own included: with a reason, audited.",
+        "description": "SysOp gives unopened packs to any account, its own included: with a reason, audited. A\nretry with the same key grants once: the key names the grant (its grant_id), looked for\nunder the account's row lock, so a retry sent at once waits for the request it repeats.",
         "operationId": "give_packs_api_v1_admin_users__user_id__packs_post",
         "parameters": [
           {
@@ -17282,7 +17322,7 @@
         "summary": "Account Tokens"
       },
       "post": {
-        "description": "SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of\nits own, apart from tokens earned, with the reason, and audited (PROG03).",
+        "description": "SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of\nits own, apart from tokens earned, with the reason, and audited (PROG03). A retry with the\nsame key grants once.",
         "operationId": "give_tokens_api_v1_admin_users__user_id__tokens_post",
         "parameters": [
           {
@@ -18333,7 +18373,7 @@
     },
     "/api/v1/auctions/sellable": {
       "get": {
-        "description": "What the viewer may list, by edition and finish, by name: copies granted to it, less those\nlisted; for SysOp, any printing the game can play, in each finish it was printed in.",
+        "description": "What the viewer may list, by edition and finish, by name: copies granted to it, less those\nlisted; for SysOp, any printing the game can play, in each finish it was printed in (one\nwith a print run: the copies granted to it).",
         "operationId": "sellable_api_v1_auctions_sellable_get",
         "parameters": [
           {
