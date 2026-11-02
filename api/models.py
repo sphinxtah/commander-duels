@@ -20,6 +20,7 @@ from sqlalchemy import (
     Text,
     TypeDecorator,
     UniqueConstraint,
+    false,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -245,6 +246,10 @@ class Game(Base):
     # A practice game's request (v0.5.0, api/rematches.py), for its rematch: the same format, decks,
     # bots, skill, turn cap and rules. Null for a table's game and for games before v0.5.0.
     settings: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # Passive bots for SysOp (v0.8.6): the switch as it stands, and whether it was ever on, which
+    # keeps the game's end from paying anything out.
+    bots_passive: Mapped[bool] = mapped_column(default=False, server_default=false())
+    passive_bots_used: Mapped[bool] = mapped_column(default=False, server_default=false())
 
 
 class GameSeat(Base):

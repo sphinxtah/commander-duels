@@ -26,6 +26,7 @@ from api import (
     economy,
     engine_cards,
     games,
+    how_to_play,
     matches,
     progression,
     quests,
@@ -53,6 +54,11 @@ from api.schemas import (
     Readiness,
 )
 from api.version import APP_VERSION
+
+
+def is_sysop_path(path: str) -> bool:
+    return path == "/api/v1/sysop" or path.startswith("/api/v1/sysop/")
+
 
 CAPABILITIES = [
     Capability(
@@ -183,6 +189,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs_url="/api/v1/docs",
         redoc_url=None,
         responses={503: {"model": Error}},
+        # No redirect to a path with or without its trailing slash (v0.8.6): an address answers
+        # as itself or as missing, so /api/v1/sysop/entrance/ looks like any unknown path.
+        redirect_slashes=False,
     )
     app.state.settings = config
     allowed_origins = config.allowed_origins
@@ -236,6 +245,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
+        # SysOp's routes answer a wrong method as a missing path (v0.8.6): off SysOp's networks
+        # a 405 would show that they exist (docs/identity.md).
+        if exc.status_code == 405 and is_sysop_path(request.url.path):
+            return error_response(request, 404, "http_404", "Not Found")
         return error_response(request, exc.status_code, f"http_{exc.status_code}", str(exc.detail))
 
     @app.exception_handler(RequestValidationError)
@@ -345,6 +358,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(rematches.router)
     app.include_router(campaign.router)
     app.include_router(card_images.router)
+    # How to play's example cards, for anyone (v0.8.6).
+    app.include_router(how_to_play.router)
     app.include_router(cards.router)
     app.include_router(decks.router)
     app.include_router(progression.router)

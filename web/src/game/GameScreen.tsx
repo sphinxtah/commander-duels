@@ -40,6 +40,7 @@ import { GameContext, boxStyle, type GameContextValue } from "./Board";
 import { CardZoom } from "./Card";
 import { useGame, type GameState } from "./connection";
 import { InspectionPanel } from "./Inspection";
+import { PassiveBots } from "./PassiveBots";
 import {
   objectIndex,
   optionsByObject,
@@ -943,6 +944,13 @@ export function GameScreen({
                     closed="hidden"
                     onClose={closeDrawer}
                   >
+                    {summary?.passive_bots != null && (
+                      <PassiveBots
+                        gameId={gameId}
+                        passive={summary.passive_bots}
+                        onChange={setSummary}
+                      />
+                    )}
                     <label className={styles.switch}>
                       <input
                         type="checkbox"

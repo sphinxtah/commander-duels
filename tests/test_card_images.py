@@ -1021,3 +1021,44 @@ def test_retry_after_is_read_as_seconds_or_a_date() -> None:
     # More digits than a float holds is still the longest pause, not an error.
     for long in ("86400", "9" * 400, "9" * 5000):
         assert pause(long) == card_images.MAX_RATE_LIMIT_PAUSE, long[:10]
+
+
+# How to play's example cards (v0.8.6): the guide's names only, signed in or not.
+GUIDE_IMAGES = "/api/v1/how-to-play/card-images"
+
+
+def test_the_guides_cards_are_served_to_anyone(
+    client: TestClient, app: FastAPI, scryfall: FakeScryfall, directory: Path
+) -> None:
+    # Lightning Bolt is one of the guide's cards: no sign-in needed, and the cache is the table's.
+    stranger = client.get(GUIDE_IMAGES, params={"name": "Lightning Bolt"})
+    assert stranger.status_code == 200, stranger.text
+    assert stranger.content == served("bolt")
+    assert stranger.headers["cache-control"].startswith("public")
+    again = client.get(IMAGES, params={"name": "Lightning Bolt"}, headers=signed_in(app))
+    assert again.content == served("bolt")
+    assert scryfall.api_calls == ["Lightning Bolt"]
+    # A signed-in account takes its own place in the queue, and gets the same picture.
+    assert (
+        client.get(GUIDE_IMAGES, params={"name": "Lightning Bolt"}, headers=signed_in(app))
+    ).status_code == 200
+
+
+def test_the_guides_route_serves_no_other_name(
+    client: TestClient, app: FastAPI, scryfall: FakeScryfall, directory: Path
+) -> None:
+    # Delver of Secrets is a card Scryfall knows, but not one of the guide's.
+    for headers in ({}, signed_in(app)):
+        refused = client.get(GUIDE_IMAGES, params={"name": "Delver of Secrets"}, headers=headers)
+        assert refused.status_code == 404
+        assert refused.json()["code"] == "card_image_missing"
+    assert scryfall.api_calls == [] and files(directory) == []
+    assert client.get(GUIDE_IMAGES, params={"name": ""}).status_code == 422
+
+
+def test_every_guide_card_is_a_name_the_route_knows() -> None:
+    from api.how_to_play import guide_cards
+
+    names = guide_cards("content")
+    assert "Serra Angel" in names and "Lightning Bolt" in names
+    assert len(names) >= 20

@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,8 +30,9 @@ import java.util.regex.Pattern;
  * are enabled, it runs bot-versus-bot matches and development games with human and bot seats (each
  * human seat's token selects that seat). When a service token is configured, the API's service
  * games run under {@code /v1/service}: every request there must carry the token, seats still need
- * their own seat tokens, and the API may also close a game, inspect it for SysOp, look up card
- * names and fetch the list of implemented cards. Every other operation fails closed.
+ * their own seat tokens, and the API may also close a game, inspect it for SysOp, make its bots
+ * passive for SysOp (v0.8.6), look up card names and fetch the list of implemented cards. Every
+ * other operation fails closed.
  */
 public final class EngineServer {
     public static final int PROTOCOL_VERSION = 1;
@@ -47,7 +49,9 @@ public final class EngineServer {
     private static final String SERVICE = "/v1/service/";
     private static final String GAME_ID = "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})";
     private static final Pattern GAME_PATH = Pattern.compile(GAME_ID + "/(view|commands|close)");
-    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection)");
+    private static final Pattern SERVICE_GAME_PATH = Pattern.compile(GAME_ID + "/(close|inspection|bots)");
+    /** The body of a request to the passive bot switch (v0.8.6). */
+    private static final Set<String> BOTS_FIELDS = Set.of("passive");
     /** Content a plugin carries for the API (v0.8.0): {@code /v1/service/content/<name>}. */
     private static final Pattern CONTENT_NAME = Pattern.compile("[a-z0-9][a-z0-9-]{0,63}");
     static final String CONTENT_RESOURCES = "commander-duels/content/";
@@ -182,6 +186,8 @@ public final class EngineServer {
                 respond(exchange, 404, Map.of("code", "not_found"));
             } else if (matcher.group(2).equals("close")) {
                 close(exchange, game.get());
+            } else if (matcher.group(2).equals("bots")) {
+                bots(exchange, game.get());
             } else {
                 inspection(exchange, game.get());
             }
@@ -275,6 +281,36 @@ public final class EngineServer {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             respond(exchange, 503, Map.of("code", "interrupted"));
+        }
+    }
+
+    /**
+     * SysOp's switch for passive bots (v0.8.6, see {@link HumanGame#setPassiveBots}): a POST of
+     * {@code {"passive": true}} or {@code {"passive": false}} answers 200 with the switch as it now
+     * is. Any other body is a 400 {@code invalid_request}, and a finished game a 409
+     * {@code game_over}. Setting the value the switch already has is accepted and changes nothing.
+     */
+    private static void bots(HttpExchange exchange, HumanGame game) throws IOException {
+        if (!exchange.getRequestMethod().equals("POST")) {
+            methodNotAllowed(exchange, "POST");
+            return;
+        }
+        Optional<String> body = readBody(exchange);
+        if (body.isEmpty()) {
+            return;
+        }
+        boolean passive;
+        try {
+            passive = JsonRequest.bool(JsonRequest.object(body.get(), BOTS_FIELDS), "passive");
+        } catch (JsonRequest.Invalid e) {
+            respond(exchange, 400, Map.of("code", "invalid_request", "message", e.getMessage()));
+            return;
+        }
+        Boolean now = game.setPassiveBots(passive);
+        if (now == null) {
+            respond(exchange, 409, Map.of("code", "game_over", "message", "The game has finished"));
+        } else {
+            respond(exchange, 200, Map.of("passive", now));
         }
     }
 
@@ -421,11 +457,27 @@ public final class EngineServer {
             respond(exchange, 403, Map.of("code", "read_only", "message", "A spectator token can only read the view"));
             return;
         }
+        if (matcher.group(2).equals("close") && !service && seat != hostSeat(game)) {
+            // Bug E5 (v0.8.6): any seat's token closed the whole game for everyone.
+            respond(exchange, 403, Map.of("code", "forbidden",
+                "message", "Only the first human seat can close the game; concede to leave it"));
+            return;
+        }
         switch (matcher.group(2)) {
             case "view" -> view(exchange, game, seat);
             case "commands" -> command(exchange, game, seat);
             default -> close(exchange, game);
         }
+    }
+
+    /**
+     * The seat that may close a development game for everyone (v0.8.6): the first human seat, the
+     * one whoever created the game sits in (seat 0 at the default tables). Every other seat leaves
+     * by conceding, and the game goes on without it while players remain. The service route's close
+     * is the API's alone (it holds the service token) and is not a seat's.
+     */
+    static int hostSeat(HumanGame game) {
+        return game.humanSeats().get(0);
     }
 
     /** A seat's snapshot, or the spectator's when {@code seat} is null. */

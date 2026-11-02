@@ -109,6 +109,8 @@ The engine's open prompt lists every option. The screen offers exactly those opt
 - **Revealed and looked-at cards** show in the column, with the engine's messages.
 - **Unsupported choices.** A choice the screen cannot show yet says so and offers to concede.
 
+- **What's this?** (v0.8.6). Under the prompt's question, a small link opens the topic of [How to play](how-to-play.md) that explains that kind of choice, in a new tab, so the game goes on.
+
 The engine still checks every answer. A refusal leaves the prompt open, and the column says why in words.
 
 ## The response timer (v0.3.0)
@@ -169,6 +171,10 @@ Chrome and Edge on a PC can install Commander Duels as an app with its own windo
 ## SysOp's inspection
 
 SysOp's Inspection drawer has the inspect switch: every player's hand and library in order, top first, refreshed with each revision. The drawer states that opening it is recorded in the audit trail, which it is (`game.inspection_opened`). When SysOp observes another player's game, the screen names that player instead of "You", and the result reads "Game over" with the winner's name.
+
+## SysOp's passive bots (v0.8.6)
+
+In SysOp's own practice game or campaign duel, with no other human seat, the Inspection drawer starts with a **Passive bots** switch, for testing cards and the campaign: passive bots only draw, pass and discard to hand size, with no lands, spells, attacks or blocks, and no to every optional choice but a commander's return to the command zone, from each bot's next decision. One switch covers every bot at the table, and the game's log says each change. The switch shows only where the server allows it (the game summary's `passive_bots`); nobody else sees anything new, and the API refuses the setting from anyone else. A game played with passive bots pays nothing out; a won campaign duel still opens the next ward ([games through the API](games.md#sysops-powers)).
 
 ## The practice table
 

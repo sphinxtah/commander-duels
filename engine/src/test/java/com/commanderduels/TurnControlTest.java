@@ -331,8 +331,11 @@ class TurnControlTest {
         try {
             played = Tables.play(game, policy, 4, new Tables.Coverage());
         } catch (AssertionError e) {
-            // Seat 0's answer to the prompt seat 1's concession closed is refused.
-            assertTrue(e.getMessage().contains("stale_prompt"), e.getMessage());
+            // Seat 0's answer to the prompt seat 1's concession closed is refused: as a stale prompt,
+            // or, when the concession has already ended the game, as a game over (both seen under
+            // the full suite's load, v0.8.6).
+            assertTrue(e.getMessage().contains("stale_prompt") || e.getMessage().contains("game_over"),
+                e.getMessage());
             played = new Tables.Played(Tables.finalSnapshot(game, 0), 0, Map.of());
         }
         scenario.settle();

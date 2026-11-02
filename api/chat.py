@@ -608,7 +608,9 @@ async def chat_events(websocket: WebSocket) -> None:
     except (TimeoutError, ValidationError, WebSocketDisconnect, KeyError):
         await refuse(websocket, CLOSE_BAD_MESSAGE, "hello_required")
         return
-    if not secrets.compare_digest(hello.csrf_token, principal.session.csrf_token):
+    # Compared as bytes (v0.8.6): a token with characters outside ASCII is a wrong token, not an
+    # error (compare_digest refuses such str).
+    if not secrets.compare_digest(hello.csrf_token.encode(), principal.session.csrf_token.encode()):
         await refuse(websocket, CLOSE_FORBIDDEN, "csrf_failed")
         return
     user_id = principal.user.id

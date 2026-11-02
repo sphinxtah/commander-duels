@@ -122,6 +122,26 @@ The search itself is unchanged, so what the bot does play is still legal and sou
 
 `FairBotTest.aSkillHasItsHabitsAndItsBudget` fixes the shares and the budgets; `aLowSkillPlaysLikeAnAmateurAndStillLegally` plays a skill-1 bot for twelve turns against a scripted seat with XMage reporting no error and at least one slip.
 
+## Passive bots (v0.8.6)
+
+SysOp tests campaign and card mechanics against bots that stay out of the way. One switch per game, `POST /v1/service/games/{id}/bots` with `{"passive": true}` or `{"passive": false}` (the service token guards it, as it does `inspection` and `close`), makes every bot at the table passive or normal again. It can be flipped either way at any time; each bot follows it at its next decision, and a search already running finishes as it would have. The answer is 200 `{"passive": <the switch now>}`; any other body is a 400 `invalid_request`, an unknown game a 404 `not_found` and a finished one a 409 `game_over`. Setting the value the switch already has is accepted and changes nothing. Each change writes `Bots set to passive.` or `Bots set to normal.` in the game's log, at the turn and step of the log's last line; a seat whose log is up to date sees it at once, at a new revision, and any other seat with its next view.
+
+A passive `FairBot` makes these decisions itself, without XMage's AI, and counts them in `FairBot.Stats.passive`:
+
+| Decision | Passive answer |
+| --- | --- |
+| Priority (`priority`) | Pass. It plays no land, casts nothing and activates nothing |
+| Mulligan (`chooseMulligan`) | Keep |
+| Attackers (`selectAttackers`) | None. A creature that must attack still does: XMage declares it before it asks (508.1d) |
+| Blockers (`selectBlockers`) | None, even against a lethal attack. A creature that must block still does: XMage adds a computer player's required blocks after it chooses (509.1c) |
+| Yes or no (`chooseUse`, both forms) | No, as the engine answers for a player nobody is left to decide for (`Prompts.Prompt.fallback`): no optional ability, no optional cost. XMage's AI says yes to nearly everything. One exception: its commander goes back to the command zone (903.9), as a player would choose |
+
+It still draws and discards to its hand size in the cleanup step: XMage does both without asking for priority. Every other choice the rules force on it (which cards to discard, a mandatory trigger's targets and modes, a sacrifice, the order of its triggers) is XMage's AI as before; "the answer that does the least" has no general meaning for a target.
+
+The switch is one `AtomicBoolean` per game, which the game hands to each `FairBot` it seats (`followPassive`) before XMage sees it. XMage's copies of the bot and the stand-ins it makes to decide for a player whose turn it controls share it by reference, so a stand-in passes for that player too. A bot whose turn a human seat controls (723.5) is not passive while it does: those decisions are the seat's. A search's simulated games ignore the switch, and a bot of another kind, which a test may seat, ignores it entirely.
+
+`PassiveBotsTest` starts a Legacy game with the switch on: the bot, with Craw Wurm and six Forests put onto the battlefield, keeps its seven, plays nothing, never attacks the human seat (which never blocks) and never blocks its Grizzly Bears, draws in each of its turns and discards to seven at each cleanup, under every leak and state check. At turn 7 the switch goes back to normal and the bot searches and plays again; the seat's log has exactly the two lines. `ServiceGameHttpTest.theBotsCanBeMadePassiveAndNormalAgain` covers the route: the service token, 405, the refused bodies, 404, repeats that write no line, and 409 once the game is over.
+
 ## Tests
 
 - `DeterminizerTest`, on seated but unstarted tables with hands dealt by the test:

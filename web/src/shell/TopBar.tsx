@@ -119,8 +119,8 @@ export function TopBar({
 
 /**
  * The account's corner: its portrait (its ally's, else its avatar), handle and tier, with the
- * connection's dot, opening a menu of Profile, Settings, Administration, Report a problem and,
- * since v0.6.1, Sign out (on Profile before). What waits for Administration (v0.4.1) is counted
+ * connection's dot, opening a menu of Profile, Settings, How to play (v0.8.6), Administration,
+ * Report a problem and, since v0.6.1, Sign out (on Profile before). What waits for Administration (v0.4.1) is counted
  * on it.
  */
 function AccountMenu({
@@ -248,6 +248,13 @@ function AccountMenu({
           aria-current={shown === "Settings" ? "page" : undefined}
         >
           Settings
+        </a>
+        {/* The guide to the game and its rules (v0.8.6). */}
+        <a
+          href="#how-to-play"
+          aria-current={shown === "HowToPlay" ? "page" : undefined}
+        >
+          How to play
         </a>
         {admin && (
           <a

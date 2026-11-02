@@ -1,5 +1,22 @@
 # Verification
 
+## v0.8.6
+
+Built on November 2, 2026 in a cloud workspace, on `main`, with PostgreSQL 16, Node 22, Python 3.13 and 3.12, Java 21, and XMage built natively from the pin (the image's own steps, outside Docker).
+
+| Check | Result |
+|---|---|
+| Python | `ruff check`, `ruff format --check` and `mypy` clean; `pytest` on Python 3.12 against PostgreSQL 16: 451 passed outside the deploy kit; the deploy kit's tests 62 passed, 6 skipped, and the one failure that is the workspace's alone (`test_upgrade_needs_a_set_up_vm` runs as root, which the kit refuses on purpose). New: the guide's card route for anyone and for no other name; passive bots for SysOp alone, in its own game against bots, audited, and what a game with them pays (nothing; a campaign duel's seal and next ward but no spoils, then the spoils on a later win); SysOp's routes answering a wrong method and a trailing slash as missing paths; a CSRF token outside ASCII on both WebSockets; `push.sh`'s host |
+| Migrations | `alembic upgrade head`, `alembic check`, and migration 0035's downgrade and upgrade again, against PostgreSQL 16 |
+| Contracts | regenerated on Python 3.12, as CI's drift check expects |
+| Web | `tsc -b`, 1,421 Vitest tests in 113 files and the production build passed. New: the rules parser on its made-up fixture and on the official file (every rule the guide names exists in the 2026-09-25 release), the guide's links from every prompt kind and tutorial lesson, the How to play page (contents, topics, a chapter at its rule, the glossary, search, a build without the text, the app's own page taken for none), "What's this?", the passive bots switch, the dev server's rules folder, and the rematch's late answer (the test fails without the fix) |
+| Browser journeys | `pnpm test:e2e` in Chromium with SysOp's password: 58 passed, 34 skipped (those needing the engine's games or on demand) |
+| How to play on screen | `web/e2e/how-to-play-shots.spec.ts` took the six screenshots (five from the guided game, the prompt from a practice game against the engine built here) with card pictures through the workspace's proxy; the pages looked at signed out at 1366×900 and 390×844: Reading a card's pins and arrows, the zones and the stack with their marked screenshots, an official chapter opened at 702.19b |
+| Engine | XMage built from the pin with its patches, then the engine's 197 JUnit tests (one skipped, the opt-in Two-Headed Giant pairing run), real bot games included. New: `PassiveBotsTest` (a passive bot only draws and discards over six turns, and plays again when switched back), the service route's switch, inspection only while XMage itself waits (fails with the old rule), the development close for the first human seat only, the commander's way home for a passive bot. `TurnControlTest.theControlledPlayerStillConcedes` failed once under the full suite's load on a race it already allowed for in part (the refused answer can read `game_over` as well as `stale_prompt`); it now accepts both |
+| Passive bots, live | the engine built here and the API: SysOp's practice game, the switch in the Inspection drawer, "Bots set to passive." in the log, the summary's `passive_bots`, and a bot that played no land on its turn |
+| Private repository | `scripts/rules_update.py` against Wizards' live page: found and downloaded `MagicCompRules 20260925.txt`, byte for byte the file on the page, then "Up to date" on a second run; the private web image's layering built with nginx's real image and a named context: `/rules/comprehensive-rules.txt` served as UTF-8, gzip-compressed, byte for byte, a missing file 404; ShellCheck clean on the smoke test |
+| Deploy kit | ShellCheck 0.10.0 (`--severity=warning`) clean; `docker compose config --quiet` |
+
 ## v0.8.5
 
 Built on November 1, 2026 in a cloud workspace, on the branch `fixes-0.8.5`, with Docker, PostgreSQL 16, Node 22 and Python 3.13 and 3.12.

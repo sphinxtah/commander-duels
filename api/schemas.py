@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictBool, model_validator
 
 from api.version import APP_VERSION
 
@@ -547,6 +547,19 @@ class GameSummary(Contract):
         default=None,
         description="The campaign encounter it was played for (v0.8.0); null for any other game.",
     )
+    passive_bots: bool | None = Field(
+        default=None,
+        description="SysOp alone (v0.8.6): whether this game's bots are passive (they draw, pass "
+        "and discard to hand size, and nothing about the game pays out once they have been). Null "
+        "for everyone else, and for a game where SysOp may not switch them: one that is not a "
+        "running practice or campaign game with SysOp its only human seat.",
+    )
+
+
+class BotsSetting(Contract):
+    """SysOp's switch between normal and passive bots (v0.8.6)."""
+
+    passive: StrictBool
 
 
 class GameState(Contract):

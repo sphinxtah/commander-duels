@@ -125,6 +125,7 @@ describe("the service worker build", () => {
         "pages/about.html",
         "pages/pages.css",
         "welcome/table-1280.webp",
+        "how-to-play/stack-640.webp",
         "packs/znr-draft-160.webp",
         "sets/znr.svg",
         "shop/leng-960.webp",

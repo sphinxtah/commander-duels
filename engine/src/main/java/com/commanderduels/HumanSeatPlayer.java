@@ -2,6 +2,7 @@ package com.commanderduels;
 
 import mage.cards.Cards;
 import mage.constants.RangeOfInfluence;
+import mage.game.Game;
 import mage.game.Graveyard;
 import mage.player.human.HumanPlayer;
 import mage.players.Library;
@@ -21,16 +22,37 @@ import mage.players.Player;
  * stand-in's requests to this seat as prompts for the bot's seat and answers them through the bot
  * ({@link HumanGame}); XMage asks one player at a time, so the stand-in and the seat itself never
  * wait at once.
+ *
+ * <p>Since v0.8.6 the seat, and any stand-in it makes, tells the game when XMage's game thread goes
+ * into its wait for an answer and when it comes out ({@link Listening}): SysOp's inspection reads
+ * XMage's state only in between (bug E4).
  */
 final class HumanSeatPlayer extends HumanPlayer {
     private static final long serialVersionUID = 1L;
 
-    HumanSeatPlayer(String name, RangeOfInfluence range) {
+    /**
+     * Told on the game thread when XMage waits for a player's answer (v0.8.6). XMage publishes its
+     * request to the seat (the engine's prompt) before it waits: it returns through the request's
+     * listeners and its own code first. {@code waiting(player, true)} comes as it goes into
+     * {@code waitForResponse}, {@code waiting(player, false)} once that returns, with the answer
+     * taken or the wait given up. The player is the one XMage waits on: this seat's, or a stand-in
+     * with a bot's identity.
+     */
+    interface Listening {
+        void waiting(Player player, boolean waiting);
+    }
+
+    /** Shared by every copy: XMage replaces the seat's player with copies when it restores a state. */
+    private final transient Listening listening;
+
+    HumanSeatPlayer(String name, RangeOfInfluence range, Listening listening) {
         super(name, range, 0);
+        this.listening = listening;
     }
 
     private HumanSeatPlayer(HumanSeatPlayer player) {
         super(player);
+        this.listening = player.listening;
     }
 
     @Override
@@ -43,7 +65,23 @@ final class HumanSeatPlayer extends HumanPlayer {
     public Player prepareControllableProxy(Player playerUnderControl) {
         // XMage's stand-in (which checks that this player controls the turn), copied into ours. Like
         // XMage's it reads this seat's settings (getControllingPlayersUserData).
-        return new StandIn((HumanPlayer) super.prepareControllableProxy(playerUnderControl), playerUnderControl);
+        return new StandIn((HumanPlayer) super.prepareControllableProxy(playerUnderControl), playerUnderControl,
+            listening);
+    }
+
+    /** XMage's wait for this seat's answer, told to the game (v0.8.6, see {@link Listening}). */
+    @Override
+    protected void waitForResponse(Game game) {
+        await(this, listening, () -> super.waitForResponse(game));
+    }
+
+    private static void await(Player player, Listening listening, Runnable wait) {
+        listening.waiting(player, true);
+        try {
+            wait.run();
+        } finally {
+            listening.waiting(player, false);
+        }
     }
 
     /**
@@ -55,11 +93,21 @@ final class HumanSeatPlayer extends HumanPlayer {
     static final class StandIn extends HumanPlayer {
         private static final long serialVersionUID = 1L;
         private final Player bot;
+        private final transient Listening listening;
 
-        /** @param xmages XMage's stand-in: a copy of the bot with the controlling seat's channel */
-        StandIn(HumanPlayer xmages, Player bot) {
+        /**
+         * @param xmages    XMage's stand-in: a copy of the bot with the controlling seat's channel
+         * @param listening the controlling seat's: XMage's wait for the stand-in's answer is the game's
+         */
+        StandIn(HumanPlayer xmages, Player bot, Listening listening) {
             super(xmages);
             this.bot = bot;
+            this.listening = listening;
+        }
+
+        @Override
+        protected void waitForResponse(Game game) {
+            await(this, listening, () -> super.waitForResponse(game));
         }
 
         @Override

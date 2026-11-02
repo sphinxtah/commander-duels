@@ -237,6 +237,79 @@ class ServiceGameHttpTest {
         assertFalse(last.toString().contains("\"seed\""));
     }
 
+    /**
+     * SysOp's switch for passive bots (v0.8.6): the service token guards it, the body is exactly
+     * {@code {"passive": true|false}}, and each change writes one line in the seats' log.
+     */
+    @Test
+    void theBotsCanBeMadePassiveAndNormalAgain() throws Exception {
+        start(true);
+        JsonObject created = json(service("POST", GAMES, null, "{\"seed\":44,\"skill\":1,\"turn_cap\":8}"));
+        String id = created.get("game_id").getAsString();
+        String seat = token(created, 0);
+        HumanGame game = games.service(id).orElseThrow();
+        String bots = GAMES + "/" + id + "/bots";
+        untilPrompt(id, seat);
+
+        assertEquals(401, send("POST", bots, null, null, "{\"passive\":true}").statusCode());
+        assertEquals(401, send("POST", bots, SERVICE_TOKEN + "x", null, "{\"passive\":true}").statusCode());
+        var get = service("GET", bots, null, null);
+        assertEquals(405, get.statusCode());
+        assertEquals("POST", get.headers().firstValue("Allow").orElse(""));
+        for (String body : new String[]{"", "{}", "[true]", "true", "not json", "{\"passive\":\"true\"}",
+                "{\"passive\":1}", "{\"passive\":null}", "{\"passive\":true,\"seat\":1}"}) {
+            var refused = service("POST", bots, null, body);
+            assertEquals(400, refused.statusCode(), body + ": " + refused.body());
+            assertEquals("invalid_request", json(refused).get("code").getAsString(), body);
+            assertTrue(json(refused).has("message"), body);
+        }
+        var unknown = service("POST", GAMES + "/" + UUID.randomUUID() + "/bots", null, "{\"passive\":true}");
+        assertEquals(404, unknown.statusCode());
+        assertEquals("not_found", json(unknown).get("code").getAsString());
+        assertEquals(404, send("POST", "/v1/games/" + id + "/bots", null, seat, "{\"passive\":true}").statusCode(),
+            "the development route has no switch");
+        assertFalse(game.passiveBots(), "no refused request changed the switch");
+        assertEquals(List.of(), notes(id, seat));
+
+        for (boolean passive : new boolean[]{true, true, false, false, true}) {
+            var set = service("POST", bots, null, "{\"passive\":" + passive + "}");
+            assertEquals(200, set.statusCode(), set.body());
+            assertEquals(passive, json(set).get("passive").getAsBoolean());
+            assertEquals(1, json(set).size(), set.body());
+            assertEquals(passive, game.passiveBots());
+        }
+        // A line for each change, none for a repeat: the seat waits on its prompt, so its log shows them.
+        assertEquals(List.of(HumanGame.BOTS_PASSIVE, HumanGame.BOTS_NORMAL, HumanGame.BOTS_PASSIVE), notes(id, seat));
+
+        assertEquals(200, service("POST", GAMES + "/" + id + "/close", null, "").statusCode());
+        untilPrompt(id, seat);
+        var over = service("POST", bots, null, "{\"passive\":false}");
+        assertEquals(409, over.statusCode(), over.body());
+        assertEquals("game_over", json(over).get("code").getAsString());
+        assertTrue(game.passiveBots(), "a finished game's switch does not change");
+        assertEquals(List.of(HumanGame.BOTS_PASSIVE, HumanGame.BOTS_NORMAL, HumanGame.BOTS_PASSIVE), notes(id, seat));
+    }
+
+    /** The passive bot switch's lines in the seat's whole log, read page by page as a client would. */
+    private List<String> notes(String id, String seat) throws Exception {
+        List<String> notes = new ArrayList<>();
+        int from = 0;
+        while (true) {
+            JsonObject view = json(service("GET", GAMES + "/" + id + "/view?log_from=" + from, seat, null));
+            JsonArray page = view.getAsJsonArray("log");
+            for (JsonElement line : page) {
+                String text = line.getAsJsonObject().get("text").getAsString();
+                if (text.equals(HumanGame.BOTS_PASSIVE) || text.equals(HumanGame.BOTS_NORMAL)) {
+                    notes.add(text);
+                }
+            }
+            from += page.size();
+            if (page.isEmpty() || from >= view.get("log_count").getAsInt()) {
+                return notes;
+            }
+        }
+    }
+
     /** Answers a prompt in a way that keeps the game going: keep, pass, or the first option. */
     private static String firstSafeOption(JsonObject prompt) {
         for (JsonElement element : prompt.getAsJsonArray("options")) {

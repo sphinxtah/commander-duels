@@ -536,10 +536,14 @@ def game_ended(
     link: CampaignGame,
     campaign: Campaign | None,
     content_dir: str | None = None,
+    *,
+    payouts: bool = True,
 ) -> None:
     """In the transaction recording the game's end: its outcome, and for a win the encounter, its
     seal and spoils, the next encounter and a chapter's rewards, once. Called by
-    games.record_end."""
+    games.record_end. Without payouts (SysOp's duel with passive bots, v0.8.6) a win still opens
+    the next encounter and records its seal, but gives no spoils and no chapter rewards: a later
+    win without passive bots gives them as a first win would."""
     outcome = outcome_of(game)
     link.outcome = outcome
     link.finished_at = utcnow()
@@ -557,6 +561,8 @@ def game_ended(
     progress.content_version = campaign.content_version
     progress.updated_at = utcnow()
     reward(db, user.id, campaign, progress, f"seal:{number:02d}", game.id)
+    if not payouts:
+        return
     served = served_list(db, game)
     prize_card = link.prize_card
     ready = True

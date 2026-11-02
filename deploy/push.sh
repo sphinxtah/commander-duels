@@ -10,6 +10,8 @@ cd "$(dirname "$0")/.."
 tag="${1:?usage: deploy/push.sh <image tag>}"
 [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "Not an image tag: $tag" >&2; exit 2; }
 host="${CD_DEPLOY_HOST:-duels}"
+# An SSH host or alias, never something ssh would read as an option (v0.8.6).
+[[ "$host" =~ ^[A-Za-z0-9][A-Za-z0-9._@:-]*$ ]] || { echo "Not an SSH host: $host" >&2; exit 2; }
 case "$tag" in
   sha-*) ref="${tag#sha-}" ;;
   *) ref="v$tag" ;;

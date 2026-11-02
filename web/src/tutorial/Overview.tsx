@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import shell from "../App.module.css";
+import { LearnMore } from "./LearnMore";
 import styles from "./tutorial.module.css";
 
 // The Novice's overview (v0.8.4): how Commander Duels works, then a short refresher on Magic's
@@ -129,6 +130,7 @@ export function Overview({
           <li key={point}>{point}</li>
         ))}
       </ul>
+      <LearnMore title={page.title} />
       <ol className={styles.dots} aria-hidden="true">
         {OVERVIEW.map((item, index) => (
           <li

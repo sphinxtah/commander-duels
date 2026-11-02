@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import mage.cards.decks.Deck;
 import mage.constants.RangeOfInfluence;
@@ -41,7 +42,15 @@ import mage.util.ThreadUtils;
  *
  * <p>A service game can also be inspected ({@link #inspect}): every hand and library, in order,
  * for SysOp. That view is built only while XMage is waiting for a human seat's answer, when the
- * game thread is parked and XMage's state holds still.
+ * game thread is parked and XMage's state holds still. Since v0.8.6 (bug E4) "waiting" means the
+ * game thread is inside XMage's wait itself, as the seat's player reports it
+ * ({@link HumanSeatPlayer.Listening}), not merely that a prompt has been published: XMage publishes
+ * a request before it waits for the answer.
+ *
+ * <p>Passive bots (v0.8.6): one switch per game ({@link #setPassiveBots}) makes every bot at the
+ * table pass every priority, keep its opening hand, attack and block with nothing and decline every
+ * optional choice, for SysOp's tests of campaign and card mechanics ({@link FairBot}). It can be
+ * turned on and off at any time; each change writes a line in the game's log.
  *
  * <p>Turn control (723, v0.5.1): while a player's turn is controlled by a human seat, XMage's
  * requests for that player (for a bot, through the stand-in its controller makes for it, see
@@ -61,6 +70,14 @@ final class HumanGame {
     static final int MAX_LOG_PAGE = 200;
     private static final int MAX_RECORDED_ACTIONS = 512;
     private static final String ENGINE_ERROR_PREFIX = "ENGINE ERROR:";
+    /** The log's line when the passive bot switch changes (v0.8.6). */
+    static final String BOTS_PASSIVE = "Bots set to passive.";
+    static final String BOTS_NORMAL = "Bots set to normal.";
+    /**
+     * How often an inspection looks again while XMage has said it will wait but its game thread has
+     * not yet parked (v0.8.6): a few lines of XMage's code, so a short poll.
+     */
+    private static final long PARK_POLL_MILLIS = 2;
 
     /** A seat at the table. A seat's snapshot names only its own deck. */
     record SeatSettings(int seat, String player, String deck) {}
@@ -146,6 +163,12 @@ final class HumanGame {
         /** Every public view published for spectators, when it is published (before any delay). */
         default void spectated(Game game, ObjectRefs refs, SeatView view) {}
 
+        /**
+         * A prompt has just opened for a seat (v0.8.6), at the end of the engine's listener: XMage
+         * has yet to return to its own code and wait for the answer.
+         */
+        default void prompted(int seat) {}
+
         /** Building the final views failed; the seats keep their last published ones. */
         default void failed(RuntimeException error) {}
     }
@@ -209,6 +232,12 @@ final class HumanGame {
     private final Thread thread;
     /** An event fired off the game thread asked for a refresh the game thread has not yet made. */
     private volatile boolean missedRefresh;
+    /**
+     * The game's switch for passive bots (v0.8.6), followed by every {@link FairBot} at the table and
+     * every copy and stand-in XMage makes of one. Changed under this game's lock, so the log's lines
+     * follow the changes in order.
+     */
+    private final AtomicBoolean passiveBots = new AtomicBoolean();
 
     // Game thread only.
     private SeatViews views;
@@ -221,6 +250,13 @@ final class HumanGame {
     private Inspection finalInspection;
     private long version;
     private String endRequest;
+    /**
+     * The player XMage's game thread is waiting on, inside its wait for an answer (v0.8.6): a human
+     * seat's player, or a stand-in with the identity of the bot whose turn a seat controls. Null
+     * while the thread runs. Set and cleared by the game thread ({@link #waiting}); cleared too,
+     * before the engine itself wakes the waiting thread for anything but an answer to an open prompt.
+     */
+    private UUID listening;
     private final List<Integer> conceded = new ArrayList<>();
     private long lastActivityNanos = System.nanoTime();
     // Spectators: public views, kept long enough to serve them spectatorDelaySeconds late.
@@ -245,7 +281,7 @@ final class HumanGame {
             HumanGameRequest.Seat seat = request.seats().get(index);
             seatSettings.add(new SeatSettings(index, seat.player(), seat.deck()));
             if (seat.human()) {
-                var human = new HumanSeatPlayer(name(seat, index), format.range());
+                var human = new HumanSeatPlayer(name(seat, index), format.range(), this::waiting);
                 // XMage's server sets each human's preferences on connect; these are its defaults (stop in
                 // both main phases, at declare attackers and blockers, and whenever something new is on
                 // the stack).
@@ -253,7 +289,12 @@ final class HumanGame {
                 seated.add(human);
                 bySeat.add(new Seat(index, human));
             } else {
-                seated.add(hooks.bot(index, name(seat, index), format.range(), request.skill(), request.seed()));
+                Player bot = hooks.bot(index, name(seat, index), format.range(), request.skill(), request.seed());
+                if (bot instanceof FairBot fair) {
+                    // Every fair bot follows the game's one switch (v0.8.6); a test's other bot ignores it.
+                    fair.followPassive(passiveBots);
+                }
+                seated.add(bot);
                 bySeat.add(null);
             }
         }
@@ -477,6 +518,8 @@ final class HumanGame {
             human.signalPlayerConcede(true);
             // XMage has removed the seat: its view now says it is out.
             publish(askingSeat);
+        } else {
+            hooks.prompted(seat.index);
         }
     }
 
@@ -1085,6 +1128,12 @@ final class HumanGame {
                 // otherwise it goes on waiting for the same answer.
                 Player waiting = waitingPlayer(current);
                 if (waiting != null && !waiting.getId().equals(playerId)) {
+                    synchronized (this) {
+                        // XMage will run on with that player's prompt still open: an inspection
+                        // must not read while it does (v0.8.6). Under the lock, so one being built
+                        // finishes first.
+                        listening = null;
+                    }
                     waiting.signalPlayerConcede(true);
                 }
             }
@@ -1278,6 +1327,53 @@ final class HumanGame {
         version++;
     }
 
+    /** Whether the game's bots are passive (v0.8.6, see {@link #setPassiveBots}). */
+    boolean passiveBots() {
+        return passiveBots.get();
+    }
+
+    /**
+     * Request thread: makes every bot at the table passive, or normal again (v0.8.6), for SysOp's
+     * tests. Each bot follows the switch at its next decision: a decision XMage's AI has already
+     * started (a search) finishes as it would have. Only {@link FairBot}s follow it; a test's other
+     * bot plays on. A change writes {@link #BOTS_PASSIVE} or {@link #BOTS_NORMAL} in the game's log;
+     * setting the value the switch already has writes nothing. Returns the switch as it now is, or
+     * null once the game has finished, when it changes nothing.
+     */
+    Boolean setPassiveBots(boolean passive) {
+        synchronized (this) {
+            if (result != null) {
+                return null;
+            }
+            if (passiveBots.getAndSet(passive) != passive) {
+                note(passive ? BOTS_PASSIVE : BOTS_NORMAL);
+            }
+            return passive;
+        }
+    }
+
+    /**
+     * Caller holds the lock. Writes the engine's own line in the game's log (v0.8.6), at the turn
+     * and step of the last line XMage wrote: it is written on a request thread, which does not read
+     * XMage's state while the game thread may be changing it. A seat whose log already reached the
+     * end is shown the line at once, at a new revision; a seat whose log stops short of XMage's last
+     * lines (its next view is still to come) is shown it with that view, so its log still never runs
+     * ahead of its board. Spectators are shown it with their next public view.
+     */
+    private void note(String text) {
+        int before = log.size();
+        log.note(text);
+        int after = log.size();
+        for (Seat seat : humans) {
+            if (seat.logEntries >= before) {
+                seat.logEntries = after;
+                seat.revision++;
+            }
+        }
+        touch();
+        notifyAll();
+    }
+
     /** Lets {@link #inspect} serve this game: service games only. */
     synchronized void allowInspection() {
         inspectable = true;
@@ -1286,9 +1382,14 @@ final class HumanGame {
     /**
      * Request thread: SysOp's inspection view, once XMage waits for a human seat's answer, waiting
      * up to {@code waitMillis} for that; null if it did not happen in time. A finished game returns
-     * its final inspection. The view is built under the game's lock while a prompt is open: the game
-     * thread is parked in XMage's wait for that answer, and an answer cannot close the prompt until
-     * the lock is free, so XMage's state holds still while it is read.
+     * its final inspection. The view is built under the game's lock while the game thread is parked
+     * in XMage's wait for the answer to an open prompt ({@link #settled}). Only an answer or the
+     * engine wakes it, and both change what {@code settled} reads under the same lock before they
+     * do, so XMage's state holds still while it is read.
+     *
+     * <p>Before v0.8.6 an open prompt was enough (bug E4). XMage publishes its request before it
+     * waits: the game thread was still returning through the engine's listener and XMage's own code,
+     * and an inspection could read XMage's state while that thread changed it.
      */
     Inspection inspect(long waitMillis) throws InterruptedException {
         synchronized (this) {
@@ -1298,7 +1399,8 @@ final class HumanGame {
             long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
             while (result == null) {
                 Game current = game;
-                if (current != null && views != null && settled()) {
+                boolean settled = current != null && views != null && settled();
+                if (settled && parked()) {
                     Inspection built = buildInspection(current, "live", null);
                     if (built != null) {
                         return built;
@@ -1308,15 +1410,51 @@ final class HumanGame {
                 if (remaining <= 0) {
                     return null;
                 }
-                wait(remaining);
+                // XMage said it waits but has not parked yet: nothing will notify when it does.
+                wait(settled ? Math.min(remaining, PARK_POLL_MILLIS) : remaining);
             }
             return finalInspection;
         }
     }
 
-    /** Caller holds the lock. A human seat's prompt is open and nothing is ending the game. */
+    /**
+     * Caller holds the lock. XMage's game thread is inside its wait for the answer to a human seat's
+     * open prompt (v0.8.6: before, any open prompt), and nothing is ending the game. The seat may
+     * hold the prompt for a player whose turn it controls, whose stand-in XMage waits on.
+     */
     private boolean settled() {
-        return endRequest == null && humans.stream().anyMatch(seat -> seat.prompt != null && !seat.concedeRequested);
+        if (endRequest != null || listening == null) {
+            return false;
+        }
+        int waitingFor = seatIds.indexOf(listening);
+        return humans.stream().anyMatch(seat -> seat.prompt != null && !seat.concedeRequested
+            && seat.promptFor == waitingFor);
+    }
+
+    /**
+     * Whether the game thread is parked (v0.8.6). XMage reports its wait as it goes into it
+     * ({@link #waiting}) and then runs a few lines of its own (it resets the answer it will take
+     * and notes what it waits for) before it parks in {@code Object.wait}; only then is it blocked.
+     * Inside that method nothing else parks the thread, and an answer that would wake it first closes
+     * the prompt under this lock.
+     */
+    private boolean parked() {
+        return thread.getState() == Thread.State.WAITING;
+    }
+
+    /**
+     * Game thread (v0.8.6): XMage goes into its wait for {@code player}'s answer, or comes out of
+     * it. An inspection waiting for the game to settle is woken to look.
+     */
+    private void waiting(Player player, boolean waiting) {
+        synchronized (this) {
+            if (waiting) {
+                listening = player.getId();
+                notifyAll();
+            } else if (player.getId().equals(listening)) {
+                listening = null;
+            }
+        }
     }
 
     /**
@@ -1352,6 +1490,11 @@ final class HumanGame {
     }
 
     // For tests: XMage's state may be read only while a prompt is open (the game thread is waiting).
+
+    /** Whether XMage's game thread is parked in its wait for a human seat's answer (v0.8.6). */
+    synchronized boolean settledForInspection() {
+        return settled() && parked();
+    }
 
     Game game() {
         return game;

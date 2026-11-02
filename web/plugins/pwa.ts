@@ -23,11 +23,13 @@ export interface BuiltFile {
 // Privacy and Terms) are not the app, and the worker never answers for them (src/pwa/swRules.ts).
 // The setup wizard's screenshots (v0.4.2) show once, to a new account. The shop's pack pictures
 // (v0.4.3: 365 packs in two sizes, about 10 MB), its set symbols and Leng's painting load when the
-// shop shows them, as the portraits do.
+// shop shows them, as the portraits do. How to play's screenshots of the table (v0.8.6) load
+// when its topics show them.
 const NOT_PRECACHED = [
   "portraits/",
   "pages/",
   "welcome/",
+  "how-to-play/",
   "packs/",
   "sets/",
   "shop/",

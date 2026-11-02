@@ -205,7 +205,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 
 SysOp copies Kingdom Connect's root account:
 - **Username.** Always `sysop`.
-- **Its own entrance.** The browser opens `#sysop`. The API's `/api/v1/sysop/*` routes exist only for clients in `CD_SYSOP_NETWORKS`. Everywhere else they answer exactly like a path that does not exist, and the page looks like any unknown address. They are left out of the published OpenAPI document.
+- **Its own entrance.** The browser opens `#sysop`. The API's `/api/v1/sysop/*` routes exist only for clients in `CD_SYSOP_NETWORKS`. Everywhere else they answer exactly like a path that does not exist, and the page looks like any unknown address. Since v0.8.6 that holds for a wrong method too (a `GET` of `/api/v1/sysop/login` is a 404, not a 405) and for a trailing slash (no redirect from `/api/v1/sysop/entrance/`: the API redirects no address to its twin with or without the slash). They are left out of the published OpenAPI document.
 - **Password.** Argon2id (argon2-cffi's current parameters, rehashed on sign-in when they change), at least 12 characters.
   - It is set only from the server console, never through the interface.
   - SysOp can change it on the Profile page (its Sign-ins tab, since v0.6.1) by giving the current one.

@@ -94,6 +94,7 @@ from api.models import (
 from api.progression import count_win
 from api.roster import roster_of
 from api.schemas import (
+    BotsSetting,
     CampaignRef,
     CardNames,
     Error,
@@ -1158,13 +1159,19 @@ def record_end(
             game.result = recorded(result) if result else None
             db.flush()
             link = db.get(CampaignGame, game.id)
+            # A game SysOp played with passive bots (v0.8.6) pays nothing out: no win, tokens,
+            # quests or achievements, and in the campaign no spoils or chapter rewards, though a
+            # won duel still moves SysOp's own campaign on, for testing the wards that follow.
+            payouts = not game.passive_bots_used
             if link is not None:
                 content = campaign.campaign_in(content_dir) if content_dir else None
-                campaign.game_ended(db, game, link, content, content_dir)
-            else:
+                campaign.game_ended(db, game, link, content, content_dir, payouts=payouts)
+            elif payouts:
                 count_win(db, game)
                 pay_game(db, game)
                 settle(db, game)
+                matches.game_ended(db, game)
+            else:
                 matches.game_ended(db, game)
             db.commit()
 
@@ -1280,6 +1287,20 @@ def full_access(principal: Principal) -> bool:
     return principal.can("games.view_concealed")
 
 
+def passive_switchable(game: Game, rows: list[GameSeat], principal: Principal) -> bool:
+    """Whether SysOp may switch this game's bots (v0.8.6): SysOp's own running practice game
+    (a campaign duel is one), with SysOp its only human seat and at least one bot."""
+    humans = [row for row in rows if row.player == "human"]
+    return (
+        principal.user.kind == "sysop"
+        and game.status == "active"
+        and game.kind == "practice"
+        and len(humans) == 1
+        and humans[0].user_id == principal.user.id
+        and any(row.player == "bot" for row in rows)
+    )
+
+
 def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
     # A match's game (v0.5.0) shows its match. Imported here: api.matches imports this module.
     from api.matches import match_ref
@@ -1336,6 +1357,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
             else None
         ),
         match=match_ref(db, game),
+        passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
         campaign=(
             CampaignRef(
                 encounter=link.encounter,
@@ -2132,6 +2154,63 @@ async def inspect_game(
     return cast(dict[str, Any], inspection)
 
 
+@router.put(
+    "/games/{game_id}/bots",
+    response_model=GameSummary,
+    responses={403: {"model": Error}, 409: {"model": Error}},
+)
+async def set_bots(
+    game_id: UUID, setting: BotsSetting, request: Request, principal: Player, db: Db
+) -> GameSummary:
+    """SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the
+    campaign: passive bots only draw, pass and discard to hand size, from their next decision.
+    Only in SysOp's own running practice game (a campaign duel included) with no other human
+    seat. Once they have been passive, the game's end pays nothing out. Audited."""
+    if principal.user.kind != "sysop":
+        raise ApiError(403, "forbidden", "Only SysOp can switch the bots.")
+    game, _ = await run_in_threadpool(visible_game, db, game_id, principal)
+    rows = await run_in_threadpool(
+        lambda: list(
+            db.scalars(select(GameSeat).where(GameSeat.game_id == game_id).order_by(GameSeat.seat))
+        )
+    )
+    hub = hub_of(request)
+    if not passive_switchable(game, rows, principal) or game_id not in hub.games:
+        raise ApiError(
+            409,
+            "passive_bots_unavailable",
+            "Passive bots are for SysOp's own running practice game against bots alone.",
+        )
+    try:
+        status, answer = await hub.require_engine().request(
+            "POST", f"/games/{game_id}/bots", body={"passive": setting.passive}
+        )
+    except EngineUnavailable as error:
+        raise unavailable() from error
+    if status == 409 or status == 404:
+        raise ApiError(409, "game_not_live", "The engine no longer holds this game.")
+    if status != 200 or not isinstance(answer, dict):
+        raise unavailable()
+    passive = bool(answer.get("passive"))
+
+    def record() -> None:
+        current = db.get_one(Game, game_id)
+        current.bots_passive = passive
+        current.passive_bots_used = current.passive_bots_used or passive
+        audit(
+            db,
+            request,
+            "game.bots_passive" if passive else "game.bots_normal",
+            actor_id=principal.user.id,
+            details={"game": str(game_id)},
+        )
+        db.commit()
+
+    await run_in_threadpool(record)
+    await run_in_threadpool(db.refresh, game)
+    return await run_in_threadpool(summary_of, db, game, principal)
+
+
 @router.get("/engine/cards", response_model=CardNames)
 async def card_names(
     request: Request,
@@ -2284,7 +2363,9 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
     except (TimeoutError, ValidationError, WebSocketDisconnect, KeyError):
         await refuse(websocket, CLOSE_BAD_MESSAGE, "hello_required")
         return
-    if not secrets.compare_digest(hello.csrf_token, principal.session.csrf_token):
+    # Compared as bytes (v0.8.6): a token with characters outside ASCII is a wrong token, not an
+    # error (compare_digest refuses such str).
+    if not secrets.compare_digest(hello.csrf_token.encode(), principal.session.csrf_token.encode()):
         await refuse(websocket, CLOSE_FORBIDDEN, "csrf_failed")
         return
     if hello.inspect and not full_access(principal):

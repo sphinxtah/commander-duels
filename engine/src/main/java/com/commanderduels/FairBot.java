@@ -73,6 +73,11 @@ import org.apache.log4j.Logger;
  *       starts, and the bot passes.</li>
  *   <li>XMage's choice of a creature type walks the bot's library from the top, following its
  *       concealed order; this bot walks it in name order.</li>
+ *   <li>Since v0.8.6 a game may make its bots passive ({@link #followPassive}), for SysOp's tests of
+ *       campaign and card mechanics: the bot keeps its opening hand, passes every priority, attacks
+ *       and blocks with nothing and says no to every optional choice. What the rules still make it
+ *       do (its draw, the discard to hand size, a mandatory trigger's targets) is XMage's AI as
+ *       before.</li>
  * </ul>
  *
  * See docs/engine/fair-bots.md for the audit of XMage's AI code behind these changes. Not final
@@ -157,6 +162,8 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong recklessAttacks = new AtomicLong();
         private final AtomicLong unblocked = new AtomicLong();
         private final AtomicLong continued = new AtomicLong();
+        // A passive bot's decisions (v0.8.6).
+        private final AtomicLong passive = new AtomicLong();
 
         /** Determinized copies made: one per search. */
         long samples() {
@@ -224,13 +231,21 @@ class FairBot extends ComputerPlayerControllableProxy {
             return unblocked.get();
         }
 
+        /**
+         * Decisions a passive bot made without XMage's AI (v0.8.6): priorities passed, attacks and
+         * blocks declared empty, opening hands kept and optional choices declined.
+         */
+        long passive() {
+            return passive.get();
+        }
+
         @Override
         public String toString() {
             return searches() + " searches, " + completed() + " completed, " + timedOut() + " cut off by the budget, "
                 + abandoned() + " abandoned, " + unstarted() + " unstarted, " + failed() + " failed; longest "
                 + longestMillis() + " ms, longest wait " + longestWaitMillis() + " ms; habits: " + slips()
                 + " slips, " + naivePlays() + " naive plays, " + heldBack() + " held back, " + recklessAttacks()
-                + " reckless attacks, " + unblocked() + " unblocked";
+                + " reckless attacks, " + unblocked() + " unblocked; " + passive() + " passive decisions";
         }
 
         /** Decisions that continued a planned chain of actions instead of searching again. */
@@ -244,6 +259,12 @@ class FairBot extends ComputerPlayerControllableProxy {
     /** The habits of this bot's skill (v0.7.1; before, v0.6.5 let a flat share of priorities pass). */
     private final transient Profile profile;
     private final transient Stats stats;
+    /**
+     * The game's switch for passive bots (v0.8.6), one object for every bot at the table, shared by
+     * reference with every copy XMage makes and every stand-in this bot makes, so a change reaches
+     * each of them at its next decision. A bot no game has given one keeps its own, always off.
+     */
+    private transient AtomicBoolean passive = new AtomicBoolean();
 
     FairBot(String name, RangeOfInfluence range, int skill, long seed) {
         this(name, range, skill, seed, Budget.forSkill(skill));
@@ -268,6 +289,7 @@ class FairBot extends ComputerPlayerControllableProxy {
         this.budget = bot.budget;
         this.profile = bot.profile;
         this.stats = bot.stats;
+        this.passive = bot.passive;
         // XMage's own copy constructor leaves these at zero.
         this.maxThinkTimeSecs = bot.maxThinkTimeSecs;
         this.maxNodes = bot.maxNodes;
@@ -285,15 +307,48 @@ class FairBot extends ComputerPlayerControllableProxy {
         this.budget = controller.budget;
         this.profile = controller.profile;
         this.stats = controller.stats;
+        this.passive = controller.passive;
+    }
+
+    /**
+     * Follows the game's switch for passive bots (v0.8.6) instead of this bot's own. The game calls
+     * it once, when it seats the bot and before XMage has copied it: copies and stand-ins take the
+     * switch they find.
+     */
+    void followPassive(AtomicBoolean gameSwitch) {
+        this.passive = gameSwitch;
+    }
+
+    /**
+     * Whether this decision is a passive bot's (v0.8.6): the switch is on, the game is the real one
+     * (a search's copies play on as XMage's AI would), and the bot decides for itself. XMage's
+     * {@code isGameUnderControl} is false while another player controls this bot's turn (723.5),
+     * when the decision is that player's to make, and true for a stand-in this bot makes to decide
+     * for a player whose turn it controls: a passive bot passes for that player too.
+     */
+    private boolean passiveNow(Game game) {
+        if (passive.get() && !game.isSimulation() && isGameUnderControl()) {
+            stats.passive.incrementAndGet();
+            return true;
+        }
+        return false;
     }
 
     /**
      * A weaker player's priority (v0.7.1): some chances pass unsearched, most of all responses on
      * other players' turns, and in its own main phases it sometimes plays what comes to hand
      * instead of what the search would choose. Skill 6 is XMage's AI as it is.
+     *
+     * <p>A passive bot (v0.8.6) passes every priority without searching: it plays no land, casts
+     * nothing and activates nothing. It still draws, and discards to its hand size in the cleanup
+     * step: XMage does both without asking for priority.
      */
     @Override
     public boolean priority(Game game) {
+        if (passiveNow(game)) {
+            pass(game);
+            return false;
+        }
         if (!profile.sharp()) {
             boolean ownMain = game.getActivePlayerId() != null && game.getActivePlayerId().equals(playerId)
                 && game.getStack().isEmpty() && isMainPhase(game);
@@ -355,9 +410,15 @@ class FairBot extends ComputerPlayerControllableProxy {
      * and some of the creatures it kept home sent in anyway, so lethal attacks are missed and
      * creatures run into blocks. XMage checks the requirements and restrictions afterwards, as it
      * does for its own choices.
+     *
+     * <p>A passive bot (v0.8.6) declares no attackers. A creature that must attack if able still
+     * does: XMage declares it before it asks (508.1d), as the rules require.
      */
     @Override
     public void selectAttackers(Game game, UUID attackingPlayerId) {
+        if (passiveNow(game)) {
+            return;
+        }
         super.selectAttackers(game, attackingPlayerId);
         if (profile.sharp() || game.getCombat() == null) {
             return;
@@ -403,9 +464,15 @@ class FairBot extends ComputerPlayerControllableProxy {
     /**
      * A weaker player's blocks (v0.7.1): sometimes none at all, unless the attack as declared would
      * take all of this player's life, when even an amateur blocks.
+     *
+     * <p>A passive bot (v0.8.6) blocks with nothing, even a lethal attack. A creature that must
+     * block still does: XMage adds a computer player's required blocks after it chooses (509.1c).
      */
     @Override
     public void selectBlockers(Ability source, Game game, UUID defendingPlayerId) {
+        if (passiveNow(game)) {
+            return;
+        }
         if (!profile.sharp() && chance(profile.noBlock()) && incomingPower(game) < getLife()) {
             stats.unblocked.incrementAndGet();
             return;
@@ -423,6 +490,45 @@ class FairBot extends ComputerPlayerControllableProxy {
             }
         }
         return power;
+    }
+
+    /** A passive bot (v0.8.6) keeps its opening hand. */
+    @Override
+    public boolean chooseMulligan(Game game) {
+        if (passiveNow(game)) {
+            return false;
+        }
+        return super.chooseMulligan(game);
+    }
+
+    /**
+     * A passive bot (v0.8.6) answers every yes-or-no question with no, as the engine answers for a
+     * player nobody is left to decide for ({@link Prompts.Prompt#fallback}): it uses no optional
+     * ability and pays no optional cost. XMage's AI says yes to nearly everything. One question is
+     * answered yes: its commander goes back to the command zone (903.9), as any player would choose,
+     * so a campaign test meets the commander again as the duel would.
+     */
+    @Override
+    public boolean chooseUse(Outcome outcome, String message, Ability source, Game game) {
+        if (passiveNow(game)) {
+            return toCommandZone(message);
+        }
+        return super.chooseUse(outcome, message, source, game);
+    }
+
+    @Override
+    public boolean chooseUse(Outcome outcome, String message, String secondMessage, String trueText,
+                             String falseText, Ability source, Game game) {
+        if (passiveNow(game)) {
+            return toCommandZone(message);
+        }
+        return super.chooseUse(outcome, message, secondMessage, trueText, falseText, source, game);
+    }
+
+    /** XMage's question for a commander leaving the battlefield or the stack (its
+     * CommanderReplacementEffect): "Move <commander> to command zone instead of your <zone>?". */
+    static boolean toCommandZone(String message) {
+        return message != null && message.contains(" to command zone instead of ");
     }
 
     Profile profile() {

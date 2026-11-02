@@ -1563,7 +1563,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.8.5",
+            "default": "0.8.6",
             "title": "Version",
             "type": "string"
           }
@@ -1573,6 +1573,21 @@
           "auth"
         ],
         "title": "Bootstrap",
+        "type": "object"
+      },
+      "BotsSetting": {
+        "additionalProperties": false,
+        "description": "SysOp's switch between normal and passive bots (v0.8.6).",
+        "properties": {
+          "passive": {
+            "title": "Passive",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "passive"
+        ],
+        "title": "BotsSetting",
         "type": "object"
       },
       "BuyNowRequest": {
@@ -5494,6 +5509,18 @@
             ],
             "description": "Its best-of-three match (v0.5.0); null for a single game."
           },
+          "passive_bots": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SysOp alone (v0.8.6): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where SysOp may not switch them: one that is not a running practice or campaign game with SysOp its only human seat.",
+            "title": "Passive Bots"
+          },
           "result": {
             "anyOf": [
               {
@@ -5780,7 +5807,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.8.5",
+            "default": "0.8.6",
             "title": "Version",
             "type": "string"
           }
@@ -13235,7 +13262,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.8.5"
+    "version": "0.8.6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -25481,6 +25508,127 @@
         "summary": "Get Game"
       }
     },
+    "/api/v1/games/{game_id}/bots": {
+      "put": {
+        "description": "SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the\ncampaign: passive bots only draw, pass and discard to hand size, from their next decision.\nOnly in SysOp's own running practice game (a campaign duel included) with no other human\nseat. Once they have been passive, the game's end pays nothing out. Audited.",
+        "operationId": "set_bots_api_v1_games__game_id__bots_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "game_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Game Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BotsSetting"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Set Bots"
+      }
+    },
     "/api/v1/games/{game_id}/close": {
       "post": {
         "description": "Ends the game for every seat: its owner's choice, or SysOp's. The reply shows the game\nas it ended. A table's game goes on for the other players, so its players concede their own\nseat instead; only SysOp closes it while it runs.",
@@ -26062,6 +26210,143 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/v1/how-to-play/card-images": {
+      "get": {
+        "description": "One of How to play's example cards by its exact name, signed in or not, from the server's\nScryfall cache. 404 card_image_missing for any name that is not one of the guide's cards, as\nfor a name Scryfall does not know.",
+        "operationId": "guide_card_image_api_v1_how_to_play_card_images_get",
+        "parameters": [
+          {
+            "description": "The card's exact name, as the game shows it.",
+            "in": "query",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The card's exact name, as the game shows it.",
+              "maxLength": 200,
+              "minLength": 1,
+              "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]+$",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "default": "normal",
+              "enum": [
+                "normal",
+                "large",
+                "png"
+              ],
+              "title": "Size",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The card's image."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Guide Card Image"
       }
     },
     "/api/v1/library": {

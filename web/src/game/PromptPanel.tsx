@@ -25,6 +25,7 @@ import { timerLive } from "./table/timer";
 import type { PromptTimerProps } from "./table/types";
 import { useTableUi } from "./table/uiStore";
 import type { Prompt, PromptOption } from "./types";
+import { guideHref, PROMPT_TOPICS, topicById } from "../howToPlay/guide";
 import styles from "./game.module.css";
 import screenStyles from "./table/screen.module.css";
 
@@ -437,6 +438,7 @@ export function PromptPanel({
         <p className={styles.promptMessage} id="prompt-message">
           {prompt.message}
         </p>
+        <WhatsThis kind={prompt.kind} />
         {team && (
           <p className={styles.promptDetail} data-team-note>
             {team}
@@ -754,5 +756,25 @@ function OptionList({
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * "What's this?" (v0.8.6): the How to play topic that explains this kind of choice, in a tab of its
+ * own, so the game goes on where it is.
+ */
+export function WhatsThis({ kind }: { kind: string }) {
+  const topic = topicById(PROMPT_TOPICS[kind] ?? "");
+  if (!topic) return null;
+  return (
+    <a
+      className={styles.whatsThis}
+      href={`/${guideHref(topic.id)}`}
+      target="_blank"
+      rel="noopener"
+      aria-label={`What's this? ${topic.title}, in How to play (opens a new tab)`}
+    >
+      What’s this?
+    </a>
   );
 }

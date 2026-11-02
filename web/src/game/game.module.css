@@ -489,6 +489,18 @@ button.life[data-selected] {
   font-size: 0.95rem;
   margin-bottom: 6px;
 }
+/* "What's this?" (v0.8.6): the prompt's topic in How to play, small, under the question. */
+.whatsThis {
+  display: inline-block;
+  margin: -2px 0 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-decoration: underline dotted;
+}
+.whatsThis:hover,
+.whatsThis:focus-visible {
+  color: inherit;
+}
 .promptDetail {
   font-size: 0.8rem;
   color: var(--muted);
@@ -950,6 +962,15 @@ button.life[data-selected] {
   grid-column: 1 / -1;
   display: grid;
   gap: 10px;
+}
+/* SysOp's passive bots (v0.8.6), above the inspect switch. */
+.passiveBots {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ffffff1a;
+}
+.passiveBots[data-passive-bots="true"] .switch span {
+  color: #f0b46a;
 }
 .switch {
   display: flex;

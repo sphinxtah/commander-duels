@@ -94,6 +94,8 @@ class FakeEngine:
         self.closed: list[str] = []
         self.created: list[dict[str, Any]] = []
         self.inspections = 0
+        # SysOp's passive bots, by game (v0.8.6).
+        self.passive: dict[str, bool] = {}
         # Views asked for without waiting: a new connection's, a resync's or a read over HTTP.
         self.pages = 0
         # A slow engine: creating a game takes this long, and so does stopping one ("closing").
@@ -138,6 +140,17 @@ class FakeEngine:
             with self.lock:
                 self.inspections += 1
                 return httpx.Response(200, json=inspection(game))
+        if parts[2] == "bots":
+            # SysOp's passive bots (v0.8.6): the engine logs a change.
+            with self.lock:
+                if game.result is not None:
+                    return httpx.Response(409, json={"code": "game_over"})
+                passive = bool(body["passive"])
+                if passive != self.passive.get(game.id, False):
+                    game.log.append("Bots set to passive." if passive else "Bots set to normal.")
+                    game.revision += 1
+                self.passive[game.id] = passive
+                return httpx.Response(200, json={"passive": passive})
         if request.headers.get("authorization") != f"Bearer {game.token}":
             return httpx.Response(404, json={"code": "not_found"})
         if parts[2] == "view":
@@ -354,6 +367,10 @@ class Account:
         if csrf:
             headers["x-csrf-token"] = self.csrf
         return self.http.post(path, json=body, headers=headers)
+
+    def put(self, path: str, body: object = None) -> httpx.Response:
+        headers = {"cookie": f"__Host-cd_session={self.token}", "x-csrf-token": self.csrf}
+        return self.http.put(path, json=body, headers=headers)
 
     def socket(self, game_id: str, origin: str | None = ORIGIN) -> Any:
         headers = {"cookie": f"__Host-cd_session={self.token}"}
@@ -612,6 +629,10 @@ def test_the_websocket_refuses_strangers(
         assert closes_with(socket, games.CLOSE_UNAUTHENTICATED) == "authentication_required"
     with ada.socket(game_id) as socket:
         socket.send_json({"type": "hello", "csrf_token": "wrong"})
+        assert closes_with(socket, games.CLOSE_FORBIDDEN) == "csrf_failed"
+    # A token with characters outside ASCII is a wrong token too, not a server error (v0.8.6, I5).
+    with ada.socket(game_id) as socket:
+        socket.send_json({"type": "hello", "csrf_token": "jeton-\u00e9t\u00e9-\u2603"})
         assert closes_with(socket, games.CLOSE_FORBIDDEN) == "csrf_failed"
     with ada.socket(game_id) as socket:
         socket.send_json({"type": "command"})
@@ -1480,3 +1501,42 @@ def test_a_second_api_process_on_postgresql_does_not_start(
         with admin.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         admin.dispose()
+
+
+def test_only_sysop_switches_bots_in_its_own_game_against_bots(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """Passive bots (v0.8.6): SysOp's own running practice game against bots alone; the server
+    refuses anyone else, and SysOp anywhere else. Each switch is audited, and the game remembers
+    that its bots were passive."""
+    ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
+    theirs = ada.post("/api/v1/practice-games", {}).json()["id"]
+    refused = ada.put(f"/api/v1/games/{theirs}/bots", {"passive": True})
+    assert (refused.status_code, refused.json()["code"]) == (403, "forbidden")
+    assert ada.get(f"/api/v1/games/{theirs}").json()["game"]["passive_bots"] is None
+    # SysOp observing a player's game may not switch its bots.
+    elsewhere = root.put(f"/api/v1/games/{theirs}/bots", {"passive": True})
+    assert (elsewhere.status_code, elsewhere.json()["code"]) == (409, "passive_bots_unavailable")
+    assert root.get(f"/api/v1/games/{theirs}").json()["game"]["passive_bots"] is None
+    assert theirs not in engine.passive
+
+    own = root.post("/api/v1/practice-games", {}).json()["id"]
+    assert root.get(f"/api/v1/games/{own}").json()["game"]["passive_bots"] is False
+    switched = root.put(f"/api/v1/games/{own}/bots", {"passive": True})
+    assert switched.status_code == 200, switched.text
+    assert switched.json()["passive_bots"] is True
+    assert engine.passive[own] is True
+    assert engine.game(own).log[-1] == "Bots set to passive."
+    back = root.put(f"/api/v1/games/{own}/bots", {"passive": False})
+    assert back.json()["passive_bots"] is False
+    assert engine.game(own).log[-1] == "Bots set to normal."
+    with Session(app.state.database) as db:
+        game = db.get_one(Game, uuid.UUID(own))
+        assert (game.bots_passive, game.passive_bots_used) == (False, True)
+    actions = audit_actions(app)
+    assert "game.bots_passive" in actions and "game.bots_normal" in actions
+    assert root.put(f"/api/v1/games/{own}/bots", {"passive": "yes"}).status_code == 422
+    # A game that has ended has no bots to switch.
+    assert root.post(f"/api/v1/games/{own}/close").status_code == 200
+    ended = root.put(f"/api/v1/games/{own}/bots", {"passive": True})
+    assert (ended.status_code, ended.json()["code"]) == (409, "passive_bots_unavailable")

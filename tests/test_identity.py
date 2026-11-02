@@ -498,6 +498,15 @@ def test_sysop_entrance_exists_only_on_its_network(app: FastAPI, database: str) 
             headers=headers,
         )
         assert login.status_code == 404
+        # A wrong method, or a trailing slash, answers as any missing path too (v0.8.6, I2).
+        for wrong in (
+            client.get("/api/v1/sysop/login", headers=headers),
+            client.put("/api/v1/sysop/entrance", headers=headers),
+            client.get("/api/v1/sysop/entrance/", headers=headers, follow_redirects=False),
+        ):
+            assert wrong.status_code == 404, (address, forwarded, wrong.request.url)
+            assert {**wrong.json(), "request_id": ""} == {**missing, "request_id": ""}
+            assert "allow" not in wrong.headers
     proxied = browser(app, PROXY).get(
         "/api/v1/sysop/entrance", headers={"X-Forwarded-For": "203.0.113.5, 10.20.0.7"}
     )

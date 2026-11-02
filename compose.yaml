@@ -99,7 +99,13 @@ services:
     # and music/playlist.json naming them, and since v0.8.1 music/campaign.mp3 for the campaign's
     # cut scenes. The live site gets them from the owner's private web
     # image instead (docs/deployment.md). An empty folder means no music and no player.
-    volumes: ["./music:/usr/share/nginx/html/music:ro"]
+    # The official rules (v0.8.6): Wizards' Comprehensive Rules text as rules/comprehensive-rules.txt
+    # (gitignored, beside this file) is How to play's official text at http://localhost:8080; the
+    # live site gets it from the owner's private web image. Without it, How to play shows its own
+    # guide and a link to Wizards' rules page.
+    volumes:
+      - "./music:/usr/share/nginx/html/music:ro"
+      - "./rules:/usr/share/nginx/html/rules:ro"
     networks:
       default: {ipv4_address: 172.30.233.10}
     depends_on:

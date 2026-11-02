@@ -545,6 +545,42 @@ describe("the rematch", () => {
     expect(window.location.hash).toBe(`#game/${NEXT}`);
   });
 
+  it("never lets an older answer replace a newer one (v0.8.6, W6)", async () => {
+    const api = mockApi();
+    // The first poll is slow: it answers only after the offer's own answer has been shown.
+    let late: (value: unknown) => void = () => {};
+    const open = offer({
+      status: "open",
+      can_offer: false,
+      offered_by: "ada",
+      your_answer: "yes",
+      expires_in: 115,
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api.on(
+      "GET /api/v1/games/{game_id}/rematch",
+      () => reply(200, offer()),
+      () =>
+        new Promise((resolve) => {
+          late = resolve;
+        }),
+    );
+    api.on("POST /api/v1/games/{game_id}/rematch", () => reply(200, open));
+    render(<Result />);
+    await settle();
+    // The next poll goes out, and is still on its way when the player offers the rematch.
+    await act(() => vi.advanceTimersByTimeAsync(REMATCH_POLL_MS));
+    await act(async () =>
+      screen.getByRole("button", { name: "Rematch" }).click(),
+    );
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("Rematch offered.");
+    await act(async () => late(reply(200, offer())));
+    await settle();
+    expect(screen.getByRole("status")).toHaveTextContent("Rematch offered.");
+    vi.useRealTimers();
+  });
+
   it("waits for the game's end to be recorded, and is not offered to an observer", async () => {
     const api = mockApi();
     render(<Result game={summary({ status: "active" })} />);

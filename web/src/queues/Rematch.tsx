@@ -55,6 +55,11 @@ export function useRematch(
   // Whether this page saw the offer open, or asked: only then does a start open the new game.
   const waitedHere = useRef(false);
   const latest = useRef<RematchView | null>(null);
+  // Every request takes a number as it is sent; an answer is shown only when no later request's
+  // answer has been (v0.8.6): a poll sent before an offer or a decline, answering after it, must
+  // not bring the older state back.
+  const issued = useRef(0);
+  const shown = useRef(0);
 
   const show = useCallback((next: RematchView) => {
     latest.current = next;
@@ -69,12 +74,15 @@ export function useRematch(
   useEffect(() => {
     if (!ready) return;
     let active = true;
+    const number = ++issued.current;
     void client
       .GET("/api/v1/games/{game_id}/rematch", {
         params: { path: { game_id: gameId } },
       })
       .then(({ data }) => {
-        if (active && data) show(data);
+        if (!active || !data || number < shown.current) return;
+        shown.current = number;
+        show(data);
       })
       .catch(() => undefined);
     return () => {
@@ -123,13 +131,18 @@ export function useRematch(
   ) {
     setError("");
     setBusy(true);
+    const number = ++issued.current;
     const { data, error: failure } = await request().catch(() => ({
       data: undefined,
       error: undefined,
     }));
     setBusy(false);
-    if (data) show(data);
-    else {
+    if (data) {
+      if (number >= shown.current) {
+        shown.current = number;
+        show(data);
+      }
+    } else {
       setError(describe(failure));
       setTick((n) => n + 1);
     }

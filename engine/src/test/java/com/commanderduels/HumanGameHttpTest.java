@@ -215,6 +215,30 @@ class HumanGameHttpTest {
             token(game, 0), "").statusCode());
     }
 
+    /**
+     * Bug E5 (v0.8.6): the first human seat closes a development game, whichever seat it is; any
+     * other seat's token is refused and concedes instead.
+     */
+    @Test
+    void onlyTheFirstHumanSeatClosesTheGame() throws Exception {
+        start(new HumanGames(SeatChecks.DECKS, 1));
+        var created = send("POST", "/v1/games", null, "{\"seed\":36,\"skill\":1,\"format\":\"commander\","
+            + "\"seats\":[{\"player\":\"bot\"},{\"player\":\"human\"},{\"player\":\"human\"}]}");
+        assertEquals(201, created.statusCode(), created.body());
+        JsonObject game = json(created);
+        String id = game.get("game_id").getAsString();
+        String close = "/v1/games/" + id + "/close";
+        var refused = send("POST", close, token(game, 2), "");
+        assertEquals(403, refused.statusCode(), refused.body());
+        assertEquals("forbidden", json(refused).get("code").getAsString());
+        assertEquals(403, send("POST", close, game.get("spectator_token").getAsString(), "").statusCode());
+        assertEquals(404, send("POST", close, null, "").statusCode());
+        var closed = send("POST", close, token(game, 1), "");
+        assertEquals(200, closed.statusCode(), closed.body());
+        JsonObject last = untilPrompt(id, token(game, 2));
+        assertEquals("closed", last.getAsJsonObject("result").get("kind").getAsString());
+    }
+
     /** The spectator token reads the public view and nothing else. */
     @Test
     void theSpectatorTokenOnlyReadsThePublicView() throws Exception {
@@ -312,7 +336,14 @@ class HumanGameHttpTest {
             "{\"option_id\":\"" + option + "\"}"));
         assertEquals(200, accepted.statusCode(), accepted.body());
 
-        var closed = send("POST", "/v1/games/" + id + "/close", otherToken, "");
+        // Bug E5 (v0.8.6): only the first human seat closes the game for everyone; seat 2 concedes instead.
+        var refused = send("POST", "/v1/games/" + id + "/close", third, "");
+        assertEquals(403, refused.statusCode(), refused.body());
+        assertEquals("forbidden", json(refused).get("code").getAsString());
+        assertTrue(json(refused).get("message").getAsString().contains("concede"));
+        assertTrue(json(send("GET", "/v1/games/" + id + "/view", third, null)).get("result").isJsonNull(),
+            "the refused close changed nothing");
+        var closed = send("POST", "/v1/games/" + id + "/close", first, "");
         assertEquals(200, closed.statusCode(), closed.body());
         JsonObject last = untilPrompt(id, first);
         assertEquals("closed", last.getAsJsonObject("result").get("kind").getAsString());

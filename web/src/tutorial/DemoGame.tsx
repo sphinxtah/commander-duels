@@ -7,6 +7,7 @@ import { buildDemo } from "./demoScript";
 import { autoWaitMs, frameHolds } from "./pacing";
 import shell from "../App.module.css";
 import styles from "./tutorial.module.css";
+import { LearnMore } from "./LearnMore";
 
 // The Beginner's watched game (v0.8.4): the scripted game of demoScript.ts on the real table,
 // with its narration in a panel over it. Next goes on a lesson; "Play on its own" goes on by
@@ -112,6 +113,7 @@ export function DemoGame({
       <p aria-live="polite" className={styles.narrationText}>
         {lesson.text}
       </p>
+      <LearnMore title={lesson.title} />
       <div className={styles.narrationActions}>
         {last ? (
           <button

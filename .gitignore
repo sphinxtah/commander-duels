@@ -34,3 +34,9 @@ Commander_Duels_Starter_Decks.xlsx
 # The owner's campaign handoff (v0.8.0): the guide and deck builds name the Godlike tier's custom
 # cards. content/campaign.json and web/src/campaign/script.ts are made from them (docs/campaign.md).
 /campaign/
+
+# The official Comprehensive Rules (v0.8.6): Wizards of the Coast's text, never in the public
+# repository. Locally, rules/comprehensive-rules.txt beside compose.yaml is How to play's official
+# text in the Docker stack and the dev server; the live site takes it from the private web image
+# (docs/how-to-play.md).
+/rules/

@@ -254,11 +254,15 @@ function Table({ me }: { me: Me }) {
   /** Whether the format was chosen (by the player, or a "Play it" link) rather than defaulted. */
   const formatChosen = useRef(false);
 
+  // The games list is asked for again after each start and close and when the scope changes; only
+  // the latest request's answer is shown (v0.8.6), so a slow older one never replaces it.
+  const refreshes = useRef(0);
   const refresh = useCallback(async () => {
+    const number = ++refreshes.current;
     const { data } = await client.GET("/api/v1/games", {
       params: { query: { scope: everyone ? "all" : "mine" } },
     });
-    setGames(data ?? []);
+    if (number === refreshes.current) setGames(data ?? []);
   }, [everyone]);
 
   useEffect(() => {
@@ -329,14 +333,21 @@ function Table({ me }: { me: Me }) {
       setFound([]);
       return;
     }
+    // An answer for a query since changed is dropped (v0.8.6): it may come after the new one's.
+    let current = true;
     const timer = window.setTimeout(() => {
       void client
         .GET("/api/v1/engine/cards", {
           params: { query: { q: query.trim(), limit: 12 } },
         })
-        .then(({ data }) => setFound(data?.names ?? []));
+        .then(({ data }) => {
+          if (current) setFound(data?.names ?? []);
+        });
     }, 250);
-    return () => window.clearTimeout(timer);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
   }, [query, useList]);
 
   const chosenFormat = options?.formats.find((f) => f.id === format);

@@ -32,6 +32,7 @@ from api.models import (
     CustomCard,
     CustomCardGrant,
     Deck,
+    Game,
     LibraryGrant,
     ProgressEntry,
     TokenEntry,
@@ -608,3 +609,32 @@ def test_a_reset_starts_the_campaign_again(
     assert after["progress"]["completed"] == []
     assert after["progress"]["highest_unlocked"] == 1
     assert after["chapters"][0]["rewards"][0]["earned"] is False
+
+
+def test_a_duel_won_with_passive_bots_moves_on_without_spoils(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """SysOp's passive bots (v0.8.6): a duel whose bots were passive still opens the next ward,
+    for testing it, but gives no spoils; a later win without them gives the spoils as a first
+    win does."""
+    ada = Account(client, "ada")
+    started = start(ada, 1)
+    assert started.status_code == 201, started.text
+    game_id = started.json()["id"]
+    with Session(app.state.database) as db:
+        db.execute(update(Game).where(Game.id == uuid.UUID(game_id)).values(passive_bots_used=True))
+        db.commit()
+    end(engine, game_id, won())
+    assert until_status(ada, game_id, "finished")["game"]["campaign"]["outcome"] == "won"
+    after = state(ada)
+    assert after["progress"]["completed"] == [1]
+    assert after["progress"]["highest_unlocked"] == 2
+    assert after["encounters"][0]["spoils"]["earned"] is False
+    with Session(app.state.database) as db:
+        rewards = list(
+            db.scalars(select(CampaignReward.reward).where(CampaignReward.user_id == ada.id))
+        )
+        assert rewards == ["seal:01"]
+        assert db.scalar(select(TokenEntry).where(TokenEntry.user_id == ada.id)) is None
+    play(ada, engine, 1, won())
+    assert state(ada)["encounters"][0]["spoils"]["earned"] is True

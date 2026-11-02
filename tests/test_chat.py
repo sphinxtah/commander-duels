@@ -269,6 +269,10 @@ def test_the_socket_needs_a_session_its_csrf_token_and_our_origin(client):
         assert forged.receive_json()["code"] == "csrf_failed"
         with pytest.raises(WebSocketDisconnect):
             forged.receive_json()
+    # Characters outside ASCII are a wrong token, not a server error (v0.8.6, I5).
+    with socket(ada) as forged:
+        forged.send_json({"type": "hello", "csrf_token": "\u00e9t\u00e9-\u2603"})
+        assert forged.receive_json()["code"] == "csrf_failed"
 
 
 def report(who: Any, kind: str, message_id: str) -> Any:

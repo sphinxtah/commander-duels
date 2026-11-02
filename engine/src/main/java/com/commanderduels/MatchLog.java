@@ -95,12 +95,31 @@ public final class MatchLog {
         int turn = game.getTurnNum();
         int seat = seatIds.indexOf(game.getState().getActivePlayerId()); // the turn's holder (805.9)
         PhaseStep step = game.getTurnStepType();
-        lastTurn = turn;
+        append(new Entry(turn, seat < 0 ? null : seat, step == null ? null : step.name(), text));
+    }
+
+    /**
+     * The engine's own line (v0.8.6: the passive bot switch), from any thread. It reads nothing of
+     * XMage's state: it takes the turn, active seat and step of the last line, or turn 0 before the
+     * first.
+     */
+    synchronized void note(String message) {
+        String text = plain(message);
+        if (text.isEmpty()) {
+            return;
+        }
+        Entry last = entries.isEmpty() ? null : entries.get(entries.size() - 1);
+        append(last == null ? new Entry(lastTurn, null, null, text)
+            : new Entry(last.turn(), last.activeSeat(), last.step(), text));
+    }
+
+    private void append(Entry entry) {
+        lastTurn = entry.turn();
         lines++;
-        String comparable = OBJECT_IDS.matcher(text).replaceAll("");
-        digest.update((turn + "|" + comparable + "\n").getBytes(StandardCharsets.UTF_8));
+        String comparable = OBJECT_IDS.matcher(entry.text()).replaceAll("");
+        digest.update((entry.turn() + "|" + comparable + "\n").getBytes(StandardCharsets.UTF_8));
         if (entries.size() < MAX_ENTRIES) {
-            entries.add(new Entry(turn, seat < 0 ? null : seat, step == null ? null : step.name(), text));
+            entries.add(entry);
         }
     }
 

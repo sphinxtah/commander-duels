@@ -45,6 +45,8 @@ import { SharedDeck } from "./decks/SharedDeck";
 import { ShopPage } from "./shop/ShopPage";
 import { AuctionsPage } from "./auctions/AuctionsPage";
 import { GameScreen } from "./game/GameScreen";
+import { HowToPlay, HOW_TO_PLAY_ROUTE } from "./howToPlay/HowToPlay";
+import { PublicHowToPlay } from "./howToPlay/PublicHowToPlay";
 import { DemoGame } from "./tutorial/DemoGame";
 import { Tour } from "./tutorial/Tour";
 import { moveTutorial, tutorialPending } from "./tutorial/tutorial";
@@ -121,6 +123,12 @@ function currentMessages(): string | undefined {
 function currentCampaign(): string | undefined {
   return returningGame(window.location.hash);
 }
+/** #how-to-play, #how-to-play/<topic> and #how-to-play/rules/<number> (v0.8.6): How to play,
+ * signed in or not. Undefined for any other address; "" for the guide's contents. */
+function currentHowToPlay(): string | undefined {
+  const match = HOW_TO_PLAY_ROUTE.exec(window.location.hash);
+  return match ? (match[1] ?? "") : undefined;
+}
 /** #player/<id> opens a player's profile (v0.4.3), under Friends. */
 function currentPlayer(): string | undefined {
   return PLAYER_ROUTE.exec(window.location.hash)?.[1]?.toLowerCase();
@@ -129,6 +137,8 @@ function currentPage(): Page {
   const path = window.location.hash.slice(1).toLowerCase().split("?")[0] ?? "";
   if (path === "sysop") return "SysOp";
   if (path === "notifications") return "Notifications";
+  if (path === "how-to-play" || path.startsWith("how-to-play/"))
+    return "HowToPlay";
   if (path.startsWith("player/")) return "Friends";
   if (path.startsWith("tables/")) return "Tables";
   // Tivit's Auction House's tabs (v0.6.0): #auctions/search, #auctions/list, #auctions/targets.
@@ -154,6 +164,7 @@ export function App() {
   const [playerRoute, setPlayerRoute] = useState(currentPlayer);
   const [campaignRoute, setCampaignRoute] = useState(currentCampaign);
   const [messagesRoute, setMessagesRoute] = useState(currentMessages);
+  const [howToPlayRoute, setHowToPlayRoute] = useState(currentHowToPlay);
   const [bootstrap, setBootstrap] = useState<Bootstrap>();
   const [formats, setFormats] = useState<Format[]>([]);
   const [connection, setConnection] = useState<
@@ -301,6 +312,7 @@ export function App() {
       setPlayerRoute(currentPlayer());
       setCampaignRoute(currentCampaign());
       setMessagesRoute(currentMessages());
+      setHowToPlayRoute(currentHowToPlay());
     };
     window.addEventListener("hashchange", change);
     return () => window.removeEventListener("hashchange", change);
@@ -540,6 +552,14 @@ export function App() {
   // Nothing of the app is drawn, or asks the API for anything, before the account is active
   // (v0.3.0). Every address shows the landing page and stays as it was, so the screen it names
   // opens after sign-in and approval; a #game/<id> never opens the game's WebSocket.
+  // How to play (v0.8.6) is for anyone: signed out, or waiting for approval, it is a page of its
+  // own with the mark and a way back to the sign-in.
+  if (
+    (!me || me.status !== "active") &&
+    howToPlayRoute !== undefined &&
+    !checking
+  )
+    return <PublicHowToPlay rest={howToPlayRoute} heading={heading} />;
   if (!me || me.status !== "active") {
     return (
       <Landing>
@@ -734,6 +754,8 @@ export function App() {
                 onRetry={retry}
                 heading={heading}
               />
+            ) : page === "HowToPlay" ? (
+              <HowToPlay rest={howToPlayRoute} heading={heading} />
             ) : page === "Settings" ? (
               <Settings
                 preferences={preferences}

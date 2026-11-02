@@ -1,0 +1,760 @@
+/* How to play (v0.8.6): the contents and search at the side, the guide or the official rules in a
+   reading column. Cards are the guide's examples, drawn at a fixed width; screenshots fill the
+   column. On a phone the side stacks above the text. */
+.page {
+  display: grid;
+  grid-template-columns: minmax(220px, 270px) minmax(0, 820px);
+  gap: 40px;
+  justify-content: center;
+  align-items: start;
+  padding-bottom: 48px;
+}
+.side {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.body {
+  min-width: 0;
+  line-height: 1.6;
+  color: var(--cd-text);
+}
+.body > h2 {
+  font: 600 clamp(1.6rem, 2.4vw, 2.3rem) / 1.15 var(--cd-display);
+  color: var(--cd-gold-hi);
+  margin: 10px 0 12px;
+}
+.body > h2:focus {
+  outline: none;
+}
+.body h3 {
+  font: 600 1.05rem/1.3 var(--cd-display);
+  color: var(--cd-gold);
+  margin: 0 0 10px;
+}
+.body a {
+  color: var(--cd-gold-hi);
+}
+.lead {
+  font-size: 1.08rem;
+  color: var(--cd-muted);
+  margin: 0 0 22px;
+}
+
+/* The contents at the side. */
+.toc,
+.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.toc > li {
+  margin: 0 0 14px;
+}
+.tocChapter {
+  display: block;
+  color: var(--cd-gold);
+  font: 600 0.66rem/1.4 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.toc a {
+  display: block;
+  padding: 3px 8px;
+  border-left: 2px solid transparent;
+  color: var(--cd-muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+.toc a:hover {
+  color: var(--cd-text);
+}
+.toc a[aria-current="page"] {
+  color: var(--cd-gold-hi);
+  border-left-color: var(--cd-gold);
+  background: #d5b77c14;
+}
+
+/* The search, and its results under it. */
+.search {
+  position: relative;
+  margin-bottom: 20px;
+}
+.search label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--cd-muted);
+  margin-bottom: 4px;
+}
+.search input,
+.filter input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--cd-gold-line);
+  background: var(--cd-bg-raised);
+  color: var(--cd-text);
+  font: inherit;
+}
+.results {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: -120px;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 8px;
+  background: var(--cd-panel);
+  box-shadow: 0 12px 32px #000c;
+  font-size: 0.9rem;
+}
+.results h3 {
+  font: 600 0.66rem/1.4 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--cd-gold);
+  margin: 8px 0 4px;
+}
+.results ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.results li a {
+  display: block;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--cd-text);
+  text-decoration: none;
+}
+.results li a:hover,
+.results li a:focus {
+  background: #d5b77c1f;
+}
+.results p {
+  margin: 4px 0;
+}
+.searchNote {
+  color: var(--cd-faint);
+  font-size: 0.82rem;
+}
+
+/* The guide's contents page. */
+.heroCards {
+  display: flex;
+  gap: 14px;
+  margin: 0 0 26px;
+}
+.heroCards > * {
+  width: 150px;
+}
+.heroCards > *:nth-child(1) {
+  transform: rotate(-4deg);
+}
+.heroCards > *:nth-child(3) {
+  transform: rotate(4deg);
+}
+.contentsChapter {
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border: 1px solid var(--cd-line);
+  border-radius: 10px;
+  background: #ffffff05;
+}
+.contentsChapter h3 > span {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6em;
+  height: 1.6em;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--cd-gold-line);
+  font-size: 0.85em;
+}
+.contentsChapter ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.contentsChapter li {
+  display: grid;
+  grid-template-columns: minmax(170px, 230px) 1fr;
+  gap: 12px;
+}
+.contentsChapter li span {
+  color: var(--cd-muted);
+  font-size: 0.92rem;
+}
+
+/* Blocks of a topic. */
+.list {
+  padding-left: 1.3em;
+}
+.list li {
+  margin: 4px 0;
+}
+.tip {
+  margin: 18px 0;
+  padding: 12px 16px;
+  border-left: 3px solid var(--cd-ember);
+  border-radius: 0 8px 8px 0;
+  background: #e9893a14;
+}
+.tip strong {
+  display: block;
+  color: var(--cd-ember);
+  font: 600 0.66rem/1.4 var(--cd-display);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.steps,
+.example {
+  margin: 22px 0;
+  padding: 16px 20px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 10px;
+  background: var(--cd-panel);
+}
+.steps ol,
+.example ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+.steps li,
+.example li {
+  margin: 6px 0;
+}
+.exampleLabel {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--cd-gold);
+  color: #1a1408;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.exampleCards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+.exampleCards > * {
+  width: 132px;
+}
+.outcome {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--cd-line);
+  font-weight: 600;
+}
+.outcome::before {
+  content: "Result: ";
+  color: var(--cd-gold);
+}
+.tableWrap {
+  overflow-x: auto;
+  margin: 18px 0;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.93rem;
+}
+.table caption {
+  text-align: left;
+  color: var(--cd-gold);
+  font: 600 0.95rem/1.3 var(--cd-display);
+  margin-bottom: 6px;
+}
+.table th,
+.table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--cd-line);
+}
+.table th {
+  color: var(--cd-gold);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.officialRefs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 28px 0 8px;
+  font-size: 0.9rem;
+}
+.officialRefs > span {
+  color: var(--cd-muted);
+}
+.officialRefs ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.officialRefs a {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 999px;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+}
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 26px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--cd-line);
+}
+.pager a {
+  text-decoration: none;
+}
+.pager a[rel="next"] {
+  margin-left: auto;
+  text-align: right;
+}
+.ruleRef {
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline dotted;
+}
+.pip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.2em;
+  height: 1.2em;
+  margin: 0 1px;
+  padding: 0 0.12em;
+  border-radius: 50%;
+  font-size: 0.8em;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 0.05em;
+  background: #c9c4b7;
+  color: #1a1a1a;
+}
+.pip[data-symbol="W"] {
+  background: #f4ecd2;
+}
+.pip[data-symbol="U"] {
+  background: #9fc5e8;
+}
+.pip[data-symbol="B"] {
+  background: #9d9290;
+}
+.pip[data-symbol="R"] {
+  background: #e99d84;
+}
+.pip[data-symbol="G"] {
+  background: #9fcf9f;
+}
+
+/* A card: the text frame, and the printed image over it once it has loaded. */
+.card {
+  position: relative;
+  aspect-ratio: 488 / 680;
+  border-radius: 4.8% / 3.5%;
+  overflow: hidden;
+  background: #1d1d1b;
+  box-shadow: 0 6px 18px #0009;
+}
+.card img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.card[data-image="loaded"] img {
+  opacity: 1;
+}
+.frame {
+  position: absolute;
+  inset: 4%;
+  display: flex;
+  flex-direction: column;
+  gap: 4%;
+  padding: 5%;
+  border-radius: 3%;
+  background: linear-gradient(#2c2b27, #1a1917);
+  border: 1px solid #ffffff22;
+  font-size: clamp(0.5rem, 0.65vw + 0.3rem, 0.78rem);
+  line-height: 1.3;
+  color: #e8e3d6;
+}
+.card[data-image="loaded"] .frame {
+  visibility: hidden;
+}
+.frameName {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-weight: 700;
+}
+.frameType {
+  font-style: italic;
+  border-top: 1px solid #ffffff22;
+  border-bottom: 1px solid #ffffff22;
+  padding: 2% 0;
+}
+.frameRules {
+  flex: 1;
+  overflow: hidden;
+}
+.frameRules p {
+  margin: 0 0 4px;
+}
+.framePt {
+  align-self: flex-end;
+  font-weight: 700;
+}
+
+/* A row of cards with their notes. */
+.cardRow {
+  margin: 22px 0;
+}
+.cardRow ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 18px;
+}
+.cardRow li .card {
+  width: 100%;
+  max-width: 190px;
+}
+.cardRow li p {
+  margin: 8px 0 0;
+  font-size: 0.88rem;
+  color: var(--cd-muted);
+}
+.cardRow figcaption,
+.anatomy figcaption,
+.shot figcaption {
+  margin-top: 10px;
+  color: var(--cd-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+/* A card with arrows from its parts to their labels. */
+.anatomy {
+  margin: 10px 0 24px;
+}
+.anatomyBody {
+  position: relative;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 70px;
+  align-items: start;
+}
+.anatomyCard {
+  position: relative;
+}
+.pin,
+.shotPin {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: var(--cd-ember);
+  color: #160c04;
+  font:
+    700 0.72rem/1 system-ui,
+    sans-serif;
+  box-shadow:
+    0 0 0 2px #160c04,
+    0 0 0 4px #e9893a66,
+    0 2px 8px #000c;
+}
+.callouts,
+.shotMarks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: none;
+}
+.callouts li,
+.shotMarks li {
+  position: relative;
+  margin: 0 0 12px;
+  padding-left: 32px;
+  font-size: 0.92rem;
+  color: var(--cd-muted);
+}
+.callouts li::before,
+.shotMarks li::before {
+  content: attr(data-n);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cd-ember);
+  color: #160c04;
+  font:
+    700 0.72rem/1 system-ui,
+    sans-serif;
+}
+.callouts strong,
+.shotMarks strong {
+  color: var(--cd-text);
+}
+.arrows {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.arrow {
+  fill: none;
+  stroke: var(--cd-ember);
+  stroke-width: 1.6;
+  opacity: 0.85;
+}
+.arrowHead {
+  fill: var(--cd-ember);
+}
+
+/* A screenshot of the table with its marks. */
+.shot {
+  margin: 22px 0;
+}
+.shotPicture {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--cd-gold-line);
+  box-shadow: 0 10px 28px #000a;
+}
+.shotPicture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.shotPin {
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  font-size: 0.8rem;
+}
+.shotMarks {
+  margin-top: 12px;
+  columns: 2 260px;
+  column-gap: 24px;
+}
+.shotMarks li {
+  break-inside: avoid;
+}
+.shotMissing {
+  padding: 18px;
+  border: 1px dashed var(--cd-line);
+  border-radius: 8px;
+  color: var(--cd-faint);
+}
+
+/* The official rules. */
+.attribution,
+.notIncluded {
+  font-size: 0.88rem;
+  color: var(--cd-muted);
+}
+.notIncluded {
+  padding: 12px 16px;
+  border: 1px solid var(--cd-gold-line);
+  border-radius: 8px;
+  background: #d5b77c0f;
+  color: var(--cd-text);
+}
+.officialIntro {
+  color: var(--cd-muted);
+}
+.ruleSections,
+.ruleSections ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ruleSections > li {
+  margin: 18px 0;
+}
+.ruleSections ol {
+  columns: 2 280px;
+  column-gap: 24px;
+}
+.ruleSections ol li {
+  break-inside: avoid;
+  margin: 2px 0;
+}
+.ruleSections a {
+  text-decoration: none;
+  color: var(--cd-text);
+}
+.ruleSections a strong {
+  color: var(--cd-gold);
+  font-variant-numeric: tabular-nums;
+}
+.rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rules > li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  scroll-margin: 90px;
+}
+.rules > li[data-sub] {
+  padding-left: 28px;
+}
+.rules > li[data-target] {
+  background: #d5b77c1c;
+  box-shadow: inset 3px 0 0 var(--cd-gold);
+}
+.rules > li:focus {
+  outline: 2px solid var(--cd-gold);
+}
+.rules p {
+  margin: 0 0 6px;
+}
+.ruleNumber {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ruleExample {
+  padding-left: 12px;
+  border-left: 2px solid var(--cd-line);
+  color: var(--cd-muted);
+}
+.filter {
+  display: block;
+  margin: 12px 0 18px;
+  max-width: 360px;
+  font-size: 0.85rem;
+  color: var(--cd-muted);
+}
+.glossary > div {
+  padding: 8px 10px;
+  border-radius: 6px;
+  scroll-margin: 90px;
+}
+.glossary > div[data-target] {
+  background: #d5b77c1c;
+}
+.glossary dt {
+  font-weight: 700;
+  color: var(--cd-gold-hi);
+}
+.glossary dd {
+  margin: 2px 0 0;
+}
+
+/* Signed out: the page on its own, with the mark and a way to sign in. */
+.public {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -8%, #c9a05a26, transparent 70%),
+    var(--cd-bg);
+  padding: 0 32px 40px;
+}
+.publicBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1130px;
+  margin: 0 auto 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--cd-line);
+}
+.publicBar a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--cd-gold-hi);
+  text-decoration: none;
+  font: 600 1rem/1 var(--cd-display);
+  letter-spacing: 1px;
+}
+
+.signIn {
+  white-space: nowrap;
+}
+.phoneContents {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .phoneContents {
+    display: inline-block;
+  }
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .side {
+    position: static;
+    max-height: none;
+  }
+  .side nav {
+    display: none;
+  }
+  .results {
+    right: 0;
+  }
+  .anatomyBody {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .anatomyCard {
+    width: min(280px, 80%);
+    margin: 0 auto;
+  }
+  .contentsChapter li {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .heroCards > * {
+    width: 30%;
+  }
+  .public {
+    padding: 0 16px 32px;
+  }
+  .publicBar a span {
+    font-size: 0.8rem;
+  }
+}

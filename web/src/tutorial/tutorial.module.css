@@ -337,3 +337,11 @@
 .replayDialog::backdrop {
   background: #050d0bed;
 }
+/* The tutorial's link into How to play (v0.8.6). */
+.learnMore {
+  margin: 4px 0 10px;
+  font-size: 0.85rem;
+}
+.learnMore a {
+  color: var(--cd-gold-hi, #f4dca6);
+}

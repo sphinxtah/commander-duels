@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import mage.game.Game;
@@ -231,6 +232,51 @@ class HumanGameTest {
         assertEquals(List.of(), last.result().concededSeats(), "closing is not a concession");
         assertFalse(game.thread().isAlive());
         assertEquals("finished", game.close("closed").get("status"), "closing twice is harmless");
+    }
+
+    /**
+     * Bug E4 (v0.8.6): SysOp's inspection read XMage's state as soon as a prompt was published, but
+     * XMage publishes its request before it waits for the answer, and its game thread was still
+     * running. Here the game thread is held just after the prompt opens: the prompt is there, yet no
+     * inspection is built until XMage itself waits.
+     */
+    @Test
+    void inspectionWaitsUntilXmageItselfWaits() throws Exception {
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicBoolean first = new AtomicBoolean(true);
+        var hooks = new HumanGame.Hooks() {
+            @Override
+            public void prompted(int seat) {
+                if (first.compareAndSet(true, false)) {
+                    held.countDown();
+                    try {
+                        release.await(60, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
+        };
+        var game = new HumanGame(UUID.randomUUID().toString(), legacy(13L, LegacyDuel.DECKS.get(0), 3, 600),
+            SeatChecks.DECKS, finished -> {}, hooks);
+        game.allowInspection();
+        game.start();
+        try {
+            assertTrue(held.await(60, TimeUnit.SECONDS), "no prompt opened");
+            assertNotNull(game.openPrompt(0), "the seat's prompt is published");
+            assertFalse(game.settledForInspection());
+            assertNull(game.inspect(500), "inspected while XMage's game thread was still running");
+            release.countDown();
+            HumanGame.Inspection inspection = game.inspect(10_000);
+            assertNotNull(inspection, "no inspection once XMage waited for the answer");
+            assertEquals("live", inspection.status());
+            assertTrue(game.settledForInspection());
+        } finally {
+            release.countDown();
+            game.close("closed");
+        }
+        assertTrue(BotMatchRunner.join(game.thread(), 10_000));
     }
 
     @Test

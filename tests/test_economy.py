@@ -312,3 +312,43 @@ def test_the_migration_welcomes_and_pays_back(tmp_path, monkeypatch):
     }
     command.downgrade(config, "0007_alliance")
     database.dispose()
+
+
+def test_a_game_with_passive_bots_pays_nothing(client):
+    """SysOp's passive bots (v0.8.6): once a game's bots have been passive, its end records the
+    result and nothing else: no win, no tokens, no quests or achievements."""
+    ada = Account(client, "ada")
+    database = client.app.state.database
+    game_id = uuid4()
+    with Session(database) as db:
+        db.add(
+            Game(
+                id=game_id,
+                format="commander",
+                status="active",
+                created_by=ada.id,
+                created_at=utcnow(),
+                bot_skill=4,
+                turn_cap=60,
+                passive_bots_used=True,
+            )
+        )
+        db.flush()
+        for index, user_id in enumerate([ada.id, None]):
+            db.add(
+                GameSeat(
+                    game_id=game_id,
+                    seat=index,
+                    player="human" if user_id else "bot",
+                    user_id=user_id,
+                    deck="x",
+                )
+            )
+        db.commit()
+    games.record_end(database, game_id, "finished", completed(0))
+    assert ledger(client, ada.id) == []
+    tokens = ada.get("/api/v1/me/tokens").json()
+    assert tokens["balance"] == 0 and tokens["entries"] == []
+    with Session(database) as db:
+        game = db.get_one(Game, game_id)
+        assert game.status == "finished" and game.result["winner_seat"] == 0

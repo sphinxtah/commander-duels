@@ -974,7 +974,7 @@ exec bash -c "${2//\/srv\/commander-duels/$STUB_VM}"
 """
 
 
-def push(tmp_path: Path, clone: Path, *args: str) -> dict[str, str]:
+def push(tmp_path: Path, clone: Path, *args: str, host: str | None = None) -> dict[str, str]:
     """Runs deploy/push.sh from the clone against a VM folder holding an older kit."""
     vm = tmp_path / "vm"
     (vm / "backups").mkdir(parents=True)
@@ -992,6 +992,7 @@ def push(tmp_path: Path, clone: Path, *args: str) -> dict[str, str]:
         "STUB_LOG": str(tmp_path / "ssh.log"),
         "STUB_VM": str(vm),
         "STUB_DEPLOYED": str(tmp_path / "deployed"),
+        **({"CD_DEPLOY_HOST": host} if host is not None else {}),
     }
     result = subprocess.run(
         ["bash", "deploy/push.sh", *args], cwd=clone, env=env, capture_output=True, text=True
@@ -1041,6 +1042,16 @@ def test_push_ships_the_tags_own_kit_not_the_checkout(tmp_path, clone):
 @pytest.mark.parametrize("tag", ["0.1.2; rm -rf /", "9.9.9", "../0.1.2"])
 def test_push_checks_the_tag_before_reaching_the_vm(tmp_path, clone, tag):
     result = push(tmp_path, clone, tag)
+    assert result["status"] != "0"
+    assert result["ssh"] == "" and result["deployed"] == ""
+
+
+@needs_bash
+@needs_git
+@pytest.mark.parametrize("host", ["-oProxyCommand=touch pwned", "duels; id", "user@host name"])
+def test_push_checks_the_host_before_reaching_the_vm(tmp_path, clone, host):
+    # v0.8.6: the host is operator input too, and an option for ssh is no host.
+    result = push(tmp_path, clone, "0.1.2", host=host)
     assert result["status"] != "0"
     assert result["ssh"] == "" and result["deployed"] == ""
 

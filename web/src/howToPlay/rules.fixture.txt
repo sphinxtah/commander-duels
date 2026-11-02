@@ -1,0 +1,66 @@
+Example Game: Test Rules
+ 
+These rules are effective as of March 4, 2031.
+ 
+Introduction
+ 
+This is a made-up rules text in the shape of the official one, for tests only. None of it is a real rule.
+ 
+Contents
+ 
+1. First Things
+100. Beginnings
+101. Middles
+ 
+2. Second Things
+200. Endings
+ 
+Glossary
+ 
+Credits
+ 
+1. First Things
+ 
+100. Beginnings
+ 
+100.1. A test game is played by two or more pretend players.
+ 
+100.1a A pretend player may also be a teapot. See rule 101.2.
+ 
+Example: A teapot joins the game. It is a pretend player.
+ 
+100.1b. A teapot can't be the starting player.
+ 
+100.2. Each pretend player starts with 9 marbles.
+Red marbles
+Blue marbles
+ 
+101. Middles
+ 
+101.1. In the middle of the game, a player may sing. See rules 200 and 704.5aa.
+ 
+101.2. A teapot whistles instead.
+ 
+101.2aa A whistle counts as a song.
+ 
+2. Second Things
+ 
+200. Endings
+ 
+200.1. The game ends when every marble is lost.
+ 
+Example: The last marble rolls under the sofa. The game ends.
+ 
+Example: A teapot holds the last marble. The game goes on.
+ 
+Glossary
+ 
+Marble
+A small glass ball. See rule 100.2.
+ 
+Teapot
+1. A pretend player that whistles. 2. A thing for tea. See rule 100.1a.
+ 
+Credits
+ 
+Written for the tests of Commander Duels.

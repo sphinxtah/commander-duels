@@ -282,4 +282,12 @@ class FairBotTest {
         assertEquals(64, new HumanGames(SeatChecks.DECKS, 64).maxActive());
         assertEquals(1, new HumanGames(SeatChecks.DECKS, 0).maxActive());
     }
+
+    /** A passive bot (v0.8.6) declines every yes-or-no question but its commander's way home. */
+    @Test
+    void aPassiveBotSendsItsCommanderToTheCommandZone() {
+        assertTrue(FairBot.toCommandZone(
+            "Move Judith, the Scourge Diva to command zone instead of your graveyard?"));
+        assertTrue(!FairBot.toCommandZone("Pay {2}?") && !FairBot.toCommandZone(null));
+    }
 }

@@ -1,0 +1,110 @@
+{
+  "attacking": {
+    "height": 800,
+    "marks": {
+      "attackers": {
+        "x": 49.2,
+        "y": 34.2
+      },
+      "defender": {
+        "x": 6.1,
+        "y": 82.8
+      }
+    },
+    "width": 1280
+  },
+  "blocking": {
+    "height": 800,
+    "marks": {
+      "attackers": {
+        "x": 49.2,
+        "y": 34.2
+      },
+      "blockers": {
+        "x": 53.1,
+        "y": 60.7
+      }
+    },
+    "width": 1280
+  },
+  "commander": {
+    "height": 800,
+    "marks": {
+      "command": {
+        "x": 85.9,
+        "y": 67.2
+      },
+      "opponent": {
+        "x": 11.7,
+        "y": 27.4
+      }
+    },
+    "width": 1280
+  },
+  "prompt": {
+    "height": 800,
+    "marks": {
+      "hand": {
+        "x": 50.3,
+        "y": 89.5
+      },
+      "prompt": {
+        "x": 12.3,
+        "y": 61.3
+      }
+    },
+    "width": 1280
+  },
+  "stack": {
+    "height": 800,
+    "marks": {
+      "prompt": {
+        "x": 12.4,
+        "y": 61.3
+      },
+      "stack": {
+        "x": 48.9,
+        "y": 47.5
+      }
+    },
+    "width": 1280
+  },
+  "table": {
+    "height": 800,
+    "marks": {
+      "band": {
+        "x": 18.4,
+        "y": 47.5
+      },
+      "battlefield": {
+        "x": 53.1,
+        "y": 60.7
+      },
+      "command": {
+        "x": 85.9,
+        "y": 67.2
+      },
+      "graveyard": {
+        "x": 93.2,
+        "y": 86.7
+      },
+      "hand": {
+        "x": 50.3,
+        "y": 89.5
+      },
+      "library": {
+        "x": 14.5,
+        "y": 90.2
+      },
+      "life": {
+        "x": 6.1,
+        "y": 82.8
+      },
+      "opponent": {
+        "x": 93.9,
+        "y": 20.8
+      }
+    },
+    "width": 1280
+  }
+}

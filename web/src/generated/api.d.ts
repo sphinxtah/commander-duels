@@ -1831,6 +1831,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/games/{game_id}/bots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Bots
+         * @description SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the
+         *     campaign: passive bots only draw, pass and discard to hand size, from their next decision.
+         *     Only in SysOp's own running practice game (a campaign duel included) with no other human
+         *     seat. Once they have been passive, the game's end pays nothing out. Audited.
+         */
+        put: operations["set_bots_api_v1_games__game_id__bots_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/games/{game_id}/close": {
         parameters: {
             query?: never;
@@ -1928,6 +1951,28 @@ export interface paths {
         };
         /** Health */
         get: operations["health_api_v1_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/how-to-play/card-images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Guide Card Image
+         * @description One of How to play's example cards by its exact name, signed in or not, from the server's
+         *     Scryfall cache. 404 card_image_missing for any name that is not one of the guide's cards, as
+         *     for a name Scryfall does not know.
+         */
+        get: operations["guide_card_image_api_v1_how_to_play_card_images_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3697,9 +3742,17 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.8.5
+             * @default 0.8.6
              */
             version: string;
+        };
+        /**
+         * BotsSetting
+         * @description SysOp's switch between normal and passive bots (v0.8.6).
+         */
+        BotsSetting: {
+            /** Passive */
+            passive: boolean;
         };
         /** BuyNowRequest */
         BuyNowRequest: {
@@ -5209,6 +5262,11 @@ export interface components {
             kind: "practice" | "table";
             /** @description Its best-of-three match (v0.5.0); null for a single game. */
             match?: components["schemas"]["GameMatch"] | null;
+            /**
+             * Passive Bots
+             * @description SysOp alone (v0.8.6): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where SysOp may not switch them: one that is not a running practice or campaign game with SysOp its only human seat.
+             */
+            passive_bots?: boolean | null;
             result: components["schemas"]["GameResult"] | null;
             /** Seats */
             seats: components["schemas"]["GameSeat"][];
@@ -5305,7 +5363,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.8.5
+             * @default 0.8.6
              */
             version: string;
         };
@@ -18164,6 +18222,104 @@ export interface operations {
             };
         };
     };
+    set_bots_api_v1_games__game_id__bots_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                game_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BotsSetting"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GameSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     close_game_api_v1_games__game_id__close_post: {
         parameters: {
             query?: never;
@@ -18652,6 +18808,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    guide_card_image_api_v1_how_to_play_card_images_get: {
+        parameters: {
+            query: {
+                /** @description The card's exact name, as the game shows it. */
+                name: string;
+                size?: "normal" | "large" | "png";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The card's image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Service Unavailable */

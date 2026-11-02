@@ -24,7 +24,10 @@ export const pages = [
   "Settings",
   "Admin",
 ] as const;
-export type Page = (typeof pages)[number] | "SysOp" | "Notifications";
+// How to play (v0.8.6) opens from the account's menu, and signed out too: not one of the main
+// pages.
+export type Page =
+  (typeof pages)[number] | "SysOp" | "Notifications" | "HowToPlay";
 
 /** The name the title band shows for each page. */
 export const pageNames: Record<Page, string> = {
@@ -42,6 +45,7 @@ export const pageNames: Record<Page, string> = {
   Admin: "Administration",
   SysOp: "SysOp",
   Notifications: "Notifications",
+  HowToPlay: "How to play",
 };
 
 export type IconName =
