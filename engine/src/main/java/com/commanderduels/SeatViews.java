@@ -157,10 +157,13 @@ final class SeatViews {
             }
         }
         int seat = seatIds.indexOf(player.getId());
+        KingsTable kingsTable = GameFormat.kingsTableOf(game);
+        Integer team = game instanceof TwoHeadedGiant giant ? Integer.valueOf(giant.teamOf(player.getId()))
+            : kingsTable != null ? Integer.valueOf(kingsTable.teamOf(player.getId())) : null;
         return new SeatView.PlayerState(
             seat,
             player.getName(),
-            game instanceof TwoHeadedGiant giant ? Integer.valueOf(giant.teamOf(player.getId())) : null,
+            team,
             seatOrNull(Visibility.controllerOf(game, player.getId())),
             player.getLife(),
             counters(player.getCountersAsCopy()),
@@ -175,7 +178,47 @@ final class SeatViews {
             player.hasWon(),
             commanderGame ? colorIdentity(player) : null,
             List.copyOf(commandZone),
-            commanderGame ? commanders(player, viewer) : List.of());
+            commanderGame ? commanders(player, viewer) : List.of(),
+            kingsTable == null ? null : KingsTableRules.role(kingsTable.seatOf(player.getId())),
+            kingsTable == null ? null : kingsTable.startingLife(player.getId(), game.getStartingLife()),
+            kingsTable == null ? null : inRange(viewer, player.getId()),
+            kingsTable == null ? null : attackable(kingsTable, viewer, player.getId()));
+    }
+
+    /** King's Table: whether the player is in the viewer's range this turn; null for a spectator. */
+    private Boolean inRange(UUID viewer, UUID playerId) {
+        Player seat = viewer == null ? null : game.getPlayer(viewer);
+        if (seat == null) {
+            return null;
+        }
+        try {
+            return seat.hasPlayerInRange(playerId);
+        } catch (IllegalStateException beforeTheStart) {
+            // XMage sets ranges as the game starts.
+            return null;
+        }
+    }
+
+    /**
+     * King's Table: whether the viewer's creatures may attack the player now, by the table's rules
+     * (809.4b and the house rule), as the declare attackers step would let them: null for a
+     * spectator, false for the viewer's own seat, a teammate and a player out of the game.
+     */
+    private Boolean attackable(KingsTable kingsTable, UUID viewer, UUID playerId) {
+        Player seat = viewer == null ? null : game.getPlayer(viewer);
+        if (seat == null) {
+            return null;
+        }
+        Player player = game.getPlayer(playerId);
+        if (player == null || !player.isInGame() || !seat.isInGame() || kingsTable.teamOf(playerId) == kingsTable.teamOf(viewer)) {
+            return false;
+        }
+        try {
+            List<UUID> inRange = new ArrayList<>(game.getOpponents(viewer, true));
+            return kingsTable.attackable(game, viewer, inRange).contains(playerId);
+        } catch (IllegalStateException beforeTheStart) {
+            return null;
+        }
     }
 
     /** A commander's card, or an emblem, plane or dungeon, which are not cards. */

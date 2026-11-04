@@ -448,15 +448,28 @@ class FairBot extends ComputerPlayerControllableProxy {
         }
     }
 
-    /** The player the attack already goes at, else the first opponent still in the game. */
+    /**
+     * The player the attack already goes at, else the first opponent still in the game; in a game
+     * with its own attack rules (King's Table, v0.8.7), the first the combat lets this player attack.
+     */
     private UUID defenderFor(Game game) {
         for (CombatGroup group : game.getCombat().getGroups()) {
             if (!group.getAttackers().isEmpty() && game.getPlayer(group.getDefenderId()) != null) {
                 return group.getDefenderId();
             }
         }
+        Set<UUID> defenders = game.getCombat().getDefenders();
         for (UUID opponentId : game.getOpponents(playerId, true)) {
-            return opponentId;
+            if (!game.attacksOnlyNamedPlayers() || defenders.contains(opponentId)) {
+                return opponentId;
+            }
+        }
+        if (game.attacksOnlyNamedPlayers()) {
+            for (UUID defenderId : defenders) {
+                if (game.getPlayer(defenderId) != null) {
+                    return defenderId;
+                }
+            }
         }
         return null;
     }

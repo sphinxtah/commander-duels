@@ -1,0 +1,531 @@
+King's Table (Commander Duels v0.8.7): allies who take their own turns, a game's own attack rules,
+combat across range, and each player's own starting life.
+
+Reason: King's Table is the Emperor variant (rule 809) with house rules: two teams of three, each
+player with their own turns and a limited range of influence (801). Patch 0001 names teammates
+only for shared team turns (805). This patch adds allies, players of a team who keep their own
+turns (Game.getAllies, the teammates by default, so Two-Headed Giant is unchanged): allies are not
+opponents, and the computer player neither aims harmful spells at them nor scores their
+permanents as an enemy's, and plans its attacks at the players the game lets it attack. It adds a game's own attack rules (Game.attackablePlayers,
+Game.attacksOnlyNamedPlayers; 809.4b and the King's house rule); players who face each other in a
+combat across range (Game.inCombatAcrossRange), who are opponents for that combat's blocks and
+triggers though not for targets and effects; and each player's own starting life total
+(Game.getStartingLife(UUID), 103.4), with the cards and the condition that read "your starting life
+total" asking for the right player's. Every default keeps XMage's behaviour in other games.
+Upstream: none.
+Remove when: XMage supports the Emperor variant with these rules itself.
+
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+index 935806f3..6a8c2a2a 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/ComputerPlayer6.java
+@@ -1009,6 +1009,29 @@ public class ComputerPlayer6 extends ComputerPlayer {
+      * @param game
+      * @param activePlayerId
+      */
++    /**
++     * The players to consider attacking, in turn order: the opponents in range and, in a game with
++     * its own attack rules (809.4b), only those the combat names as defenders, then any other
++     * player it names (a player outside range whom those rules let this player attack).
++     */
++    private List<UUID> attackablePlayers(Game game) {
++        List<UUID> players = new ArrayList<>();
++        Set<UUID> defenders = game.getCombat().getDefenders();
++        for (UUID opponentId : game.getOpponents(playerId, true)) {
++            if (!game.attacksOnlyNamedPlayers() || defenders.contains(opponentId)) {
++                players.add(opponentId);
++            }
++        }
++        if (game.attacksOnlyNamedPlayers()) {
++            for (UUID defenderId : defenders) {
++                if (game.getPlayer(defenderId) != null && !players.contains(defenderId)) {
++                    players.add(defenderId);
++                }
++            }
++        }
++        return players;
++    }
++
+     private void declareAttackers(Game game, UUID activePlayerId) {
+         attackersToCheck.clear();
+         attackersList.clear();
+@@ -1017,7 +1040,7 @@ public class ComputerPlayer6 extends ComputerPlayer {
+             Player attackingPlayer = game.getPlayer(activePlayerId);
+ 
+             // check alpha strike first (all in attack to kill a player)
+-            for (UUID defenderId : game.getOpponents(playerId, true)) {
++            for (UUID defenderId : attackablePlayers(game)) {
+                 Player defender = game.getPlayer(defenderId);
+                 if (!defender.isInGame()) {
+                     continue;
+@@ -1046,7 +1069,7 @@ public class ComputerPlayer6 extends ComputerPlayer {
+             // TODO: add game simulations here to find best attackers/blockers combination
+ 
+             // find safe attackers (can't be killed by blockers)
+-            for (UUID defenderId : game.getOpponents(playerId, true)) {
++            for (UUID defenderId : attackablePlayers(game)) {
+                 Player defender = game.getPlayer(defenderId);
+                 if (!defender.isInGame()) {
+                     continue;
+diff --git a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
+index fa89ecc2..bf8ade55 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
++++ b/Mage.Server.Plugins/Mage.Player.AI.MAD/src/mage/player/ai/SimulatedPlayer2.java
+@@ -208,9 +208,9 @@ public final class SimulatedPlayer2 extends ComputerPlayer {
+                         iterator.remove();
+                         continue;
+                     }
+-                    // nor its teammate in a team game (rule 805)
++                    // nor its teammate or ally in a team game (rules 805, 809)
+                     if (ability1.getFirstTarget().equals(playerId)
+-                            || game.getTeammates(playerId).contains(ability1.getFirstTarget())) {
++                            || game.getAllies(playerId).contains(ability1.getFirstTarget())) {
+                         iterator.remove();
+                     }
+                 }
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
+index b7cd1400..a9244673 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/PossibleTargetsSelector.java
+@@ -154,7 +154,7 @@ public class PossibleTargetsSelector {
+     }
+ 
+     private static boolean isTeammateItem(UUID abilityControllerId, MageItem item, Game game) {
+-        Set<UUID> teammates = game.getTeammates(abilityControllerId);
++        Set<UUID> teammates = game.getAllies(abilityControllerId);
+         if (teammates.isEmpty()) {
+             return false;
+         } else if (item instanceof Player) {
+diff --git a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
+index 68879b74..26ba4bc4 100644
+--- a/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
++++ b/Mage.Server.Plugins/Mage.Player.AI/src/mage/player/ai/score/GameStateEvaluator2.java
+@@ -28,10 +28,10 @@ public final class GameStateEvaluator2 {
+         return evaluate(playerId, game, true);
+     }
+ 
+-    /** The permanents of the player and, in a team game, of the player's teammates. */
++    /** The permanents of the player and, in a team game, of the player's teammates and allies. */
+     private static java.util.List<Permanent> teamPermanents(UUID playerId, Game game) {
+         java.util.List<Permanent> permanents = new java.util.ArrayList<>(game.getBattlefield().getAllActivePermanents(playerId));
+-        for (UUID teammateId : game.getTeammates(playerId)) {
++        for (UUID teammateId : game.getAllies(playerId)) {
+             permanents.addAll(game.getBattlefield().getAllActivePermanents(teammateId));
+         }
+         return permanents;
+diff --git a/Mage.Sets/src/mage/cards/a/AjaniStrengthOfThePride.java b/Mage.Sets/src/mage/cards/a/AjaniStrengthOfThePride.java
+index 99fc5605..249266f9 100644
+--- a/Mage.Sets/src/mage/cards/a/AjaniStrengthOfThePride.java
++++ b/Mage.Sets/src/mage/cards/a/AjaniStrengthOfThePride.java
+@@ -111,7 +111,7 @@ class AjaniStrengthOfThePrideEffect extends OneShotEffect {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player player = game.getPlayer(source.getControllerId());
+-        if (player == null || player.getLife() < game.getStartingLife() + 15) {
++        if (player == null || player.getLife() < game.getStartingLife(player.getId()) + 15) {
+             return false;
+         }
+         new ExileSourceEffect().apply(game, source);
+diff --git a/Mage.Sets/src/mage/cards/a/AnyaMercilessAngel.java b/Mage.Sets/src/mage/cards/a/AnyaMercilessAngel.java
+index bcd16706..4427382d 100644
+--- a/Mage.Sets/src/mage/cards/a/AnyaMercilessAngel.java
++++ b/Mage.Sets/src/mage/cards/a/AnyaMercilessAngel.java
+@@ -73,12 +73,11 @@ enum AnyaMercilessAngelDynamicValue implements DynamicValue {
+         if (controller == null) {
+             return 3 * opponentCount;
+         }
+-        int startingLifeTotal = game.getStartingLife();
+         for (UUID opponentId : game.getOpponents(controller.getId())) {
+             Player opponent = game.getPlayer(opponentId);
+             if (opponent != null 
+                     && opponent.isInGame()
+-                    && opponent.getLife() < startingLifeTotal / 2) {
++                    && opponent.getLife() < game.getStartingLife(opponentId) / 2) {
+                 opponentCount++;
+             }
+         }
+diff --git a/Mage.Sets/src/mage/cards/b/BaneLordOfDarkness.java b/Mage.Sets/src/mage/cards/b/BaneLordOfDarkness.java
+index 589d2563..7d98943c 100644
+--- a/Mage.Sets/src/mage/cards/b/BaneLordOfDarkness.java
++++ b/Mage.Sets/src/mage/cards/b/BaneLordOfDarkness.java
+@@ -81,8 +81,7 @@ enum BaneLordOfDarknessCondition implements Condition {
+     public boolean apply(Game game, Ability source) {
+         return Optional
+                 .ofNullable(game.getPlayer(source.getControllerId()))
+-                .map(Player::getLife)
+-                .map(x -> 2 * x <= game.getStartingLife())
++                .map(player -> 2 * player.getLife() <= game.getStartingLife(player.getId()))
+                 .orElse(false);
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/b/BhaalLordOfMurder.java b/Mage.Sets/src/mage/cards/b/BhaalLordOfMurder.java
+index ac3f6d89..df1bc8bf 100644
+--- a/Mage.Sets/src/mage/cards/b/BhaalLordOfMurder.java
++++ b/Mage.Sets/src/mage/cards/b/BhaalLordOfMurder.java
+@@ -79,8 +79,7 @@ enum BhaalLordOfMurderCondition implements Condition {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         return Optional.ofNullable(game.getPlayer(source.getControllerId()))
+-                .map(Player::getLife)
+-                .map(x -> 2 * x <= game.getStartingLife())
++                .map(player -> 2 * player.getLife() <= game.getStartingLife(player.getId()))
+                 .orElse(false);
+     }
+ }
+\ No newline at end of file
+diff --git a/Mage.Sets/src/mage/cards/c/CecilDarkKnight.java b/Mage.Sets/src/mage/cards/c/CecilDarkKnight.java
+index b7bc8060..defa9831 100644
+--- a/Mage.Sets/src/mage/cards/c/CecilDarkKnight.java
++++ b/Mage.Sets/src/mage/cards/c/CecilDarkKnight.java
+@@ -86,8 +86,7 @@ enum CecilDarkKnightCondition implements Condition {
+                 .ofNullable(source)
+                 .map(Controllable::getControllerId)
+                 .map(game::getPlayer)
+-                .map(Player::getLife)
+-                .map(life -> life <= game.getStartingLife() / 2)
++                .map(player -> player.getLife() <= game.getStartingLife(player.getId()) / 2)
+                 .orElse(false);
+     }
+ 
+diff --git a/Mage.Sets/src/mage/cards/c/CosmosElixir.java b/Mage.Sets/src/mage/cards/c/CosmosElixir.java
+index d4f022a6..932a3fe1 100644
+--- a/Mage.Sets/src/mage/cards/c/CosmosElixir.java
++++ b/Mage.Sets/src/mage/cards/c/CosmosElixir.java
+@@ -46,6 +46,6 @@ enum CosmosElixirCondition implements Condition {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player player = game.getPlayer(source.getControllerId());
+-        return player != null && player.getLife() > game.getStartingLife();
++        return player != null && player.getLife() > game.getStartingLife(player.getId());
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/e/ExquisiteArchangel.java b/Mage.Sets/src/mage/cards/e/ExquisiteArchangel.java
+index 45670ba2..6f88edcf 100644
+--- a/Mage.Sets/src/mage/cards/e/ExquisiteArchangel.java
++++ b/Mage.Sets/src/mage/cards/e/ExquisiteArchangel.java
+@@ -73,7 +73,7 @@ class ExquisiteArchangelEffect extends ReplacementEffectImpl {
+         Permanent sourcePermanent = game.getPermanent(source.getSourceId());
+         if (player != null && sourcePermanent != null) {
+             new ExileSourceEffect().apply(game, source);
+-            player.setLife(game.getStartingLife(), game, source);
++            player.setLife(game.getStartingLife(player.getId()), game, source);
+             return true;
+         }
+         return false;
+diff --git a/Mage.Sets/src/mage/cards/g/GameOver.java b/Mage.Sets/src/mage/cards/g/GameOver.java
+index 5ca0ced8..e63d16d3 100644
+--- a/Mage.Sets/src/mage/cards/g/GameOver.java
++++ b/Mage.Sets/src/mage/cards/g/GameOver.java
+@@ -51,7 +51,7 @@ enum GameOverCondition implements Condition {
+             .stream()
+             .map(game::getPlayer)
+             .filter(p -> p != null)
+-            .anyMatch(p -> 2 * p.getLife() <= game.getStartingLife());
++            .anyMatch(p -> 2 * p.getLife() <= game.getStartingLife(p.getId()));
+     }
+ 
+     @Override
+diff --git a/Mage.Sets/src/mage/cards/h/HappilyEverAfter.java b/Mage.Sets/src/mage/cards/h/HappilyEverAfter.java
+index 544db48f..c6324956 100644
+--- a/Mage.Sets/src/mage/cards/h/HappilyEverAfter.java
++++ b/Mage.Sets/src/mage/cards/h/HappilyEverAfter.java
+@@ -55,7 +55,7 @@ enum HappilyEverAfterCondition implements Condition {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         Player player = game.getPlayer(source.getControllerId());
+-        if (player == null || player.getLife() < game.getStartingLife()) {
++        if (player == null || player.getLife() < game.getStartingLife(player.getId())) {
+             return false;
+         }
+         ObjectColor color = new ObjectColor("");
+@@ -197,7 +197,7 @@ enum HappilyEverAfterLifeHint implements Hint {
+             return null;
+         }
+ 
+-        if (player.getLife() >= game.getStartingLife()) {
++        if (player.getLife() >= game.getStartingLife(player.getId())) {
+             return HintUtils.prepareText("Life total is greater than or equal to your starting life total", null, HintUtils.HINT_ICON_GOOD);
+         } else {
+             return HintUtils.prepareText("Life total less than starting amount", null, HintUtils.HINT_ICON_BAD);
+diff --git a/Mage.Sets/src/mage/cards/l/LongRest.java b/Mage.Sets/src/mage/cards/l/LongRest.java
+index 68532a86..bf38f7eb 100644
+--- a/Mage.Sets/src/mage/cards/l/LongRest.java
++++ b/Mage.Sets/src/mage/cards/l/LongRest.java
+@@ -128,7 +128,7 @@ class LongRestEffect extends OneShotEffect {
+             if (numCards > 0) {
+                 controller.moveCards(cardsToHand, Zone.HAND, source, game);
+                 if (numCards >= 8) {
+-                    controller.setLife(game.getStartingLife(), game, source);
++                    controller.setLife(game.getStartingLife(controller.getId()), game, source);
+                 }
+                 return true;
+             }
+diff --git a/Mage.Sets/src/mage/cards/m/MyrkulLordOfBones.java b/Mage.Sets/src/mage/cards/m/MyrkulLordOfBones.java
+index 3e714a6e..910e5113 100644
+--- a/Mage.Sets/src/mage/cards/m/MyrkulLordOfBones.java
++++ b/Mage.Sets/src/mage/cards/m/MyrkulLordOfBones.java
+@@ -70,8 +70,7 @@ enum MyrkulLordOfBonesCondition implements Condition {
+     @Override
+     public boolean apply(Game game, Ability source) {
+         return Optional.ofNullable(game.getPlayer(source.getControllerId()))
+-                .map(Player::getLife)
+-                .map(x -> (2 * x) <= game.getStartingLife())
++                .map(player -> (2 * player.getLife()) <= game.getStartingLife(player.getId()))
+                 .orElse(false);
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/o/OketrasLastMercy.java b/Mage.Sets/src/mage/cards/o/OketrasLastMercy.java
+index ae29c463..c39eb180 100644
+--- a/Mage.Sets/src/mage/cards/o/OketrasLastMercy.java
++++ b/Mage.Sets/src/mage/cards/o/OketrasLastMercy.java
+@@ -59,7 +59,7 @@ class OketrasLastMercyEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+         if (controller != null) {
+-            controller.setLife(game.getStartingLife(), game, source);
++            controller.setLife(game.getStartingLife(controller.getId()), game, source);
+             return true;
+         }
+         return false;
+diff --git a/Mage.Sets/src/mage/cards/p/PathOfBravery.java b/Mage.Sets/src/mage/cards/p/PathOfBravery.java
+index f2ae415b..6658dd22 100644
+--- a/Mage.Sets/src/mage/cards/p/PathOfBravery.java
++++ b/Mage.Sets/src/mage/cards/p/PathOfBravery.java
+@@ -58,7 +58,7 @@ enum PathOfBraveryCondition implements Condition {
+     public boolean apply(Game game, Ability source) {
+         Player you = game.getPlayer(source.getControllerId());
+         if (you != null) {
+-            return you.getLife() >= game.getStartingLife();
++            return you.getLife() >= game.getStartingLife(you.getId());
+         }
+         return false;
+     }
+diff --git a/Mage.Sets/src/mage/cards/r/ResoluteArchangel.java b/Mage.Sets/src/mage/cards/r/ResoluteArchangel.java
+index 26308476..65a77a59 100644
+--- a/Mage.Sets/src/mage/cards/r/ResoluteArchangel.java
++++ b/Mage.Sets/src/mage/cards/r/ResoluteArchangel.java
+@@ -67,7 +67,7 @@ class ResoluteArchangelEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+         if (controller != null) {
+-            controller.setLife(game.getStartingLife(), game, source);
++            controller.setLife(game.getStartingLife(controller.getId()), game, source);
+             return true;
+         }
+         return false;
+@@ -82,7 +82,7 @@ enum ControllerLifeLowerThanStrtingLife implements Condition {
+     public boolean apply(Game game, Ability source) {
+         Player controller = game.getPlayer(source.getControllerId());
+         if (controller != null) {
+-            return controller.getLife() < game.getStartingLife();
++            return controller.getLife() < game.getStartingLife(controller.getId());
+         }
+         return false;
+     }
+diff --git a/Mage.Sets/src/mage/cards/s/ShadowOfMortality.java b/Mage.Sets/src/mage/cards/s/ShadowOfMortality.java
+index 89a0b1fa..cef3c93a 100644
+--- a/Mage.Sets/src/mage/cards/s/ShadowOfMortality.java
++++ b/Mage.Sets/src/mage/cards/s/ShadowOfMortality.java
+@@ -58,7 +58,7 @@ enum ShadowOfMortalityValue implements DynamicValue {
+     @Override
+     public int calculate(Game game, Ability sourceAbility, Effect effect) {
+         Player player = game.getPlayer(sourceAbility.getControllerId());
+-        return player != null ? Math.max(game.getStartingLife() - player.getLife(), 0) : 0;
++        return player != null ? Math.max(game.getStartingLife(player.getId()) - player.getLife(), 0) : 0;
+     }
+ 
+     @Override
+diff --git a/Mage.Sets/src/mage/cards/t/TheEndstone.java b/Mage.Sets/src/mage/cards/t/TheEndstone.java
+index c38de5d4..44820097 100644
+--- a/Mage.Sets/src/mage/cards/t/TheEndstone.java
++++ b/Mage.Sets/src/mage/cards/t/TheEndstone.java
+@@ -64,7 +64,7 @@ class TheEndstoneEffect extends OneShotEffect {
+         Optional.ofNullable(source)
+                 .map(Controllable::getControllerId)
+                 .map(game::getPlayer)
+-                .ifPresent(player -> player.setLife(game.getStartingLife() / 2 + game.getStartingLife() % 2, game, source));
++                .ifPresent(player -> player.setLife(game.getStartingLife(player.getId()) / 2 + game.getStartingLife(player.getId()) % 2, game, source));
+         return true;
+     }
+ }
+diff --git a/Mage.Sets/src/mage/cards/t/TorgaarFamineIncarnate.java b/Mage.Sets/src/mage/cards/t/TorgaarFamineIncarnate.java
+index 2e2f5275..8feb4808 100644
+--- a/Mage.Sets/src/mage/cards/t/TorgaarFamineIncarnate.java
++++ b/Mage.Sets/src/mage/cards/t/TorgaarFamineIncarnate.java
+@@ -77,7 +77,7 @@ class TorgaarFamineIncarnateEffect extends OneShotEffect {
+     public boolean apply(Game game, Ability source) {
+         Player targetPlayer = game.getPlayer(getTargetPointer().getFirst(game, source));
+         if (targetPlayer != null) {
+-            int startingLifeTotal = game.getStartingLife();
++            int startingLifeTotal = game.getStartingLife(targetPlayer.getId());
+             targetPlayer.setLife(startingLifeTotal / 2, game, source);
+         }
+         return true;
+diff --git a/Mage/src/main/java/mage/abilities/condition/common/MoreThanStartingLifeTotalCondition.java b/Mage/src/main/java/mage/abilities/condition/common/MoreThanStartingLifeTotalCondition.java
+index 080cf4a7..cc928d2a 100644
+--- a/Mage/src/main/java/mage/abilities/condition/common/MoreThanStartingLifeTotalCondition.java
++++ b/Mage/src/main/java/mage/abilities/condition/common/MoreThanStartingLifeTotalCondition.java
+@@ -28,8 +28,7 @@ public enum MoreThanStartingLifeTotalCondition implements Condition {
+                 .ofNullable(source)
+                 .map(Controllable::getControllerId)
+                 .map(game::getPlayer)
+-                .map(Player::getLife)
+-                .map(life -> life >= game.getStartingLife() + amount)
++                .map(player -> player.getLife() >= game.getStartingLife(player.getId()) + amount)
+                 .orElse(false);
+     }
+ 
+diff --git a/Mage/src/main/java/mage/game/Game.java b/Mage/src/main/java/mage/game/Game.java
+index 3816ee33..78edacf5 100644
+--- a/Mage/src/main/java/mage/game/Game.java
++++ b/Mage/src/main/java/mage/game/Game.java
+@@ -215,10 +215,57 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+                 .filter(opponentId -> !opponentId.equals(playerId))
+                 .filter(player::hasPlayerInRange)
+                 .filter(opponentId -> !excludeLeavedPlayers || getPlayer(opponentId).isInGame())
+-                .filter(opponentId -> !getTeammates(playerId).contains(opponentId))
++                .filter(opponentId -> !getAllies(playerId).contains(opponentId))
+                 .collect(Collectors.toCollection(LinkedHashSet::new));
+     }
+ 
++    /**
++     * The other players on the given player's team: its teammates (getTeammates) in a game with
++     * shared team turns, and in a team game whose players take their own turns, such as the
++     * Emperor variant (rule 809), the players of that team, who are not opponents either. A
++     * player is not their own ally. Empty in games without teams.
++     */
++    default Set<UUID> getAllies(UUID playerId) {
++        return getTeammates(playerId);
++    }
++
++    /**
++     * The players the given attacking player may attack, given those the game's attack option
++     * allows (508.1b, 802): the same players in most games. A game with its own attack rules, such
++     * as the Emperor variant's (809.4b), names them.
++     */
++    default List<UUID> attackablePlayers(UUID attackingPlayerId, List<UUID> byAttackOption) {
++        return byAttackOption;
++    }
++
++    /**
++     * Whether the battles an attacking player may attack are only those protected by the players
++     * attackablePlayers names, whatever their range (809.4b): false in most games, where they are
++     * the battles protected by an opponent in range.
++     */
++    default boolean attacksOnlyNamedPlayers() {
++        return false;
++    }
++
++    /**
++     * Whether the two players face each other in the current combat although one is outside the
++     * other's range of influence, by the game's own attack rules: then they are opponents for that
++     * combat's blocks, damage and triggered abilities, though not for targets and effects, which
++     * keep to range. False in most games.
++     */
++    default boolean inCombatAcrossRange(UUID playerId, UUID otherPlayerId) {
++        return false;
++    }
++
++    /**
++     * The given player's starting life total (103.4), which an effect that refers to "your
++     * starting life total" uses: the game's in most games; a game may give its players different
++     * ones.
++     */
++    default int getStartingLife(UUID playerId) {
++        return getStartingLife();
++    }
++
+     /**
+      * The other players on the given player's team, in a game played by teams with the shared team
+      * turns option (rule 805), such as Two-Headed Giant (rule 810). A player is not their own
+@@ -351,8 +398,8 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+ 
+     /**
+      * Checks if the given playerToCheckId is an opponent of player. Every other
+-     * player is an opponent, except teammates in a team game (see
+-     * getTeammates). Also if this player is out of range. This method can't
++     * player is an opponent, except teammates and allies in a team game (see
++     * getTeammates, getAllies). Also if this player is out of range. This method can't
+      * handle that only players in range are processed because it can only
+      * return TRUE or FALSE.
+      *
+@@ -361,7 +408,7 @@ public interface Game extends MageItem, Serializable, Copyable<Game> {
+      * @return
+      */
+     default boolean isOpponent(Player player, UUID playerToCheckId) {
+-        return !player.getId().equals(playerToCheckId) && !getTeammates(player.getId()).contains(playerToCheckId);
++        return !player.getId().equals(playerToCheckId) && !getAllies(player.getId()).contains(playerToCheckId);
+     }
+ 
+     Turn getTurn();
+diff --git a/Mage/src/main/java/mage/game/GameImpl.java b/Mage/src/main/java/mage/game/GameImpl.java
+index deb847a9..4d2b70b6 100644
+--- a/Mage/src/main/java/mage/game/GameImpl.java
++++ b/Mage/src/main/java/mage/game/GameImpl.java
+@@ -1412,7 +1412,7 @@ public abstract class GameImpl implements Game {
+             Player player = getPlayer(playerId);
+             player.initStartingDeckSize();
+             if (!gameOptions.testMode || player.getLife() == 0) {
+-                player.initLife(this.getStartingLife());
++                player.initLife(this.getStartingLife(playerId));
+             }
+             if (!gameOptions.testMode) {
+                 mulligan.drawHand(startingHandSize, player, this);
+diff --git a/Mage/src/main/java/mage/game/combat/Combat.java b/Mage/src/main/java/mage/game/combat/Combat.java
+index 9fcc301f..0717f51d 100644
+--- a/Mage/src/main/java/mage/game/combat/Combat.java
++++ b/Mage/src/main/java/mage/game/combat/Combat.java
+@@ -1692,11 +1692,20 @@ public class Combat implements Serializable, Copyable<Combat> {
+ 
+     public void setDefenders(Game game) {
+         // player + planeswalkers
+-        for (UUID playerId : getAttackablePlayers(game)) {
++        List<UUID> attackable = getAttackablePlayers(game);
++        for (UUID playerId : attackable) {
+             addDefendersFromPlayer(playerId, game);
+         }
+ 
+-        // battles
++        // battles: in a game with its own attack rules (809.4b), those of the players it names
++        if (game.attacksOnlyNamedPlayers()) {
++            for (Permanent permanent : game.getBattlefield().getActivePermanents(new FilterBattlePermanent(), attackingPlayerId, game)) {
++                if (attackable.contains(permanent.getProtectorId())) {
++                    defenders.add(permanent.getId());
++                }
++            }
++            return;
++        }
+         for (Permanent permanent : game.getBattlefield().getActivePermanents(filterBattles, attackingPlayerId, game)) {
+             defenders.add(permanent.getId());
+         }
+@@ -1736,7 +1745,7 @@ public class Combat implements Serializable, Copyable<Combat> {
+                     break;
+             }
+         }
+-        return attackablePlayers;
++        return game.attackablePlayers(attackingPlayerId, attackablePlayers);
+     }
+ 
+     private void addDefendersFromPlayer(UUID playerId, Game game) {
+diff --git a/Mage/src/main/java/mage/players/PlayerImpl.java b/Mage/src/main/java/mage/players/PlayerImpl.java
+index dde7d66d..3fd39c2e 100644
+--- a/Mage/src/main/java/mage/players/PlayerImpl.java
++++ b/Mage/src/main/java/mage/players/PlayerImpl.java
+@@ -431,7 +431,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+         //this.name;
+         //this.human;
+ 
+-        this.life = game.getStartingLife();
++        this.life = game.getStartingLife(this.playerId);
+         this.wins = false;
+         this.draws = false;
+         this.loses = false;
+@@ -5611,7 +5611,7 @@ public abstract class PlayerImpl implements Player, Serializable {
+     public boolean hasOpponent(UUID playerToCheckId, Game game) {
+         return !this.getId().equals(playerToCheckId)
+                 && game.isOpponent(this, playerToCheckId)
+-                && hasPlayerInRange(playerToCheckId);
++                && (hasPlayerInRange(playerToCheckId) || game.inCombatAcrossRange(this.getId(), playerToCheckId));
+     }
+ 
+     @Override

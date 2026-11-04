@@ -26,10 +26,15 @@ import java.util.function.LongSupplier;
  * <p>Since v0.8.3 a service request may carry {@code game_id}, a lower-case UUID the API chooses, so
  * that a create it retries, or cancels before the engine answered, names the same game (see
  * {@link HumanGames}). The development route refuses the field as unknown.
+ *
+ * <p>Since v0.8.7 the format may be {@code kings_table}, with exactly six seats in the table's order
+ * ({@link KingsTableRules}) and its settings in {@code kings_table}: {@code deck_format},
+ * {@code life} and {@code king_attacks_anyone}, each defaulting as the owner suggested. A starting
+ * seat must then be a King's; without one a King drawn at random starts.
  */
 public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
                                int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat,
-                               String gameId) {
+                               String gameId, KingsTableRules kingsTable) {
     public static final int DEFAULT_SKILL = 4;
     public static final int MAX_SKILL = 6;
     public static final int DEFAULT_TURN_CAP = 60;
@@ -41,10 +46,10 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
     public static final String HUMAN = "human";
     public static final String BOT = "bot";
     private static final Set<String> FIELDS = Set.of("seed", "format", "seats", "skill", "turn_cap",
-        "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat");
+        "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat", "kings_table");
     /** The service route's fields: the development route's and the API's own game id (v0.8.3). */
     private static final Set<String> SERVICE_FIELDS = Set.of("seed", "format", "seats", "skill", "turn_cap",
-        "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat", "game_id");
+        "idle_timeout_seconds", "spectator_delay_seconds", "starting_seat", "game_id", "kings_table");
     private static final Set<String> SEAT_FIELDS = Set.of("player", "deck");
     private static final Set<String> SERVICE_SEAT_FIELDS = Set.of("player", "deck", "deck_list");
     /** What a seat's settings call a deck from a deck list. */
@@ -66,6 +71,16 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
 
     public HumanGameRequest {
         seats = List.copyOf(seats);
+        if (format.kingsTable() && kingsTable == null) {
+            kingsTable = new KingsTableRules(format == GameFormat.KINGS_TABLE_COMMANDER, KingsTableRules.ALL_40, false);
+        }
+    }
+
+    /** A request in any format but King's Table, or one with its default settings. */
+    public HumanGameRequest(long seed, GameFormat format, List<Seat> seats, int skill, int turnCap,
+                            int idleTimeoutSeconds, int spectatorDelaySeconds, Integer startingSeat, String gameId) {
+        this(seed, format, seats, skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds, startingSeat, gameId,
+            null);
     }
 
     /** A request whose game the engine names. */
@@ -122,11 +137,21 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
         String gameId = json.has("game_id") ? JsonRequest.uuid(json, "game_id") : null;
         long seed = json.has("seed") ? JsonRequest.integer(json, "seed").longValueExact() : seedSource.getAsLong();
         GameFormat format = GameFormat.LEGACY;
+        KingsTableRules kingsTable = null;
         if (json.has("format")) {
-            format = GameFormat.of(JsonRequest.string(json, "format", 32));
+            String id = JsonRequest.string(json, "format", 32);
+            if (id.equals(GameFormat.KINGS_TABLE)) {
+                kingsTable = KingsTableRules.parse(json.get("kings_table"));
+                format = GameFormat.kingsTable(kingsTable.commander());
+            } else {
+                format = GameFormat.of(id);
+            }
             if (format == null) {
                 throw new JsonRequest.Invalid("format must be one of " + GameFormat.ids());
             }
+        }
+        if (kingsTable == null && json.has("kings_table")) {
+            throw new JsonRequest.Invalid("kings_table is for the kings_table format only");
         }
         List<String> players = new ArrayList<>();
         List<String> decks = new ArrayList<>();
@@ -189,6 +214,9 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
                 throw new JsonRequest.Invalid("starting_seat must be a seat of the game, 0 to " + (seats.size() - 1));
             }
             startingSeat = value.intValueExact();
+            if (kingsTable != null && !KingsTableRules.king(startingSeat)) {
+                throw new JsonRequest.Invalid("starting_seat must be a King's seat, 1 or 4, at King's Table");
+            }
         }
         return new HumanGameRequest(
             seed,
@@ -200,7 +228,8 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
                 MAX_IDLE_TIMEOUT_SECONDS),
             JsonRequest.clamped(json, "spectator_delay_seconds", 0, 0, MAX_SPECTATOR_DELAY_SECONDS),
             startingSeat,
-            gameId);
+            gameId,
+            kingsTable);
     }
 
     private static String deck(JsonObject seat, GameFormat format) throws JsonRequest.Invalid {

@@ -82,13 +82,21 @@ final class HumanGame {
     /** A seat at the table. A seat's snapshot names only its own deck. */
     record SeatSettings(int seat, String player, String deck) {}
 
+    /** A King's Table game's settings (v0.8.7), as the request named them. */
+    record KingsTableSettings(String deckFormat, String life, boolean kingAttacksAnyone) {
+        static KingsTableSettings of(KingsTableRules rules) {
+            return rules == null ? null
+                : new KingsTableSettings(rules.deckFormat(), rules.life(), rules.kingAttacksAnyone());
+        }
+    }
+
     record Settings(String format, String rulesProfile, List<SeatSettings> seats, int skill, int turnCap,
-                    int idleTimeoutSeconds, int spectatorDelaySeconds) {
+                    int idleTimeoutSeconds, int spectatorDelaySeconds, KingsTableSettings kingsTable) {
         /** What one seat is told (other seats' decks are private); a spectator, seat -1, sees no deck. */
         Settings forSeat(int seat) {
             return new Settings(format, rulesProfile, seats.stream()
                 .map(entry -> entry.seat() == seat ? entry : new SeatSettings(entry.seat(), entry.player(), null))
-                .toList(), skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds);
+                .toList(), skill, turnCap, idleTimeoutSeconds, spectatorDelaySeconds, kingsTable);
         }
     }
 
@@ -281,7 +289,7 @@ final class HumanGame {
             HumanGameRequest.Seat seat = request.seats().get(index);
             seatSettings.add(new SeatSettings(index, seat.player(), seat.deck()));
             if (seat.human()) {
-                var human = new HumanSeatPlayer(name(seat, index), format.range(), this::waiting);
+                var human = new HumanSeatPlayer(name(seat, index), format.range(index), this::waiting);
                 // XMage's server sets each human's preferences on connect; these are its defaults (stop in
                 // both main phases, at declare attackers and blockers, and whenever something new is on
                 // the stack).
@@ -289,7 +297,7 @@ final class HumanGame {
                 seated.add(human);
                 bySeat.add(new Seat(index, human));
             } else {
-                Player bot = hooks.bot(index, name(seat, index), format.range(), request.skill(), request.seed());
+                Player bot = hooks.bot(index, name(seat, index), format.range(index), request.skill(), request.seed());
                 if (bot instanceof FairBot fair) {
                     // Every fair bot follows the game's one switch (v0.8.6); a test's other bot ignores it.
                     fair.followPassive(passiveBots);
@@ -299,7 +307,8 @@ final class HumanGame {
             }
         }
         this.settings = new Settings(format.id(), format.rulesProfile(seated.size()), List.copyOf(seatSettings),
-            request.skill(), request.turnCap(), request.idleTimeoutSeconds(), request.spectatorDelaySeconds());
+            request.skill(), request.turnCap(), request.idleTimeoutSeconds(), request.spectatorDelaySeconds(),
+            KingsTableSettings.of(request.kingsTable()));
         this.players = List.copyOf(seated);
         // Stream.toList tolerates indexOf(null): XMage has no active player before the first turn.
         this.seatIds = seated.stream().map(Player::getId).toList();
@@ -378,7 +387,7 @@ final class HumanGame {
         for (HumanGameRequest.Seat seat : request.seats()) {
             decks.add(seat.custom() != null ? DeckLists.load(seat.custom()) : format.loadDeck(deckDirectory, seat.deck()));
         }
-        Game created = format.newGame(players.size(), request.turnCap());
+        Game created = format.newGame(players.size(), request.turnCap(), request.kingsTable());
         Match match = format.newMatch("Commander Duels development game", players.size());
         // XMage's player list inserts each player it is given at the front, so turns pass in the
         // opposite order to the one players were added in. Adding seat 0 and then the others in
@@ -418,6 +427,11 @@ final class HumanGame {
                 // takes the first turn, and XMage asks nobody who starts.
                 created.setStartingPlayerId(seatIds.get(starting));
                 created.start(seatIds.get(starting));
+            } else if (format.kingsTable()) {
+                // King's Table (v0.8.7): a King chosen at random takes the first turn.
+                UUID king = seatIds.get(RandomUtil.nextBoolean() ? 1 : 4);
+                created.setStartingPlayerId(king);
+                created.start(king);
             } else {
                 created.start(seatIds.get(RandomUtil.nextInt(seatIds.size())));
             }

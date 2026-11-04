@@ -42,7 +42,7 @@
     "players": {
       "type": "array",
       "minItems": 2,
-      "maxItems": 4,
+      "maxItems": 6,
       "items": {
         "type": "object",
         "additionalProperties": false,

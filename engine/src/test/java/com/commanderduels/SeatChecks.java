@@ -631,7 +631,7 @@ class SeatChecks implements HumanGame.Hooks {
             check(state.hand() == null, "a hand shown to someone who may not see it" + where);
             return;
         }
-        boolean teammate = game.getTeammates(viewer).contains(player.getId());
+        boolean teammate = game.getAllies(viewer).contains(player.getId());
         reached.add(teammate ? "teammate hand shown" : "controlled player's hand shown");
         List<UUID> shownHand = state.hand() == null ? List.of()
             : state.hand().stream().map(card -> refs.resolve(card.id()).orElse(null)).toList();
@@ -672,7 +672,7 @@ class SeatChecks implements HumanGame.Hooks {
     /** Whether the viewer may see this player's hand, for itself or for a player whose turn it controls. */
     private static boolean handShownTo(Game game, UUID owner, UUID viewer) {
         for (UUID player : viewersFor(game, viewer)) {
-            if (player.equals(owner) || game.getTeammates(owner).contains(player)) {
+            if (player.equals(owner) || game.getAllies(owner).contains(player)) {
                 return true;
             }
         }

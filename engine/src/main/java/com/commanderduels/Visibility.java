@@ -84,7 +84,7 @@ final class Visibility {
             return false;
         }
         for (UUID player : seesFor(game, viewerId)) {
-            if (player.equals(ownerId) || game.getTeammates(ownerId).contains(player)) {
+            if (player.equals(ownerId) || game.getAllies(ownerId).contains(player)) {
                 return true;
             }
         }

@@ -58,11 +58,19 @@ public record SeatView(
      * @param commandZone   the objects in the command zone that the player owns or controls
      * @param commanders    one entry per commander the player owns; empty outside Commander
      */
+    /**
+     * A player's public state. Since v0.8.7, at King's Table: the seat's {@code role} ("king" or
+     * "general"), its {@code startingLife}, and for a seat's own view whether this player is in the
+     * viewer's range of influence this turn ({@code inRange}, 801.2c) and whether the viewer's
+     * creatures may attack them now by the table's rules ({@code attackable}); null elsewhere, and
+     * the last two null for spectators.
+     */
     public record PlayerState(int seat, String name, Integer team, Integer controlledBy, int life,
                               Map<String, Integer> counters, int libraryCount, int handCount, List<CardInfo> hand,
                               List<CardInfo> graveyard, List<CardInfo> exile, ManaPoolInfo manaPool, boolean lost,
                               boolean won, String colorIdentity, List<CardInfo> commandZone,
-                              List<CommanderState> commanders) {}
+                              List<CommanderState> commanders, String role, Integer startingLife, Boolean inRange,
+                              Boolean attackable) {}
 
     /**
      * One commander (FMT01). Its identity is public from the start of the game; its current object and

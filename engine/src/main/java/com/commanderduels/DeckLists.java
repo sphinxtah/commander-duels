@@ -151,10 +151,10 @@ final class DeckLists {
                 commanders.add(JsonRequest.string(holder, "commander", MAX_NAME).strip());
             }
         }
-        if (format == GameFormat.COMMANDER && commanders.isEmpty()) {
+        if (format.commanderDecks() && commanders.isEmpty()) {
             throw new JsonRequest.Invalid("a Commander deck_list names one or two commanders");
         }
-        if (format != GameFormat.COMMANDER && !commanders.isEmpty()) {
+        if (!format.commanderDecks() && !commanders.isEmpty()) {
             throw new JsonRequest.Invalid("only Commander deck lists have commanders");
         }
         Map<String, StandInCard.Description> standIns = json.has("stand_ins") ? standIns(json.get("stand_ins"))

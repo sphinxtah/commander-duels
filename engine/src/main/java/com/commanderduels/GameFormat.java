@@ -41,13 +41,27 @@ import mage.game.mulligan.MulliganType;
  * its own; the team's deck rule (no card in both teammates' decks) is the API's, which builds the
  * teams. Its fixtures are paired red and white against green and blue (v0.5.1): the most even of
  * the three pairings in bot-versus-bot games (docs/engine/two-headed-giant.md).
+ *
+ * <p>King's Table (since v0.8.7) seats six players in two teams of three, with Legacy or Commander
+ * decks as its settings say: see {@link KingsTable}. Its two constants share the id {@code kings_table};
+ * a request names the deck format in its {@code kings_table} settings. A bot without a deck plays the
+ * deck format's fixtures, which repeat after the fourth.
  */
 enum GameFormat {
     LEGACY("legacy", "Legacy", 2, 2, LegacyDuel.DECKS, Legacy::new),
     COMMANDER("commander", "Commander", 2, 4, List.of("commander-mono-white-soldiers", "commander-mono-blue-flyers",
         "commander-mono-red-raiders", "commander-mono-green-stompers"), Commander::new),
     TWO_HEADED_GIANT("two_headed_giant", "Two-Headed Giant", 4, 4, List.of("legacy-mono-red-burn",
-        "legacy-mono-white-weenie", "legacy-mono-green-creatures", "legacy-mono-blue-skies"), Legacy::new);
+        "legacy-mono-white-weenie", "legacy-mono-green-creatures", "legacy-mono-blue-skies"), Legacy::new),
+    /** King's Table with Legacy decks (v0.8.7): requested as {@link #KINGS_TABLE} and its deck format. */
+    KINGS_TABLE_LEGACY("kings_table", "King's Table", 6, 6, List.of("legacy-mono-red-burn",
+        "legacy-mono-white-weenie", "legacy-mono-green-creatures", "legacy-mono-blue-skies"), Legacy::new),
+    /** King's Table with Commander decks (v0.8.7). */
+    KINGS_TABLE_COMMANDER("kings_table", "King's Table", 6, 6, List.of("commander-mono-white-soldiers",
+        "commander-mono-blue-flyers", "commander-mono-red-raiders", "commander-mono-green-stompers"), Commander::new);
+
+    /** The id a request names King's Table by, with its deck format in its own settings. */
+    static final String KINGS_TABLE = "kings_table";
 
     static final int COMMANDER_START_LIFE = 40;
     private static final int START_HAND = 7;
@@ -86,17 +100,32 @@ enum GameFormat {
         return decks;
     }
 
+    /** The format named by a request's id; King's Table by its id and deck format, see {@link #kingsTable}. */
     static GameFormat of(String id) {
         for (GameFormat format : values()) {
-            if (format.id.equals(id)) {
+            if (format.id.equals(id) && !format.kingsTable()) {
                 return format;
             }
         }
         return null;
     }
 
+    /** King's Table with the given decks. */
+    static GameFormat kingsTable(boolean commander) {
+        return commander ? KINGS_TABLE_COMMANDER : KINGS_TABLE_LEGACY;
+    }
+
     static List<String> ids() {
-        return List.of(values()).stream().map(GameFormat::id).toList();
+        return List.of(values()).stream().map(GameFormat::id).distinct().toList();
+    }
+
+    boolean kingsTable() {
+        return this == KINGS_TABLE_LEGACY || this == KINGS_TABLE_COMMANDER;
+    }
+
+    /** Whether the decks are Commander decks: a commander, the command zone (and a reserve, v0.8.0). */
+    boolean commanderDecks() {
+        return this == COMMANDER || this == KINGS_TABLE_COMMANDER;
     }
 
     /** What the settings call the rules this table plays under. */
@@ -106,6 +135,9 @@ enum GameFormat {
         }
         if (this == TWO_HEADED_GIANT) {
             return "two_headed_giant_legacy";
+        }
+        if (kingsTable()) {
+            return this == KINGS_TABLE_COMMANDER ? "kings_table_commander" : "kings_table_legacy";
         }
         return seats == 2 ? "commander_two_seat" : "commander_free_for_all";
     }
@@ -118,13 +150,24 @@ enum GameFormat {
         return this == LEGACY ? RangeOfInfluence.ONE : RangeOfInfluence.ALL;
     }
 
+    /** A seat's player's range of influence: at King's Table a General's is one, a King's two (809.4a). */
+    RangeOfInfluence range(int seat) {
+        if (kingsTable()) {
+            return KingsTableRules.king(seat) ? RangeOfInfluence.TWO : RangeOfInfluence.ONE;
+        }
+        return range();
+    }
+
     /** Whether seats play in teams: seats 0 and 1 against seats 2 and 3. */
     boolean teams() {
-        return this == TWO_HEADED_GIANT;
+        return this == TWO_HEADED_GIANT || kingsTable();
     }
 
     /** The team of a seat, or null outside team formats. */
     Integer teamOf(int seat) {
+        if (kingsTable()) {
+            return KingsTableRules.team(seat);
+        }
         return teams() ? seat / 2 : null;
     }
 
@@ -133,10 +176,38 @@ enum GameFormat {
         if (game instanceof TwoHeadedGiant giant) {
             giant.setTeams(List.of(seatIds.subList(0, 2), seatIds.subList(2, 4)));
         }
+        KingsTable table = kingsTableOf(game);
+        if (table != null) {
+            table.seat(seatIds);
+        }
+    }
+
+    /** A King's Table game's rules, or null for any other game. */
+    static KingsTable kingsTableOf(Game game) {
+        if (game instanceof KingsTableGame legacy) {
+            return legacy.table();
+        }
+        if (game instanceof KingsTableCommanderGame commander) {
+            return commander.table();
+        }
+        return null;
     }
 
     /** A new game that stops at the untap step after {@code turnCap} turns. */
     Game newGame(int seats, int turnCap) {
+        return newGame(seats, turnCap, KingsTableRules.DEFAULT);
+    }
+
+    /** A new game; a King's Table game with the given settings. */
+    Game newGame(int seats, int turnCap, KingsTableRules kingsTable) {
+        if (kingsTable()) {
+            // 103.5c: a multiplayer game, so each player's first mulligan is free.
+            Game game = this == KINGS_TABLE_COMMANDER
+                ? new KingsTableCommanderGame(kingsTable, MulliganType.LONDON.getMulligan(1), START_HAND)
+                : new KingsTableGame(kingsTable, MulliganType.LONDON.getMulligan(1), START_HAND);
+            game.setGameOptions(LegacyDuel.options(turnCap));
+            return game;
+        }
         if (this == LEGACY) {
             return LegacyDuel.newGame(turnCap);
         }
@@ -161,6 +232,12 @@ enum GameFormat {
     Match newMatch(String name, int seats) {
         if (this == LEGACY) {
             return LegacyDuel.newMatch(name);
+        }
+        if (kingsTable()) {
+            var options = new MatchOptions(name, "King's Table", false);
+            options.setDeckType(this == KINGS_TABLE_COMMANDER ? "Variant Magic - Commander" : "Constructed - Legacy");
+            options.setWinsNeeded(1);
+            return new KingsTable.Match(options);
         }
         if (this == TWO_HEADED_GIANT) {
             var options = new MatchOptions(name, "Two-Headed Giant", false);
