@@ -17,6 +17,7 @@ import {
 } from "vitest";
 import { ChatContext, type Chat } from "../chat/chat";
 import { GameScreen } from "./GameScreen";
+import { tableFixture } from "./table/fixtures";
 import type {
   GameView,
   PlayerView,
@@ -1013,5 +1014,81 @@ describe("a human table's chat and alliances (v0.4.4)", () => {
     } finally {
       get.mockImplementation(original);
     }
+  });
+});
+
+describe("a King's Table game (v0.8.7)", () => {
+  function kings(change: Partial<Snapshot> = {}) {
+    render(<GameScreen gameId="fx-kings" me={null} />);
+    const socket = FakeSocket.made[0];
+    const shown = { ...tableFixture("kings").snapshot, ...change };
+    act(() => {
+      socket.accept();
+      socket.deliver(welcome(2, false));
+      socket.deliver({ type: "snapshot", snapshot: shown });
+    });
+    return socket;
+  }
+
+  it("seats all five others around the table, says the settings, and names the mode", () => {
+    kings();
+    expect(
+      screen.getByRole("heading", { name: /^King’s Table/ }),
+    ).toBeInTheDocument();
+    for (const name of [
+      "Bot 4, seat 4, Team B's Right General, the other team, in your range, you can attack them",
+      "Bot 5, seat 5, Team B's King, the other team, out of your range",
+      "Bot 6, seat 6, Team B's Left General, the other team, out of your range",
+      "Bot 1, seat 1, Team A's Left General, your teammate, out of your range",
+      "Bot 2, seat 2, Team A's King, your teammate, in your range",
+    ])
+      expect(screen.getByRole("article", { name })).toBeInTheDocument();
+    expect(document.querySelector("[data-arrangement]")).toHaveAttribute(
+      "data-arrangement",
+      "six",
+    );
+    // The game menu carries the settings for the whole game.
+    expect(
+      screen.getByText(
+        "Commander decks · Generals 20, Kings 40 · King can attack anyone: off",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("names the winning team when the game ends", () => {
+    kings({
+      status: "finished",
+      prompt: null,
+      result: {
+        kind: "completed",
+        winner_seat: 4,
+        winner_seats: [3, 4, 5],
+        draw: false,
+        conceded_seats: [],
+        turns: 21,
+        error: null,
+      },
+    });
+    expect(screen.getAllByText("Defeat")).not.toHaveLength(0);
+    expect(
+      screen.getAllByText("Team B won in 21 turns: Bot 4, Bot 5 and Bot 6."),
+    ).not.toHaveLength(0);
+  });
+
+  it("calls both Kings at once a draw", () => {
+    kings({
+      status: "finished",
+      prompt: null,
+      result: {
+        kind: "completed",
+        winner_seat: null,
+        winner_seats: [],
+        draw: true,
+        conceded_seats: [],
+        turns: 30,
+        error: null,
+      },
+    });
+    expect(screen.getAllByText("A draw")).not.toHaveLength(0);
   });
 });

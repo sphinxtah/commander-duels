@@ -184,8 +184,19 @@ export interface PlayerView {
   seat: Seat;
   name: string;
   /** Two-Headed Giant (v0.5.0): 0 for seats 0 and 1, 1 for seats 2 and 3; teammates share one
-   * life total, so both show the team's. Null or missing in other games. */
+   * life total, so both show the team's. King's Table (v0.8.7): 0 for seats 0 to 2, 1 for seats 3
+   * to 5, each with their own life total. Null or missing in other games. */
   team?: number | null;
+  /** King's Table (v0.8.7): the seat's role, king (seats 1 and 4) or general. */
+  role?: "king" | "general" | null;
+  /** King's Table (v0.8.7): the player's starting life, as the settings give it. */
+  starting_life?: number | null;
+  /** King's Table (v0.8.7), in a seat's own view: whether this player is in the viewer's range of
+   * influence this turn, which spells, abilities and effects keep to. Null for spectators. */
+  in_range?: boolean | null;
+  /** King's Table (v0.8.7), in a seat's own view: whether the viewer's creatures may attack this
+   * player now, apart from in_range. Null for spectators. */
+  attackable?: boolean | null;
   /** Turn control (rule 723, v0.5.1): the seat controlling this player's turn, shown to everyone;
    * null or missing while the player controls it themselves. */
   controlled_by?: Seat | null;
@@ -274,8 +285,11 @@ export interface GameResultView {
     | "humans_eliminated"
     | "error";
   winner_seat: Seat | null;
-  /** Every winning seat (v0.5.0): in Two-Headed Giant the winning team. */
+  /** Every winning seat (v0.5.0): in Two-Headed Giant the winning team; at King's Table (v0.8.7)
+   * the engine names the winning team's players still in the game. */
   winner_seats?: Seat[];
+  /** King's Table (v0.8.7), in a recorded result only (the API's): the winning team, 0 or 1. */
+  winner_team?: number | null;
   draw: boolean;
   conceded_seats: Seat[];
   turns: number;
@@ -290,14 +304,23 @@ export interface LogLine {
   text: string;
 }
 
+/** King's Table's settings (v0.8.7), the host's, fixed for the whole game. */
+export interface KingsTableView {
+  deck_format: "legacy" | "commander";
+  life: "all_20" | "all_40" | "generals_20_kings_40";
+  king_attacks_anyone: boolean;
+}
+
 export interface SeatSettings {
-  format: "legacy" | "commander" | "two_headed_giant";
+  format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
   rules_profile: string;
   seats: { seat: Seat; player: "human" | "bot"; deck: string | null }[];
   skill: number;
   turn_cap: number;
   idle_timeout_seconds: number;
   spectator_delay_seconds: number;
+  /** King's Table (v0.8.7): the settings; null or missing in other formats. */
+  kings_table?: KingsTableView | null;
 }
 
 export type SnapshotStatus =

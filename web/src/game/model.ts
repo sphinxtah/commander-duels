@@ -1,3 +1,4 @@
+import { kingsTeamName, listWords } from "../tables/kingsTable";
 import type {
   CardView,
   GameView,
@@ -74,7 +75,10 @@ export function turnHolder(
 ): string | null {
   const active = view.active_seat;
   if (active === null) return null;
-  const team = players(view).find((p) => p.seat === active)?.team ?? null;
+  // At King's Table (v0.8.7) each player takes their own turns: a turn is its player's.
+  const team = kingsTableView(view)
+    ? null
+    : (players(view).find((p) => p.seat === active)?.team ?? null);
   const ours =
     !observing && (active === view.seat || active === teammateOf(view));
   const watching = observing || view.you === null;
@@ -104,11 +108,39 @@ export function turnHolder(
 }
 
 /** The viewer's teammate's seat in Two-Headed Giant (v0.5.0); null in other games and for
- * spectators. Teammates take their turns together and share one life total. */
+ * spectators. Teammates take their turns together and share one life total. King's Table's
+ * teammates (v0.8.7) do neither, so they are allies (alliesOf), never this. */
 export function teammateOf(view: GameView | null): Seat | null {
   const team = view?.you?.team;
-  if (team === undefined || team === null) return null;
+  if (team === undefined || team === null || kingsTableView(view)) return null;
   return view?.opponents.find((p) => p.team === team)?.seat ?? null;
+}
+
+/** Whether a view is King's Table's (v0.8.7): its players have roles. */
+export function kingsTableView(view: GameView | null): boolean {
+  return view ? players(view).some((p) => p.role != null) : false;
+}
+
+/** The viewer's team's other players (Two-Headed Giant's teammate, King's Table's two), by seat;
+ * none in other games and for spectators. */
+export function alliesOf(view: GameView | null): Seat[] {
+  const team = view?.you?.team;
+  if (!view || team === undefined || team === null) return [];
+  return view.opponents
+    .filter((p) => p.team === team)
+    .map((p) => p.seat)
+    .sort((a, b) => a - b);
+}
+
+/** King's Table's Deploy (804, v0.8.7) as the engine words it: "{T}: Target teammate in your
+ * range gains control of this creature. Activate only as a sorcery. (Deploy)". */
+const DEPLOY = /teammate in your range gains control of this creature/i;
+
+/** A rules line as the table shows it: King's Table's Deploy ability named first, where the
+ * engine names it last. Every other line is as the engine gives it. */
+export function readableRule(line: string): string {
+  if (!DEPLOY.test(line) || /^Deploy\b/.test(line)) return line;
+  return `Deploy — ${line.replace(/\s*\(Deploy\)\s*$/, "")}`;
 }
 
 /** Every object the seat can see, by its opaque id. */
@@ -255,6 +287,9 @@ function optionWords(
     return `Stop attacking with ${subject}`;
   if (option.action === "toggle_blocker" && option.selected && subject)
     return `Stop blocking with ${subject}`;
+  if (option.label && DEPLOY.test(option.label) && !option.object_id)
+    // King's Table's Deploy (v0.8.7), chosen among a creature's abilities.
+    return "Deploy: tap this creature to give it to a teammate in your range (as a sorcery)";
   if (option.label) {
     // The engine labels object options with the object's name; say what the option does.
     if (subject && option.label === subject)
@@ -362,6 +397,8 @@ export function resultText(
     winner_seat: Seat | null;
     /** The winning team in Two-Headed Giant (v0.5.0). */
     winner_seats?: Seat[];
+    /** King's Table (v0.8.7): the winning team, in a recorded result. */
+    winner_team?: number | null;
     draw: boolean;
     turns: number;
   },
@@ -370,6 +407,10 @@ export function resultText(
     playerName(view, winner, seat === null),
 ): { title: string; detail: string } {
   const turns = `${result.turns} turn${result.turns === 1 ? "" : "s"}`;
+  if (view && kingsTableView(view)) {
+    const kings = kingsResult(view, seat, result, turns, nameOf);
+    if (kings) return kings;
+  }
   if (result.draw)
     return {
       title: "A draw",
@@ -419,5 +460,54 @@ export function resultText(
   return {
     title: "Game over",
     detail: `${kinds[result.kind] ?? "The game ended"} after ${turns}.`,
+  };
+}
+
+/** King's Table's result (v0.8.7): a team wins when the other team's King is out, and both Kings
+ * at once is a draw. The engine names the winning team's players still in the game, so the team
+ * is that of any of them, and its every player shares the win, a General out earlier too. Null
+ * when the game ended without a winning team or a draw, which reads as anywhere else. */
+function kingsResult(
+  view: GameView,
+  seat: Seat | null,
+  result: {
+    winner_seat: Seat | null;
+    winner_seats?: Seat[];
+    winner_team?: number | null;
+    draw: boolean;
+  },
+  turns: string,
+  nameOf: (seat: Seat) => string,
+): { title: string; detail: string } | null {
+  const everyone = players(view);
+  const teamOf = (s: Seat | null) =>
+    s === null ? null : (everyone.find((p) => p.seat === s)?.team ?? null);
+  if (result.draw)
+    return {
+      title: "A draw",
+      detail: `Neither team won: the game ended in a draw after ${turns}.`,
+    };
+  const named = [
+    ...(result.winner_seat !== null ? [result.winner_seat] : []),
+    ...(result.winner_seats ?? []),
+  ];
+  const team =
+    result.winner_team ??
+    named.map(teamOf).find((t): t is number => t !== null) ??
+    null;
+  if (team === null) return null;
+  const members = everyone.filter((p) => p.team === team).map((p) => p.seat);
+  const words = members.map((member) =>
+    member === seat && nameOf(member) === "You" ? "you" : nameOf(member),
+  );
+  const who = listWords(words);
+  if (seat !== null && teamOf(seat) === team)
+    return {
+      title: "Victory",
+      detail: `Your team, ${kingsTeamName(team)}, won in ${turns}: ${who}.`,
+    };
+  return {
+    title: seat === null ? "Game over" : "Defeat",
+    detail: `${kingsTeamName(team)} won in ${turns}: ${who}.`,
   };
 }

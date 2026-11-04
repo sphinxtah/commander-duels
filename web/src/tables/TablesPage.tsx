@@ -4,8 +4,17 @@ import game from "../game/game.module.css";
 import { FindGame } from "../queues/FindGame";
 import { TableLobby } from "./TableLobby";
 import {
+  DEFAULT_KINGS_TABLE,
+  KINGS_SEATS,
+  KINGS_TABLE,
+  seatTitle,
+  startingLife,
+  type KingsTableSettings,
+} from "./kingsTable";
+import {
   DeckChoices,
   Face,
+  KingsSettingsFields,
   RulesFields,
   TableTags,
   TeamsLine,
@@ -28,13 +37,16 @@ import styles from "./tables.module.css";
 // table's own page (#tables/<code>, its invite link) seats the players and starts the game. Since
 // v0.5.1 a table may be Two-Headed Giant's: two teams of two, with bots in either team. Since
 // v0.8.7 the lobby also holds "Find a game" in the public queues (#find), which was the Play
-// page's: Play is for the bots, Tables for other people.
+// page's: Play is for the bots, Tables for other people. Since v0.8.7 a table may be King's
+// Table's: six seats in two teams of three, players in any seats and bots in the others.
 
-const FORMATS: Format[] = ["legacy", "commander", TEAM_FORMAT];
+const FORMATS: Format[] = ["legacy", "commander", TEAM_FORMAT, KINGS_TABLE];
 const FORMAT_WORDS: Record<Format, string> = {
   legacy: "Two players, 20 life",
   commander: "Two to four seats, 40 life",
   two_headed_giant: "Two teams of two, Legacy decks, 30 life a team",
+  kings_table:
+    "Six seats, two teams of three: a King and two Generals each. A team wins when the other King is out",
 };
 /** The other team's seats in Two-Headed Giant, by how many bots fill them. */
 const OTHER_TEAM = ["Two players", "A player and a bot", "Two bots"];
@@ -90,13 +102,23 @@ function Lobby({
   // Two-Headed Giant (v0.5.1): whether your teammate is a bot, and the other team's bots.
   const [teammateBot, setTeammateBot] = useState(false);
   const [otherBots, setOtherBots] = useState(0);
+  // King's Table (v0.8.7): its settings, the host's seat and the seats bots take.
+  const [kings, setKings] = useState<KingsTableSettings>(DEFAULT_KINGS_TABLE);
+  const [hostSeat, setHostSeat] = useState(1);
+  const [botSeats, setBotSeats] = useState<number[]>([]);
   const [deck, setDeck] = useState("");
   const [error, setError] = useState("");
   const [opening, setOpening] = useState(false);
 
   const teams = format === TEAM_FORMAT;
-  const allBots = teams ? Number(teammateBot) + otherBots : bots;
-  const here = (decks ?? []).filter((d) => d.format === deckFormat(format));
+  const kingsTable = format === KINGS_TABLE;
+  const allBots = kingsTable
+    ? botSeats.length
+    : teams
+      ? Number(teammateBot) + otherBots
+      : bots;
+  const decksFormat = deckFormat(format, kings);
+  const here = (decks ?? []).filter((d) => d.format === decksFormat);
   // The deck chosen while the rules take it; else the first deck they take.
   const fitting = here.filter((d) => unfit(d, rules) === null);
   const chosen =
@@ -106,10 +128,17 @@ function Lobby({
   function chooseFormat(next: Format) {
     setFormat(next);
     setDeck("");
-    setSeats(next === "legacy" ? 2 : 4);
+    setSeats(next === "legacy" ? 2 : next === KINGS_TABLE ? 6 : 4);
     setBots(0);
     setTeammateBot(false);
     setOtherBots(0);
+    setBotSeats([]);
+  }
+
+  /** Your seat at a King's Table table: a bot never takes it. */
+  function chooseSeat(seat: number) {
+    setHostSeat(seat);
+    setBotSeats((current) => current.filter((other) => other !== seat));
   }
 
   async function open(event: FormEvent) {
@@ -128,6 +157,13 @@ function Lobby({
         rules,
         best_of: format === "legacy" ? bestOf : 1,
         deck_id: chosen,
+        ...(kingsTable
+          ? {
+              seat: hostSeat,
+              bot_seats: [...botSeats].sort((a, b) => a - b),
+              kings_table: kings,
+            }
+          : {}),
       },
     });
     setOpening(false);
@@ -150,8 +186,8 @@ function Lobby({
         or join one below. Bring a deck of your own that the table's rules take:
         its host chooses whether banned cards, and cards not legal in the
         format, may play. Wins over players pay 50 to 500 tokens, by how many
-        wins they have. In Two-Headed Giant a team wins together, and both its
-        players are paid.
+        wins they have. In Two-Headed Giant and at King&apos;s Table a team wins
+        together, and each of its players is paid.
       </p>
       {yours && (
         <p className={styles.notice} role="status">
@@ -238,6 +274,57 @@ function Lobby({
                 ))}
               </select>
             </label>
+          )}
+          {kingsTable && (
+            <>
+              <KingsSettingsFields
+                name="table-kings"
+                settings={kings}
+                onChange={(change) => {
+                  setKings((current) => ({ ...current, ...change }));
+                  if (change.deck_format) setDeck("");
+                }}
+              />
+              <fieldset>
+                <legend>Your seat</legend>
+                {KINGS_SEATS.map((seat) => (
+                  <label key={seat} className={game.choice}>
+                    <input
+                      type="radio"
+                      name="table-kings-seat"
+                      checked={hostSeat === seat}
+                      onChange={() => chooseSeat(seat)}
+                    />
+                    <span>
+                      <strong>{seatTitle(seat)}</strong>
+                      <small>{startingLife(kings, seat)} life to start</small>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+              <fieldset>
+                <legend>Seats bots take</legend>
+                {KINGS_SEATS.filter((seat) => seat !== hostSeat).map((seat) => (
+                  <label key={seat} className={game.choice}>
+                    <input
+                      type="checkbox"
+                      checked={botSeats.includes(seat)}
+                      onChange={(event) =>
+                        setBotSeats((current) =>
+                          event.target.checked
+                            ? [...current, seat]
+                            : current.filter((other) => other !== seat),
+                        )
+                      }
+                    />
+                    <span>
+                      <strong>A bot as {seatTitle(seat)}</strong>
+                      <small>Left unticked, the seat waits for a player</small>
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            </>
           )}
           {format === "commander" && (
             <label className={game.field}>
@@ -333,21 +420,26 @@ function Lobby({
               </label>
             </fieldset>
           )}
-          <RulesFields rules={rules} format={format} onChange={setRules} />
+          <RulesFields
+            rules={rules}
+            format={format}
+            kings={kings}
+            onChange={setRules}
+          />
           {decks !== null && here.every((d) => !d.playable) ? (
             <div className={game.field} data-no-deck>
               <span>Your deck</span>
               <span>
-                You have no playable {formatNames[deckFormat(format)]} deck yet.
-                Build one in <a href="#decks">Decks</a>.
+                You have no playable {formatNames[decksFormat]} deck yet. Build
+                one in <a href="#decks">Decks</a>.
               </span>
             </div>
           ) : decks !== null && fitting.length === 0 ? (
             <div className={game.field} data-no-deck>
               <span>Your deck</span>
               <span>
-                None of your {formatNames[deckFormat(format)]} decks fits these
-                rules: each holds cards they do not allow.
+                None of your {formatNames[decksFormat]} decks fits these rules:
+                each holds cards they do not allow.
               </span>
             </div>
           ) : (
@@ -420,7 +512,7 @@ function ListedTable({ table }: { table: TableView }) {
           {table.bots > 0 &&
             ` · ${table.bots} ${table.bots === 1 ? "bot" : "bots"} at skill ${table.bot_skill}`}
         </small>
-        {table.format === TEAM_FORMAT ? (
+        {table.format === TEAM_FORMAT || table.format === KINGS_TABLE ? (
           <TeamsLine table={table} />
         ) : (
           <div className={styles.faces} aria-label="Seated players">

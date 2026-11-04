@@ -742,6 +742,39 @@ describe("the end of the game", () => {
     expect(results(lost.told)).toEqual([{ type: "result", outcome: "defeat" }]);
   });
 
+  it("tells a King's Table team's win to a General who left before it (v0.8.7)", () => {
+    // Alice, team A's Right General, is out; her King wins, and the engine names only the team's
+    // players still in.
+    const out = (v: GameView) => {
+      v.you!.lost = true;
+    };
+    const won = finish(
+      "kings",
+      ended({ winner_seat: 1, winner_seats: [0, 1] }),
+      out,
+    );
+    expect(results(won.told)).toEqual([{ type: "result", outcome: "victory" }]);
+    const lost = finish(
+      "kings",
+      ended({ winner_seat: 4, winner_seats: [3, 4, 5] }),
+    );
+    expect(results(lost.told)).toEqual([{ type: "result", outcome: "defeat" }]);
+    expect(results(finish("kings", ended({ draw: true })).told)).toEqual([
+      { type: "result", outcome: "draw" },
+    ]);
+  });
+
+  it("gives a King's Table teammate's turn to that teammate, not to you (v0.8.7)", () => {
+    const a = fx("kings");
+    const b = next(a, (v) => {
+      v.turn += 1;
+      v.active_seat = 1;
+    });
+    expect(of(events(a, b), "turn")).toEqual([
+      { type: "turn", turn: 10, activeSeat: 1, yours: false },
+    ]);
+  });
+
   it("says nothing more once the result is known, and nothing on a baseline", () => {
     const a = fx("duel");
     const b = next(a, (v) => {

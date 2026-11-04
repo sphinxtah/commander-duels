@@ -15,6 +15,9 @@ export const C_FACTOR: Record<Arrangement, { you: number; opponents: number }> =
     duel: { you: 0.9, opponents: 0.9 },
     three: { you: 0.9, opponents: 0.78 },
     four: { you: 0.9, opponents: 0.66 },
+    // King's Table (v0.8.7): five opponents. At 0.5 a row card shrunk to 72% still keeps a hit
+    // 36 su wide on the back row.
+    six: { you: 0.9, opponents: 0.5 },
   };
 
 /** A row card's size at its centre line. */
@@ -363,6 +366,46 @@ export const FOUR = {
     }),
 };
 
+/* ---------- five opponents: King's Table (v0.8.7) ---------- */
+/** Five columns of 384 su, the opponents in seat order from your left neighbour to your right.
+ * A column is too narrow for the zone tiles beside its rows, so its plate is a header: the tiles
+ * in a row at its top left, the portrait and life at its top right, the name, title, pills and
+ * status under the tiles; the battlefield's two rows below, the whole column wide. */
+export const SIX = {
+  width: 384,
+  columns: [0, 384, 768, 1152, 1536] as const,
+  seat: (x0: SU): SeatGeometry =>
+    column(x0, 384, {
+      name: { dx: 284, y: 120, size: 18, maxWidth: 276 },
+      title: { y: 140 },
+      pills: [8, 144, 240, 188],
+      statusRow: [8, 192, 376, 214],
+      portrait: [336, 54, 62],
+      life: [336, 116, 30],
+      target: [292, 8, 380, 140],
+      counts: { y: 160, side: 18, hand: 314, graveyard: 288, library: 262 },
+      expand: [362, 160, 26],
+      graveyard: [8, 10, 52, 72],
+      library: {
+        pile: [58, 10, 102, 72],
+        top: [52, 72, 108, 78],
+        front: [78, 92],
+      },
+      exile: [112, 14, 150, 68],
+      command: { tile: [158, 10, 202, 94], card: [160, 10, 200, 66] },
+      back: { y: 290, x0: 8, x1: 376 },
+      front: { y: 396, x0: 8, x1: 376 },
+    }),
+};
+
+/** An arrangement's opponent columns: their left edges and each one's geometry. */
+export function columnsOf(arrangement: "three" | "four" | "six"): {
+  columns: readonly SU[];
+  seat: (x0: SU) => SeatGeometry;
+} {
+  return arrangement === "three" ? THREE : arrangement === "four" ? FOUR : SIX;
+}
+
 /* ---------- a teammate's hand (Two-Headed Giant, v0.5.1) ---------- */
 /** A teammate's hand fans face up along the near edge of their area, by the band, as yours fans
  * along the stage's bottom edge. Their rows move up to make room, and the fan keeps to its side
@@ -382,6 +425,8 @@ export const TEAM_HAND = {
     duel: { back: 180, front: 326 },
     three: { back: 210, front: 330 },
     four: { back: 220, front: 344 },
+    // King's Table's teammates (v0.8.7): rows nearer the header, the fan under them.
+    six: { back: 275, front: 354 },
   } as Record<Arrangement, { back: SU; front: SU }>,
 };
 
@@ -400,8 +445,8 @@ export function withTeamHand(
 /* ---------- chips: collapsed opponents while another is expanded (§8.8) ---------- */
 export const CHIP = {
   /** Chip centres for the opponents left over: one in three players, two in four. */
-  centres: { three: [920], four: [720, 1120] } as Record<
-    "three" | "four",
+  centres: { three: [920], four: [720, 1120], six: [] } as Record<
+    "three" | "four" | "six",
     SU[]
   >,
   y: 64,
@@ -411,11 +456,32 @@ export const CHIP = {
   portrait: { dx: -64, side: 64 },
   life: { dx: -26, dy: 22, side: 30 },
   name: { dx: -14, y: 54, size: 18, maxWidth: 124 },
-  counts: { y: 92, side: 18, dx: [16, 46, 76] as const },
+  counts: { y: 92, side: 18, dx: [16, 46, 76] as [SU, SU, SU] },
   /** Expand and the chipped battlefield's "+N" sit just right of the chip button. */
   expand: { dx: 130, y: 40, side: 26 },
   more: { dx0: 112, dx1: 168, y0: 64, y1: 104 },
-} as const;
+};
+
+/** King's Table's chips (v0.8.7): four opponents left over beside the expanded one, so each chip
+ * is narrower, between the expanded board's tiles (to x 266) and its pills (from x 1300). */
+export const SMALL_CHIP: typeof CHIP = {
+  centres: { three: [], four: [], six: [380, 602, 824, 1046] },
+  y: 64,
+  half: 80,
+  top: 20,
+  bottom: 108,
+  portrait: { dx: -46, side: 48 },
+  life: { dx: -14, dy: 22, side: 26 },
+  name: { dx: -2, y: 50, size: 16, maxWidth: 78 },
+  counts: { y: 92, side: 16, dx: [14, 38, 62] as [SU, SU, SU] },
+  expand: { dx: 100, y: 40, side: 26 },
+  more: { dx0: 82, dx1: 126, y0: 64, y1: 104 },
+};
+
+/** The chips of an arrangement. */
+export function chipOf(arrangement: Arrangement): typeof CHIP {
+  return arrangement === "six" ? SMALL_CHIP : CHIP;
+}
 
 /* ---------- regions (§8.9) ---------- */
 export const REGIONS: Regions = {

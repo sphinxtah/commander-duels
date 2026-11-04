@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { boxStyle } from "../Board";
 import { CardFace, ManaCost, permanentState } from "../Card";
 import { imageSizeFor } from "../images";
-import { playerName } from "../model";
+import { playerName, readableRule } from "../model";
 import type { GameView } from "../types";
 import { REGIONS } from "./geometry";
 import { useTableContext } from "./TableContext";
@@ -187,7 +187,7 @@ function Facts({
       lines.push(
         `Targets ${target.kind === "player" ? name(target.seat) : (target.label ?? "an object")}`,
       );
-    if (stack.text) lines.push(stack.text);
+    if (stack.text) lines.push(readableRule(stack.text));
   }
   return (
     <>

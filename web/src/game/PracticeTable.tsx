@@ -13,7 +13,15 @@ import {
 } from "../app/fullscreen";
 import { readTableSettings } from "../app/tableSettings";
 import { RunningMatches } from "../matches/RunningMatches";
-import { RulesFields } from "../tables/TableParts";
+import {
+  DEFAULT_KINGS_TABLE,
+  KINGS_SEATS,
+  KINGS_TABLE,
+  seatTitle,
+  startingLife,
+  type KingsTableSettings,
+} from "../tables/kingsTable";
+import { KingsSettingsFields, RulesFields } from "../tables/TableParts";
 import { casualRules, unfit, type TableRules } from "../tables/tables";
 import { getSoundEngine } from "./sound/engine";
 import type { components } from "../generated/api";
@@ -163,6 +171,7 @@ const formatNames: Record<GameSummary["format"], string> = {
   legacy: "Legacy",
   commander: "Commander",
   two_headed_giant: "Two-Headed Giant",
+  kings_table: "King's Table",
 };
 
 /** What each format's choice says: the bots and life (Two-Headed Giant marked early from v0.5.0
@@ -171,19 +180,41 @@ const formatLines: Record<Request["format"], string> = {
   legacy: "One bot, 20 life",
   commander: "One to three bots, 40 life",
   two_headed_giant: "A bot teammate against two bots, 30 life a team",
+  kings_table:
+    "Five bots: two teams of three, a King and two Generals each, in the seat you choose",
 };
 
-/** The format a game's decks are built for: Two-Headed Giant plays Legacy decks (v0.5.0). */
-export function deckFormat(format: Request["format"]): "legacy" | "commander" {
+/** The format a game's decks are built for: Two-Headed Giant plays Legacy decks (v0.5.0), King's
+ * Table the deck format of its settings (v0.8.7). */
+export function deckFormat(
+  format: Request["format"],
+  kings?: Pick<KingsTableSettings, "deck_format"> | null,
+): "legacy" | "commander" {
+  if (format === KINGS_TABLE) return kings?.deck_format ?? "commander";
   return format === "two_headed_giant" ? "legacy" : format;
 }
 
+/** King's Table's bots sit in the seats you leave, in seat order (v0.8.7). */
+function botSeatsOf(seat: number): number[] {
+  return KINGS_SEATS.filter((other) => other !== seat);
+}
+
 /** A bot seat's deck choice, by its place at the table. */
-function botLabel(format: Request["format"], bots: number, index: number) {
+function botLabel(
+  format: Request["format"],
+  bots: number,
+  index: number,
+  seat: number,
+) {
+  if (format === KINGS_TABLE)
+    return `Deck for ${seatTitle(botSeatsOf(seat)[index] ?? 0)}`;
   if (format === "two_headed_giant")
     return index === 0 ? "Teammate's deck" : `Opponent ${index}'s deck`;
   return bots === 1 ? "Bot's deck" : `Bot ${index + 1}'s deck`;
 }
+
+/** The bots' deck choices, one for each bot seat there may be (King's Table's five at most). */
+const blankBots = ["", "", "", "", ""];
 
 const refusals: Record<string, string> = {
   deck_not_playable:
@@ -238,12 +269,15 @@ function Table({ me }: { me: Me }) {
   const [format, setFormat] = useState<Request["format"]>("legacy");
   const [deck, setDeck] = useState<string>("");
   const [bots, setBots] = useState(1);
-  const [botDecks, setBotDecks] = useState<string[]>(["", "", ""]);
+  const [botDecks, setBotDecks] = useState<string[]>(blankBots);
   const [skill, setSkill] = useState(4);
   const [turnCap, setTurnCap] = useState(60);
   const [rules, setRules] = useState<TableRules>(casualRules);
   // One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards.
   const [bestOf, setBestOf] = useState<BestOf>(1);
+  // King's Table (v0.8.7): its settings and your seat, team A's King unless you choose another.
+  const [kings, setKings] = useState<KingsTableSettings>(DEFAULT_KINGS_TABLE);
+  const [seat, setSeat] = useState(1);
   const [useList, setUseList] = useState(false);
   const [deckList, setDeckList] = useState("");
   const [query, setQuery] = useState("");
@@ -297,11 +331,20 @@ function Table({ me }: { me: Me }) {
   const defaultBots = options?.formats.find(
     (f) => f.id === format,
   )?.default_bots;
+  // King's Table's defaults come with the options; a change of its deck format resets the decks
+  // as a change of format does, since the decks of one do not play in the other.
+  const kingsDefaults = options?.formats.find(
+    (f) => f.id === KINGS_TABLE,
+  )?.kings_table;
+  useEffect(() => {
+    if (kingsDefaults) setKings(kingsDefaults);
+  }, [kingsDefaults]);
+  const kingsDecks = kings.deck_format;
   useEffect(() => {
     if (defaultBots !== undefined) setBots(defaultBots);
     setDeck("");
-    setBotDecks(["", "", ""]);
-  }, [format, defaultBots]);
+    setBotDecks(blankBots);
+  }, [format, defaultBots, kingsDecks]);
   useEffect(() => {
     // A deck asked for by a link from the deck builder: its format, then the deck itself. It
     // runs after the reset above, which a change of format also triggers.
@@ -351,16 +394,24 @@ function Table({ me }: { me: Me }) {
   }, [query, useList]);
 
   const chosenFormat = options?.formats.find((f) => f.id === format);
-  const fixtures = chosenFormat?.decks ?? [];
-  const ownHere = (ownDecks ?? []).filter(
-    (d) => d.format === deckFormat(format),
+  const kingsTable = format === KINGS_TABLE;
+  const decksFormat = deckFormat(format, kings);
+  // King's Table offers both formats' fixture decks: those of its deck format fit.
+  const fixtures = (chosenFormat?.decks ?? []).filter(
+    (d) => !kingsTable || d.startsWith(`${decksFormat}-`),
   );
+  const ownHere = (ownDecks ?? []).filter((d) => d.format === decksFormat);
   /** A seat's choice while the game's rules take it (v0.4.5); else none. */
   const allowed = (value: string): string =>
-    !value.startsWith(OWN) ||
-    ownHere.some((d) => `${OWN}${d.id}` === value && unfit(d, rules) === null)
-      ? value
-      : "";
+    value.startsWith(OWN)
+      ? ownHere.some(
+          (d) => `${OWN}${d.id}` === value && unfit(d, rules) === null,
+        )
+        ? value
+        : ""
+      : !value || fixtures.includes(value as Deck)
+        ? value
+        : "";
   // A player has no fixture decks (v0.3.1): they play a deck of their own, the first one the
   // rules take unless they choose another. SysOp may leave it to the engine's free fixture decks.
   const firstPlayable = ownHere.find((d) => unfit(d, rules) === null);
@@ -389,6 +440,8 @@ function Table({ me }: { me: Me }) {
       ...(useList && deckList.trim()
         ? { deck_list: deckList }
         : seatChoice(chosenDeck)),
+      // King's Table (v0.8.7): your seat and the settings; the bots in the other seats.
+      ...(kingsTable ? { seat, kings_table: kings } : {}),
     };
     // A request that throws (the network dropped) is a failure like a refusal: no game, so the
     // full screen asked for above ends and the button comes back.
@@ -485,11 +538,35 @@ function Table({ me }: { me: Me }) {
             </label>
           </fieldset>
         )}
-        <RulesFields
-          rules={rules}
-          format={deckFormat(format)}
-          onChange={setRules}
-        />
+        {kingsTable && (
+          <>
+            <KingsSettingsFields
+              name="practice-kings"
+              settings={kings}
+              onChange={(change) =>
+                setKings((current) => ({ ...current, ...change }))
+              }
+            />
+            <fieldset>
+              <legend>Your seat</legend>
+              {KINGS_SEATS.map((place) => (
+                <label key={place} className={styles.choice}>
+                  <input
+                    type="radio"
+                    name="practice-seat"
+                    checked={seat === place}
+                    onChange={() => setSeat(place)}
+                  />
+                  <span>
+                    <strong>{seatTitle(place)}</strong>
+                    <small>{startingLife(kings, place)} life to start</small>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          </>
+        )}
+        <RulesFields rules={rules} format={decksFormat} onChange={setRules} />
         {noDeck ? (
           <div className={styles.field} data-no-deck>
             <span>Your deck</span>
@@ -537,9 +614,9 @@ function Table({ me }: { me: Me }) {
         )}
         {Array.from({ length: bots }, (_, i) => (
           <label key={i} className={styles.field}>
-            <span>{botLabel(format, bots, i)}</span>
+            <span>{botLabel(format, bots, i, seat)}</span>
             <select
-              aria-label={botLabel(format, bots, i)}
+              aria-label={botLabel(format, bots, i, seat)}
               value={allowed(botDecks[i] ?? "")}
               onChange={(event) =>
                 setBotDecks((current) =>
@@ -550,8 +627,9 @@ function Table({ me }: { me: Me }) {
               }
             >
               {/* Left to the server: Commander bots play the starter decks, Legacy bots the
-                  engine's fixture decks, and Two-Headed Giant bots fixture decks that share no
-                  card with their teammate's. */}
+                  engine's fixture decks, Two-Headed Giant bots fixture decks that share no
+                  card with their teammate's, and King's Table bots the engine's fixture decks
+                  of its deck format. */}
               <option value="">Chosen by the table</option>
               <DeckOptions fixtures={fixtures} own={ownHere} rules={rules} />
             </select>
@@ -599,7 +677,7 @@ function Table({ me }: { me: Me }) {
                     rows={10}
                     value={deckList}
                     placeholder={
-                      format === "commander"
+                      decksFormat === "commander"
                         ? "Commander: Tetsuko Umezawa, Fugitive\n38 Island\n1 Fact or Fiction"
                         : "4 Lightning Bolt\n20 Mountain"
                     }
@@ -691,6 +769,9 @@ function Table({ me }: { me: Me }) {
                     {formatNames[game.format]}
                     {game.kind === "table" ? " table" : ""}
                   </strong>{" "}
+                  {game.kings_table && game.your_seat !== null && (
+                    <span>{seatTitle(game.your_seat)} · </span>
+                  )}
                   <span>{players}</span>
                   <small>
                     {game.match ? `Game ${game.match.game} of a match · ` : ""}

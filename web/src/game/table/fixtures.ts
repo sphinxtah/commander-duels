@@ -4,6 +4,7 @@ import type {
   CombatGroup,
   CommanderView,
   GameView,
+  KingsTableView,
   LogLine,
   ObjectId,
   PermanentView,
@@ -20,7 +21,8 @@ import type {
 import { mulberry32 } from "./sigil";
 import type { BuildInput, SummarySeat } from "./types";
 
-// Seat views for the table: what one connection receives, at two, three and four players, for a
+// Seat views for the table: what one connection receives, at two, three and four players and at
+// King's Table's six (v0.8.7), for a
 // spectator and for SysOp observing, with token piles, attachments, a long stack, a full hand,
 // revealed and looked-at cards and a 240-permanent stress board, plus seeded random boards. The unit tests, the table lab and
 // the fake-table journey (e2e/table.spec.ts) all draw from here, so this module imports types
@@ -572,7 +574,8 @@ function log(turn: number, active: Seat, lines: string[]): LogLine[] {
 function fixture(f: {
   name: string;
   description: string;
-  format: "legacy" | "commander" | "two_headed_giant";
+  format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+  kings?: KingsTableView;
   seats: SummarySeat[];
   view: GameView | null;
   prompt?: Prompt | null;
@@ -604,7 +607,9 @@ function fixture(f: {
         rules_profile:
           f.format === "two_headed_giant"
             ? "two_headed_giant_legacy"
-            : f.format,
+            : f.format === "kings_table"
+              ? `kings_table_${f.kings?.deck_format ?? "commander"}`
+              : f.format,
         seats: f.seats.map((s) => ({
           seat: s.seat,
           player: s.player,
@@ -614,6 +619,7 @@ function fixture(f: {
         turn_cap: 40,
         idle_timeout_seconds: 900,
         spectator_delay_seconds: 0,
+        ...(f.kings ? { kings_table: f.kings } : {}),
       },
       prompt: promptShown,
       view: f.view,
@@ -1706,10 +1712,12 @@ function randomPermanents(
  * attachments (chained and across controllers), counters, combat, a stack of 0–8, a hand of
  * 0–25, command zones, eliminated players, and the spectator's and SysOp's views. As Two-Headed
  * Giant (four players, v0.5.1) the teams share their life, and seat 0's view shows its
- * teammate's hand of 0–20 cards. */
+ * teammate's hand of 0–20 cards. At six players the board is King's Table's (v0.8.7): random
+ * settings, each player's team, role, starting life, range and attack seen from seat 0, the
+ * Deploy emblem in every command zone, and seat 0's two teammates' hands of 0–20 cards. */
 export function randomFixture(
   seed: number,
-  players: 2 | 3 | 4,
+  players: 2 | 3 | 4 | 6,
   change: {
     maxPermanents?: number;
     perspective?: "player" | "spectator" | "sysop";
@@ -1719,7 +1727,21 @@ export function randomFixture(
   const random = mulberry32(seed * 7919 + players);
   const o = new Objects(`r${seed}-`);
   const giant = change.twoHeadedGiant === true && players === 4;
-  const commanderGame = !giant && (players > 2 || random() < 0.3);
+  const kingsGame = players === 6;
+  const kingsSettings: KingsTableView | null = kingsGame
+    ? {
+        deck_format: random() < 0.5 ? "commander" : "legacy",
+        life: pick(random, [
+          "all_20",
+          "all_40",
+          "generals_20_kings_40",
+        ] as const),
+        king_attacks_anyone: random() < 0.5,
+      }
+    : null;
+  const commanderGame = kingsSettings
+    ? kingsSettings.deck_format === "commander"
+    : !giant && (players > 2 || random() < 0.3);
   const roll = random();
   const perspective =
     change.perspective ??
@@ -1931,6 +1953,30 @@ export function randomFixture(
 
   const youView = views[0];
   const spectating = perspective === "spectator";
+  if (kingsSettings) {
+    for (const p of views) {
+      const made = kingsPlayer(
+        p.seat,
+        p.name,
+        spectating ? null : 0,
+        kingsSettings,
+      );
+      p.team = made.team;
+      p.role = made.role;
+      p.starting_life = made.starting_life;
+      p.in_range = made.in_range;
+      p.attackable = made.attackable;
+      p.command_zone = [o.card(DEPLOY_EMBLEM), ...p.command_zone];
+    }
+    // Seat 0's teammates' hands, in seat 0's view (a spectator's has none).
+    if (!spectating)
+      for (const mate of [views[1]!, views[2]!]) {
+        mate.hand = Array.from({ length: between(random, 0, 20) }, () =>
+          o.card(pick(random, [...LANDS, ...CREATURES, ...SPELLS])),
+        );
+        mate.hand_count = mate.hand.length;
+      }
+  }
   if (giant) {
     const lives = [between(random, 1, 30), between(random, 1, 30)];
     for (const p of views) {
@@ -1947,8 +1993,15 @@ export function randomFixture(
   }
   return fixture({
     name: `random-${players}-${seed}${giant ? "-giant" : ""}`,
-    description: `Seeded random board ${seed} for ${players} players${giant ? " in Two-Headed Giant" : ""} (${perspective}).`,
-    format: giant ? "two_headed_giant" : commanderGame ? "commander" : "legacy",
+    description: `Seeded random board ${seed} for ${players} players${giant ? " in Two-Headed Giant" : kingsGame ? " at King's Table" : ""} (${perspective}).`,
+    format: kingsGame
+      ? "kings_table"
+      : giant
+        ? "two_headed_giant"
+        : commanderGame
+          ? "commander"
+          : "legacy",
+    ...(kingsSettings ? { kings: kingsSettings } : {}),
     seats: seats.map((seat) =>
       seat === 0
         ? alice(perspective === "spectator" ? null : "custom")
@@ -2049,6 +2102,229 @@ function stress(): TableFixture {
   };
 }
 
+/* ---------- King's Table (v0.8.7) ---------- */
+
+/** The rules line the engine gives each creature at King's Table (804). */
+export const DEPLOY_RULE =
+  "{T}: Target teammate in your range gains control of this creature. Activate only as a sorcery. (Deploy)";
+
+/** The command zone's Deploy emblem, each player's. */
+const DEPLOY_EMBLEM = printed(
+  "Deploy",
+  null,
+  "Emblem",
+  null,
+  'Creatures you control have "{T}: Target teammate in your range gains control of this creature. Activate only as a sorcery." (804, deploying creatures)',
+);
+
+/** A King's Table player as a seat's view gives them: team, role and starting life, and, seen
+ * from `viewer`, whether they are in range (a General's one seat each way, a King's two) and
+ * whether the viewer may attack them (an opponent beside the viewer and in range; any opponent
+ * for a King under the house rule). */
+export function kingsPlayer(
+  seat: Seat,
+  name: string,
+  viewer: Seat | null,
+  settings: KingsTableView,
+  change: Partial<PlayerView> = {},
+): PlayerView {
+  const king = seat === 1 || seat === 4;
+  const team = Math.floor(seat / 3);
+  const start =
+    settings.life === "all_20"
+      ? 20
+      : settings.life === "all_40"
+        ? 40
+        : king
+          ? 40
+          : 20;
+  let inRange: boolean | null = null;
+  let attackable: boolean | null = null;
+  if (viewer !== null) {
+    const distance = Math.min((seat - viewer + 6) % 6, (viewer - seat + 6) % 6);
+    const reach = viewer === 1 || viewer === 4 ? 2 : 1;
+    const opponent = team !== Math.floor(viewer / 3);
+    inRange = distance <= reach;
+    attackable =
+      opponent &&
+      ((distance === 1 && inRange) ||
+        (settings.king_attacks_anyone && (viewer === 1 || viewer === 4)));
+  }
+  return player(seat, name, {
+    team,
+    role: king ? "king" : "general",
+    starting_life: start,
+    life: start,
+    in_range: inRange,
+    attackable,
+    ...change,
+  });
+}
+
+const KINGS_SETTINGS: KingsTableView = {
+  deck_format: "commander",
+  life: "generals_20_kings_40",
+  king_attacks_anyone: false,
+};
+
+/** King's Table (v0.8.7): Alice is team A's Right General (seat 2), with Commander decks,
+ * Generals 20 and Kings 40, the house rule off. Around the table from her left: Bot 4 (team B's
+ * Right General, beside her and in her range, the one she may attack), Bot 5 (team B's King) and
+ * Bot 6 (team B's Left General), out of her range, then her teammates Bot 1 (team A's Left
+ * General) and Bot 2 (team A's King, in her range), whose hands she sees. Each player has their
+ * commander and the Deploy emblem; her Grizzly Bears may be deployed. */
+function kings(): TableFixture {
+  const o = new Objects("k");
+  const settings = KINGS_SETTINGS;
+  const deployable = (face: Printed): Printed => ({
+    ...face,
+    rules: [...face.rules, DEPLOY_RULE],
+  });
+  // Each command zone: the Deploy emblem and the player's commander.
+  const zones = (face: Printed) => {
+    const commanderCard = o.card(face);
+    return {
+      command_zone: [o.card(DEPLOY_EMBLEM), commanderCard],
+      commanders: [commander(commanderCard, "command")],
+    };
+  };
+  const bears = o.permanent(2, deployable(CARDS.grizzlyBears));
+  const hand = [
+    o.card(CARDS.forest),
+    o.card(deployable(CARDS.llanowarElves)),
+    o.card(CARDS.giantGrowth),
+  ];
+  const you = kingsPlayer(2, "Alice", 2, settings, {
+    life: 17,
+    hand_count: hand.length,
+    library_count: 88,
+    ...zones(CARDS.omnath),
+  });
+  const bot1 = kingsPlayer(0, "Bot 1", 2, settings, {
+    life: 20,
+    library_count: 90,
+    hand: [o.card(CARDS.island), o.card(CARDS.counterspell)],
+    hand_count: 2,
+    ...zones(CARDS.talrand),
+  });
+  const bot2 = kingsPlayer(1, "Bot 2", 2, settings, {
+    life: 36,
+    library_count: 89,
+    hand: [
+      o.card(CARDS.plains),
+      o.card(deployable(CARDS.savannahLions)),
+      o.card(CARDS.swords),
+      o.card(CARDS.anthem),
+    ],
+    hand_count: 4,
+    ...zones(CARDS.isamaru),
+  });
+  const bot4 = kingsPlayer(3, "Bot 4", 2, settings, {
+    life: 14,
+    library_count: 87,
+    hand_count: 5,
+    ...zones(CARDS.krenko),
+  });
+  bot4.commanders[0]!.damage_dealt = [{ seat: 2, damage: 6 }];
+  const bot5 = kingsPlayer(4, "Bot 5", 2, settings, {
+    life: 40,
+    library_count: 90,
+    hand_count: 6,
+    ...zones(CARDS.tymna),
+  });
+  const bot6 = kingsPlayer(5, "Bot 6", 2, settings, {
+    life: 9,
+    library_count: 85,
+    hand_count: 3,
+    ...zones(CARDS.thrasios),
+  });
+  const [forest, elves] = hand;
+  return fixture({
+    name: "kings",
+    description:
+      "King's Table: Alice as team A's Right General among five bots, her teammates' hands face up, one opponent in range to attack.",
+    format: "kings_table",
+    kings: settings,
+    seat: 2,
+    seats: [
+      bot(0),
+      bot(1),
+      { ...alice("commander-mono-green-stompers"), seat: 2 },
+      bot(3),
+      bot(4),
+      bot(5),
+    ],
+    view: view({
+      turn: 9,
+      active_seat: 2,
+      priority_seat: 2,
+      you,
+      opponents: [bot1, bot2, bot4, bot5, bot6],
+      hand,
+      battlefield: [
+        ...o.many(4, 2, CARDS.forest),
+        bears,
+        o.permanent(2, deployable(CARDS.kalonianTusker), { tapped: true }),
+        ...o.many(4, 0, CARDS.island),
+        o.permanent(0, deployable(CARDS.airElemental)),
+        ...o.many(5, 1, CARDS.plains),
+        o.permanent(1, deployable(CARDS.serraAngel)),
+        o.permanent(1, CARDS.anthem),
+        ...o.many(4, 3, CARDS.mountain),
+        o.permanent(3, deployable(CARDS.goblinGuide)),
+        ...o.many(3, 3, CARDS.goblin),
+        ...o.many(5, 4, CARDS.plains),
+        o.permanent(4, deployable(CARDS.baneslayer)),
+        ...o.many(3, 5, CARDS.island),
+        o.permanent(5, deployable(CARDS.birds)),
+      ],
+    }),
+    prompt: prompt("p-kings", "priority", "Play spells and abilities.", [
+      () => option("pass"),
+      () => option("play_land", { object_id: forest!.id }),
+      () => option("cast", { object_id: elves!.id }),
+      () => option("activate", { object_id: bears.id }),
+    ]),
+    log: log(9, 2, ["Turn 9: Alice.", "Alice draws a card."]),
+  });
+}
+
+/** The same table seen by a spectator: no range and no attacks, every team by its name. */
+function kingsSpectator(): TableFixture {
+  const base = kings();
+  const view = base.snapshot.view!;
+  const everyone = [view.you!, ...view.opponents].map((p) => ({
+    ...p,
+    hand: null,
+    in_range: null,
+    attackable: null,
+  }));
+  return {
+    ...base,
+    name: "kingsSpectator",
+    description:
+      "A spectator at King's Table: the lowest seat below, both teams by their letters.",
+    seat: null,
+    role: "observer",
+    selfHandle: "watcher",
+    snapshot: {
+      ...base.snapshot,
+      game_id: "fx-kings-spectator",
+      status: "spectating",
+      seat: null,
+      prompt: null,
+      view: {
+        ...view,
+        seat: null,
+        you: null,
+        opponents: everyone,
+        hand: [],
+        priority: null,
+      },
+    },
+  };
+}
+
 export type FixtureName =
   | "duel"
   | "three"
@@ -2066,7 +2342,9 @@ export type FixtureName =
   | "giant"
   | "giantSysop"
   | "controlling"
-  | "controlled";
+  | "controlled"
+  | "kings"
+  | "kingsSpectator";
 
 const makers: Record<FixtureName, () => TableFixture> = {
   duel,
@@ -2078,6 +2356,8 @@ const makers: Record<FixtureName, () => TableFixture> = {
   giantSysop,
   controlling,
   controlled,
+  kings,
+  kingsSpectator,
   tokens,
   attachments,
   stack,

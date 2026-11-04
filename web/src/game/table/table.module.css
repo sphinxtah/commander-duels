@@ -231,6 +231,19 @@
 .pill[data-tone="foe"] {
   color: #f0957a;
 }
+/* King's Table (v0.8.7): in your range (what your spells and abilities reach) in pale blue, and
+   whom you can attack now in a red-gold ring, so the two read apart at a glance. */
+.pill[data-tone="range"] {
+  color: #9fd0f0;
+}
+.pill[data-tone="attack"] {
+  color: #ffd58a;
+  box-shadow: inset 0 0 0 1px #e0485a;
+}
+.pills[data-compact] {
+  font-size: 0.875rem;
+  gap: 3px 5px;
+}
 /* Turn control (v0.5.1): a player whose turn another controls, in violet. */
 .pill[data-tone="control"] {
   color: #c8a8ff;

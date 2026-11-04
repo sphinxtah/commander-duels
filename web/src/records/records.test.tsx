@@ -85,6 +85,7 @@ describe("the words for a record (v0.5.0)", () => {
     ]);
     // A Two-Headed Giant teammate (v0.5.1) played beside the player, not against them.
     expect(formatName("two_headed_giant")).toBe("Two-Headed Giant");
+    expect(formatName("kings_table")).toBe("King's Table");
     expect(
       opponentsWords([
         {

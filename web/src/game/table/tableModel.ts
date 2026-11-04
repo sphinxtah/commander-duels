@@ -1,8 +1,11 @@
 import { cardLabel } from "../Card";
+import { kingsTeamName, roleWords, seatTitle } from "../../tables/kingsTable";
 import {
+  kingsTableView,
   objectName,
   optionText,
   playerName,
+  readableRule,
   teammateOf,
   type Located,
   type Zone,
@@ -66,7 +69,7 @@ function stackCard(item: StackItem): CardView {
     type_line: item.hidden ? null : item.kind === "ability" ? "Ability" : null,
     power: null,
     toughness: null,
-    rules: !item.hidden && item.text ? [item.text] : [],
+    rules: !item.hidden && item.text ? [readableRule(item.text)] : [],
   };
 }
 
@@ -82,12 +85,20 @@ export const buildTableModel: BuildTableModel = (input) => {
   const prompt = context.prompt;
   const observing = context.observing;
   const cards = new Map<string, TableCard>();
+  // King's Table (v0.8.7): its settings, whose deck format says whether commanders play.
+  const settings = snapshot.settings;
+  const kingsTable =
+    settings.format === "kings_table" ? (settings.kings_table ?? null) : null;
+  const kingsGame = settings.format === "kings_table" || kingsTableView(view);
   const base = {
     gameId: input.gameId,
     revision: snapshot.revision,
     promptId: prompt?.id ?? null,
     promptKind: prompt?.kind ?? null,
-    commander: snapshot.settings.format === "commander",
+    commander:
+      settings.format === "commander" ||
+      kingsTable?.deck_format === "commander",
+    kingsTable,
     viewSeat,
     observing,
     canAnswer: context.canAnswer,
@@ -130,7 +141,9 @@ export const buildTableModel: BuildTableModel = (input) => {
   // The anchored player sits below: you, the owner SysOp observes, or for a spectator the
   // lowest seat. The others go on top, left to right in turn order after the anchored seat. In
   // Two-Headed Giant (v0.5.1) the anchored player's teammate sits first, at the left, and the
-  // other team beside it: each team together, whichever seat the viewer holds.
+  // other team beside it: each team together, whichever seat the viewer holds. At King's Table
+  // (v0.8.7) the five others go around the circle in seat order, from the seat after yours to
+  // the seat before it, teammates where they sit: your neighbours at either end.
   const everyone = [...(view.you ? [view.you] : []), ...view.opponents];
   const anchoredView: PlayerView | null =
     view.you ??
@@ -146,11 +159,17 @@ export const buildTableModel: BuildTableModel = (input) => {
     .sort((a, b) => {
       const after = (seat: Seat) =>
         anchoredSeat === null || seat > anchoredSeat ? seat : seat + 1000;
-      const team = (p: PlayerView) => (sameTeam(p) ? 0 : 1);
+      const team = (p: PlayerView) => (sameTeam(p) && !kingsGame ? 0 : 1);
       return team(a) - team(b) || after(a.seat) - after(b.seat);
     });
   const arrangement: Arrangement =
-    everyone.length <= 2 ? "duel" : everyone.length === 3 ? "three" : "four";
+    everyone.length <= 2
+      ? "duel"
+      : everyone.length === 3
+        ? "three"
+        : everyone.length === 4
+          ? "four"
+          : "six";
   // "You" only for the viewer's own seat; SysOp observing and spectators see names (L7).
   const youSeat = observing ? null : (view.you?.seat ?? null);
 
@@ -416,18 +435,31 @@ export const buildTableModel: BuildTableModel = (input) => {
     const team = player.team ?? null;
     const teammate = seat === base.teammateSeat;
     const ours = anchored || sameTeam(player);
+    // King's Table (v0.8.7): the role, the starting life, and in the seat's own view the range
+    // (what spells and abilities reach) and the attack (where creatures may go), kept apart.
+    const role = kingsGame ? (player.role ?? null) : null;
+    const kings: TablePlayer["kings"] = role
+      ? {
+          role,
+          startingLife: player.starting_life ?? null,
+          inRange: player.in_range ?? null,
+          attackable: player.attackable ?? null,
+        }
+      : null;
+    const teamWord = (n: number) =>
+      kingsGame ? kingsTeamName(n) : `Team ${n + 1}`;
     const teamPill: TablePlayer["teamPill"] =
       team === null
         ? null
         : youSeat === null
-          ? { text: `Team ${team + 1}`, tone: ours ? "team" : "foe" }
+          ? { text: teamWord(team), tone: ours ? "team" : "foe" }
           : anchored
             ? null
             : ours
               ? { text: "Teammate", tone: "team" }
               : { text: "Other team", tone: "foe" };
     const teamPoison =
-      team === null
+      team === null || kingsGame
         ? null
         : everyone
             .filter((p) => p.team === team)
@@ -441,7 +473,7 @@ export const buildTableModel: BuildTableModel = (input) => {
           ? "you"
           : playerName(view, controlledBy, observing);
     // Other seats' decks are private: only SysOp sees their names (design §23.4).
-    const title = self
+    const baseTitle = self
       ? deckTitle(summary?.deck)
       : teammate
         ? "Your teammate"
@@ -456,7 +488,32 @@ export const buildTableModel: BuildTableModel = (input) => {
             : kind === "human"
               ? "Player"
               : null;
-    const life = `${player.life} ${team === null ? "life" : "team life"}`;
+    // At King's Table the title says the role first and the life the player started at.
+    const title = kings
+      ? [
+          roleWords(kings.role),
+          kings.startingLife !== null
+            ? `started at ${kings.startingLife}`
+            : null,
+          baseTitle,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : baseTitle;
+    const life = kings
+      ? `${player.life} life${kings.startingLife !== null ? `, started at ${kings.startingLife}` : ""}`
+      : `${player.life} ${team === null ? "life" : "team life"}`;
+    const reach =
+      kings && !anchored && youSeat !== null
+        ? [
+            kings.inRange === null
+              ? null
+              : kings.inRange
+                ? "in your range"
+                : "out of your range",
+            kings.attackable ? "you can attack them" : null,
+          ].filter(Boolean)
+        : [];
     const handle = summary?.handle ?? (self ? selfHandle : null);
     const seed =
       kind === "bot"
@@ -492,6 +549,8 @@ export const buildTableModel: BuildTableModel = (input) => {
       kind,
       team,
       teammate,
+      ally: !anchored && sameTeam(player),
+      kings,
       teamPill,
       teamPoison,
       controlledBy,
@@ -517,15 +576,17 @@ export const buildTableModel: BuildTableModel = (input) => {
         : null,
       articleLabel: anchored
         ? null
-        : `${player.name}, seat ${seat + 1}${
+        : `${player.name}, seat ${seat + 1}${kings ? `, ${seatTitle(seat)}` : ""}${
             team === null
               ? ""
               : youSeat === null
-                ? `, team ${team + 1}`
-                : teammate
+                ? kings
+                  ? ""
+                  : `, team ${team + 1}`
+                : teammate || (kings && ours)
                   ? ", your teammate"
                   : ", the other team"
-          }${
+          }${reach.length > 0 ? `, ${reach.join(", ")}` : ""}${
             controllerName === null
               ? ""
               : controlledBy === youSeat

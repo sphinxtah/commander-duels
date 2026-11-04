@@ -213,6 +213,22 @@
   box-shadow: 0 12px 30px #000c;
   pointer-events: auto;
 }
+/* King's Table's settings (v0.8.7), above the menu's items. */
+.menuRules {
+  padding: 6px 14px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e6c68c33;
+  color: #cfc6b4;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.menuRules span {
+  display: block;
+  color: #e6c68c;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
 .gameMenu a,
 .gameMenu button {
   display: flex;

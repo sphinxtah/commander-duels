@@ -463,6 +463,26 @@ describe("alliances on the plates (v0.4.4)", () => {
     expect(screen.queryByText("Ally")).toBeNull();
   });
 
+  it("has no Alliance button at King's Table, whose teams are fixed alliances (v0.8.7)", () => {
+    // The API sends King's Table's teams as fixed alliances, as Two-Headed Giant's: each two of a
+    // team allied from the start, none to offer, and so no Alliance button in the narrow columns.
+    plate("kings", 3, {
+      alliances: table(
+        {
+          alliances: [
+            [0, 1],
+            [0, 2],
+            [1, 2],
+          ],
+          offers: [],
+          fixed: true,
+        },
+        { mine: 2, open: new Set([0, 1, 3, 4, 5]) },
+      ),
+    });
+    expect(screen.queryByRole("button", { name: /^Alliance/ })).toBeNull();
+  });
+
   it("sits clear of the plate's other controls in every arrangement", () => {
     for (const name of ["duel", "three", "four"] as const) {
       const f = tableFixture(name);
@@ -553,5 +573,79 @@ describe("a Two-Headed Giant plate (v0.5.0, v0.5.1)", () => {
   it("is a plate as at any table outside Two-Headed Giant", () => {
     plate("four", 1);
     expect(screen.queryByText(/^Team \d$|^Teammate$|^Other team$/)).toBeNull();
+  });
+});
+
+describe("a King's Table plate (v0.8.7)", () => {
+  it("crowns a King, and says the life a player started at", () => {
+    const { container } = plate("kings", 1);
+    expect(
+      screen.getByText("♔ King · started at 40 · Bot"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "36 life, started at 40" }),
+    ).toBeVisible();
+    expect(container.querySelector("[data-seat='1']")).toHaveAttribute(
+      "data-role",
+      "king",
+    );
+  });
+
+  it("marks a teammate apart from an opponent", () => {
+    const { unmount } = plate("kings", 0);
+    expect(screen.getByText("Teammate", { exact: true })).toHaveAttribute(
+      "data-tone",
+      "team",
+    );
+    expect(screen.getByText("General · started at 20 · Bot")).toBeVisible();
+    unmount();
+    plate("kings", 5);
+    expect(screen.getByText("Other team")).toHaveAttribute("data-tone", "foe");
+  });
+
+  it("shows range and attack apart: in range, and whom you can attack", () => {
+    // Bot 4, beside you and in range: both.
+    let view = plate("kings", 3);
+    expect(screen.getByText("In range")).toHaveAttribute("data-tone", "range");
+    expect(screen.getByText("Can attack")).toHaveAttribute(
+      "data-tone",
+      "attack",
+    );
+    expect(view.container.querySelector("[data-seat='3']")).toMatchObject({
+      dataset: { inRange: "true", attackable: "true" },
+    });
+    view.unmount();
+    // Your teammate the King: in range, never attacked.
+    view = plate("kings", 1);
+    expect(screen.getByText("In range")).toBeInTheDocument();
+    expect(screen.queryByText("Can attack")).toBeNull();
+    view.unmount();
+    // Team B's King, out of range: neither.
+    view = plate("kings", 4);
+    expect(screen.queryByText("In range")).toBeNull();
+    expect(screen.queryByText("Can attack")).toBeNull();
+    view.unmount();
+    // Your own plate says neither of you.
+    plate("kings", 2);
+    expect(screen.queryByText("In range")).toBeNull();
+  });
+
+  it("keeps the pills small in five opponents' narrow columns", () => {
+    const { container } = plate("kings", 3);
+    expect(container.querySelector(`.${styles.pills}`)).toHaveAttribute(
+      "data-compact",
+    );
+  });
+
+  it("shows commander damage taken, as in Commander", () => {
+    plate("kings", 2);
+    expect(screen.getByText("6 from Bot 4’s Krenko, Mob Boss")).toBeVisible();
+  });
+
+  it("names each team by its letter to a spectator, and no range", () => {
+    plate("kingsSpectator", 4);
+    expect(screen.getByText("Team B")).toBeInTheDocument();
+    expect(screen.queryByText("In range")).toBeNull();
+    expect(screen.queryByText("Can attack")).toBeNull();
   });
 });

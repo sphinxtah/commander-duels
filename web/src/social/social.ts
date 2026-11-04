@@ -33,6 +33,7 @@ const formatNames: Record<string, string> = {
   commander: "Commander",
   legacy: "Legacy",
   two_headed_giant: "Two-Headed Giant",
+  kings_table: "King's Table",
 };
 
 /** "Online", "Playing Commander at a table", "Idle"…; empty when the player does not share it. */

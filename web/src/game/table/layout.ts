@@ -3,10 +3,8 @@ import {
   ATTACHMENT_CAP,
   BAND,
   C_FACTOR,
-  CHIP,
   DROPS,
   DUEL,
-  FOUR,
   HAND,
   MENU,
   MIN_HAND_SLICE,
@@ -18,10 +16,11 @@ import {
   ROW_MORE,
   STACK,
   TEAM_HAND,
-  THREE,
   YOU,
   centre,
+  chipOf,
   clamp,
+  columnsOf,
   contains,
   diamond,
   diamondBox,
@@ -1178,6 +1177,10 @@ export const layoutTable: LayoutTable = (model, options) => {
   };
 
   /* --- opponents --- */
+  // Nobody attacks their teammate (v0.5.1), and at King's Table (v0.8.7) only the players the
+  // viewer may attack now take an attack: a drop elsewhere names no defender.
+  const noAttack = (player: TablePlayer) =>
+    player.teammate || player.ally || player.kings?.attackable === false;
   const opponentGeometry = new Map<Seat, { g: SeatGeometry; c: number }>();
   const chips: TablePlayer[] = [];
   // A seat that shows a teammate's hand (v0.5.1) lifts its rows for the fan under them.
@@ -1197,7 +1200,7 @@ export const layoutTable: LayoutTable = (model, options) => {
       else chips.push(player);
     }
   } else {
-    const spec = model.arrangement === "three" ? THREE : FOUR;
+    const spec = columnsOf(model.arrangement);
     model.opponents.forEach((player, i) => {
       const x0 = spec.columns[i];
       if (x0 === undefined) chips.push(player);
@@ -1274,7 +1277,7 @@ export const layoutTable: LayoutTable = (model, options) => {
     });
     teamHand(player, g);
     // Nobody attacks their teammate: a drop there means nothing (v0.5.1).
-    if (player.teammate) continue;
+    if (noAttack(player)) continue;
     drops.push(
       model.arrangement === "duel" || player.seat === expandedSeat
         ? {
@@ -1289,6 +1292,7 @@ export const layoutTable: LayoutTable = (model, options) => {
   }
 
   // Chips: the opponents left over while another one's board is expanded (UI02).
+  const CHIP = chipOf(model.arrangement);
   const chipCentres =
     model.arrangement === "duel" ? [] : CHIP.centres[model.arrangement];
   chips.forEach((player, i) => {
@@ -1357,7 +1361,7 @@ export const layoutTable: LayoutTable = (model, options) => {
       });
     // Nobody attacks their teammate, chipped or not (v0.5.1): a drop on their chip falls to the
     // expanded board's half around it, and never names the teammate as the defender.
-    if (!player.teammate)
+    if (!noAttack(player))
       drops.push({ kind: "attack", rect: target, seat: player.seat });
   });
 
@@ -1652,10 +1656,7 @@ export const layoutTable: LayoutTable = (model, options) => {
     ]),
   ];
   if (expandedSeat === null && model.arrangement !== "duel")
-    for (const x of (model.arrangement === "three"
-      ? THREE
-      : FOUR
-    ).columns.slice(1))
+    for (const x of columnsOf(model.arrangement).columns.slice(1))
       grooves.push([
         { x, y: 0 },
         { x, y: 476 },

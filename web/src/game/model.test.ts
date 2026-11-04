@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  alliesOf,
   objectIndex,
   optionText,
   playerName,
+  readableRule,
   resultText,
   teamNote,
   teammateOf,
   turnHolder,
 } from "./model";
+import { kingsPlayer, tableFixture } from "./table/fixtures";
 import type { GameView, PlayerView, Prompt, PromptOption } from "./types";
 
 function player(seat: number, name: string): PlayerView {
@@ -300,5 +303,145 @@ describe("whose turn it is", () => {
       opponents: [team(0), team(1), team(2, 0)],
     };
     expect(turnHolder(mate, false, name)).toBe("ada controls your team’s turn");
+  });
+});
+
+describe("King's Table (v0.8.7)", () => {
+  /** The kings fixture's view: Alice in seat 2, team A's Right General, among five bots. */
+  const kingsView = (): GameView => tableFixture("kings").snapshot.view!;
+  const finished = (fields: {
+    winner_seat?: number | null;
+    winner_seats?: number[];
+    draw?: boolean;
+  }) => ({
+    kind: "completed",
+    winner_seat: null,
+    winner_seats: [],
+    draw: false,
+    turns: 14,
+    ...fields,
+  });
+
+  it("has allies, never the shared-turn teammate of Two-Headed Giant", () => {
+    const view = kingsView();
+    expect(teammateOf(view)).toBeNull();
+    expect(alliesOf(view)).toEqual([0, 1]);
+  });
+
+  it("gives each turn to its player: teammates take their own", () => {
+    const view = kingsView();
+    const name = (seat: number) => playerName(view, seat);
+    expect(turnHolder({ ...view, active_seat: 2 }, false, name)).toBe(
+      "Your turn",
+    );
+    expect(turnHolder({ ...view, active_seat: 1 }, false, name)).toBe(
+      "Bot 2’s turn",
+    );
+    expect(turnHolder({ ...view, active_seat: 4 }, false, name)).toBe(
+      "Bot 5’s turn",
+    );
+  });
+
+  it("names the winning team, every one of its players, a General out earlier too", () => {
+    const view = kingsView();
+    // Bot 1, team A's Left General, left the game before team B's King fell: the engine names
+    // only the winners still in, and the team's win is still all three's.
+    expect(
+      resultText(view, 2, finished({ winner_seat: 1, winner_seats: [1, 2] })),
+    ).toEqual({
+      title: "Victory",
+      detail: "Your team, Team A, won in 14 turns: Bot 1, Bot 2 and you.",
+    });
+    expect(
+      resultText(
+        view,
+        2,
+        finished({ winner_seat: 3, winner_seats: [3, 4, 5] }),
+      ),
+    ).toEqual({
+      title: "Defeat",
+      detail: "Team B won in 14 turns: Bot 4, Bot 5 and Bot 6.",
+    });
+    // SysOp observing, or a spectator: the team by its letter.
+    expect(
+      resultText(view, null, finished({ winner_seat: 4, winner_seats: [4] })),
+    ).toEqual({
+      title: "Game over",
+      detail: "Team B won in 14 turns: Bot 4, Bot 5 and Bot 6.",
+    });
+    // The API's recorded result names the team itself.
+    expect(
+      resultText(view, 2, { ...finished({ winner_seat: 0 }), winner_team: 0 })
+        .title,
+    ).toBe("Victory");
+  });
+
+  it("calls both Kings at once a draw, and a game with no winner over", () => {
+    const view = kingsView();
+    expect(resultText(view, 2, finished({ draw: true }))).toEqual({
+      title: "A draw",
+      detail: "Neither team won: the game ended in a draw after 14 turns.",
+    });
+    expect(
+      resultText(view, 2, { ...finished({}), kind: "turn_limit" }),
+    ).toEqual({
+      title: "Game over",
+      detail: "The turn limit was reached after 14 turns.",
+    });
+  });
+
+  it("reads the Deploy ability with its name first", () => {
+    expect(
+      readableRule(
+        "{T}: Target teammate in your range gains control of this creature. Activate only as a sorcery. (Deploy)",
+      ),
+    ).toBe(
+      "Deploy — {T}: Target teammate in your range gains control of this creature. Activate only as a sorcery.",
+    );
+    expect(readableRule("Flying")).toBe("Flying");
+    const view = kingsView();
+    const choice: PromptOption = {
+      id: "1",
+      action: "use_ability",
+      label:
+        "{T}: Target teammate in your range gains control of this creature. Activate only as a sorcery. (Deploy)",
+      object_id: null,
+      seat: null,
+      selected: false,
+    };
+    expect(optionText(choice, objectIndex(view), view)).toBe(
+      "Deploy: tap this creature to give it to a teammate in your range (as a sorcery)",
+    );
+    // The teammate it goes to is named as any player is.
+    expect(
+      optionText(
+        { ...choice, action: "choose", label: null, seat: 1 },
+        objectIndex(view),
+        view,
+      ),
+    ).toBe("Choose Bot 2");
+  });
+
+  it("builds plates from a seat's view of the circle", () => {
+    const settings = {
+      deck_format: "legacy" as const,
+      life: "all_20" as const,
+      king_attacks_anyone: true,
+    };
+    // A King under the house rule may attack any opponent, in range or not.
+    expect(kingsPlayer(3, "Bot 4", 1, settings)).toMatchObject({
+      in_range: true,
+      attackable: true,
+    });
+    expect(kingsPlayer(4, "Bot 5", 1, settings)).toMatchObject({
+      in_range: false,
+      attackable: true,
+      starting_life: 20,
+    });
+    // A General keeps to the usual restriction.
+    expect(kingsPlayer(4, "Bot 5", 2, settings)).toMatchObject({
+      in_range: false,
+      attackable: false,
+    });
   });
 });

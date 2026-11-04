@@ -240,3 +240,137 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* King's Table (v0.8.7): its settings as tags and in sentences, and its six seats as the circle's
+   two rows facing each other, team B across the table from team A, each King in the middle of
+   their side with a General either side. */
+.badge[data-tone="kings"] {
+  border-color: #74c7b566;
+  color: #b8e0d6;
+}
+.kingsRules {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid #d4b47a88;
+  background: #d4b47a0a;
+  color: #e6dcc4;
+  line-height: 1.55;
+  max-width: 72ch;
+}
+.circle {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+}
+.circleTable {
+  margin: 0;
+  padding: 6px;
+  border-radius: 40px;
+  border: 1px dashed #d4b47a44;
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #93a198;
+}
+.kingsSide {
+  border: 1px solid #ffffff14;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.kingsSide[data-team="0"] {
+  border-color: #74c7b544;
+}
+.kingsSide[data-team="1"] {
+  border-color: #f0957a44;
+}
+.kingsSide[data-yours="true"] {
+  box-shadow: inset 0 0 0 1px #d4b47a88;
+}
+.kingsSide h2 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kingsRow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.kingsSeat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #ffffff14;
+  border-radius: 8px;
+  background: #ffffff04;
+  min-width: 0;
+}
+.kingsSeat[data-role="king"] {
+  border-color: #d4b47a66;
+  background: #d4b47a0a;
+}
+.kingsSeat[data-you="true"] {
+  border-color: #d4b47a;
+}
+.kingsSeat[data-empty="true"] {
+  border-style: dashed;
+}
+.kingsSeat .seatHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #e3c68f;
+}
+.kingsSeat .seatWho {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+.kingsSeat .seatWho > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kingsSeat strong {
+  display: block;
+  font-size: 0.95rem;
+}
+.kingsSeat small {
+  display: block;
+  color: #93a198;
+  font-size: 0.78rem;
+}
+.kingsSeat button,
+.kingsSeat select {
+  align-self: start;
+  max-width: 100%;
+}
+.hostPanel {
+  margin: 18px 0;
+  padding: 12px 16px;
+  border: 1px solid #d4b47a44;
+  border-radius: 8px;
+}
+.hostPanel h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+.hostPanel fieldset {
+  margin: 10px 0;
+}
+@media (max-width: 720px) {
+  .kingsRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -535,6 +535,15 @@ function outcomeOf(
   if (draw) return "draw";
   const viewSeat = model.observing ? null : model.viewSeat;
   if (winner === null || viewSeat === null) return "over";
+  // King's Table (v0.8.7): the engine names the winning team's players still in, so a General out
+  // earlier wins or loses with their team.
+  if (model.kingsTable || model.anchored?.kings) {
+    const teamOf = (seat: Seat) =>
+      [model.anchored, ...model.opponents].find((p) => p?.seat === seat)
+        ?.team ?? null;
+    const team = teamOf(winner);
+    if (team !== null) return team === teamOf(viewSeat) ? "victory" : "defeat";
+  }
   // A team wins together (Two-Headed Giant, v0.5.0): your teammate's win is yours.
   return winner === viewSeat ||
     winner === model.teammateSeat ||

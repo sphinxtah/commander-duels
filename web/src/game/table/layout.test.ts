@@ -7,7 +7,7 @@ import {
   type FixtureName,
   type TableFixture,
 } from "./fixtures";
-import { MIN_ROW_SCALE, diamondBox, rowCard } from "./geometry";
+import { MIN_ROW_SCALE, SIX, diamondBox, rowCard } from "./geometry";
 import {
   dropZoneAt,
   fanHand,
@@ -64,7 +64,7 @@ describe("the layout's invariants (§8.11)", () => {
     },
   );
 
-  it.each(["three", "four", "stress"] as const)(
+  it.each(["three", "four", "stress", "kings"] as const)(
     "hold with each of the %s fixture's opponents expanded",
     (name) => {
       const m = fixtureModel(name);
@@ -80,6 +80,7 @@ describe("the layout's invariants (§8.11)", () => {
     ["duel", 2],
     ["three", 3],
     ["four", 4],
+    ["six", 6],
   ] as const)(
     "hold on 300 seeded random boards in the %s arrangement",
     (arrangement, players) => {
@@ -686,6 +687,140 @@ describe("a Two-Headed Giant teammate's hand (v0.5.1)", () => {
       50, 50, 62,
     ]);
     expect(fanTeamHand(5, { x0: 0, x1: 40 })).toEqual([]);
+  });
+});
+
+describe("King's Table's six seats (v0.8.7)", () => {
+  const seats = (m: TableModel) => m.opponents.map((p) => p.seat);
+
+  it("sets five opponents in five columns, in seat order from your left neighbour to your right", () => {
+    const m = fixtureModel("kings");
+    expect(m.arrangement).toBe("six");
+    // Alice is seat 2: the circle goes on from seat 3, beside her, round to seat 1, beside her.
+    expect(seats(m)).toEqual([3, 4, 5, 0, 1]);
+    const l = layout(m);
+    expect(l.arrangement).toBe("six");
+    expect(validateHits(l, m)).toEqual([]);
+    for (const [i, seat] of seats(m).entries()) {
+      const node = l.players.get(seat)!;
+      expect(node.chip).toBe(false);
+      expect(node.area).toEqual({ x: SIX.columns[i], y: 0, w: 384, h: 476 });
+      // The plate and every tile stay inside the column.
+      for (const tile of l.zones.filter((t) => t.seat === seat)) {
+        expect(tile.card.x).toBeGreaterThanOrEqual(node.area.x);
+        expect(tile.card.x + tile.card.w).toBeLessThanOrEqual(
+          node.area.x + node.area.w,
+        );
+      }
+      expect(node.target.x + node.target.w).toBeLessThanOrEqual(
+        node.area.x + node.area.w,
+      );
+    }
+    // Every command zone holds the Deploy emblem: each opponent has a command tile.
+    expect(l.zones.filter((t) => t.zone === "command")).toHaveLength(6);
+    // A groove between each two columns.
+    expect(
+      l.table.grooves
+        .filter(([a, b]) => a.y === 0 && b.y === 476)
+        .map(([a]) => a.x),
+    ).toEqual([384, 768, 1152, 1536]);
+  });
+
+  it("wraps round the circle for every seat, teammates where they sit", () => {
+    for (const [seat, expected] of [
+      [0, [1, 2, 3, 4, 5]],
+      [1, [2, 3, 4, 5, 0]],
+      [4, [5, 0, 1, 2, 3]],
+      [5, [0, 1, 2, 3, 4]],
+    ] as const) {
+      const f = tableFixture("kings");
+      const view = f.snapshot.view!;
+      const all = [view.you!, ...view.opponents];
+      const you = all.find((p) => p.seat === seat)!;
+      f.snapshot.view = {
+        ...view,
+        seat,
+        you: { ...you, hand: null },
+        opponents: all.filter((p) => p !== you),
+      };
+      f.snapshot.prompt = null;
+      f.seat = seat;
+      const m = model(f);
+      expect(seats(m)).toEqual(expected);
+      expect(m.opponents.filter((p) => p.ally).map((p) => p.seat)).toEqual(
+        expected.filter(
+          (other) => Math.floor(other / 3) === Math.floor(seat / 3),
+        ),
+      );
+    }
+  });
+
+  it("takes an attack only on a player you may attack now", () => {
+    const m = fixtureModel("kings");
+    const l = layout(m);
+    const attacks = l.drops.filter((drop) => drop.kind === "attack");
+    expect(new Set(attacks.map((drop) => drop.seat))).toEqual(new Set([3]));
+    const middle = (seat: number) => {
+      const r = l.players.get(seat)!.area;
+      return dropZoneAt(l, { x: r.x + r.w / 2, y: 300 });
+    };
+    expect(middle(3)).toMatchObject({ kind: "attack", seat: 3 });
+    // In range but a teammate, or an opponent out of reach: no attack.
+    expect(middle(1)).toBeNull();
+    expect(middle(4)).toBeNull();
+    expect(middle(5)).toBeNull();
+  });
+
+  it("fans each teammate's hand under their board, clear of the stack's lane", () => {
+    const m = fixtureModel("kings");
+    const l = layout(m);
+    for (const seat of [0, 1]) {
+      const player = m.opponents.find((p) => p.seat === seat)!;
+      const area = l.players.get(seat)!.area;
+      const cards = player.hand!.map((key) => card(l, key));
+      expect(cards.length).toBeGreaterThan(0);
+      for (const node of cards) {
+        expect(node.role).toBe("teammate-hand");
+        expect(node.hit!.x).toBeGreaterThanOrEqual(Math.max(area.x, 1330));
+        expect(node.hit!.x + node.hit!.w).toBeLessThanOrEqual(area.x + area.w);
+        expect(node.hit!.y + node.hit!.h).toBeLessThanOrEqual(488);
+      }
+    }
+    // The other team's hands are counts only.
+    for (const seat of [3, 4, 5])
+      expect(m.opponents.find((p) => p.seat === seat)!.hand).toBeNull();
+  });
+
+  it("expands any opponent's board, the other four as chips between its tiles and its pills", () => {
+    const m = quiet("kings");
+    for (const opponent of m.opponents) {
+      const l = layout(m, opponent.seat);
+      expect(l.expandedSeat).toBe(opponent.seat);
+      expect(validateHits(l, m)).toEqual([]);
+      const chips = [...l.players.values()].filter((p) => p.chip);
+      expect(chips).toHaveLength(4);
+      for (const chip of chips) {
+        expect(chip.target.x).toBeGreaterThan(266);
+        expect(
+          diamondBox(chip.expand).x + diamondBox(chip.expand).w,
+        ).toBeLessThan(1300);
+      }
+    }
+    // Nobody attacks a teammate's chip, or a chipped opponent out of reach.
+    const l = layout(m, 3);
+    expect(
+      l.drops
+        .filter((drop) => drop.kind === "attack")
+        .every((drop) => drop.seat === 3),
+    ).toBe(true);
+  });
+
+  it("holds with a spectator, who sees every seat and no range", () => {
+    const m = fixtureModel("kingsSpectator");
+    expect(m.arrangement).toBe("six");
+    expect(m.anchored?.seat).toBe(0);
+    expect(seats(m)).toEqual([1, 2, 3, 4, 5]);
+    expect(validateHits(layout(m), m)).toEqual([]);
   });
 });
 

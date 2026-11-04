@@ -25,6 +25,7 @@ import { useTableSettings } from "../app/tableSettings";
 import { TableSettingsForm } from "../app/TableSettingsForm";
 import { UpdateNotice } from "../app/UpdateNotice";
 import { useChatContext } from "../chat/chat";
+import { settingsLine } from "../tables/kingsTable";
 import {
   ConcedeMatchDialog,
   MatchChip,
@@ -627,6 +628,9 @@ export function GameScreen({
     ? resultText(view, state.seat, result, seatName)
     : null;
   const format = snapshot?.settings.format ?? summary?.format;
+  // King's Table (v0.8.7): the settings, which the game menu shows for the whole game.
+  const kingsSettings =
+    snapshot?.settings.kings_table ?? summary?.kings_table ?? null;
   // A best-of-three match's game (v0.5.0): the score on the table, and once the game is recorded
   // the way on to sideboarding, which the screen follows by itself.
   const match = summary?.match ?? null;
@@ -715,7 +719,9 @@ export function GameScreen({
                   ? "Commander"
                   : format === "two_headed_giant"
                     ? "Two-Headed Giant"
-                    : "Legacy"}
+                    : format === "kings_table"
+                      ? "King’s Table"
+                      : "Legacy"}
                 <span>
                   {scripted
                     ? " · Guided game"
@@ -796,6 +802,7 @@ export function GameScreen({
                     : undefined
                 }
                 onLeave={leave}
+                rules={kingsSettings ? settingsLine(kingsSettings) : null}
               />
 
               {(state.ended || state.crowded || state.interrupted || !view) && (
@@ -1092,13 +1099,15 @@ export function GameScreen({
                 {/* Two-Headed Giant (v0.5.1): a team wins and loses together (810.8a). */}
                 {format === "two_headed_giant"
                   ? "You and your teammate lose this game at once: a team wins and loses together."
-                  : `You lose this game at once. ${
-                      match
-                        ? "The match goes on to its next game."
-                        : atTable
-                          ? "The other players play on without you."
-                          : "The bots play on without you."
-                    }`}
+                  : format === "kings_table" && view?.you?.role === "king"
+                    ? "You are your team’s King: conceding loses the game for your whole team at once."
+                    : `You lose this game at once. ${
+                        match
+                          ? "The match goes on to its next game."
+                          : atTable
+                            ? "The other players play on without you."
+                            : "The bots play on without you."
+                      }`}
               </p>
               <form method="dialog" className={styles.confirmButtons}>
                 <button

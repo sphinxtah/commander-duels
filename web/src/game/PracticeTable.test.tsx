@@ -605,3 +605,164 @@ describe("Two-Headed Giant at the practice table (v0.5.0)", () => {
     expect(game).toHaveTextContent("Won in 11 turns");
   });
 });
+
+describe("King's Table at the practice table (v0.8.7)", () => {
+  const kingsFormat = {
+    id: "kings_table",
+    name: "King's Table",
+    bots: [5],
+    default_bots: 5,
+    best_of: [1],
+    kings_table: {
+      deck_format: "commander",
+      life: "all_40",
+      king_attacks_anyone: false,
+    },
+  };
+  const legacy = summary({ id: "deck-l", title: "Red deck", format: "legacy" });
+  const commander = summary({
+    id: "deck-c",
+    title: "Skyward Patrol",
+    format: "commander",
+    card_count: 100,
+  });
+  const allFixtures = [
+    "legacy-mono-red-burn",
+    "legacy-mono-blue-skies",
+    "commander-mono-red-raiders",
+    "commander-mono-blue-flyers",
+  ];
+
+  async function open(me: Me, decks: string[]) {
+    await navigate("#play");
+    const api = mockApi();
+    api.on("GET /api/v1/practice-games/options", () =>
+      reply(200, {
+        formats: [
+          ...options.formats,
+          { ...kingsFormat, decks: structuredClone(decks) },
+        ],
+        deck_lists: false,
+        own_decks: true,
+      }),
+    );
+    api.on("GET /api/v1/decks", () => reply(200, [legacy, commander]));
+    api.on("GET /api/v1/games", () => reply(200, []));
+    api.on("GET /api/v1/matches", () => reply(200, []));
+    api.on("POST /api/v1/practice-games", () =>
+      reply(503, { code: "games_busy", message: "Busy." }),
+    );
+    render(<PracticeTable me={me} />);
+    await settle();
+    const choice = screen.getByRole("radio", { name: /King's Table/ });
+    expect(choice.closest("label")).toHaveTextContent(
+      "Five bots: two teams of three, a King and two Generals each, in the seat you choose",
+    );
+    await act(async () => choice.click());
+    return api;
+  }
+
+  it("plays you and five bots in the seat and with the settings you choose", async () => {
+    const player = {
+      ...sysop,
+      kind: "player",
+      handle: "pat",
+      permissions: ["games.play", "decks.edit", "profile.edit"],
+      roles: ["player"],
+    } as unknown as Me;
+    const api = await open(player, []);
+    // Commander decks by default: the player's Commander deck, not the Legacy one.
+    const deck = screen.getByLabelText("Your deck");
+    expect(deck).toHaveValue("own:deck-c");
+    expect(
+      within(deck)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["Skyward Patrol"]);
+    // Each life preset says what it gives, and each seat its team, role and starting life.
+    expect(
+      screen
+        .getByRole("radio", { name: /^Generals 20, Kings 40/ })
+        .closest("label"),
+    ).toHaveTextContent("Each General starts at 20 life, each King at 40");
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Generals 20, Kings 40/ }).click(),
+    );
+    expect(screen.getByRole("radio", { name: /^Team A's King/ })).toBeChecked();
+    expect(
+      screen
+        .getByRole("radio", { name: /^Team B's Left General/ })
+        .closest("label"),
+    ).toHaveTextContent("20 life to start");
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Team B's Right General/ }).click(),
+    );
+    // The five bots, in seat order without yours.
+    expect(screen.queryByLabelText("Bots")).toBeNull();
+    for (const label of [
+      "Deck for Team A's Left General",
+      "Deck for Team A's King",
+      "Deck for Team A's Right General",
+      "Deck for Team B's King",
+      "Deck for Team B's Left General",
+    ])
+      expect(screen.getByLabelText(label)).toHaveValue("");
+    // Legacy decks instead: the player's Legacy deck.
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Legacy decks/ }).click(),
+    );
+    expect(screen.getByLabelText("Your deck")).toHaveValue("own:deck-l");
+    await act(async () =>
+      screen.getByRole("checkbox", { name: /^King can attack anyone/ }).click(),
+    );
+    await act(async () =>
+      screen.getByRole("button", { name: "Start the game" }).click(),
+    );
+    await settle();
+    expect(
+      api.calls.find((c) => c.route === "POST /api/v1/practice-games")!.options,
+    ).toMatchObject({
+      body: {
+        format: "kings_table",
+        seat: 3,
+        deck_id: "deck-l",
+        best_of: 1,
+        bots: [{}, {}, {}, {}, {}],
+        kings_table: {
+          deck_format: "legacy",
+          life: "generals_20_kings_40",
+          king_attacks_anyone: true,
+        },
+      },
+    });
+  });
+
+  it("offers SysOp the fixture decks of the chosen deck format, for each bot", async () => {
+    await open(sysop, allFixtures);
+    const fixtures = (label: string) =>
+      within(screen.getByLabelText(label))
+        .getAllByRole("option")
+        .map((o) => o.textContent);
+    expect(fixtures("Deck for Team B's King")).toEqual([
+      "Chosen by the table",
+      "Skyward Patrol",
+      "Mono-red raiders",
+      "Mono-blue flyers",
+    ]);
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Legacy decks/ }).click(),
+    );
+    expect(fixtures("Deck for Team B's King")).toEqual([
+      "Chosen by the table",
+      "Red deck",
+      "Mono-red burn",
+      "Mono-blue skies",
+    ]);
+    expect(fixtures("Your deck")).toEqual([
+      "Any free fixture deck",
+      "Red deck",
+      "Mono-red burn",
+      "Mono-blue skies",
+    ]);
+  });
+});

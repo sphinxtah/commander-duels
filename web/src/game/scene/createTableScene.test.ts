@@ -657,6 +657,25 @@ describe("animation", () => {
     watched.scene.destroy();
   });
 
+  it("gives a King's Table teammate's turn to the teammate, and draws all five opponents (v0.8.7)", async () => {
+    const table = new Table("kings");
+    const first = await table.start();
+    expect(first.layout.arrangement).toBe("six");
+    for (const seat of [0, 1, 3, 4, 5])
+      expect(table.internals.portraits.has(seat)).toBe(true);
+    table.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 1;
+    });
+    expect(table.internals.emblem.caption.text).toBe("Bot 2’s Turn");
+    table.next((s) => {
+      s.view!.turn += 1;
+      s.view!.active_seat = 2;
+    });
+    expect(table.internals.emblem.caption.text).toBe("Your Turn");
+    table.scene.destroy();
+  });
+
   it("says a controlled turn is the controller's to play (rule 723, v0.5.1)", async () => {
     const table = new Table("duel");
     await table.start();

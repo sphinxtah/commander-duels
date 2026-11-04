@@ -340,6 +340,7 @@ describe("the table model", () => {
     expect(fixtureModel("three").arrangement).toBe("three");
     expect(fixtureModel("four").arrangement).toBe("four");
     expect(fixtureModel("spectator").arrangement).toBe("three");
+    expect(fixtureModel("kings").arrangement).toBe("six");
   });
 
   it("draws curves for casts, targets, attacks and blocks", () => {
@@ -807,5 +808,131 @@ describe("turn control (rule 723, v0.5.1)", () => {
       mark: "none",
     });
     expect(m.opponents[0].controlPill).toBeNull();
+  });
+});
+
+describe("King's Table (v0.8.7)", () => {
+  const by = (m: TableModel, seat: number) =>
+    [m.anchored, ...m.opponents].find((p) => p?.seat === seat)!;
+
+  it("keeps the settings, and plays commanders with Commander decks", () => {
+    const m = fixtureModel("kings");
+    expect(m.kingsTable).toEqual({
+      deck_format: "commander",
+      life: "generals_20_kings_40",
+      king_attacks_anyone: false,
+    });
+    expect(m.commander).toBe(true);
+    const legacy = tableFixture("kings");
+    legacy.snapshot.settings.kings_table = {
+      ...legacy.snapshot.settings.kings_table!,
+      deck_format: "legacy",
+    };
+    expect(model(legacy).commander).toBe(false);
+    expect(fixtureModel("four").kingsTable).toBeNull();
+  });
+
+  it("gives every plate its role, team and starting life, a crown for each King", () => {
+    const m = fixtureModel("kings");
+    expect(by(m, 2)).toMatchObject({
+      anchored: true,
+      title: "General · started at 20 · Mono Green Stompers",
+      kings: { role: "general", startingLife: 20 },
+      teamPill: null,
+    });
+    expect(by(m, 1)).toMatchObject({
+      title: "♔ King · started at 40 · Bot",
+      kings: {
+        role: "king",
+        startingLife: 40,
+        inRange: true,
+        attackable: false,
+      },
+      team: 0,
+      ally: true,
+      teammate: false,
+      teamPill: { text: "Teammate", tone: "team" },
+      targetLabel: "36 life, started at 40",
+    });
+    expect(by(m, 4)).toMatchObject({
+      title: "♔ King · started at 40 · Bot",
+      ally: false,
+      teamPill: { text: "Other team", tone: "foe" },
+    });
+    // Each player has their own life and poison: nothing is the team's.
+    expect(m.opponents.every((p) => p.teamPoison === null)).toBe(true);
+    // Teammates take their own turns: none is the Two-Headed Giant's shared-turn teammate.
+    expect(m.teammateSeat).toBeNull();
+  });
+
+  it("says apart who is in your range and whom you can attack", () => {
+    const m = fixtureModel("kings");
+    const reach = (seat: number) => {
+      const kings = by(m, seat).kings!;
+      return [kings.inRange, kings.attackable];
+    };
+    expect(reach(3)).toEqual([true, true]);
+    expect(reach(1)).toEqual([true, false]);
+    expect(reach(0)).toEqual([false, false]);
+    expect(reach(4)).toEqual([false, false]);
+    expect(by(m, 3).articleLabel).toBe(
+      "Bot 4, seat 4, Team B's Right General, the other team, in your range, you can attack them",
+    );
+    expect(by(m, 1).articleLabel).toBe(
+      "Bot 2, seat 2, Team A's King, your teammate, in your range",
+    );
+    expect(by(m, 5).articleLabel).toBe(
+      "Bot 6, seat 6, Team B's Left General, the other team, out of your range",
+    );
+  });
+
+  it("shows both teammates' hands, never playable", () => {
+    const m = fixtureModel("kings");
+    for (const seat of [0, 1]) {
+      const hand = by(m, seat).hand!;
+      expect(hand.length).toBeGreaterThan(0);
+      for (const key of hand)
+        expect(m.cards.get(key)).toMatchObject({ offered: [], mark: "none" });
+    }
+    expect(by(m, 3).hand).toBeNull();
+  });
+
+  it("names each team by its letter to a spectator, with no range", () => {
+    const m = fixtureModel("kingsSpectator");
+    expect(m.anchored?.seat).toBe(0);
+    expect(m.opponents.map((p) => p.teamPill?.text)).toEqual([
+      "Team A",
+      "Team A",
+      "Team B",
+      "Team B",
+      "Team B",
+    ]);
+    expect(
+      m.opponents.every(
+        (p) => p.kings?.inRange === null && p.kings?.attackable === null,
+      ),
+    ).toBe(true);
+    expect(m.opponents[0].articleLabel).toBe("Bot 2, seat 2, Team A's King");
+  });
+
+  it("puts the Deploy ability's name first in its rules", () => {
+    const m = fixtureModel("kings");
+    expect(named(m, "Grizzly Bears").card.rules.at(-1)).toMatch(/\(Deploy\)$/);
+    // The stack shows an activated Deploy as the table reads it.
+    const f = tableFixture("kings");
+    f.snapshot.view!.stack = [
+      {
+        id: "deploy-1",
+        kind: "ability",
+        controller_seat: 2,
+        name: "Grizzly Bears",
+        text: "{T}: Target teammate in your range gains control of this creature. Activate only as a sorcery. (Deploy)",
+        hidden: false,
+        targets: [{ kind: "player", seat: 1, object_id: null, label: null }],
+      },
+    ];
+    expect(model(f).cards.get("stack:deploy-1")!.card.rules).toEqual([
+      "Deploy — {T}: Target teammate in your range gains control of this creature. Activate only as a sorcery.",
+    ]);
   });
 });

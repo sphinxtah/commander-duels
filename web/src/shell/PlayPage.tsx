@@ -13,6 +13,7 @@ const practiceFormats: Record<PracticeFormat["id"], true> = {
   commander: true,
   legacy: true,
   two_headed_giant: true,
+  kings_table: true,
 };
 export function comingSoon(format: Format | undefined): boolean {
   return Boolean(
@@ -28,16 +29,20 @@ export function early(format: Format | undefined): boolean {
 const howToPlay: Record<string, string> = {
   two_headed_giant:
     "Two teams of two, with Legacy decks: with a bot teammate at the practice table here; or, from Tables, in the queue, alone or with a friend, and at a table for four players, or players with bots as teammates or opponents. Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
+  kings_table:
+    "Six players in two teams of three, a King and two Generals each: at the practice table here, you and five bots in the seat you choose; or at a table in Tables, with players in any seats and bots in the others. Not in the queues. Each player takes their own turns with their own life; a team wins when the other team's King is out.",
 };
 const symbols: Record<string, string> = {
   commander: "♜",
   legacy: "⚔",
   two_headed_giant: "♜♜",
+  kings_table: "♔",
 };
 const players: Record<string, string> = {
   commander: "2–4 PLAYERS",
   legacy: "2 PLAYERS",
   two_headed_giant: "2 × 2 PLAYERS",
+  kings_table: "6 PLAYERS",
 };
 
 /**
@@ -71,9 +76,9 @@ export function PlayPage({
           Battle the bots.
         </h1>
         <p>
-          Practice against the bots in Legacy, Commander or Two-Headed Giant,
-          with your own decks, at the skill you choose. To play other people,
-          find a game or sit down at a table in{" "}
+          Practice against the bots in Legacy, Commander, Two-Headed Giant or
+          King&apos;s Table, with your own decks, at the skill you choose. To
+          play other people, find a game or sit down at a table in{" "}
           <a href="#tables" onClick={selectSound}>
             Tables
           </a>

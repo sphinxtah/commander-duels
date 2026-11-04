@@ -22,7 +22,7 @@ import {
   useQueue,
   waited,
   watchQueue,
-  type QueueFormat,
+  type QueueFormat as AnyQueueFormat,
   type QueueInfo,
   type QueueStatus,
   type TeamInvite,
@@ -35,6 +35,13 @@ import styles from "./queues.module.css";
 // with a way out. The game the queue finds opens by itself (queue.ts), on any page of the app.
 // Since v0.5.1 Two-Headed Giant's queue too, whose teams form alone or with a friend: a player
 // invites a friend, who accepts here with a deck of their own, and the two wait as one team.
+// King's Table (v0.8.7) has no queue: it is played at tables and at the practice table.
+
+/** The formats with a public queue: every format but King's Table. */
+type QueueFormat = Exclude<AnyQueueFormat, "kings_table">;
+function queued(format: AnyQueueFormat | null | undefined): QueueFormat {
+  return !format || format === "kings_table" ? "legacy" : format;
+}
 
 const SIZES: Record<QueueFormat, number[]> = {
   legacy: [2],
@@ -285,7 +292,7 @@ function JoinForm({
   queues: QueueInfo[];
 }) {
   const decks = useOwnDecks();
-  const [format, setFormat] = useState<QueueFormat>(status.format ?? "legacy");
+  const [format, setFormat] = useState<QueueFormat>(queued(status.format));
   const [seats, setSeats] = useState(status.seats ?? 2);
   const [deck, setDeck] = useState(status.deck_id ?? "");
   const [humansOnly, setHumansOnly] = useState(status.humans_only);

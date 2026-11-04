@@ -1839,8 +1839,9 @@ class PixiTableScene implements TableScene {
             if (event.emblem === "block") caption = "Block!";
             if (event.emblem === "turn") {
               const active = players.find((p) => p.seat === model.activeSeat);
-              // Two-Headed Giant (v0.5.1): a team takes its turn together (805.4a).
-              const team = active?.team ?? null;
+              // Two-Headed Giant (v0.5.1): a team takes its turn together (805.4a). At King's
+              // Table (v0.8.7) each player takes their own: a turn is its player's.
+              const team = active?.kings ? null : (active?.team ?? null);
               const watching = model.observing || model.viewSeat === null;
               const ours =
                 active &&

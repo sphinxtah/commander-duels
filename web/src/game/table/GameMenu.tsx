@@ -8,7 +8,8 @@ import styles from "./screen.module.css";
 // Table, Full screen, Mute, Mute music (v0.7.2), the table options, Report a problem (v0.4.1) and
 // Concede. It is a
 // list of ordinary links and buttons that Tab moves through, never a dialog: the game goes on
-// behind it. Escape closes it (the table's Escape chain), and so does a press anywhere else.
+// behind it. Escape closes it (the table's Escape chain), and so does a press anywhere else. At
+// King's Table (v0.8.7) it starts with the game's settings, fixed for the whole game.
 
 export const GAME_MENU_ID = "game-menu";
 
@@ -26,6 +27,7 @@ export function GameMenu({
   concedeDisabled,
   onConcedeMatch,
   onLeave,
+  rules = null,
 }: {
   open: boolean;
   onClose(refocus: boolean): void;
@@ -43,6 +45,8 @@ export function GameMenu({
   /** In a best-of-three match (v0.5.0): concede the whole match, not only this game. */
   onConcedeMatch?: () => void;
   onLeave(): void;
+  /** King's Table's settings in a line (v0.8.7): the decks, the life and the house rule. */
+  rules?: string | null;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -77,6 +81,11 @@ export function GameMenu({
       role="group"
     >
       <ul>
+        {rules && (
+          <li className={styles.menuRules}>
+            <span>King&apos;s Table</span> {rules}
+          </li>
+        )}
         <li>
           <a href="#play" onClick={onLeave}>
             <span aria-hidden="true">←</span> Table

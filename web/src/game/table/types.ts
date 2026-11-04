@@ -5,6 +5,7 @@ import type {
   CardView,
   CombatGroup,
   GameView,
+  KingsTableView,
   ObjectId,
   PlayerView,
   PriorityControls,
@@ -39,7 +40,9 @@ export interface Diamond {
   side: SU;
 } // a square turned 45°; bounding box side·√2
 
-export type Arrangement = "duel" | "three" | "four";
+/** Opponents in the top half: one, two or three in columns, and since v0.8.7 King's Table's five
+ * in five narrower columns ("six", for its six seats). */
+export type Arrangement = "duel" | "three" | "four" | "six";
 /** offered: purple glow + ◆; playable: hand card with an answerable play/cast (pink + ◆);
  *  selected: teal ring + ✓. Marks follow what is offered, not canAnswer (C2). */
 export type Mark = "none" | "offered" | "playable" | "selected";
@@ -90,10 +93,23 @@ export interface TablePlayer {
   name: string; // "You" or the name (P1, L7 observer wording)
   title: string | null; // your deck name for yourself; "Bot"/"Player" otherwise; deck name only for SysOp
   kind: "human" | "bot" | null;
-  team: number | null; // Two-Headed Giant (v0.5.0): 0 or 1; null in other games
+  team: number | null; // Two-Headed Giant (v0.5.0), King's Table (v0.8.7): 0 or 1; else null
   teammate: boolean; // the viewer's teammate, who shares the viewer's life total
+  /** On the viewer's team (v0.8.7): a Two-Headed Giant teammate, or one of King's Table's two
+   * teammates, who take their own turns with their own life. Nobody attacks them. */
+  ally: boolean;
+  /** King's Table (v0.8.7): the player's role and starting life, and in a seat's own view whether
+   * the player is in the viewer's range (targets, spells, abilities) and whether the viewer may
+   * attack them (attack destinations), shown apart; null in other games. */
+  kings: {
+    role: "king" | "general";
+    startingLife: number | null;
+    inRange: boolean | null;
+    attackable: boolean | null;
+  } | null;
   /** The plate's team pill (v0.5.1): "Teammate" or "Other team" to a player, "Team 1" or
-   * "Team 2" to SysOp observing and spectators; null outside Two-Headed Giant and on your own. */
+   * "Team 2" to SysOp observing and spectators ("Team A", "Team B" at King's Table); null outside
+   * team games and on your own. */
   teamPill: { text: string; tone: "team" | "foe" } | null;
   /** The team's poison counters (810.10a, v0.5.1): both teammates' together; null in other
    * games. */
@@ -154,6 +170,8 @@ export interface TableModel {
   promptKind: Prompt["kind"] | null;
   arrangement: Arrangement;
   commander: boolean;
+  /** King's Table's settings (v0.8.7), fixed for the game; null in other games. */
+  kingsTable: KingsTableView | null;
   viewSeat: Seat | null;
   observing: boolean;
   canAnswer: boolean;

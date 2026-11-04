@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cardImageUrl } from "./images";
 import type { Located } from "./model";
-import { manaSymbols, manaWords } from "./model";
+import { manaSymbols, manaWords, readableRule } from "./model";
 import { useImageRetry } from "./RetryingImage";
 import type { CardImageSize } from "./table/types";
 import type { CardView, PermanentView } from "./types";
@@ -44,7 +44,7 @@ function TextFrame({ card }: { card: CardView }) {
       <div className={styles.frameType}>{card.type_line}</div>
       <div className={styles.frameRules}>
         {card.rules.map((line, index) => (
-          <p key={index}>{line}</p>
+          <p key={index}>{readableRule(line)}</p>
         ))}
       </div>
       {card.power !== null && (
@@ -209,7 +209,7 @@ export function CardZoom({
               <>
                 <p className={styles.zoomType}>{card.type_line}</p>
                 {card.rules.map((line, index) => (
-                  <p key={index}>{line}</p>
+                  <p key={index}>{readableRule(line)}</p>
                 ))}
                 {card.power !== null && (
                   <p className={styles.zoomPt}>

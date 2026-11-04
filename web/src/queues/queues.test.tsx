@@ -313,6 +313,25 @@ describe("finding a game", () => {
     expect(screen.getByLabelText("Players")).toHaveValue("3");
   });
 
+  it("offers no King's Table queue: it is played at tables and the practice table (v0.8.7)", async () => {
+    const api = mockApi();
+    // A place that last named King's Table (it never does) opens on Legacy all the same.
+    api.on("GET /api/v1/queue", () =>
+      reply(200, place({ format: "kings_table", seats: 6 })),
+    );
+    api.on("GET /api/v1/queues", () => reply(200, queues));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    render(<FindGame me={ada} />);
+    await settle();
+    expect(
+      screen
+        .getAllByRole("radio", { name: /./ })
+        .map((r) => r.getAttribute("value")),
+    ).not.toContain("kings_table");
+    expect(screen.queryByRole("radio", { name: /King's Table/ })).toBeNull();
+    expect(screen.getByRole("radio", { name: /^Legacy/ })).toBeChecked();
+  });
+
   it("joins Legacy's best-of-three queue, a queue of its own (v0.5.0)", async () => {
     const api = mockApi();
     api.on("GET /api/v1/queue", () => reply(200, place()));

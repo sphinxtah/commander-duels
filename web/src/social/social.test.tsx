@@ -127,6 +127,15 @@ describe("the words (v0.4.3)", () => {
         appears_offline: false,
       }),
     ).toBe("Playing a Legacy practice game");
+    // King's Table (v0.8.7) by its name.
+    expect(
+      presenceWords({
+        state: "in_game",
+        game_kind: "table",
+        game_format: "kings_table",
+        appears_offline: false,
+      }),
+    ).toBe("Playing King's Table at a table");
     expect(presenceWords({ state: "idle", appears_offline: true })).toBe(
       "Idle (appears offline)",
     );

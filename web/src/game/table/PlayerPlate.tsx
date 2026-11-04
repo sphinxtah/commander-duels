@@ -37,7 +37,10 @@ import styles from "./table.module.css";
 // scene draws the diamonds, the portrait or sigil and the counts' numerals unless the dom painter
 // does. A Planeswalker portrait (v0.3.1) is named in both painters. At a human table (v0.4.4) the
 // pills say the player's alliances, and another player's plate has its Alliance button. In
-// Two-Headed Giant (v0.5.1) a pill says the player's team, and poison is the team's.
+// Two-Headed Giant (v0.5.1) a pill says the player's team, and poison is the team's. At King's
+// Table (v0.8.7) the title says the role (a crown for a King) and the starting life, and in a
+// seat's own view two pills say apart whether the player is in your range (what your spells and
+// abilities reach) and whether you can attack them now.
 
 const poolColours: [keyof ManaPool, string][] = [
   ["white", "W"],
@@ -533,11 +536,18 @@ export function PlayerPlate({
     const text = playerName(game.view, seat, game.observing);
     return text === "You" ? "you" : text;
   };
+  const kings = player.kings;
+  const reach = kings && !player.anchored ? kings : null;
+  // Five opponents' columns (v0.8.7) are narrow: their pills are smaller.
+  const compact = !player.anchored && scene.layout?.arrangement === "six";
   return (
     <div
       className={styles.plate}
       data-seat={player.seat}
       data-chip={node.chip || undefined}
+      data-role={kings?.role}
+      data-in-range={reach?.inRange ?? undefined}
+      data-attackable={reach?.attackable ?? undefined}
     >
       <span
         className={styles.name}
@@ -560,12 +570,24 @@ export function PlayerPlate({
       <span
         className={styles.pills}
         data-align={align}
+        data-compact={compact || undefined}
         style={boxStyle(node.pills)}
       >
         {/* A chip has no room for it; its article's name still says the team. */}
         {player.teamPill && !node.chip && (
           <span className={styles.pill} data-tone={player.teamPill.tone}>
             {player.teamPill.text}
+          </span>
+        )}
+        {/* King's Table (v0.8.7): range and attack, shown apart, the article saying both. */}
+        {reach?.inRange && !node.chip && (
+          <span className={styles.pill} data-tone="range">
+            In range
+          </span>
+        )}
+        {reach?.attackable && !node.chip && (
+          <span className={styles.pill} data-tone="attack">
+            Can attack
           </span>
         )}
         {player.controlPill && (

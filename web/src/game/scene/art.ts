@@ -1,4 +1,4 @@
-import { manaSymbols } from "../model";
+import { manaSymbols, readableRule } from "../model";
 import { mulberry32 } from "../table/sigil";
 import type { CardView } from "../types";
 
@@ -413,7 +413,7 @@ export function textFrame(card: CardView, width: number): HTMLCanvasElement {
     y += rulesSize * 0.5;
     const bottom = height - pad - ptRoom;
     outer: for (const rule of card.rules)
-      for (const line of wrap(ctx, rule, width - pad * 2)) {
+      for (const line of wrap(ctx, readableRule(rule), width - pad * 2)) {
         if (y + rulesSize > bottom) break outer;
         ctx.fillText(line, pad, y);
         y += rulesSize * 1.22;

@@ -38,17 +38,25 @@ import { createTableUi } from "../table/uiStore";
 import type { CardView, PermanentView, Snapshot, StackItem } from "../types";
 
 // The table lab (development only, at /table-lab.html under Vite's dev server; never built):
-// the PixiJS table drawn from the fixtures at two, three and four seats, with either painter, a
+// the PixiJS table drawn from the fixtures at two, three, four and (King's Table, v0.8.7) six
+// seats, with either painter, a
 // short scripted turn to watch the animation, and a bench that times commits on the stress
 // board. It is the owner's look-and-feel check against the design's reference screenshots, so beside the
 // canvas it draws a rough stand-in for the DOM layer's text (names, life, the band's words and
 // the prompt's diamonds) that the game screen draws for real.
 //
-// Query: ?fixture=<name> (or ?seats=2|3|4), &painter=webgl|dom, &motion=normal|fast|faster|none,
-// &hits=1 (outline every button's box), &chrome=0 (hide the toolbar; H toggles it), &text=1.25.
+// Query: ?fixture=<name> (or ?seats=2|3|4|6), &painter=webgl|dom, &motion=normal|fast|faster|none,
+// &hits=1 (outline every button's box), &chrome=0 (hide the toolbar; H toggles it), &text=1.25,
+// &expand=<seat> (that opponent's board expanded, the others as chips).
 
 const params = new URLSearchParams(location.search);
-const SEATS: Record<string, FixtureName> = { 2: "duel", 3: "three", 4: "four" };
+const EXPANDED = params.has("expand") ? Number(params.get("expand")) : null;
+const SEATS: Record<string, FixtureName> = {
+  2: "duel",
+  3: "three",
+  4: "four",
+  6: "kings",
+};
 
 function initialFixture(): FixtureName {
   const named = params.get("fixture");
@@ -413,7 +421,7 @@ export function TableLab() {
     [fixture],
   );
   const layout = useMemo<TableLayout>(
-    () => layoutTable(model, { expandedSeat: null, textScale }),
+    () => layoutTable(model, { expandedSeat: EXPANDED, textScale }),
     [model, textScale],
   );
   const drawn = useRef<TableModel | null>(null);

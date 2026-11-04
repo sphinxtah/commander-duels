@@ -1,4 +1,10 @@
-import { controllerOf, playerName, primaryOption, teammateOf } from "../model";
+import {
+  alliesOf,
+  controllerOf,
+  playerName,
+  primaryOption,
+  teammateOf,
+} from "../model";
 import type { TimerInput, TimerKey, TimerPhase, TimerView } from "./types";
 
 // The response timer (design §12). When the seat gets priority only to answer an opponent's spell,
@@ -45,10 +51,11 @@ export const timerKey: TimerKey = (input) => {
     return top.controller_seat !== view.seat ? `${prompt.id}|${top.id}` : null;
   // In Two-Headed Giant (v0.5.1) the team attacks together: an attack in a turn the teammate
   // holds is the seat's own team's. An attack in a turn the seat controls (v0.5.1) the seat
-  // declared itself.
+  // declared itself. A King's Table teammate's attack (v0.8.7) is no opponent's either.
   const attacked =
     view.active_seat !== view.seat &&
     view.active_seat !== teammateOf(view) &&
+    !alliesOf(view).includes(view.active_seat ?? -1) &&
     controllerOf(view, view.active_seat) !== view.seat &&
     view.step !== null &&
     COMBAT_STEPS.has(view.step) &&

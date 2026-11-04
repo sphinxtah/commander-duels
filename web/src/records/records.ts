@@ -23,6 +23,7 @@ const formatNames: Record<string, string> = {
   commander: "Commander",
   legacy: "Legacy",
   two_headed_giant: "Two-Headed Giant",
+  kings_table: "King's Table",
 };
 
 /** "Commander"; a format added later shows by its own name. */

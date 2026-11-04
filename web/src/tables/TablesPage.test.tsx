@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
@@ -615,6 +615,333 @@ describe("Two-Headed Giant at a table (v0.5.1)", () => {
     await settle();
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Your deck and bob's share Lightning Bolt.",
+    );
+  });
+});
+
+describe("King's Table at a table (v0.8.7)", () => {
+  const settings = {
+    deck_format: "commander" as const,
+    life: "generals_20_kings_40" as const,
+    king_attacks_anyone: false,
+  };
+  const life = (n: number) => (n === 1 || n === 4 ? 40 : 20);
+  /** A King's Table seat, its team, role and life filled in as the API gives them. */
+  function kseat(fields: Partial<TablePlayer> & { seat: number }): TablePlayer {
+    return seat({
+      team: Math.floor(fields.seat / 3),
+      role: fields.seat === 1 || fields.seat === 4 ? "king" : "general",
+      starting_life: life(fields.seat),
+      ...fields,
+    });
+  }
+  function kingsTable(fields: Partial<TableView> = {}): TableView {
+    return table({
+      format: "kings_table",
+      seats: 6,
+      bots: 2,
+      kings_table: settings,
+      players: [
+        kseat({ seat: 0 }),
+        kseat({ seat: 1, taken: true, handle: "bob", host: true, ready: true }),
+        kseat({ seat: 2, player: "bot", taken: true }),
+        kseat({ seat: 3 }),
+        kseat({ seat: 4, player: "bot", taken: true }),
+        kseat({ seat: 5, taken: true, handle: "cara" }),
+      ],
+      ...fields,
+    });
+  }
+  const commanderDeck = deck({
+    id: "deck-c",
+    title: "Soldiers",
+    format: "commander",
+    card_count: 100,
+  });
+
+  it("tags its settings in the lobby, and opens with its settings, your seat and the bots' seats", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/tables", () => reply(200, [kingsTable()]));
+    api.on("GET /api/v1/decks", () => reply(200, [deck(), commanderDeck]));
+    api.on("POST /api/v1/tables", () =>
+      reply(201, kingsTable({ host: "ada", your_seat: 3 })),
+    );
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    // The lobby tags its settings, and says who sits in each team.
+    const listed = screen.getByRole("listitem");
+    expect(within(listed).getByText("Two teams of three")).toBeInTheDocument();
+    expect(within(listed).getByText("Commander decks")).toBeInTheDocument();
+    expect(
+      within(listed).getByText("Generals 20, Kings 40"),
+    ).toBeInTheDocument();
+    expect(
+      within(listed).getByText("King can attack anyone: off"),
+    ).toBeInTheDocument();
+    expect(within(listed).getByLabelText("Teams")).toHaveTextContent(
+      "Team A: an open seat, bob and a bot",
+    );
+    expect(within(listed).getByLabelText("Teams")).toHaveTextContent(
+      "Team B: an open seat, a bot and cara",
+    );
+
+    await act(async () =>
+      screen.getByRole("radio", { name: /^King's Table/ }).click(),
+    );
+    // Commander decks by default: only those fit.
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-c");
+    expect(
+      screen.getByRole("radio", { name: /^Generals 20, Kings 40/ }),
+    ).toHaveAccessibleName(/Each General starts at 20 life, each King at 40$/);
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Generals 20, Kings 40/ }).click(),
+    );
+    await act(async () =>
+      screen.getByRole("checkbox", { name: /^King can attack anyone/ }).click(),
+    );
+    // Team A's King by default; Team B's Right General instead, and bots in two seats.
+    expect(screen.getByRole("radio", { name: /^Team A's King/ })).toBeChecked();
+    await act(async () =>
+      screen
+        .getByRole("checkbox", { name: /^A bot as Team B's Right General/ })
+        .click(),
+    );
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Team B's Right General/ }).click(),
+    );
+    // Your seat is never a bot's: the box for it is gone, and so is its tick.
+    expect(
+      screen.queryByRole("checkbox", {
+        name: /^A bot as Team B's Right General/,
+      }),
+    ).toBeNull();
+    for (const name of [
+      /^A bot as Team A's Left General/,
+      /^A bot as Team B's King/,
+    ])
+      await act(async () => screen.getByRole("checkbox", { name }).click());
+    expect(
+      screen.getByRole("radio", { name: /^Team B's King/ }),
+    ).toHaveAccessibleName(/40 life to start$/);
+    // Legacy decks instead: the Legacy deck fits.
+    await act(async () =>
+      screen.getByRole("radio", { name: /^Legacy decks/ }).click(),
+    );
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-1");
+    await act(async () =>
+      screen.getByRole("button", { name: "Open the table" }).click(),
+    );
+    await settle();
+    const opened = api.calls.find((c) => c.route === "POST /api/v1/tables")!;
+    expect(opened.options).toMatchObject({
+      body: {
+        format: "kings_table",
+        seats: 6,
+        bots: 2,
+        seat: 3,
+        bot_seats: [0, 4],
+        best_of: 1,
+        deck_id: "deck-1",
+        kings_table: {
+          deck_format: "legacy",
+          life: "generals_20_kings_40",
+          king_attacks_anyone: true,
+        },
+      },
+    });
+  });
+
+  it("draws the six seats as the circle's two sides, shows the rules before anyone readies, and takes a seat", async () => {
+    const api = mockApi();
+    api.on("GET /api/v1/tables/{code}", () => reply(200, kingsTable()));
+    api.on("GET /api/v1/decks", () => reply(200, [deck(), commanderDeck]));
+    const joined = kingsTable({
+      your_seat: 3,
+      players: kingsTable().players.map((p) =>
+        p.seat === 3
+          ? {
+              ...p,
+              taken: true,
+              handle: "ada",
+              you: true,
+              deck: "Soldiers",
+              deck_id: "deck-c",
+            }
+          : p,
+      ),
+    });
+    api.on("POST /api/v1/tables/{code}/join", () => reply(200, joined));
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    expect(
+      screen.getByRole("heading", { name: "King's Table table" }),
+    ).toBeInTheDocument();
+    // The settings, in sentences, before anyone is ready.
+    expect(
+      screen.getByText(/^Commander decks for all six players/),
+    ).toHaveTextContent(
+      "Each General starts at 20 life, each King at 40. House rule off",
+    );
+    // Team B across the table (5, 4, 3), team A on your side (0, 1, 2): each King in the middle.
+    const across = screen.getByRole("list", { name: "Team B seats" });
+    const near = screen.getByRole("list", { name: "Team A seats" });
+    expect(
+      within(across)
+        .getAllByRole("listitem")
+        .map((item) => item.getAttribute("aria-label")),
+    ).toEqual([
+      "Team B's Left General",
+      "Team B's King",
+      "Team B's Right General",
+    ]);
+    expect(
+      within(near)
+        .getAllByRole("listitem")
+        .map((item) => item.getAttribute("aria-label")),
+    ).toEqual([
+      "Team A's Left General",
+      "Team A's King",
+      "Team A's Right General",
+    ]);
+    const king = within(near).getByRole("listitem", { name: "Team A's King" });
+    expect(king).toHaveTextContent("♔ King");
+    expect(king).toHaveTextContent("40 life");
+    expect(king).toHaveTextContent("bob");
+    expect(king).toHaveTextContent("Team A · King · 40 starting life");
+    // Only the open seats offer themselves; the deck is a Commander one.
+    expect(
+      screen.getAllByRole("button", { name: /^Take this seat/ }),
+    ).toHaveLength(2);
+    expect(screen.getByLabelText("Your deck")).toHaveValue("deck-c");
+    api.on("GET /api/v1/tables/{code}", () => reply(200, joined));
+    await act(async () =>
+      screen
+        .getByRole("button", { name: "Take this seat: Team B's Right General" })
+        .click(),
+    );
+    await settle();
+    expect(
+      api.calls.find((c) => c.route === "POST /api/v1/tables/{code}/join")!
+        .options,
+    ).toMatchObject({ body: { deck_id: "deck-c", seat: 3 } });
+    // Seated: your team at the bottom, and the open seat offers a move.
+    expect(
+      screen.getByRole("button", {
+        name: "Move to this seat: Team A's Left General",
+      }),
+    ).toBeInTheDocument();
+    const lists = screen.getAllByRole("list", { name: /seats$/ });
+    expect(lists.map((list) => list.getAttribute("aria-label"))).toEqual([
+      "Team A seats",
+      "Team B seats",
+    ]);
+  });
+
+  it("lets the host change the settings, the bots' seats and a player's seat, which clears readiness", async () => {
+    const api = mockApi();
+    const hosting = kingsTable({
+      host: "ada",
+      your_seat: 1,
+      players: kingsTable().players.map((p) =>
+        p.seat === 1
+          ? {
+              ...p,
+              handle: "ada",
+              you: true,
+              deck: "Soldiers",
+              deck_id: "deck-c",
+            }
+          : p,
+      ),
+    });
+    api.on("GET /api/v1/tables/{code}", () => reply(200, hosting));
+    api.on("GET /api/v1/decks", () => reply(200, [commanderDeck]));
+    api.on("PATCH /api/v1/tables/{code}", () => reply(200, hosting));
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    expect(
+      screen.getByText(/makes every player not ready again/),
+    ).toBeInTheDocument();
+    const patches = () =>
+      api.calls
+        .filter((c) => c.route === "PATCH /api/v1/tables/{code}")
+        .map((c) => (c.options as { body: unknown }).body);
+    const host = screen.getByRole("region", { name: "Change the table" });
+    await act(async () =>
+      within(host)
+        .getByRole("radio", { name: /^Everyone 20/ })
+        .click(),
+    );
+    await settle();
+    await act(async () =>
+      screen
+        .getByRole("button", {
+          name: "Give Team A's Left General's seat to a bot",
+        })
+        .click(),
+    );
+    await settle();
+    await act(async () =>
+      screen
+        .getByRole("button", { name: "Open Team B's King's seat for a player" })
+        .click(),
+    );
+    await settle();
+    await act(async () =>
+      fireEvent.change(
+        screen.getByRole("combobox", { name: "Move cara to another seat" }),
+        { target: { value: "3" } },
+      ),
+    );
+    await settle();
+    expect(patches()).toEqual([
+      { kings_table: { life: "all_20" } },
+      { bot_seats: [2, 4, 0] },
+      { bot_seats: [2] },
+      { move: { seat: 5, to: 3 } },
+    ]);
+  });
+
+  it("says why a deck of the other format cannot get ready", async () => {
+    const api = mockApi();
+    const seated = kingsTable({
+      your_seat: 0,
+      players: kingsTable().players.map((p) =>
+        p.seat === 0
+          ? {
+              ...p,
+              taken: true,
+              handle: "ada",
+              you: true,
+              deck: "Red deck",
+              deck_id: "deck-1",
+            }
+          : p,
+      ),
+    });
+    api.on("GET /api/v1/tables/{code}", () => reply(200, seated));
+    api.on("GET /api/v1/decks", () => reply(200, [deck(), commanderDeck]));
+    api.on("PATCH /api/v1/tables/{code}/seat", () =>
+      reply(422, {
+        code: "invalid_deck",
+        message: "Red deck is a Legacy deck, not a Commander one.",
+      }),
+    );
+    render(<TablesPage me={ada} heading={createRef()} code={CODE} />);
+    await settle();
+    // The host changed the decks to Commander after ada sat down with a Legacy deck.
+    expect(
+      screen.getByText(/Red deck is a Legacy deck, and this table plays/),
+    ).toHaveTextContent(
+      "Commander decks now: choose one of yours before you get ready.",
+    );
+    expect(screen.getByLabelText("Your deck")).toHaveValue("");
+    await act(async () =>
+      screen.getByRole("button", { name: "Ready" }).click(),
+    );
+    await settle();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Red deck is a Legacy deck, not a Commander one. This table plays Commander decks now: choose one of yours, then get ready.",
     );
   });
 });

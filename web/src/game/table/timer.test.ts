@@ -220,6 +220,19 @@ describe("the response timer's eligibility", () => {
     expect(timerKey(input({ view: giant }))).toBe(
       "p1|attack:3:declare_attackers",
     );
+    // At King's Table (v0.8.7) the other team's attack is an opponent's too.
+    const kings = view({
+      ...attack,
+      active_seat: 3,
+      you: { ...player(0, "Alice"), team: 0, role: "general" },
+      opponents: [
+        { ...player(1, "Bram"), team: 0, role: "king" },
+        { ...player(3, "Cara"), team: 1, role: "general" },
+      ],
+    });
+    expect(timerKey(input({ view: kings }))).toBe(
+      "p1|attack:3:declare_attackers",
+    );
   });
 
   it.each<[string, Partial<TimerInput>]>([
@@ -259,6 +272,20 @@ describe("the response timer's eligibility", () => {
           opponents: [
             { ...player(1, "Bram"), team: 0 },
             { ...player(2, "Cara"), team: 1 },
+          ],
+        }),
+      },
+    ],
+    [
+      "the attack is a King's Table teammate's, in their own turn (v0.8.7)",
+      {
+        view: view({
+          ...attack,
+          active_seat: 1,
+          you: { ...player(0, "Alice"), team: 0, role: "general" },
+          opponents: [
+            { ...player(1, "Bram"), team: 0, role: "king" },
+            { ...player(3, "Cara"), team: 1, role: "general" },
           ],
         }),
       },
