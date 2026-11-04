@@ -124,7 +124,8 @@ final class DeckLists {
         List<Entry> entries = entries(cards, "cards");
         List<Entry> sideboard = List.of();
         if (json.has("sideboard")) {
-            if (format != GameFormat.LEGACY) {
+            // King's Table with Legacy decks (v0.8.7) keeps the deck's sideboard as Legacy does.
+            if (format != GameFormat.LEGACY && format != GameFormat.KINGS_TABLE_LEGACY) {
                 throw new JsonRequest.Invalid("only Legacy deck lists have a sideboard");
             }
             sideboard = entries(json.get("sideboard"), "sideboard");

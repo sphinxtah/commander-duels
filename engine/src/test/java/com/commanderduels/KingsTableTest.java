@@ -308,6 +308,16 @@ class KingsTableTest {
             "{\"format\": \"kings_table\", \"kings_table\": {\"life\": \"all_30\"}}", () -> 1L, true));
         assertEquals(4, HumanGameRequest.parse("{\"format\": \"kings_table\", \"starting_seat\": 4}", () -> 1L, true)
             .startingSeat());
+        // A Legacy deck's sideboard comes along, as in Legacy; a Commander deck has none.
+        String withSideboard = """
+            {"format": "kings_table", "kings_table": {"deck_format": "%s"},
+             "seats": [{"player": "human", "deck_list": {"cards": [{"name": "Mountain", "count": 60}],
+                        "sideboard": [{"name": "Shock", "count": 4}]%s}},
+                       {"player": "bot"}, {"player": "bot"}, {"player": "bot"}, {"player": "bot"}, {"player": "bot"}]}""";
+        assertEquals(4, HumanGameRequest.parse(withSideboard.formatted("legacy", ""), () -> 1L, true).seats().get(0)
+            .custom().sideboard().get(0).count());
+        assertThrows(JsonRequest.Invalid.class, () -> HumanGameRequest.parse(
+            withSideboard.formatted("commander", ", \"commanders\": [\"Krenko, Mob Boss\"]"), () -> 1L, true));
     }
 
     /**

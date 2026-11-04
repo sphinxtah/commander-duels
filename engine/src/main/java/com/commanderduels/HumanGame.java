@@ -670,10 +670,13 @@ final class HumanGame {
         publishSpectators();
         Game current = game;
         if (current != null && current.getStartTime() != null && !current.hasEnded()
+                && GameFormat.kingsTableOf(current) == null
                 && humans.stream().map(this::current).allMatch(human -> human.hasLost() || human.hasLeft())
                 && current.getPlayers().values().stream().filter(p -> !p.hasLost() && !p.hasLeft()).count() > 1) {
             // Every human seat is out and two or more bots play on: there is nobody left to play for.
-            // With one player left XMage ends the game itself, and a close would race it.
+            // With one player left XMage ends the game itself, and a close would race it. At King's
+            // Table (v0.8.7) the bots play on: an eliminated General's team may still win, and the
+            // team's result is theirs too.
             boolean first;
             synchronized (this) {
                 first = endRequest == null && result == null;
