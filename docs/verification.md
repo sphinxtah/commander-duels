@@ -1,5 +1,18 @@
 # Verification
 
+## v0.8.7
+
+Built on November 3, 2026 in a cloud workspace, on the branch `v0.8.7`, with PostgreSQL 16, Node 22, Python 3.12, Java 21, and XMage built natively from the pin with its eleven patches (the image's own steps, outside Docker).
+
+| Check | Result |
+|---|---|
+| Python | `ruff check`, `ruff format --check` and `mypy` clean; `pytest` on Python 3.12 against PostgreSQL 16: 543 passed, 6 skipped, and the one failure that is the workspace's alone (`test_upgrade_needs_a_set_up_vm` runs as root, which the deploy kit refuses on purpose). New: `tests/test_kings_table.py` (30 tests: the twelve setting combinations reaching the engine from practice and from a table, seats by number and team, readiness cleared by settings, bot seats and moves but not by a change that changes nothing, the host's moves, the deck format checked at ready, the lock at the start, the team channel, a team's win counting and paying a General eliminated earlier, a draw paying nobody, rematches, practice from each seat, the refusals, an engine that doesn't echo the settings, and migration 0036's downgrade); passive bots for an administrator in their own game and not in a player's |
+| Migrations | `alembic upgrade head`, `alembic check`, and migration 0036's downgrade and upgrade again, against PostgreSQL 16. `alembic check` on SQLite reports `problem_reports.pixel_ratio` (FLOAT against Double), at v0.8.6 too: a SQLite type, not a migration |
+| Contracts | regenerated on Python 3.12, as CI's drift check expects |
+| Web | `tsc -b`, 1,466 Vitest tests in 114 files and the production build passed. New: the six-seat layout (300 random six-seat boards through the layout's invariants), its table model, plates, events, timer, scene, results by team, the practice table's King's Table choices, the six-seat table page and the host's panel, the Play page and Tables' "Find a game" |
+| Engine | XMage built from the pin with the eleven patches and its card database built from those jars, then the engine's JUnit tests: 204 passed, one skipped (the opt-in Two-Headed Giant pairing run). New: `KingsTableTest`, the owner's acceptance checks (every setting combination with each seat's life, team and range; the Kings' attacks with the house rule off and on; a General's exit opening neighbours at once and range at the next turn; a King's loss ending the game for the whole team, and both Kings a draw; an attack across range blocked, with no new target or "each opponent"; a deployed creature attacking by the General's rules; the request's settings and sideboards), six bots playing whole games in both deck formats with every attack checked against the rules, and a human King with five bots under every leak check. `PriorityControlsTest` (three tests of the priority controls in Legacy) hung in this workspace on one test or another from run to run, the game waiting for an answer the test never got. It hung the same way on XMage rebuilt with the ten patches of v0.8.6 and none of v0.8.7's, so it isn't King's Table's. It passed in v0.8.6's workspace; hosted CI runs it |
+| Hosted CI | see the release notes |
+
 ## v0.8.6
 
 Built on November 2, 2026 in a cloud workspace, on `main`, with PostgreSQL 16, Node 22, Python 3.13 and 3.12, Java 21, and XMage built natively from the pin (the image's own steps, outside Docker).
