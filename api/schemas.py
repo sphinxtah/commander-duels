@@ -70,7 +70,7 @@ class Bootstrap(Contract):
 
 
 class Format(Contract):
-    id: Literal["commander", "legacy", "two_headed_giant"]
+    id: Literal["commander", "legacy", "two_headed_giant", "kings_table"]
     name: str
     seats: list[int]
     default_seats: int
@@ -338,9 +338,47 @@ class AuditPage(Contract):
 
 
 # A game's format. Two-Headed Giant (v0.5.0, early) plays Legacy decks: decks and format versions
-# keep Legacy and Commander. Since v0.5.1 human tables and the public queues play it too.
-GameFormatId = Literal["legacy", "commander", "two_headed_giant"]
-TableFormatId = Literal["legacy", "commander", "two_headed_giant"]
+# keep Legacy and Commander. Since v0.5.1 human tables and the public queues play it too. King's
+# Table (v0.8.7, api/kings_table.py) plays Legacy or Commander decks, as its settings choose, at
+# tables and the practice table only.
+GameFormatId = Literal["legacy", "commander", "two_headed_giant", "kings_table"]
+TableFormatId = Literal["legacy", "commander", "two_headed_giant", "kings_table"]
+KingsTableLife = Literal["all_20", "all_40", "generals_20_kings_40"]
+KingsTableRole = Literal["king", "general"]
+
+
+class KingsTableSettings(Contract):
+    """King's Table's settings (v0.8.7), chosen by the host or the practice player before the
+    game and fixed once it starts. The engine takes them as they are."""
+
+    deck_format: Literal["legacy", "commander"] = Field(
+        default="commander",
+        description="Every deck's format, with its own legality and banned list: commander is "
+        "100-card singleton with a commander, for the Generals too.",
+    )
+    life: KingsTableLife = Field(
+        default="all_40",
+        description="Starting life, whatever the deck format would give: all_20, all_40, or "
+        "generals_20_kings_40.",
+    )
+    king_attacks_anyone: bool = Field(
+        default=False,
+        description="House rule: a King may attack any opponent, not only those in range.",
+    )
+
+
+class KingsTableChange(Contract):
+    """A change to a King's Table table's settings (v0.8.7); a setting left out stays."""
+
+    deck_format: Literal["legacy", "commander"] | None = None
+    life: KingsTableLife | None = None
+    king_attacks_anyone: bool | None = None
+
+
+KINGS_TABLE_SEAT_TEXT = (
+    "King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, "
+    "3 team B's Right General, 4 team B's King, 5 team B's Left General."
+)
 FixtureDeck = Literal[
     "legacy-mono-red-burn",
     "legacy-mono-green-creatures",
@@ -409,7 +447,8 @@ class SeatChoice(Contract):
 
 
 class PracticeGameRequest(Contract):
-    """A practice game: your seat first, then the bots in turn order."""
+    """A practice game: your seat first, then the bots in turn order; at King's Table (v0.8.7)
+    your chosen seat, the bots in the others."""
 
     format: GameFormatId = "legacy"
     deck: FixtureDeck | None = None
@@ -420,9 +459,11 @@ class PracticeGameRequest(Contract):
     bots: list[SeatChoice] | None = Field(
         default=None,
         min_length=1,
-        max_length=3,
+        max_length=5,
         description="One bot in Legacy; one to three in Commander (default three); three in "
-        "Two-Headed Giant: your teammate, then the two opponents.",
+        "Two-Headed Giant: your teammate, then the two opponents; five at King's Table (v0.8.7), "
+        "in seat order without yours. A King's Table bot left without a deck plays one of the "
+        "engine's fixture decks of the deck format.",
     )
     bot_skill: int = Field(default=4, ge=1, le=6)
     turn_cap: int = Field(default=60, ge=1, le=200)
@@ -432,6 +473,18 @@ class PracticeGameRequest(Contract):
         "told otherwise.",
     )
     best_of: BestOf = Field(default=1, description=BEST_OF_TEXT)
+    seat: int | None = Field(
+        default=None,
+        ge=0,
+        le=5,
+        description=f"{KINGS_TABLE_SEAT_TEXT} Your seat; team A's King (1) when left out. "
+        "Refused in other formats.",
+    )
+    kings_table: KingsTableSettings | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): its settings, the defaults when left out. Refused in "
+        "other formats.",
+    )
 
 
 class PracticeFormat(Contract):
@@ -443,6 +496,11 @@ class PracticeFormat(Contract):
     best_of: list[int] = Field(
         default_factory=lambda: [1],
         description="Since v0.5.0: 1, and 3 in Legacy for a best-of-three match.",
+    )
+    kings_table: KingsTableSettings | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): the default settings; null in other formats. Its "
+        "decks are the fixture decks of both deck formats.",
     )
 
 
@@ -472,6 +530,16 @@ class GameSeat(Contract):
         description="A player's seat out of a table's game that went on without it (v0.4.0): it "
         "conceded, the others removed it while it was away, or it lost.",
     )
+    team: int | None = Field(
+        default=None, description="King's Table (v0.8.7): 0 or 1, seat // 3; null elsewhere."
+    )
+    role: KingsTableRole | None = Field(
+        default=None, description="King's Table (v0.8.7): king or general; null elsewhere."
+    )
+    starting_life: int | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): the seat's starting life under the game's settings.",
+    )
 
 
 class GameResult(Contract):
@@ -487,6 +555,12 @@ class GameResult(Contract):
     draw: bool
     turns: int
     conceded_seats: list[int]
+    winner_team: int | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): the winning team, 0 or 1, whose every seat is in "
+        "winner_seats, a General eliminated before the end too; null for a draw, for no winner and "
+        "in other formats.",
+    )
 
 
 MatchStatus = Literal["playing", "sideboarding", "finished", "closed"]
@@ -547,6 +621,11 @@ class GameSummary(Contract):
     campaign: CampaignRef | None = Field(
         default=None,
         description="The campaign encounter it was played for (v0.8.0); null for any other game.",
+    )
+    kings_table: KingsTableSettings | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): the settings the game started with; null in other "
+        "formats.",
     )
     passive_bots: bool | None = Field(
         default=None,

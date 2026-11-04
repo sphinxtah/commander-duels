@@ -2622,7 +2622,8 @@ export interface paths {
         put?: never;
         /**
          * Create Practice Game
-         * @description Starts a game against bots. The response names the game; play it over its WebSocket.
+         * @description Starts a game against bots. The response names the game; play it over its WebSocket. At
+         *     King's Table (v0.8.7) the player takes the seat they chose, with the settings they chose.
          */
         post: operations["create_practice_game_api_v1_practice_games_post"];
         delete?: never;
@@ -3041,7 +3042,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Change Table
+         * @description The host changes a King's Table table before its start (v0.8.7): its settings, the seats
+         *     its bots fill, or a player's seat (to an open one). Anything that changes makes every player
+         *     not ready again.
+         */
+        patch: operations["change_table_api_v1_tables__code__patch"];
         trace?: never;
     };
     "/api/v1/tables/{code}/join": {
@@ -3055,7 +3062,8 @@ export interface paths {
         put?: never;
         /**
          * Join Table
-         * @description Takes the first free player's seat with one of your decks.
+         * @description Takes the first free player's seat with one of your decks; at a Two-Headed Giant table the
+         *     team's, and at a King's Table table (v0.8.7) the seat named, or the team's.
          */
         post: operations["join_table_api_v1_tables__code__join_post"];
         delete?: never;
@@ -3102,6 +3110,8 @@ export interface paths {
          * @description Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed
          *     Giant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready
          *     too, and you are ready only once your deck and your teammate's share no card but basic lands.
+         *     At a King's Table table (v0.8.7) also your seat, or your team, either of which makes every
+         *     player not ready; getting ready checks your deck by the settings' deck format again.
          */
         patch: operations["change_seat_api_v1_tables__code__seat_patch"];
         trace?: never;
@@ -5078,7 +5088,7 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "commander" | "legacy" | "two_headed_giant";
+            id: "commander" | "legacy" | "two_headed_giant" | "kings_table";
             /** Name */
             name: string;
             /** Seats */
@@ -5192,6 +5202,11 @@ export interface components {
              * @description Every winning seat (v0.5.0): the winner, or in Two-Headed Giant the winning team, whose first seat is winner_seat.
              */
             winner_seats?: number[];
+            /**
+             * Winner Team
+             * @description King's Table (v0.8.7): the winning team, 0 or 1, whose every seat is in winner_seats, a General eliminated before the end too; null for a draw, for no winner and in other formats.
+             */
+            winner_team?: number | null;
         };
         /** GameSeat */
         GameSeat: {
@@ -5217,8 +5232,23 @@ export interface components {
              * @description A player's allied Planeswalker, whose portrait stands for them; since v0.8.0 also a campaign opponent's (a bot seat, whose handle is then the opponent's name).
              */
             portrait?: string | null;
+            /**
+             * Role
+             * @description King's Table (v0.8.7): king or general; null elsewhere.
+             */
+            role?: ("king" | "general") | null;
             /** Seat */
             seat: number;
+            /**
+             * Starting Life
+             * @description King's Table (v0.8.7): the seat's starting life under the game's settings.
+             */
+            starting_life?: number | null;
+            /**
+             * Team
+             * @description King's Table (v0.8.7): 0 or 1, seat // 3; null elsewhere.
+             */
+            team?: number | null;
         };
         /** GameState */
         GameState: {
@@ -5248,7 +5278,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /**
              * Id
              * Format: uuid
@@ -5261,6 +5291,8 @@ export interface components {
              * @enum {string}
              */
             kind: "practice" | "table";
+            /** @description King's Table (v0.8.7): the settings the game started with; null in other formats. */
+            kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /** @description Its best-of-three match (v0.5.0); null for a single game. */
             match?: components["schemas"]["GameMatch"] | null;
             /**
@@ -5545,6 +5577,45 @@ export interface components {
             openable: boolean;
             product: components["schemas"]["ProductRef"];
         };
+        /**
+         * KingsTableChange
+         * @description A change to a King's Table table's settings (v0.8.7); a setting left out stays.
+         */
+        KingsTableChange: {
+            /** Deck Format */
+            deck_format?: ("legacy" | "commander") | null;
+            /** King Attacks Anyone */
+            king_attacks_anyone?: boolean | null;
+            /** Life */
+            life?: ("all_20" | "all_40" | "generals_20_kings_40") | null;
+        };
+        /**
+         * KingsTableSettings
+         * @description King's Table's settings (v0.8.7), chosen by the host or the practice player before the
+         *     game and fixed once it starts. The engine takes them as they are.
+         */
+        KingsTableSettings: {
+            /**
+             * Deck Format
+             * @description Every deck's format, with its own legality and banned list: commander is 100-card singleton with a commander, for the Generals too.
+             * @default commander
+             * @enum {string}
+             */
+            deck_format: "legacy" | "commander";
+            /**
+             * King Attacks Anyone
+             * @description House rule: a King may attack any opponent, not only those in range.
+             * @default false
+             */
+            king_attacks_anyone: boolean;
+            /**
+             * Life
+             * @description Starting life, whatever the deck format would give: all_20, all_40, or generals_20_kings_40.
+             * @default all_40
+             * @enum {string}
+             */
+            life: "all_20" | "all_40" | "generals_20_kings_40";
+        };
         /** LibraryCard */
         LibraryCard: {
             /** @description The card, its image that of the edition (v0.5.0); owned counts every edition of it. */
@@ -5727,7 +5798,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /**
              * Game Id
              * @description The game in play.
@@ -6256,13 +6327,16 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "legacy" | "commander" | "two_headed_giant";
+            id: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /** @description King's Table (v0.8.7): the default settings; null in other formats. Its decks are the fixture decks of both deck formats. */
+            kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /** Name */
             name: string;
         };
         /**
          * PracticeGameRequest
-         * @description A practice game: your seat first, then the bots in turn order.
+         * @description A practice game: your seat first, then the bots in turn order; at King's Table (v0.8.7)
+         *     your chosen seat, the bots in the others.
          */
         PracticeGameRequest: {
             /**
@@ -6279,7 +6353,7 @@ export interface components {
             bot_skill: number;
             /**
              * Bots
-             * @description One bot in Legacy; one to three in Commander (default three); three in Two-Headed Giant: your teammate, then the two opponents.
+             * @description One bot in Legacy; one to three in Commander (default three); three in Two-Headed Giant: your teammate, then the two opponents; five at King's Table (v0.8.7), in seat order without yours. A King's Table bot left without a deck plays one of the engine's fixture decks of the deck format.
              */
             bots?: components["schemas"]["SeatChoice"][] | null;
             /** Deck */
@@ -6299,9 +6373,16 @@ export interface components {
              * @default legacy
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /** @description King's Table (v0.8.7): its settings, the defaults when left out. Refused in other formats. */
+            kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /** @description Which cards the game's own decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
+            /**
+             * Seat
+             * @description King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Your seat; team A's King (1) when left out. Refused in other formats.
+             */
+            seat?: number | null;
             /**
              * Turn Cap
              * @default 60
@@ -6349,7 +6430,7 @@ export interface components {
              * Game Format
              * @description In a game, or since v0.5.0 in a public queue: its format.
              */
-            game_format?: ("legacy" | "commander" | "two_headed_giant") | null;
+            game_format?: ("legacy" | "commander" | "two_headed_giant" | "kings_table") | null;
             /**
              * Game Kind
              * @description In a game: a practice game against bots, or a human table.
@@ -6714,7 +6795,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /** Name */
             name: string;
             /** Seats */
@@ -6748,7 +6829,7 @@ export interface components {
              * @default legacy
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /**
              * Humans Only
              * @description Wait for players only: bots never fill your game.
@@ -6791,7 +6872,7 @@ export interface components {
             /** Deck Id */
             deck_id: string | null;
             /** Format */
-            format: ("legacy" | "commander" | "two_headed_giant") | null;
+            format: ("legacy" | "commander" | "two_headed_giant" | "kings_table") | null;
             /**
              * Game Id
              * @description The game your wait found.
@@ -7458,8 +7539,13 @@ export interface components {
             /** Ready */
             ready?: boolean | null;
             /**
+             * Seat
+             * @description King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Moves you to that open seat, which makes every player not ready.
+             */
+            seat?: number | null;
+            /**
              * Team
-             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Moves you to a free seat of that team; unreadies you, and the teammate you then have.
+             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): 0 for seats 0-2, 1 for seats 3-5. Moves you to a free seat of that team; unreadies you, and the teammate you then have (at King's Table every player).
              */
             team?: number | null;
         };
@@ -7479,6 +7565,19 @@ export interface components {
              */
             deck_list?: string | null;
         };
+        /** SeatMove */
+        SeatMove: {
+            /**
+             * Seat
+             * @description The seat of the player to move.
+             */
+            seat: number;
+            /**
+             * To
+             * @description An open seat: neither taken nor a bot's.
+             */
+            to: number;
+        };
         /** SeatTaking */
         SeatTaking: {
             /**
@@ -7488,8 +7587,13 @@ export interface components {
              */
             deck_id: string;
             /**
+             * Seat
+             * @description King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. The open seat to take; the first open one (of team, when given) when left out.
+             */
+            seat?: number | null;
+            /**
              * Team
-             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. The team to join; the first free seat when left out.
+             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): 0 for seats 0-2, 1 for seats 3-5. The team to join; the first free seat when left out.
              */
             team?: number | null;
         };
@@ -7925,6 +8029,22 @@ export interface components {
             /** Trigger */
             trigger: string;
         };
+        /**
+         * TableChange
+         * @description The host's changes to a King's Table table before its start (v0.8.7). Anything that
+         *     changes makes every player not ready again; the host's start is their ready.
+         */
+        TableChange: {
+            /**
+             * Bot Seats
+             * @description Every seat bots fill from now on, none of a player's (after the move).
+             */
+            bot_seats?: number[] | null;
+            /** @description Settings to change; one left out stays. */
+            kings_table?: components["schemas"]["KingsTableChange"] | null;
+            /** @description Moves a player to an open seat. */
+            move?: components["schemas"]["SeatMove"] | null;
+        };
         /** TablePlayer */
         TablePlayer: {
             /**
@@ -7956,8 +8076,18 @@ export interface components {
              * @description The host is always ready: starting is their ready.
              */
             ready: boolean;
+            /**
+             * Role
+             * @description King's Table (v0.8.7): king or general; null elsewhere.
+             */
+            role?: ("king" | "general") | null;
             /** Seat */
             seat: number;
+            /**
+             * Starting Life
+             * @description King's Table (v0.8.7): the seat's starting life under the settings.
+             */
+            starting_life?: number | null;
             /**
              * Taken
              * @description Whether a player sits there; bots' seats always are.
@@ -7965,7 +8095,7 @@ export interface components {
             taken: boolean;
             /**
              * Team
-             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Null in other formats.
+             * @description Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): 0 for seats 0-2, 1 for seats 3-5. Null in other formats.
              */
             team?: number | null;
             /** You */
@@ -7984,6 +8114,11 @@ export interface components {
              */
             best_of: 1 | 3;
             /**
+             * Bot Seats
+             * @description King's Table (v0.8.7): the seats bots fill, any but yours; none when left out.
+             */
+            bot_seats?: number[] | null;
+            /**
              * Bot Skill
              * @default 4
              */
@@ -7996,7 +8131,7 @@ export interface components {
             bot_teammate: boolean;
             /**
              * Bots
-             * @description Seats bots fill: in Commander after the players'; in Two-Headed Giant (since v0.5.1) your teammate's when bot_teammate, the rest the other team's.
+             * @description Seats bots fill: in Commander after the players'; in Two-Headed Giant (since v0.5.1) your teammate's when bot_teammate, the rest the other team's. At King's Table bot_seats names them; bots, if given, counts them.
              * @default 0
              */
             bots: number;
@@ -8011,12 +8146,19 @@ export interface components {
              * @default legacy
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /** @description King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables. */
+            kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /** @description Which cards its decks may hold by their legality; casual unless told otherwise. */
             rules?: components["schemas"]["TableRules"];
             /**
+             * Seat
+             * @description King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Your seat; team A's King (1) when left out.
+             */
+            seat?: number | null;
+            /**
              * Seats
-             * @description Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in Two-Headed Giant.
+             * @description Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in Two-Headed Giant, 6 at King's Table.
              * @default 2
              */
             seats: number;
@@ -8087,7 +8229,7 @@ export interface components {
              * Format
              * @enum {string}
              */
-            format: "legacy" | "commander" | "two_headed_giant";
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /**
              * Game Id
              * @description Its game, once started; for its players and SysOp.
@@ -8098,9 +8240,11 @@ export interface components {
              * @description The host's handle.
              */
             host: string | null;
+            /** @description King's Table (v0.8.7): the host's settings, which its game starts with; null at other tables. */
+            kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /**
              * Players
-             * @description Every seat in turn order, bots last.
+             * @description Every seat in turn order, bots last (at Two-Headed Giant and King's Table tables, in their own seats).
              */
             players: components["schemas"]["TablePlayer"][];
             rules: components["schemas"]["TableRules"];
@@ -24301,6 +24445,104 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_table_api_v1_tables__code__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableChange"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

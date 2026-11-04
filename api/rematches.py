@@ -17,6 +17,9 @@
 - **Two-Headed Giant** (v0.5.1): the rematch keeps the teams. Every player keeps their seat, bots
   take the seats bots or removed players held, and each team's decks are checked together again.
   A table refusing banned cards refuses the format's own (Erayo) again, as at its start.
+- **King's Table** (v0.8.7): the rematch keeps the seats, and so the teams and roles, and the
+  settings. Bots take the seats bots or removed players held, and each deck is checked by the
+  settings' deck format again.
 """
 
 import secrets
@@ -32,11 +35,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import teams
+from api import kings_table, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.games import (
-    DECK_FORMATS,
     TABLE_IDLE_SECONDS,
     LiveGame,
     LiveSeat,
@@ -44,6 +46,7 @@ from api.games import (
     SeatPlan,
     active_games_of,
     create_practice_game,
+    deck_format_of,
     engine_game,
     followed_or_closed,
     full_access,
@@ -51,6 +54,7 @@ from api.games import (
     own_deck,
     require_loaded,
     seat_tokens,
+    team_play,
     visible_game,
 )
 from api.identity import ApiError, Db, Principal, permissions_for, roles_of, settings_of, utcnow
@@ -407,6 +411,10 @@ def plan_rematch(
     }
     roster = roster_of(request)
     team = game.format == teams.FORMAT
+    # King's Table (v0.8.7) keeps every player's seat too: their team and role.
+    kept_seats = (
+        teams.SEATS if team else kings_table.SEATS if game.format == kings_table.FORMAT else None
+    )
     plans: list[SeatPlan] = []
     users: list[UUID | None] = []
     decks: list[UUID] = []
@@ -429,7 +437,7 @@ def plan_rematch(
                 user,
                 permissions,
                 revision.deck_id,
-                DECK_FORMATS.get(game.format, game.format),
+                deck_format_of(game.format, game.kings_table),
                 library,
                 rules_of(table),
             )
@@ -451,15 +459,16 @@ def plan_rematch(
         plans.append(SeatPlan({"player": "human", **seat}, bound, title))
         users.append(user.id)
         decks.append(revision.deck_id)
-    if team:
-        # Two-Headed Giant (v0.5.1): every player keeps their seat, so the teams stay; bots take
-        # the seats bots or removed players held.
+    if kept_seats is not None:
+        # Two-Headed Giant (v0.5.1) and King's Table (v0.8.7): every player keeps their seat, so
+        # the teams stay; bots take the seats bots or removed players held.
         kept = {row.seat: (plan, row.user_id) for row, plan in zip(rows, plans, strict=True)}
         plans = [
-            kept[s][0] if s in kept else SeatPlan({"player": "bot"}) for s in range(teams.SEATS)
+            kept[s][0] if s in kept else SeatPlan({"player": "bot"}) for s in range(kept_seats)
         ]
-        users = [kept[s][1] if s in kept else None for s in range(teams.SEATS)]
-        check_teams(db, game, plans, users)
+        users = [kept[s][1] if s in kept else None for s in range(kept_seats)]
+        if team:
+            check_teams(db, game, plans, users)
     else:
         bots = table.seats - len(plans)
         plans += bot_plans(db, request, game.format, bots)
@@ -531,12 +540,13 @@ def record_rematch(
         visibility=old.visibility,
         seats=old.seats,
         bots=old.seats - len(players),
-        # Two-Headed Giant's bots (v0.5.1) take the seats nobody kept.
+        # Two-Headed Giant's bots (v0.5.1) and King's Table's (v0.8.7) take the seats nobody kept.
         bot_seats=(
             [seat for seat, user in enumerate(users) if user is None]
-            if old.format == teams.FORMAT
+            if old.format in (teams.FORMAT, kings_table.FORMAT)
             else None
         ),
+        kings_table=old.kings_table,
         bot_skill=old.bot_skill,
         turn_cap=old.turn_cap,
         allow_banned=old.allow_banned,
@@ -607,17 +617,19 @@ async def start_table_rematch(
                 raise
             try:
                 try:
-                    created = await engine_game(
-                        engine,
-                        {
-                            "format": game.format,
-                            "seats": [plan.engine for plan in plans],
-                            "skill": game.bot_skill,
-                            "turn_cap": game.turn_cap,
-                            "idle_timeout_seconds": TABLE_IDLE_SECONDS,
-                        },
-                        request,
-                    )
+                    body: dict[str, object] = {
+                        "format": game.format,
+                        "seats": [plan.engine for plan in plans],
+                        "skill": game.bot_skill,
+                        "turn_cap": game.turn_cap,
+                        "idle_timeout_seconds": TABLE_IDLE_SECONDS,
+                    }
+                    if game.format == kings_table.FORMAT:
+                        # The settings the game played, as its table keeps them too.
+                        body["kings_table"] = kings_table.engine_settings(
+                            kings_table.config_of(game.kings_table)
+                        )
+                    created = await engine_game(engine, body, request)
                 except ApiError:
                     await run_in_threadpool(reopen, db, game.id, principal.user.id)
                     raise
@@ -635,7 +647,7 @@ async def start_table_rematch(
                                 for seat, user_id in enumerate(users)
                                 if user_id is not None
                             },
-                            teams=game.format == teams.FORMAT,
+                            **team_play(game.format),
                         )
                     )
             finally:

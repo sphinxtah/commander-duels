@@ -336,6 +336,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 description="Two teams of two. Plan together and share the victory.",
                 available=True,
             ),
+            # Since v0.8.7 (api/kings_table.py): at human tables and the practice table, not in
+            # the public queues.
+            Format(
+                id="kings_table",
+                name="King's Table",
+                seats=[6],
+                default_seats=6,
+                description="Two teams of three: a King and two Generals each. Guard your King.",
+                available=True,
+            ),
         ]
 
     @app.get("/api/v1/engine/status", response_model=EngineStatus)

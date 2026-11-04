@@ -326,7 +326,11 @@ async def receive(
         if not allies:
             refuse(
                 "no_allies",
-                "Your teammate is a bot: nobody reads your team's channel."
+                (
+                    "Your teammates are bots: nobody reads your team's channel."
+                    if any(len(group) > 2 for group in game.groups)
+                    else "Your teammate is a bot: nobody reads your team's channel."
+                )
                 if game.teams and connection.seat is not None
                 else "You have no allies at this table.",
                 client_id=client_id,
@@ -373,7 +377,7 @@ def alliance(
     if game.teams:
         refuse(
             "fixed_teams",
-            "In Two-Headed Giant your team is your alliance, for the whole game.",
+            "Your team is your alliance, for the whole game.",
             seat=wanted.seat,
         )
         return

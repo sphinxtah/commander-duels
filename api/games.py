@@ -40,6 +40,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager, suppres
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
+from itertools import combinations
 from typing import Annotated, Any, Literal, cast
 from uuid import UUID, uuid4
 
@@ -53,6 +54,7 @@ from sqlalchemy.exc import InterfaceError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from api import kings_table
 from api.auth import INPUT_ERRORS
 from api.config import Settings
 from api.custom_play import custom_in_seats
@@ -103,6 +105,7 @@ from api.schemas import (
     GameResult,
     GameState,
     GameSummary,
+    KingsTableSettings,
     PracticeFormat,
     PracticeGameRequest,
     PracticeOptions,
@@ -138,18 +141,32 @@ FIXTURE_DECKS: dict[str, list[FixtureDeck]] = {
         "legacy-mono-blue-skies",
     ],
 }
-BOTS = {"legacy": [1], "commander": [1, 2, 3], "two_headed_giant": [3]}
-DEFAULT_BOTS = {"legacy": 1, "commander": 3, "two_headed_giant": 3}
+# King's Table (v0.8.7, api/kings_table.py): the fixtures of its settings' deck format.
+FIXTURE_DECKS["kings_table"] = FIXTURE_DECKS["two_headed_giant"] + FIXTURE_DECKS["commander"]
+BOTS = {"legacy": [1], "commander": [1, 2, 3], "two_headed_giant": [3], "kings_table": [5]}
+DEFAULT_BOTS = {"legacy": 1, "commander": 3, "two_headed_giant": 3, "kings_table": 5}
 # Best of one game, or (v0.5.0) a best-of-three match with sideboards: Legacy only.
-BEST_OF = {"legacy": [1, 3], "commander": [1], "two_headed_giant": [1]}
+BEST_OF = {"legacy": [1, 3], "commander": [1], "two_headed_giant": [1], "kings_table": [1]}
 FORMAT_NAMES = {
     "legacy": "Legacy",
     "commander": "Commander",
     "two_headed_giant": "Two-Headed Giant",
+    "kings_table": "King's Table",
 }
 # The format a game's decks are built for, when it is not the game's own: Two-Headed Giant plays
-# Legacy decks, under Legacy's legality and format versions.
+# Legacy decks, under Legacy's legality and format versions. King's Table's settings choose its
+# decks' format (deck_format_of).
 DECK_FORMATS = {"two_headed_giant": "legacy"}
+
+
+def deck_format_of(fmt: str, kings: object = None) -> str:
+    """The format a game's or a table's decks are built for: King's Table's (v0.8.7) as its
+    settings (a game's or a table's kings_table) say."""
+    if fmt == kings_table.FORMAT:
+        return kings_table.config_of(kings).deck_format
+    return DECK_FORMATS.get(fmt, fmt)
+
+
 SERVICE_HEADER = "X-Service-Token"
 LONG_POLL_MS = 25_000
 INSPECTION_WAIT_MS = 3_000
@@ -428,12 +445,19 @@ class LiveGame:
     alliances: set[frozenset[int]] = field(default_factory=set)
     offers: set[tuple[int, int]] = field(default_factory=set)
     # A Two-Headed Giant table's game (v0.5.1): the teams are fixed, and the allies-only channel
-    # is each team's, its two players allied from the start when both are players.
+    # is each team's, its two players allied from the start when both are players. Since v0.8.7
+    # King's Table's teams of three (groups), each two of a team's players allied.
     teams: bool = False
+    groups: tuple[tuple[int, ...], ...] = TEAMS
 
     def __post_init__(self) -> None:
         if self.teams:
-            self.alliances = {frozenset(pair) for pair in TEAMS if set(pair) <= self.seats.keys()}
+            self.alliances = {
+                frozenset(pair)
+                for group in self.groups
+                for pair in combinations(group, 2)
+                if set(pair) <= self.seats.keys()
+            }
 
     @property
     def path(self) -> str:
@@ -452,6 +476,16 @@ class LiveGame:
         if connection.seat is not None and connection.seat in self.seats:
             return self.seats[connection.seat]
         return self.watched
+
+
+def team_play(fmt: str) -> dict[str, Any]:
+    """A table's game's fixed teams, as LiveGame takes them: Two-Headed Giant's pairs (v0.5.1) and
+    King's Table's teams of three (v0.8.7); none in other formats."""
+    if fmt == kings_table.FORMAT:
+        return {"teams": True, "groups": kings_table.TEAMS}
+    if fmt == "two_headed_giant":
+        return {"teams": True, "groups": TEAMS}
+    return {}
 
 
 def log_end(snapshot: dict[str, Any]) -> int:
@@ -1156,7 +1190,7 @@ def record_end(
             game.status = status
             game.finished_at = utcnow()
             # Engine error details stay in the engine's log.
-            game.result = recorded(result) if result else None
+            game.result = recorded(result, game.format) if result else None
             db.flush()
             link = db.get(CampaignGame, game.id)
             # A game played with passive bots (SysOp's since v0.8.6, an administrator's since
@@ -1189,12 +1223,16 @@ def force_interrupted(database: Engine, game_id: UUID) -> None:
         db.commit()
 
 
-def recorded(result: dict[str, Any]) -> dict[str, Any]:
+def recorded(result: dict[str, Any], fmt: str | None = None) -> dict[str, Any]:
     """The engine's result as the game keeps it. An engine before v0.5.0 names no winning team:
-    its winning seats are the winner alone."""
+    its winning seats are the winner alone. At King's Table (v0.8.7) the winning team is every
+    seat of the team of a seat the engine names, a General eliminated before the end too
+    (kings_table.team_result), and winner_team names it."""
     kept = {key: result.get(key) for key in RESULT_FIELDS}
     if kept["winner_seats"] is None:
         kept["winner_seats"] = [] if kept["winner_seat"] is None else [kept["winner_seat"]]
+    if fmt == kings_table.FORMAT:
+        kept = kings_table.team_result(kept)
     return kept
 
 
@@ -1319,6 +1357,8 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
     # A campaign duel (v0.8.0): the bot is the encounter's opponent, by name and portrait.
     link = db.get(CampaignGame, game.id)
     opponent = (link.opponent_name, link.opponent) if link is not None else None
+    # King's Table (v0.8.7): the settings it started with, and each seat's team, role and life.
+    kings = kings_table.config_of(game.kings_table) if game.format == kings_table.FORMAT else None
     return GameSummary(
         id=game.id,
         kind=game.kind,  # type: ignore[arg-type]
@@ -1344,6 +1384,9 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
                 ),
                 deck=row.deck if everything or row.user_id == principal.user.id else None,
                 left=row.left_reason,  # type: ignore[arg-type]
+                team=kings_table.team_of(row.seat) if kings else None,
+                role=kings_table.role_of(row.seat) if kings else None,
+                starting_life=kings_table.starting_life(kings, row.seat) if kings else None,
             )
             for row in rows
         ],
@@ -1359,6 +1402,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
             else None
         ),
         match=match_ref(db, game),
+        kings_table=kings,
         passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
         campaign=(
             CampaignRef(
@@ -1413,6 +1457,7 @@ def practice_options(principal: Player) -> PracticeOptions:
                 default_bots=DEFAULT_BOTS[fmt],
                 decks=decks if fixtures else [],
                 best_of=BEST_OF[fmt],
+                kings_table=KingsTableSettings() if fmt == kings_table.FORMAT else None,
             )
             for fmt, decks in FIXTURE_DECKS.items()
         ],
@@ -1662,6 +1707,12 @@ def starter_seat(db: Session, starter: Starter) -> SeatPlan | None:
     return SeatPlan({"player": "bot", "deck_list": deck_list}, title=starter.title, starter=True)
 
 
+def practice_seat(body: PracticeGameRequest) -> int:
+    """The player's seat at a King's Table practice game (v0.8.7): their choice, or team A's
+    King."""
+    return body.seat if body.seat is not None else kings_table.KINGS[0]
+
+
 def plan_seats(
     db: Session,
     request: Request,
@@ -1670,7 +1721,9 @@ def plan_seats(
     bots: list[SeatChoice | None],
 ) -> list[SeatPlan]:
     fmt = body.format
-    deck_format = DECK_FORMATS.get(fmt, fmt)
+    deck_format = deck_format_of(fmt, body.kings_table)
+    # King's Table (v0.8.7) takes fixture decks and deck lists of its decks' format.
+    seat_format = deck_format if fmt == kings_table.FORMAT else fmt
     settings = settings_of(request)
     library = library_of(db, principal.user, principal.permissions, roster_of(request))
     # Commander bots with no deck chosen play the starter decks, each a different one, unless the
@@ -1692,6 +1745,10 @@ def plan_seats(
         )
         for bot in bots
     ]
+    if fmt == kings_table.FORMAT:
+        # King's Table (v0.8.7): the player's chosen seat, the bots in the others in seat order.
+        mine = practice_seat(body)
+        choices = choices[1 : mine + 1] + [human] + choices[mine + 1 :]
     plans: list[SeatPlan] = []
     for player, deck, deck_id, deck_list in choices:
         if deck_id is not None:
@@ -1713,7 +1770,7 @@ def plan_seats(
             if planned is not None:
                 plans.append(planned)
                 continue
-        seat = engine_seat(player, deck, deck_list, fmt, principal)
+        seat = engine_seat(player, deck, deck_list, seat_format, principal)
         if isinstance(seat.get("deck_list"), dict):
             # SysOp's lists hold only cards in the game, as every deck does (v0.4.5).
             refuse_unplayable(db, cast(dict[str, object], seat["deck_list"]))
@@ -1783,14 +1840,20 @@ def record_game(
         bot_skill=body.bot_skill,
         turn_cap=body.turn_cap,
         catalog_revision_id=db.scalar(select(func.max(CatalogRevision.id))),
-        # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.0).
+        # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.0), King's Table those of
+        # its settings (v0.8.7).
         format_version=db.scalar(
             select(func.max(FormatVersion.version)).where(
-                FormatVersion.format == DECK_FORMATS.get(body.format, body.format)
+                FormatVersion.format == deck_format_of(body.format, body.kings_table)
             )
         ),
         # The request, for a rematch with the same settings (v0.5.0, api/rematches.py).
         settings=body.model_dump(mode="json"),
+        kings_table=(
+            kings_table.engine_settings(kings_table.config_of(body.kings_table))
+            if body.format == kings_table.FORMAT
+            else None
+        ),
     )
     db.add(game)
     db.flush()
@@ -1860,6 +1923,11 @@ def malformed(created: object, body: dict[str, object]) -> str | None:
     named = {entry.get("seat"): entry.get("deck") for entry in decks}
     if any(not isinstance(named.get(index), str) for index in range(len(asked))):
         return "a seat without its deck"
+    # King's Table (v0.8.7): an engine that does not echo the settings would play other rules.
+    if body.get("format") == kings_table.FORMAT and (
+        not isinstance(settings, dict) or settings.get("kings_table") != body.get("kings_table")
+    ):
+        return "not the King's Table settings asked for"
     return None
 
 
@@ -1986,10 +2054,23 @@ async def engine_game(
 async def create_practice_game(
     body: PracticeGameRequest, request: Request, principal: Player, db: Db
 ) -> GameSummary:
-    """Starts a game against bots. The response names the game; play it over its WebSocket."""
+    """Starts a game against bots. The response names the game; play it over its WebSocket. At
+    King's Table (v0.8.7) the player takes the seat they chose, with the settings they chose."""
     hub = hub_of(request)
     engine = hub.require_engine()
     fmt = body.format
+    if fmt != kings_table.FORMAT and (body.seat is not None or body.kings_table is not None):
+        raise ApiError(
+            422, "invalid_table", "Only King's Table takes a seat and King's Table settings."
+        )
+    if fmt == kings_table.FORMAT:
+        # Kept whole with the game, for its summary and its rematch.
+        body = body.model_copy(
+            update={
+                "seat": practice_seat(body),
+                "kings_table": kings_table.config_of(body.kings_table),
+            }
+        )
     bots: list[SeatChoice | None] = (
         list(body.bots) if body.bots is not None else [None] * DEFAULT_BOTS[fmt]
     )
@@ -2003,6 +2084,17 @@ async def create_practice_game(
     await require_loaded(request, plans)
     seats = [plan.engine for plan in plans]
     user_id = principal.user.id
+    engine_body: dict[str, object] = {
+        "format": fmt,
+        "seats": seats,
+        "skill": body.bot_skill,
+        "turn_cap": body.turn_cap,
+    }
+    if fmt == kings_table.FORMAT:
+        engine_body["kings_table"] = kings_table.engine_settings(
+            kings_table.config_of(body.kings_table)
+        )
+    mine = practice_seat(body) if fmt == kings_table.FORMAT else 0
     async with hub.locks[user_id]:
         if not full_access(principal):
             running = await run_in_threadpool(active_games_of, db, user_id)
@@ -2017,17 +2109,13 @@ async def create_practice_game(
         # holds the slot itself.
         hub.reserve()
         try:
-            created = await engine_game(
-                engine,
-                {"format": fmt, "seats": seats, "skill": body.bot_skill, "turn_cap": body.turn_cap},
-                request,
-            )
+            created = await engine_game(engine, engine_body, request)
             async with followed_or_closed(hub, created, db):
                 game = await run_in_threadpool(
                     record_game, db, request, principal, created, body, plans
                 )
-                token = seat_tokens(created)[0]
-                hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
+                token = seat_tokens(created)[mine]
+                hub.register(LiveGame(id=game.id, seats={mine: LiveSeat(mine, user_id, token)}))
         finally:
             hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal)

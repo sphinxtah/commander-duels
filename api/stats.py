@@ -35,6 +35,7 @@ from pydantic import Field
 from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.orm import Session
 
+from api import kings_table
 from api.admin import decode_cursor, encode_cursor
 from api.auth import INPUT_ERRORS
 from api.decks import identity_of, revision_entries
@@ -46,6 +47,8 @@ from api.schemas import Contract, Error
 from api.social import PlayerRef, player_ref, visible_player
 from api.teams import FORMAT as TEAM_FORMAT
 from api.teams import teammate
+
+KINGS_FORMAT = kings_table.FORMAT
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -184,9 +187,21 @@ class HistoryPage(Contract):
 # Recording results.
 
 
-def outcome_of(result: dict[str, object] | None, seat: GameSeat) -> Outcome:
-    """The seat's outcome under OUTCOME_POLICY (the module's docstring says it in words)."""
+def teammates(fmt: str, seat: int, other: int) -> bool:
+    """Whether two seats play on one team: Two-Headed Giant's (v0.5.1) or King's Table's
+    (v0.8.7)."""
+    if fmt == KINGS_FORMAT:
+        return seat != other and seat // 3 == other // 3
+    return fmt == TEAM_FORMAT and other == teammate(seat)
+
+
+def outcome_of(result: dict[str, object] | None, seat: GameSeat, fmt: str | None = None) -> Outcome:
+    """The seat's outcome under OUTCOME_POLICY (the module's docstring says it in words). At
+    King's Table (v0.8.7) the team's result is every one of its seats', a General out before the
+    end too: a draw is a draw for all, whoever left first."""
     found = result or {}
+    if fmt == KINGS_FORMAT and found.get("draw") is True:
+        return "draw"
     winner = found.get("winner_seat")
     kind = found.get("kind")
     if kind == "completed" and isinstance(winner, int):
@@ -213,7 +228,13 @@ def deck_colors(db: Session, game: Game, seat: GameSeat) -> str:
     if seat.deck_revision_id is not None:
         revision = db.get(DeckRevision, seat.deck_revision_id)
         if revision is not None:
-            return identity_of(db, game.format, revision_entries(db, revision))
+            # King's Table (v0.8.7) plays decks of its settings' format.
+            fmt = (
+                kings_table.config_of(game.kings_table).deck_format
+                if game.format == KINGS_FORMAT
+                else game.format
+            )
+            return identity_of(db, fmt, revision_entries(db, revision))
     for word, letter in FIXTURE_COLORS.items():
         if f"-mono-{word}-" in seat.deck:
             return letter
@@ -234,20 +255,20 @@ def record_results(db: Session, game: Game) -> list[PlayerResult]:
     for seat in seats:
         if seat.user_id is None or seat.seat in done:
             continue
-        # The other players and bots are the seat's opponents: in Two-Headed Giant (v0.5.1) the
-        # other team's, so a teammate, a player's or a bot's, is never one the seat beat.
+        # The other players and bots are the seat's opponents: in Two-Headed Giant (v0.5.1) and at
+        # King's Table (v0.8.7) the other team's, so a teammate, a player's or a bot's, is never
+        # one the seat beat.
         others = [
             other
             for other in seats
-            if other is not seat
-            and not (game.format == TEAM_FORMAT and other.seat == teammate(seat.seat))
+            if other is not seat and not teammates(game.format, seat.seat, other.seat)
         ]
         bots = sum(1 for other in others if other.player == "bot")
         row = PlayerResult(
             game_id=game.id,
             seat=seat.seat,
             user_id=seat.user_id,
-            outcome=outcome_of(game.result, seat),
+            outcome=outcome_of(game.result, seat, game.format),
             format=game.format,
             kind=game.kind,
             seats=len(seats),
@@ -426,7 +447,7 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
                         else None,
                         bot_skill=skills.get(row.game_id) if seat.player == "bot" else None,
                         won=seat.seat in won,
-                        teammate=row.format == TEAM_FORMAT and seat.seat == teammate(row.seat),
+                        teammate=teammates(row.format, row.seat, seat.seat),
                     )
                     for seat in seats[row.game_id]
                     if seat.seat != row.seat

@@ -220,7 +220,8 @@ class Game(Base):
     __table_args__ = (
         CheckConstraint("kind IN ('practice', 'table')", name="ck_games_kind"),
         CheckConstraint(
-            "format IN ('legacy', 'commander', 'two_headed_giant')", name="ck_games_format"
+            "format IN ('legacy', 'commander', 'two_headed_giant', 'kings_table')",
+            name="ck_games_format",
         ),
         CheckConstraint("status IN ('active', 'finished', 'interrupted')", name="ck_games_status"),
         CheckConstraint("(match_id IS NULL) = (match_game IS NULL)", name="ck_games_match"),
@@ -250,6 +251,9 @@ class Game(Base):
     # keeps the game's end from paying anything out.
     bots_passive: Mapped[bool] = mapped_column(default=False, server_default=false())
     passive_bots_used: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # King's Table (v0.8.7, api/kings_table.py): the settings it started with, as the engine took
+    # them ({deck_format, life, king_attacks_anyone}). Null in other formats.
+    kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class GameSeat(Base):
@@ -283,22 +287,31 @@ class GameSeat(Base):
     left_reason: Mapped[str | None] = mapped_column(String(16))
 
 
+# A table's seats: two to four, at least two of them players', or King's Table's six (v0.8.7), at
+# least one a player's.
+TABLE_SEATS = (
+    "bots >= 0 AND ((format = 'kings_table' AND seats = 6 AND seats - bots >= 1) OR "
+    "(format <> 'kings_table' AND seats BETWEEN 2 AND 4 AND seats - bots >= 2))"
+)
+
+
 class GameTable(Base):
     """A human table (v0.4.0): the lobby where players take seats with their own decks, then the
     game it started. It is reached by its code: listed in the lobby when public, by its invite link
     alone when private. Bots fill the seats after the players', or since v0.5.1 at a Two-Headed
-    Giant table the seats its teams leave them (bot_seats)."""
+    Giant table the seats its teams leave them (bot_seats), and since v0.8.7 at a King's Table
+    table the seats the host chooses (bot_seats)."""
 
     __tablename__ = "game_tables"
     __table_args__ = (
         CheckConstraint(
-            "format IN ('legacy', 'commander', 'two_headed_giant')", name="ck_game_tables_format"
+            "format IN ('legacy', 'commander', 'two_headed_giant', 'kings_table')",
+            name="ck_game_tables_format",
         ),
         CheckConstraint("visibility IN ('public', 'private')", name="ck_game_tables_visibility"),
         CheckConstraint("status IN ('open', 'started', 'closed')", name="ck_game_tables_status"),
-        CheckConstraint(
-            "seats BETWEEN 2 AND 4 AND bots >= 0 AND seats - bots >= 2", name="ck_game_tables_seats"
-        ),
+        # King's Table (v0.8.7) seats six, at least one of them a player's.
+        CheckConstraint(TABLE_SEATS, name="ck_game_tables_seats"),
         CheckConstraint(
             "best_of IN (1, 3) AND (best_of = 1 OR format = 'legacy')",
             name="ck_game_tables_best_of",
@@ -314,7 +327,8 @@ class GameTable(Base):
     seats: Mapped[int]
     bots: Mapped[int]
     # The seats bots fill (v0.5.1), when they are not the last ones: at a Two-Headed Giant table,
-    # where seats 0 and 1 play seats 2 and 3, a bot may be either team's. Null: the last bots seats.
+    # where seats 0 and 1 play seats 2 and 3, a bot may be either team's, and at a King's Table
+    # table (v0.8.7) any seat the host chooses. Null: the last bots seats.
     bot_seats: Mapped[list[int] | None] = mapped_column(JsonType)
     bot_skill: Mapped[int]
     turn_cap: Mapped[int]
@@ -338,6 +352,9 @@ class GameTable(Base):
     # Two-Headed Giant (v0.5.1): the players who stay on a team at this table until it closes, by
     # user id, because cards their deck shares with a teammate's were named here. Null for none.
     kept_teams: Mapped[dict[str, int] | None] = mapped_column(JsonType)
+    # King's Table (v0.8.7, api/kings_table.py): the host's settings, which the game takes when it
+    # starts ({deck_format, life, king_attacks_anyone}). Null in other formats.
+    kings_table: Mapped[dict[str, object] | None] = mapped_column(JsonType)
 
 
 class TableSeat(Base):

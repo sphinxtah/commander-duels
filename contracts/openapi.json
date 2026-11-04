@@ -5074,7 +5074,8 @@
             "enum": [
               "commander",
               "legacy",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Id",
             "type": "string"
@@ -5323,6 +5324,18 @@
             },
             "title": "Winner Seats",
             "type": "array"
+          },
+          "winner_team": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the winning team, 0 or 1, whose every seat is in winner_seats, a General eliminated before the end too; null for a draw, for no winner and in other formats.",
+            "title": "Winner Team"
           }
         },
         "required": [
@@ -5398,9 +5411,49 @@
             "description": "A player's allied Planeswalker, whose portrait stands for them; since v0.8.0 also a campaign opponent's (a bot seat, whose handle is then the opponent's name).",
             "title": "Portrait"
           },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "king",
+                  "general"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): king or general; null elsewhere.",
+            "title": "Role"
+          },
           "seat": {
             "title": "Seat",
             "type": "integer"
+          },
+          "starting_life": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the seat's starting life under the game's settings.",
+            "title": "Starting Life"
+          },
+          "team": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): 0 or 1, seat // 3; null elsewhere.",
+            "title": "Team"
           }
         },
         "required": [
@@ -5478,7 +5531,8 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
@@ -5497,6 +5551,17 @@
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "kings_table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KingsTableSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the settings the game started with; null in other formats."
           },
           "match": {
             "anyOf": [
@@ -6216,6 +6281,91 @@
         "title": "InventoryItem",
         "type": "object"
       },
+      "KingsTableChange": {
+        "additionalProperties": false,
+        "description": "A change to a King's Table table's settings (v0.8.7); a setting left out stays.",
+        "properties": {
+          "deck_format": {
+            "anyOf": [
+              {
+                "enum": [
+                  "legacy",
+                  "commander"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deck Format"
+          },
+          "king_attacks_anyone": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "King Attacks Anyone"
+          },
+          "life": {
+            "anyOf": [
+              {
+                "enum": [
+                  "all_20",
+                  "all_40",
+                  "generals_20_kings_40"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Life"
+          }
+        },
+        "title": "KingsTableChange",
+        "type": "object"
+      },
+      "KingsTableSettings": {
+        "additionalProperties": false,
+        "description": "King's Table's settings (v0.8.7), chosen by the host or the practice player before the\ngame and fixed once it starts. The engine takes them as they are.",
+        "properties": {
+          "deck_format": {
+            "default": "commander",
+            "description": "Every deck's format, with its own legality and banned list: commander is 100-card singleton with a commander, for the Generals too.",
+            "enum": [
+              "legacy",
+              "commander"
+            ],
+            "title": "Deck Format",
+            "type": "string"
+          },
+          "king_attacks_anyone": {
+            "default": false,
+            "description": "House rule: a King may attack any opponent, not only those in range.",
+            "title": "King Attacks Anyone",
+            "type": "boolean"
+          },
+          "life": {
+            "default": "all_40",
+            "description": "Starting life, whatever the deck format would give: all_20, all_40, or generals_20_kings_40.",
+            "enum": [
+              "all_20",
+              "all_40",
+              "generals_20_kings_40"
+            ],
+            "title": "Life",
+            "type": "string"
+          }
+        },
+        "title": "KingsTableSettings",
+        "type": "object"
+      },
       "LibraryCard": {
         "additionalProperties": false,
         "properties": {
@@ -6663,7 +6813,8 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
@@ -7946,10 +8097,22 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Id",
             "type": "string"
+          },
+          "kings_table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KingsTableSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the default settings; null in other formats. Its decks are the fixture decks of both deck formats."
           },
           "name": {
             "title": "Name",
@@ -7968,7 +8131,7 @@
       },
       "PracticeGameRequest": {
         "additionalProperties": false,
-        "description": "A practice game: your seat first, then the bots in turn order.",
+        "description": "A practice game: your seat first, then the bots in turn order; at King's Table (v0.8.7)\nyour chosen seat, the bots in the others.",
         "properties": {
           "best_of": {
             "default": 1,
@@ -7993,7 +8156,7 @@
                 "items": {
                   "$ref": "#/components/schemas/SeatChoice"
                 },
-                "maxItems": 3,
+                "maxItems": 5,
                 "minItems": 1,
                 "type": "array"
               },
@@ -8001,7 +8164,7 @@
                 "type": "null"
               }
             ],
-            "description": "One bot in Legacy; one to three in Commander (default three); three in Two-Headed Giant: your teammate, then the two opponents.",
+            "description": "One bot in Legacy; one to three in Commander (default three); three in Two-Headed Giant: your teammate, then the two opponents; five at King's Table (v0.8.7), in seat order without yours. A King's Table bot left without a deck plays one of the engine's fixture decks of the deck format.",
             "title": "Bots"
           },
           "deck": {
@@ -8057,14 +8220,40 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
           },
+          "kings_table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KingsTableSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): its settings, the defaults when left out. Refused in other formats."
+          },
           "rules": {
             "$ref": "#/components/schemas/TableRules",
             "description": "Which cards the game's own decks may hold by their legality; casual unless told otherwise."
+          },
+          "seat": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Your seat; team A's King (1) when left out. Refused in other formats.",
+            "title": "Seat"
           },
           "turn_cap": {
             "default": 60,
@@ -8138,7 +8327,8 @@
                 "enum": [
                   "legacy",
                   "commander",
-                  "two_headed_giant"
+                  "two_headed_giant",
+                  "kings_table"
                 ],
                 "type": "string"
               },
@@ -9113,7 +9303,8 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
@@ -9167,7 +9358,8 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
@@ -9258,7 +9450,8 @@
                 "enum": [
                   "legacy",
                   "commander",
-                  "two_headed_giant"
+                  "two_headed_giant",
+                  "kings_table"
                 ],
                 "type": "string"
               },
@@ -10952,6 +11145,20 @@
             ],
             "title": "Ready"
           },
+          "seat": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Moves you to that open seat, which makes every player not ready.",
+            "title": "Seat"
+          },
           "team": {
             "anyOf": [
               {
@@ -10963,7 +11170,7 @@
                 "type": "null"
               }
             ],
-            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Moves you to a free seat of that team; unreadies you, and the teammate you then have.",
+            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): 0 for seats 0-2, 1 for seats 3-5. Moves you to a free seat of that team; unreadies you, and the teammate you then have (at King's Table every player).",
             "title": "Team"
           }
         },
@@ -11025,6 +11232,31 @@
         "title": "SeatChoice",
         "type": "object"
       },
+      "SeatMove": {
+        "additionalProperties": false,
+        "properties": {
+          "seat": {
+            "description": "The seat of the player to move.",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Seat",
+            "type": "integer"
+          },
+          "to": {
+            "description": "An open seat: neither taken nor a bot's.",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "To",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seat",
+          "to"
+        ],
+        "title": "SeatMove",
+        "type": "object"
+      },
       "SeatTaking": {
         "additionalProperties": false,
         "properties": {
@@ -11033,6 +11265,20 @@
             "format": "uuid",
             "title": "Deck Id",
             "type": "string"
+          },
+          "seat": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. The open seat to take; the first open one (of team, when given) when left out.",
+            "title": "Seat"
           },
           "team": {
             "anyOf": [
@@ -11045,7 +11291,7 @@
                 "type": "null"
               }
             ],
-            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. The team to join; the first free seat when left out.",
+            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): 0 for seats 0-2, 1 for seats 3-5. The team to join; the first free seat when left out.",
             "title": "Team"
           }
         },
@@ -12079,6 +12325,54 @@
         "title": "SyncRunInfo",
         "type": "object"
       },
+      "TableChange": {
+        "additionalProperties": false,
+        "description": "The host's changes to a King's Table table before its start (v0.8.7). Anything that\nchanges makes every player not ready again; the host's start is their ready.",
+        "properties": {
+          "bot_seats": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 5.0,
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                "maxItems": 5,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every seat bots fill from now on, none of a player's (after the move).",
+            "title": "Bot Seats"
+          },
+          "kings_table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KingsTableChange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Settings to change; one left out stays."
+          },
+          "move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeatMove"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Moves a player to an open seat."
+          }
+        },
+        "title": "TableChange",
+        "type": "object"
+      },
       "TablePlayer": {
         "additionalProperties": false,
         "properties": {
@@ -12147,9 +12441,37 @@
             "title": "Ready",
             "type": "boolean"
           },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "king",
+                  "general"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): king or general; null elsewhere.",
+            "title": "Role"
+          },
           "seat": {
             "title": "Seat",
             "type": "integer"
+          },
+          "starting_life": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the seat's starting life under the settings.",
+            "title": "Starting Life"
           },
           "taken": {
             "description": "Whether a player sits there; bots' seats always are.",
@@ -12165,7 +12487,7 @@
                 "type": "null"
               }
             ],
-            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3. Null in other formats.",
+            "description": "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): 0 for seats 0-2, 1 for seats 3-5. Null in other formats.",
             "title": "Team"
           },
           "you": {
@@ -12202,6 +12524,24 @@
             "title": "Best Of",
             "type": "integer"
           },
+          "bot_seats": {
+            "anyOf": [
+              {
+                "items": {
+                  "maximum": 5.0,
+                  "minimum": 0.0,
+                  "type": "integer"
+                },
+                "maxItems": 5,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the seats bots fill, any but yours; none when left out.",
+            "title": "Bot Seats"
+          },
           "bot_skill": {
             "default": 4,
             "maximum": 6.0,
@@ -12217,8 +12557,8 @@
           },
           "bots": {
             "default": 0,
-            "description": "Seats bots fill: in Commander after the players'; in Two-Headed Giant (since v0.5.1) your teammate's when bot_teammate, the rest the other team's.",
-            "maximum": 2.0,
+            "description": "Seats bots fill: in Commander after the players'; in Two-Headed Giant (since v0.5.1) your teammate's when bot_teammate, the rest the other team's. At King's Table bot_seats names them; bots, if given, counts them.",
+            "maximum": 5.0,
             "minimum": 0.0,
             "title": "Bots",
             "type": "integer"
@@ -12234,19 +12574,45 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
+          },
+          "kings_table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KingsTableSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables."
           },
           "rules": {
             "$ref": "#/components/schemas/TableRules",
             "description": "Which cards its decks may hold by their legality; casual unless told otherwise."
           },
+          "seat": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): 0 team A's Left General, 1 team A's King, 2 team A's Right General, 3 team B's Right General, 4 team B's King, 5 team B's Left General. Your seat; team A's King (1) when left out.",
+            "title": "Seat"
+          },
           "seats": {
             "default": 2,
-            "description": "Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in Two-Headed Giant.",
-            "maximum": 4.0,
+            "description": "Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in Two-Headed Giant, 6 at King's Table.",
+            "maximum": 6.0,
             "minimum": 2.0,
             "title": "Seats",
             "type": "integer"
@@ -12338,7 +12704,8 @@
             "enum": [
               "legacy",
               "commander",
-              "two_headed_giant"
+              "two_headed_giant",
+              "kings_table"
             ],
             "title": "Format",
             "type": "string"
@@ -12368,8 +12735,19 @@
             "description": "The host's handle.",
             "title": "Host"
           },
+          "kings_table": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KingsTableSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.7): the host's settings, which its game starts with; null at other tables."
+          },
           "players": {
-            "description": "Every seat in turn order, bots last.",
+            "description": "Every seat in turn order, bots last (at Two-Headed Giant and King's Table tables, in their own seats).",
             "items": {
               "$ref": "#/components/schemas/TablePlayer"
             },
@@ -30115,7 +30493,7 @@
     },
     "/api/v1/practice-games": {
       "post": {
-        "description": "Starts a game against bots. The response names the game; play it over its WebSocket.",
+        "description": "Starts a game against bots. The response names the game; play it over its WebSocket. At\nKing's Table (v0.8.7) the player takes the seat they chose, with the settings they chose.",
         "operationId": "create_practice_game_api_v1_practice_games_post",
         "requestBody": {
           "content": {
@@ -32646,11 +33024,132 @@
           }
         },
         "summary": "Get Table"
+      },
+      "patch": {
+        "description": "The host changes a King's Table table before its start (v0.8.7): its settings, the seats\nits bots fill, or a player's seat (to an open one). Anything that changes makes every player\nnot ready again.",
+        "operationId": "change_table_api_v1_tables__code__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 8,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TableView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Table"
       }
     },
     "/api/v1/tables/{code}/join": {
       "post": {
-        "description": "Takes the first free player's seat with one of your decks.",
+        "description": "Takes the first free player's seat with one of your decks; at a Two-Headed Giant table the\nteam's, and at a King's Table table (v0.8.7) the seat named, or the team's.",
         "operationId": "join_table_api_v1_tables__code__join_post",
         "parameters": [
           {
@@ -32886,7 +33385,7 @@
     },
     "/api/v1/tables/{code}/seat": {
       "patch": {
-        "description": "Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed\nGiant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready\ntoo, and you are ready only once your deck and your teammate's share no card but basic lands.",
+        "description": "Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed\nGiant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready\ntoo, and you are ready only once your deck and your teammate's share no card but basic lands.\nAt a King's Table table (v0.8.7) also your seat, or your team, either of which makes every\nplayer not ready; getting ready checks your deck by the settings' deck format again.",
         "operationId": "change_seat_api_v1_tables__code__seat_patch",
         "parameters": [
           {

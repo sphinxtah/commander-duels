@@ -203,7 +203,8 @@ def test_seat_view_contract_cannot_carry_concealed_information():
         ("named hidden card", lambda view: view["view"]["hand"][0].update(hidden=True)),
         ("unknown prompt kind", lambda view: view["prompt"].update(kind="reveal_hand")),
         ("seat chosen by option", lambda view: view["prompt"]["options"][0].update(seat=7)),
-        ("a fifth seat", lambda view: view["view"]["opponents"].append(player(3) | {"seat": 4})),
+        # King's Table (v0.8.7) seats six: seats 0-5.
+        ("a seventh seat", lambda view: view["view"]["opponents"].append(player(3) | {"seat": 6})),
         ("hidden commander's object", lambda view: opponent_commander(view).update(zone="hidden")),
         ("commander library", lambda view: opponent_commander(view).update(library=[])),
         ("odd commander tax", lambda view: view["view"]["you"]["commanders"][0].update(tax=3)),
@@ -252,8 +253,8 @@ def test_seat_view_contract_carries_a_controlled_players_hand_only_with_its_cont
             "another uncontrolled hand",
             lambda view: view["view"]["opponents"][2].update(hand=[secret]),
         ),
-        ("a controller out of range", lambda v: v["view"]["opponents"][1].update(controlled_by=4)),
-        ("a prompt for a fifth seat", lambda view: view["prompt"].update(for_seat=4)),
+        ("a controller out of range", lambda v: v["view"]["opponents"][1].update(controlled_by=6)),
+        ("a prompt for a seventh seat", lambda view: view["prompt"].update(for_seat=6)),
     ]
     for description, mutate in leaks:
         leaked = copy.deepcopy(controlling())

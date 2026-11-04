@@ -32,6 +32,15 @@
   Changing deck or team makes the player and their teammate not ready again. Bots get fixture
   decks their teammate's deck shares no card with. A player's concession is their team's (810.8b),
   as the engine plays it.
+- **King's Table** (v0.8.7, api/kings_table.py). Six named seats in two teams of three, a King
+  and two Generals each, at least one of them a player's. The host chooses the settings (the
+  decks' format, the starting life and whether a King attacks anyone), their own seat and the
+  seats bots fill, and until the start may change the settings, the bots' seats and any player's
+  seat (to an open one); players take an open seat by its number or team and may move to another.
+  Any such change makes every player not ready again. Each deck is checked by the settings' deck
+  format and the table's rules, when it is chosen, when its player gets ready and at the start;
+  teammates may share cards. Bots play the engine's fixture decks of that format. The settings
+  are the game's once it starts.
 """
 
 import random
@@ -48,12 +57,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from api import matches, teams
+from api import kings_table, matches, teams
 from api.auth import INPUT_ERRORS
 from api.custom_play import custom_in_seats
 from api.decks import entries_of, revision_entries, starters_of
 from api.games import (
-    DECK_FORMATS,
     FORMAT_NAMES,
     TABLE_IDLE_SECONDS,
     LiveGame,
@@ -61,6 +69,7 @@ from api.games import (
     Player,
     SeatPlan,
     active_games_of,
+    deck_format_of,
     engine_game,
     engine_names,
     followed_or_closed,
@@ -70,6 +79,7 @@ from api.games import (
     require_loaded,
     seat_tokens,
     starter_seat,
+    team_play,
 )
 from api.identity import (
     ApiError,
@@ -94,7 +104,19 @@ from api.models import (
     User,
 )
 from api.roster import roster_of
-from api.schemas import BEST_OF_TEXT, BestOf, Contract, Error, TableFormatId, TableRules, casual
+from api.schemas import (
+    BEST_OF_TEXT,
+    KINGS_TABLE_SEAT_TEXT,
+    BestOf,
+    Contract,
+    Error,
+    KingsTableChange,
+    KingsTableRole,
+    KingsTableSettings,
+    TableFormatId,
+    TableRules,
+    casual,
+)
 from api.validation import DeckEntry
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -103,13 +125,20 @@ router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 OPEN_HOURS = 3
 LISTED = 50
 TEAM_FORMAT = teams.FORMAT
-SEATS = {"legacy": [2], "commander": [2, 3, 4], TEAM_FORMAT: [teams.SEATS]}
+KINGS = kings_table.FORMAT
+SEATS = {
+    "legacy": [2],
+    "commander": [2, 3, 4],
+    TEAM_FORMAT: [teams.SEATS],
+    KINGS: [kings_table.SEATS],
+}
 # A Two-Headed Giant player beside a bot whose deck leaves the bot no fixture deck (v0.5.1).
 NO_BOT_TEAMMATE = (
     "Your deck shares a card with every bot deck, so no bot can be your teammate: choose another "
     "deck."
 )
 Code = Annotated[str, Path(min_length=8, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")]
+KingsSeat = Annotated[int, Field(ge=0, le=5)]
 Visibility = Literal["public", "private"]
 
 
@@ -120,16 +149,17 @@ class TableRequest(Contract):
     seats: int = Field(
         default=2,
         ge=2,
-        le=4,
+        le=6,
         description="Every seat, bots included: 2 in Legacy, 2-4 in Commander, 4 in "
-        "Two-Headed Giant.",
+        "Two-Headed Giant, 6 at King's Table.",
     )
     bots: int = Field(
         default=0,
         ge=0,
-        le=2,
+        le=5,
         description="Seats bots fill: in Commander after the players'; in Two-Headed Giant (since "
-        "v0.5.1) your teammate's when bot_teammate, the rest the other team's.",
+        "v0.5.1) your teammate's when bot_teammate, the rest the other team's. At King's Table "
+        "bot_seats names them; bots, if given, counts them.",
     )
     bot_teammate: bool = Field(
         default=False,
@@ -148,10 +178,28 @@ class TableRequest(Contract):
     )
     best_of: BestOf = Field(default=1, description=BEST_OF_TEXT)
     deck_id: UUID = Field(description="The host's deck.")
+    seat: KingsSeat | None = Field(
+        default=None,
+        description=f"{KINGS_TABLE_SEAT_TEXT} Your seat; team A's King (1) when left out.",
+    )
+    bot_seats: list[KingsSeat] | None = Field(
+        default=None,
+        max_length=5,
+        description="King's Table (v0.8.7): the seats bots fill, any but yours; none when left "
+        "out.",
+    )
+    kings_table: KingsTableSettings | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): its settings, the defaults when left out. Refused at "
+        "other tables.",
+    )
 
 
 Team = Annotated[int, Field(ge=0, le=1)]
-TEAM_TEXT = "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3."
+TEAM_TEXT = (
+    "Two-Headed Giant (v0.5.1): 0 for seats 0 and 1, 1 for seats 2 and 3; King's Table (v0.8.7): "
+    "0 for seats 0-2, 1 for seats 3-5."
+)
 
 
 class SeatTaking(Contract):
@@ -159,6 +207,11 @@ class SeatTaking(Contract):
     team: Team | None = Field(
         default=None,
         description=f"{TEAM_TEXT} The team to join; the first free seat when left out.",
+    )
+    seat: KingsSeat | None = Field(
+        default=None,
+        description=f"{KINGS_TABLE_SEAT_TEXT} The open seat to take; the first open one (of team, "
+        "when given) when left out.",
     )
 
 
@@ -168,8 +221,33 @@ class SeatChange(Contract):
     team: Team | None = Field(
         default=None,
         description=f"{TEAM_TEXT} Moves you to a free seat of that team; unreadies you, and the "
-        "teammate you then have.",
+        "teammate you then have (at King's Table every player).",
     )
+    seat: KingsSeat | None = Field(
+        default=None,
+        description=f"{KINGS_TABLE_SEAT_TEXT} Moves you to that open seat, which makes every "
+        "player not ready.",
+    )
+
+
+class SeatMove(Contract):
+    seat: KingsSeat = Field(description="The seat of the player to move.")
+    to: KingsSeat = Field(description="An open seat: neither taken nor a bot's.")
+
+
+class TableChange(Contract):
+    """The host's changes to a King's Table table before its start (v0.8.7). Anything that
+    changes makes every player not ready again; the host's start is their ready."""
+
+    kings_table: KingsTableChange | None = Field(
+        default=None, description="Settings to change; one left out stays."
+    )
+    bot_seats: list[KingsSeat] | None = Field(
+        default=None,
+        max_length=5,
+        description="Every seat bots fill from now on, none of a player's (after the move).",
+    )
+    move: SeatMove | None = Field(default=None, description="Moves a player to an open seat.")
 
 
 class TablePlayer(Contract):
@@ -184,6 +262,13 @@ class TablePlayer(Contract):
     deck: str | None = Field(description="Your own seat's deck title; others' decks are private.")
     deck_id: UUID | None = Field(description="Your own seat's deck.")
     team: int | None = Field(default=None, description=f"{TEAM_TEXT} Null in other formats.")
+    role: KingsTableRole | None = Field(
+        default=None, description="King's Table (v0.8.7): king or general; null elsewhere."
+    )
+    starting_life: int | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): the seat's starting life under the settings.",
+    )
 
 
 class TableView(Contract):
@@ -197,8 +282,16 @@ class TableView(Contract):
     turn_cap: int
     rules: TableRules
     best_of: int = Field(default=1, description="Since v0.5.0: 3 for a best-of-three match.")
+    kings_table: KingsTableSettings | None = Field(
+        default=None,
+        description="King's Table (v0.8.7): the host's settings, which its game starts with; "
+        "null at other tables.",
+    )
     host: str | None = Field(description="The host's handle.")
-    players: list[TablePlayer] = Field(description="Every seat in turn order, bots last.")
+    players: list[TablePlayer] = Field(
+        description="Every seat in turn order, bots last (at Two-Headed Giant and King's Table "
+        "tables, in their own seats)."
+    )
     your_seat: int | None
     can_start: bool = Field(description="You host it, every player's seat is taken and ready.")
     game_id: UUID | None = Field(description="Its game, once started; for its players and SysOp.")
@@ -245,7 +338,19 @@ def player_seats_of(table: GameTable) -> list[int]:
 
 
 def team_of(table: GameTable, seat: int) -> int | None:
+    if table.format == KINGS:
+        return kings_table.team_of(seat)
     return seat // 2 if table.format == TEAM_FORMAT else None
+
+
+def kings_of(table: GameTable) -> KingsTableSettings | None:
+    """A King's Table table's settings (v0.8.7); None at any other table."""
+    return kings_table.config_of(table.kings_table) if table.format == KINGS else None
+
+
+def deck_format_for(table: GameTable) -> str:
+    """The format the table's decks are built for."""
+    return deck_format_of(table.format, table.kings_table)
 
 
 def team_cards(db: Session, deck_id: UUID) -> set[str]:
@@ -375,9 +480,12 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
     mine = next((row for row in rows if row.user_id == you), None)
     deck = db.get(Deck, mine.deck_id) if mine is not None else None
     bots = bot_seats_of(table)
+    kings = kings_of(table)
     players: list[TablePlayer] = []
     for index in range(table.seats):
         row = by_seat.get(index)
+        role = kings_table.role_of(index) if kings else None
+        life = kings_table.starting_life(kings, index) if kings else None
         if index in bots:
             players.append(
                 TablePlayer(
@@ -392,6 +500,8 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
                     deck=None,
                     deck_id=None,
                     team=team_of(table, index),
+                    role=role,
+                    starting_life=life,
                 )
             )
             continue
@@ -411,6 +521,8 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
                 deck=deck.title if own and deck is not None else None,
                 deck_id=row.deck_id if own and row is not None else None,
                 team=team_of(table, index),
+                role=role,
+                starting_life=life,
             )
         )
     status = status_of(table)
@@ -426,6 +538,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         turn_cap=table.turn_cap,
         rules=rules_of(table),
         best_of=table.best_of,
+        kings_table=kings,
         host=found.get(table.host_id, (None, None))[0],
         players=players,
         your_seat=mine.seat if mine is not None else None,
@@ -443,15 +556,17 @@ def check_deck(
     deck_id: UUID,
     fmt: str,
     rules: TableRules,
+    kings: object = None,
 ) -> UUID:
     """A deck the player may sit down with: theirs, of the table's format, playable with their
     library now (as at the practice table), and holding no card the table's rules do not allow.
     Two-Headed Giant (v0.5.1) takes a Legacy deck, and refuses its own banned card where banned
-    cards are refused. Returns the revision the deck is bound to, as checked (v0.5.1)."""
+    cards are refused; King's Table (v0.8.7) a deck of its settings' (kings) deck format. Returns
+    the revision the deck is bound to, as checked (v0.5.1)."""
     if "decks.edit" not in permissions:
         raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
     library = library_of(db, user, permissions, roster_of(request))
-    deck_format = DECK_FORMATS.get(fmt, fmt)
+    deck_format = deck_format_of(fmt, kings)
     seat, revision, _ = own_deck(db, user, permissions, deck_id, deck_format, library, rules)
     if fmt == TEAM_FORMAT:
         refused = team_banned(teams.cards_of(seat) or set(), rules, permissions)
@@ -509,7 +624,26 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
             "invalid_table",
             f"{FORMAT_NAMES[fmt]} seats {SEATS[fmt]} players, not {body.seats}.",
         )
-    if body.bots > body.seats - 2:
+    if fmt != KINGS and (
+        body.seat is not None or body.bot_seats is not None or body.kings_table is not None
+    ):
+        raise ApiError(
+            422,
+            "invalid_table",
+            "Only a King's Table table takes King's Table settings, a seat and bot seats.",
+        )
+    kings: KingsTableSettings | None = None
+    host_seat, bots, bot_seats = 0, body.bots, None
+    if fmt == KINGS:
+        kings = kings_table.config_of(body.kings_table)
+        host_seat = body.seat if body.seat is not None else kings_table.KINGS[0]
+        bot_seats = kings_bot_seats(body.bot_seats or [], {host_seat})
+        if body.bots not in (0, len(bot_seats)):
+            raise ApiError(
+                422, "invalid_table", "At King's Table bot_seats names the seats bots fill."
+            )
+        bots = len(bot_seats)
+    elif body.bots > body.seats - 2:
         raise ApiError(422, "invalid_table", "A table needs at least two players' seats.")
     if body.best_of != 1 and fmt != "legacy":
         raise ApiError(422, "invalid_table", "Only Legacy plays best of three.")
@@ -517,8 +651,10 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         raise ApiError(
             422, "invalid_table", "A bot teammate is one of a Two-Headed Giant table's bots."
         )
+    if fmt == TEAM_FORMAT:
+        bot_seats = team_bot_seats(body.bots, body.bot_teammate)
     revision = check_deck(
-        db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules
+        db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules, kings
     )
     may_sit(db, request, principal)
     now = utcnow()
@@ -528,8 +664,9 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         format=fmt,
         visibility=body.visibility,
         seats=body.seats,
-        bots=body.bots,
-        bot_seats=team_bot_seats(body.bots, body.bot_teammate) if fmt == TEAM_FORMAT else None,
+        bots=bots,
+        bot_seats=bot_seats,
+        kings_table=kings_table.engine_settings(kings) if kings is not None else None,
         bot_skill=body.bot_skill,
         turn_cap=body.turn_cap,
         allow_banned=body.rules.banned,
@@ -544,7 +681,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
     db.add(
         TableSeat(
             table_id=table.id,
-            seat=0,
+            seat=host_seat,
             user_id=principal.user.id,
             deck_id=body.deck_id,
             deck_revision_id=revision,
@@ -566,7 +703,8 @@ def get_table(code: Code, principal: Player, db: Db) -> TableView:
 def join_table(
     code: Code, body: SeatTaking, request: Request, principal: Player, db: Db
 ) -> TableView:
-    """Takes the first free player's seat with one of your decks."""
+    """Takes the first free player's seat with one of your decks; at a Two-Headed Giant table the
+    team's, and at a King's Table table (v0.8.7) the seat named, or the team's."""
     # Locked, as changing seat locks it (v0.5.1): a team a player stays on is read as it stands.
     table = find(db, code, lock=True)
     if status_of(table) != "open":
@@ -586,6 +724,8 @@ def join_table(
             raise ApiError(409, "team_locked", KEPT)
     elif body.team is not None:
         free = free_in_team(table, free, body.team)
+    if body.seat is not None:
+        free = [open_seat(table, free, body.seat)]
     revision = check_deck(
         db,
         request,
@@ -594,6 +734,7 @@ def join_table(
         body.deck_id,
         table.format,
         rules_of(table),
+        table.kings_table,
     )
     may_sit(db, request, principal)
     db.add(
@@ -616,14 +757,44 @@ def join_table(
 
 
 def free_in_team(table: GameTable, free: list[int], team: int) -> list[int]:
-    """The free players' seats of a team (v0.5.1); refused outside Two-Headed Giant, or when that
-    team has none."""
-    if table.format != TEAM_FORMAT:
-        raise ApiError(422, "invalid_table", "Only Two-Headed Giant tables have teams.")
-    seats = [seat for seat in free if seat // 2 == team]
+    """The free players' seats of a team (v0.5.1); refused outside Two-Headed Giant and (v0.8.7)
+    King's Table, or when that team has none."""
+    if table.format not in (TEAM_FORMAT, KINGS):
+        raise ApiError(
+            422, "invalid_table", "Only Two-Headed Giant and King's Table tables have teams."
+        )
+    seats = [seat for seat in free if team_of(table, seat) == team]
     if not seats:
         raise ApiError(409, "team_full", "That team has no free seat.")
     return seats
+
+
+def open_seat(table: GameTable, free: list[int], seat: int) -> int:
+    """A King's Table seat a player may take (v0.8.7): one of the free players' seats."""
+    if table.format != KINGS:
+        raise ApiError(422, "invalid_table", "Only King's Table tables seat players by number.")
+    if seat not in free:
+        raise ApiError(409, "seat_taken", "That seat is taken, or a bot's.")
+    return seat
+
+
+def kings_bot_seats(seats: list[int], players: set[int]) -> list[int]:
+    """The seats a King's Table table's bots fill (v0.8.7): none twice and none of a player's, so
+    a table keeps at least one player."""
+    if len(set(seats)) != len(seats):
+        raise ApiError(422, "invalid_table", "A seat takes one bot.")
+    taken = sorted(set(seats) & players)
+    if taken:
+        raise ApiError(
+            409, "seat_taken", f"A player sits in seat {taken[0]}: a bot cannot take it."
+        )
+    return sorted(seats)
+
+
+def unready_all(db: Session, table: GameTable) -> None:
+    """King's Table (v0.8.7): a setting or a seat changed, so every player gets ready again."""
+    for row in seats_of(db, table):
+        row.ready = False
 
 
 def seat_at(db: Session, table: GameTable, principal: Principal) -> TableSeat:
@@ -645,11 +816,23 @@ def change_seat(
 ) -> TableView:
     """Changes your deck (which makes you not ready), or whether you are ready. At a Two-Headed
     Giant table (v0.5.1) also your team; a change of deck or team makes your teammate not ready
-    too, and you are ready only once your deck and your teammate's share no card but basic lands."""
+    too, and you are ready only once your deck and your teammate's share no card but basic lands.
+    At a King's Table table (v0.8.7) also your seat, or your team, either of which makes every
+    player not ready; getting ready checks your deck by the settings' deck format again."""
     # Locked (v0.5.1): what a ready check names is recorded before another change at the table.
     table = find(db, code, lock=True)
     row = seat_at(db, table, principal)
-    if body.team is not None and team_of(table, row.seat) != body.team:
+    if body.seat is not None and table.format != KINGS:
+        raise ApiError(422, "invalid_table", "Only King's Table tables seat players by number.")
+    if table.format == KINGS and (body.seat is not None or body.team is not None):
+        target = body.seat if body.seat is not None else row.seat
+        if body.seat is None and body.team is not None and team_of(table, row.seat) != body.team:
+            taken = {other.seat for other in seats_of(db, table)}
+            free = [seat for seat in player_seats_of(table) if seat not in taken]
+            target = free_in_team(table, free, body.team)[0]
+        if target != row.seat:
+            move_player(db, table, row, target)
+    elif body.team is not None and team_of(table, row.seat) != body.team:
         stays_on(table, row.user_id, body.team)
         taken = {other.seat for other in seats_of(db, table)}
         free = [seat for seat in player_seats_of(table) if seat not in taken]
@@ -670,6 +853,7 @@ def change_seat(
             body.deck_id,
             table.format,
             rules_of(table),
+            table.kings_table,
         )
         row.deck_id = body.deck_id
         row.ready = False
@@ -677,8 +861,81 @@ def change_seat(
     if body.ready is not None:
         if body.ready and table.format == TEAM_FORMAT:
             check_team(db, request, principal, table, row)
+        if body.ready and table.format == KINGS:
+            # The settings' deck format may have changed since the deck was chosen.
+            row.deck_revision_id = check_deck(
+                db,
+                request,
+                principal.user,
+                principal.permissions,
+                row.deck_id,
+                table.format,
+                rules_of(table),
+                table.kings_table,
+            )
         row.ready = body.ready
     db.commit()
+    return view_of(db, table, principal)
+
+
+def move_player(db: Session, table: GameTable, row: TableSeat, seat: int) -> None:
+    """Moves a King's Table player to an open seat (v0.8.7), which makes every player not ready."""
+    taken = {other.seat for other in seats_of(db, table) if other is not row}
+    open_seat(table, [s for s in player_seats_of(table) if s not in taken], seat)
+    row.seat = seat
+    unready_all(db, table)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise ApiError(409, "seat_taken", "That seat was just taken. Try again.") from None
+
+
+@router.patch("/tables/{code}", response_model=TableView, responses={409: {"model": Error}})
+def change_table(code: Code, body: TableChange, principal: Player, db: Db) -> TableView:
+    """The host changes a King's Table table before its start (v0.8.7): its settings, the seats
+    its bots fill, or a player's seat (to an open one). Anything that changes makes every player
+    not ready again."""
+    table = find(db, code, lock=True)
+    if table.host_id != principal.user.id:
+        raise ApiError(403, "not_host", "Only the table's host changes the table.")
+    if status_of(table) != "open":
+        raise ApiError(409, "table_closed", "This table is no longer open.")
+    if table.format != KINGS:
+        raise ApiError(422, "invalid_table", "Only King's Table tables have settings to change.")
+    rows = seats_of(db, table)
+    changed = False
+    if body.kings_table is not None:
+        before = kings_table.config_of(table.kings_table)
+        after = before.model_copy(update=body.kings_table.model_dump(exclude_none=True))
+        if after != before:
+            table.kings_table = kings_table.engine_settings(after)
+            changed = True
+    moved = None
+    if body.move is not None:
+        moved = next((row for row in rows if row.seat == body.move.seat), None)
+        if moved is None:
+            raise ApiError(409, "not_seated", "No player sits in that seat.")
+    players = {row.seat for row in rows if row is not moved} | (
+        {body.move.to} if body.move is not None else set()
+    )
+    if body.bot_seats is not None:
+        seats = kings_bot_seats(body.bot_seats, players)
+        if seats != bot_seats_of(table):
+            table.bot_seats, table.bots = seats, len(seats)
+            changed = True
+    if moved is not None and body.move is not None and body.move.to != moved.seat:
+        if body.move.to in bot_seats_of(table) or body.move.to in {r.seat for r in rows}:
+            raise ApiError(409, "seat_taken", "That seat is taken, or a bot's.")
+        moved.seat = body.move.to
+        changed = True
+    if changed:
+        unready_all(db, table)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise ApiError(409, "seat_taken", "That seat was just taken. Try again.") from None
     return view_of(db, table, principal)
 
 
@@ -779,7 +1036,8 @@ def plan_table(
     bots = bot_seats_of(table)
     # Bots with no deck chosen play the starter decks in Commander, a different one each, unless
     # the site keeps them on the engine's fixture decks. In Two-Headed Giant the team rules deal
-    # them fixture decks (check_teams).
+    # them fixture decks (check_teams); at King's Table (v0.8.7) the engine does, of the settings'
+    # deck format.
     starters = (
         list(starters_of(request).values())
         if settings_of(request).bot_decks == "starters" and table.format == "commander"
@@ -807,7 +1065,7 @@ def plan_table(
                 user,
                 permissions,
                 row.deck_id,
-                DECK_FORMATS.get(table.format, table.format),
+                deck_format_for(table),
                 library,
                 rules_of(table),
             )
@@ -957,12 +1215,14 @@ def add_table_game(
         bot_skill=table.bot_skill,
         turn_cap=table.turn_cap,
         catalog_revision_id=db.scalar(select(func.max(CatalogRevision.id))),
-        # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.1).
+        # The decks' format: Two-Headed Giant plays Legacy decks (v0.5.1), King's Table those of
+        # its settings (v0.8.7), which the game keeps.
         format_version=db.scalar(
             select(func.max(FormatVersion.version)).where(
-                FormatVersion.format == DECK_FORMATS.get(table.format, table.format)
+                FormatVersion.format == deck_format_for(table)
             )
         ),
+        kings_table=table.kings_table if table.format == KINGS else None,
     )
     db.add(game)
     db.flush()
@@ -1015,15 +1275,7 @@ async def start_table(code: Code, request: Request, principal: Player, db: Db) -
             hub.reserve()
             try:
                 created = await engine_game(
-                    engine,
-                    {
-                        "format": table.format,
-                        "seats": [plan.engine for plan in plans],
-                        "skill": table.bot_skill,
-                        "turn_cap": table.turn_cap,
-                        "idle_timeout_seconds": TABLE_IDLE_SECONDS,
-                    },
-                    request,
+                    engine, engine_body(table, [plan.engine for plan in plans]), request
                 )
                 async with followed_or_closed(hub, created, db):
                     game = await run_in_threadpool(
@@ -1039,13 +1291,28 @@ async def start_table(code: Code, request: Request, principal: Player, db: Db) -
                                 for seat, user_id in enumerate(users)
                                 if user_id is not None
                             },
-                            teams=table.format == TEAM_FORMAT,
+                            **team_play(table.format),
                         )
                     )
             finally:
                 hub.starting -= 1
     await run_in_threadpool(db.refresh, table)
     return await run_in_threadpool(view_of, db, table, principal)
+
+
+def engine_body(table: GameTable, seats: list[dict[str, object]]) -> dict[str, object]:
+    """The engine's request for a table's game, and since v0.8.7 King's Table's settings with
+    it: the engine chooses which King plays first."""
+    body: dict[str, object] = {
+        "format": table.format,
+        "seats": seats,
+        "skill": table.bot_skill,
+        "turn_cap": table.turn_cap,
+        "idle_timeout_seconds": TABLE_IDLE_SECONDS,
+    }
+    if table.format == KINGS:
+        body["kings_table"] = kings_table.engine_settings(kings_table.config_of(table.kings_table))
+    return body
 
 
 def under_limits(db: Session, request: Request, players: list[UUID]) -> None:

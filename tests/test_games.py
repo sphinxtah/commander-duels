@@ -504,7 +504,12 @@ def test_a_practice_game_belongs_to_its_owner(
     ada, bea = Account(client, "ada"), Account(client, "bea")
     options = ada.get("/api/v1/practice-games/options").json()
     assert options["deck_lists"] is False
-    assert [f["id"] for f in options["formats"]] == ["legacy", "commander", "two_headed_giant"]
+    assert [f["id"] for f in options["formats"]] == [
+        "legacy",
+        "commander",
+        "two_headed_giant",
+        "kings_table",
+    ]
 
     refused = ada.post("/api/v1/practice-games", {}, csrf=False)
     assert refused.json()["code"] == "csrf_failed"
@@ -520,6 +525,10 @@ def test_a_practice_game_belongs_to_its_owner(
         "portrait": None,
         "deck": "legacy-mono-red-burn",
         "left": None,
+        # King's Table's (v0.8.7) alone.
+        "team": None,
+        "role": None,
+        "starting_life": None,
     }
     assert summary["seats"][1]["player"] == "bot" and summary["seats"][1]["deck"] is None
     assert engine.created[0]["seats"] == [
@@ -688,6 +697,8 @@ def test_results_are_recorded_and_restarts_interrupt(
         "draw": False,
         "turns": 2,
         "conceded_seats": [0],
+        # King's Table's (v0.8.7) alone.
+        "winner_team": None,
     }
     assert finished["finished_at"] is not None
 

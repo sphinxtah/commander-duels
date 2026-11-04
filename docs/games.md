@@ -44,7 +44,7 @@ POST /api/v1/practice-games
 
 | Field | Meaning |
 | --- | --- |
-| `format` | `legacy` (one bot, the default), `commander` (one to three bots, three by default) or, since v0.5.0, `two_headed_giant` (three bots: your teammate, then the two opponents; [below](#two-headed-giant-v050-early)) |
+| `format` | `legacy` (one bot, the default), `commander` (one to three bots, three by default), since v0.5.0 `two_headed_giant` (three bots: your teammate, then the two opponents; [below](#two-headed-giant-v050-early)) or since v0.8.7 `kings_table` (five bots; [below](#kings-table-v087)) |
 | `deck` | Your fixture deck. Without one, the engine picks the format's first unused fixture |
 | `deck_id` | Since v0.2.0: one of your own decks instead ([decks](decks.md#at-the-practice-table)). The API stores a revision of it and sends the engine its main deck and commanders |
 | `deck_list` | SysOp only (`cards.any`): a deck list as text, below |
@@ -53,8 +53,10 @@ POST /api/v1/practice-games
 | `turn_cap` | 1–200 turns (default 60) |
 | `rules` | Since v0.4.5: which cards the game's own decks may hold, `{"banned": bool, "not_legal": bool}`, as at a human table ([the table's rules](tables.md#the-tables-rules-v045)), and since v0.6.2 `"stand_in": bool` ([below](#stand-ins-v062)). All true, casual, by default; left out, `stand_in` is allowed when both others are. The bots' starter and fixture decks, and SysOp's deck lists, are not checked |
 | `best_of` | Since v0.5.0: 1 (the default), or in Legacy 3 for a best-of-three match with sideboards ([matches](matches.md)) |
+| `seat` | Since v0.8.7, King's Table only: your seat, 0–5 (team A's King, 1, by default) |
+| `kings_table` | Since v0.8.7, King's Table only: its settings, `{"deck_format", "life", "king_attacks_anyone"}`, each defaulting as at a table ([tables](tables.md#kings-table-v087)) |
 
-The account sits in seat 0. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
+The account sits in seat 0, or since v0.8.7 at King's Table in its `seat`. `GET /api/v1/practice-games/options` lists the formats, bot counts and fixture decks, whether the account may use deck lists, and (`own_decks`) whether it may play its own decks.
 
 The engine checks no deck's legality in its format. Players' own decks and the bots' starter decks reach it as deck lists, which it loads without XMage's deck validator; only its own fixture decks, named by `deck`, pass XMage's Legacy or Commander validator as they load. So the table's rules (v0.4.5) are the API's alone, and a casual deck plays as any other.
 
@@ -84,6 +86,25 @@ You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the 
 
 `GET /api/v1/formats` lists Two-Headed Giant as available, with `early: true` until v0.6.1, which gave teams their priority and their choices and one combined attack and block ([the engine](engine/two-headed-giant.md#team-priority-and-team-choices-v061)), and `early: false` since. Since v0.5.1 human tables and the public queue play it too, with players in either team, and every player of the winning team counts a win and is paid ([tables](tables.md#two-headed-giant-v051), [queues](queues.md#two-headed-giant-v051)); the practice game above is unchanged.
 
+### King's Table (v0.8.7)
+
+Two teams of three, a King and two Generals each, after Magic's Emperor variant (CR 809); the whole mode is in [King's Table](kings-table.md). Seat 0 is team A's Left General, 1 its King, 2 its Right General, 3 team B's Right General, 4 its King, 5 its Left General; a seat's team is `seat // 3`.
+
+```json
+POST /api/v1/practice-games
+{"format": "kings_table", "deck_id": "…", "seat": 3, "bot_skill": 4,
+ "kings_table": {"deck_format": "commander", "life": "generals_20_kings_40", "king_attacks_anyone": false},
+ "bots": [{}, {}, {"deck": "commander-mono-red-raiders"}, {}, {}]}
+```
+
+- **The practice table.** You in the seat you choose, five bots in the others (`bots` in seat order without yours). Your deck, your own (`deck_id`) or for SysOp a fixture or a deck list, is of the settings' `deck_format` and checked by its legality and the game's `rules`, as at a Legacy or Commander practice game; so is a bot's chosen deck. A bot with none plays one of the engine's fixture decks of that format. One game only (`best_of` 1). The game keeps the request (`games.settings`), your seat and settings included, so Rematch plays the same seat and settings again.
+- **Tables** play it too, with players in any seats ([tables](tables.md#kings-table-v087)); the public queues do not (`422 invalid_queue`).
+- **The engine's request** carries `"format": "kings_table"`, exactly six seats in seat order and `"kings_table"`, the settings; never `starting_seat`, since the engine draws which King starts. Its answer must echo the settings (`settings.kings_table`), or the API closes the game and answers `503 engine_unavailable`, as for any answer it cannot follow.
+- **The summary** gives the settings (`kings_table`, null in other formats) and each seat's `team`, `role` (`king` or `general`) and `starting_life`. The settings are the game's (`games.kings_table`), fixed from its start. Seat views pass through as the engine makes them, each player with their team, role, starting life and range.
+- **Results.** A King's elimination loses their team the game; both Kings at once is a draw. The engine's `winner_seats` names the winning team's seats still in the game, so the API records every seat of the team of any of them (`winner_seats`) and the team (`result.winner_team`, 0 or 1): a General eliminated before the end shares the team's win or loss. Each player of the winning team counts a win and is paid for each seat of the other team, a practice game as practice games pay; a draw pays nobody, and is a draw for every player.
+
+`GET /api/v1/formats` lists King's Table (`seats` [6]), and `GET /api/v1/practice-games/options` its five bots, both formats' fixture decks (for SysOp) and its default settings (`kings_table`).
+
 ### Reading and ending games
 
 | Request | Who | Returns |
@@ -94,7 +115,7 @@ You and a bot teammate (seats 0 and 1) against two bots (seats 2 and 3), on the 
 | `GET /api/v1/games/{id}/inspection` | SysOp (`games.view_concealed`) | The inspection view, below |
 | `GET /api/v1/engine/cards?q=` | SysOp (`cards.any`) | Up to 50 card names the engine implements, for deck lists; since v0.4.5 only those of cards in the game. It was `GET /api/v1/cards` until v0.2.0, which gave that path to [the card catalog](catalog.md#search-deck03-deck04) |
 
-Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp. Since v0.4.0 a summary also gives the game's `kind` (`practice` or `table`), each seat's `left` (`conceded`, `removed` or `eliminated` while the game went on), and `tokens`, what the finished game paid you.
+Any other account gets 404 for someone else's game, exactly as for a game that does not exist (T29's match case). A summary shows each seat's player and owner's handle, and since v0.3.1 the owner's allied Planeswalker (`portrait`), whose portrait stands for them at the table. A seat's deck is shown only to that seat's owner, and to SysOp. Since v0.4.0 a summary also gives the game's `kind` (`practice` or `table`), each seat's `left` (`conceded`, `removed` or `eliminated` while the game went on), and `tokens`, what the finished game paid you. Since v0.8.7 a King's Table game's summary gives its settings (`kings_table`) and each seat's `team`, `role` and `starting_life` ([above](#kings-table-v087)).
 
 The account's running games, for `CD_GAMES_PER_ACCOUNT`, are the active games where its seat is still in play (since v0.4.0): a seat out of a table's game that goes on no longer counts. Since v0.5.0 a best-of-three match counts as one running game, between its games too, and a summary gives a match's game its `match` ([matches](matches.md#routes)).
 
@@ -228,6 +249,8 @@ Migration `0022_queues` (v0.5.0) adds each practice game's request (`games.setti
 
 Migration `0024_two_headed_giant` (v0.5.0) lets a game's format be `two_headed_giant`. Its downgrade turns those games into Legacy ones, which their decks are, keeping their wins and tokens. Since v0.5.0 a game's result also keeps `winner_seats`; a result from an older engine gets the winner alone.
 
+Migration `0036_kings_table` (v0.8.7) lets a game's format be `kings_table` and adds `games.kings_table`, the settings it started with (null for every game already there). Since v0.8.7 a King's Table result also keeps `winner_team`. Its downgrade turns those games into games of their decks' format, keeping their wins and tokens, with no practice request to replay ([tables](tables.md#data)).
+
 One API process holds the running games. When it starts, every game still `active` in the database is marked `interrupted` and closed in the engine, because the seat tokens died with the old process. When the engine loses a game (a restart), the API marks it `interrupted` and tells its connections. A finished game stays followable for 10 minutes, then the API forgets its token. Since v0.8.3 the API creates each engine game under an id of its own, with 30 seconds to answer; when no answer comes it closes that id, so a game the engine made anyway (or makes later) is not left running with nothing following it, and a retry starts a new one. An answer the API cannot follow the game from (no game id, a human seat without its token, a seat without its deck) is treated as no answer: the game is closed and nothing is recorded (503 `engine_unavailable`). When recording or registering a created game fails for any reason, the engine game is closed and, if it was recorded, recorded `interrupted`; a close the engine does not answer is logged and never hides the original error. Practice games, tables, queues, rematches and a match's next game start the same way. A game's end that cannot be written for any reason but an unreachable database (which is waited for) is logged and the game recorded `interrupted` instead, so it never stays active holding its players' running game; following a game that fails beyond recovery ends it the same way. Recovery and replay journals (NET08–NET09) remain later work.
 
 **One process.** The running games, their seat tokens, the queues' claims, the locks and the limits live in the API process's memory, so the API runs as exactly one process: one uvicorn worker, never `--workers` or `WEB_CONCURRENCY` above 1. A second process on the same database would mark the first one's games interrupted as it starts, see the first one's games as orphans when they are closed, and make the queues' places that the first is starting wait again. On PostgreSQL the API therefore takes a session-level advisory lock, one for each database schema, on a connection of its own before that startup check, and holds it until it stops; a process that cannot take it logs that another API process is running and fails to start. Taking the lock comes first: while PostgreSQL cannot be reached at startup, the API waits for it (retrying as below) before it serves, since until then it cannot tell whether another process runs the games. SQLite (the tests) takes no lock.
@@ -263,6 +286,7 @@ A short database outage cannot leave a game active and its owner blocked (since 
     - `session_refresh` mid-game in four cases: at a command, at the session check, after an HTTP rotation, and on a connection opened during the rotation grace with the pre-rotation cookie. `authentication_required` once the session ends with a sign-out everywhere.
     - The close reply shows the recorded end, also when the engine answers `closing`. Close interrupts a game nothing follows, and closes it in the engine.
     - A failed write of a game's end is retried. A startup check that cannot reach the database retries, and spares games started since. Games created at the same moment keep to `CD_GAMES_MAX`.
+- **API tests (`tests/test_kings_table.py`, v0.8.7).** Practice from each of the six seats (the seat's token, view and role, a bot's chosen deck in seat order, a King's concession losing the team, a General's leaving no player), every combination of the settings in the engine's request and the summary, decks of the deck format only, a rematch keeping the seat and settings, the refusals, and the tables' part ([tables](tables.md#verification)).
 - **Engine tests (`ServiceGameHttpTest`).**
   - The service token guards every route, and a short token is refused at startup.
   - The two routes keep their games apart.

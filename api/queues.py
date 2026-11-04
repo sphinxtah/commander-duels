@@ -1402,6 +1402,13 @@ async def join_queue(
     queue found at once."""
     queues = queues_of(request)
     key = QueueKey(body.format, body.seats, body.best_of)
+    if body.format == "kings_table":
+        # King's Table (v0.8.7) seats its players by role: at tables and the practice table only.
+        raise ApiError(
+            422,
+            "invalid_queue",
+            "King's Table has no public queue: open a table, or play it at the practice table.",
+        )
     if key not in QUEUES:
         raise ApiError(
             422,

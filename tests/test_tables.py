@@ -395,6 +395,8 @@ def test_a_table_from_the_lobby_to_the_result(client, engine):
         "deck": "Burn",
         "deck_id": ada_deck,
         "team": None,
+        "role": None,
+        "starting_life": None,
     }
     assert table["players"][1]["taken"] is False and table["can_start"] is False
     listed = bob.get("/api/v1/tables").json()
@@ -810,7 +812,10 @@ def test_a_concession_frees_the_seat_and_sysop_observes(client, engine):
     assert practice.status_code == 201, practice.text
     closed_now = root.send("POST", f"/api/v1/games/{game_id}/close")
     assert closed_now.status_code == 200
-    assert closed_now.json()["result"] == {key: closed()[key] for key in games.RESULT_FIELDS}
+    assert closed_now.json()["result"] == {
+        **{key: closed()[key] for key in games.RESULT_FIELDS},
+        "winner_team": None,
+    }
     assert "game.closed" in actions(client)
 
 
