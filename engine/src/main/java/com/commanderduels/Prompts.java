@@ -147,10 +147,20 @@ final class Prompts {
         }
     }
 
-    /** A pass mode: XMage passes now and keeps passing until the mode ends (see {@link Priority}). */
+    /**
+     * A pass mode: XMage passes now and keeps passing until the mode ends (see {@link Priority}).
+     *
+     * <p>XMage hands the pass to its waiting thread by {@code skip()}, which, unlike its other
+     * answers, does not wait for the thread to start listening: a pass that came between the prompt
+     * and the wait was wiped as the wait began, and the game waited for an answer already given
+     * (since v0.8.7 it waits first, as XMage's other answers do).
+     */
     record PassAnswer(PlayerAction action, Game game) implements Answer {
         @Override
         public void apply(Player player) {
+            if (player instanceof OpensResponse opens) {
+                opens.awaitResponseOpen();
+            }
             player.sendPlayerAction(action, game, null);
         }
     }

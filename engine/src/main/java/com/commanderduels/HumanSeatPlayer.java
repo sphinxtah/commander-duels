@@ -27,8 +27,13 @@ import mage.players.Player;
  * into its wait for an answer and when it comes out ({@link Listening}): SysOp's inspection reads
  * XMage's state only in between (bug E4).
  */
-final class HumanSeatPlayer extends HumanPlayer {
+final class HumanSeatPlayer extends HumanPlayer implements OpensResponse {
     private static final long serialVersionUID = 1L;
+
+    @Override
+    public boolean awaitResponseOpen() {
+        return waitResponseOpen();
+    }
 
     /**
      * Told on the game thread when XMage waits for a player's answer (v0.8.6). XMage publishes its
@@ -90,8 +95,13 @@ final class HumanSeatPlayer extends HumanPlayer {
      * shares the controlling seat's answer channel: XMage clears a concession it has handled only on
      * the channels of the game's players, and a channel of its own would stay marked and spin.
      */
-    static final class StandIn extends HumanPlayer {
+    static final class StandIn extends HumanPlayer implements OpensResponse {
         private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean awaitResponseOpen() {
+            return waitResponseOpen();
+        }
         private final Player bot;
         private final transient Listening listening;
 

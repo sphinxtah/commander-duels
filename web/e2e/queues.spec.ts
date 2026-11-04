@@ -128,12 +128,14 @@ test.describe("the public queues", () => {
     await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
 
     // A table with a bot teammate, and a player and a bot in the other team.
+    // Since v0.8.7 "Find a game" shares the page, with choices of its own.
     await page.goto("/#tables");
-    await page.getByRole("radio", { name: /^Two-Headed Giant/ }).check();
-    await page.getByRole("radio", { name: /^A bot/ }).check();
-    await page.getByLabel("The other team").selectOption("1");
-    await page.getByLabel("Your deck").selectOption({ label: title });
-    await page.getByRole("button", { name: "Open the table" }).click();
+    const opening = page.getByRole("region", { name: "Open a table" });
+    await opening.getByRole("radio", { name: /^Two-Headed Giant/ }).check();
+    await opening.getByRole("radio", { name: /^A bot/ }).check();
+    await opening.getByLabel("The other team").selectOption("1");
+    await opening.getByLabel("Your deck").selectOption({ label: title });
+    await opening.getByRole("button", { name: "Open the table" }).click();
     await expect(page).toHaveURL(/#tables\/[A-Za-z0-9_-]+$/);
     await expect(
       page.getByRole("heading", { name: "Two-Headed Giant table" }),

@@ -36,9 +36,9 @@ test("connected shell, the main menu, all navigation, format dialog and saved pr
   await expect(
     page.getByRole("heading", { name: "Commander", exact: true }),
   ).toBeVisible();
-  // The owner's art: the mark in the top bar, the banner on Play, and the favicon.
+  // The owner's art: the mark in the top bar and the favicon (the banner left Play in v0.8.7).
   const brand = page.locator('img[src^="/brand/"]');
-  await expect(brand).toHaveCount(2);
+  await expect(brand).toHaveCount(1);
   await expect
     .poll(() =>
       brand.evaluateAll((images) =>
