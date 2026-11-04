@@ -1541,13 +1541,13 @@ def test_only_sysop_and_administrators_switch_bots_in_their_own_game_against_bot
     ended = root.put(f"/api/v1/games/{own}/bots", {"passive": True})
     assert (ended.status_code, ended.json()["code"]) == (409, "passive_bots_unavailable")
 
-    # An administrator (v0.8.7): their own game against bots, not a player's.
+    # An administrator (v0.8.7): their own game against bots; a player's is not even theirs to see.
     eve = Account(client, "eve")
     with Session(app.state.database) as db:
         db.add(RoleGrant(user_id=eve.id, role="administrator", granted_at=utcnow()))
         db.commit()
-    watching = eve.put(f"/api/v1/games/{theirs}/bots", {"passive": True})
-    assert (watching.status_code, watching.json()["code"]) == (409, "passive_bots_unavailable")
+    assert eve.put(f"/api/v1/games/{theirs}/bots", {"passive": True}).status_code == 404
+    assert theirs not in engine.passive
     eves = eve.post("/api/v1/practice-games", {}).json()["id"]
     assert eve.get(f"/api/v1/games/{eves}").json()["game"]["passive_bots"] is False
     theirs_now = eve.put(f"/api/v1/games/{eves}/bots", {"passive": True})
