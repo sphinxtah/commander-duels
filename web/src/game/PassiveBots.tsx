@@ -6,10 +6,11 @@ import styles from "./game.module.css";
 type Summary = components["schemas"]["GameSummary"];
 
 /**
- * SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the campaign:
- * passive bots only draw, pass and discard to hand size, from their next decision. Shown only where
- * the server allows it (the summary's passive_bots is not null): SysOp's own practice game or
- * campaign duel with no other human seat. The game's log says each change, and once the bots
+ * The switch between normal and passive bots, SysOp's (v0.8.6, in the Inspection drawer) and
+ * since v0.8.7 an administrator's (in the Priority controls drawer), for testing cards and the
+ * campaign: passive bots only draw, pass and discard to hand size, from their next decision.
+ * Shown only where the server allows it (the summary's passive_bots is not null): the viewer's
+ * own practice game or campaign duel with no other human seat. The game's log says each change, and once the bots
  * have been passive the game pays nothing out.
  */
 export function PassiveBots({

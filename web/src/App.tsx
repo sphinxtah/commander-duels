@@ -147,9 +147,10 @@ function currentPage(): Page {
   // The campaign (v0.8.0), and its way back from a duel.
   if (path.startsWith("campaign/")) return "Campaign";
   if (path.startsWith("deck/") || path.startsWith("shared/")) return "Decks";
-  // The Play page's own anchors: "Find a game" (v0.5.0), its practice table and its formats.
-  if (path === "find" || path === "practice" || path === "formats")
-    return "Play";
+  // The Play page's own anchors: its practice table and its formats. "Find a game" (v0.5.0,
+  // #find) is in Tables since v0.8.7.
+  if (path === "find") return "Tables";
+  if (path === "practice" || path === "formats") return "Play";
   // Any other address, Learn and Collection's old ones included, is the main menu.
   return pages.find((page) => page.toLowerCase() === path) ?? "Home";
 }

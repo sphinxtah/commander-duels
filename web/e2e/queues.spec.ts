@@ -72,7 +72,7 @@ test.describe("the public queues", () => {
     await importer.getByRole("button", { name: "Create the deck" }).click();
     await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
 
-    // Play's first section finds a game: the format, the deck, and players only.
+    // Tables' "Find a game" (Play's first section until v0.8.7): the format, the deck, players only.
     await page.goto("/#find");
     const finder = page.getByRole("region", { name: "Find a game" });
     await finder.getByRole("radio", { name: /^Legacy/ }).check();
@@ -95,7 +95,7 @@ test.describe("the public queues", () => {
       }),
     ).toBeGreaterThanOrEqual(1);
 
-    // The main menu's Play tile says so, and leads back to the wait.
+    // The main menu's Tables tile (Play's until v0.8.7) says so, and leads back to the wait.
     await page.goto("/#home");
     const tile = page.getByRole("link", { name: /Looking for a Legacy game/ });
     await expect(tile).toHaveAttribute("href", "#find");

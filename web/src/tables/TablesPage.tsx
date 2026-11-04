@@ -1,6 +1,7 @@
 import { useCallback, useState, type FormEvent, type RefObject } from "react";
 import { client, describe, type Me } from "../api";
 import game from "../game/game.module.css";
+import { FindGame } from "../queues/FindGame";
 import { TableLobby } from "./TableLobby";
 import {
   DeckChoices,
@@ -25,7 +26,9 @@ import styles from "./tables.module.css";
 
 // Human tables (v0.4.0, docs/tables.md): the lobby lists the open tables and opens new ones; a
 // table's own page (#tables/<code>, its invite link) seats the players and starts the game. Since
-// v0.5.1 a table may be Two-Headed Giant's: two teams of two, with bots in either team.
+// v0.5.1 a table may be Two-Headed Giant's: two teams of two, with bots in either team. Since
+// v0.8.7 the lobby also holds "Find a game" in the public queues (#find), which was the Play
+// page's: Play is for the bots, Tables for other people.
 
 const FORMATS: Format[] = ["legacy", "commander", TEAM_FORMAT];
 const FORMAT_WORDS: Record<Format, string> = {
@@ -60,10 +63,16 @@ export function TablesPage({
       </div>
     );
   if (code) return <TableLobby key={code} code={code} heading={heading} />;
-  return <Lobby heading={heading} />;
+  return <Lobby me={me} heading={heading} />;
 }
 
-function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
+function Lobby({
+  me,
+  heading,
+}: {
+  me: Me;
+  heading: RefObject<HTMLHeadingElement | null>;
+}) {
   const load = useCallback(
     async () => (await client.GET("/api/v1/tables")).data,
     [],
@@ -137,11 +146,12 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
         Sit down with other players.
       </h1>
       <p className={styles.lead}>
-        Open a table and share its invite link, or join one below. Bring a deck
-        of your own that the table's rules take: its host chooses whether banned
-        cards, and cards not legal in the format, may play. Wins over players
-        pay 50 to 500 tokens, by how many wins they have. In Two-Headed Giant a
-        team wins together, and both its players are paid.
+        Find a game in the public queue, open a table and share its invite link,
+        or join one below. Bring a deck of your own that the table's rules take:
+        its host chooses whether banned cards, and cards not legal in the
+        format, may play. Wins over players pay 50 to 500 tokens, by how many
+        wins they have. In Two-Headed Giant a team wins together, and both its
+        players are paid.
       </p>
       {yours && (
         <p className={styles.notice} role="status">
@@ -149,6 +159,10 @@ function Lobby({ heading }: { heading: RefObject<HTMLHeadingElement | null> }) {
           <a href={`#tables/${yours.code}`}>Go to your table</a>
         </p>
       )}
+
+      <div id="find" className={styles.find}>
+        <FindGame me={me} />
+      </div>
 
       <section className={game.table} aria-labelledby="open-title">
         <h2 id="open-title">Open a table</h2>

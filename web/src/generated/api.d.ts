@@ -1841,10 +1841,11 @@ export interface paths {
         get?: never;
         /**
          * Set Bots
-         * @description SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the
-         *     campaign: passive bots only draw, pass and discard to hand size, from their next decision.
-         *     Only in SysOp's own running practice game (a campaign duel included) with no other human
-         *     seat. Once they have been passive, the game's end pays nothing out. Audited.
+         * @description The switch between normal and passive bots, SysOp's (v0.8.6) and since v0.8.7 an
+         *     administrator's (games.passive_bots), for testing cards and the campaign: passive bots only
+         *     draw, pass and discard to hand size, from their next decision. Only in the switcher's own
+         *     running practice game (a campaign duel included) with no other human seat. Once they have
+         *     been passive, the game's end pays nothing out. Audited.
          */
         put: operations["set_bots_api_v1_games__game_id__bots_put"];
         post?: never;
@@ -3748,7 +3749,7 @@ export interface components {
         };
         /**
          * BotsSetting
-         * @description SysOp's switch between normal and passive bots (v0.8.6).
+         * @description The switch between normal and passive bots: SysOp's (v0.8.6) and administrators' (v0.8.7).
          */
         BotsSetting: {
             /** Passive */
@@ -5264,7 +5265,7 @@ export interface components {
             match?: components["schemas"]["GameMatch"] | null;
             /**
              * Passive Bots
-             * @description SysOp alone (v0.8.6): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where SysOp may not switch them: one that is not a running practice or campaign game with SysOp its only human seat.
+             * @description SysOp, and since v0.8.7 administrators (games.passive_bots): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where the viewer may not switch them: one that is not their own running practice or campaign game with them its only human seat.
              */
             passive_bots?: boolean | null;
             result: components["schemas"]["GameResult"] | null;
@@ -5822,7 +5823,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];

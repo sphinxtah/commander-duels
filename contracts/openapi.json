@@ -1577,7 +1577,7 @@
       },
       "BotsSetting": {
         "additionalProperties": false,
-        "description": "SysOp's switch between normal and passive bots (v0.8.6).",
+        "description": "The switch between normal and passive bots: SysOp's (v0.8.6) and administrators' (v0.8.7).",
         "properties": {
           "passive": {
             "title": "Passive",
@@ -5518,7 +5518,7 @@
                 "type": "null"
               }
             ],
-            "description": "SysOp alone (v0.8.6): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where SysOp may not switch them: one that is not a running practice or campaign game with SysOp its only human seat.",
+            "description": "SysOp, and since v0.8.7 administrators (games.passive_bots): whether this game's bots are passive (they draw, pass and discard to hand size, and nothing about the game pays out once they have been). Null for everyone else, and for a game where the viewer may not switch them: one that is not their own running practice or campaign game with them its only human seat.",
             "title": "Passive Bots"
           },
           "result": {
@@ -6921,7 +6921,8 @@
                 "chat.read_all",
                 "admin.users.reset",
                 "players.history",
-                "auctions.manage"
+                "auctions.manage",
+                "games.passive_bots"
               ],
               "type": "string"
             },
@@ -25510,7 +25511,7 @@
     },
     "/api/v1/games/{game_id}/bots": {
       "put": {
-        "description": "SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the\ncampaign: passive bots only draw, pass and discard to hand size, from their next decision.\nOnly in SysOp's own running practice game (a campaign duel included) with no other human\nseat. Once they have been passive, the game's end pays nothing out. Audited.",
+        "description": "The switch between normal and passive bots, SysOp's (v0.8.6) and since v0.8.7 an\nadministrator's (games.passive_bots), for testing cards and the campaign: passive bots only\ndraw, pass and discard to hand size, from their next decision. Only in the switcher's own\nrunning practice game (a campaign duel included) with no other human seat. Once they have\nbeen passive, the game's end pays nothing out. Audited.",
         "operationId": "set_bots_api_v1_games__game_id__bots_put",
         "parameters": [
           {

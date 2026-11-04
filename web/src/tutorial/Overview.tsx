@@ -18,7 +18,7 @@ export const OVERVIEW: OverviewPage[] = [
     title: "The table",
     points: [
       "Play Commander (two to four players, 40 life each, 100-card decks led by a commander) or Legacy (two players, 20 life each, 60-card decks).",
-      "Play page: a practice game against bots, at the skill you choose. Tables: sit down with other players. Find a game: the public queue.",
+      "Play page: a practice game against bots, at the skill you choose. Tables: find a game in the public queue, or sit down with other players.",
       "At the table, the big diamonds on the left are your choices; drag a card from your hand to play it, or click it.",
     ],
   },

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { Format, Me, PracticeFormat } from "../api";
 import { PracticeTable } from "../game/PracticeTable";
-import { FindGame } from "../queues/FindGame";
 import shell from "../App.module.css";
 import type { Connection } from "./TopBar";
 import { hoverSound, selectSound } from "./menuSound";
@@ -28,7 +27,7 @@ export function early(format: Format | undefined): boolean {
 /** What a format's details say of how to play it, beyond the general way in. */
 const howToPlay: Record<string, string> = {
   two_headed_giant:
-    "Two teams of two, with Legacy decks: in the queue, alone or with a friend; at a table for four players, or players with bots as teammates or opponents; or with a bot teammate at the practice table. Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
+    "Two teams of two, with Legacy decks: with a bot teammate at the practice table here; or, from Tables, in the queue, alone or with a friend, and at a table for four players, or players with bots as teammates or opponents. Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",
 };
 const symbols: Record<string, string> = {
   commander: "♜",
@@ -42,9 +41,9 @@ const players: Record<string, string> = {
 };
 
 /**
- * Play (v0.4.5; the first page until then): the owner's banner, since v0.5.0 "Find a game" in
- * the public queues, the practice table against the bots, and the formats, those not built yet
- * marked "Coming soon".
+ * Play (v0.4.5; the first page until then): since v0.8.7 for the bots alone, the practice table
+ * and the formats, those not built yet marked "Coming soon". The owner's banner left it in
+ * v0.8.7, and "Find a game" in the public queues moved to Tables.
  */
 export function PlayPage({
   me,
@@ -66,60 +65,21 @@ export function PlayPage({
   }, [selected]);
   return (
     <>
-      <section className={styles.playHero} aria-labelledby="page-title">
-        <picture className={styles.playBanner}>
-          <source
-            media="(max-width: 600px)"
-            srcSet="/brand/banner-logo-640.webp"
-            width={640}
-            height={584}
-          />
-          <source
-            media="(max-width: 1100px)"
-            srcSet="/brand/banner-960.webp"
-            width={960}
-            height={411}
-          />
-          <img
-            src="/brand/banner-1600.webp"
-            alt="Commander Duels: an armoured warrior with an axe on a battlefield, beside the Commander Duels logo"
-            width={1600}
-            height={686}
-          />
-        </picture>
-        <div className={styles.playCopy}>
-          <div>
-            <span className={styles.kicker}>Battle mode</span>
-            <h1 id="page-title" ref={heading} tabIndex={-1}>
-              Gather your cards. <em>Make your mark.</em>
-            </h1>
-            <p>
-              Find a game with other players in the queue, practice against the
-              bots in Legacy, Commander or Two-Headed Giant with your own decks,
-              or sit down at a table with an invite. In Two-Headed Giant, team
-              up with another player, or a friend.
-            </p>
-          </div>
-          <div className={styles.playActions}>
-            <a className={shell.primary} href="#find" onClick={selectSound}>
-              Find a game <span aria-hidden="true">↓</span>
-            </a>
-            <a
-              className={shell.secondary}
-              href="#practice"
-              onClick={selectSound}
-            >
-              Battle the bots
-            </a>
-            <a className={shell.secondary} href="#tables" onClick={selectSound}>
-              Tables
-            </a>
-          </div>
-        </div>
-      </section>
-      <div id="find" className={styles.practice}>
-        <FindGame me={me} />
-      </div>
+      <header className={styles.playHead}>
+        <span className={styles.kicker}>Versus the bots</span>
+        <h1 id="page-title" ref={heading} tabIndex={-1}>
+          Battle the bots.
+        </h1>
+        <p>
+          Practice against the bots in Legacy, Commander or Two-Headed Giant,
+          with your own decks, at the skill you choose. To play other people,
+          find a game or sit down at a table in{" "}
+          <a href="#tables" onClick={selectSound}>
+            Tables
+          </a>
+          .
+        </p>
+      </header>
       <div id="practice" className={styles.practice}>
         <PracticeTable me={me} />
       </div>
@@ -212,7 +172,7 @@ export function PlayPage({
           {comingSoon(selected)
             ? `${selected?.name} is coming soon.`
             : ((selected && howToPlay[selected.id]) ??
-              "Find a game in the queue, start a practice game against the bots from the practice table, or open a table for other players from Tables.")}
+              "Start a practice game against the bots from the practice table here, or play other people from Tables: find a game in the queue, or open a table.")}
         </p>
         <button
           className={shell.primary}

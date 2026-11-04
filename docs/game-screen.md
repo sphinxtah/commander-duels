@@ -4,7 +4,7 @@ v0.1.0 put the practice games on screen and v0.2.0 added the priority controls. 
 
 ## Starting a game
 
-The Play page opens with the owner's banner. Below it, the practice table offers:
+The Play page (since v0.8.7 for the bots alone, with a plain heading in place of the owner's banner; "Find a game" in the public queues is in Tables) opens with the practice table, which offers:
 - **the format.** Legacy against one bot, or Commander against one to three bots;
 - **your deck, and each bot's:** a starter deck, or one of your own playable decks ([decks](decks.md#at-the-practice-table)). "Play it at the practice table" in the deck builder opens the table with that deck chosen;
 - **the bots' skill** (1–6) and a turn limit;
@@ -172,9 +172,9 @@ Chrome and Edge on a PC can install Commander Duels as an app with its own windo
 
 SysOp's Inspection drawer has the inspect switch: every player's hand and library in order, top first, refreshed with each revision. The drawer states that opening it is recorded in the audit trail, which it is (`game.inspection_opened`). When SysOp observes another player's game, the screen names that player instead of "You", and the result reads "Game over" with the winner's name.
 
-## SysOp's passive bots (v0.8.6)
+## Passive bots (v0.8.6; administrators v0.8.7)
 
-In SysOp's own practice game or campaign duel, with no other human seat, the Inspection drawer starts with a **Passive bots** switch, for testing cards and the campaign: passive bots only draw, pass and discard to hand size, with no lands, spells, attacks or blocks, and no to every optional choice but a commander's return to the command zone, from each bot's next decision. One switch covers every bot at the table, and the game's log says each change. The switch shows only where the server allows it (the game summary's `passive_bots`); nobody else sees anything new, and the API refuses the setting from anyone else. A game played with passive bots pays nothing out; a won campaign duel still opens the next ward ([games through the API](games.md#sysops-powers)).
+In SysOp's own practice game or campaign duel, with no other human seat, the Inspection drawer starts with a **Passive bots** switch. Since v0.8.7 an administrator has the same switch in their own such game, at the foot of the Priority controls drawer (only SysOp has the Inspection drawer). It is for testing cards and the campaign: passive bots only draw, pass and discard to hand size, with no lands, spells, attacks or blocks, and no to every optional choice but a commander's return to the command zone, from each bot's next decision. One switch covers every bot at the table, and the game's log says each change. The switch shows only where the server allows it (the game summary's `passive_bots`); nobody else sees anything new, and the API refuses the setting from anyone without `games.passive_bots`. A game played with passive bots pays nothing out; a won campaign duel still opens the next ward ([games through the API](games.md#sysops-powers)).
 
 ## The practice table
 

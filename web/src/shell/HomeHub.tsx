@@ -212,41 +212,31 @@ export function HomeHub({
       </div>
       <section className={styles.tiles} aria-label="Main menu">
         <Tile
-          href={
-            data.game ? `#game/${data.game}` : data.queue ? "#find" : "#play"
-          }
+          href={data.game ? `#game/${data.game}` : "#play"}
           className={styles.playTile}
           icon="play"
           title="Play"
           tour="play"
-          lead="Find a game, or battle the bots in Legacy or Commander."
-          meta={
-            data.game
-              ? "A game is waiting for you"
-              : data.queue
-                ? `Looking for a ${data.queue} game`
-                : undefined
-          }
-          action={
-            data.game
-              ? "Resume your game"
-              : data.queue
-                ? "See your place"
-                : "Play now"
-          }
+          lead="Battle the bots in Legacy, Commander or Two-Headed Giant."
+          meta={data.game ? "A game is waiting for you" : undefined}
+          action={data.game ? "Resume your game" : "Play now"}
           index={0}
         />
+        {/* Since v0.8.7 the queues' "Find a game" is in Tables, so a place in one shows here. */}
         <Tile
-          href="#tables"
+          href={data.queue && !data.game ? "#find" : "#tables"}
           className={styles.tablesTile}
           icon="tables"
           title="Tables"
-          lead="Sit down with other players."
+          lead="Find a game, or sit down with other players."
           meta={
-            data.tables === 0
-              ? "Open the first table"
-              : count(data.tables, "open table", "open tables")
+            data.queue
+              ? `Looking for a ${data.queue} game`
+              : data.tables === 0
+                ? "Open the first table"
+                : count(data.tables, "open table", "open tables")
           }
+          action={data.queue && !data.game ? "See your place" : undefined}
           index={1}
         />
         <Tile

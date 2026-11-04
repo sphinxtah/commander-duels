@@ -40,7 +40,7 @@ from api.config import Settings
 from api.decklists import parse_deck_list
 from api.identity import ApiError, hash_token, utcnow
 from api.main import create_app
-from api.models import AuditEvent, Game, GameSeat, User, UserSession
+from api.models import AuditEvent, Game, GameSeat, RoleGrant, User, UserSession
 
 SERVICE_TOKEN = "service-token-for-the-api-tests-0123456789"
 SYSOP_ADDRESS = ("10.20.0.7", 50000)
@@ -1503,12 +1503,12 @@ def test_a_second_api_process_on_postgresql_does_not_start(
         admin.dispose()
 
 
-def test_only_sysop_switches_bots_in_its_own_game_against_bots(
+def test_only_sysop_and_administrators_switch_bots_in_their_own_game_against_bots(
     client: TestClient, app: FastAPI, engine: FakeEngine
 ) -> None:
-    """Passive bots (v0.8.6): SysOp's own running practice game against bots alone; the server
-    refuses anyone else, and SysOp anywhere else. Each switch is audited, and the game remembers
-    that its bots were passive."""
+    """Passive bots (v0.8.6): SysOp's own running practice game against bots alone, and since
+    v0.8.7 an administrator's; the server refuses anyone else, and both anywhere else. Each
+    switch is audited, and the game remembers that its bots were passive."""
     ada, root = Account(client, "ada"), Account(client, "sysop", kind="sysop")
     theirs = ada.post("/api/v1/practice-games", {}).json()["id"]
     refused = ada.put(f"/api/v1/games/{theirs}/bots", {"passive": True})
@@ -1540,3 +1540,19 @@ def test_only_sysop_switches_bots_in_its_own_game_against_bots(
     assert root.post(f"/api/v1/games/{own}/close").status_code == 200
     ended = root.put(f"/api/v1/games/{own}/bots", {"passive": True})
     assert (ended.status_code, ended.json()["code"]) == (409, "passive_bots_unavailable")
+
+    # An administrator (v0.8.7): their own game against bots, not a player's.
+    eve = Account(client, "eve")
+    with Session(app.state.database) as db:
+        db.add(RoleGrant(user_id=eve.id, role="administrator", granted_at=utcnow()))
+        db.commit()
+    watching = eve.put(f"/api/v1/games/{theirs}/bots", {"passive": True})
+    assert (watching.status_code, watching.json()["code"]) == (409, "passive_bots_unavailable")
+    eves = eve.post("/api/v1/practice-games", {}).json()["id"]
+    assert eve.get(f"/api/v1/games/{eves}").json()["game"]["passive_bots"] is False
+    theirs_now = eve.put(f"/api/v1/games/{eves}/bots", {"passive": True})
+    assert theirs_now.status_code == 200, theirs_now.text
+    assert theirs_now.json()["passive_bots"] is True
+    assert engine.passive[eves] is True
+    with Session(app.state.database) as db:
+        assert db.get_one(Game, uuid.UUID(eves)).passive_bots_used is True

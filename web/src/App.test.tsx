@@ -752,7 +752,7 @@ describe("navigation", () => {
         screen.getByRole("heading", { level: 1 }),
       ),
     );
-    expect(document.activeElement).toHaveTextContent("Gather your cards.");
+    expect(document.activeElement).toHaveTextContent("Battle the bots.");
     // Between pages, as before.
     window.location.hash = "#settings";
     await waitFor(() =>
@@ -783,7 +783,7 @@ describe("navigation", () => {
     markIntendedLeave();
     fireEvent.click(back);
     await waitFor(() =>
-      expect(document.activeElement).toHaveTextContent("Gather your cards."),
+      expect(document.activeElement).toHaveTextContent("Battle the bots."),
     );
     expect(exitTableFullscreen).toHaveBeenCalledTimes(1);
     // The update the game screen said was ready applies now.
@@ -1120,7 +1120,7 @@ describe("what this version offers", () => {
     // Since v0.5.1 at tables and in the queue too; since v0.6.1 with team priority and the
     // team's one attack and block.
     expect(dialog).toHaveTextContent(
-      "Two teams of two, with Legacy decks: in the queue, alone or with a friend",
+      "Two teams of two, with Legacy decks: with a bot teammate at the practice table here",
     );
     expect(dialog).toHaveTextContent(
       "Your team takes its turns together, holds priority together, attacks and blocks together, shares one life total and wins together.",

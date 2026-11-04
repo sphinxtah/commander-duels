@@ -144,6 +144,7 @@ Permission = Literal[
     "admin.users.reset",
     "players.history",
     "auctions.manage",
+    "games.passive_bots",
 ]
 Avatar = Literal["sigil", "sun", "moon", "flame", "wave", "leaf", "crown", "tower"]
 AccountStatus = Literal["active", "pending", "denied", "disabled", "deleted"]
@@ -549,15 +550,16 @@ class GameSummary(Contract):
     )
     passive_bots: bool | None = Field(
         default=None,
-        description="SysOp alone (v0.8.6): whether this game's bots are passive (they draw, pass "
-        "and discard to hand size, and nothing about the game pays out once they have been). Null "
-        "for everyone else, and for a game where SysOp may not switch them: one that is not a "
-        "running practice or campaign game with SysOp its only human seat.",
+        description="SysOp, and since v0.8.7 administrators (games.passive_bots): whether this "
+        "game's bots are passive (they draw, pass and discard to hand size, and nothing about the "
+        "game pays out once they have been). Null for everyone else, and for a game where the "
+        "viewer may not switch them: one that is not their own running practice or campaign "
+        "game with them its only human seat.",
     )
 
 
 class BotsSetting(Contract):
-    """SysOp's switch between normal and passive bots (v0.8.6)."""
+    """The switch between normal and passive bots: SysOp's (v0.8.6) and administrators' (v0.8.7)."""
 
     passive: StrictBool
 

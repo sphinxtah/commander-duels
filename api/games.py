@@ -1159,9 +1159,10 @@ def record_end(
             game.result = recorded(result) if result else None
             db.flush()
             link = db.get(CampaignGame, game.id)
-            # A game SysOp played with passive bots (v0.8.6) pays nothing out: no win, tokens,
-            # quests or achievements, and in the campaign no spoils or chapter rewards, though a
-            # won duel still moves SysOp's own campaign on, for testing the wards that follow.
+            # A game played with passive bots (SysOp's since v0.8.6, an administrator's since
+            # v0.8.7) pays nothing out: no win, tokens, quests or achievements, and in the
+            # campaign no spoils or chapter rewards, though a won duel still moves the player's
+            # own campaign on, for testing the wards that follow.
             payouts = not game.passive_bots_used
             if link is not None:
                 content = campaign.campaign_in(content_dir) if content_dir else None
@@ -1288,11 +1289,12 @@ def full_access(principal: Principal) -> bool:
 
 
 def passive_switchable(game: Game, rows: list[GameSeat], principal: Principal) -> bool:
-    """Whether SysOp may switch this game's bots (v0.8.6): SysOp's own running practice game
-    (a campaign duel is one), with SysOp its only human seat and at least one bot."""
+    """Whether the viewer may switch this game's bots: SysOp (v0.8.6) or, since v0.8.7, an
+    administrator (games.passive_bots), in their own running practice game (a campaign duel is
+    one), with them its only human seat and at least one bot."""
     humans = [row for row in rows if row.player == "human"]
     return (
-        principal.user.kind == "sysop"
+        principal.can("games.passive_bots")
         and game.status == "active"
         and game.kind == "practice"
         and len(humans) == 1
@@ -2162,12 +2164,13 @@ async def inspect_game(
 async def set_bots(
     game_id: UUID, setting: BotsSetting, request: Request, principal: Player, db: Db
 ) -> GameSummary:
-    """SysOp's switch between normal and passive bots (v0.8.6), for testing cards and the
-    campaign: passive bots only draw, pass and discard to hand size, from their next decision.
-    Only in SysOp's own running practice game (a campaign duel included) with no other human
-    seat. Once they have been passive, the game's end pays nothing out. Audited."""
-    if principal.user.kind != "sysop":
-        raise ApiError(403, "forbidden", "Only SysOp can switch the bots.")
+    """The switch between normal and passive bots, SysOp's (v0.8.6) and since v0.8.7 an
+    administrator's (games.passive_bots), for testing cards and the campaign: passive bots only
+    draw, pass and discard to hand size, from their next decision. Only in the switcher's own
+    running practice game (a campaign duel included) with no other human seat. Once they have
+    been passive, the game's end pays nothing out. Audited."""
+    if not principal.can("games.passive_bots"):
+        raise ApiError(403, "forbidden", "Only SysOp and administrators can switch the bots.")
     game, _ = await run_in_threadpool(visible_game, db, game_id, principal)
     rows = await run_in_threadpool(
         lambda: list(
@@ -2179,7 +2182,7 @@ async def set_bots(
         raise ApiError(
             409,
             "passive_bots_unavailable",
-            "Passive bots are for SysOp's own running practice game against bots alone.",
+            "Passive bots are for your own running practice game against bots alone.",
         )
     try:
         status, answer = await hub.require_engine().request(

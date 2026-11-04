@@ -6,6 +6,12 @@ import { mockApi, reply } from "../decks/fixtures";
 import type { OwnDeck, TablePlayer, TableView } from "./tables";
 import { TablesPage } from "./TablesPage";
 
+// "Find a game" (the public queues) is in the lobby since v0.8.7, from the Play page; its own
+// tests are in queues.test.tsx, so here it is a stand-in.
+vi.mock("../queues/FindGame", () => ({
+  FindGame: () => <section aria-label="Find a game" />,
+}));
+
 const ada = {
   id: "00000000-0000-4000-8000-0000000000a1",
   kind: "player",
@@ -113,6 +119,10 @@ describe("the lobby", () => {
     );
     render(<TablesPage me={ada} heading={createRef()} />);
     await settle();
+    // "Find a game" first (v0.8.7: Tables is where people play other people), at #find.
+    expect(
+      screen.getByRole("region", { name: "Find a game" }).parentElement,
+    ).toHaveAttribute("id", "find");
     const listed = screen.getByRole("listitem");
     expect(listed).toHaveTextContent("Hosted by bob · 1 of 2 players");
     expect(

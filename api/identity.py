@@ -78,6 +78,9 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             # Tivit's Auction House's log of sales and live auctions (v0.6.0); cancelling one
             # is SysOp's (economy.manage).
             "auctions.manage",
+            # Passive bots in their own game against bots, for testing (v0.8.7; SysOp's since
+            # v0.8.6).
+            "games.passive_bots",
         }
     ),
 }

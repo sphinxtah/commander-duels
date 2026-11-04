@@ -935,6 +935,15 @@ export function GameScreen({
                       Only the seat’s own player sets its priority.
                     </p>
                   )}
+                  {/* An administrator's passive bots (v0.8.7): here, since only SysOp has the
+                      Inspection drawer, where SysOp's switch stays. */}
+                  {!sysop && summary?.passive_bots != null && (
+                    <PassiveBots
+                      gameId={gameId}
+                      passive={summary.passive_bots}
+                      onChange={setSummary}
+                    />
+                  )}
                 </Drawer>
                 {sysop && (
                   <Drawer

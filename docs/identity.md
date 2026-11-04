@@ -171,6 +171,7 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  |  | ✓ |
 | `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  |  | ✓ |
 | `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history)) |  |  |  |  | ✓ |
+| `games.passive_bots` (v0.8.7: [passive bots](game-screen.md#passive-bots-v086-administrators-v087) in their own game against bots; SysOp's since v0.8.6) |  |  |  | ✓ | ✓ |
 
 **Administrators.**
 - They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
