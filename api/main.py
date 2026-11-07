@@ -35,6 +35,7 @@ from api import (
     rematches,
     reports,
     shop,
+    sleeves,
     social,
     stats,
     tables,
@@ -389,4 +390,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(achievements.router)
     app.include_router(testing.router)
     app.include_router(cosmetics.router)
+    app.include_router(sleeves.router)
     return app

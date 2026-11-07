@@ -167,6 +167,11 @@ class DeckSummary(Contract):
         description="Copies switched to editions the library holds when v0.5.0 deployed, until "
         "the owner dismisses the note; null or empty: none.",
     )
+    sleeve: str | None = Field(
+        default=None,
+        description='The card sleeve its cards wear at a table (v0.8.9): "sleeve:<id>", '
+        '"back:<slug>", or null for the default.',
+    )
 
 
 class RevisionSummary(Contract):
@@ -566,6 +571,7 @@ def deck_summary(db: Session, deck: Deck) -> DeckSummary:
             )
             for item in deck.switched_editions or []
         ],
+        sleeve=deck.sleeve,
     )
 
 

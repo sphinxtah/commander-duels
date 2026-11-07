@@ -477,7 +477,10 @@ def reported_table(
     seat = db.scalar(
         select(GameSeat.seat).where(GameSeat.game_id == row.game_id, GameSeat.user_id == me)
     )
-    everything = principal.can("games.view_concealed")
+    # Imported here: api.games imports this module.
+    from api.games import concealed_in
+
+    everything = concealed_in(db, principal, row.game_id)
     if not (everything or (seat is not None and visible(row.channel, row.seat, row.seats, seat))):
         raise not_found()
     if row.kind == "event" or row.sender_id is None:

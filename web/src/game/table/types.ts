@@ -125,6 +125,9 @@ export interface TablePlayer {
   hand: string[] | null;
   sigil: { seed: string; grey: boolean }; // seed: `handle:<h>` | `bot:<seat>` | `seat:<seat>`
   portrait: string | null; // a human's allied Planeswalker (v0.3.1), shown instead of the sigil
+  /** Another human player's account and card sleeve (v0.8.9), for their profile at the table,
+   * where a sleeve may be reported; absent for bots, yourself and SysOp. */
+  profile?: { playerId: string; sleeve: string | null } | null;
   active: boolean;
   priority: boolean;
   lost: boolean;
@@ -192,6 +195,9 @@ export interface TableModel {
   combat: CombatGroup[];
   lines: LineModel[];
   cards: Map<string, TableCard>; // by key (an id can appear twice: hand and revealed)
+  /** Each human seat's card sleeve (v0.8.9), a picture's path; a seat not here shows the
+   * official back. Optional: a model built without a summary has none. */
+  backs?: Map<Seat, string>;
 }
 export interface SummarySeat {
   seat: Seat;
@@ -200,6 +206,8 @@ export interface SummarySeat {
   deck: string | null;
   portrait?: string | null; // a human's allied Planeswalker, by roster ID (v0.3.1)
   left?: "conceded" | "removed" | "eliminated" | null; // out of a table's game (v0.4.0)
+  sleeve?: string | null; // the backs of the seat's cards (v0.8.9); null: the official back
+  player_id?: string | null; // a human seat's player, for their profile (v0.8.9)
 }
 export interface BuildInput {
   gameId: string;

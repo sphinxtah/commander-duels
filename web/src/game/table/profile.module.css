@@ -1,0 +1,97 @@
+/* A player's profile at the table (v0.8.9). */
+.profile {
+  position: fixed;
+  width: min(340px, calc(100vw - 32px));
+  border: 1px solid #d4b47a55;
+  border-radius: 10px;
+  background: #121b1c;
+  color: #f2efe6;
+  padding: 22px 22px 18px;
+  box-shadow: 0 18px 48px #000c;
+}
+.profile::backdrop {
+  background: #050909aa;
+}
+.profile h2 {
+  margin: 0 28px 4px 0;
+  font-size: 1.15rem;
+}
+.close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: none;
+  color: #b8c1b6;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.title {
+  margin: 0 0 4px;
+  color: #d9c79c;
+  font-style: italic;
+}
+.fine {
+  margin: 4px 0;
+  color: #a5b0a3;
+  font-size: 0.82rem;
+}
+.error {
+  margin: 4px 0;
+  color: #ffb4a8;
+  font-size: 0.85rem;
+}
+.sleeve {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 12px 0;
+}
+.sleeve img {
+  width: 126px;
+  height: 176px;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px #0009;
+}
+.sleeve figcaption {
+  color: #a5b0a3;
+  font-size: 0.78rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0;
+}
+.actions a {
+  color: #e6cf8f;
+}
+.actions button {
+  padding: 5px 12px;
+  border: 1px solid #ffffff33;
+  border-radius: 5px;
+  background: #1d2a26;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.actions .report {
+  border-color: #c4554a;
+  background: #3a1a17;
+}
+.field {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.field textarea {
+  font: inherit;
+  background: #0b1212;
+  color: inherit;
+  border: 1px solid #ffffff2a;
+  border-radius: 5px;
+  padding: 6px;
+}

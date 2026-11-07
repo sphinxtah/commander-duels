@@ -17,18 +17,20 @@ export class HandNode {
   readonly root = new Container();
   private readonly kit: SceneKit;
   private backs = -1;
+  private backsSeat: number | null = null;
 
   constructor(kit: SceneKit) {
     this.kit = kit;
   }
 
   /** A spectator sees the anchored player's hand as backs fanned along the edge. */
-  setBacks(count: number): void {
-    if (count === this.backs) return;
+  setBacks(count: number, seat: number | null = null): void {
+    if (count === this.backs && seat === this.backsSeat) return;
     this.backs = count;
+    this.backsSeat = seat;
     for (const child of this.root.removeChildren()) child.destroy();
     for (const slot of fanHand(count)) {
-      const back = new Sprite(this.kit.art.back);
+      const back = new Sprite(this.kit.back(seat));
       back.anchor.set(0.5, 1);
       back.position.set(
         slot.face.x + slot.face.w / 2,

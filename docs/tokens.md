@@ -34,7 +34,7 @@ Daily quests pay 100 to 250 tokens each, and each achievement a one-time reward 
 
 ## SysOp and administrators
 
-- **SysOp gives tokens** to any account, its own included, or takes them back with a negative amount, never below zero (permission `economy.manage`, SysOp's alone). Each grant needs a reason, is audited (`economy.tokens_granted`) and is kept apart from tokens won: the profile counts won, given and spent separately. Since v0.8.5 a grant may carry the client's `key` (8 to 64 letters, digits, `-` or `_`), as a shop purchase does: a retry with it grants once (ledger key `grant:<account>:<key>`), and the key with another amount or reason is refused (`409 key_reused`). The give-tokens form sends one with each grant.
+- **SysOp gives tokens** to any account, its own included, or takes them back with a negative amount, never below zero (permission `economy.manage`, SysOp's alone until v0.8.9; since then `economy.grant`, administrators' too). Each grant needs a reason, is audited (`economy.tokens_granted`) and is kept apart from tokens won: the profile counts won, given and spent separately. Since v0.8.5 a grant may carry the client's `key` (8 to 64 letters, digits, `-` or `_`), as a shop purchase does: a retry with it grants once (ledger key `grant:<account>:<key>`), and the key with another amount or reason is refused (`409 key_reused`). The give-tokens form sends one with each grant.
 - **A reset** (v0.4.5, [resetting an account](identity.md#resetting-an-account-v045)) brings the balance back to the welcome's 1,000 with a grant of the difference, given or taken back, whose reason is "Account reset by SysOp"; it is audited with the reset. The earlier entries stay, so the profile's totals of won, given and spent keep counting them.
 - **Administrators** see every account's balance in Administration and its latest entries through the API, and read the economy's settings; they cannot change them.
 
@@ -52,6 +52,6 @@ Daily quests pay 100 to 250 tokens each, and each achievement a one-time reward 
 | `GET /api/v1/me/tokens` | any active account | balance, totals, the latest 50 entries |
 | `GET /api/v1/me/quests`, `GET /api/v1/me/achievements` | any active account | pay what the account's recorded games already completed or earned (v0.5.0, [quests](quests.md#routes)) |
 | `GET /api/v1/admin/users/{id}/tokens` | administrators, SysOp | the same for an account |
-| `POST /api/v1/admin/users/{id}/tokens` | SysOp (`economy.manage`) | give or take back tokens, with a reason |
+| `POST /api/v1/admin/users/{id}/tokens` | SysOp and administrators (`economy.grant`, v0.8.9) | give or take back tokens, with a reason |
 | `GET /api/v1/admin/economy` | administrators, SysOp | the settings (the daily cap on bots) |
 | `PUT /api/v1/admin/economy` | SysOp (`economy.manage`) | change them, audited (`economy.settings_changed`) |

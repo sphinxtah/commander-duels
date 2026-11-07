@@ -85,7 +85,18 @@ The owner asked on 2026-10-23: "make sure you're following the actual counts for
 - **Across every account.** A printing's copies dealt are every copy any library was granted of it, by a pack or otherwise, an account's reset or deletion aside (a copy pulled stays printed). When a pack would deal a copy past the run, the slot gives another card from the same sheet, as for a card out of the game; the pack keeps its size and its slots' odds. Once the run is all dealt, no pack deals it again.
 - **No race.** A pack that drew a limited printing counts its copies again under a lock on that printing's catalog row, taken in a fixed order, with the copies this very pack deals; one it would take past the run is drawn again without it. Two packs opened at once never both take the last copy.
 - **The One Ring 001/001** (LTR #0) has a run of one, Sphinx's ([one of a kind](progression.md#one-of-a-kind-v051)).
+- **SysOp's copies** (v0.8.9, the owner: "SysOp cards do not come from the total in circulation") are not counted: SysOp's library is for testing, and SysOp may not sell a limited printing at the auction house. Every other account's are, an administrator's too. A testing grant of cards past what is left of a run is refused (`409 print_run`), except to SysOp.
 - `api/print_runs.py`; checked by `tests/test_one_of_a_kind.py` (a run of two dealt to two accounts, a pack that would take both drawn again, the run then closed to everyone, the content file's examples, and every Alpha and Beta printing's copies against its sheets).
+
+## Sold out (v0.8.9)
+
+The owner asked on 2026-11-06 for packs to sell out as the real ones did, the total in circulation matching real-life numbers, from researched counts.
+
+- **The counts** are `content/pack-supply.json`: each set whose print run a source of the time states, in cards. They come from Stephen D'Angelo's *Rulings Summary: Cards* of 1995-07-05, the rules summary of the time (rec.games.trading-cards.magic.rules): Alpha 2.6 million cards, Beta 7.8 million, Unlimited 40 million, Arabian Nights 5 million, Antiquities 15 million, Legends 35 million, The Dark 75 million, Fallen Empires 350 million (stated as 350 to 375; the lower figure). Where later sources differ (Beta 7.3 million in *The Duelist*'s card list, Unlimited 35 million, The Dark 62 million) the file says so. Alpha's and Beta's sheet counts in `print-runs.json` come to 2,601,500 and 7,792,400, which agree. Revised's run was only ever estimated from below ("to exceed 750 million"), and no later set's run was published, so those never sell out.
+- **Every product of a set** takes its real size in cards out of the set's run, because starter decks and boosters came off the same presses: a starter deck 60, a booster 15 (Arabian Nights, Antiquities, The Dark and Fallen Empires boosters 8). A product is sold out once what is left cannot fill one more of it.
+- **What counts:** every pack bought or given to an account other than SysOp's, from the first on, before an account's reset too (a pack sold stays sold). SysOp's packs, like its cards, do not.
+- **Sold out** shows on the shelf as a SOLD OUT banner across the pack, dimmed, its button "Sold out", and neither a purchase nor a grant goes through (`409 sold_out`); a grant to SysOp still does. A pack already held opens as before. A purchase locks the set's products' rows in a fixed order, so two at once never both take the last of a run.
+- At the real numbers this is far off: Alpha alone holds about 173,000 boosters' worth. `api/pack_supply.py`; checked by `tests/test_pack_supply.py`.
 
 ## Starter decks (v0.4.2)
 
@@ -98,7 +109,7 @@ The shop's second tab, beside the packs, sells the ten Commander starter decks (
 
 ## SysOp gives packs
 
-SysOp gives unopened packs to any account, its own included (permission `economy.manage`): 1 to 100 of one product at a time, with a reason, audited (`shop.packs_granted`). Since v0.8.5 a grant may carry the client's `key`, as a purchase does: a retry with it (a double click, a lost answer) grants once, and the key with another grant is refused (`409 key_reused`). Administration's Card shop tab has the form, and sends a key with each grant. Administrators see the shop's data but give nothing.
+SysOp gives unopened packs to any account, its own included (permission `economy.manage`; since v0.8.9 `economy.grant`, administrators' too): 1 to 100 of one product at a time, with a reason, audited (`shop.packs_granted`). Since v0.8.5 a grant may carry the client's `key`, as a purchase does: a retry with it (a double click, a lost answer) grants once, and the key with another grant is refused (`409 key_reused`). Administration's Card shop tab has the form, and sends a key with each grant. Until v0.8.9 administrators saw the shop's data but gave nothing; since then they give packs too. A grant past a set's print run is refused ([sold out](#sold-out-v089)).
 
 ## The scope's notes
 

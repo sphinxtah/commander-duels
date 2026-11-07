@@ -47,7 +47,7 @@ import {
   restPose,
   type CardPlacement,
 } from "./nodes/CardNode";
-import { cardBackUrl, onCardBack } from "../cardBack";
+import { OFFICIAL_BACK, cardBackUrl, onCardBack } from "../cardBack";
 import { CurveNode } from "./nodes/CurveNode";
 import { EmblemNode, type EmblemKind } from "./nodes/EmblemNode";
 import { FLOAT_COLOURS, FloatNode } from "./nodes/FloatNode";
@@ -127,6 +127,9 @@ export interface SceneKit {
   portrait(id: string, size: 256 | 512, grey: boolean): Texture | PortraitState;
   /** Asks for a frame to be drawn. */
   request(): void;
+  /** The card back for a seat's cards (v0.8.9): that player's card sleeve, drawn in place once
+   * its picture loads; null, the viewer's own back. */
+  back(seat: number | null): Texture;
 }
 
 export type PortraitState = "loading" | "missing";
@@ -323,6 +326,13 @@ class PixiTableScene implements TableScene {
   private readonly frames: LazyTextures<Texture>;
   private readonly art: SceneArt;
   private readonly backCanvas: HTMLCanvasElement;
+  /** Each seat's card back (v0.8.9): a canvas texture drawn again in place when the seat's
+   * sleeve arrives, so cards already showing it need nothing done. */
+  private readonly seatBacks = new Map<
+    number,
+    { canvas: HTMLCanvasElement; texture: Texture; url: string }
+  >();
+  private backUrls: Map<number, string> = new Map();
   private readonly kit: SceneKit;
   private readonly sigils = new Map<string, Texture>();
   /** The Planeswalker portraits asked for, by id, size and greyness: each a texture, still
@@ -505,6 +515,7 @@ class PixiTableScene implements TableScene {
       sigil: (seed, grey) => scene.sigil(seed, grey),
       portrait: (id, size, grey) => scene.portrait(id, size, grey),
       request: () => scene.requestFrame(),
+      back: (seat) => scene.seatBack(seat),
     };
 
     this.plane = new PerspectiveMesh({
@@ -563,6 +574,7 @@ class PixiTableScene implements TableScene {
 
   commit(frame: SceneFrame): void {
     if (this.destroyed || frame === this.frame) return;
+    this.syncBacks(frame.model.backs);
     if (this.lost) {
       this.frame = frame;
       return;
@@ -1096,6 +1108,7 @@ class PixiTableScene implements TableScene {
       tierHeight: hand ? face.h * HAND.rise.scale : node.drawHeight,
       priority: hand ? 0 : node.role === "stack" ? 2 : yours ? 1 : 3,
       yours,
+      backSeat: card.ownerSeat ?? card.controllerSeat,
       ribbon:
         node.role === "stack" && card.located.stack?.kind === "ability"
           ? ribbonRect(face, node.footprint)
@@ -1488,7 +1501,7 @@ class PixiTableScene implements TableScene {
     this.drawGrooves(layout);
     this.band.resize(layout.band, this.span.left, this.span.right);
     this.band.update(layout.band, model.phase, model.step);
-    this.hand.setBacks(model.handBacks);
+    this.hand.setBacks(model.handBacks, model.anchored?.seat ?? null);
     this.applyTiles(model, layout);
     this.applyMores(layout);
     this.applyPortraits(model, layout, ui);
@@ -1819,7 +1832,7 @@ class PixiTableScene implements TableScene {
           if (!from || !to) break;
           for (let i = 0; i < Math.min(event.count, 4); i++) {
             const key = `fly:${this.serial++}`;
-            const sprite = new Sprite(this.art.back);
+            const sprite = new Sprite(this.seatBack(event.seat));
             sprite.anchor.set(0.5);
             const w = from.height * (150 / 209.52);
             sprite.width = w;
@@ -2216,6 +2229,66 @@ class PixiTableScene implements TableScene {
       this.requestFrame();
     } catch {
       // The lattice is still a card back.
+    }
+  }
+
+  /** A seat's back texture, made the first time it is asked for (v0.8.9). */
+  private seatBack(seat: number | null): Texture {
+    if (seat === null) return this.art.back;
+    let entry = this.seatBacks.get(seat);
+    if (!entry) {
+      const canvas = cardBack(
+        this.backCanvas.width,
+        this.backCanvas.height,
+        null,
+      );
+      entry = { canvas, texture: canvasTexture(canvas), url: "" };
+      this.seatBacks.set(seat, entry);
+      void this.paintSeatBack(seat, this.backUrls.get(seat) ?? OFFICIAL_BACK);
+    }
+    return entry.texture;
+  }
+
+  /** The seats' sleeves from the game's summary: each seat whose sleeve changed is drawn again. */
+  private syncBacks(backs: Map<number, string> | undefined): void {
+    this.backUrls = backs ?? new Map();
+    for (const [seat, entry] of this.seatBacks) {
+      const url = this.backUrls.get(seat) ?? OFFICIAL_BACK;
+      if (entry.url !== url) void this.paintSeatBack(seat, url);
+    }
+  }
+
+  private async paintSeatBack(seat: number, url: string): Promise<void> {
+    const entry = this.seatBacks.get(seat);
+    if (!entry) return;
+    entry.url = url;
+    try {
+      let picture: CanvasImageSource & { close?: () => void };
+      if (url.endsWith(".svg")) {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        picture = image;
+      } else {
+        const response = await fetch(url, { credentials: "same-origin" });
+        if (!response.ok) throw new Error(String(response.status));
+        picture = await createImageBitmap(await response.blob());
+      }
+      if (this.destroyed || entry.url !== url) {
+        picture.close?.();
+        return;
+      }
+      const drawn = cardBack(entry.canvas.width, entry.canvas.height, picture);
+      picture.close?.();
+      const ctx = entry.canvas.getContext("2d");
+      ctx?.clearRect(0, 0, entry.canvas.width, entry.canvas.height);
+      ctx?.drawImage(drawn, 0, 0);
+      entry.texture.source.update();
+      this.requestFrame();
+    } catch {
+      // A sleeve removed or missing shows the official back; the lattice stands in meanwhile.
+      if (url !== OFFICIAL_BACK && entry.url === url)
+        void this.paintSeatBack(seat, OFFICIAL_BACK);
     }
   }
 

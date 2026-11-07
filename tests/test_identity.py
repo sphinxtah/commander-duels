@@ -652,7 +652,17 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     promoted = ada.get("/api/v1/me")
     assert "__Host-cd_session=" in promoted.headers["set-cookie"]  # rotated on the privilege change
     assert "admin.users.manage" in promoted.json()["permissions"]
-    assert "games.view_concealed" not in promoted.json()["permissions"]
+    # Since v0.8.9 an administrator sees the app as SysOp does, but for the system-level powers.
+    held = set(promoted.json()["permissions"])
+    assert {"games.view_concealed", "chat.read_all", "players.history"} <= held
+    assert {"progress.manage", "economy.grant"} <= held
+    assert not held & {
+        "economy.manage",
+        "custom_cards.manage",
+        "admin.roles.administrator",
+        "admin.users.reset",
+        "cards.any",
+    }
     # Since v0.8.8 an administrator builds from a library of its own, as a player does.
     assert "library.unlimited" not in promoted.json()["permissions"]
 

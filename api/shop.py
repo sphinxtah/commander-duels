@@ -57,6 +57,7 @@ from sqlalchemy import func, not_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from api import pack_supply as supply
 from api.auth import INPUT_ERRORS
 from api.cards import SyncQueued, image_of
 from api.collation import draw, load
@@ -131,6 +132,8 @@ router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Builder = Annotated[Principal, Depends(require_permission("decks.edit"))]
 ShopManager = Annotated[Principal, Depends(require_permission("shop.manage"))]
 EconomyManager = Annotated[Principal, Depends(require_permission("economy.manage"))]
+# Giving tokens and packs (v0.8.9): SysOp and administrators.
+Granter = Annotated[Principal, Depends(require_permission("economy.grant"))]
 MAX_PRICE = 10_000_000_000
 MAX_GRANT = 100
 HISTORY_SHOWN = 50
@@ -193,6 +196,11 @@ class ProductInfo(ProductRef):
     sale_price: int | None = Field(
         default=None,
         description="In tokens, while the product is in this week's sale; null otherwise.",
+    )
+    sold_out: bool = Field(
+        default=False,
+        description="Its set's print run cannot fill one more (v0.8.9, api/pack_supply.py): "
+        "neither sold nor given.",
     )
 
 
@@ -430,7 +438,9 @@ def ref_of(product: ShopProduct, art: ArtIndex) -> ProductRef:
     )
 
 
-def info_of(product: ShopProduct, art: ArtIndex, sale: Sale | None = None) -> ProductInfo:
+def info_of(
+    product: ShopProduct, art: ArtIndex, sale: Sale | None = None, gone: set[str] | None = None
+) -> ProductInfo:
     price, basis = price_of(product)
     return ProductInfo(
         **ref_of(product, art).model_dump(),
@@ -438,7 +448,24 @@ def info_of(product: ShopProduct, art: ArtIndex, sale: Sale | None = None) -> Pr
         price_basis=basis,
         pack_size=product.pack_size,
         sale_price=sale.price(product.id, price) if sale else None,
+        sold_out=gone is not None and str(product.id) in gone,
     )
+
+
+def refuse_sold_out(
+    db: Session, request: Request, user: User, product: ShopProduct, count: int
+) -> None:
+    """A product whose set's print run cannot fill this many more is refused (v0.8.9), except to
+    SysOp, whose packs are not counted."""
+    if user.kind == "sysop":
+        return
+    if not supply.take(db, settings_of(request).content_dir, product, count):
+        raise ApiError(
+            409,
+            "sold_out",
+            f"{product.name} is sold out: its print run has no more to fill "
+            f"{'it' if count == 1 else f'{count} of them'}.",
+        )
 
 
 def newest_first(product: ShopProduct) -> tuple[date, str, str]:
@@ -531,9 +558,10 @@ def shop(request: Request, principal: Active, db: Db) -> ShopView:
     version, checked = latest_version(db)
     free = free_decks(principal.user)
     art = art_of(request)
+    gone = supply.sold_out(db, settings_of(request).content_dir, on_sale)
     return ShopView(
         balance=balance_of(db, principal.user.id),
-        products=[info_of(product, art, sale) for product in on_sale],
+        products=[info_of(product, art, sale, gone) for product in on_sale],
         eras=[EraInfo(id=era.id, name=era.name, since=era.since) for era in (LAND_ERA, *ERAS)],
         inventory=inventory_of(db, principal.user, art),
         data=ShopData(
@@ -694,6 +722,7 @@ def buy(body: PurchaseRequest, request: Request, principal: Active, db: Db) -> P
         raise not_found()
     if not selling(product, utcnow().date()):
         raise ApiError(409, "not_on_sale", f"{product.name} is not on sale.")
+    refuse_sold_out(db, request, principal.user, product, 1)
     price, _ = price_of(product)
     discounted = sale.price(product.id, price)
     if discounted is not None:
@@ -1043,11 +1072,12 @@ def opening(opening_id: UUID, request: Request, principal: Active, db: Db) -> Op
 
 @router.post("/admin/users/{user_id}/packs", response_model=PacksGranted, status_code=201)
 def give_packs(
-    user_id: UUID, body: PackGrant, request: Request, principal: EconomyManager, db: Db
+    user_id: UUID, body: PackGrant, request: Request, principal: Granter, db: Db
 ) -> PacksGranted:
-    """SysOp gives unopened packs to any account, its own included: with a reason, audited. A
-    retry with the same key grants once: the key names the grant (its grant_id), looked for
-    under the account's row lock, so a retry sent at once waits for the request it repeats."""
+    """SysOp, and since v0.8.9 an administrator, gives unopened packs to any account, its own
+    included: with a reason, audited. A retry with the same key grants once: the key names the
+    grant (its grant_id), looked for under the account's row lock, so a retry sent at once waits
+    for the request it repeats."""
     ensured(request)
     user = target(db, user_id, principal)
     refuse_deleted(user)
@@ -1075,6 +1105,7 @@ def give_packs(
             return PacksGranted(
                 granted=len(earlier), inventory=inventory_of(db, user, art_of(request))
             )
+    refuse_sold_out(db, request, user, product, body.count)
     now = utcnow()
     for _ in range(body.count):
         db.add(
@@ -1110,7 +1141,7 @@ def give_packs(
 
 @router.get("/admin/users/{user_id}/packs", response_model=list[InventoryItem])
 def account_packs(
-    user_id: UUID, request: Request, principal: EconomyManager, db: Db
+    user_id: UUID, request: Request, principal: Granter, db: Db
 ) -> list[InventoryItem]:
     return inventory_of(db, target(db, user_id, principal), art_of(request))
 
@@ -1118,7 +1149,9 @@ def account_packs(
 # Administration (shop.manage: administrators and SysOp).
 
 
-def admin_products(db: Session, products: list[ShopProduct], art: ArtIndex) -> list[AdminProduct]:
+def admin_products(
+    db: Session, products: list[ShopProduct], art: ArtIndex, folder: str
+) -> list[AdminProduct]:
     today = utcnow().date()
     revisions = {
         row.id: (row.revision, row.mtgjson_version)
@@ -1132,12 +1165,13 @@ def admin_products(db: Session, products: list[ShopProduct], art: ArtIndex) -> l
             )
         )
     }
+    gone = supply.sold_out(db, folder, products)
     found = []
     for product in sorted(products, key=newest_first, reverse=True):
         revision, version = revisions.get(product.collation_id or uuid4(), (None, None))
         found.append(
             AdminProduct(
-                **info_of(product, art).model_dump(),
+                **info_of(product, art, gone=gone).model_dump(),
                 usd=product.usd,
                 usd_method=product.usd_method,
                 usd_source=product.usd_source,
@@ -1189,7 +1223,7 @@ def shop_admin(request: Request, principal: ShopManager, db: Db) -> ShopAdminVie
     listing = price_list(settings_of(request).content_dir)
     return ShopAdminView(
         enabled=bool(settings_of(request).catalog_dir),
-        products=admin_products(db, products, art_of(request)),
+        products=admin_products(db, products, art_of(request), settings_of(request).content_dir),
         last_run=run_of(last) if last else None,
         next_run_at=upcoming,
         prices_as_of=listing.as_of if listing else None,
@@ -1264,7 +1298,7 @@ def change_price(
         },
     )
     db.commit()
-    return admin_products(db, [product], art_of(request))[0]
+    return admin_products(db, [product], art_of(request), settings_of(request).content_dir)[0]
 
 
 @router.put("/admin/shop/products/{product_id}/sale", response_model=AdminProduct)
@@ -1292,4 +1326,4 @@ def change_sale(
         },
     )
     db.commit()
-    return admin_products(db, [product], art_of(request))[0]
+    return admin_products(db, [product], art_of(request), settings_of(request).content_dir)[0]

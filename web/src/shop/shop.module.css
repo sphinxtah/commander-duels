@@ -889,3 +889,30 @@ svg.packArt {
   gap: 4px 6px;
   font-size: 0.85rem;
 }
+
+/* Sold out (v0.8.9): a banner across the pack, and the product dimmed and locked. */
+.productArt {
+  position: relative;
+  overflow: hidden;
+}
+.product[data-sold-out] .productArt > :not(.soldOut) {
+  filter: grayscale(0.8) brightness(0.6);
+}
+.soldOut {
+  position: absolute;
+  top: 50%;
+  left: -10%;
+  width: 120%;
+  transform: translateY(-50%) rotate(-14deg);
+  background: #9e1b1b;
+  border-block: 2px solid #f1d27a;
+  color: #fff4d6;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 4px;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 6px 0;
+  box-shadow: 0 4px 12px #0009;
+  pointer-events: none;
+}

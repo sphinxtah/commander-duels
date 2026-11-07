@@ -1,0 +1,74 @@
+{
+  "about": "Pack supply (v0.8.9, api/pack_supply.py, docs/shop.md \"Sold out\"): the sets whose print run a source states, in cards. Every product of a set takes its cards out of the set's run, as the real starter decks and boosters came off the same presses: a pack's cards are its real size (cards_per_product), counted for every pack bought or given to an account other than SysOp. When what is left cannot fill one more of a product, it is sold out: the shop shows SOLD OUT across it and sells and gives no more. A set whose run no source states (Revised and every set after Fallen Empires) is not limited. Read 2026-11-06.",
+  "sources": {
+    "dangelo-1995": "Stephen D'Angelo, 'Rulings Summary: Cards', updated 1995-07-05, posted to rec.games.trading-cards.magic.rules 1995-07-06 (https://groups.google.com/g/rec.games.trading-cards.magic.rules/c/TASsCMbhyjw): the Magic rules summary of the time, giving 'Approximately N cards were printed' for each early set.",
+    "duelist-card-list": "The Duelist Presents the Complete Magic Card List (Wizards of the Coast, 1996, https://archive.org/details/TheDuelistPresentstheCompleteMagicCardList): Limited Edition 'a 10-million-card print run', 2.6 million Alpha and 7.3 million Beta.",
+    "print-runs": "content/print-runs.json: the copies of each Alpha and Beta sheet printed (Scrye's table), which come to 2,601,500 Alpha and 7,792,400 Beta cards."
+  },
+  "sets": [
+    {
+      "set": "LEA",
+      "name": "Limited Edition Alpha",
+      "cards": 2600000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 2.6 million cards were printed.' The Duelist's card list gives the same 2.6 million; the sheet counts in print-runs.json come to 2,601,500.",
+      "cards_per_product": {"default": 15, "starter": 60}
+    },
+    {
+      "set": "LEB",
+      "name": "Limited Edition Beta",
+      "cards": 7800000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 7.8 million cards were printed.' The sheet counts in print-runs.json come to 7,792,400, which agree; The Duelist's card list gives 7.3 million, so this may be up to 7% high.",
+      "cards_per_product": {"default": 15, "starter": 60}
+    },
+    {
+      "set": "2ED",
+      "name": "Unlimited Edition",
+      "cards": 40000000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 40 million cards were printed.' Some later articles give 35 million.",
+      "cards_per_product": {"default": 15, "starter": 60}
+    },
+    {
+      "set": "ARN",
+      "name": "Arabian Nights",
+      "cards": 5000000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 5 million cards were printed.' Sold in boosters of 8 only.",
+      "cards_per_product": {"default": 8}
+    },
+    {
+      "set": "ATQ",
+      "name": "Antiquities",
+      "cards": 15000000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 15 million cards were printed.' Sold in boosters of 8 only.",
+      "cards_per_product": {"default": 8}
+    },
+    {
+      "set": "LEG",
+      "name": "Legends",
+      "cards": 35000000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 35 million cards were printed.' Sold in boosters of 15 only.",
+      "cards_per_product": {"default": 15}
+    },
+    {
+      "set": "DRK",
+      "name": "The Dark",
+      "cards": 75000000,
+      "source": "dangelo-1995",
+      "note": "'Approximately 75 million cards were printed.' Some later articles give 62 million. Sold in boosters of 8 only.",
+      "cards_per_product": {"default": 8}
+    },
+    {
+      "set": "FEM",
+      "name": "Fallen Empires",
+      "cards": 350000000,
+      "source": "dangelo-1995",
+      "note": "'The printing size is estimated to be between 350 and 375 million cards': the lower figure is used. Sold in boosters of 8 only.",
+      "cards_per_product": {"default": 8}
+    }
+  ]
+}

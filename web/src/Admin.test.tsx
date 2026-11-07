@@ -643,9 +643,15 @@ describe("wins, tiers and alliances (v0.3.1)", () => {
 });
 
 describe("tokens (v0.4.0)", () => {
+  // Giving tokens takes economy.grant: SysOp's, and since v0.8.9 administrators'. The economy's
+  // limits stay SysOp's alone (economy.manage).
   const sysop: Me = {
     ...administrator,
-    permissions: [...administrator.permissions, "economy.manage"],
+    permissions: [
+      ...administrator.permissions,
+      "economy.grant",
+      "economy.manage",
+    ],
   };
   const balance = (amount: number) => ({
     balance: amount,
@@ -655,7 +661,7 @@ describe("tokens (v0.4.0)", () => {
     entries: [],
   });
 
-  it("show each account's balance; only SysOp gives tokens, with a reason", async () => {
+  it("show each account's balance; only economy.grant gives tokens, with a reason", async () => {
     on(USERS, () => page([user("ann", "active", { tokens: 1000 })]));
     const view = render(<Admin me={administrator} heading={createRef()} />);
     const ann = await screen.findByRole("listitem", { name: "ann" });

@@ -121,6 +121,86 @@ function ReportedMessage({ chat }: { chat: ReportedChat }) {
   );
 }
 
+type SleeveReported = NonNullable<ReportDetail["sleeve"]>;
+
+/** A reported card sleeve (v0.8.9): its picture, and the moderator's button to remove it from
+ * every table, with a reason, audited. */
+function ReportedSleeve({
+  sleeve,
+  owner,
+}: {
+  sleeve: SleeveReported;
+  owner: string | null;
+}) {
+  const [removed, setRemoved] = useState(sleeve.removed);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function remove() {
+    setBusy(true);
+    setError("");
+    const { data, error: refused } = await client.POST(
+      "/api/v1/admin/sleeves/{sleeve_id}/remove",
+      {
+        params: { path: { sleeve_id: sleeve.id } },
+        body: { reason: reason.trim() || "Removed after a report." },
+      },
+    );
+    setBusy(false);
+    if (!data) return setError(describe(refused));
+    setRemoved(true);
+  }
+  return (
+    <>
+      <h3 className={admin.reportHeading}>The reported card sleeve</h3>
+      <p className={styles.fine}>
+        {sleeve.name}
+        {owner ? `, ${owner}'s` : ""}.{" "}
+        {removed
+          ? "Removed: it shows on no table."
+          : sleeve.deleted
+            ? "Its owner has deleted it."
+            : "It shows at every table its deck plays."}
+      </p>
+      {!sleeve.deleted || removed ? (
+        <img
+          src={sleeve.url}
+          alt={`The reported sleeve, ${sleeve.name}`}
+          width={126}
+          height={176}
+          style={{ borderRadius: 6, objectFit: "cover" }}
+        />
+      ) : null}
+      {!removed && !sleeve.deleted && (
+        <p className={styles.fine}>
+          <label>
+            Reason{" "}
+            <input
+              value={reason}
+              maxLength={200}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="Removed after a report."
+            />
+          </label>{" "}
+          <button
+            type="button"
+            className={shell.secondary}
+            disabled={busy}
+            onClick={() => void remove()}
+          >
+            Remove from every table
+          </button>
+        </p>
+      )}
+      {error && (
+        <p role="alert" className={styles.fine}>
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 function Detail({
   detail,
   onStatus,
@@ -183,6 +263,12 @@ function Detail({
         )}
       </dl>
       {detail.chat && <ReportedMessage chat={detail.chat} />}
+      {detail.sleeve && (
+        <ReportedSleeve
+          sleeve={detail.sleeve}
+          owner={detail.reported_user?.handle ?? null}
+        />
+      )}
       <h3 className={admin.reportHeading}>Latest requests</h3>
       {detail.requests.length === 0 ? (
         <p className={styles.fine}>None recorded.</p>
@@ -373,7 +459,7 @@ export function Reports({ onCounts }: { onCounts?: () => void }) {
                     <span>{reporterName(report)}</span>
                     {report.reported_user && (
                       <p className={admin.reportedFrom}>
-                        Message from{" "}
+                        {report.sleeve ? "Card sleeve of" : "Message from"}{" "}
                         {report.reported_user.handle ?? "an unknown account"}
                       </p>
                     )}

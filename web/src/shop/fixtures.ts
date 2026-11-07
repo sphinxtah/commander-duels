@@ -45,6 +45,7 @@ export function product(fields: Partial<Product> = {}): Product {
     price: 380,
     price_basis: "market",
     pack_size: 15,
+    sold_out: false,
     ...fields,
   };
 }

@@ -26,6 +26,60 @@ export function connectionWords(connection: Connection, online: boolean) {
       : "Service unavailable";
 }
 
+/** On a phone (v0.8.9, the owner: "just like how facebook app works"), how far the page must move
+ * before the bar goes or comes back, so a finger's jitter does neither. */
+const RETRACT_STEP = 8;
+const PHONE = "(max-width: 820px)";
+
+/**
+ * Whether the top bar is tucked away: on a phone, scrolling down hides it, scrolling up shows it
+ * again, and it always shows at the top of the page and while one of its pop-overs is open or it
+ * holds the focus. Larger screens keep it in place.
+ */
+export function useRetracting(bar: { current: HTMLElement | null }): boolean {
+  const [retracted, setRetracted] = useState(false);
+  useEffect(() => {
+    const phone = window.matchMedia?.(PHONE);
+    let last = window.scrollY;
+    let hidden = false;
+    const set = (next: boolean) => {
+      if (next === hidden) return;
+      hidden = next;
+      setRetracted(next);
+    };
+    const onScroll = () => {
+      const y = window.scrollY;
+      const element = bar.current;
+      const busy =
+        !!element &&
+        (element.contains(document.activeElement) ||
+          !!element.querySelector('[aria-expanded="true"]'));
+      if (!phone?.matches || busy || y <= (element?.offsetHeight ?? 68)) {
+        last = y;
+        set(false);
+        return;
+      }
+      if (y - last > RETRACT_STEP) {
+        set(true);
+        last = y;
+      } else if (last - y > RETRACT_STEP) {
+        set(false);
+        last = y;
+      }
+    };
+    const onChange = () => {
+      if (!phone?.matches) set(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    phone?.addEventListener?.("change", onChange);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      phone?.removeEventListener?.("change", onChange);
+    };
+  }, [bar]);
+  return retracted;
+}
+
 function badge(count: number) {
   return count > 99 ? "99+" : String(count);
 }
@@ -59,8 +113,18 @@ export function TopBar({
   /** This browser's session ended; the notice is what the sign-in page then says. */
   onSignedOut: (notice: string) => void;
 }) {
+  const bar = useRef<HTMLElement>(null);
+  const retracted = useRetracting(bar);
   return (
-    <header className={styles.topbar}>
+    <header
+      ref={bar}
+      className={styles.topbar}
+      data-retracted={retracted || undefined}
+      onFocus={() => {
+        // A keyboard reaching the bar brings it back.
+        if (retracted) window.dispatchEvent(new Event("scroll"));
+      }}
+    >
       <a
         href="#home"
         className={styles.brand}

@@ -107,6 +107,7 @@ export class PileNode {
         priority: 4 as const,
         yours: false,
         ribbon: null,
+        backSeat: card.ownerSeat ?? card.controllerSeat,
       };
       this.top.place(card.card, placement);
       this.top.setPose(restPose(placement));

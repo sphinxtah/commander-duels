@@ -22,6 +22,8 @@ Since v0.8.5 the tutorial's tour goes on to Decks and the Play page, its bubbles
 
 Since v0.8.8 administrators and moderators play as any player does, from libraries of their own (only SysOp builds from the whole catalog), and the content editor role is gone ([identity](docs/identity.md)). SysOp gives itself, or any account, tokens, wins, packs, wins by format for testing quests and achievements, cards and campaign progress from its own row in Administration ([SysOp's grants for testing](docs/identity.md#sysops-grants-for-testing-v088)). My library adds a card to a deck in one step ([decks](docs/decks.md#add-to-deck-v088)), the campaign's card backs and titles show on the table and on profiles ([the campaign](docs/campaign.md#cosmetics-v088)), and a payment names what raised its cost ([release notes](docs/releases/0.8.8.md)).
 
+Since v0.8.9 players sleeve their decks: up to 20 uploaded pictures, three default sleeves and the campaign's backs, each deck wearing one, seen by everyone at the table and reportable from a player's profile there ([card sleeves](docs/sleeves.md)). Administrators see the app as SysOp does but for the system-level powers, basic lands lead the mana payment, and the earliest sets' packs sell out at their real print runs ([release notes](docs/releases/0.8.9.md)).
+
 ## Start with Docker
 
 Install Docker with Compose and start its Linux engine, then run from this directory:

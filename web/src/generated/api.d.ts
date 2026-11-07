@@ -460,6 +460,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/sleeves/{sleeve_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove Sleeve
+         * @description A moderator takes a reported sleeve off every table: it shows to nobody but staff, and
+         *     the decks wearing it go back to the default. Audited.
+         */
+        post: operations["remove_sleeve_api_v1_admin_sleeves__sleeve_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users": {
         parameters: {
             query?: never;
@@ -553,9 +574,10 @@ export interface paths {
         put?: never;
         /**
          * Give Packs
-         * @description SysOp gives unopened packs to any account, its own included: with a reason, audited. A
-         *     retry with the same key grants once: the key names the grant (its grant_id), looked for
-         *     under the account's row lock, so a retry sent at once waits for the request it repeats.
+         * @description SysOp, and since v0.8.9 an administrator, gives unopened packs to any account, its own
+         *     included: with a reason, audited. A retry with the same key grants once: the key names the
+         *     grant (its grant_id), looked for under the account's row lock, so a retry sent at once waits
+         *     for the request it repeats.
          */
         post: operations["give_packs_api_v1_admin_users__user_id__packs_post"];
         delete?: never;
@@ -676,9 +698,9 @@ export interface paths {
         put?: never;
         /**
          * Give Tokens
-         * @description SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of
-         *     its own, apart from tokens earned, with the reason, and audited (PROG03). A retry with the
-         *     same key grants once.
+         * @description SysOp, and since v0.8.9 an administrator, gives tokens to any account, its own included,
+         *     or takes them back: a ledger entry of its own, apart from tokens earned, with the reason, and
+         *     audited (PROG03). A retry with the same key grants once.
          */
         post: operations["give_tokens_api_v1_admin_users__user_id__tokens_post"];
         delete?: never;
@@ -1693,6 +1715,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/{deck_id}/sleeve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose Sleeve
+         * @description Puts a sleeve on one of your decks: one of your own, a campaign back you earned, or none.
+         */
+        put: operations["choose_sleeve_api_v1_decks__deck_id__sleeve_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/{deck_id}/switched-editions": {
         parameters: {
             query?: never;
@@ -2440,6 +2482,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/sleeves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Sleeves */
+        get: operations["my_sleeves_api_v1_me_sleeves_get"];
+        put?: never;
+        /**
+         * Upload Sleeve
+         * @description Adds a sleeve to the account's: at most 20.
+         */
+        post: operations["upload_sleeve_api_v1_me_sleeves_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/sleeves/{sleeve_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Sleeve */
+        delete: operations["delete_sleeve_api_v1_me_sleeves__sleeve_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/starters": {
         parameters: {
             query?: never;
@@ -3085,6 +3165,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sleeves/{sleeve_id}/image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sleeve Image
+         * @description A sleeve's picture, for anyone signed in: the table shows it to everyone. A removed one
+         *     only to staff (reports.manage), for its report; a deleted one to nobody.
+         */
+        get: operations["sleeve_image_api_v1_sleeves__sleeve_id__image_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tables": {
         parameters: {
             query?: never;
@@ -3423,6 +3524,12 @@ export interface components {
             set_code: string;
             /** Set Name */
             set_name: string;
+            /**
+             * Sold Out
+             * @description Its set's print run cannot fill one more (v0.8.9, api/pack_supply.py): neither sold nor given.
+             * @default false
+             */
+            sold_out: boolean;
             /**
              * Symbol
              * @description The set's symbol, an SVG file on this site under /sets/; null: none.
@@ -3837,7 +3944,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.8.8
+             * @default 0.8.9
              */
             version: string;
         };
@@ -4879,6 +4986,11 @@ export interface components {
             revisions: components["schemas"]["RevisionSummary"][];
             /** Share Code */
             share_code: string | null;
+            /**
+             * Sleeve
+             * @description The card sleeve its cards wear at a table (v0.8.9): "sleeve:<id>", "back:<slug>", or null for the default.
+             */
+            sleeve?: string | null;
             /** Source */
             source: string;
             /**
@@ -4982,6 +5094,14 @@ export interface components {
             /** Deck */
             deck: string;
         };
+        /** DeckSleeve */
+        DeckSleeve: {
+            /**
+             * Sleeve
+             * @description "sleeve:<id>", one of your sleeves; "default:<slug>", one of the sleeves everyone has; "back:<slug>", a campaign card back you have earned; null, the official card back (or your campaign back, if you chose one).
+             */
+            sleeve: string | null;
+        };
         /** DeckSource */
         DeckSource: {
             /** Deck Id */
@@ -5038,6 +5158,11 @@ export interface components {
              * @description Cards that left the draft because the game cannot play them (v0.4.5), until the owner dismisses the note.
              */
             removed_cards: components["schemas"]["RemovedCard"][];
+            /**
+             * Sleeve
+             * @description The card sleeve its cards wear at a table (v0.8.9): "sleeve:<id>", "back:<slug>", or null for the default.
+             */
+            sleeve?: string | null;
             /** Source */
             source: string;
             /**
@@ -5066,6 +5191,18 @@ export interface components {
             title?: string | null;
             /** Visibility */
             visibility?: ("private" | "link") | null;
+        };
+        /** DefaultSleeve */
+        DefaultSleeve: {
+            /**
+             * Id
+             * @description Its slug; a deck wears it as default:<slug>.
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Url */
+            url: string;
         };
         /** Draft */
         Draft: {
@@ -5423,6 +5560,11 @@ export interface components {
              */
             player: "human" | "bot";
             /**
+             * Player Id
+             * @description A human seat's player, for their profile (v0.8.9); null for a bot, and for SysOp to anyone else.
+             */
+            player_id?: string | null;
+            /**
              * Portrait
              * @description A player's allied Planeswalker, whose portrait stands for them; since v0.8.0 also a campaign opponent's (a bot seat, whose handle is then the opponent's name).
              */
@@ -5434,6 +5576,11 @@ export interface components {
             role?: ("king" | "general") | null;
             /** Seat */
             seat: number;
+            /**
+             * Sleeve
+             * @description The picture on the backs of a human seat's cards (v0.8.9, api/sleeves.py), a path on this site; null: the official card back.
+             */
+            sleeve?: string | null;
             /**
              * Starting Life
              * @description King's Table (v0.8.7): the seat's starting life under the game's settings.
@@ -5479,6 +5626,12 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            /**
+             * Inspectable
+             * @description Whether the viewer sees this game's concealed information, every hand and library (SysOp; since v0.8.9 an administrator, except in a game they play with another person).
+             * @default false
+             */
+            inspectable: boolean;
             /**
              * Kind
              * @description A practice game against bots, or a human table's game (v0.4.0).
@@ -5591,7 +5744,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.8.8
+             * @default 0.8.9
              */
             version: string;
         };
@@ -6089,7 +6242,7 @@ export interface components {
              */
             onboarding: "handle" | "starters" | "complete";
             /** Permissions */
-            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
+            permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "economy.grant" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
             roles: ("player" | "moderator" | "administrator" | "sysop")[];
@@ -6795,6 +6948,12 @@ export interface components {
             /** Set Name */
             set_name: string;
             /**
+             * Sold Out
+             * @description Its set's print run cannot fill one more (v0.8.9, api/pack_supply.py): neither sold nor given.
+             * @default false
+             */
+            sold_out: boolean;
+            /**
              * Symbol
              * @description The set's symbol, an SVG file on this site under /sets/; null: none.
              */
@@ -7373,6 +7532,19 @@ export interface components {
              */
             removed_at: string;
         };
+        /** RemovedSleeve */
+        RemovedSleeve: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Removed At
+             * Format: date-time
+             */
+            removed_at: string;
+        };
         /**
          * ReportContext
          * @description What the page attaches on its own. Context only: nothing in it is checked against the
@@ -7417,6 +7589,11 @@ export interface components {
              * @description An image, base64: PNG, JPEG or WebP, at most 5 MB decoded.
              */
             screenshot?: string | null;
+            /**
+             * Sleeve
+             * @description The card sleeve the report is about (v0.8.9): another player's, as it shows at a table.
+             */
+            sleeve?: string | null;
             /** Summary */
             summary: string;
         };
@@ -7451,7 +7628,7 @@ export interface components {
             page: string;
             /** Pixel Ratio */
             pixel_ratio: number;
-            /** @description Who sent the reported chat message, if the report is of one. */
+            /** @description Who sent the reported chat message, or whose card sleeve it reports. */
             reported_user?: components["schemas"]["ChatPerson"] | null;
             reporter: components["schemas"]["Reporter"];
             /** Requests */
@@ -7462,6 +7639,8 @@ export interface components {
             screenshot_height: number | null;
             /** Screenshot Width */
             screenshot_width: number | null;
+            /** @description The reported card sleeve (v0.8.9), if the report is of one. */
+            sleeve?: components["schemas"]["ReportedSleeve"] | null;
             /**
              * Status
              * @description new (unread), seen, fixed or closed.
@@ -7533,11 +7712,13 @@ export interface components {
             id: string;
             /** Page */
             page: string;
-            /** @description Who sent the reported chat message, if the report is of one. */
+            /** @description Who sent the reported chat message, or whose card sleeve it reports. */
             reported_user?: components["schemas"]["ChatPerson"] | null;
             reporter: components["schemas"]["Reporter"];
             /** Screenshot */
             screenshot: boolean;
+            /** @description The reported card sleeve (v0.8.9), if the report is of one. */
+            sleeve?: components["schemas"]["ReportedSleeve"] | null;
             /**
              * Status
              * @description new (unread), seen, fixed or closed.
@@ -7578,6 +7759,31 @@ export interface components {
              * @enum {string}
              */
             kind: "direct" | "table";
+        };
+        /** ReportedSleeve */
+        ReportedSleeve: {
+            /**
+             * Deleted
+             * @description Its owner deleted it.
+             */
+            deleted: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Removed
+             * @description A moderator took it off every table.
+             */
+            removed: boolean;
+            /**
+             * Url
+             * @description Its picture; staff see it after its removal too.
+             */
+            url: string;
         };
         /** Reporter */
         Reporter: {
@@ -8088,6 +8294,63 @@ export interface components {
             sideboard: number;
             /** Type Line */
             type_line: string;
+        };
+        /** Sleeve */
+        Sleeve: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Removed
+             * @description A moderator removed it after a report: it shows to nobody, and no deck may wear it.
+             */
+            removed: boolean;
+            /**
+             * Url
+             * @description The picture, WebP, 504 by 704.
+             */
+            url: string;
+        };
+        /** SleeveRemoval */
+        SleeveRemoval: {
+            /** Reason */
+            reason: string;
+        };
+        /** SleeveUpload */
+        SleeveUpload: {
+            /**
+             * Image
+             * @description The picture, base64: PNG, BMP or JPEG, at most 5 MB decoded.
+             */
+            image: string;
+            /** Name */
+            name: string;
+        };
+        /** Sleeves */
+        Sleeves: {
+            /**
+             * Backs
+             * @description The campaign card backs the account has earned, by slug; a deck may wear one as back:<slug>.
+             */
+            backs: string[];
+            /**
+             * Defaults
+             * @description The sleeves every account has.
+             */
+            defaults: components["schemas"]["DefaultSleeve"][];
+            /** Limit */
+            limit: number;
+            /** Sleeves */
+            sleeves: components["schemas"]["Sleeve"][];
         };
         /** StartEncounter */
         StartEncounter: {
@@ -11148,6 +11411,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyncQueued"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    remove_sleeve_api_v1_admin_sleeves__sleeve_id__remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sleeve_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SleeveRemoval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemovedSleeve"];
                 };
             };
             /** @description Bad Request */
@@ -17920,6 +18281,104 @@ export interface operations {
             };
         };
     };
+    choose_sleeve_api_v1_decks__deck_id__sleeve_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeckSleeve"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeckSleeve"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     dismiss_switched_api_v1_decks__deck_id__switched_editions_delete: {
         parameters: {
             query?: never;
@@ -20519,7 +20978,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -21822,6 +22281,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_sleeves_api_v1_me_sleeves_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sleeves"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    upload_sleeve_api_v1_me_sleeves_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SleeveUpload"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sleeve"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_sleeve_api_v1_me_sleeves__sleeve_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sleeve_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Too Many Requests */
@@ -24909,6 +25648,100 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Purchase"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    sleeve_image_api_v1_sleeves__sleeve_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sleeve_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/webp": unknown;
                 };
             };
             /** @description Bad Request */

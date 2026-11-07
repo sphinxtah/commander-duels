@@ -16,6 +16,11 @@ that would deal a copy beyond the run deals another card from the same sheet ins
 card the game cannot play (api/collation.py draw). The check takes a row lock on each limited
 printing the pack drew, in a fixed order, so two packs opened at once never both take the last
 copy.
+
+Since v0.8.9 SysOp's copies are not counted (the owner, 2026-11-06: "SysOp cards do not come from
+the total in circulation"): SysOp's library is for testing, and SysOp may not sell a limited
+printing at the auction house (api/auctions.py). Every other account's copies count, an
+administrator's too, and a testing grant (api/testing.py) past the run is refused.
 """
 
 import json
@@ -26,7 +31,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from api.models import CardPrinting, LibraryGrant
+from api.models import CardPrinting, LibraryGrant, User
 
 
 @lru_cache(maxsize=4)
@@ -75,8 +80,21 @@ def dealt(db: Session, printings: set[UUID], lock: bool = False) -> dict[UUID, i
     counted = {printing_id: 0 for printing_id in printings}
     for printing_id, copies in db.execute(
         select(LibraryGrant.printing_id, func.sum(LibraryGrant.quantity))
-        .where(LibraryGrant.printing_id.in_(printings), LibraryGrant.source != "auction")
+        .join(User, User.id == LibraryGrant.user_id)
+        .where(
+            LibraryGrant.printing_id.in_(printings),
+            LibraryGrant.source != "auction",
+            User.kind != "sysop",
+        )
         .group_by(LibraryGrant.printing_id)
     ):
         counted[printing_id] = int(copies or 0)
     return counted
+
+
+def left_of(db: Session, folder: str, printing_id: UUID, lock: bool = False) -> int | None:
+    """Copies of a printing still to deal: None when its run is not known (no limit)."""
+    run = limited(db, folder, {printing_id}).get(printing_id)
+    if run is None:
+        return None
+    return run - dealt(db, {printing_id}, lock=lock)[printing_id]

@@ -55,6 +55,8 @@ RequestKey = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 Reader = Annotated[Principal, Depends(require_permission("admin.users.read"))]
 EconomyManager = Annotated[Principal, Depends(require_permission("economy.manage"))]
+# Giving tokens and packs (v0.8.9): SysOp and administrators.
+Granter = Annotated[Principal, Depends(require_permission("economy.grant"))]
 
 # The rule tokens are paid under, recorded on each entry (PROG05).
 POLICY = "tokens-v1"
@@ -530,11 +532,11 @@ def account_tokens(user_id: UUID, principal: Reader, db: Db) -> Tokens:
 
 @router.post("/admin/users/{user_id}/tokens", response_model=Tokens)
 def give_tokens(
-    user_id: UUID, body: TokenGrant, request: Request, principal: EconomyManager, db: Db
+    user_id: UUID, body: TokenGrant, request: Request, principal: Granter, db: Db
 ) -> Tokens:
-    """SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of
-    its own, apart from tokens earned, with the reason, and audited (PROG03). A retry with the
-    same key grants once."""
+    """SysOp, and since v0.8.9 an administrator, gives tokens to any account, its own included,
+    or takes them back: a ledger entry of its own, apart from tokens earned, with the reason, and
+    audited (PROG03). A retry with the same key grants once."""
     user = target(db, user_id, principal)
     refuse_deleted(user)
     if body.key is not None and granted(db, user, body.amount, body.reason, body.key):

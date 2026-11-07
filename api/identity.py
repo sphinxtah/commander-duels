@@ -80,15 +80,24 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             # Passive bots in their own game against bots, for testing (v0.8.7; SysOp's since
             # v0.8.6).
             "games.passive_bots",
+            # Since v0.8.9 an administrator sees the app as SysOp does, but for the system-level
+            # powers (the owner, 2026-11-06): concealed information in a game they do not play
+            # against another person (api/games.py concealed_for), every chat, any player's
+            # history, the testing grants and wins, and giving tokens and packs.
+            "games.view_concealed",
+            "chat.read_all",
+            "players.history",
+            "progress.manage",
+            "economy.grant",
         }
     ),
 }
-# Held by SysOp alone and grantable to no role: making or removing administrators, seeing
-# concealed information in a running game (SysOp's exception to SEC05 and NET14, accepted on
-# 2026-10-18), putting any card in the engine's database into its own library, setting any
-# account's wins (v0.3.1), uploading the Godlike tier's custom cards, giving tokens and setting
-# the economy's limits (v0.4.0), reading any chat (v0.4.4), resetting an account to a new one's
-# state (v0.4.5), and reading any player's match history (v0.5.0).
+# Held by SysOp alone and grantable to no role, the system-level powers: making or removing
+# administrators, putting any card in the engine's database into its own library or a deck list,
+# uploading the Godlike tier's custom cards, setting the economy's limits and cancelling auctions
+# (economy.manage), and resetting an account to a new one's state (v0.4.5). Until v0.8.9 SysOp
+# alone also saw concealed information in games, set wins, gave tokens and packs, read any chat
+# and any player's history; administrators now do too.
 SYSOP_ONLY = ALL_PERMISSIONS - frozenset().union(*ROLE_PERMISSIONS.values())
 
 

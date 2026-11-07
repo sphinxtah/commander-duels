@@ -104,8 +104,8 @@ function Users({
   const roles = me.permissions.includes("admin.roles.manage");
   const administrators = me.permissions.includes("admin.roles.administrator");
   const progress = me.permissions.includes("progress.manage");
-  // SysOp gives and takes back tokens (v0.4.0).
-  const economy = me.permissions.includes("economy.manage");
+  // SysOp gives and takes back tokens (v0.4.0), and since v0.8.9 administrators.
+  const economy = me.permissions.includes("economy.grant");
   // SysOp resets an account to a new one's state, for the setup wizard (v0.4.5).
   const resets = me.permissions.includes("admin.users.reset");
   // SysOp's changes, which any account's row offers, an administrator's too.

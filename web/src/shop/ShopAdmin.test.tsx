@@ -34,7 +34,12 @@ const sysop: Me = {
   kind: "sysop",
   handle: "sysop",
   roles: ["sysop"],
-  permissions: [...player.permissions, "shop.manage", "economy.manage"],
+  permissions: [
+    ...player.permissions,
+    "shop.manage",
+    "economy.manage",
+    "economy.grant",
+  ],
 };
 const draft = adminProduct();
 const unresolved = adminProduct({

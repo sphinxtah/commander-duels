@@ -157,14 +157,18 @@ export function GameScreen({
   /** What a scripted game draws over the table: its narration. */
   overlay?: ReactNode;
 }) {
-  const sysop =
+  // Concealed information (every hand and library): SysOp's in any game, and since v0.8.9 an
+  // administrator's in a game they do not play with another person, as the summary says.
+  const conceals =
     !scripted && (me?.permissions.includes("games.view_concealed") ?? false);
+  const root = conceals && me?.kind === "sysop";
   const [inspect, setInspect] = useState(
-    () => sysop && remembered(`cd.inspect.${gameId}`),
+    () => root && remembered(`cd.inspect.${gameId}`),
   );
   const [liveState, connection] = useGame(scripted ? null : gameId, inspect);
   const state = scripted ?? liveState;
   const [summary, setSummary] = useState<Summary>();
+  const sysop = root || (conceals && summary?.inspectable === true);
   const [zoomed, setZoomed] = useState<{
     card: CardView;
     located?: Located;
@@ -947,8 +951,8 @@ export function GameScreen({
                       Only the seat’s own player sets its priority.
                     </p>
                   )}
-                  {/* An administrator's passive bots (v0.8.7): here, since only SysOp has the
-                      Inspection drawer, where SysOp's switch stays. */}
+                  {/* Passive bots outside the Inspection drawer: only for a viewer without it.
+                      Since v0.8.9 an administrator's switch is in that drawer, as SysOp's. */}
                   {!sysop && summary?.passive_bots != null && (
                     <PassiveBots
                       gameId={gameId}

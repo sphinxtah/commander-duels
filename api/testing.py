@@ -46,6 +46,7 @@ from api.identity import (
     refuse_deleted,
     require_permission,
     roles_of,
+    settings_of,
     utcnow,
 )
 from api.library import default_printings, library_of
@@ -58,6 +59,7 @@ from api.models import (
     ProgressEntry,
     User,
 )
+from api.print_runs import left_of
 from api.progression import POLICY as WINS_POLICY
 from api.progression import Progress, progress_of, total_wins
 from api.quests import count_game
@@ -246,6 +248,17 @@ def give_cards(
         raise ApiError(
             422, "invalid_finish", f"This edition comes {', '.join(finishes)}, not {body.finish}."
         )
+    # A limited printing's copies come out of its print run (v0.8.9): a grant past what is left
+    # is refused, except to SysOp, whose copies are not counted (api/print_runs.py).
+    if user.kind != "sysop":
+        left = left_of(db, settings_of(request).content_dir, printing.id, lock=True)
+        if left is not None and body.quantity > left:
+            raise ApiError(
+                409,
+                "print_run",
+                f"Only {max(left, 0):,} of this edition's print run "
+                f"{'is' if left == 1 else 'are'} left to give.",
+            )
     grant_id = uuid4()
     db.add(
         LibraryGrant(

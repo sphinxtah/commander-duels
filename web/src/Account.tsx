@@ -1025,10 +1025,10 @@ export function Account({
               >
                 <h2 id="own-wins-title">Set your wins</h2>
                 <p className={styles.fine}>
-                  SysOp may set any account's wins, its own included, to test
-                  the tiers and what they open. A setting is kept apart from the
-                  wins counted from games, and the audit log records it with its
-                  reason.
+                  SysOp and administrators may set any account's wins, their own
+                  included, to test the tiers and what they open. A setting is
+                  kept apart from the wins counted from games, and the audit log
+                  records it with its reason.
                 </p>
                 <SetWins
                   userId={me.id}
@@ -1049,17 +1049,19 @@ export function Account({
         {shownTab === "tokens" && (
           <>
             <TokensPanel refresh={tokensShown} />
-            {/* SysOp gives itself tokens here too, to try Leng's card shop (v0.4.0). */}
-            {me.permissions.includes("economy.manage") && (
+            {/* SysOp gives itself tokens here too, to try Leng's card shop (v0.4.0), and since
+                v0.8.9 an administrator. */}
+            {me.permissions.includes("economy.grant") && (
               <section
                 className={styles.panel}
                 aria-labelledby="own-tokens-title"
               >
                 <h2 id="own-tokens-title">Give yourself tokens</h2>
                 <p className={styles.fine}>
-                  SysOp may give tokens to any account, its own included, or
-                  take them back. A grant is kept apart from the tokens won in
-                  games, and the audit log records it with its reason.
+                  SysOp and administrators may give tokens to any account, their
+                  own included, or take them back. A grant is kept apart from
+                  the tokens won in games, and the audit log records it with its
+                  reason.
                 </p>
                 <GiveTokens
                   userId={me.id}

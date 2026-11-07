@@ -1329,7 +1329,29 @@ def running_matches_of(db: Session, user_id: UUID) -> int:
 
 
 def full_access(principal: Principal) -> bool:
+    """Every game, to list, observe and close: SysOp, and since v0.8.9 administrators."""
     return principal.can("games.view_concealed")
+
+
+def concealed_for(principal: Principal, rows: list[GameSeat]) -> bool:
+    """Whether the viewer sees this game's concealed information (every hand and library, every
+    seat's deck): SysOp in any game; since v0.8.9 an administrator too, except in a game they
+    play against or beside another person, where it would be cheating (the owner, 2026-11-06)."""
+    if not principal.can("games.view_concealed"):
+        return False
+    if principal.user.kind == "sysop":
+        return True
+    seated = any(row.user_id == principal.user.id for row in rows)
+    others = any(row.user_id is not None and row.user_id != principal.user.id for row in rows)
+    return not (seated and others)
+
+
+def seats_of(db: Session, game_id: UUID) -> list[GameSeat]:
+    return list(db.scalars(select(GameSeat).where(GameSeat.game_id == game_id)))
+
+
+def concealed_in(db: Session, principal: Principal, game_id: UUID) -> bool:
+    return concealed_for(principal, seats_of(db, game_id))
 
 
 def passive_switchable(game: Game, rows: list[GameSeat], principal: Principal) -> bool:
@@ -1354,11 +1376,19 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
     seats = db.scalars(select(GameSeat).where(GameSeat.game_id == game.id).order_by(GameSeat.seat))
     rows = list(seats)
     owners = [row.user_id for row in rows if row.user_id is not None]
-    found = db.execute(select(User.id, User.handle, User.alliance).where(User.id.in_(owners)))
-    handles, alliances = {}, {}
-    for user_id, handle, alliance in found:
+    found = db.execute(
+        select(User.id, User.handle, User.alliance, User.kind).where(User.id.in_(owners))
+    )
+    handles, alliances, roots = {}, {}, set()
+    for user_id, handle, alliance, kind in found:
         handles[user_id], alliances[user_id] = handle, alliance
-    everything = full_access(principal)
+        if kind == "sysop":
+            roots.add(user_id)
+    everything = concealed_for(principal, rows)
+    # Each human seat's card sleeve (v0.8.9), shown to everyone at the table.
+    from api.sleeves import seat_sleeves
+
+    sleeves = seat_sleeves(db, [(row.seat, row.user_id, row.deck_revision_id) for row in rows])
     your_seat = next((row.seat for row in rows if row.user_id == principal.user.id), None)
     # A campaign duel (v0.8.0): the bot is the encounter's opponent, by name and portrait.
     link = db.get(CampaignGame, game.id)
@@ -1393,6 +1423,13 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
                 team=kings_table.team_of(row.seat) if kings else None,
                 role=kings_table.role_of(row.seat) if kings else None,
                 starting_life=kings_table.starting_life(kings, row.seat) if kings else None,
+                sleeve=sleeves.get(row.seat),
+                player_id=(
+                    row.user_id
+                    if row.user_id
+                    and (row.user_id not in roots or principal.user.id == row.user_id)
+                    else None
+                ),
             )
             for row in rows
         ],
@@ -1410,6 +1447,7 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
         match=match_ref(db, game),
         kings_table=kings,
         passive_bots=(game.bots_passive if passive_switchable(game, rows, principal) else None),
+        inspectable=everything,
         campaign=(
             CampaignRef(
                 encounter=link.encounter,
@@ -2244,6 +2282,8 @@ async def inspect_game(
     """SysOp's inspection view: every hand and library in order (engine view type
     contracts/engine-inspection.schema.json). Audited."""
     await run_in_threadpool(visible_game, db, game_id, principal)
+    if not await run_in_threadpool(concealed_in, db, principal, game_id):
+        raise ApiError(403, "forbidden", "You play this game with other people.")
     hub = hub_of(request)
     if game_id not in hub.games:
         raise ApiError(409, "game_not_live", "The engine no longer holds this game.")
@@ -2420,6 +2460,11 @@ def websocket_game(database: Engine, game_id: UUID, principal: Principal) -> boo
             return None
 
 
+def inspects(database: Engine, game_id: UUID, principal: Principal) -> bool:
+    with Session(database) as db:
+        return concealed_in(db, principal, game_id)
+
+
 def origin_refused(websocket: WebSocket) -> bool:
     """Browsers send Origin with every WebSocket handshake; another site's is refused."""
     origin = websocket.headers.get("origin")
@@ -2479,7 +2524,7 @@ async def game_events(websocket: WebSocket, game_id: UUID) -> None:
     if not secrets.compare_digest(hello.csrf_token.encode(), principal.session.csrf_token.encode()):
         await refuse(websocket, CLOSE_FORBIDDEN, "csrf_failed")
         return
-    if hello.inspect and not full_access(principal):
+    if hello.inspect and not await run_in_threadpool(inspects, database, game_id, principal):
         await refuse(websocket, CLOSE_FORBIDDEN, "forbidden")
         return
     # Counted and added with no await between, so handshakes at once cannot all pass.

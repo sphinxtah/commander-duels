@@ -103,6 +103,11 @@ export const buildTableModel: BuildTableModel = (input) => {
     observing,
     canAnswer: context.canAnswer,
     teammateSeat: observing ? null : teammateOf(view),
+    backs: new Map(
+      (summarySeats ?? []).flatMap((entry) =>
+        entry.sleeve ? [[entry.seat, entry.sleeve] as const] : [],
+      ),
+    ),
   };
   if (!view)
     return {
@@ -561,6 +566,10 @@ export const buildTableModel: BuildTableModel = (input) => {
       hand: anchored ? null : (shownHands.get(seat) ?? null),
       sigil: { seed, grey: !ours },
       portrait,
+      profile:
+        summary?.player_id && !self
+          ? { playerId: summary.player_id, sleeve: summary.sleeve ?? null }
+          : null,
       active: view.active_seat === seat,
       priority: view.priority_seat === seat,
       lost: player.lost,

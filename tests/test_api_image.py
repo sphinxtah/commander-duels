@@ -16,6 +16,8 @@ READ_BY_THE_API = {
     "pack-prices.json",
     "pack-art.json",
     "print-runs.json",
+    # Pack supply (v0.8.9).
+    "pack-supply.json",
     CAMPAIGN_FILE,
     # How to play's example cards (v0.8.6).
     CARDS_FILE,

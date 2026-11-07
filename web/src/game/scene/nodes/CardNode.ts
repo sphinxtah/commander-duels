@@ -58,6 +58,8 @@ export interface CardPlacement {
   yours: boolean;
   /** An ability on the stack: where its "Ability" ribbon goes, above the picture. */
   ribbon: Rect | null;
+  /** Whose card sleeve its back shows (v0.8.9): its owner's seat; absent, the viewer's back. */
+  backSeat?: number | null;
 }
 
 const COLOURS = {
@@ -270,7 +272,7 @@ export class CardNode {
       this.frame.position.set(x, y);
       this.frame.width = w;
       this.frame.height = h;
-      this.back.texture = this.kit.art.back;
+      this.back.texture = this.kit.back(p.backSeat ?? null);
       this.back.position.set(x, y);
       this.back.width = w;
       this.back.height = h;
@@ -326,7 +328,7 @@ export class CardNode {
       this.releaseImage();
       this.releaseFrame();
       this.frameKey = "back";
-      this.frame.texture = this.kit.art.back;
+      this.frame.texture = this.kit.back(p.backSeat ?? null);
       this.hideImage();
       return;
     }

@@ -995,6 +995,11 @@ class Deck(Base):
     # owner dismisses the note: [{card_id, name, quantity, from, to, switched_at}].
     switched_editions: Mapped[list[dict[str, object]]] = mapped_column(JsonType, default=list)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # The card sleeve its cards show at a table (v0.8.9, api/sleeves.py): "sleeve:<id>", one of
+    # the owner's uploaded sleeves, "default:<slug>", one everyone has, or "back:<slug>", a
+    # campaign card back; null, the account's
+    # campaign back if it chose one, else the official card back.
+    sleeve: Mapped[str | None] = mapped_column(String(64))
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
@@ -1449,6 +1454,30 @@ class ProblemReport(Base):
     # reported, whatever becomes of the account or the messages.
     reported_user_id: Mapped[UUID | None]
     chat: Mapped[dict[str, object] | None] = mapped_column(JsonType)
+    # A reported card sleeve (v0.8.9, api/sleeves.py); reported_user_id is its owner.
+    sleeve_id: Mapped[UUID | None] = mapped_column(ForeignKey("card_sleeves.id"))
+
+
+class CardSleeve(Base):
+    """A card sleeve a player uploaded (v0.8.9, api/sleeves.py): the picture on the backs of a
+    deck's cards at a table, shown to everyone there. At most 20 per account. The image is the
+    upload cropped to a card's shape and encoded again as WebP from its pixels alone. Deleting a
+    sleeve clears its image and keeps the row for the reports that name it; a moderator's removal
+    keeps the image for review and hides it from everyone else."""
+
+    __tablename__ = "card_sleeves"
+    __table_args__ = (Index("ix_card_sleeves_user_id", "user_id", "created_at"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    name: Mapped[str] = mapped_column(String(40))
+    image: Mapped[bytes | None] = mapped_column(LargeBinary, deferred=True)
+    width: Mapped[int]
+    height: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+    deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    removed_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    removed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    removed_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class Friendship(Base):

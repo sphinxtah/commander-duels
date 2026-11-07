@@ -16,7 +16,7 @@ Before an account is active, every address shows the title screen: the owner's m
 
 ## The top bar
 
-At the top of every page, and staying there as the page scrolls:
+At the top of every page, and staying there as the page scrolls; since v0.8.9 on a phone (820 px or less) it tucks away as the page scrolls down and comes back as it scrolls up, staying while a pop-over of its own is open or it holds the focus ([release notes](releases/0.8.9.md#the-top-bar-tucks-away-on-a-phone)):
 - **The mark and the wordmark**, which lead to the main menu.
 - **The player search** ([finding players](social.md)), centred over the main menu's tiles on every page (v0.6.1): its column is worked out from the main column's width and the main menu's two columns. Where the account's corner needs the room (between about 1,180 and 1,500 px wide) the search gives way to the left; where the tiles span the page (narrower than 1,100 px) it is centred on the bar.
 - **The account's corner:** its tokens (a gold coin and the balance, leading to the shop), Friends, the notification bell, and the account's own button: its portrait (its ally's, else its avatar), its handle and its tier with its wins, and a dot for the connection to the service. The button opens a menu of Profile, Settings, How to play (v0.8.6, [how to play](how-to-play.md)), Administration (for administrators and SysOp, with what waits there counted on the button and on the item), Report a problem and, since v0.6.1, Sign out (on Profile before; the owner's request), with the connection and the version. Messages, with its unread count, sat between Friends and the bell until v0.5.1; the count is now on the chat bar.

@@ -161,16 +161,18 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 | `admin.users.read` |  | ✓ | ✓ | ✓ |
 | `admin.users.manage`, `admin.roles.manage`, `admin.audit.read` |  |  | ✓ | ✓ |
 | `admin.roles.administrator` |  |  |  | ✓ |
-| `games.view_concealed` |  |  |  | ✓ |
+| `games.view_concealed` (since v0.8.9 administrators' too, but not in a game they play with another person: [administrators](#administrators-see-the-app-as-sysop-does-v089)) |  |  | ✓ | ✓ |
 | `cards.any` |  |  |  | ✓ |
 | `library.unlimited` (v0.3.1: build from the whole catalog; administrators' until v0.8.8) |  |  |  | ✓ |
-| `progress.manage` (v0.3.1: set any account's wins; since v0.8.8 [the testing grants](#sysops-grants-for-testing-v088)) |  |  |  | ✓ |
+| `progress.manage` (v0.3.1: set any account's wins; since v0.8.8 [the testing grants](#sysops-grants-for-testing-v088); administrators' since v0.8.9) |  |  | ✓ | ✓ |
 | `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  | ✓ |
 | `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  | ✓ | ✓ |
 | `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  | ✓ | ✓ |
-| `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  | ✓ |
+| `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader); administrators' since v0.8.9) |  |  | ✓ | ✓ |
 | `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  | ✓ |
-| `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history)) |  |  |  | ✓ |
+| `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history); administrators' since v0.8.9) |  |  | ✓ | ✓ |
+| `economy.grant` (v0.8.9: give and take back tokens, give packs, [tokens](tokens.md)) |  |  | ✓ | ✓ |
+| `economy.manage` (v0.4.0: the economy's limits; cancelling auctions) |  |  |  | ✓ |
 | `games.passive_bots` (v0.8.7: [passive bots](game-screen.md#passive-bots-v086-administrators-v087) in their own game against bots; SysOp's since v0.8.6) |  |  | ✓ | ✓ |
 
 **Administrators.**
@@ -184,6 +186,13 @@ Every active account is a player. Grants add the other roles. Permissions are ch
 - In approval mode, a new account is `pending` until approved. It can sign in, see its state and change its own profile, and nothing more. Since v0.3.0 the page offers the handle only once the account is approved ([what it sees](#before-the-app-the-landing-page-v030)); the API still accepts one before.
 - A denied account sees that it was not approved.
 - A disabled account cannot sign in.
+
+**Administrators see the app as SysOp does (v0.8.9).** The owner, 2026-11-06: "Ideally, the Administrator role has all the power of the SysOp, except for the system-level things like custom card adding, and making changes to SysOp account." Settled at the start of v0.8.9 (the owner took the recommended split):
+- **Administrators gain** the eye icon at the table and SysOp's Inspection drawer (every hand and library, audited at each opening) with the passive-bots switch in it, observing and listing every game, reading any chat (`chat.read_all`), any player's history (`players.history`), setting wins and the testing grants (`progress.manage`), and giving tokens and packs (`economy.grant`, split from `economy.manage` in v0.8.9).
+- **Never where it would be cheating.** Concealed information shows to an administrator in a game they do not sit in, or one where they are the only person (against bots); never in a game they play with or against another person (`api/games.py` `concealed_for`): the summary's `inspectable` says which, and the inspection route and socket refuse the rest (403). Their seats are counted for a Two-Headed Giant team's shared cards as any player's.
+- **SysOp's alone, the system-level powers:** custom cards, SysOp's own account, making or removing administrators, the economy's limits and cancelling auctions (`economy.manage`), resetting accounts (`admin.users.reset`), and any card in a deck list or library (`cards.any`, `library.unlimited`: v0.8.8's libraries of their own stay).
+- **Print runs.** An administrator's cards come out of a printing's print run as any player's; SysOp's do not ([shop](shop.md#print-runs-v051)).
+- Moderators get none of it.
 
 **SysOp-only permissions.**
 - Five permissions belong to SysOp alone, and no role can be granted them: `admin.roles.administrator`, `games.view_concealed`, `cards.any`, and since v0.3.1 `progress.manage` and `custom_cards.manage`.

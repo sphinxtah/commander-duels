@@ -799,6 +799,8 @@ def test_the_shop_lists_what_is_on_sale(client):
         "price_basis": "market",
         "pack_size": 15,
         "sale_price": None,
+        # Pack supply (v0.8.9): Zendikar Rising's run is not known, so it never sells out.
+        "sold_out": False,
     }
     # The basic land packs' shelf first (v0.6.4), then the eras, newest first.
     assert [era["id"] for era in shop["eras"]][:3] == ["lands", "play", "collector"]

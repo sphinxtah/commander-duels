@@ -103,10 +103,20 @@ def remove_chat(db: Session, user_id: UUID) -> int:
     return delete_chat_of(db, user_id)
 
 
+def remove_sleeves(db: Session, user_id: UUID) -> int:
+    """The account's card sleeves' pictures (api/sleeves.py, v0.8.9): each is deleted, its picture
+    cleared, a removed one's too; the rows stay for the reports that name them."""
+    # Imported here: api.sleeves imports api.reports, which imports api.admin.
+    from api.sleeves import delete_sleeves_of
+
+    return delete_sleeves_of(db, user_id)
+
+
 CLEANUPS: tuple[Callable[[Session, UUID], object], ...] = (
     remove_reports,
     remove_social,
     remove_chat,
+    remove_sleeves,
 )
 
 

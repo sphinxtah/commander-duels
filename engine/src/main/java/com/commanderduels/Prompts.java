@@ -34,6 +34,8 @@ import mage.constants.CostModificationType;
 import mage.constants.Constants;
 import mage.constants.ManaType;
 import mage.constants.PlayerAction;
+import mage.constants.SubType;
+import mage.constants.SuperType;
 import mage.constants.MultiAmountType;
 import mage.constants.Zone;
 import mage.game.Game;
@@ -698,7 +700,10 @@ final class Prompts {
                 sources.add(permanent);
             }
         }
-        sources.sort(Comparator.comparing(Permanent::getName).thenComparing(views::ref));
+        // Basic lands lead the sources (v0.8.9, the owner's word), in W, U, B, R, G order and then
+        // Wastes, snow basics among them; every other source follows by name, as before.
+        sources.sort(Comparator.comparingInt((Permanent permanent) -> basicRank(permanent, game))
+            .thenComparing(Permanent::getName).thenComparing(views::ref));
         for (Permanent permanent : sources) {
             add("tap_source", permanent.getName(), views.ref(permanent), null, false,
                 new UuidAnswer(permanent.getId()));
@@ -724,6 +729,26 @@ final class Prompts {
                 new StringAnswer("special"));
         }
         add("cancel", "Cancel", null, null, false, new BooleanAnswer(false));
+    }
+
+    /** Basic land types in the payment prompt's order: W, U, B, R, G. */
+    private static final List<SubType> BASIC_ORDER =
+        List.of(SubType.PLAINS, SubType.ISLAND, SubType.SWAMP, SubType.MOUNTAIN, SubType.FOREST);
+
+    /**
+     * A mana source's place in the payment prompt: a basic land by its type (0 to 4, a basic with
+     * none of the five, such as Wastes, 5), every other source after them (6).
+     */
+    static int basicRank(Permanent permanent, Game game) {
+        if (!permanent.isLand(game) || !permanent.getSuperType(game).contains(SuperType.BASIC)) {
+            return BASIC_ORDER.size() + 1;
+        }
+        for (int i = 0; i < BASIC_ORDER.size(); i++) {
+            if (permanent.hasSubtype(BASIC_ORDER.get(i), game)) {
+                return i;
+            }
+        }
+        return BASIC_ORDER.size();
     }
 
     /** Splitting an amount, such as combat damage among blockers: XMage's suggestion or a custom split. */

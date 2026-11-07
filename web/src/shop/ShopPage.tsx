@@ -388,14 +388,24 @@ export function ShopPage({
                   {group.map((product) => {
                     const price = priceToPay(product);
                     const short = price - balance;
+                    // Sold out (v0.8.9): its set's print run is spent. Locked, with a banner.
+                    const gone = product.sold_out ?? false;
                     return (
                       <li
                         key={product.id}
                         className={styles.product}
-                        aria-label={product.name}
+                        aria-label={
+                          gone ? `${product.name}, sold out` : product.name
+                        }
+                        data-sold-out={gone || undefined}
                       >
                         <div className={styles.productArt}>
                           <PackArt product={product} height={9} />
+                          {gone && (
+                            <span className={styles.soldOut} aria-hidden="true">
+                              Sold out
+                            </span>
+                          )}
                         </div>
                         <header>
                           <strong>{product.name}</strong>
@@ -434,23 +444,33 @@ export function ShopPage({
                           <button
                             type="button"
                             className={styles.secondary}
-                            aria-disabled={short > 0}
+                            aria-disabled={gone || short > 0}
                             title={
-                              short > 0
-                                ? `You need ${tokens(short)} more.`
-                                : undefined
+                              gone
+                                ? "Sold out: its print run is spent."
+                                : short > 0
+                                  ? `You need ${tokens(short)} more.`
+                                  : undefined
                             }
                             aria-label={`Buy ${product.name}`}
-                            data-tour={short > 0 ? undefined : "buy"}
-                            onClick={() => short <= 0 && choose(product)}
+                            data-tour={gone || short > 0 ? undefined : "buy"}
+                            onClick={() =>
+                              !gone && short <= 0 && choose(product)
+                            }
                           >
-                            Buy
+                            {gone ? "Sold out" : "Buy"}
                           </button>
                         </div>
-                        {short > 0 && (
+                        {gone ? (
                           <p className={styles.note}>
-                            You need {tokens(short)} more.
+                            Every pack its print run held has been sold.
                           </p>
+                        ) : (
+                          short > 0 && (
+                            <p className={styles.note}>
+                              You need {tokens(short)} more.
+                            </p>
+                          )
                         )}
                       </li>
                     );

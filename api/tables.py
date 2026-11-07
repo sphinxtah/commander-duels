@@ -404,9 +404,10 @@ def keep_team(db: Session, table: GameTable, team: int, told: UUID, mate: UUID) 
 
 
 def sees_all(db: Session, user_id: UUID) -> bool:
-    """SysOp, whose inspection shows every seat's cards."""
+    """SysOp, whose inspection shows every seat's cards. Not an administrator (v0.8.9), who sees
+    none of a game they play with other people."""
     user = db.get(User, user_id)
-    return user is not None and "games.view_concealed" in permissions_for(user, roles_of(db, user))
+    return user is not None and user.kind == "sysop"
 
 
 def stays_on(table: GameTable, user_id: UUID, team: int) -> None:

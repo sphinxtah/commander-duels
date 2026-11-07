@@ -454,6 +454,12 @@
             "title": "Set Name",
             "type": "string"
           },
+          "sold_out": {
+            "default": false,
+            "description": "Its set's print run cannot fill one more (v0.8.9, api/pack_supply.py): neither sold nor given.",
+            "title": "Sold Out",
+            "type": "boolean"
+          },
           "symbol": {
             "anyOf": [
               {
@@ -1562,7 +1568,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.8.8",
+            "default": "0.8.9",
             "title": "Version",
             "type": "string"
           }
@@ -4315,6 +4321,18 @@
             ],
             "title": "Share Code"
           },
+          "sleeve": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The card sleeve its cards wear at a table (v0.8.9): \"sleeve:<id>\", \"back:<slug>\", or null for the default.",
+            "title": "Sleeve"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -4581,6 +4599,29 @@
         "title": "DeckPurchaseRequest",
         "type": "object"
       },
+      "DeckSleeve": {
+        "additionalProperties": false,
+        "properties": {
+          "sleeve": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "\"sleeve:<id>\", one of your sleeves; \"default:<slug>\", one of the sleeves everyone has; \"back:<slug>\", a campaign card back you have earned; null, the official card back (or your campaign back, if you chose one).",
+            "title": "Sleeve"
+          }
+        },
+        "required": [
+          "sleeve"
+        ],
+        "title": "DeckSleeve",
+        "type": "object"
+      },
       "DeckSource": {
         "additionalProperties": false,
         "properties": {
@@ -4716,6 +4757,18 @@
             "title": "Removed Cards",
             "type": "array"
           },
+          "sleeve": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The card sleeve its cards wear at a table (v0.8.9): \"sleeve:<id>\", \"back:<slug>\", or null for the default.",
+            "title": "Sleeve"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -4820,6 +4873,31 @@
           }
         },
         "title": "DeckUpdate",
+        "type": "object"
+      },
+      "DefaultSleeve": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "Its slug; a deck wears it as default:<slug>.",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url"
+        ],
+        "title": "DefaultSleeve",
         "type": "object"
       },
       "Draft": {
@@ -5663,6 +5741,19 @@
             "title": "Player",
             "type": "string"
           },
+          "player_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A human seat's player, for their profile (v0.8.9); null for a bot, and for SysOp to anyone else.",
+            "title": "Player Id"
+          },
           "portrait": {
             "anyOf": [
               {
@@ -5694,6 +5785,18 @@
           "seat": {
             "title": "Seat",
             "type": "integer"
+          },
+          "sleeve": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The picture on the backs of a human seat's cards (v0.8.9, api/sleeves.py), a path on this site; null: the official card back.",
+            "title": "Sleeve"
           },
           "starting_life": {
             "anyOf": [
@@ -5805,6 +5908,12 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "inspectable": {
+            "default": false,
+            "description": "Whether the viewer sees this game's concealed information, every hand and library (SysOp; since v0.8.9 an administrator, except in a game they play with another person).",
+            "title": "Inspectable",
+            "type": "boolean"
           },
           "kind": {
             "default": "practice",
@@ -6136,7 +6245,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.8.8",
+            "default": "0.8.9",
             "title": "Version",
             "type": "string"
           }
@@ -7331,6 +7440,7 @@
                 "progress.manage",
                 "custom_cards.manage",
                 "economy.manage",
+                "economy.grant",
                 "shop.manage",
                 "reports.manage",
                 "players.presence",
@@ -9090,6 +9200,12 @@
             "title": "Set Name",
             "type": "string"
           },
+          "sold_out": {
+            "default": false,
+            "description": "Its set's print run cannot fill one more (v0.8.9, api/pack_supply.py): neither sold nor given.",
+            "title": "Sold Out",
+            "type": "boolean"
+          },
           "symbol": {
             "anyOf": [
               {
@@ -10472,6 +10588,27 @@
         "title": "RemovedCard",
         "type": "object"
       },
+      "RemovedSleeve": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "removed_at": {
+            "format": "date-time",
+            "title": "Removed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "removed_at"
+        ],
+        "title": "RemovedSleeve",
+        "type": "object"
+      },
       "ReportContext": {
         "additionalProperties": false,
         "description": "What the page attaches on its own. Context only: nothing in it is checked against the\naccount or decides anything.",
@@ -10590,6 +10727,19 @@
             "description": "An image, base64: PNG, JPEG or WebP, at most 5 MB decoded.",
             "title": "Screenshot"
           },
+          "sleeve": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The card sleeve the report is about (v0.8.9): another player's, as it shows at a table.",
+            "title": "Sleeve"
+          },
           "summary": {
             "maxLength": 120,
             "minLength": 1,
@@ -10682,7 +10832,7 @@
                 "type": "null"
               }
             ],
-            "description": "Who sent the reported chat message, if the report is of one."
+            "description": "Who sent the reported chat message, or whose card sleeve it reports."
           },
           "reporter": {
             "$ref": "#/components/schemas/Reporter"
@@ -10719,6 +10869,17 @@
               }
             ],
             "title": "Screenshot Width"
+          },
+          "sleeve": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedSleeve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reported card sleeve (v0.8.9), if the report is of one."
           },
           "status": {
             "description": "new (unread), seen, fixed or closed.",
@@ -10932,7 +11093,7 @@
                 "type": "null"
               }
             ],
-            "description": "Who sent the reported chat message, if the report is of one."
+            "description": "Who sent the reported chat message, or whose card sleeve it reports."
           },
           "reporter": {
             "$ref": "#/components/schemas/Reporter"
@@ -10940,6 +11101,17 @@
           "screenshot": {
             "title": "Screenshot",
             "type": "boolean"
+          },
+          "sleeve": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportedSleeve"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The reported card sleeve (v0.8.9), if the report is of one."
           },
           "status": {
             "description": "new (unread), seen, fixed or closed.",
@@ -11038,6 +11210,44 @@
           "id"
         ],
         "title": "ReportedMessageRef",
+        "type": "object"
+      },
+      "ReportedSleeve": {
+        "additionalProperties": false,
+        "properties": {
+          "deleted": {
+            "description": "Its owner deleted it.",
+            "title": "Deleted",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "removed": {
+            "description": "A moderator took it off every table.",
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "url": {
+            "description": "Its picture; staff see it after its removal too.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "removed",
+          "deleted"
+        ],
+        "title": "ReportedSleeve",
         "type": "object"
       },
       "Reporter": {
@@ -12266,6 +12476,124 @@
           "sideboard"
         ],
         "title": "SideboardCard",
+        "type": "object"
+      },
+      "Sleeve": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "removed": {
+            "description": "A moderator removed it after a report: it shows to nobody, and no deck may wear it.",
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "url": {
+            "description": "The picture, WebP, 504 by 704.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "url",
+          "created_at",
+          "removed"
+        ],
+        "title": "Sleeve",
+        "type": "object"
+      },
+      "SleeveRemoval": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "SleeveRemoval",
+        "type": "object"
+      },
+      "SleeveUpload": {
+        "additionalProperties": false,
+        "properties": {
+          "image": {
+            "description": "The picture, base64: PNG, BMP or JPEG, at most 5 MB decoded.",
+            "maxLength": 6990508,
+            "minLength": 1,
+            "title": "Image",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "image"
+        ],
+        "title": "SleeveUpload",
+        "type": "object"
+      },
+      "Sleeves": {
+        "additionalProperties": false,
+        "properties": {
+          "backs": {
+            "description": "The campaign card backs the account has earned, by slug; a deck may wear one as back:<slug>.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Backs",
+            "type": "array"
+          },
+          "defaults": {
+            "description": "The sleeves every account has.",
+            "items": {
+              "$ref": "#/components/schemas/DefaultSleeve"
+            },
+            "title": "Defaults",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "sleeves": {
+            "items": {
+              "$ref": "#/components/schemas/Sleeve"
+            },
+            "title": "Sleeves",
+            "type": "array"
+          }
+        },
+        "required": [
+          "defaults",
+          "sleeves",
+          "limit",
+          "backs"
+        ],
+        "title": "Sleeves",
         "type": "object"
       },
       "StartEncounter": {
@@ -14040,7 +14368,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.8.8"
+    "version": "0.8.9"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -16907,6 +17235,127 @@
         "summary": "Request Booster Sync"
       }
     },
+    "/api/v1/admin/sleeves/{sleeve_id}/remove": {
+      "post": {
+        "description": "A moderator takes a reported sleeve off every table: it shows to nobody but staff, and\nthe decks wearing it go back to the default. Audited.",
+        "operationId": "remove_sleeve_api_v1_admin_sleeves__sleeve_id__remove_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sleeve_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sleeve Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SleeveRemoval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovedSleeve"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Remove Sleeve"
+      }
+    },
     "/api/v1/admin/users": {
       "get": {
         "operationId": "list_users_api_v1_admin_users_get",
@@ -17552,7 +18001,7 @@
         "summary": "Account Packs"
       },
       "post": {
-        "description": "SysOp gives unopened packs to any account, its own included: with a reason, audited. A\nretry with the same key grants once: the key names the grant (its grant_id), looked for\nunder the account's row lock, so a retry sent at once waits for the request it repeats.",
+        "description": "SysOp, and since v0.8.9 an administrator, gives unopened packs to any account, its own\nincluded: with a reason, audited. A retry with the same key grants once: the key names the\ngrant (its grant_id), looked for under the account's row lock, so a retry sent at once waits\nfor the request it repeats.",
         "operationId": "give_packs_api_v1_admin_users__user_id__packs_post",
         "parameters": [
           {
@@ -18488,7 +18937,7 @@
         "summary": "Account Tokens"
       },
       "post": {
-        "description": "SysOp gives tokens to any account, its own included, or takes them back: a ledger entry of\nits own, apart from tokens earned, with the reason, and audited (PROG03). A retry with the\nsame key grants once.",
+        "description": "SysOp, and since v0.8.9 an administrator, gives tokens to any account, its own included,\nor takes them back: a ledger entry of its own, apart from tokens earned, with the reason, and\naudited (PROG03). A retry with the same key grants once.",
         "operationId": "give_tokens_api_v1_admin_users__user_id__tokens_post",
         "parameters": [
           {
@@ -25474,6 +25923,127 @@
         "summary": "Read Revision"
       }
     },
+    "/api/v1/decks/{deck_id}/sleeve": {
+      "put": {
+        "description": "Puts a sleeve on one of your decks: one of your own, a campaign back you earned, or none.",
+        "operationId": "choose_sleeve_api_v1_decks__deck_id__sleeve_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeckSleeve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckSleeve"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Choose Sleeve"
+      }
+    },
     "/api/v1/decks/{deck_id}/switched-editions": {
       "delete": {
         "description": "Dismisses the deck's note of the copies switched to editions the library holds (v0.5.0).",
@@ -28530,7 +29100,7 @@
                 }
               }
             },
-            "description": "Unprocessable Entity"
+            "description": "Unprocessable Content"
           },
           "429": {
             "content": {
@@ -30002,6 +30572,314 @@
           }
         },
         "summary": "End Session"
+      }
+    },
+    "/api/v1/me/sleeves": {
+      "get": {
+        "operationId": "my_sleeves_api_v1_me_sleeves_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sleeves"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Sleeves"
+      },
+      "post": {
+        "description": "Adds a sleeve to the account's: at most 20.",
+        "operationId": "upload_sleeve_api_v1_me_sleeves_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SleeveUpload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sleeve"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Upload Sleeve"
+      }
+    },
+    "/api/v1/me/sleeves/{sleeve_id}": {
+      "delete": {
+        "operationId": "delete_sleeve_api_v1_me_sleeves__sleeve_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sleeve_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sleeve Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Sleeve"
       }
     },
     "/api/v1/me/starters": {
@@ -33666,6 +34544,113 @@
           }
         },
         "summary": "Buy"
+      }
+    },
+    "/api/v1/sleeves/{sleeve_id}/image": {
+      "get": {
+        "description": "A sleeve's picture, for anyone signed in: the table shows it to everyone. A removed one\nonly to staff (reports.manage), for its report; a deleted one to nobody.",
+        "operationId": "sleeve_image_api_v1_sleeves__sleeve_id__image_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sleeve_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sleeve Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/webp": {}
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Sleeve Image"
       }
     },
     "/api/v1/tables": {

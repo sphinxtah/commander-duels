@@ -4,7 +4,7 @@ COPY requirements.lock pyproject.toml alembic.ini VERSION ./
 COPY api ./api
 COPY catalog ./catalog
 # The Planeswalker roster, the starter decks, the shop's price list and its pack artwork (v0.4.3).
-COPY content/planeswalkers.json content/starter-decks.json content/starter-deck-prices.json content/pack-prices.json content/pack-art.json content/print-runs.json content/campaign.json content/how-to-play-cards.json ./content/
+COPY content/planeswalkers.json content/starter-decks.json content/starter-deck-prices.json content/pack-prices.json content/pack-art.json content/print-runs.json content/pack-supply.json content/campaign.json content/how-to-play-cards.json ./content/
 ENV CD_CONTENT_DIR=/app/content
 RUN pip install --no-cache-dir -r requirements.lock && pip install --no-cache-dir --no-deps .
 # The card image cache and the catalog's bulk files; named volumes mounted here start with this owner.

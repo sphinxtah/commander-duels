@@ -15,6 +15,7 @@ import {
 } from "./portrait";
 import { sigilSpec } from "./sigil";
 import { SigilSvg } from "./SigilSvg";
+import { PlayerProfileButton } from "./PlayerProfile";
 import { useTableContext } from "./TableContext";
 import {
   STAGE_W,
@@ -549,14 +550,28 @@ export function PlayerPlate({
       data-in-range={reach?.inRange ?? undefined}
       data-attackable={reach?.attackable ?? undefined}
     >
-      <span
-        className={styles.name}
-        data-align={align}
-        style={textStyle(node.name)}
-        title={player.name}
-      >
-        {player.name}
-      </span>
+      {/* Another person's name opens their profile (v0.8.9), where their sleeve is reported. */}
+      {player.profile ? (
+        <PlayerProfileButton
+          name={player.name}
+          playerId={player.profile.playerId}
+          sleeve={player.profile.sleeve}
+          gameId={scene.model?.gameId ?? null}
+          className={`${styles.name} ${styles.nameButton}`}
+          style={textStyle(node.name)}
+          title={`${player.name}: open their profile`}
+          align={align}
+        />
+      ) : (
+        <span
+          className={styles.name}
+          data-align={align}
+          style={textStyle(node.name)}
+          title={player.name}
+        >
+          {player.name}
+        </span>
+      )}
       {node.title && player.title && (
         <span
           className={styles.title}

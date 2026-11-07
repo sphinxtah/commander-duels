@@ -52,6 +52,7 @@ import {
   type Shortage,
   type Validation,
 } from "./decks";
+import { SleevePicker } from "./SleevePicker";
 import styles from "./decks.module.css";
 
 type SaveState = "saved" | "dirty" | "saving" | "error" | "conflict";
@@ -1364,6 +1365,8 @@ function DeckMeta({
   const shareUrl = deck.share_code
     ? `${window.location.origin}/#shared/${deck.share_code}`
     : "";
+  // The deck's card sleeve (v0.8.9): its own setting, saved apart from the draft.
+  const [sleeve, setSleeve] = useState<string | null>(deck.sleeve ?? null);
   return (
     <section className={styles.meta} aria-labelledby="meta-title">
       <h2 id="meta-title">This deck</h2>
@@ -1441,6 +1444,7 @@ function DeckMeta({
           </button>
         </p>
       )}
+      <SleevePicker deckId={deck.id} current={sleeve} onChange={setSleeve} />
       <label className={styles.field}>
         <span>Notes (only you see these)</span>
         <textarea

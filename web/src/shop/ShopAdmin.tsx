@@ -132,7 +132,7 @@ export function ShopAdmin({ me }: { me: Me }) {
   const [reason, setReason] = useState("");
   const [editError, setEditError] = useState("");
   const [busy, setBusy] = useState(false);
-  const gives = me.permissions.includes("economy.manage");
+  const gives = me.permissions.includes("economy.grant");
 
   const load = useCallback(async () => {
     const [shop, recent] = await Promise.all([

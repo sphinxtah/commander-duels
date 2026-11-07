@@ -1,0 +1,107 @@
+/* Card sleeves (v0.8.9): a deck's choice and the player's uploads. */
+.sleeves {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.sleeves h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.fine {
+  margin: 0;
+  color: #a5b0a3;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+.error {
+  margin: 0;
+  color: #ffb4a8;
+  font-size: 0.82rem;
+}
+.grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 10px;
+}
+.choice {
+  position: relative;
+}
+.sleeveButton {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #ffffff1f;
+  border-radius: 6px;
+  background: #0d1515;
+  color: inherit;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.sleeveButton img {
+  width: 63px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #1b2425;
+}
+.sleeveButton span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sleeveButton[aria-pressed="true"] {
+  border-color: var(--cd-gold, #d4b47a);
+  box-shadow: 0 0 0 2px #d4b47a66;
+}
+.sleeveButton:focus-visible {
+  outline: 2px solid var(--cd-gold, #d4b47a);
+  outline-offset: 2px;
+}
+.deleteSleeve {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: #000a;
+  color: #fff;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.upload {
+  display: grid;
+  gap: 8px;
+}
+.upload label {
+  display: grid;
+  gap: 3px;
+  font-size: 0.8rem;
+}
+.upload input {
+  font: inherit;
+}
+.uploadButton {
+  justify-self: start;
+  padding: 6px 14px;
+  border: 1px solid #d4b47a66;
+  border-radius: 5px;
+  background: #1d2a26;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.uploadButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

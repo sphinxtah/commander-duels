@@ -529,6 +529,9 @@ def test_a_practice_game_belongs_to_its_owner(
         "team": None,
         "role": None,
         "starting_life": None,
+        # v0.8.9: the official card back, and the player for their profile.
+        "sleeve": None,
+        "player_id": str(ada.id),
     }
     assert summary["seats"][1]["player"] == "bot" and summary["seats"][1]["deck"] is None
     assert engine.created[0]["seats"] == [

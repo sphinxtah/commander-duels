@@ -154,6 +154,11 @@ class ReportCreate(Contract):
     message: ReportedMessageRef | None = Field(
         default=None, description="The chat message the report is about (v0.4.4)."
     )
+    sleeve: UUID | None = Field(
+        default=None,
+        description="The card sleeve the report is about (v0.8.9): another player's, as it shows "
+        "at a table.",
+    )
 
 
 class ReportReceipt(Contract):
@@ -168,6 +173,14 @@ class Reporter(Contract):
     display_name: str
 
 
+class ReportedSleeve(Contract):
+    id: UUID
+    name: str
+    url: str = Field(description="Its picture; staff see it after its removal too.")
+    removed: bool = Field(description="A moderator took it off every table.")
+    deleted: bool = Field(description="Its owner deleted it.")
+
+
 class ReportSummary(Contract):
     id: UUID
     created_at: datetime
@@ -180,7 +193,11 @@ class ReportSummary(Contract):
     game_turn: int | None
     screenshot: bool
     reported_user: ChatPerson | None = Field(
-        default=None, description="Who sent the reported chat message, if the report is of one."
+        default=None,
+        description="Who sent the reported chat message, or whose card sleeve it reports.",
+    )
+    sleeve: ReportedSleeve | None = Field(
+        default=None, description="The reported card sleeve (v0.8.9), if the report is of one."
     )
 
 
@@ -317,6 +334,13 @@ def send_report(body: ReportCreate, request: Request, principal: Active, db: Db)
 
         found = reported_direct if body.message.kind == "direct" else reported_table
         reported = found(db, principal, body.message.id)
+    sleeve: tuple[UUID, UUID] | None = None
+    if body.sleeve is not None:
+        # Imported here: api.sleeves imports this module.
+        from api.sleeves import reported_sleeve
+
+        found_sleeve = reported_sleeve(db, principal, body.sleeve)
+        sleeve = (found_sleeve.id, found_sleeve.user_id)
     shot = screenshot_of(body.screenshot) if body.screenshot else None
     context = body.context
     report = ProblemReport(
@@ -338,8 +362,9 @@ def send_report(body: ReportCreate, request: Request, principal: Active, db: Db)
         screenshot=shot[0] if shot else None,
         screenshot_width=shot[1] if shot else None,
         screenshot_height=shot[2] if shot else None,
-        reported_user_id=reported[0] if reported else None,
+        reported_user_id=reported[0] if reported else sleeve[1] if sleeve else None,
         chat=reported[1].model_dump(mode="json") if reported else None,
+        sleeve_id=sleeve[0] if sleeve else None,
     )
     db.add(report)
     db.commit()
@@ -362,7 +387,34 @@ def users_of(db: Session, ids: set[UUID | None]) -> dict[UUID, User]:
     return {user.id: user for user in db.scalars(select(User).where(User.id.in_(wanted)))}
 
 
-def summary_of(report: ProblemReport, users: dict[UUID, User], viewer: Principal) -> ReportSummary:
+def sleeves_of(db: Session, reports: list[ProblemReport]) -> dict[UUID, ReportedSleeve]:
+    """The sleeves these reports name (v0.8.9)."""
+    from api.models import CardSleeve
+    from api.sleeves import image_url
+
+    wanted = {report.sleeve_id for report in reports if report.sleeve_id is not None}
+    if not wanted:
+        return {}
+    return {
+        row.id: ReportedSleeve(
+            id=row.id,
+            name=row.name,
+            url=image_url(row.id),
+            removed=row.removed_at is not None,
+            deleted=row.deleted_at is not None,
+        )
+        for row in db.scalars(select(CardSleeve).where(CardSleeve.id.in_(wanted)))
+    }
+
+
+def summary_of(
+    report: ProblemReport,
+    users: dict[UUID, User],
+    viewer: Principal,
+    sleeves: dict[UUID, ReportedSleeve] | None = None,
+) -> ReportSummary:
+    sleeve = (sleeves or {}).get(report.sleeve_id) if report.sleeve_id else None
+    owner = users.get(report.reported_user_id) if sleeve and report.reported_user_id else None
     return ReportSummary(
         id=report.id,
         created_at=report.created_at,
@@ -376,16 +428,21 @@ def summary_of(report: ProblemReport, users: dict[UUID, User], viewer: Principal
         # The width says whether there is one, without loading the image itself.
         screenshot=report.screenshot_width is not None,
         reported_user=(
-            ReportedChat.model_validate(report.chat).reported_user if report.chat else None
+            ReportedChat.model_validate(report.chat).reported_user
+            if report.chat
+            else ChatPerson(id=owner.id, handle=owner.handle)
+            if owner
+            else None
         ),
+        sleeve=sleeve,
     )
 
 
 def detail_of(db: Session, report: ProblemReport, viewer: Principal) -> ReportDetail:
-    users = users_of(db, {report.user_id, report.status_changed_by})
+    users = users_of(db, {report.user_id, report.status_changed_by, report.reported_user_id})
     changer = users.get(report.status_changed_by) if report.status_changed_by else None
     return ReportDetail(
-        **summary_of(report, users, viewer).model_dump(),
+        **summary_of(report, users, viewer, sleeves_of(db, [report])).model_dump(),
         description=report.description,
         api_version=report.api_version,
         user_agent=report.user_agent,
@@ -430,10 +487,13 @@ def list_reports(
     )
     more = len(reports) > limit
     reports = reports[:limit]
-    users = users_of(db, {report.user_id for report in reports})
+    wanted: set[UUID | None] = {report.user_id for report in reports}
+    wanted |= {report.reported_user_id for report in reports}
+    users = users_of(db, wanted)
+    sleeves = sleeves_of(db, reports)
     last = reports[-1] if reports else None
     return ReportPage(
-        items=[summary_of(report, users, principal) for report in reports],
+        items=[summary_of(report, users, principal, sleeves) for report in reports],
         next_cursor=encode_cursor(last.created_at, last.id) if more and last else None,
     )
 

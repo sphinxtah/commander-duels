@@ -139,6 +139,7 @@ Permission = Literal[
     "progress.manage",
     "custom_cards.manage",
     "economy.manage",
+    "economy.grant",
     "shop.manage",
     "reports.manage",
     "players.presence",
@@ -547,6 +548,16 @@ class GameSeat(Contract):
         default=None,
         description="King's Table (v0.8.7): the seat's starting life under the game's settings.",
     )
+    sleeve: str | None = Field(
+        default=None,
+        description="The picture on the backs of a human seat's cards (v0.8.9, api/sleeves.py), "
+        "a path on this site; null: the official card back.",
+    )
+    player_id: UUID | None = Field(
+        default=None,
+        description="A human seat's player, for their profile (v0.8.9); null for a bot, and for "
+        "SysOp to anyone else.",
+    )
 
 
 class GameResult(Contract):
@@ -641,6 +652,12 @@ class GameSummary(Contract):
         "game pays out once they have been). Null for everyone else, and for a game where the "
         "viewer may not switch them: one that is not their own running practice or campaign "
         "game with them its only human seat.",
+    )
+    inspectable: bool = Field(
+        default=False,
+        description="Whether the viewer sees this game's concealed information, every hand and "
+        "library (SysOp; since v0.8.9 an administrator, except in a game they play with another "
+        "person).",
     )
 
 
