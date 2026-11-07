@@ -15,7 +15,7 @@ Each deck wears one sleeve, chosen in the deck editor's "Card sleeve" section (T
 
 ## At a table
 
-Every human seat's sleeve shows to everyone at the table, players and spectators alike: the game's summary gives each human seat's picture (`seats[].sleeve`, a path on the site), and the table's canvas draws each seat's cards, library, hand backs and draws with their owner's sleeve, each seat's texture drawn again in place once its picture loads. Bots show the official back. The sleeve is the deck's when the summary is read, so a change shows at the next load. (The table drawn without WebGL still shows the viewer's own back on every card.)
+Every human seat's sleeve shows to everyone at the table, players and spectators alike: the game's summary gives each human seat's picture (`seats[].sleeve`, a path on the site), and the table's canvas draws each seat's cards, library, hand backs and draws with their owner's sleeve, each seat's texture drawn again in place once its picture loads. Bots show the official back. The sleeve is the deck's when the summary is read, so a change shows at the next load. Since v0.9.0 the library piles and the pile of backs at a long hand's end wear it too (until then they drew the viewer's own back), and so does the plain table drawn without WebGL: each face-down card, library and magnified back shows its owner's sleeve.
 
 ## Reporting and removal
 

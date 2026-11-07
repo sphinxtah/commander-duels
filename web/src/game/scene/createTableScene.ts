@@ -1503,7 +1503,7 @@ class PixiTableScene implements TableScene {
     this.band.update(layout.band, model.phase, model.step);
     this.hand.setBacks(model.handBacks, model.anchored?.seat ?? null);
     this.applyTiles(model, layout);
-    this.applyMores(layout);
+    this.applyMores(layout, model.anchored?.seat ?? null);
     this.applyPortraits(model, layout, ui);
     this.landLosses();
     this.applyCurves(layout, ui, plan?.cast);
@@ -1539,7 +1539,7 @@ class PixiTableScene implements TableScene {
       }
   }
 
-  private applyMores(layout: TableLayout): void {
+  private applyMores(layout: TableLayout, handSeat: number | null): void {
     const seen = new Set<string>();
     for (const node of layout.nodes.values()) {
       if (node.kind !== "more") continue;
@@ -1562,6 +1562,7 @@ class PixiTableScene implements TableScene {
           : node.key === "more:hand"
             ? "hand"
             : "plate",
+        handSeat,
       );
     }
     for (const [key, view] of this.mores)

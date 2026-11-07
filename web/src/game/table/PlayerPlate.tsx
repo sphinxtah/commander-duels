@@ -317,7 +317,7 @@ function Tile({
       <div className={styles.slot} style={boxStyle(tile.card)} aria-hidden>
         {tile.count > 0 ? (
           <div className={styles.paint} style={within(tile.card, tile.card)}>
-            <CardFace card={{ ...back, id: tile.key }} />
+            <CardFace card={{ ...back, id: tile.key }} seat={tile.seat} />
           </div>
         ) : (
           <span className={styles.tileEmpty} />

@@ -3,7 +3,8 @@ import { cardImageUrl } from "./images";
 import type { Located } from "./model";
 import { manaSymbols, manaWords, readableRule } from "./model";
 import { useImageRetry } from "./RetryingImage";
-import { useCardBack } from "./cardBack";
+import { OFFICIAL_BACK, useCardBack } from "./cardBack";
+import { useTableContext } from "./table/TableContext";
 import type { CardImageSize } from "./table/types";
 import type { CardView, PermanentView } from "./types";
 import styles from "./game.module.css";
@@ -57,14 +58,18 @@ function TextFrame({ card }: { card: CardView }) {
   );
 }
 
+/** `seat`: whose card it is, so a face-down card wears its owner's card sleeve (v0.9.0), as the
+ * canvas draws it; absent or null, the viewer's own back. */
 export function CardFace({
   card,
   size = "normal",
+  seat = null,
 }: {
   card: CardView;
   size?: CardImageSize;
+  seat?: number | null;
 }) {
-  if (card.hidden || !card.name) return <CardBack />;
+  if (card.hidden || !card.name) return <CardBack seat={seat} />;
   // A new name is a new image: remount rather than reset, so a cached image that loads at once
   // is never marked loading again afterwards.
   return (
@@ -77,9 +82,14 @@ export function CardFace({
   );
 }
 
-/** A face-down card: the official back, or the campaign's back the player chose (v0.8.8). */
-function CardBack() {
-  const back = useCardBack();
+/** A face-down card: its owner's card sleeve at a table (v0.9.0), from the game's summary, where
+ * a seat with none shows the official back; with no seat, the campaign's back the viewer chose
+ * (v0.8.8) or the official back. */
+function CardBack({ seat }: { seat: number | null }) {
+  const own = useCardBack();
+  const { model } = useTableContext();
+  const back =
+    seat === null || !model ? own : (model.backs?.get(seat) ?? OFFICIAL_BACK);
   return (
     <div className={styles.cardBack} aria-hidden="true">
       <img src={back} alt="" />

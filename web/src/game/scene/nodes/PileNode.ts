@@ -151,12 +151,13 @@ export class PileNode {
           front.y + front.h / 2,
         ),
       );
-      // The face-down pile: a few backs, a little higher each, as deep as the library.
+      // The face-down pile: a few backs, a little higher each, as deep as the library. Its
+      // backs are its owner's card sleeve (v0.9.0), as every card of theirs is.
       const layers =
         tile.count === 0 ? 0 : Math.min(3, 1 + Math.floor(tile.count / 20));
       const face = fitCard(r);
       for (let i = 0; i < layers; i++) {
-        const back = new Sprite(this.kit.art.back);
+        const back = new Sprite(this.kit.back(tile.seat));
         back.position.set(face.x, face.y - i * 2);
         back.width = face.w;
         back.height = face.h;
@@ -236,9 +237,14 @@ export class MoreBadge {
     this.root.addChild(this.backs, this.g, this.label);
   }
 
-  update(node: PlacedMore, look: "plate" | "diamond" | "hand"): void {
+  /** `seat`: whose card sleeve the hand's backs wear (v0.9.0); null, the viewer's own back. */
+  update(
+    node: PlacedMore,
+    look: "plate" | "diamond" | "hand",
+    seat: number | null = null,
+  ): void {
     const r = node.hit;
-    const signature = `${r.x},${r.y},${r.w},${r.h}|${node.count}|${look}`;
+    const signature = `${r.x},${r.y},${r.w},${r.h}|${node.count}|${look}|${seat}`;
     if (signature === this.signature) return;
     this.signature = signature;
     const g = this.g;
@@ -255,7 +261,7 @@ export class MoreBadge {
         y: slot.face.y + slot.face.h,
       };
       for (let i = 2; i >= 0; i--) {
-        const back = new Sprite(this.kit.art.back);
+        const back = new Sprite(this.kit.back(seat));
         back.anchor.set(0.5, 1);
         back.width = slot.face.w;
         back.height = slot.face.h;

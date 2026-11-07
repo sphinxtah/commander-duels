@@ -363,6 +363,55 @@ describe("the scene's card textures", () => {
   });
 });
 
+describe("card sleeves (v0.8.9)", () => {
+  type Backed = { backs: Container };
+  const textures = (node: Backed) =>
+    node.backs.children.map((child) => (child as Sprite).texture);
+  const seatBack = (table: Table, seat: number | null) =>
+    (
+      table.scene as unknown as { seatBack(seat: number | null): Texture }
+    ).seatBack(seat);
+  const art = (table: Table) =>
+    (table.scene as unknown as { art: { back: Texture } }).art.back;
+
+  it("puts each player's own sleeve on their library's backs (v0.9.0)", async () => {
+    const table = new Table("duel", (f) => {
+      f.summarySeats = f.summarySeats.map((entry) =>
+        entry.seat === 0
+          ? { ...entry, sleeve: "/brand/sleeves/duels-crest.webp" }
+          : entry,
+      );
+    });
+    const first = await table.start("none");
+    expect(first.model.backs?.get(0)).toBe("/brand/sleeves/duels-crest.webp");
+    for (const seat of [0, 1]) {
+      const library = table.internals.tiles.get(`tile:${seat}:library`) as
+        Backed | undefined;
+      expect(library).toBeDefined();
+      const backs = textures(library!);
+      expect(backs.length).toBeGreaterThan(0);
+      // The seat's back, never the viewer's: yours wears your sleeve, the bot's the official back.
+      for (const texture of backs) {
+        expect(texture).toBe(seatBack(table, seat));
+        expect(texture).not.toBe(art(table));
+      }
+    }
+    table.scene.destroy();
+  });
+
+  it("puts your sleeve on your long hand's pile of backs (v0.9.0)", async () => {
+    const table = new Table("hand25");
+    const first = await table.start("none");
+    const seat = first.model.anchored!.seat;
+    const more = table.internals.mores.get("more:hand") as unknown as Backed;
+    expect(more).toBeDefined();
+    const backs = textures(more);
+    expect(backs.length).toBeGreaterThan(0);
+    for (const texture of backs) expect(texture).toBe(seatBack(table, seat));
+    table.scene.destroy();
+  });
+});
+
 describe("drawing on demand", () => {
   it("draws nothing for store changes the canvas does not show", async () => {
     const table = new Table("duel");

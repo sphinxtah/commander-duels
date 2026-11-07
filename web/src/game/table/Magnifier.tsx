@@ -85,6 +85,7 @@ export function Magnifier({
           <CardFace
             card={risenCard.card}
             size={imageSizeFor(risenRect.h * fit.k * fit.dpr)}
+            seat={risenCard.ownerSeat ?? risenCard.controllerSeat}
           />
         </div>
       )}
@@ -96,7 +97,11 @@ export function Magnifier({
           data-level={magnified.level}
         >
           <div className={styles.card} style={picture(slot.card)}>
-            <CardFace card={card.card} size="large" />
+            <CardFace
+              card={card.card}
+              size="large"
+              seat={card.ownerSeat ?? card.controllerSeat}
+            />
             {pngFor === pngKey && pngKey && (
               <div className={styles.png}>
                 <CardFace card={card.card} size="png" />

@@ -243,10 +243,12 @@ function Picture({
   node,
   card,
   origin,
+  seat,
 }: {
   node: CardNode;
   card: CardView;
   origin: Rect;
+  seat: number | null;
 }) {
   const at = (r: Rect): CSSProperties => ({
     left: r.x - origin.x,
@@ -282,7 +284,7 @@ function Picture({
           } as CSSProperties
         }
       >
-        <CardFace card={card} />
+        <CardFace card={card} seat={seat} />
       </div>
       {node.tag && (
         <span
@@ -350,6 +352,10 @@ export function CardButton({
   const game = useGameContext();
   const scene = useTableContext();
   const own = useId();
+  // Whose card sleeve a face-down card wears (v0.9.0): its owner's, as the canvas draws it.
+  const backSeat = table
+    ? (table.ownerSeat ?? table.controllerSeat)
+    : (located?.seat ?? null);
   const permanent = located?.permanent;
   // Options name a permanent by its own id or its card's; the engine uses one reference for both.
   const offered = table?.offered ?? [
@@ -488,7 +494,12 @@ export function CardButton({
           {...handlers}
         >
           {painted && node && (
-            <Picture node={node} card={card} origin={place.hit} />
+            <Picture
+              node={node}
+              card={card}
+              origin={place.hit}
+              seat={backSeat}
+            />
           )}
         </button>
         {optionMenu}
@@ -517,7 +528,7 @@ export function CardButton({
         aria-haspopup={options.length > 1 ? "menu" : undefined}
         {...handlers}
       >
-        <CardFace card={card} />
+        <CardFace card={card} seat={backSeat} />
         {offered.length > 0 && (
           <span className={styles.actionMark} aria-hidden="true">
             {selected ? "✓" : "◆"}

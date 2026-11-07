@@ -303,6 +303,22 @@ describe("the table's DOM layer", () => {
     expect(onBrowse).toHaveBeenCalledWith({ kind: "pile", unit: pile.key });
   });
 
+  it("paints each library with its owner's card sleeve without WebGL (v0.9.0)", () => {
+    const f = tableFixture("duel");
+    f.summarySeats = f.summarySeats.map((entry) =>
+      entry.seat === 0
+        ? { ...entry, sleeve: "/brand/sleeves/the-sphinx.webp" }
+        : entry,
+    );
+    setup(f, "dom");
+    const backs = Array.from(document.querySelectorAll<HTMLImageElement>("img"))
+      .map((img) => img.getAttribute("src"))
+      .filter((src) => src?.startsWith("/brand/"));
+    // Your library wears your sleeve; the bot's, which has none, the official back.
+    expect(backs).toContain("/brand/sleeves/the-sphinx.webp");
+    expect(backs).toContain("/brand/card-back.webp");
+  });
+
   it("paints faces with the dom painter and leaves the webgl painter's buttons clear", () => {
     const placedCards = () =>
       Array.from(
