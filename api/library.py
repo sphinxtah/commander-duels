@@ -1,7 +1,7 @@
 """Players' card libraries and the starter decks (v0.3.1; PROG01, PROG03, DECK08).
 
-Players build from their own library; administrators and SysOp from the whole catalog
-(library.unlimited). A library holds:
+Players build from their own library, administrators and moderators too since v0.8.8; SysOp from
+the whole catalog (library.unlimited). A library holds:
 - copies granted for good, each grant recorded with its source (api/models.py LibraryGrant):
   the two starter decks a player chose, every copy of each, and the cards of decks saved before
   libraries existed;
@@ -96,7 +96,7 @@ LOCATION_ORDER = ("commander", "companion", "main", "sideboard")
 FINISHES = ("nonfoil", "foil", "etched")
 # The grants whose copies may be listed at the auction house (v0.6.0), and the auctions whose copy
 # is out of the seller's library: while it runs, and once it sold.
-SELLABLE_SOURCES = frozenset({"starter", "grandfathered", "pack", "auction", "campaign"})
+SELLABLE_SOURCES = frozenset({"starter", "grandfathered", "pack", "auction", "campaign", "grant"})
 LISTED = ("active", "sold")
 
 

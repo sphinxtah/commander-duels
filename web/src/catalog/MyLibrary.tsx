@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { client, describe } from "../api";
 import { finishesWords } from "../auctions/auctions";
 import { SellDialog, type SellRequest } from "../auctions/SellDialog";
+import { AddToDeck, type AddRequest } from "./AddToDeck";
 import type { LibraryFinishes } from "../auctions/types";
 import { ManaCost } from "../game/Card";
 import { CardTile, ViewSwitch } from "./CardViews";
@@ -48,6 +49,7 @@ const sourceNotes: [Source, string][] = [
     "campaign",
     "Every copy of each warden's deck you won in the campaign, yours for good.",
   ],
+  ["grant", "Cards SysOp gave your account, for testing, yours for good."],
 ];
 /** Editions drawn at a time (v0.6.5): a library of thousands drawn whole was slow to scroll, and
  * its pictures, asked for all at once, outran the server's downloads and kept their text frames. */
@@ -122,6 +124,16 @@ export function MyLibrary({
   // Sell (v0.6.0): an edition's copies listed in Tivit's Auction House, from its tile or row.
   const [sell, setSell] = useState<SellRequest | null>(null);
   const [said, setSaid] = useState("");
+  // "Add to deck" (v0.8.8): an edition's copies put into one of the player's decks.
+  const [adding, setAdding] = useState<AddRequest | null>(null);
+  const addItem = (item: LibraryItem) =>
+    setAdding({
+      cardId: item.card.id,
+      printingId: item.edition.printing_id,
+      name: item.card.name,
+      copies: item.copies ?? null,
+      commander: item.card.commander,
+    });
   const [loads, setLoads] = useState(0);
   const reload = useCallback(() => setLoads((count) => count + 1), []);
   useEffect(() => {
@@ -187,8 +199,8 @@ export function MyLibrary({
       <section className={styles.library} aria-labelledby="library-title">
         <h2 id="library-title">Your library</h2>
         <p className={styles.lead}>
-          You build from the whole catalog: administrators and SysOp have no
-          library, and no limit on copies beyond each format's own.
+          You build from the whole catalog: SysOp has no library, and no limit
+          on copies beyond each format's own.
         </p>
         <p className={styles.note}>
           To sell a card, use Sell in{" "}
@@ -202,10 +214,6 @@ export function MyLibrary({
     0,
   );
   const cards = new Set(library.cards.map((item) => item.card.id)).size;
-  // The list's Sell column, when any edition has a copy to sell (v0.6.0).
-  const selling = (library.cards as LibraryItem[]).some(
-    (item) => (item.sellable ?? 0) > 0,
-  );
   const editions = library.cards.length;
   return (
     <section className={styles.library} aria-labelledby="library-title">
@@ -213,8 +221,8 @@ export function MyLibrary({
       <p className={styles.lead}>
         Your decks are built from these cards, each in the edition you own. A
         deck may hold an edition as many times as your library does; two decks
-        may each hold them all. Sell puts a copy up in{" "}
-        <a href="#auctions">Tivit's Auction House</a>.
+        may each hold them all. Add to deck puts copies into one of your decks;
+        Sell puts a copy up in <a href="#auctions">Tivit's Auction House</a>.
       </p>
       <p className={styles.note} role="status">
         {said}
@@ -334,16 +342,26 @@ export function MyLibrary({
                 <span className={styles.tileSources}>
                   {item.sources.map((from) => sourceLabels[from]).join(", ")}
                 </span>
-                {(item.sellable ?? 0) > 0 && (
+                <span className={styles.tileActions}>
                   <button
                     type="button"
                     className={styles.sellLink}
-                    aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
-                    onClick={() => sellItem(item)}
+                    aria-label={`Add ${item.card.name} from ${editionName(item.edition)} to a deck`}
+                    onClick={() => addItem(item)}
                   >
-                    Sell
+                    Add to deck
                   </button>
-                )}
+                  {(item.sellable ?? 0) > 0 && (
+                    <button
+                      type="button"
+                      className={styles.sellLink}
+                      aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
+                      onClick={() => sellItem(item)}
+                    >
+                      Sell
+                    </button>
+                  )}
+                </span>
               </CardTile>
             );
           })}
@@ -358,11 +376,9 @@ export function MyLibrary({
                 <th scope="col">Type</th>
                 <th scope="col">Copies</th>
                 <th scope="col">From</th>
-                {selling && (
-                  <th scope="col">
-                    <span className={styles.visuallyHidden}>Sell</span>
-                  </th>
-                )}
+                <th scope="col">
+                  <span className={styles.visuallyHidden}>Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -393,20 +409,26 @@ export function MyLibrary({
                   <td>
                     {item.sources.map((from) => sourceLabels[from]).join(", ")}
                   </td>
-                  {selling && (
-                    <td>
-                      {(item.sellable ?? 0) > 0 && (
-                        <button
-                          type="button"
-                          className={styles.sellLink}
-                          aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
-                          onClick={() => sellItem(item)}
-                        >
-                          Sell
-                        </button>
-                      )}
-                    </td>
-                  )}
+                  <td className={styles.rowActions}>
+                    <button
+                      type="button"
+                      className={styles.sellLink}
+                      aria-label={`Add ${item.card.name} from ${editionName(item.edition)} to a deck`}
+                      onClick={() => addItem(item)}
+                    >
+                      Add to deck
+                    </button>
+                    {(item.sellable ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        className={styles.sellLink}
+                        aria-label={`Sell ${item.card.name} from ${editionName(item.edition)}`}
+                        onClick={() => sellItem(item)}
+                      >
+                        Sell
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -425,6 +447,11 @@ export function MyLibrary({
         </div>
       )}
       {sellDialog}
+      <AddToDeck
+        request={adding}
+        onClose={() => setAdding(null)}
+        onAdded={(words) => setSaid(words)}
+      />
     </section>
   );
 }

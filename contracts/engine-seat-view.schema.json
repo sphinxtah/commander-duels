@@ -216,7 +216,7 @@
       "properties": {
         "id": {"type": "string", "pattern": "^[0-9]{1,16}$"},
         "action": {
-          "enum": ["pass", "pass_until_stack_resolved", "pass_until_next_main", "pass_until_end_of_turn", "pass_until_next_turn", "pass_until_end_step_before_my_turn", "pass_until_my_turn", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "choose_mode", "put_first", "choose_pile"]
+          "enum": ["pass", "pass_until_stack_resolved", "pass_until_next_main", "pass_until_end_of_turn", "pass_until_next_turn", "pass_until_end_step_before_my_turn", "pass_until_my_turn", "cast", "play_land", "activate", "activate_mana", "mulligan", "keep", "yes", "no", "choose", "done", "tap_source", "use_pool", "special_payment", "cancel", "toggle_attacker", "all_attack", "toggle_blocker", "suggested", "use_ability", "deploy", "choose_mode", "put_first", "choose_pile"]
         },
         "label": {"$ref": "#/$defs/nullableString"},
         "object_id": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/objectId"}]},

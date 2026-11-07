@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="880" viewBox="0 0 630 880">
+  <!-- Unclaimed World (v0.8.8): the Silver ward's card back, a world no banner has claimed. -->
+  <defs>
+    <radialGradient id="sky" cx="50%" cy="48%" r="70%">
+      <stop offset="0" stop-color="#1d2a40"/>
+      <stop offset="0.65" stop-color="#0d1424"/>
+      <stop offset="1" stop-color="#060912"/>
+    </radialGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f1f4f8"/>
+      <stop offset="0.5" stop-color="#a9b4c4"/>
+      <stop offset="1" stop-color="#5f6b7d"/>
+    </linearGradient>
+    <radialGradient id="world" cx="38%" cy="34%" r="70%">
+      <stop offset="0" stop-color="#9fb8d6"/>
+      <stop offset="0.55" stop-color="#3e5677"/>
+      <stop offset="1" stop-color="#121c2c"/>
+    </radialGradient>
+    <clipPath id="globe"><circle cx="315" cy="440" r="170"/></clipPath>
+    <clipPath id="inside"><rect x="40" y="40" width="550" height="800" rx="12"/></clipPath>
+  </defs>
+  <rect width="630" height="880" rx="30" fill="#05070c"/>
+  <rect x="14" y="14" width="602" height="852" rx="22" fill="url(#sky)"/>
+  <g fill="#dfe7f2">
+    <circle cx="90" cy="120" r="2"/><circle cx="520" cy="160" r="2.5"/><circle cx="140" cy="700" r="1.8"/>
+    <circle cx="480" cy="740" r="2"/><circle cx="560" cy="420" r="1.6"/><circle cx="70" cy="430" r="1.6"/>
+    <circle cx="210" cy="190" r="1.4"/><circle cx="420" cy="230" r="1.4"/><circle cx="250" cy="760" r="1.4"/>
+  </g>
+  <rect x="34" y="34" width="562" height="812" rx="16" fill="none" stroke="url(#silver)" stroke-width="6"/>
+  <rect x="50" y="50" width="530" height="780" rx="10" fill="none" stroke="#a9b4c4" stroke-width="1.5" opacity="0.5"/>
+  <!-- The orbit behind, the world, then the orbit before it. -->
+  <ellipse clip-path="url(#inside)" cx="315" cy="440" rx="230" ry="58" fill="none" stroke="url(#silver)" stroke-width="5" opacity="0.55" transform="rotate(-18 315 440)"/>
+  <circle cx="315" cy="440" r="170" fill="url(#world)" stroke="url(#silver)" stroke-width="5"/>
+  <g clip-path="url(#globe)" fill="none" stroke="#c6d3e4" stroke-width="2" opacity="0.35">
+    <ellipse cx="315" cy="440" rx="170" ry="60"/><ellipse cx="315" cy="440" rx="170" ry="120"/>
+    <ellipse cx="315" cy="440" rx="60" ry="170"/><ellipse cx="315" cy="440" rx="120" ry="170"/>
+    <path d="M145 440H485M315 270V610"/>
+  </g>
+  <path clip-path="url(#inside)" d="M85 440 A230 58 0 0 0 545 440" fill="none" stroke="url(#silver)" stroke-width="5" transform="rotate(-18 315 440)" opacity="0.9"/>
+  <!-- An empty standard: nobody's banner flies here. -->
+  <g transform="translate(315 255)" stroke="url(#silver)" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M0 0 V-120"/>
+    <path d="M0 -118 H70 L55 -96 L70 -74 H0" stroke-dasharray="10 9" opacity="0.7"/>
+  </g>
+  <g fill="url(#silver)">
+    <path d="M315 70 l12 22 -12 22 -12 -22z"/><path d="M315 766 l12 22 -12 22 -12 -22z"/>
+  </g>
+</svg>

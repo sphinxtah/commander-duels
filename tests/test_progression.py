@@ -293,6 +293,7 @@ def test_onboarding_chooses_two_starter_decks(client):
     assert early.json()["code"] == "handle_first"
 
 
+@pytest.mark.real_roles
 def test_players_build_from_their_library(client, engine):
     ada = Account(client, "ada", onboarding="starters")
     ada.send("POST", "/api/v1/me/starters", {"decks": ["starter_red_test", "starter_blue_test"]})
@@ -344,8 +345,15 @@ def test_players_build_from_their_library(client, engine):
         card = guided["cards"][item["card_id"]]
         assert card["owned"] is None or item["quantity"] <= card["owned"]
 
-    # Administrators build from the whole catalog.
-    root = Account(client, "admin", admin=True)
+    # Since v0.8.8 administrators build from a library of their own, as players do; only SysOp
+    # builds from the whole catalog.
+    admin = Account(client, "admin", admin=True)
+    assert admin.get("/api/v1/library").json()["unlimited"] is False
+    mine = admin.send(
+        "POST", "/api/v1/decks", {"title": "Burn", "format": "legacy", "entries": burn}
+    ).json()
+    assert mine["playable"] is False and mine["collection_locked"] is True
+    root = Account(client, "sysop", kind="sysop")
     assert root.get("/api/v1/library").json() == {"unlimited": True, "alliance": None, "cards": []}
     theirs = root.send(
         "POST", "/api/v1/decks", {"title": "Burn", "format": "legacy", "entries": burn}

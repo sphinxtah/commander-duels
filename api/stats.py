@@ -288,8 +288,15 @@ def record_results(db: Session, game: Game) -> list[PlayerResult]:
 
 
 def counted(user: User) -> ColumnElement[bool]:
-    """The account's results that count: since SysOp last reset it, or all of them."""
+    """The account's results that count: since SysOp last reset it, or all of them. Results SysOp
+    granted itself for testing (v0.8.8) count towards quests and achievements."""
     return and_(PlayerResult.user_id == user.id, since_reset(user, PlayerResult.finished_at))
+
+
+def played(user: User) -> ColumnElement[bool]:
+    """The account's results from games played: its statistics and its history leave out the
+    results SysOp granted itself for testing (v0.8.8)."""
+    return and_(counted(user), PlayerResult.granted_by.is_(None))
 
 
 # Totals.
@@ -311,7 +318,7 @@ def stats_of(db: Session, user: User, *, history: bool) -> Stats:
     with_players = (PlayerResult.players > 0).label("with_players")
     rows = db.execute(
         select(PlayerResult.format, with_players, PlayerResult.outcome, func.count())
-        .where(counted(user))
+        .where(played(user))
         .group_by(PlayerResult.format, with_players, PlayerResult.outcome)
     ).all()
     totals, bots, players = empty(), empty(), empty()
@@ -365,7 +372,7 @@ def match_totals(db: Session, user: User) -> Totals:
 
 
 def history_of(db: Session, user: User, limit: int, cursor: str | None) -> HistoryPage:
-    query = select(PlayerResult).where(counted(user))
+    query = select(PlayerResult).where(played(user))
     if cursor:
         moment, row_id = decode_cursor(cursor)
         query = query.where(
@@ -381,7 +388,7 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
     )
     more = len(rows) > limit
     rows = rows[:limit]
-    games = {row.game_id for row in rows}
+    games = {row.game_id for row in rows if row.game_id is not None}
     seats: dict[UUID, list[GameSeat]] = defaultdict(list)
     for seat in db.scalars(
         select(GameSeat).where(GameSeat.game_id.in_(games)).order_by(GameSeat.seat)
@@ -408,6 +415,7 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
     own = {
         seat.deck_revision_id
         for row in rows
+        if row.game_id is not None
         for seat in seats[row.game_id]
         if seat.seat == row.seat and seat.deck_revision_id is not None
     }
@@ -419,12 +427,15 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
     }
     items = []
     for row in rows:
-        result = results.get(row.game_id) or {}
+        game_id = row.game_id
+        if game_id is None:
+            continue  # Granted for testing (v0.8.8): played() leaves these out already.
+        result = results.get(game_id) or {}
         won = winning_seats(result)
-        mine = next((seat for seat in seats[row.game_id] if seat.seat == row.seat), None)
+        mine = next((seat for seat in seats[game_id] if seat.seat == row.seat), None)
         items.append(
             HistoryEntry(
-                game_id=row.game_id,
+                game_id=game_id,
                 format=row.format,
                 kind=row.kind,
                 outcome=row.outcome,  # type: ignore[arg-type]
@@ -445,11 +456,11 @@ def history_of(db: Session, user: User, limit: int, cursor: str | None) -> Histo
                         player=player_ref(players[seat.user_id])
                         if seat.user_id in players
                         else None,
-                        bot_skill=skills.get(row.game_id) if seat.player == "bot" else None,
+                        bot_skill=skills.get(game_id) if seat.player == "bot" else None,
                         won=seat.seat in won,
                         teammate=teammates(row.format, row.seat, seat.seat),
                     )
-                    for seat in seats[row.game_id]
+                    for seat in seats[game_id]
                     if seat.seat != row.seat
                 ],
             )

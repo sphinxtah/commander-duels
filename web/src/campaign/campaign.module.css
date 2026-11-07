@@ -776,3 +776,70 @@ button.choice:focus-visible {
   font-style: italic;
   color: #cfc8b6;
 }
+
+/* The campaign's cosmetics in use (v0.8.8, CosmeticsPicker.tsx). */
+.cosmetics {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+.cosmetics h3 {
+  margin: 0;
+}
+.backChoices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.4rem 0.5rem 0.6rem;
+  border: 1px solid #ffffff1f;
+  border-radius: 8px;
+  font-size: 0.8rem;
+}
+.backChoices legend {
+  padding: 0 0.3rem;
+  color: #a5b0a3;
+}
+.backChoices label {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  width: 4.6rem;
+  padding: 0.3rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  color: #d4d9d3;
+}
+.backChoices label[data-chosen] {
+  outline: 2px solid var(--cd-gold-hi);
+  background: #e6c68c14;
+}
+.backChoices input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.backChoices label:has(input:focus-visible) {
+  outline: 2px solid #8fd0ff;
+}
+.backChoices img {
+  width: 3.6rem;
+  aspect-ratio: 63 / 88;
+  border-radius: 4px;
+}
+.titleChoice {
+  display: grid;
+  gap: 0.25rem;
+  max-width: 18rem;
+  font-size: 0.85rem;
+}
+.titleChoice select {
+  min-height: 34px;
+}
+.cosmeticsSaid {
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.82rem;
+  color: #a5b0a3;
+}

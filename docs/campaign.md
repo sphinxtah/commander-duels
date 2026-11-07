@@ -63,7 +63,19 @@ An engine without the owner's content (the public images, a local stack) plays t
 `api/campaign.py`; migration 0032:
 - **campaign_progress**, one row an account: the furthest ward open, the wards won (their seals), the ending seen (standard or early), the scenes seen (at most 200 keys, for the journal and the first-time scenes) and the tutorial (hints, skipped, lessons). Made on the account's first look; an account reset (SysOp's, v0.4.5) after it starts it again.
 - **campaign_games**: each duel's encounter, the opponent's name, portrait and title, the deck chosen (own, loaner or learn), the hints, the finale run and the outcome. The outcome is written in the transaction that records the game's end (`games.record_end`), and a win records the ward, its seal, the next ward and a completed chapter's rewards there too, once: a replayed result or a second win earns nothing again, and a duel begun before an account reset belongs to the old progress. A campaign duel counts no win towards the account's tier, pays no win's tokens, advances no quest or achievement and keeps no record in the history: the handoff's separation of the campaign from progression. Account wins never gate a ward either. A warden's first defeat pays the spoils instead ([below](#the-spoils)).
-- **campaign_rewards**, keyed by the account, the campaign, the progress and the reward: each ward's seal; Bronze's Broken Writ card back, Silver's Unclaimed World card back, Gold's Unbowed title, Platinum's Broken Throne card back, Mythic's Witness of the Unbound title, and for the finale the Concordance Breaker title and the Fractured Throne card back. The Campaign page lists those earned; card backs and titles do not show elsewhere yet ([the v0.8.8 plan](plans/0.8.8.md)).
+- **campaign_rewards**, keyed by the account, the campaign, the progress and the reward: each ward's seal; Bronze's Broken Writ card back, Silver's Unclaimed World card back, Gold's Unbowed title, Platinum's Broken Throne card back, Mythic's Witness of the Unbound title, and for the finale the Concordance Breaker title and the Fractured Throne card back. The Campaign page lists those earned, and since v0.8.8 they can be used ([below](#cosmetics-v088)).
+
+### Cosmetics (v0.8.8)
+
+`api/cosmetics.py`; migration 0037 adds `users.card_back` and `users.title`. Under the Campaign page's Rewards, "Your rewards in use" offers the card backs earned (drawn small, beside the official back) and the titles earned.
+- **A card back** replaces the official Magic card back on the player's own table: their library, their opponents' hands, every face-down card, on the canvas and on the page. The four designs are `web/public/brand/backs/<slug>.svg`, drawn for v0.8.8: Broken Writ (a torn writ under a broken seal, bronze), Unclaimed World (a world with an empty standard, silver), Broken Throne (a throne split in two, its crown on the floor, platinum) and Fractured Throne (The Sphinx's golden throne cracked by the five colours). Showing each player's back to the others at a shared table is for v0.8.9.
+- **A title** stands under the player's name on their profile (`title` on `GET /api/v1/players/{id}`), for everyone who may open it.
+- **Only what's earned** in the current progress may be chosen (409 `not_earned`), and what is shown is checked on every read: a reset of the account or of its campaign takes it away with the reward.
+
+| Route | Who | What |
+| --- | --- | --- |
+| `GET /api/v1/me/cosmetics` | signed in | The card back and title in use, and every card back and title the campaign rewards with whether it is earned |
+| `PUT /api/v1/me/cosmetics` | signed in | `{"card_back", "title"}`: each an earned slug or null |
 
 ### Routes
 

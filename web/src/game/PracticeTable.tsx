@@ -396,9 +396,13 @@ function Table({ me }: { me: Me }) {
   const chosenFormat = options?.formats.find((f) => f.id === format);
   const kingsTable = format === KINGS_TABLE;
   const decksFormat = deckFormat(format, kings);
-  // King's Table offers both formats' fixture decks: those of its deck format fit.
-  const fixtures = (chosenFormat?.decks ?? []).filter(
-    (d) => !kingsTable || d.startsWith(`${decksFormat}-`),
+  // King's Table's fixture decks come by its deck format (v0.8.8); an older API's single list
+  // is told apart by the decks' names.
+  const byFormat =
+    chosenFormat?.decks_by_format?.[decksFormat as "legacy" | "commander"];
+  const fixtures = (byFormat ?? chosenFormat?.decks ?? []).filter(
+    (d) =>
+      !kingsTable || byFormat !== undefined || d.startsWith(`${decksFormat}-`),
   );
   const ownHere = (ownDecks ?? []).filter((d) => d.format === decksFormat);
   /** A seat's choice while the game's rules take it (v0.4.5); else none. */

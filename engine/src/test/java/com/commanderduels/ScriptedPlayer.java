@@ -87,7 +87,8 @@ class ScriptedPlayer {
                 yield !players.isEmpty() && random.nextInt(10) < 7 ? pick(players) : pick(options);
             }
             case "choose_ability" -> {
-                var abilities = byAction(options, "use_ability");
+                var abilities = new java.util.ArrayList<>(byAction(options, "use_ability"));
+                abilities.addAll(byAction(options, "deploy"));
                 yield abilities.isEmpty() ? pick(options) : pick(abilities);
             }
             case "choose_choice" -> {

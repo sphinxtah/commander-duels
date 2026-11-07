@@ -700,3 +700,12 @@ a.noteLink:hover {
     right: 16px;
   }
 }
+
+/* A campaign title under the player's name (v0.8.8). */
+.playerTitle {
+  margin: -0.2rem 0 0.3rem;
+  color: var(--cd-gold-hi, #e6c68c);
+  font-family: "Cinzel Variable", serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+}

@@ -23,10 +23,14 @@ import mage.abilities.PlayLandAbility;
 import mage.abilities.SpellAbility;
 import mage.abilities.costs.mana.ManaCost;
 import mage.abilities.costs.mana.ManaCostsImpl;
+import mage.abilities.effects.ContinuousEffectsList;
+import mage.abilities.effects.CostModificationEffect;
+import mage.abilities.effects.common.cost.CommanderCostModification;
 import mage.abilities.mana.ActivatedManaAbilityImpl;
 import mage.cards.Card;
 import mage.choices.Choice;
 import mage.constants.AsThoughEffectType;
+import mage.constants.CostModificationType;
 import mage.constants.Constants;
 import mage.constants.ManaType;
 import mage.constants.PlayerAction;
@@ -35,6 +39,9 @@ import mage.constants.Zone;
 import mage.game.Game;
 import mage.game.combat.CombatGroup;
 import mage.game.events.PlayerQueryEvent;
+import mage.game.stack.Spell;
+import mage.game.stack.StackAbility;
+import mage.game.stack.StackObject;
 import mage.game.permanent.Permanent;
 import mage.players.ManaPool;
 import mage.players.Player;
@@ -348,6 +355,11 @@ final class Prompts {
                 if (detail == null && options.size() == 1) {
                     detail = "Nothing you control can pay " + (unpaid == null ? "this cost" : unpaid.getText()) + ".";
                 }
+                // What made the cost higher (v0.8.8): commander tax, Thalia, Sphere of Resistance.
+                String raised = raisedBy();
+                if (raised != null) {
+                    detail = detail == null ? raised : detail + " " + raised;
+                }
                 break;
             }
             case MULTI_AMOUNT:
@@ -451,8 +463,9 @@ final class Prompts {
         List<? extends Ability> abilities = event.getAbilities() == null ? List.of() : event.getAbilities();
         for (Ability ability : abilities) {
             String rule = SeatViews.plain(source == null ? ability.getRule() : ability.getRule(source));
-            add("use_ability", rule.isEmpty() ? ability.toString() : rule, null, null, false,
-                new UuidAnswer(ability.getId()));
+            // King's Table's Deploy (804) is marked as such (v0.8.8), not told apart by its words.
+            add(ability instanceof KingsTable.DeployAbility ? "deploy" : "use_ability",
+                rule.isEmpty() ? ability.toString() : rule, null, null, false, new UuidAnswer(ability.getId()));
         }
         add("cancel", "Cancel", null, null, false, new BooleanAnswer(false));
     }
@@ -601,6 +614,61 @@ final class Prompts {
         if (!event.isRequired()) {
             add("done", "Done", null, null, false, new BooleanAnswer(true));
         }
+    }
+
+    /**
+     * The effects that raised the cost being paid (v0.8.8), in words: "The cost is raised by
+     * commander tax and Thalia, Guardian of Thraben." The cost is the spell or ability on top of the
+     * stack, this player's, as XMage puts it there before its costs are paid (601.2a); each of
+     * XMage's cost-increasing effects that applies to it and whose source is still in a zone where
+     * it works is named once, by its source, commander tax by its name. Null when none applies, or
+     * when the top of the stack is not this player's (a payment asked by another's spell).
+     */
+    String raisedBy() {
+        StackObject top = game.getStack().getFirstOrNull();
+        if (top == null || !player.getId().equals(top.getControllerId())) {
+            return null;
+        }
+        Ability paid = top instanceof Spell spell ? spell.getSpellAbility()
+            : top instanceof StackAbility ability ? ability.getStackAbility() : null;
+        if (paid == null) {
+            return null;
+        }
+        Set<String> names = new LinkedHashSet<>();
+        for (ContinuousEffectsList<?> list : game.getContinuousEffects().allEffectsLists) {
+            for (Object found : list) {
+                if (!(found instanceof CostModificationEffect effect)
+                        || effect.getModificationType() != CostModificationType.INCREASE_COST) {
+                    continue;
+                }
+                for (Ability source : list.getAbility(effect.getId())) {
+                    try {
+                        if (effect.isInactive(source, game) || !source.isInUseableZone(game, null, null)
+                                || !effect.applies(paid, source, game)) {
+                            continue;
+                        }
+                    } catch (RuntimeException e) {
+                        // An effect that cannot judge a copy of the cost names nothing.
+                        continue;
+                    }
+                    if (effect instanceof CommanderCostModification) {
+                        names.add("commander tax");
+                        continue;
+                    }
+                    MageObject object = game.getObject(source.getSourceId());
+                    if (object != null && !object.getName().isEmpty()) {
+                        names.add(object.getName());
+                    }
+                }
+            }
+        }
+        if (names.isEmpty()) {
+            return null;
+        }
+        List<String> listed = new ArrayList<>(names);
+        String words = listed.size() == 1 ? listed.get(0)
+            : String.join(", ", listed.subList(0, listed.size() - 1)) + " and " + listed.get(listed.size() - 1);
+        return "The cost is raised by " + words + ".";
     }
 
     /**

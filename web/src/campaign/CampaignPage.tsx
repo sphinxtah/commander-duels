@@ -23,6 +23,7 @@ import {
   type CampaignState,
 } from "./campaign";
 import type { PlayerFace } from "./cast";
+import { CosmeticsPicker } from "./CosmeticsPicker";
 import { Cutscene } from "./Cutscene";
 import { DuelSetup } from "./DuelSetup";
 import { Journal } from "./Journal";
@@ -478,6 +479,7 @@ export function CampaignPage({
                   <li key={reward.id}>{reward.name}</li>
                 ))}
               </ul>
+              <CosmeticsPicker />
             </>
           )}
 

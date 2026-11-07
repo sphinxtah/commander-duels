@@ -897,3 +897,63 @@
   justify-content: center;
   margin: 18px 0 6px;
 }
+
+/* "Add to deck" from My library (v0.8.8, AddToDeck.tsx). */
+.addDialog {
+  width: min(32rem, calc(100vw - 24px));
+  max-height: calc(100vh - 32px);
+  padding: 20px 24px 22px;
+  border: 1px solid #d5b77c66;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 50% 0%, #d5b77c18, transparent 60%),
+    linear-gradient(180deg, #141e1c, #0c1312);
+  color: var(--cd-text);
+  box-shadow: 0 30px 80px #000000cc;
+}
+.addDialog::backdrop {
+  background: #030707b3;
+  backdrop-filter: blur(2px);
+}
+.addDialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.addDialog h2 {
+  margin: 0;
+  color: #e6c68c;
+  font-size: 1.15rem;
+}
+.addField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  font-size: 0.86rem;
+}
+.addField select,
+.addField input {
+  min-height: 36px;
+}
+.addRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.addActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.tileActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.rowActions {
+  white-space: nowrap;
+}
+.rowActions > button + button {
+  margin-left: 12px;
+}

@@ -57,7 +57,6 @@ ALL_PERMISSIONS: frozenset[str] = frozenset(get_args(Permission))
 ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "player": frozenset({"profile.edit", "games.play", "decks.edit"}),
     "moderator": frozenset({"moderation.read", "admin.users.read"}),
-    "content_editor": frozenset({"content.edit"}),
     "administrator": frozenset(
         {
             "moderation.read",
@@ -67,8 +66,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "admin.roles.manage",
             "admin.audit.read",
             "catalog.manage",
-            # Builds from the whole catalog, not a library of its own (v0.3.1).
-            "library.unlimited",
+            # Since v0.8.8 an administrator plays as any player does, from a library of its own:
+            # only SysOp builds from the whole catalog (library.unlimited).
             # Leng's card shop: prices, sale and the booster data job (v0.4.0).
             "shop.manage",
             # Reading the players' problem reports and setting their status (v0.4.1).

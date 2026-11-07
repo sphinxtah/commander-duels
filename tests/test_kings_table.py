@@ -345,6 +345,11 @@ def test_the_play_page_and_the_practice_options_list_it(client):
         "king_attacks_anyone": False,
     }
     assert options["legacy"]["kings_table"] is None
+    # Its fixture decks by deck format (v0.8.8), each list of its own format; others have none.
+    by_format = options[KINGS]["decks_by_format"]
+    assert set(by_format) == {"legacy", "commander"}
+    assert all(d.startswith(f"{fmt}-") for fmt, decks in by_format.items() for d in decks)
+    assert options["legacy"]["decks_by_format"] is None
 
 
 @pytest.mark.parametrize(("deck_format", "life", "king_attacks_anyone"), COMBINATIONS)
@@ -584,6 +589,9 @@ def test_the_start_locks_the_table_and_the_team_result_counts_for_every_teammate
     assert engine.kings(game_id).result["winner_seats"] == [1, 2]  # type: ignore[index]
     assert finished["result"]["winner_seats"] == [0, 1, 2]
     assert finished["result"]["winner_team"] == 0
+    # The live result the seats' sockets get names the team too (v0.8.8).
+    assert live.seats[2].snapshot["result"]["winner_team"] == 0  # type: ignore[index]
+    assert live.seats[2].snapshot["result"]["winner_seats"] == [0, 1, 2]  # type: ignore[index]
     assert finished["seats"][0]["left"] == "eliminated"
     assert outcomes(client, game_id) == {0: "win", 2: "win", 4: "loss", 5: "loss"}
     wins = {row.user_id for row in ledger(client, ProgressEntry, game_id)}

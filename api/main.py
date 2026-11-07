@@ -21,6 +21,7 @@ from api import (
     card_images,
     cards,
     chat,
+    cosmetics,
     custom_cards,
     decks,
     economy,
@@ -37,6 +38,7 @@ from api import (
     social,
     stats,
     tables,
+    testing,
     tutorial,
 )
 from api.config import Settings
@@ -385,4 +387,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(stats.router)
     app.include_router(quests.router)
     app.include_router(achievements.router)
+    app.include_router(testing.router)
+    app.include_router(cosmetics.router)
     return app

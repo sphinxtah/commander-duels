@@ -1,5 +1,18 @@
 # Verification
 
+## v0.8.8
+
+Built on November 6, 2026 in a cloud workspace, on the branch `v0.8.8`, with PostgreSQL 16, Node 22, Python 3.12, Java 21, and XMage built natively from the pin with its eleven patches (the image's own steps, outside Docker).
+
+| Check | Result |
+|---|---|
+| Python | `ruff check`, `ruff format --check` and `mypy` clean; `pytest` on Python 3.12: 524 passed, 31 skipped, and the one failure that is the workspace's alone (`test_upgrade_needs_a_set_up_vm` runs as root, which the deploy kit refuses on purpose); the 14 files that use PostgreSQL again with `CD_TEST_POSTGRES_URL` against PostgreSQL 16: 218 passed. New: `tests/test_testing_grants.py` (SysOp's own account first in its list and in nobody else's; granted wins counting for quests and achievements and never for statistics or the history; the team formats' opponents; cards into a library; campaign progress without spoils and starting over; the cosmetics chosen once earned, shown on a profile and gone with a restart), King's Table's live `winner_team` and practice decks by format, an administrator's own library (marked `real_roles`: the other tests keep administrators building from the whole catalog, as before v0.8.8) |
+| Migrations | `alembic upgrade head`, `alembic check`, and migration 0037's downgrade and upgrade again, against PostgreSQL 16 |
+| Contracts | regenerated on Python 3.12, as CI's drift check expects |
+| Web | `tsc -b`, 1,468 Vitest tests in 115 files and the production build passed. New: "Add to deck"'s merge of copies into a draft, My library's Actions column. Seen in Chromium: Administration's own SysOp row with its testing grants, campaign progress set to 10, and the Campaign page's card backs and title chosen |
+| Engine | XMage built from the pin with its eleven patches and its card database, then the engine's JUnit tests: 208 passed, one skipped (the opt-in Two-Headed Giant pairing run). New: `CostRaisersTest` (Sphere of Resistance named in every payment for Grizzly Bears), and `TurnControlTest`'s controller asked in both main phases of a skill-1 bot's controlled turn |
+| Browser journeys | `pnpm test:e2e` in Chromium with SysOp's password, against PostgreSQL 16: 65 passed, 27 skipped (those needing the engine's games or on demand) |
+
 ## v0.8.7
 
 Built on November 3, 2026 in a cloud workspace, on the branch `v0.8.7`, with PostgreSQL 16, Node 22, Python 3.12, Java 21, and XMage built natively from the pin with its eleven patches (the image's own steps, outside Docker).

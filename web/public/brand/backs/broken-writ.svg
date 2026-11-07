@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="880" viewBox="0 0 630 880">
+  <!-- Broken Writ (v0.8.8): the Bronze ward's card back, a torn writ under a broken seal. -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#3a2416"/>
+      <stop offset="0.7" stop-color="#1d120b"/>
+      <stop offset="1" stop-color="#0d0805"/>
+    </radialGradient>
+    <linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e2b07a"/>
+      <stop offset="0.5" stop-color="#a86b38"/>
+      <stop offset="1" stop-color="#6e3f1c"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9c29a"/>
+      <stop offset="1" stop-color="#a88d62"/>
+    </linearGradient>
+    <pattern id="weave" width="28" height="28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <path d="M0 14H28M14 0V28" stroke="#4a2e1a" stroke-width="1.2" opacity="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="630" height="880" rx="30" fill="#0b0705"/>
+  <rect x="14" y="14" width="602" height="852" rx="22" fill="url(#bg)"/>
+  <rect x="14" y="14" width="602" height="852" rx="22" fill="url(#weave)"/>
+  <rect x="34" y="34" width="562" height="812" rx="16" fill="none" stroke="url(#bronze)" stroke-width="6"/>
+  <rect x="50" y="50" width="530" height="780" rx="10" fill="none" stroke="#a86b38" stroke-width="1.5" opacity="0.6"/>
+  <!-- The writ, torn across. -->
+  <g transform="translate(315 430)">
+    <path d="M-170 -250 H170 V-30 L140 -18 L118 -40 L90 -12 L60 -36 L28 -8 L0 -30 L-34 -6 L-62 -34 L-96 -10 L-124 -38 L-150 -16 L-170 -28 Z" fill="url(#paper)" stroke="#5a3a1f" stroke-width="3"/>
+    <path d="M-170 30 L-150 12 L-124 34 L-96 8 L-62 30 L-34 4 L0 26 L28 2 L60 30 L90 6 L118 34 L140 12 L170 24 V250 H-170 Z" fill="url(#paper)" stroke="#5a3a1f" stroke-width="3" transform="rotate(4)"/>
+    <g stroke="#6b5136" stroke-width="5" stroke-linecap="round" opacity="0.55">
+      <path d="M-130 -200 H120"/><path d="M-130 -165 H90"/><path d="M-130 -130 H130"/><path d="M-130 -95 H60"/>
+      <path d="M-120 90 H130" transform="rotate(4)"/><path d="M-120 125 H100" transform="rotate(4)"/><path d="M-120 160 H130" transform="rotate(4)"/>
+    </g>
+    <!-- The broken seal. -->
+    <g transform="translate(0 10)">
+      <path d="M-62 -6 A62 62 0 0 1 52 -38 L18 -6 L34 12 Z" fill="#8f1d1d" stroke="#4d0c0c" stroke-width="4"/>
+      <path d="M-58 22 A62 62 0 0 0 60 10 L26 20 L10 0 Z" fill="#7a1717" stroke="#4d0c0c" stroke-width="4" transform="translate(6 10) rotate(8)"/>
+      <circle r="26" fill="none" stroke="#c7432f" stroke-width="3" opacity="0.6"/>
+    </g>
+  </g>
+  <g fill="url(#bronze)">
+    <path d="M315 70 l12 22 -12 22 -12 -22z"/>
+    <path d="M315 766 l12 22 -12 22 -12 -22z"/>
+  </g>
+</svg>

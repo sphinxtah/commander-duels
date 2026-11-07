@@ -614,6 +614,7 @@ def test_sysop_lockout_holds_for_parallel_guesses_and_password_changes(
     assert login(neighbour, PASSWORD).status_code == 429
 
 
+@pytest.mark.real_roles
 def test_roles_follow_least_privilege_and_players_cannot_administer(
     app: FastAPI, database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -642,7 +643,9 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     assert ada.delete(f"/api/v1/me/sessions/{sysop_session}").status_code == 404
 
     users = root.get("/api/v1/admin/users").json()["items"]
-    assert {user["handle"] for user in users} == {"ada", "bea"}  # SysOp is never listed
+    # SysOp lists only its own account beside the players' (v0.8.8), first, for its own grants.
+    assert [user["handle"] for user in users][0] == "sysop"
+    assert {user["handle"] for user in users} == {"sysop", "ada", "bea"}
     assert root.put(f"/api/v1/admin/users/{sysop_id}/roles/moderator").status_code == 404
     granted = root.put(f"/api/v1/admin/users/{ada_id}/roles/administrator").json()
     assert granted["roles"] == ["player", "administrator"]
@@ -650,6 +653,8 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
     assert "__Host-cd_session=" in promoted.headers["set-cookie"]  # rotated on the privilege change
     assert "admin.users.manage" in promoted.json()["permissions"]
     assert "games.view_concealed" not in promoted.json()["permissions"]
+    # Since v0.8.8 an administrator builds from a library of its own, as a player does.
+    assert "library.unlimited" not in promoted.json()["permissions"]
 
     # An administrator manages players and the lesser roles, but not administrators, SysOp or
     # their own account.
@@ -697,7 +702,7 @@ def test_roles_follow_least_privilege_and_players_cannot_administer(
 
     # Role and status changes need a recent sign-in.
     clock.offset = timedelta(hours=13)
-    late = ada.put(f"/api/v1/admin/users/{bea_id}/roles/content_editor")
+    late = ada.put(f"/api/v1/admin/users/{bea_id}/roles/moderator")
     assert late.status_code == 401 and late.json()["code"] == "reauthentication_required"
 
 
@@ -721,7 +726,6 @@ def test_only_sysop_restores_a_disabled_administrator(app: FastAPI, database: st
         ("POST", f"{base}/status", {"status": "active"}),
         ("POST", f"{base}/sign-out", None),
         ("DELETE", f"{base}/roles/moderator", None),
-        ("PUT", f"{base}/roles/content_editor", None),
     ]:
         refused = ada.request(method, path, json=body)
         assert refused.status_code == 403 and refused.json()["code"] == "forbidden", path

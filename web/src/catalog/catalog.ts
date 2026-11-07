@@ -87,7 +87,7 @@ export function isBasicLand(card: Pick<CardSummary, "type_line">): boolean {
 /**
  * Whether the account builds from a library of its own (v0.3.1), as the cards it was sent say:
  * every card's `owned` is a number of copies for such an account, and null for one that builds
- * from the whole catalog (administrators, SysOp). Basic lands are null for both, so they tell
+ * from the whole catalog (SysOp alone since v0.8.8). Basic lands are null for both, so they tell
  * nothing; undefined until a card tells.
  */
 export function buildsFromLibrary(
@@ -140,6 +140,8 @@ export const sourceLabels: Record<LibraryCard["sources"][number], string> = {
   auction: "Bought at auction",
   // A campaign warden's deck, won by beating them (v0.8.0).
   campaign: "Won in the campaign",
+  // Given by SysOp, for testing (v0.8.8).
+  grant: "Given by SysOp",
 };
 
 /** A catalog printing's image, from our own server's cache of Scryfall's. */

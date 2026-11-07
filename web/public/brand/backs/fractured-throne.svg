@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="880" viewBox="0 0 630 880">
+  <!-- Fractured Throne (v0.8.8): The Sphinx's card back, his golden throne shattered by the five
+       colours of the Concordance. -->
+  <defs>
+    <radialGradient id="void" cx="50%" cy="46%" r="75%">
+      <stop offset="0" stop-color="#2b2210"/>
+      <stop offset="0.6" stop-color="#120d06"/>
+      <stop offset="1" stop-color="#050302"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff0c2"/>
+      <stop offset="0.45" stop-color="#e6c68c"/>
+      <stop offset="1" stop-color="#8a6a2a"/>
+    </linearGradient>
+    <linearGradient id="seat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f3d58f"/>
+      <stop offset="1" stop-color="#7c5a1e"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="630" height="880" rx="30" fill="#040302"/>
+  <rect x="14" y="14" width="602" height="852" rx="22" fill="url(#void)"/>
+  <rect x="34" y="34" width="562" height="812" rx="16" fill="none" stroke="url(#gold)" stroke-width="7"/>
+  <rect x="50" y="50" width="530" height="780" rx="10" fill="none" stroke="#e6c68c" stroke-width="1.5" opacity="0.5"/>
+  <!-- The throne, whole in outline. -->
+  <path d="M190 700 V430 H170 V240 L230 150 L270 205 L315 120 L360 205 L400 150 L460 240 V430 H440 V700 Z" fill="url(#seat)" stroke="#3d2b0c" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M225 430 H405 V520 H225 Z" fill="#3d2b0c" opacity="0.35"/>
+  <!-- Five fractures from one point, one in each colour of mana. -->
+  <g filter="url(#glow)" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M315 400 L300 330 L322 270 L305 190 L315 120" stroke="#f8f3dc"/>
+    <path d="M315 400 L380 350 L410 290 L460 250" stroke="#4fa3e0"/>
+    <path d="M315 400 L370 470 L420 500 L440 600 L470 700" stroke="#3a2f45"/>
+    <path d="M315 400 L250 470 L230 560 L180 640" stroke="#e0533a"/>
+    <path d="M315 400 L250 350 L215 290 L170 260" stroke="#3fae5a"/>
+  </g>
+  <circle cx="315" cy="400" r="16" fill="#fff6dc" filter="url(#glow)"/>
+  <!-- Shards thrown from it. -->
+  <g stroke="#3d2b0c" stroke-width="2">
+    <path d="M120 300 l26 -10 -6 28z" fill="#f3d58f"/>
+    <path d="M500 330 l22 14 -26 10z" fill="#e6c68c"/>
+    <path d="M110 560 l30 4 -18 22z" fill="#c9a45c"/>
+    <path d="M512 560 l-24 18 28 8z" fill="#f3d58f"/>
+  </g>
+  <g fill="url(#gold)">
+    <path d="M315 70 l12 22 -12 22 -12 -22z"/><path d="M315 766 l12 22 -12 22 -12 -22z"/>
+  </g>
+</svg>

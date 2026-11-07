@@ -47,6 +47,7 @@ import {
   restPose,
   type CardPlacement,
 } from "./nodes/CardNode";
+import { cardBackUrl, onCardBack } from "../cardBack";
 import { CurveNode } from "./nodes/CurveNode";
 import { EmblemNode, type EmblemKind } from "./nodes/EmblemNode";
 import { FLOAT_COLOURS, FloatNode } from "./nodes/FloatNode";
@@ -349,6 +350,7 @@ class PixiTableScene implements TableScene {
   private lost = false;
   private retier: ReturnType<typeof setTimeout> | undefined;
   private readonly unsubscribe: () => void;
+  private readonly unsubscribeBack: () => void;
   private lastUi: TableUiSnapshot;
   private webgl2 = false;
   /** The stage's visible width in stage units: wider than 0–1920 on an ultrawide screen. */
@@ -549,6 +551,8 @@ class PixiTableScene implements TableScene {
     document.addEventListener("visibilitychange", this.onVisible);
     this.unsubscribe = this.ui.subscribe(this.onUi);
     void this.loadBack();
+    // A campaign card back chosen (v0.8.8), or the player's own arriving after the table opened.
+    this.unsubscribeBack = onCardBack(() => void this.loadBack());
 
     this.layoutStage();
     this.render();
@@ -633,6 +637,7 @@ class PixiTableScene implements TableScene {
     this.raf = 0;
     clearTimeout(this.retier);
     this.unsubscribe();
+    this.unsubscribeBack();
     this.canvas.removeEventListener("webglcontextlost", this.onLost);
     this.canvas.removeEventListener("webglcontextrestored", this.onRestored);
     document.removeEventListener("visibilitychange", this.onVisible);
@@ -2178,24 +2183,32 @@ class PixiTableScene implements TableScene {
     }
   }
 
-  /** Draws the official card back (v0.6.0) once its image has loaded. */
+  /** Draws the official card back (v0.6.0) once its image has loaded, or since v0.8.8 the
+   * campaign's back the player chose: a picture the browser draws (an SVG), loaded as an image. */
   private async loadBack(): Promise<void> {
+    const url = cardBackUrl();
     try {
-      const response = await fetch("/brand/card-back.webp", {
-        credentials: "same-origin",
-      });
-      if (!response.ok) return;
-      const bitmap = await createImageBitmap(await response.blob());
-      if (this.destroyed) {
-        bitmap.close();
+      let picture: CanvasImageSource & { close?: () => void };
+      if (url.endsWith(".svg")) {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+        picture = image;
+      } else {
+        const response = await fetch(url, { credentials: "same-origin" });
+        if (!response.ok) return;
+        picture = await createImageBitmap(await response.blob());
+      }
+      if (this.destroyed || url !== cardBackUrl()) {
+        picture.close?.();
         return;
       }
       const drawn = cardBack(
         this.backCanvas.width,
         this.backCanvas.height,
-        bitmap,
+        picture,
       );
-      bitmap.close();
+      picture.close?.();
       const ctx = this.backCanvas.getContext("2d");
       ctx?.clearRect(0, 0, this.backCanvas.width, this.backCanvas.height);
       ctx?.drawImage(drawn, 0, 0);

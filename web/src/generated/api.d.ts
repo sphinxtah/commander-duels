@@ -477,6 +477,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users/{user_id}/campaign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give Campaign
+         * @description SysOp sets how far an account has come in the campaign, for testing: the encounters won
+         *     through a number, their seals and the chapters' rewards, never the spoils. Audited.
+         */
+        post: operations["give_campaign_api_v1_admin_users__user_id__campaign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give Cards
+         * @description SysOp grants copies of a card in the game into an account's library for good, in one
+         *     edition and finish: with a reason, audited.
+         */
+        post: operations["give_cards_api_v1_admin_users__user_id__cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/users/{user_id}/delete": {
         parameters: {
             query?: never;
@@ -540,6 +582,27 @@ export interface paths {
          *     meanwhile, as for a deletion, so no game of it starts.
          */
         post: operations["reset_user_api_v1_admin_users__user_id__reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give Results
+         * @description SysOp grants wins in a format, for testing quests, achievements and tiers: results with no
+         *     game, counted by quests and achievements but never by statistics, and as many wins. Audited.
+         */
+        post: operations["give_results_api_v1_admin_users__user_id__results_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2228,6 +2291,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/cosmetics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Cosmetics */
+        get: operations["my_cosmetics_api_v1_me_cosmetics_get"];
+        /**
+         * Change Cosmetics
+         * @description Chooses the card back and the title to show: each one the account has earned, or none.
+         */
+        put: operations["change_cosmetics_api_v1_me_cosmetics_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/history": {
         parameters: {
             query?: never;
@@ -3389,7 +3473,7 @@ export interface components {
             /** Last Seen At */
             last_seen_at: string | null;
             /** Roles */
-            roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
+            roles: ("player" | "moderator" | "administrator" | "sysop")[];
             /**
              * Status
              * @enum {string}
@@ -3753,7 +3837,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.8.7
+             * @default 0.8.8
              */
             version: string;
         };
@@ -3825,6 +3909,28 @@ export interface components {
             tier: "bronze" | "silver" | "gold" | "platinum" | "mythic" | "godlike";
             /** Title */
             title: string;
+        };
+        /** CampaignGrant */
+        CampaignGrant: {
+            /** Reason */
+            reason: string;
+            /**
+             * Won Through
+             * @description Encounters won, 1 through this; 0 starts the campaign over.
+             */
+            won_through: number;
+        };
+        /** CampaignGranted */
+        CampaignGranted: {
+            /** Completed */
+            completed: number[];
+            /** Highest Unlocked */
+            highest_unlocked: number;
+            /**
+             * Rewards
+             * @description The seals, card backs and titles the account holds.
+             */
+            rewards: string[];
         };
         /** CampaignProgressView */
         CampaignProgressView: {
@@ -4240,6 +4346,48 @@ export interface components {
             /** Type Line */
             type_line: string;
         };
+        /** CardsGrant */
+        CardsGrant: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /**
+             * Finish
+             * @default nonfoil
+             * @enum {string}
+             */
+            finish: "nonfoil" | "foil" | "etched";
+            /**
+             * Printing Id
+             * @description The edition; without one, the card's default printing.
+             */
+            printing_id?: string | null;
+            /** Quantity */
+            quantity: number;
+            /** Reason */
+            reason: string;
+        };
+        /** CardsGranted */
+        CardsGranted: {
+            /**
+             * Card Id
+             * Format: uuid
+             */
+            card_id: string;
+            /** Finish */
+            finish: string;
+            /** Name */
+            name: string;
+            /**
+             * Printing Id
+             * Format: uuid
+             */
+            printing_id: string;
+            /** Quantity */
+            quantity: number;
+        };
         /** CatalogStatus */
         CatalogStatus: {
             /** Cards */
@@ -4432,6 +4580,53 @@ export interface components {
              * @description Unread messages in all of them.
              */
             unread: number;
+        };
+        /** Cosmetic */
+        Cosmetic: {
+            /** Earned */
+            earned: boolean;
+            /**
+             * Id
+             * @description The reward's slug, without its kind: broken-writ, unbowed.
+             */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /** Cosmetics */
+        Cosmetics: {
+            /**
+             * Card Back
+             * @description The card back in use; null: the official one.
+             */
+            card_back: string | null;
+            /**
+             * Card Backs
+             * @description Every card back the campaign rewards.
+             */
+            card_backs: components["schemas"]["Cosmetic"][];
+            /**
+             * Title
+             * @description The title in use; null: none.
+             */
+            title: string | null;
+            /**
+             * Title Name
+             * @description The title in use, in words.
+             */
+            title_name: string | null;
+            /**
+             * Titles
+             * @description Every title the campaign rewards.
+             */
+            titles: components["schemas"]["Cosmetic"][];
+        };
+        /** CosmeticsChange */
+        CosmeticsChange: {
+            /** Card Back */
+            card_back?: string | null;
+            /** Title */
+            title?: string | null;
         };
         /**
          * Coverage
@@ -5396,7 +5591,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.8.7
+             * @default 0.8.8
              */
             version: string;
         };
@@ -5636,9 +5831,9 @@ export interface components {
             sellable: number;
             /**
              * Sources
-             * @description Where this edition's copies came from.
+             * @description Where this edition's copies came from; grant: SysOp's (v0.8.8).
              */
-            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign")[];
+            sources: ("starter" | "grandfathered" | "alliance" | "pack" | "unique" | "auction" | "campaign" | "grant")[];
         };
         /**
          * LibraryEdition
@@ -5690,7 +5885,7 @@ export interface components {
             cards: components["schemas"]["LibraryCard"][];
             /**
              * Unlimited
-             * @description Builds from the whole catalog (administrators, SysOp).
+             * @description Builds from the whole catalog (SysOp alone since v0.8.8).
              */
             unlimited: boolean;
         };
@@ -5897,7 +6092,7 @@ export interface components {
             permissions: ("profile.edit" | "games.play" | "moderation.read" | "content.edit" | "admin.users.read" | "admin.users.manage" | "admin.roles.manage" | "admin.roles.administrator" | "admin.audit.read" | "games.view_concealed" | "cards.any" | "decks.edit" | "catalog.manage" | "library.unlimited" | "progress.manage" | "custom_cards.manage" | "economy.manage" | "shop.manage" | "reports.manage" | "players.presence" | "chat.read_all" | "admin.users.reset" | "players.history" | "auctions.manage" | "games.passive_bots")[];
             preferences: components["schemas"]["Preferences"];
             /** Roles */
-            roles: ("player" | "moderator" | "content_editor" | "administrator" | "sysop")[];
+            roles: ("player" | "moderator" | "administrator" | "sysop")[];
             session: components["schemas"]["SessionInfo"];
             /**
              * Status
@@ -6238,6 +6433,11 @@ export interface components {
             /** @description Null when the player does not share their presence with you. */
             presence: components["schemas"]["Presence"] | null;
             tier: components["schemas"]["TierInfo"];
+            /**
+             * Title
+             * @description The campaign title the player shows (v0.8.8, api/cosmetics.py); null: none.
+             */
+            title?: string | null;
             /** Wins */
             wins: number;
             /**
@@ -6321,6 +6521,13 @@ export interface components {
             bots: number[];
             /** Decks */
             decks: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "legacy-mono-white-weenie" | "legacy-mono-blue-skies" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers")[];
+            /**
+             * Decks By Format
+             * @description King's Table (v0.8.8): its fixture decks by the deck format its settings choose, so each list fits it; null in other formats.
+             */
+            decks_by_format?: {
+                [key: string]: ("legacy-mono-red-burn" | "legacy-mono-green-creatures" | "legacy-mono-white-weenie" | "legacy-mono-blue-skies" | "commander-mono-white-soldiers" | "commander-mono-blue-flyers" | "commander-mono-red-raiders" | "commander-mono-green-stompers")[];
+            } | null;
             /** Default Bots */
             default_bots: number;
             /**
@@ -7383,6 +7590,55 @@ export interface components {
              * @description Null for SysOp's own reports, to anyone but SysOp.
              */
             id: string | null;
+        };
+        /** ResultsGrant */
+        ResultsGrant: {
+            /**
+             * Against
+             * @default bots
+             * @enum {string}
+             */
+            against: "bots" | "players";
+            /**
+             * Bot Skill
+             * @description The bots' skill, against bots.
+             * @default 4
+             */
+            bot_skill: number;
+            /**
+             * Colors
+             * @description The deck's colours, WUBRG letters in that order; empty for colorless.
+             * @default
+             */
+            colors: string;
+            /**
+             * Count
+             * @description Wins to grant.
+             */
+            count: number;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "commander" | "legacy" | "two_headed_giant" | "kings_table";
+            /** Reason */
+            reason: string;
+        };
+        /** ResultsGranted */
+        ResultsGranted: {
+            /**
+             * Achievement Tokens
+             * @description Tokens the achievements earned paid.
+             */
+            achievement_tokens: number;
+            /** Granted */
+            granted: number;
+            progress: components["schemas"]["Progress"];
+            /**
+             * Quest Tokens
+             * @description Tokens the day's quests paid for these wins.
+             */
+            quest_tokens: number;
         };
         /** ReviewAction */
         ReviewAction: {
@@ -11065,6 +11321,202 @@ export interface operations {
             };
         };
     };
+    give_campaign_api_v1_admin_users__user_id__campaign_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CampaignGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignGranted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    give_cards_api_v1_admin_users__user_id__cards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardsGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardsGranted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     delete_user_api_v1_admin_users__user_id__delete_post: {
         parameters: {
             query?: never;
@@ -11449,13 +11901,111 @@ export interface operations {
             };
         };
     };
+    give_results_api_v1_admin_users__user_id__results_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResultsGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultsGranted"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     grant_role_api_v1_admin_users__user_id__roles__role__put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
                 user_id: string;
-                role: "moderator" | "content_editor" | "administrator";
+                role: "moderator" | "administrator";
             };
             cookie?: never;
         };
@@ -11550,7 +12100,7 @@ export interface operations {
             header?: never;
             path: {
                 user_id: string;
-                role: "moderator" | "content_editor" | "administrator";
+                role: "moderator" | "administrator";
             };
             cookie?: never;
         };
@@ -20294,6 +20844,194 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BlockedPlayer"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    my_cosmetics_api_v1_me_cosmetics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cosmetics"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    change_cosmetics_api_v1_me_cosmetics_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CosmeticsChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cosmetics"];
                 };
             };
             /** @description Bad Request */

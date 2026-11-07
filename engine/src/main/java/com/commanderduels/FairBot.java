@@ -335,6 +335,16 @@ class FairBot extends ComputerPlayerControllableProxy {
     }
 
     /**
+     * Whether this decision may show a weaker player's habits (v0.7.1): the bot is not sharp and
+     * decides for itself. While another player controls this bot's turn (723.5) XMage's
+     * {@code isGameUnderControl} is false and the decision is that player's: it is never slipped,
+     * held back or left unblocked for them (v0.8.8).
+     */
+    private boolean habitsNow() {
+        return !profile.sharp() && isGameUnderControl();
+    }
+
+    /**
      * A weaker player's priority (v0.7.1): some chances pass unsearched, most of all responses on
      * other players' turns, and in its own main phases it sometimes plays what comes to hand
      * instead of what the search would choose. Skill 6 is XMage's AI as it is.
@@ -349,7 +359,7 @@ class FairBot extends ComputerPlayerControllableProxy {
             pass(game);
             return false;
         }
-        if (!profile.sharp()) {
+        if (habitsNow()) {
             boolean ownMain = game.getActivePlayerId() != null && game.getActivePlayerId().equals(playerId)
                 && game.getStack().isEmpty() && isMainPhase(game);
             if (chance(ownMain ? profile.passMain() : profile.passResponse())) {
@@ -420,7 +430,7 @@ class FairBot extends ComputerPlayerControllableProxy {
             return;
         }
         super.selectAttackers(game, attackingPlayerId);
-        if (profile.sharp() || game.getCombat() == null) {
+        if (!habitsNow() || game.getCombat() == null) {
             return;
         }
         for (UUID attackerId : new ArrayList<>(game.getCombat().getAttackers())) {
@@ -486,7 +496,7 @@ class FairBot extends ComputerPlayerControllableProxy {
         if (passiveNow(game)) {
             return;
         }
-        if (!profile.sharp() && chance(profile.noBlock()) && incomingPower(game) < getLife()) {
+        if (habitsNow() && chance(profile.noBlock()) && incomingPower(game) < getLife()) {
             stats.unblocked.incrementAndGet();
             return;
         }

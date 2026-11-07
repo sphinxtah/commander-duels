@@ -51,7 +51,6 @@ export const avatars: Record<Avatar, string> = {
 const roleNames: Record<string, string> = {
   player: "Player",
   moderator: "Moderator",
-  content_editor: "Content editor",
   administrator: "Administrator",
   sysop: "SysOp",
 };

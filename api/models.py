@@ -124,6 +124,10 @@ class User(Base):
     presence_visibility: Mapped[str] = mapped_column(String(16), default="friends")
     appear_offline: Mapped[bool] = mapped_column(default=False)
     email_searchable: Mapped[bool] = mapped_column(default=True)
+    # The campaign's cosmetics in use (v0.8.8, api/cosmetics.py): a card back's slug and a title's,
+    # each shown only while the reward stays earned.
+    card_back: Mapped[str | None] = mapped_column(String(48))
+    title: Mapped[str | None] = mapped_column(String(48))
 
 
 class ExternalIdentity(Base):
@@ -173,9 +177,7 @@ class RoleGrant(Base):
     __tablename__ = "role_grants"
     __table_args__ = (
         UniqueConstraint("user_id", "role"),
-        CheckConstraint(
-            "role IN ('moderator', 'content_editor', 'administrator')", name="ck_role_grants_role"
-        ),
+        CheckConstraint("role IN ('moderator', 'administrator')", name="ck_role_grants_role"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
@@ -1091,7 +1093,8 @@ class LibraryGrant(Base):
         ),
         CheckConstraint("quantity > 0", name="ck_library_grants_quantity"),
         CheckConstraint(
-            "source IN ('starter', 'grandfathered', 'pack', 'unique', 'auction', 'campaign')",
+            "source IN ('starter', 'grandfathered', 'pack', 'unique', 'auction', 'campaign', "
+            "'grant')",
             name="ck_library_grants_source",
         ),
         CheckConstraint("finish IN ('nonfoil', 'foil', 'etched')", name="ck_library_grants_finish"),
@@ -1109,7 +1112,8 @@ class LibraryGrant(Base):
     # What granted it, the same for every card of one grant: starter:<deck>, grandfathered:0.3.1,
     # pack:<opening>, unique:<Scryfall ID> (a one-of-a-kind card, v0.5.1), auction:<auction> (a
     # card bought at Tivit's Auction House, v0.6.0), campaign:<campaign>:<encounter>:<progress> (a
-    # warden's deck won, v0.8.0); after a reset, a
+    # warden's deck won, v0.8.0), grant:<id> (SysOp's own cards for testing, v0.8.8); after a
+    # reset, a
     # starter deck's carries the reset's time (starter:<deck>:<time>), so the deck can be granted
     # again.
     grant_key: Mapped[str] = mapped_column(String(96))
@@ -1605,9 +1609,16 @@ class PlayerResult(Base):
         ),
         # A player's totals and history, newest first.
         Index("ix_player_results_user_id_finished_at", "user_id", "finished_at"),
+        # Played in a game, or granted by SysOp for testing (v0.8.8).
+        CheckConstraint(
+            "(game_id IS NULL) = (granted_by IS NOT NULL)", name="ck_player_results_granted"
+        ),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-    game_id: Mapped[UUID] = mapped_column(ForeignKey("games.id"))
+    # The game played; none for a result SysOp granted itself for testing (v0.8.8, api/testing.py),
+    # which counts towards quests and achievements but never towards statistics or the history.
+    game_id: Mapped[UUID | None] = mapped_column(ForeignKey("games.id"))
+    granted_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     seat: Mapped[int]
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     outcome: Mapped[str] = mapped_column(String(16))

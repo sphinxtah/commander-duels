@@ -99,6 +99,7 @@ import type {
   Seat,
   Snapshot,
 } from "./types";
+import { loadCardBack } from "./cardBack";
 import styles from "./game.module.css";
 import screen from "./table/screen.module.css";
 
@@ -241,6 +242,10 @@ export function GameScreen({
       document.title = "Commander Duels";
     };
   }, []);
+  // The card back the player chose from the campaign's rewards (v0.8.8), asked for once.
+  useEffect(() => {
+    if (!scripted) loadCardBack();
+  }, [scripted]);
   // The summary again once the game ends, and until the API has recorded the end: it then holds
   // the tokens the game paid (v0.4.0).
   const [summaryTries, setSummaryTries] = useState(0);

@@ -632,7 +632,6 @@
               "enum": [
                 "player",
                 "moderator",
-                "content_editor",
                 "administrator",
                 "sysop"
               ],
@@ -1563,7 +1562,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.8.7",
+            "default": "0.8.8",
             "title": "Version",
             "type": "string"
           }
@@ -1740,6 +1739,61 @@
           "spoils"
         ],
         "title": "CampaignEncounter",
+        "type": "object"
+      },
+      "CampaignGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          },
+          "won_through": {
+            "description": "Encounters won, 1 through this; 0 starts the campaign over.",
+            "maximum": 99.0,
+            "minimum": 0.0,
+            "title": "Won Through",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "won_through",
+          "reason"
+        ],
+        "title": "CampaignGrant",
+        "type": "object"
+      },
+      "CampaignGranted": {
+        "additionalProperties": false,
+        "properties": {
+          "completed": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Completed",
+            "type": "array"
+          },
+          "highest_unlocked": {
+            "title": "Highest Unlocked",
+            "type": "integer"
+          },
+          "rewards": {
+            "description": "The seals, card backs and titles the account holds.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Rewards",
+            "type": "array"
+          }
+        },
+        "required": [
+          "highest_unlocked",
+          "completed",
+          "rewards"
+        ],
+        "title": "CampaignGranted",
         "type": "object"
       },
       "CampaignProgressView": {
@@ -2958,6 +3012,94 @@
         "title": "CardSummary",
         "type": "object"
       },
+      "CardsGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "finish": {
+            "default": "nonfoil",
+            "enum": [
+              "nonfoil",
+              "foil",
+              "etched"
+            ],
+            "title": "Finish",
+            "type": "string"
+          },
+          "printing_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The edition; without one, the card's default printing.",
+            "title": "Printing Id"
+          },
+          "quantity": {
+            "maximum": 99.0,
+            "minimum": 1.0,
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "card_id",
+          "quantity",
+          "reason"
+        ],
+        "title": "CardsGrant",
+        "type": "object"
+      },
+      "CardsGranted": {
+        "additionalProperties": false,
+        "properties": {
+          "card_id": {
+            "format": "uuid",
+            "title": "Card Id",
+            "type": "string"
+          },
+          "finish": {
+            "title": "Finish",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "printing_id": {
+            "format": "uuid",
+            "title": "Printing Id",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "card_id",
+          "printing_id",
+          "name",
+          "quantity",
+          "finish"
+        ],
+        "title": "CardsGranted",
+        "type": "object"
+      },
       "CatalogStatus": {
         "additionalProperties": false,
         "properties": {
@@ -3397,6 +3539,128 @@
           "unread"
         ],
         "title": "ConversationList",
+        "type": "object"
+      },
+      "Cosmetic": {
+        "additionalProperties": false,
+        "properties": {
+          "earned": {
+            "title": "Earned",
+            "type": "boolean"
+          },
+          "id": {
+            "description": "The reward's slug, without its kind: broken-writ, unbowed.",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "earned"
+        ],
+        "title": "Cosmetic",
+        "type": "object"
+      },
+      "Cosmetics": {
+        "additionalProperties": false,
+        "properties": {
+          "card_back": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The card back in use; null: the official one.",
+            "title": "Card Back"
+          },
+          "card_backs": {
+            "description": "Every card back the campaign rewards.",
+            "items": {
+              "$ref": "#/components/schemas/Cosmetic"
+            },
+            "title": "Card Backs",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The title in use; null: none.",
+            "title": "Title"
+          },
+          "title_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The title in use, in words.",
+            "title": "Title Name"
+          },
+          "titles": {
+            "description": "Every title the campaign rewards.",
+            "items": {
+              "$ref": "#/components/schemas/Cosmetic"
+            },
+            "title": "Titles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "card_back",
+          "title",
+          "title_name",
+          "card_backs",
+          "titles"
+        ],
+        "title": "Cosmetics",
+        "type": "object"
+      },
+      "CosmeticsChange": {
+        "additionalProperties": false,
+        "properties": {
+          "card_back": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card Back"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 48,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "CosmeticsChange",
         "type": "object"
       },
       "Coverage": {
@@ -5872,7 +6136,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.8.7",
+            "default": "0.8.8",
             "title": "Version",
             "type": "string"
           }
@@ -6399,7 +6663,7 @@
             "type": "integer"
           },
           "sources": {
-            "description": "Where this edition's copies came from.",
+            "description": "Where this edition's copies came from; grant: SysOp's (v0.8.8).",
             "items": {
               "enum": [
                 "starter",
@@ -6408,7 +6672,8 @@
                 "pack",
                 "unique",
                 "auction",
-                "campaign"
+                "campaign",
+                "grant"
               ],
               "type": "string"
             },
@@ -6521,7 +6786,7 @@
             "type": "array"
           },
           "unlimited": {
-            "description": "Builds from the whole catalog (administrators, SysOp).",
+            "description": "Builds from the whole catalog (SysOp alone since v0.8.8).",
             "title": "Unlimited",
             "type": "boolean"
           }
@@ -7088,7 +7353,6 @@
               "enum": [
                 "player",
                 "moderator",
-                "content_editor",
                 "administrator",
                 "sysop"
               ],
@@ -7869,6 +8133,18 @@
           "tier": {
             "$ref": "#/components/schemas/TierInfo"
           },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The campaign title the player shows (v0.8.8, api/cosmetics.py); null: none.",
+            "title": "Title"
+          },
           "wins": {
             "title": "Wins",
             "type": "integer"
@@ -8088,6 +8364,40 @@
             },
             "title": "Decks",
             "type": "array"
+          },
+          "decks_by_format": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "enum": [
+                      "legacy-mono-red-burn",
+                      "legacy-mono-green-creatures",
+                      "legacy-mono-white-weenie",
+                      "legacy-mono-blue-skies",
+                      "commander-mono-white-soldiers",
+                      "commander-mono-blue-flyers",
+                      "commander-mono-red-raiders",
+                      "commander-mono-green-stompers"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "enum": [
+                    "legacy",
+                    "commander"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "King's Table (v0.8.8): its fixture decks by the deck format its settings choose, so each list fits it; null in other formats.",
+            "title": "Decks By Format"
           },
           "default_bots": {
             "title": "Default Bots",
@@ -10768,6 +11078,95 @@
           "display_name"
         ],
         "title": "Reporter",
+        "type": "object"
+      },
+      "ResultsGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "against": {
+            "default": "bots",
+            "enum": [
+              "bots",
+              "players"
+            ],
+            "title": "Against",
+            "type": "string"
+          },
+          "bot_skill": {
+            "default": 4,
+            "description": "The bots' skill, against bots.",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Bot Skill",
+            "type": "integer"
+          },
+          "colors": {
+            "default": "",
+            "description": "The deck's colours, WUBRG letters in that order; empty for colorless.",
+            "pattern": "^W?U?B?R?G?$",
+            "title": "Colors",
+            "type": "string"
+          },
+          "count": {
+            "description": "Wins to grant.",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "format": {
+            "enum": [
+              "commander",
+              "legacy",
+              "two_headed_giant",
+              "kings_table"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 200,
+            "minLength": 3,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "count",
+          "reason"
+        ],
+        "title": "ResultsGrant",
+        "type": "object"
+      },
+      "ResultsGranted": {
+        "additionalProperties": false,
+        "properties": {
+          "achievement_tokens": {
+            "description": "Tokens the achievements earned paid.",
+            "title": "Achievement Tokens",
+            "type": "integer"
+          },
+          "granted": {
+            "title": "Granted",
+            "type": "integer"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/Progress"
+          },
+          "quest_tokens": {
+            "description": "Tokens the day's quests paid for these wins.",
+            "title": "Quest Tokens",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "granted",
+          "progress",
+          "quest_tokens",
+          "achievement_tokens"
+        ],
+        "title": "ResultsGranted",
         "type": "object"
       },
       "ReviewAction": {
@@ -13641,7 +14040,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.8.7"
+    "version": "0.8.8"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -16676,6 +17075,248 @@
         "summary": "List Users"
       }
     },
+    "/api/v1/admin/users/{user_id}/campaign": {
+      "post": {
+        "description": "SysOp sets how far an account has come in the campaign, for testing: the encounters won\nthrough a number, their seals and the chapters' rewards, never the spoils. Audited.",
+        "operationId": "give_campaign_api_v1_admin_users__user_id__campaign_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignGranted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Give Campaign"
+      }
+    },
+    "/api/v1/admin/users/{user_id}/cards": {
+      "post": {
+        "description": "SysOp grants copies of a card in the game into an account's library for good, in one\nedition and finish: with a reason, audited.",
+        "operationId": "give_cards_api_v1_admin_users__user_id__cards_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardsGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardsGranted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Give Cards"
+      }
+    },
     "/api/v1/admin/users/{user_id}/delete": {
       "post": {
         "description": "Deletes an account for good (v0.4.1, api/accounts.py): its sign-in, profile, sessions,\nroles and decks go; its game results, wins and tokens stay, as \"Deleted player\". Refused 409\nwhile it plays a game. The account's game lock is held meanwhile, so no game of it starts.",
@@ -17141,6 +17782,127 @@
         "summary": "Reset User"
       }
     },
+    "/api/v1/admin/users/{user_id}/results": {
+      "post": {
+        "description": "SysOp grants wins in a format, for testing quests, achievements and tiers: results with no\ngame, counted by quests and achievements but never by statistics, and as many wins. Audited.",
+        "operationId": "give_results_api_v1_admin_users__user_id__results_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultsGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultsGranted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Give Results"
+      }
+    },
     "/api/v1/admin/users/{user_id}/roles/{role}": {
       "delete": {
         "operationId": "revoke_role_api_v1_admin_users__user_id__roles__role__delete",
@@ -17162,7 +17924,6 @@
             "schema": {
               "enum": [
                 "moderator",
-                "content_editor",
                 "administrator"
               ],
               "title": "Role",
@@ -17284,7 +18045,6 @@
             "schema": {
               "enum": [
                 "moderator",
-                "content_editor",
                 "administrator"
               ],
               "title": "Role",
@@ -28200,6 +28960,211 @@
           }
         },
         "summary": "My Blocks"
+      }
+    },
+    "/api/v1/me/cosmetics": {
+      "get": {
+        "operationId": "my_cosmetics_api_v1_me_cosmetics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cosmetics"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "My Cosmetics"
+      },
+      "put": {
+        "description": "Chooses the card back and the title to show: each one the account has earned, or none.",
+        "operationId": "change_cosmetics_api_v1_me_cosmetics_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CosmeticsChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Cosmetics"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Change Cosmetics"
       }
     },
     "/api/v1/me/history": {

@@ -151,30 +151,30 @@ This pair, the cookie and the nonce inside the signed token, is this flow's CSRF
 
 ## Roles and permissions (AUTH06, AUTH07, SEC05)
 
-Every active account is a player. Grants add the other roles. Permissions are checked on the server for every request.
+Every active account is a player. Grants add the other roles. Permissions are checked on the server for every request. Since v0.8.8 moderators and administrators are players in every way, with libraries of their own (the owner's decision): only SysOp builds from the whole catalog. The content editor role was removed in v0.8.8; migration 0037 deleted its grants, and its permission stays with administrators.
 
-| Permission | Player | Moderator | Content editor | Administrator | SysOp |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| `profile.edit`, `games.play` | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `moderation.read` |  | ✓ |  | ✓ | ✓ |
-| `content.edit` |  |  | ✓ | ✓ | ✓ |
-| `admin.users.read` |  | ✓ |  | ✓ | ✓ |
-| `admin.users.manage`, `admin.roles.manage`, `admin.audit.read` |  |  |  | ✓ | ✓ |
-| `admin.roles.administrator` |  |  |  |  | ✓ |
-| `games.view_concealed` |  |  |  |  | ✓ |
-| `cards.any` |  |  |  |  | ✓ |
-| `library.unlimited` (v0.3.1: build from the whole catalog) |  |  |  | ✓ | ✓ |
-| `progress.manage` (v0.3.1: set any account's wins) |  |  |  |  | ✓ |
-| `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  |  | ✓ |
-| `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  |  | ✓ | ✓ |
-| `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  |  | ✓ | ✓ |
-| `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  |  | ✓ |
-| `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  |  | ✓ |
-| `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history)) |  |  |  |  | ✓ |
-| `games.passive_bots` (v0.8.7: [passive bots](game-screen.md#passive-bots-v086-administrators-v087) in their own game against bots; SysOp's since v0.8.6) |  |  |  | ✓ | ✓ |
+| Permission | Player | Moderator | Administrator | SysOp |
+| --- | :-: | :-: | :-: | :-: |
+| `profile.edit`, `games.play` | ✓ | ✓ | ✓ | ✓ |
+| `moderation.read` |  | ✓ | ✓ | ✓ |
+| `content.edit` |  |  | ✓ | ✓ |
+| `admin.users.read` |  | ✓ | ✓ | ✓ |
+| `admin.users.manage`, `admin.roles.manage`, `admin.audit.read` |  |  | ✓ | ✓ |
+| `admin.roles.administrator` |  |  |  | ✓ |
+| `games.view_concealed` |  |  |  | ✓ |
+| `cards.any` |  |  |  | ✓ |
+| `library.unlimited` (v0.3.1: build from the whole catalog; administrators' until v0.8.8) |  |  |  | ✓ |
+| `progress.manage` (v0.3.1: set any account's wins; since v0.8.8 [the testing grants](#sysops-grants-for-testing-v088)) |  |  |  | ✓ |
+| `custom_cards.manage` (v0.3.1: the Godlike tier's custom cards) |  |  |  | ✓ |
+| `reports.manage` (v0.4.1: read [problem reports](reports.md) and set their status) |  |  | ✓ | ✓ |
+| `players.presence` (v0.4.3: every player's real [presence](social.md#presence), appearing offline or not) |  |  | ✓ | ✓ |
+| `chat.read_all` (v0.4.4: read any conversation or table's chat, [SysOp's reader](chat.md#sysops-reader)) |  |  |  | ✓ |
+| `admin.users.reset` (v0.4.5: reset an account to a new one's state, [resetting an account](#resetting-an-account-v045)) |  |  |  | ✓ |
+| `players.history` (v0.5.0: any player's games one by one, [the match history](quests.md#statistics-and-the-match-history)) |  |  |  | ✓ |
+| `games.passive_bots` (v0.8.7: [passive bots](game-screen.md#passive-bots-v086-administrators-v087) in their own game against bots; SysOp's since v0.8.6) |  |  | ✓ | ✓ |
 
 **Administrators.**
-- They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator and content-editor roles, and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
+- They approve or deny pending accounts, disable and restore accounts (disabling ends every session), sign accounts out everywhere, grant or remove the moderator role (until v0.8.8 also the content editor role), and since v0.4.1 delete accounts ([deleting an account](#deleting-an-account-v041)).
 - Since v0.4.1 they read the players' [problem reports](reports.md) and set their status, and Admin in the navigation and the browser tab's title count the accounts waiting for approval and the unread reports ([counts](reports.md#counts)).
 - They cannot change administrators, SysOp or their own account. This holds whatever the administrator's status: grants survive a disable, so only SysOp can restore, deny, sign out or change the lesser roles of an account holding an administrator grant. The account list reports a disabled, pending or denied account's dormant grants in `roles` (without `player`, which only active accounts hold), so the Administration page locks the row.
 - The account search matches the handle, the display name and, for administrators only, the email, as written: `%`, `_` and `\` are literal, and names and email compare without regard to case.
@@ -220,7 +220,7 @@ SysOp copies Kingdom Connect's root account:
   - SysOp's sessions are short (table above).
   - They count as signed out whenever a request comes from outside the SysOp networks, so a session carried off the network is useless there.
 - **A ghost account.**
-  - SysOp never appears in account lists and cannot be changed, demoted or disabled through the interface.
+  - SysOp never appears in anyone else's account list and cannot be changed, demoted or disabled through the interface. Since v0.8.8 SysOp's own list shows its account first, for its grants to itself.
   - Other viewers of the audit log see its actions as the *Site administrator*'s, without its addresses, and never see its sign-in trail.
 - **No second factor.** As agreed, the network check stands in for it. Every SysOp sign-in, sign-out, failure, password change and administrative action is audited with its source address.
 
@@ -243,6 +243,19 @@ It asks twice, without echo. For automation, `--stdin` reads one line, and `--pa
   - The trusted proxies are the TSH nginx proxy (10.10.50.2) and the web container. The proxy replaces `X-Forwarded-For`, and the web container appends the proxy's address.
   - The entrance is re-tested from outside the network at each version: it must answer *not found*.
   - Sign-up needs approval (`CD_SIGNUP_POLICY=approval`); SysOp approves every account until the site opens to the public at v1.0.0.
+
+## SysOp's grants for testing (v0.8.8)
+
+The owner, 2026-11-06: "I want the SysOp account to be able to give itself coins for testing, and also give wins, etc like the other users." SysOp's own account is first in its Administration › Accounts list, and its row (any account's row, for SysOp) offers:
+
+- **Give tokens** (v0.4.0) and **set wins** (v0.3.1), as before.
+- **Testing grants…** ([api/testing.py](../api/testing.py)):
+  - **Wins by format.** Granted results with no game, marked with SysOp as their granter, counted by the day's quests and the achievements (settled and paid at once), and as many wins as a setting of wins. The profile's statistics and the match history never count them, and no win pays tokens.
+  - **Packs**, any product with booster data (the v0.4.0 API, given a form).
+  - **Cards**: copies of a card's default edition, nonfoil or foil, granted for good (source `grant`) and sellable.
+  - **Campaign progress**: encounters won through a number, with their seals, the next one open and the chapters' card backs and titles, never the spoils; a lower number starts the campaign over first.
+
+Every grant takes a reason and is audited (`testing.results_granted`, `testing.cards_granted`, `testing.campaign_set`). Only SysOp grants (`progress.manage` and `economy.manage`), and another root account is never a target.
 
 ## Audit trail
 

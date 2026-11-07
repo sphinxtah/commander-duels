@@ -3,6 +3,7 @@ import { cardImageUrl } from "./images";
 import type { Located } from "./model";
 import { manaSymbols, manaWords, readableRule } from "./model";
 import { useImageRetry } from "./RetryingImage";
+import { useCardBack } from "./cardBack";
 import type { CardImageSize } from "./table/types";
 import type { CardView, PermanentView } from "./types";
 import styles from "./game.module.css";
@@ -63,12 +64,7 @@ export function CardFace({
   card: CardView;
   size?: CardImageSize;
 }) {
-  if (card.hidden || !card.name)
-    return (
-      <div className={styles.cardBack} aria-hidden="true">
-        <img src="/brand/card-back.webp" alt="" />
-      </div>
-    );
+  if (card.hidden || !card.name) return <CardBack />;
   // A new name is a new image: remount rather than reset, so a cached image that loads at once
   // is never marked loading again afterwards.
   return (
@@ -78,6 +74,16 @@ export function CardFace({
       name={card.name}
       size={size}
     />
+  );
+}
+
+/** A face-down card: the official back, or the campaign's back the player chose (v0.8.8). */
+function CardBack() {
+  const back = useCardBack();
+  return (
+    <div className={styles.cardBack} aria-hidden="true">
+      <img src={back} alt="" />
+    </div>
   );
 }
 

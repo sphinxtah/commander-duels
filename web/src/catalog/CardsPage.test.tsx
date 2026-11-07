@@ -327,7 +327,7 @@ describe("the Cards page", () => {
       within(table)
         .getAllByRole("columnheader")
         .map((cell) => cell.textContent),
-    ).toEqual(["Card", "Edition", "Type", "Copies", "From"]);
+    ).toEqual(["Card", "Edition", "Type", "Copies", "From", "Actions"]);
     const row = within(table)
       .getAllByRole("button", { name: "Lightning Bolt" })[0]!
       .closest("tr")!;
@@ -340,6 +340,7 @@ describe("the Cards page", () => {
       "Artifact",
       "2",
       "Your earlier decks, Starter decks",
+      "Add to deck",
     ]);
     // Each source with the cards it gave, and what it gives.
     expect(screen.getAllByRole("term").map((term) => term.textContent)).toEqual(

@@ -1,11 +1,14 @@
 """Administration: accounts, roles and the audit trail (AUTH06, SEC05).
 
-Administrators approve, deny, disable, restore and delete accounts and grant the moderator and
-content-editor roles. Only SysOp makes or removes administrators, and resets an account to a new
-one's state (v0.4.5, api/resets.py). SysOp itself never appears here: it cannot be listed,
-changed, demoted or disabled through the interface, and other viewers see its audit events as the
-site administrator's. A deleted account (v0.4.1, api/accounts.py) is listed only when asked for,
-as "Deleted player", and nothing changes it afterwards.
+Administrators approve, deny, disable, restore and delete accounts and grant the moderator role
+(the content editor role was removed in v0.8.8). Moderators and administrators play as any player
+does, from libraries of their own (v0.8.8). Only SysOp makes or removes administrators, and resets
+an account to a new one's state (v0.4.5, api/resets.py). SysOp never appears to anyone else here:
+it cannot be changed, demoted or disabled through the interface, and other viewers see its audit
+events as the site administrator's. Since v0.8.8 SysOp sees its own account first in the list, for
+its grants to itself (tokens, wins, packs, cards, campaign progress; api/testing.py). A deleted
+account (v0.4.1, api/accounts.py) is listed only when asked for, as "Deleted player", and nothing
+changes it afterwards.
 """
 
 import base64
@@ -15,7 +18,7 @@ from typing import Annotated, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import Select, and_, delete, or_, select
+from sqlalchemy import ColumnElement, Select, and_, delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -125,9 +128,10 @@ def list_users(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     cursor: str | None = None,
 ) -> UserPage:
-    query: Select[User] = select(User).where(User.kind == "player")
     # Deleted accounts only when asked for: there is nothing left to do with them.
-    query = query.where(User.status == status if status else User.status != "deleted")
+    filters: list[ColumnElement[bool]] = [
+        User.status == status if status else User.status != "deleted"
+    ]
     if q and (term := q.strip()):
         # The text is matched as written: autoescape makes % _ and \ literal, and names and
         # email compare through the database's own lower(), as they are stored.
@@ -143,7 +147,15 @@ def list_users(
                     )
                 )
             )
-        query = query.where(or_(*matches))
+        filters.append(or_(*matches))
+    query: Select[User] = select(User).where(User.kind == "player", *filters)
+    # SysOp's own account first on the first page (v0.8.8), for its grants to itself; never
+    # another root account.
+    own = (
+        db.scalar(select(User).where(User.id == principal.user.id, *filters))
+        if principal.user.kind == "sysop" and not cursor
+        else None
+    )
     if cursor:
         moment, row_id = decode_cursor(cursor)
         query = query.where(
@@ -154,7 +166,7 @@ def list_users(
     more = len(page) > limit
     page = page[:limit]
     return UserPage(
-        items=[admin_user(db, user, principal) for user in page],
+        items=[admin_user(db, user, principal) for user in ([own] if own else []) + page],
         next_cursor=encode_cursor(page[-1].created_at, page[-1].id) if more and page else None,
     )
 

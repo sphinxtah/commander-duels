@@ -402,7 +402,7 @@ describe("King's Table (v0.8.7)", () => {
     const view = kingsView();
     const choice: PromptOption = {
       id: "1",
-      action: "use_ability",
+      action: "deploy",
       label:
         "{T}: Target teammate in your range gains control of this creature. Activate only as a sorcery. (Deploy)",
       object_id: null,
@@ -412,6 +412,10 @@ describe("King's Table (v0.8.7)", () => {
     expect(optionText(choice, objectIndex(view), view)).toBe(
       "Deploy: tap this creature to give it to a teammate in your range (as a sorcery)",
     );
+    // Since v0.8.8 the engine's mark, not the words, says it is Deploy (v0.8.8).
+    expect(
+      optionText({ ...choice, action: "use_ability" }, objectIndex(view), view),
+    ).not.toMatch(/^Deploy:/);
     // The teammate it goes to is named as any player is.
     expect(
       optionText(

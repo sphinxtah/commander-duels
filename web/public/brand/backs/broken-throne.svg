@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="630" height="880" viewBox="0 0 630 880">
+  <!-- Broken Throne (v0.8.8): the Platinum ward's card back, a throne split in two. -->
+  <defs>
+    <radialGradient id="hall" cx="50%" cy="40%" r="75%">
+      <stop offset="0" stop-color="#2b3134"/>
+      <stop offset="0.7" stop-color="#14181a"/>
+      <stop offset="1" stop-color="#08090a"/>
+    </radialGradient>
+    <linearGradient id="platinum" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#cfd8dc"/>
+      <stop offset="1" stop-color="#7d8a90"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9aa6ab"/>
+      <stop offset="1" stop-color="#4a5458"/>
+    </linearGradient>
+    <clipPath id="inside"><rect x="40" y="40" width="550" height="800" rx="12"/></clipPath>
+  </defs>
+  <rect width="630" height="880" rx="30" fill="#070809"/>
+  <rect x="14" y="14" width="602" height="852" rx="22" fill="url(#hall)"/>
+  <g stroke="#3a4245" stroke-width="2" opacity="0.6" clip-path="url(#inside)">
+    <path d="M14 700 H616"/><path d="M14 760 H616"/><path d="M14 820 H616"/>
+    <path d="M120 700 V866M250 700 V866M380 700 V866M510 700 V866"/>
+  </g>
+  <rect x="34" y="34" width="562" height="812" rx="16" fill="none" stroke="url(#platinum)" stroke-width="6"/>
+  <rect x="50" y="50" width="530" height="780" rx="10" fill="none" stroke="#cfd8dc" stroke-width="1.5" opacity="0.45"/>
+  <!-- The throne's left half, upright. -->
+  <g stroke="#2a3033" stroke-width="4" stroke-linejoin="round">
+    <path d="M200 690 V420 H180 V250 L215 170 L250 230 L268 250 L288 300 L270 360 L296 420 L282 470 L300 520 L284 690 Z" fill="url(#stone)"/>
+    <!-- And its right half, fallen aside. -->
+    <path d="M338 300 L358 250 L376 230 L412 170 L447 250 V420 H427 V690 H342 L326 520 L344 470 L330 420 L356 360 Z" fill="url(#stone)" transform="rotate(9 400 690) translate(26 8)"/>
+  </g>
+  <g fill="none" stroke="url(#platinum)" stroke-width="3" opacity="0.8">
+    <path d="M215 200 L240 245 M225 330 H262 M225 560 H272"/>
+    <path d="M440 200 L415 245 M380 330 H418 M370 560 H420" transform="rotate(9 400 690) translate(26 8)"/>
+  </g>
+  <!-- The crown that sat on it, on the floor. -->
+  <path d="M150 742 l14 -34 18 22 18 -30 18 30 18 -22 14 34 z" fill="url(#platinum)" stroke="#2a3033" stroke-width="3" transform="rotate(-14 200 730)"/>
+  <g fill="url(#platinum)">
+    <path d="M315 70 l12 22 -12 22 -12 -22z"/><path d="M315 766 l12 22 -12 22 -12 -22z" opacity="0"/>
+  </g>
+</svg>

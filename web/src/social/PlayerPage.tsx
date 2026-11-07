@@ -120,6 +120,10 @@ export function PlayerPage({
           <h1 id="player-title" ref={heading} tabIndex={-1}>
             {profile.handle}
           </h1>
+          {/* A campaign title the player chose to show (v0.8.8). */}
+          {profile.title && (
+            <p className={styles.playerTitle}>{profile.title}</p>
+          )}
           <p className={styles.tierLine}>
             <TierBadge tier={profile.tier.id} size={28} decorative />
             <span>

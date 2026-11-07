@@ -117,8 +117,10 @@ class EngineStatus(Contract):
     implementations: ImplementationList | None = None
 
 
-Role = Literal["player", "moderator", "content_editor", "administrator", "sysop"]
-GrantableRole = Literal["moderator", "content_editor", "administrator"]
+# The content editor role was removed in v0.8.8 (the owner's decision); its permission stays
+# with administrators.
+Role = Literal["player", "moderator", "administrator", "sysop"]
+GrantableRole = Literal["moderator", "administrator"]
 Permission = Literal[
     "profile.edit",
     "games.play",
@@ -501,6 +503,11 @@ class PracticeFormat(Contract):
         default=None,
         description="King's Table (v0.8.7): the default settings; null in other formats. Its "
         "decks are the fixture decks of both deck formats.",
+    )
+    decks_by_format: dict[Literal["legacy", "commander"], list[FixtureDeck]] | None = Field(
+        default=None,
+        description="King's Table (v0.8.8): its fixture decks by the deck format its settings "
+        "choose, so each list fits it; null in other formats.",
     )
 
 

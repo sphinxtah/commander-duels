@@ -54,6 +54,8 @@ export type OptionAction =
   | "toggle_blocker"
   | "suggested"
   | "use_ability"
+  // King's Table's Deploy (804), among a creature's abilities (v0.8.8).
+  | "deploy"
   | "choose_mode"
   | "put_first"
   | "choose_pile";

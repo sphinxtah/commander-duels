@@ -248,6 +248,7 @@ const verbs: Record<PromptOption["action"], string> = {
   toggle_blocker: "Block with",
   suggested: "Use the suggestion",
   use_ability: "Use",
+  deploy: "Deploy",
   choose_mode: "Choose",
   put_first: "Put first",
   choose_pile: "Choose",
@@ -287,8 +288,9 @@ function optionWords(
     return `Stop attacking with ${subject}`;
   if (option.action === "toggle_blocker" && option.selected && subject)
     return `Stop blocking with ${subject}`;
-  if (option.label && DEPLOY.test(option.label) && !option.object_id)
-    // King's Table's Deploy (v0.8.7), chosen among a creature's abilities.
+  if (option.action === "deploy")
+    // King's Table's Deploy (v0.8.7), chosen among a creature's abilities; marked by the engine
+    // since v0.8.8.
     return "Deploy: tap this creature to give it to a teammate in your range (as a sorcery)";
   if (option.label) {
     // The engine labels object options with the object's name; say what the option does.

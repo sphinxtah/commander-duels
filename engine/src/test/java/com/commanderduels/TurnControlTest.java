@@ -57,11 +57,16 @@ class TurnControlTest {
         /** By "turn:viewer": the controlling seat the viewer's own entry named. */
         final Map<String, Set<Integer>> controlledBy = new ConcurrentHashMap<>();
         final List<String> problems = new CopyOnWriteArrayList<>();
+        /** "turn:step" of each priority prompt a seat answered for another seat (v0.8.8). */
+        final Set<String> priorityFor = ConcurrentHashMap.newKeySet();
 
         void prompt(int seat, PromptView prompt, SeatView view) {
             if (prompt.forSeat() != null) {
                 answeredFor.computeIfAbsent(view.turn() + ":" + seat, key -> ConcurrentHashMap.newKeySet())
                     .add(prompt.forSeat());
+                if (prompt.kind().equals("priority")) {
+                    priorityFor.add(view.turn() + ":" + view.step());
+                }
             } else {
                 ownPrompts.computeIfAbsent(view.turn() + ":" + seat, key -> new AtomicInteger()).incrementAndGet();
             }
@@ -247,6 +252,10 @@ class TurnControlTest {
         assertTrue(seen.hands(3, 0).isEmpty() && seen.hands(1, 0).isEmpty(), "and in no other turn: "
             + seen.handsShown);
         assertTrue(run.scenario().reached.contains("prompt for a controlled player"));
+        // A skill-1 bot's habits never slip a priority its controller should answer (v0.8.8): the
+        // controller is asked in both of the controlled turn's main phases.
+        assertTrue(seen.priorityFor.containsAll(Set.of("2:precombat_main", "2:postcombat_main")),
+            "priority for the bot in turn 2: " + seen.priorityFor);
         assertTrue(run.log().stream().anyMatch(line -> line.contains("taken turn control")), "XMage's log line");
         // The bot played one land at most in the turn seat 0 controlled.
         assertTrue(scenario.count.getOrDefault("3:Forest:1", 0) - scenario.count.getOrDefault("2:Forest:1", 0) <= 1,

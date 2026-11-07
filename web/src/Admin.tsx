@@ -23,6 +23,7 @@ import { DeleteAccount } from "./admin/DeleteAccount";
 import { Reports } from "./admin/Reports";
 import { ResetAccount, resetWords } from "./admin/ResetAccount";
 import { SetWins } from "./admin/SetWins";
+import { TestingGrants } from "./admin/TestingGrants";
 import { tierNames } from "./alliance/alliance";
 import { Portrait } from "./alliance/Portrait";
 import { TierBadge } from "./alliance/TierBadge";
@@ -36,7 +37,7 @@ import shell from "./App.module.css";
 import admin from "./admin/admin.module.css";
 
 type Status = AdminUser["status"];
-type GrantableRole = "moderator" | "content_editor" | "administrator";
+type GrantableRole = "moderator" | "administrator";
 // "All accounts" leaves the deleted ones out (v0.4.1): they are listed only when asked for.
 const statuses: (Status | "")[] = [
   "",
@@ -56,7 +57,6 @@ const statusNames: Record<Status | "", string> = {
 };
 const grantable: { role: GrantableRole; name: string }[] = [
   { role: "moderator", name: "Moderator" },
-  { role: "content_editor", name: "Content editor" },
   { role: "administrator", name: "Administrator" },
 ];
 
@@ -91,6 +91,8 @@ function Users({
   // The account whose wins SysOp is setting, if any.
   const [settingWins, setSettingWins] = useState<string>();
   const [givingTokens, setGivingTokens] = useState<string>();
+  // The account SysOp's testing grants are open for (v0.8.8), if any.
+  const [testing, setTesting] = useState<string>();
   // The account whose deletion the dialog asks to confirm (v0.4.1), if any.
   const [deleting, setDeleting] = useState<AdminUser>();
   // The account SysOp is resetting to a new one's state (v0.4.5), if any.
@@ -276,6 +278,8 @@ function Users({
         <ul className={styles.users}>
           {users.map((user) => {
             const name = user.handle ?? user.display_name;
+            // SysOp's own account (v0.8.8), first in its list: its grants to itself only.
+            const own = user.id === me.id;
             const isAdministrator = user.roles.includes("administrator");
             const locked = isAdministrator && !administrators;
             // A deleted account (v0.4.1) is "Deleted player", and nothing changes it.
@@ -367,7 +371,7 @@ function Users({
                     </dd>
                   </div>
                 </dl>
-                {roles && user.status === "active" && (
+                {roles && !own && user.status === "active" && (
                   <fieldset className={styles.roleSet} disabled={locked}>
                     <legend>Roles</legend>
                     {grantable.map(({ role, name: roleName }) => (
@@ -393,7 +397,7 @@ function Users({
                         className={styles.secondary}
                         onClick={() => setSettingWins(user.id)}
                       >
-                        Set wins for {name}
+                        {own ? "Set your wins" : `Set wins for ${name}`}
                       </button>
                     )}
                     {economy && givingTokens !== user.id && (
@@ -401,10 +405,23 @@ function Users({
                         className={styles.secondary}
                         onClick={() => setGivingTokens(user.id)}
                       >
-                        Give tokens to {name}
+                        {own
+                          ? "Give yourself tokens"
+                          : `Give tokens to ${name}`}
                       </button>
                     )}
-                    {manage && !locked && user.status === "pending" && (
+                    {/* Packs, wins by format, cards and campaign progress (v0.8.8). */}
+                    {progress && economy && testing !== user.id && (
+                      <button
+                        className={styles.secondary}
+                        onClick={() => setTesting(user.id)}
+                      >
+                        {own
+                          ? "Testing grants for yourself…"
+                          : `Testing grants for ${name}…`}
+                      </button>
+                    )}
+                    {manage && !locked && !own && user.status === "pending" && (
                       <>
                         <button
                           className={shell.primary}
@@ -420,7 +437,7 @@ function Users({
                         </button>
                       </>
                     )}
-                    {manage && !locked && user.status === "active" && (
+                    {manage && !locked && !own && user.status === "active" && (
                       <>
                         <button
                           className={styles.secondary}
@@ -438,6 +455,7 @@ function Users({
                     )}
                     {manage &&
                       !locked &&
+                      !own &&
                       (user.status === "disabled" ||
                         user.status === "denied") && (
                         <button
@@ -470,7 +488,7 @@ function Users({
                 {progress && settingWins === user.id && (
                   <SetWins
                     userId={user.id}
-                    subject={name}
+                    subject={own ? "your" : name}
                     wins={user.wins}
                     onSet={(changed) => {
                       replace({
@@ -489,7 +507,7 @@ function Users({
                 {economy && givingTokens === user.id && (
                   <GiveTokens
                     userId={user.id}
-                    subject={name}
+                    subject={own ? "your" : name}
                     onGiven={(changed) => {
                       replace({ ...user, tokens: changed.balance });
                       setGivingTokens(undefined);
@@ -498,6 +516,21 @@ function Users({
                       );
                     }}
                     onCancel={() => setGivingTokens(undefined)}
+                  />
+                )}
+                {progress && economy && testing === user.id && (
+                  <TestingGrants
+                    userId={user.id}
+                    subject={name}
+                    own={own}
+                    onWins={(wins, tier) =>
+                      replace({
+                        ...user,
+                        wins,
+                        tier: tier as AdminUser["tier"],
+                      })
+                    }
+                    onCancel={() => setTesting(undefined)}
                   />
                 )}
               </li>

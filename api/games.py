@@ -449,6 +449,9 @@ class LiveGame:
     # King's Table's teams of three (groups), each two of a team's players allied.
     teams: bool = False
     groups: tuple[tuple[int, ...], ...] = TEAMS
+    # King's Table (v0.8.7): the live result names its winning team as the recorded one does
+    # (v0.8.8), whether the game is a table's or the practice table's.
+    kings: bool = False
 
     def __post_init__(self) -> None:
         if self.teams:
@@ -482,7 +485,7 @@ def team_play(fmt: str) -> dict[str, Any]:
     """A table's game's fixed teams, as LiveGame takes them: Two-Headed Giant's pairs (v0.5.1) and
     King's Table's teams of three (v0.8.7); none in other formats."""
     if fmt == kings_table.FORMAT:
-        return {"teams": True, "groups": kings_table.TEAMS}
+        return {"teams": True, "groups": kings_table.TEAMS, "kings": True}
     if fmt == "two_headed_giant":
         return {"teams": True, "groups": TEAMS}
     return {}
@@ -729,6 +732,9 @@ class GameHub:
                 continue
             failures = 0
             finished = snapshot.get("result") is not None
+            if finished and game.kings and isinstance(snapshot["result"], dict):
+                # The winning team made whole, as the recorded result names it (v0.8.8).
+                snapshot = {**snapshot, "result": kings_table.team_result(snapshot["result"])}
             if snapshot["revision"] != since or finished:
                 since = snapshot["revision"]
                 log_from = snapshot["log_from"] + len(snapshot["log"])
@@ -1458,6 +1464,14 @@ def practice_options(principal: Player) -> PracticeOptions:
                 decks=decks if fixtures else [],
                 best_of=BEST_OF[fmt],
                 kings_table=KingsTableSettings() if fmt == kings_table.FORMAT else None,
+                decks_by_format=(
+                    {
+                        "legacy": FIXTURE_DECKS["two_headed_giant"] if fixtures else [],
+                        "commander": FIXTURE_DECKS["commander"] if fixtures else [],
+                    }
+                    if fmt == kings_table.FORMAT
+                    else None
+                ),
             )
             for fmt, decks in FIXTURE_DECKS.items()
         ],
@@ -2115,7 +2129,13 @@ async def create_practice_game(
                     record_game, db, request, principal, created, body, plans
                 )
                 token = seat_tokens(created)[mine]
-                hub.register(LiveGame(id=game.id, seats={mine: LiveSeat(mine, user_id, token)}))
+                hub.register(
+                    LiveGame(
+                        id=game.id,
+                        seats={mine: LiveSeat(mine, user_id, token)},
+                        kings=body.format == kings_table.FORMAT,
+                    )
+                )
         finally:
             hub.starting -= 1
         return await run_in_threadpool(summary_of, db, game, principal)

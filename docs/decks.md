@@ -96,6 +96,10 @@ The practice table's deck choices list "Your decks"; since v0.3.1 the engine's f
 
 SysOp's own decks may hold any card in the game (until v0.4.5, any card the engine implements), as its deck lists may ([games through the API](games.md)).
 
+## Add to deck (v0.8.8)
+
+Every card in My library offers "Add to deck" on its tile and in its row (the owner's request of 2026-10-24). The pop-up chooses one of the player's decks (Commander or Legacy, not archived or trashed), the copies and where they go: the main deck, the sideboard (Legacy) or the maybeboard, and the command zone for a card that can lead a Commander deck. The copies join the draft's entry for that card, edition and place, or a new one, through the editor's own `GET /api/v1/decks/{id}` and `PUT /api/v1/decks/{id}/draft` with the version read; a draft another tab saved meanwhile is read again once. The page then says whether the deck is ready to play.
+
 ## The Godlike tier's custom cards (v0.4.0)
 
 An account at the Godlike tier (100,000 wins, SysOp included) may put the owner's custom cards in its decks ([the Planeswalker Alliance](progression.md#playing-them-v040)). Nothing about the cards themselves is in this repository.

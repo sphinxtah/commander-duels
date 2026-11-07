@@ -167,6 +167,10 @@ class PlayerProfile(PlayerSummary):
     member_since: datetime
     blocked: bool = Field(description="Whether you have blocked this player.")
     you: bool = Field(description="Whether this is your own profile.")
+    title: str | None = Field(
+        default=None,
+        description="The campaign title the player shows (v0.8.8, api/cosmetics.py); null: none.",
+    )
 
 
 class UnnamedPlayer(Contract):
@@ -968,9 +972,12 @@ def search_players(
 
 
 @router.get("/players/{player_id}", response_model=PlayerProfile)
-def player_profile(player_id: UUID, principal: Active, db: Db) -> PlayerProfile:
+def player_profile(player_id: UUID, request: Request, principal: Active, db: Db) -> PlayerProfile:
+    from api.cosmetics import title_of
+
     user = visible_player(db, player_id)
-    return profile_of(db, viewer_of(db, principal), user)
+    profile = profile_of(db, viewer_of(db, principal), user)
+    return profile.model_copy(update={"title": title_of(db, request, user.id)})
 
 
 # Friends.

@@ -384,7 +384,6 @@ def test_administrators_and_sysop_read_reports_and_others_cannot(client):
     for handle, roles in (
         ("player", ()),
         ("moderator", ("moderator",)),
-        ("editor", ("content_editor",)),
     ):
         other = account(client, handle, roles=roles)
         for path in ("/api/v1/admin/reports", f"/api/v1/admin/reports/{report_id}"):
@@ -511,11 +510,10 @@ def test_counts_per_role(client):
     root = account(client, "sysop", kind="sysop")
     admin = account(client, "admin", roles=("administrator",))
     moderator = account(client, "moderator", roles=("moderator",))
-    editor = account(client, "editor", roles=("content_editor",))
     first = report(ada).json()["id"]
     report(ada)
     nothing = {"pending_accounts": None, "unread_reports": None}
-    for viewer in (ada, moderator, editor):
+    for viewer in (ada, moderator):
         assert viewer.get("/api/v1/admin/counts").json() == nothing
     for viewer in (admin, root):
         assert viewer.get("/api/v1/admin/counts").json() == {

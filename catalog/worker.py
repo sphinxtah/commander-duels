@@ -14,7 +14,9 @@ from sqlalchemy.orm import Session
 from api import accounts, auctions, decks, roster
 from api.config import Settings
 from api.database import build_engine
-from api.models import ScheduledJob
+from api.identity import permissions_for, roles_of
+from api.library import library_of
+from api.models import RoleGrant, ScheduledJob, User
 from catalog import boosters, sync
 
 logger = logging.getLogger(__name__)
@@ -76,6 +78,20 @@ def withdraw_unplayable(engine: Engine, config: Settings) -> None:
         logger.info("Cards the game cannot play left the drafts of %s decks", changed)
 
 
+def refresh_staff_decks(engine: Engine, config: Settings) -> None:
+    """Since v0.8.8 administrators build from libraries of their own, as players do: each start
+    revalidates their decks, so a deck holding cards their library lacks says so. Cheap: the
+    site's staff are few."""
+    found = roster.load(config.content_dir)
+    with Session(engine) as session, session.begin():
+        staff = session.scalars(
+            select(User).where(User.id.in_(select(RoleGrant.user_id)), User.status == "active")
+        ).all()
+        for user in staff:
+            permissions = permissions_for(user, roles_of(session, user))
+            decks.refresh_decks(session, user.id, library_of(session, user, permissions, found))
+
+
 def switch_editions(engine: Engine, config: Settings) -> None:
     """Once, on v0.5.0's first start: the players' drafts in the editions their libraries hold
     (api/decks.py). A second worker starting at the same time finds it done."""
@@ -110,11 +126,13 @@ def start(engine: Engine, config: Settings) -> None:
     imports its cards again at once, and the decks' drafts lose what the game cannot play when
     that import ends; otherwise they lose it now. On v0.5.0's first start the drafts take the
     editions their owners' libraries hold. Since v0.6.1 products a version added get their booster
-    data at once (boosters.ensure_collated)."""
+    data at once (boosters.ensure_collated). Since v0.8.8 the staff's decks are revalidated against
+    their own libraries (refresh_staff_decks)."""
     boosters.ensure_collated(engine, config, datetime.now(UTC))
     if not sync.ensure_relearned(engine, config, datetime.now(UTC)):
         withdraw_unplayable(engine, config)
     switch_editions(engine, config)
+    refresh_staff_decks(engine, config)
 
 
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:
