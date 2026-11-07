@@ -196,7 +196,8 @@ describe("Tivit's Auction House", () => {
       .mockImplementation(() => ok(undefined) as never);
     show();
     await screen.findByRole("list", { name: "Auctions" });
-    const star = screen.getByRole("button", { name: "Watch Sol Ring" });
+    // The list may draw before its items on a slow runner (v0.8.8's first hosted run).
+    const star = await screen.findByRole("button", { name: "Watch Sol Ring" });
     expect(star).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(star);
     await waitFor(() =>

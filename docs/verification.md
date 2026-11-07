@@ -12,6 +12,7 @@ Built on November 6, 2026 in a cloud workspace, on the branch `v0.8.8`, with Pos
 | Web | `tsc -b`, 1,468 Vitest tests in 115 files and the production build passed. New: "Add to deck"'s merge of copies into a draft, My library's Actions column. Seen in Chromium: Administration's own SysOp row with its testing grants, campaign progress set to 10, and the Campaign page's card backs and title chosen |
 | Engine | XMage built from the pin with its eleven patches and its card database, then the engine's JUnit tests: 208 passed, one skipped (the opt-in Two-Headed Giant pairing run). New: `CostRaisersTest` (Sphere of Resistance named in every payment for Grizzly Bears), and `TurnControlTest`'s controller asked in both main phases of a skill-1 bot's controlled turn |
 | Browser journeys | `pnpm test:e2e` in Chromium with SysOp's password, against PostgreSQL 16: 65 passed, 27 skipped (those needing the engine's games or on demand) |
+| Hosted CI | run 42339036184 (aa12568 on `main`) green in verify and engine; the same commit's branch run 42339025631 failed one Vitest test, the auction house's "watches with the star", which looked for its star before the list had drawn its items on a slow runner (older than v0.8.8, passing five times in a row here); it waits for the star since the next commit |
 
 ## v0.8.7
 
