@@ -179,3 +179,88 @@ export function purchaseKey(): string {
     "",
   );
 }
+
+/** One edition's share of a land in a basic land pack (v0.9.0). */
+export interface EditionCount {
+  set_code: string;
+  set_name: string;
+  released_at: string | null;
+  count: number;
+  foils: number;
+}
+
+/** A land's count in a basic land pack, by edition, newest first (v0.9.0). */
+export interface LandCount {
+  name: string;
+  count: number;
+  foils: number;
+  editions: EditionCount[];
+}
+
+const LAND_ORDER = ["Plains", "Island", "Swamp", "Mountain", "Forest"];
+/** How many of a land pack's oldest pulls the summary calls out. */
+export const OLDEST_SHOWN = 5;
+
+/**
+ * A basic land pack's cards counted by land and edition (v0.9.0, the owner's view made for big
+ * packs): the lands in WUBRG order, each edition newest first; and the oldest pulls, the
+ * rarest by the packs' scale (each edition's chance is its rank by release), oldest first.
+ */
+export function landTally(cards: PulledCard[]): {
+  lands: LandCount[];
+  oldest: PulledCard[];
+} {
+  const lands = new Map<string, LandCount>();
+  for (const card of cards) {
+    const land = lands.get(card.name) ?? {
+      name: card.name,
+      count: 0,
+      foils: 0,
+      editions: [],
+    };
+    lands.set(card.name, land);
+    const foil = card.finish !== "nonfoil" ? 1 : 0;
+    land.count += 1;
+    land.foils += foil;
+    let edition = land.editions.find(
+      (found) => found.set_code === card.set_code,
+    );
+    if (!edition) {
+      edition = {
+        set_code: card.set_code,
+        set_name: card.set_name ?? card.set_code,
+        released_at: card.released_at ?? null,
+        count: 0,
+        foils: 0,
+      };
+      land.editions.push(edition);
+    }
+    edition.count += 1;
+    edition.foils += foil;
+  }
+  const released = (value: string | null | undefined) => value ?? "0000";
+  for (const land of lands.values())
+    land.editions.sort(
+      (a, b) =>
+        released(b.released_at).localeCompare(released(a.released_at)) ||
+        a.set_name.localeCompare(b.set_name),
+    );
+  const rank = (name: string) => {
+    const index = LAND_ORDER.indexOf(name);
+    return index < 0 ? LAND_ORDER.length : index;
+  };
+  const oldest = cards
+    .filter((card) => card.released_at)
+    .sort(
+      (a, b) =>
+        released(a.released_at).localeCompare(released(b.released_at)) ||
+        a.position - b.position,
+    )
+    .slice(0, OLDEST_SHOWN);
+  return {
+    lands: [...lands.values()].sort(
+      (a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name),
+    ),
+    oldest,
+  };
+}

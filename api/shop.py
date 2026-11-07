@@ -294,6 +294,10 @@ class PulledCard(Contract):
     type_line: str
     rarity: str
     set_code: str
+    set_name: str = Field(default="", description="Its edition's name (v0.9.0).")
+    released_at: date | None = Field(
+        default=None, description="When its edition was released (v0.9.0)."
+    )
     collector_number: str
     finish: Finish
     sheet: str
@@ -796,6 +800,8 @@ def opening_of(db: Session, opening: PackOpening, art: ArtIndex) -> Opening:
             type_line=concept.type_line,
             rarity=printing.rarity,
             set_code=printing.set_code,
+            set_name=printing.set_name,
+            released_at=printing.released_at,
             collector_number=printing.collector_number,
             finish=card.finish,  # type: ignore[arg-type]
             sheet=card.sheet,

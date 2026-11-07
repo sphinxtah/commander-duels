@@ -164,6 +164,8 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong continued = new AtomicLong();
         // A passive bot's decisions (v0.8.6).
         private final AtomicLong passive = new AtomicLong();
+        // A King's Table General's pressed attacks (v0.9.0).
+        private final AtomicLong pressed = new AtomicLong();
 
         /** Determinized copies made: one per search. */
         long samples() {
@@ -239,13 +241,19 @@ class FairBot extends ComputerPlayerControllableProxy {
             return passive.get();
         }
 
+        /** Creatures a King's Table General sent at an opposing General beside it (v0.9.0). */
+        long pressed() {
+            return pressed.get();
+        }
+
         @Override
         public String toString() {
             return searches() + " searches, " + completed() + " completed, " + timedOut() + " cut off by the budget, "
                 + abandoned() + " abandoned, " + unstarted() + " unstarted, " + failed() + " failed; longest "
                 + longestMillis() + " ms, longest wait " + longestWaitMillis() + " ms; habits: " + slips()
                 + " slips, " + naivePlays() + " naive plays, " + heldBack() + " held back, " + recklessAttacks()
-                + " reckless attacks, " + unblocked() + " unblocked; " + passive() + " passive decisions";
+                + " reckless attacks, " + unblocked() + " unblocked; " + passive() + " passive decisions; "
+                + pressed() + " pressed attacks";
         }
 
         /** Decisions that continued a planned chain of actions instead of searching again. */
@@ -423,6 +431,8 @@ class FairBot extends ComputerPlayerControllableProxy {
      *
      * <p>A passive bot (v0.8.6) declares no attackers. A creature that must attack if able still
      * does: XMage declares it before it asks (508.1d), as the rules require.
+     *
+     * <p>At King's Table (v0.9.0) a General then presses the attack ({@link #pressAsGeneral}).
      */
     @Override
     public void selectAttackers(Game game, UUID attackingPlayerId) {
@@ -430,9 +440,17 @@ class FairBot extends ComputerPlayerControllableProxy {
             return;
         }
         super.selectAttackers(game, attackingPlayerId);
-        if (!habitsNow() || game.getCombat() == null) {
+        if (game.getCombat() == null) {
             return;
         }
+        if (habitsNow()) {
+            weakerAttack(game);
+        }
+        pressAsGeneral(game);
+    }
+
+    /** The weaker player's habits in an attack (v0.7.1): some attackers held back, some sent in. */
+    private void weakerAttack(Game game) {
         for (UUID attackerId : new ArrayList<>(game.getCombat().getAttackers())) {
             Permanent attacker = game.getPermanent(attackerId);
             if (attacker != null && attacker.isControlledBy(playerId) && chance(profile.timid())) {
@@ -456,6 +474,62 @@ class FairBot extends ComputerPlayerControllableProxy {
                 }
             }
         }
+    }
+
+    /**
+     * A King's Table General presses the attack (v0.9.0, the owner's choice after a game where
+     * the bot Generals never fought and, with the house rule off, the Kings could never attack).
+     * XMage's AI is cautious at a multiplayer table; a General's purpose is to fight the opposing
+     * Generals beside it. So each creature XMage kept home that may attack an opposing General
+     * (never a King: the King is for the house rule and a fallen General) attacks the one with the
+     * least life, unless that player has an untapped creature that could block it, kill it and
+     * live: then it would be badly outmatched, and stays home. Kings and other formats' bots play
+     * as before.
+     */
+    private void pressAsGeneral(Game game) {
+        KingsTable table = GameFormat.kingsTableOf(game);
+        if (table == null || table.isKing(playerId) || !isGameUnderControl()) {
+            return;
+        }
+        int team = table.teamOf(playerId);
+        List<UUID> generals = game.getCombat().getDefenders().stream()
+            .filter(defenderId -> game.getPlayer(defenderId) != null && !table.isKing(defenderId))
+            .filter(defenderId -> table.teamOf(defenderId) >= 0 && table.teamOf(defenderId) != team)
+            .sorted(Comparator.comparingInt((UUID defenderId) -> game.getPlayer(defenderId).getLife()))
+            .toList();
+        if (generals.isEmpty()) {
+            return;
+        }
+        Set<UUID> attacking = new HashSet<>(game.getCombat().getAttackers());
+        for (UUID defenderId : generals) {
+            for (Permanent idle : getAvailableAttackers(defenderId, game)) {
+                if (attacking.contains(idle.getId()) || !idle.canAttack(defenderId, game)
+                    || outmatched(game, idle, defenderId)) {
+                    continue;
+                }
+                declareAttacker(idle.getId(), defenderId, game, false);
+                if (game.getCombat().getAttackers().contains(idle.getId())) {
+                    attacking.add(idle.getId());
+                    stats.pressed.incrementAndGet();
+                }
+            }
+        }
+    }
+
+    /** Whether the defending player has an untapped creature that could block the attacker, kill it
+     * and survive. */
+    static boolean outmatched(Game game, Permanent attacker, UUID defendingPlayerId) {
+        int power = Math.max(0, attacker.getPower().getValue());
+        int toughness = attacker.getToughness().getValue();
+        for (Permanent blocker : game.getBattlefield().getAllActivePermanents(defendingPlayerId)) {
+            if (!blocker.isCreature(game) || blocker.isTapped() || !blocker.canBlock(attacker.getId(), game)) {
+                continue;
+            }
+            if (blocker.getPower().getValue() >= toughness && blocker.getToughness().getValue() > power) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

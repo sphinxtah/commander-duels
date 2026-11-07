@@ -17,7 +17,11 @@ players sleeve their decks (the owner, 2026-11-06). docs/sleeves.md describes th
 - **Reporting.** Live at once and reportable (the owner's choice): from a player's profile at the
   table, any player reports another's sleeve. The report reaches Administration's Reports tab
   with the picture, where a moderator with reports.manage removes it: from then on it shows
-  nowhere but to staff, and the decks wearing it go back to the default. Removal is audited.
+  nowhere but to staff, and the decks wearing it show the default. Since v0.9.0 a removal keeps
+  each deck's choice, and a moderator may restore the sleeve, which puts it back on those decks.
+  Removal and restoring are audited.
+- **Campaign backs** are checked on every read (v0.9.0): a deck wearing a back its owner no
+  longer has (after a campaign reset) shows the default, and wears it again once it is earned.
 - **Deleting** one's own sleeve clears its picture; decks wearing it go back to the default.
 """
 
@@ -35,6 +39,7 @@ from pydantic import AfterValidator, Field, StringConstraints
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from api import campaign as campaigns
 from api.auth import INPUT_ERRORS
 from api.cosmetics import campaign_or_none, earned_slugs
 from api.identity import (
@@ -132,6 +137,11 @@ class SleeveRemoval(Contract):
 class RemovedSleeve(Contract):
     id: UUID
     removed_at: datetime
+
+
+class RestoredSleeve(Contract):
+    id: UUID
+    restored_at: datetime
 
 
 def image_url(sleeve_id: UUID) -> str:
@@ -253,9 +263,24 @@ def delete_sleeves_of(db: Session, user_id: UUID) -> int:
 # What a table shows.
 
 
-def picture_of(db: Session, choice: str | None, owner: User | None) -> str | None:
+def picture_of(
+    db: Session, choice: str | None, owner: User | None, campaign: campaigns.Campaign | None
+) -> str | None:
     """A deck's sleeve as a picture's path, else the account's campaign back, else None (the
-    official back). A sleeve that is gone, or not the owner's, is the default."""
+    official back). A sleeve that is gone or removed, or not the owner's, and a campaign back
+    the owner no longer has (v0.9.0), is the default; the deck keeps its choice."""
+    earned: set[str] | None = None
+
+    def has(slug: str) -> bool:
+        nonlocal earned
+        if earned is None:
+            earned = (
+                earned_slugs(db, owner, campaign, "card_back")
+                if campaign is not None and owner is not None
+                else set()
+            )
+        return slug in earned
+
     if choice and choice.startswith("sleeve:") and owner is not None:
         try:
             sleeve_id = UUID(choice.removeprefix("sleeve:"))
@@ -266,16 +291,20 @@ def picture_of(db: Session, choice: str | None, owner: User | None) -> str | Non
             return image_url(row.id)
     elif choice and choice.startswith("default:") and choice.removeprefix("default:") in DEFAULTS:
         return default_url(choice.removeprefix("default:"))
-    elif choice and choice.startswith("back:"):
+    elif choice and choice.startswith("back:") and has(choice.removeprefix("back:")):
         return back_url(choice.removeprefix("back:"))
-    if owner is not None and owner.card_back:
+    if owner is not None and owner.card_back and has(owner.card_back):
         return back_url(owner.card_back)
     return None
 
 
-def seat_sleeves(db: Session, seats: list[tuple[int, UUID | None, UUID | None]]) -> dict[int, str]:
+def seat_sleeves(
+    db: Session,
+    seats: list[tuple[int, UUID | None, UUID | None]],
+    campaign: campaigns.Campaign | None,
+) -> dict[int, str]:
     """Each human seat's sleeve picture, by seat: (seat, owner, deck revision) in; a seat with
-    the official back is left out."""
+    the official back is left out. The campaign, if installed, says which backs are earned."""
     revisions = {revision for _, _, revision in seats if revision is not None}
     decks: dict[UUID, str | None] = {}
     if revisions:
@@ -297,7 +326,9 @@ def seat_sleeves(db: Session, seats: list[tuple[int, UUID | None, UUID | None]])
     for seat, owner, revision in seats:
         if owner is None:
             continue
-        picture = picture_of(db, decks.get(revision) if revision else None, users.get(owner))
+        picture = picture_of(
+            db, decks.get(revision) if revision else None, users.get(owner), campaign
+        )
         if picture:
             found[seat] = picture
     return found
@@ -424,7 +455,8 @@ def remove_sleeve(
     sleeve_id: UUID, body: SleeveRemoval, request: Request, principal: CanManageReports, db: Db
 ) -> RemovedSleeve:
     """A moderator takes a reported sleeve off every table: it shows to nobody but staff, and
-    the decks wearing it go back to the default. Audited."""
+    the decks wearing it show the default. They keep their choice (v0.9.0), so a restore puts it
+    back on them. Audited."""
     row = db.get(CardSleeve, sleeve_id)
     if row is None:
         raise not_found()
@@ -432,7 +464,6 @@ def remove_sleeve(
         row.removed_at = utcnow()
         row.removed_by = principal.user.id
         row.removed_reason = body.reason
-        forget(db, row.id)
         audit(
             db,
             request,
@@ -453,3 +484,31 @@ def reported_sleeve(db: Session, principal: Principal, sleeve_id: UUID) -> CardS
     if row.user_id == principal.user.id:
         raise ApiError(409, "own_sleeve", "That is your own sleeve.")
     return row
+
+
+@router.post("/admin/sleeves/{sleeve_id}/restore", response_model=RestoredSleeve)
+def restore_sleeve(
+    sleeve_id: UUID, request: Request, principal: CanManageReports, db: Db
+) -> RestoredSleeve:
+    """Undoes a removal (v0.9.0): the sleeve shows again, on every deck that wore it, even past
+    its owner's 20 sleeves. One its owner has deleted since is gone for good. Audited."""
+    row = db.get(CardSleeve, sleeve_id)
+    if row is None:
+        raise not_found()
+    if row.deleted_at is not None:
+        raise ApiError(409, "sleeve_deleted", "Its owner has deleted that sleeve.")
+    if row.removed_at is not None:
+        reason = row.removed_reason
+        row.removed_at = None
+        row.removed_by = None
+        row.removed_reason = None
+        audit(
+            db,
+            request,
+            "sleeves.restored",
+            actor_id=principal.user.id,
+            target_user_id=row.user_id,
+            details={"sleeve": str(row.id), "name": row.name, "removed_for": reason},
+        )
+        db.commit()
+    return RestoredSleeve(id=row.id, restored_at=utcnow())

@@ -71,6 +71,7 @@ export function ItemPanel({
   const [error, setError] = useState("");
   const [said, setSaid] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [price, setPrice] = useState(0);
   const [compare, setCompare] = useState<ComparePrices | "loading" | null>(
     null,
   );
@@ -123,6 +124,11 @@ export function ItemPanel({
   const canBid = live && item && !item.mine;
   // An unlimited auction (v0.6.3) is Buy Now only: no bids.
   const buyNowOnly = item?.duration === "unlimited";
+  // Its seller's price box starts at its price (v0.9.0).
+  const listed = item?.mine && buyNowOnly ? item.buy_now : null;
+  useEffect(() => {
+    if (listed !== null) setPrice(listed);
+  }, [listed]);
   const outcome = item ? bidOutcome(item, bid) : "too_low";
   const short = balance !== undefined && bid > balance ? bid - balance : 0;
 
@@ -161,11 +167,37 @@ export function ItemPanel({
       const { data, error: refused } = await auctionApi.buyNow(
         item.id,
         buyKey.current,
+        item.buy_now,
       );
-      if (!data) return setError(describe(refused));
+      if (!data) {
+        setError(describe(refused));
+        // The seller changed the price (v0.9.0): show the new one before another try.
+        if (refused?.code === "price_changed") {
+          setConfirming(false);
+          const { data: fresh } = await auctionApi.item(item.id, true);
+          if (fresh) onChanged(fresh);
+        }
+        return;
+      }
       buyKey.current = requestKey();
       setConfirming(false);
       const words = `You bought ${item.card.name} for ${tokens(data.sold_price ?? item.buy_now)}. It is in your library.`;
+      setSaid(words);
+      onChanged(data, words);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** The seller changes an unlimited listing's Buy Now price in place (v0.9.0). */
+  async function reprice() {
+    if (!item || busy || !Number.isFinite(price) || price < 1) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error: refused } = await auctionApi.reprice(item.id, price);
+      if (!data) return setError(describe(refused));
+      const words = `${item.card.name} is now ${tokens(data.buy_now ?? price)} to Buy Now.`;
       setSaid(words);
       onChanged(data, words);
     } finally {
@@ -473,6 +505,38 @@ export function ItemPanel({
                     ? "No bids yet: you may withdraw it, and the card comes back to your library."
                     : "It has bids, so it stays on the market until it ends."}
                 </p>
+                {buyNowOnly && (
+                  <div className={styles.bidActions}>
+                    <label>
+                      <span className={styles.hidden}>
+                        New Buy Now price in tokens
+                      </span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        step={1}
+                        value={Number.isFinite(price) ? price : ""}
+                        onChange={(event) =>
+                          setPrice(Math.floor(Number(event.target.value)))
+                        }
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className={styles.secondary}
+                      disabled={
+                        busy ||
+                        !Number.isFinite(price) ||
+                        price < 1 ||
+                        price === item.buy_now
+                      }
+                      onClick={() => void reprice()}
+                    >
+                      Change price
+                    </button>
+                  </div>
+                )}
                 {item.bids === 0 && (
                   <div className={styles.bidActions}>
                     <button

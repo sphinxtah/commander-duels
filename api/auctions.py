@@ -29,7 +29,9 @@ transfer market does (docs/auctions.md). The owner's rules are in the v0.6.0 pla
 - **Unlimited listings** (v0.6.3) have no end: Buy Now only, as eBay's Good 'Til Cancelled.
   They need a Buy Now price, which is their starting bid too, and take no bids
   (`409 buy_now_only`); they run until bought, withdrawn (at any time, having no bids) or
-  cancelled. Their ends_at is null. 7 and 30 days are lengths like the others.
+  cancelled. Their ends_at is null. 7 and 30 days are lengths like the others. Since v0.9.0 a
+  seller may change one's Buy Now price in place (up or down, audited), a buyer's Buy Now names
+  the price it saw so a changed price buys nothing, and a player may have at most 50 up at once.
 - **Withdrawing** is the seller's until the first bid; **SysOp cancels** any live auction with a
   reason (audited): the leading bid goes back, and the copy. A reset or deletion of an account
   first ends its live auctions so, and returns its own leading bids (end_auctions_of).
@@ -119,6 +121,8 @@ SNIPE = timedelta(seconds=30)
 INCREMENT_PERCENT = 5
 MAX_PRICE = 10_000_000_000
 MAX_QUANTITY = 20
+# The unlimited listings a player may have up at once (v0.9.0, the owner's choice).
+MAX_UNLIMITED = 50
 PAGE = 24
 PAGE_MAX = 60
 COMPARED = 20
@@ -215,6 +219,15 @@ class BidRequest(Contract):
 
 class BuyNowRequest(Contract):
     key: RequestKey
+    price: int | None = Field(
+        default=None,
+        description="The Buy Now price the buyer saw (v0.9.0): if the seller has changed it since, "
+        "nothing is bought (409 price_changed).",
+    )
+
+
+class Repricing(Contract):
+    buy_now: int = Field(description="The unlimited listing's new Buy Now price (v0.9.0).")
 
 
 class Targets(Contract):
@@ -717,6 +730,25 @@ def end_auctions_of(
 
 
 # Listing.
+
+
+def check_unlimited_room(db: Session, user: User, adding: int) -> None:
+    """At most MAX_UNLIMITED unlimited listings up at once per player (v0.9.0)."""
+    up = db.scalar(
+        select(func.count())
+        .select_from(Auction)
+        .where(
+            Auction.seller_id == user.id,
+            Auction.status == "active",
+            Auction.duration == UNLIMITED,
+        )
+    )
+    if (up or 0) + adding > MAX_UNLIMITED:
+        raise ApiError(
+            409,
+            "too_many_unlimited",
+            f"You may have {MAX_UNLIMITED} unlimited listings up at once; {up} are up now.",
+        )
 
 
 def check_prices(starting_bid: int, buy_now: int | None, duration: str) -> int:
@@ -1282,6 +1314,8 @@ def list_cards(body: Listing, request: Request, principal: Active, db: Db) -> Au
     earlier = listed_by(db, user, body.key)
     if earlier:
         return AuctionList(items=items_of(db, user, earlier))
+    if body.duration == UNLIMITED:
+        check_unlimited_room(db, user, body.quantity)
     concept, printing = listable(
         db,
         user,
@@ -1335,6 +1369,7 @@ def place(
     auction_id: UUID,
     amount: int | None,
     key: str,
+    seen_price: int | None = None,
 ) -> AuctionItem:
     """A bid (amount), or Buy Now (no amount). The auction's row is locked first, then the
     accounts: the bidder's, the leading bidder's, and on a sale the seller's."""
@@ -1365,6 +1400,12 @@ def place(
     if amount is None:
         if auction.buy_now is None:
             raise ApiError(409, "no_buy_now", "This auction has no Buy Now price.")
+        if seen_price is not None and seen_price != auction.buy_now:
+            raise ApiError(
+                409,
+                "price_changed",
+                f"The seller changed the Buy Now price to {auction.buy_now:,} tokens.",
+            )
         price = auction.buy_now
     else:
         if auction.duration == UNLIMITED:
@@ -1432,8 +1473,38 @@ def make_bid(
 def buy_now(
     auction_id: UUID, body: BuyNowRequest, request: Request, principal: Active, db: Db
 ) -> AuctionItem:
-    """Buys at the Buy Now price: the auction ends at once, the leading bid returned."""
-    return place(db, request, principal, auction_id, None, body.key)
+    """Buys at the Buy Now price: the auction ends at once, the leading bid returned. With the
+    price the buyer saw, a price the seller has changed since buys nothing (v0.9.0)."""
+    return place(db, request, principal, auction_id, None, body.key, body.price)
+
+
+@router.put("/auctions/{auction_id}/buy-now", response_model=AuctionItem)
+def reprice(
+    auction_id: UUID, body: Repricing, request: Request, principal: Active, db: Db
+) -> AuctionItem:
+    """The seller changes an unlimited listing's Buy Now price (v0.9.0), up or down, without
+    withdrawing it. Audited as auction.repriced."""
+    user = principal.user
+    auction = own_locked(db, request, user, auction_id)
+    if auction.status != "active":
+        raise ApiError(409, "auction_ended", "This auction has ended.")
+    if auction.duration != UNLIMITED:
+        raise ApiError(409, "not_unlimited", "Only an unlimited listing's price can change.")
+    if not 1 <= body.buy_now <= MAX_PRICE:
+        raise ApiError(422, "invalid_price", f"Buy Now is 1 to {MAX_PRICE:,} tokens.")
+    if auction.buy_now != body.buy_now:
+        before = auction.buy_now
+        auction.buy_now = body.buy_now
+        auction.starting_bid = body.buy_now
+        record(
+            db,
+            request,
+            "auction.repriced",
+            actor_id=user.id,
+            details={"auction": str(auction.id), "from": before, "to": body.buy_now},
+        )
+    db.commit()
+    return item_of(db, user, auction)
 
 
 def own_locked(db: Session, request: Request, user: User, auction_id: UUID) -> Auction:
@@ -1496,6 +1567,8 @@ def relist(
         raise ApiError(409, "not_relistable", "Only an unsold auction can be relisted.")
     if db.scalar(select(Auction.id).where(Auction.relisted_from == old.id)) is not None:
         raise ApiError(409, "not_relistable", "This auction was relisted already.")
+    if body.duration == UNLIMITED:
+        check_unlimited_room(db, user, 1)
     concept, printing = listable(
         db,
         user,

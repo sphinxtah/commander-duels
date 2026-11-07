@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from test_games import Account, FakeEngine, build, connect
 
+from api import campaign as campaigns
 from api.games import concealed_for
 from api.identity import Principal, utcnow
 from api.models import AuditEvent, CardSleeve, DeckRevision, GameSeat, RoleGrant, User
@@ -174,12 +175,56 @@ def test_a_reported_sleeve_is_removed_from_every_table(client: TestClient, app: 
     assert bob.get(sleeve["url"]).status_code == 404
     assert ada.get(sleeve["url"]).status_code == 404
     assert admin.get(sleeve["url"]).status_code == 200
-    assert ada.get(f"/api/v1/decks/{deck}").json()["sleeve"] is None
+    # The deck keeps its choice (v0.9.0), and its tables show the default.
+    assert ada.get(f"/api/v1/decks/{deck}").json()["sleeve"] == f"sleeve:{sleeve['id']}"
     assert ada.get("/api/v1/me/sleeves").json()["sleeves"][0]["removed"] is True
     assert bob.post("/api/v1/reports", report).status_code == 404
     with Session(app.state.database) as db:
         actions = list(db.scalars(select(AuditEvent.action)))
         assert "sleeves.removed" in actions
+    # A deck that wore it shows the default while it is removed.
+    assert ada.post(f"/api/v1/decks/{deck}/revisions").status_code == 201
+    with Session(app.state.database) as db:
+        revision = db.scalars(select(DeckRevision.id)).one()
+        assert seat_sleeves(db, [(0, ada.id, revision)], None) == {}
+
+    # Restored (v0.9.0): back on the decks that wore it, for everyone, audited.
+    restore = f"/api/v1/admin/sleeves/{sleeve['id']}/restore"
+    assert bob.post(restore).status_code == 403
+    restored = admin.post(restore)
+    assert restored.status_code == 200, restored.text
+    assert admin.post(restore).status_code == 200  # again: nothing more to do
+    assert bob.get(sleeve["url"]).status_code == 200
+    assert ada.get("/api/v1/me/sleeves").json()["sleeves"][0]["removed"] is False
+    assert (
+        admin.get(f"/api/v1/admin/reports/{sent.json()['id']}").json()["sleeve"]["removed"] is False
+    )
+    with Session(app.state.database) as db:
+        assert seat_sleeves(db, [(0, ada.id, revision)], None) == {0: sleeve["url"]}
+        restores = list(
+            db.scalars(select(AuditEvent).where(AuditEvent.action == "sleeves.restored"))
+        )
+        assert len(restores) == 1
+        assert restores[0].details["removed_for"] == "Not allowed"
+    # One its owner deleted since is gone for good.
+    assert admin.post(path, {"reason": "Again"}).status_code == 200
+    assert delete(ada, f"/api/v1/me/sleeves/{sleeve['id']}").status_code == 204
+    gone = admin.post(restore)
+    assert (gone.status_code, gone.json()["code"]) == (409, "sleeve_deleted")
+
+
+def test_a_restore_may_pass_the_sleeve_limit(client: TestClient, app: FastAPI) -> None:
+    ada = Account(client, "ada")
+    admin = administrator(app, client, "admin")
+    first = ada.post("/api/v1/me/sleeves", {"name": "First", "image": picture()}).json()
+    removed = admin.post(f"/api/v1/admin/sleeves/{first['id']}/remove", {"reason": "Not allowed"})
+    assert removed.status_code == 200
+    for number in range(MAX_SLEEVES):
+        made = ada.post("/api/v1/me/sleeves", {"name": f"S{number}", "image": picture()})
+        assert made.status_code == 201, made.text
+    assert admin.post(f"/api/v1/admin/sleeves/{first['id']}/restore").status_code == 200
+    held = [found for found in ada.get("/api/v1/me/sleeves").json()["sleeves"]]
+    assert len([found for found in held if not found["removed"]]) == MAX_SLEEVES + 1
 
 
 def test_each_seat_shows_its_decks_sleeve(client: TestClient, app: FastAPI) -> None:
@@ -191,16 +236,65 @@ def test_each_seat_shows_its_decks_sleeve(client: TestClient, app: FastAPI) -> N
     assert ada.post(f"/api/v1/decks/{deck}/revisions").status_code == 201
     with Session(app.state.database) as db:
         revision = db.scalars(select(DeckRevision.id)).one()
-        shown = seat_sleeves(db, [(0, ada.id, revision), (1, bob.id, None), (2, None, None)])
-        assert shown == {0: sleeve["url"]}
-        # The account's campaign back stands in for a deck without a sleeve.
-        db.get_one(User, bob.id).card_back = "broken-writ"
-        db.commit()
-        assert seat_sleeves(db, [(1, bob.id, None)]) == {1: "/brand/backs/broken-writ.svg"}
+        seats = [(0, ada.id, revision), (1, bob.id, None), (2, None, None)]
+        assert seat_sleeves(db, seats, None) == {0: sleeve["url"]}
         # A removed sleeve shows the default.
         db.get_one(CardSleeve, UUID(sleeve["id"])).removed_at = utcnow()
         db.commit()
-        assert seat_sleeves(db, [(0, ada.id, revision)]) == {}
+        assert seat_sleeves(db, [(0, ada.id, revision)], None) == {}
+
+
+def test_a_campaign_back_shows_only_while_it_is_earned(client: TestClient, app: FastAPI) -> None:
+    """v0.9.0: a deck wearing a campaign back, and the account's chosen back, are checked on
+    every read; one no longer earned shows the default, and the deck keeps its choice."""
+    ada = Account(client, "ada")
+    campaign = campaigns.campaign_in("content")
+    assert campaign is not None
+    deck = deck_of(ada)
+    with Session(app.state.database) as db:
+        user = db.get_one(User, ada.id)
+        progress = campaigns.progress_of(db, user, campaign)
+        for slug in ("broken-writ", "unclaimed-world"):
+            campaigns.reward(db, ada.id, campaign, progress, f"card_back:{slug}", None)
+        db.commit()
+    chosen = ada.put(f"/api/v1/decks/{deck}/sleeve", {"sleeve": "back:unclaimed-world"})
+    assert chosen.status_code == 200, chosen.text
+    assert ada.post(f"/api/v1/decks/{deck}/revisions").status_code == 201
+    with Session(app.state.database) as db:
+        revision = db.scalars(select(DeckRevision.id)).one()
+        user = db.get_one(User, ada.id)
+        user.card_back = "broken-writ"
+        db.commit()
+        assert seat_sleeves(db, [(0, ada.id, revision)], campaign) == {
+            0: "/brand/backs/unclaimed-world.svg"
+        }
+        # The account's campaign back stands in for a deck without a sleeve.
+        assert seat_sleeves(db, [(0, ada.id, None)], campaign) == {
+            0: "/brand/backs/broken-writ.svg"
+        }
+        # Without the campaign installed, no campaign back can be earned.
+        assert seat_sleeves(db, [(0, ada.id, revision)], None) == {}
+
+        # A campaign reset: neither back is earned in the new run.
+        progress = campaigns.progress_of(db, user, campaign)
+        progress.started_at = utcnow()
+        db.commit()
+        assert seat_sleeves(db, [(0, ada.id, revision)], campaign) == {}
+        assert seat_sleeves(db, [(0, ada.id, None)], campaign) == {}
+        # The deck keeps its choice, and wears it again once it is earned again.
+        campaigns.reward(
+            db,
+            ada.id,
+            campaign,
+            campaigns.progress_of(db, user, campaign),
+            "card_back:unclaimed-world",
+            None,
+        )
+        db.commit()
+        assert seat_sleeves(db, [(0, ada.id, revision)], campaign) == {
+            0: "/brand/backs/unclaimed-world.svg"
+        }
+    assert ada.get(f"/api/v1/decks/{deck}").json()["sleeve"] == "back:unclaimed-world"
 
 
 def principal(user_id: Any, kind: str, *permissions: str) -> Principal:

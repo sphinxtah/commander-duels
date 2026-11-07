@@ -1568,7 +1568,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.8.9",
+            "default": "0.9.0",
             "title": "Version",
             "type": "string"
           }
@@ -1604,6 +1604,18 @@
             "pattern": "^[A-Za-z0-9_-]+$",
             "title": "Key",
             "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Buy Now price the buyer saw (v0.9.0): if the seller has changed it since, nothing is bought (409 price_changed).",
+            "title": "Price"
           }
         },
         "required": [
@@ -6245,7 +6257,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.8.9",
+            "default": "0.9.0",
             "title": "Version",
             "type": "string"
           }
@@ -9561,8 +9573,27 @@
             "title": "Rarity",
             "type": "string"
           },
+          "released_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When its edition was released (v0.9.0).",
+            "title": "Released At"
+          },
           "set_code": {
             "title": "Set Code",
+            "type": "string"
+          },
+          "set_name": {
+            "default": "",
+            "description": "Its edition's name (v0.9.0).",
+            "title": "Set Name",
             "type": "string"
           },
           "sheet": {
@@ -11288,6 +11319,42 @@
           "display_name"
         ],
         "title": "Reporter",
+        "type": "object"
+      },
+      "Repricing": {
+        "additionalProperties": false,
+        "properties": {
+          "buy_now": {
+            "description": "The unlimited listing's new Buy Now price (v0.9.0).",
+            "title": "Buy Now",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "buy_now"
+        ],
+        "title": "Repricing",
+        "type": "object"
+      },
+      "RestoredSleeve": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "restored_at": {
+            "format": "date-time",
+            "title": "Restored At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "restored_at"
+        ],
+        "title": "RestoredSleeve",
         "type": "object"
       },
       "ResultsGrant": {
@@ -14368,7 +14435,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.8.9"
+    "version": "0.9.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -17237,7 +17304,7 @@
     },
     "/api/v1/admin/sleeves/{sleeve_id}/remove": {
       "post": {
-        "description": "A moderator takes a reported sleeve off every table: it shows to nobody but staff, and\nthe decks wearing it go back to the default. Audited.",
+        "description": "A moderator takes a reported sleeve off every table: it shows to nobody but staff, and\nthe decks wearing it show the default. They keep their choice (v0.9.0), so a restore puts it\nback on them. Audited.",
         "operationId": "remove_sleeve_api_v1_admin_sleeves__sleeve_id__remove_post",
         "parameters": [
           {
@@ -17354,6 +17421,117 @@
           }
         },
         "summary": "Remove Sleeve"
+      }
+    },
+    "/api/v1/admin/sleeves/{sleeve_id}/restore": {
+      "post": {
+        "description": "Undoes a removal (v0.9.0): the sleeve shows again, on every deck that wore it, even past\nits owner's 20 sleeves. One its owner has deleted since is gone for good. Audited.",
+        "operationId": "restore_sleeve_api_v1_admin_sleeves__sleeve_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sleeve_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sleeve Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoredSleeve"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Restore Sleeve"
       }
     },
     "/api/v1/admin/users": {
@@ -20676,7 +20854,7 @@
     },
     "/api/v1/auctions/{auction_id}/buy-now": {
       "post": {
-        "description": "Buys at the Buy Now price: the auction ends at once, the leading bid returned.",
+        "description": "Buys at the Buy Now price: the auction ends at once, the leading bid returned. With the\nprice the buyer saw, a price the seller has changed since buys nothing (v0.9.0).",
         "operationId": "buy_now_api_v1_auctions__auction_id__buy_now_post",
         "parameters": [
           {
@@ -20793,6 +20971,125 @@
           }
         },
         "summary": "Buy Now"
+      },
+      "put": {
+        "description": "The seller changes an unlimited listing's Buy Now price (v0.9.0), up or down, without\nwithdrawing it. Audited as auction.repriced.",
+        "operationId": "reprice_api_v1_auctions__auction_id__buy_now_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "auction_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Auction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Repricing"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuctionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Reprice"
       }
     },
     "/api/v1/auctions/{auction_id}/relist": {

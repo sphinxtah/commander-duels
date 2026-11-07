@@ -485,6 +485,74 @@ def test_seven_and_thirty_days_and_unlimited_buy_now_only(client):
     assert relisted.json()["ends_at"] is not None
 
 
+def test_an_unlimited_listings_price_changes_in_place(client):
+    """v0.9.0: the seller changes an unlimited listing's Buy Now, up or down, audited; a buyer
+    who saw the old price buys nothing; a timed auction's price stays."""
+    first, second, _ = bolts(client)
+    ada = Account(client, "ada")
+    finished(client, ada.id, first, "nonfoil", 1)
+    finished(client, ada.id, second, "nonfoil", 1)
+    bob = funded(client, "bob", 1_000)
+    endless = sell(ada, first, buy_now=400, duration="unlimited")
+    path = f"/api/v1/auctions/{endless['id']}/buy-now"
+    assert bob.send("PUT", path, {"buy_now": 300}).status_code == 403
+    for bad in (0, auctions_api.MAX_PRICE + 1):
+        refused = ada.send("PUT", path, {"buy_now": bad})
+        assert (refused.status_code, refused.json()["code"]) == (422, "invalid_price")
+    lowered = ada.send("PUT", path, {"buy_now": 250})
+    assert lowered.status_code == 200, lowered.text
+    assert (lowered.json()["buy_now"], lowered.json()["starting_bid"]) == (250, 250)
+    raised = ada.send("PUT", path, {"buy_now": 350}).json()
+    assert raised["buy_now"] == 350
+    # Bob saw 250: nothing is bought, and his tokens stay.
+    stale = bob.send("POST", path, {"key": key(), "price": 250})
+    assert (stale.status_code, stale.json()["code"]) == (409, "price_changed")
+    assert balance(bob) == 1_000
+    bought = bob.send("POST", path, {"key": key(), "price": 350}).json()
+    assert (bought["status"], bought["sold_price"]) == ("sold", 350)
+    assert balance(bob) == 650
+    ended = ada.send("PUT", path, {"buy_now": 100})
+    assert (ended.status_code, ended.json()["code"]) == (409, "auction_ended")
+    timed = sell(ada, second, duration="1h")
+    fixed = ada.send("PUT", f"/api/v1/auctions/{timed['id']}/buy-now", {"buy_now": 600})
+    assert (fixed.status_code, fixed.json()["code"]) == (409, "not_unlimited")
+    with database(client) as db:
+        repriced = db.scalars(
+            select(AuditEvent.details).where(AuditEvent.action == "auction.repriced")
+        ).all()
+        assert [(entry["from"], entry["to"]) for entry in repriced] == [(400, 250), (250, 350)]
+
+
+def test_at_most_fifty_unlimited_listings_up(client, monkeypatch):
+    """v0.9.0: a player may have MAX_UNLIMITED unlimited listings up at once (3 here)."""
+    monkeypatch.setattr(auctions_api, "MAX_UNLIMITED", 3)
+    first, second, _ = bolts(client)
+    ada = Account(client, "ada")
+    finished(client, ada.id, first, "nonfoil", 4)
+    finished(client, ada.id, second, "nonfoil", 1)
+    sell_two = ada.send(
+        "POST", "/api/v1/auctions", listing(first, buy_now=10, duration="unlimited", quantity=2)
+    )
+    assert sell_two.status_code == 201, sell_two.text
+    too_many = ada.send(
+        "POST", "/api/v1/auctions", listing(first, buy_now=10, duration="unlimited", quantity=2)
+    )
+    assert (too_many.status_code, too_many.json()["code"]) == (409, "too_many_unlimited")
+    third = sell(ada, first, buy_now=10, duration="unlimited")
+    assert third["duration"] == "unlimited"
+    # Timed auctions don't count, and a withdrawn listing makes room.
+    assert sell(ada, second, duration="1h")["duration"] == "1h"
+    refused = ada.send("POST", "/api/v1/auctions", listing(first, buy_now=10, duration="unlimited"))
+    assert refused.json()["code"] == "too_many_unlimited"
+    assert ada.send("DELETE", f"/api/v1/auctions/{third['id']}").json()["status"] == "withdrawn"
+    relisted = ada.send(
+        "POST",
+        f"/api/v1/auctions/{third['id']}/relist",
+        {"starting_bid": 10, "buy_now": 10, "duration": "unlimited", "key": key()},
+    )
+    assert relisted.status_code == 201, relisted.text
+
+
 def test_a_late_bid_pushes_the_end_and_the_end_settles_on_a_read(client):
     first, _, _ = bolts(client)
     ada = Account(client, "ada")

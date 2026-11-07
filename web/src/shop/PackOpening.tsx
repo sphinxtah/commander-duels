@@ -14,6 +14,7 @@ import { useImageRetry } from "../game/RetryingImage";
 import { getSoundEngine } from "../game/sound/engine";
 import type { Cue } from "../game/sound/recipes";
 import shell from "../App.module.css";
+import { LandTally } from "./LandTally";
 import { LengBackdrop } from "./Leng";
 import { PackArt } from "./PackArt";
 import {
@@ -124,6 +125,9 @@ export function PackOpening({
   );
   const [announced, setAnnounced] = useState("");
   const [details, setDetails] = useState<PulledCard | null>(null);
+  // A basic land pack's summary opens on its counts by land and edition (v0.9.0).
+  const lands = opening.product.kind === "lands";
+  const [byEdition, setByEdition] = useState(lands);
   const timers = useRef<number[]>([]);
   const board = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -262,53 +266,81 @@ export function PackOpening({
           {foils ? ` · ${foils} foil${foils === 1 ? "" : "s"}` : ""}. Every card
           is now in your library for good.
         </p>
-        <ul className={styles.summary} aria-label="Cards in the pack">
-          {cards.map((card) => (
-            <li
-              key={card.position}
-              className={styles.summaryCard}
-              data-glow={glowOf(card) ?? undefined}
-              data-finish={card.finish}
+        {lands && (
+          <div
+            className={styles.viewSwitch}
+            role="group"
+            aria-label="Show the pack"
+          >
+            <button
+              type="button"
+              className={styles.secondary}
+              aria-pressed={byEdition}
+              onClick={() => setByEdition(true)}
             >
-              <CardFace card={card} glow />
-              <div className={styles.summaryText}>
-                <strong>{card.name}</strong>
-                <span>
-                  {rarityLabels[card.rarity] ?? card.rarity}
-                  {card.finish === "foil" && " · Foil"}
-                  {card.finish === "etched" && " · Etched foil"}
-                </span>
-                {/* v0.6.2: the game has no rules for it yet; casual games play it as a stand-in. */}
-                {card.stand_in && (
-                  <span
-                    className={styles.standIn}
-                    title="The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness."
-                  >
-                    Stand-in
+              By land and edition
+            </button>
+            <button
+              type="button"
+              className={styles.secondary}
+              aria-pressed={!byEdition}
+              onClick={() => setByEdition(false)}
+            >
+              Every card
+            </button>
+          </div>
+        )}
+        {lands && byEdition ? (
+          <LandTally cards={cards} />
+        ) : (
+          <ul className={styles.summary} aria-label="Cards in the pack">
+            {cards.map((card) => (
+              <li
+                key={card.position}
+                className={styles.summaryCard}
+                data-glow={glowOf(card) ?? undefined}
+                data-finish={card.finish}
+              >
+                <CardFace card={card} glow />
+                <div className={styles.summaryText}>
+                  <strong>{card.name}</strong>
+                  <span>
+                    {rarityLabels[card.rarity] ?? card.rarity}
+                    {card.finish === "foil" && " · Foil"}
+                    {card.finish === "etched" && " · Etched foil"}
                   </span>
-                )}
-                {/* Before v0.6.2 a card the game could not play gave way to this one; the
+                  {/* v0.6.2: the game has no rules for it yet; casual games play it as a stand-in. */}
+                  {card.stand_in && (
+                    <span
+                      className={styles.standIn}
+                      title="The game has no rules for this card yet: in casual games it plays as a stand-in with its cost, types, power and toughness."
+                    >
+                      Stand-in
+                    </span>
+                  )}
+                  {/* Before v0.6.2 a card the game could not play gave way to this one; the
                     card drawn, listed before it, is now the player's too. */}
-                {card.extra && (
-                  <span className={styles.extraMark}>
-                    Extra: given in place of the card before it, which is now
-                    yours too
-                  </span>
-                )}
-                {/* New: the library held no copy of this edition before (v0.5.0). */}
-                {card.new && <span className={styles.newMark}>New</span>}
-                <button
-                  type="button"
-                  className={styles.linkButton}
-                  aria-label={`Details of ${card.name}`}
-                  onClick={() => setDetails(card)}
-                >
-                  Details
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+                  {card.extra && (
+                    <span className={styles.extraMark}>
+                      Extra: given in place of the card before it, which is now
+                      yours too
+                    </span>
+                  )}
+                  {/* New: the library held no copy of this edition before (v0.5.0). */}
+                  {card.new && <span className={styles.newMark}>New</span>}
+                  <button
+                    type="button"
+                    className={styles.linkButton}
+                    aria-label={`Details of ${card.name}`}
+                    onClick={() => setDetails(card)}
+                  >
+                    Details
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className={styles.actions}>
           {onAnother && remaining > 0 && (
             <button type="button" className={shell.primary} onClick={onAnother}>

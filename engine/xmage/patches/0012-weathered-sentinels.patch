@@ -1,0 +1,210 @@
+Weathered Sentinels attacks only players who attacked you (Commander Duels v0.9.0), in every
+format.
+
+Reason: at the pin, the card's limit was a replacement of DECLARE_ATTACKER that applied to every
+creature its controller declared, not only the Sentinels, and read its watcher's two arguments the
+wrong way round, asking whether the controller had attacked that player. The controller's own
+record is cleared as their turn begins, so in a first combat it limited nothing: once any opponent
+had attacked you, the Sentinels could attack every player, planeswalker and battle; in an extra
+combat the controller's creatures could not attack a player already attacked that turn. The hint
+named the players the controller had attacked. The limit is now a restriction on the Sentinels alone: while it has defender and only
+its own ability lets it attack, it may attack only a player who attacked its controller during
+that player's last turn (no planeswalkers or battles); without defender, or with another effect
+letting it attack as though it didn't have defender, it attacks as any creature. The hint names
+the players who attacked you. Applies after 0009, which changed the watcher's bookkeeping for
+team games and is unchanged here. The human player's defender choice offers only the defenders
+the attacker can attack (PlayerImpl.declareAttacker refused the others without a word), so a
+seat choosing where the Sentinels attack sees only the players who attacked it; with one, no
+choice is asked.
+Upstream: none.
+Remove when: XMage limits the Sentinels alone, reading its watcher the right way round.
+
+diff --git a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+index 6b6b4e6f..164c4b06 100644
+--- a/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
++++ b/Mage.Server.Plugins/Mage.Player.Human/src/mage/player/human/HumanPlayer.java
+@@ -2165,6 +2165,17 @@ public class HumanPlayer extends PlayerImpl {
+                 || possibleDefender.isEmpty()) {
+             possibleDefender = defenders;
+         }
++        // Commander Duels: offer only the defenders this attacker can attack (its restriction
++        // effects: Weathered Sentinels'), as declareAttacker would refuse the others
++        Permanent attackingPermanent = game.getPermanent(attackerId);
++        if (attackingPermanent != null) {
++            Set<UUID> attackable = possibleDefender.stream()
++                    .filter(defenderId -> attackingPermanent.canAttack(defenderId, game))
++                    .collect(Collectors.toCollection(LinkedHashSet::new));
++            if (!attackable.isEmpty()) {
++                possibleDefender = attackable;
++            }
++        }
+         if (possibleDefender.size() == 1) {
+             declareAttacker(attackerId, possibleDefender.iterator().next(), game, true);
+             return true;
+diff --git a/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java b/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java
+index 0e31a65f..91a55d91 100644
+--- a/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java
++++ b/Mage.Sets/src/mage/cards/w/WeatheredSentinels.java
+@@ -6,7 +6,7 @@ import mage.abilities.common.AttacksTriggeredAbility;
+ import mage.abilities.common.SimpleStaticAbility;
+ import mage.abilities.condition.Condition;
+ import mage.abilities.decorator.ConditionalAsThoughEffect;
+-import mage.abilities.effects.ReplacementEffectImpl;
++import mage.abilities.effects.RestrictionEffect;
+ import mage.abilities.effects.common.combat.CanAttackAsThoughItDidntHaveDefenderSourceEffect;
+ import mage.abilities.effects.common.continuous.BoostSourceEffect;
+ import mage.abilities.effects.common.continuous.GainAbilitySourceEffect;
+@@ -63,7 +63,7 @@ public class WeatheredSentinels extends CardImpl {
+ 
+         // Ability to limit who Weathered Sentinels can attack
+         this.addAbility(new SimpleStaticAbility(
+-                new WeatheredSentinelsAttackerReplacementEffect()
++                new WeatheredSentinelsAttackRestrictionEffect()
+                 ).addHint(WeatheredSentinelsPlayersWhoAttackedYouLastTurn.instance)
+         );
+     }
+@@ -78,61 +78,49 @@ public class WeatheredSentinels extends CardImpl {
+     }
+ }
+ 
+-class WeatheredSentinelsAttackerReplacementEffect extends ReplacementEffectImpl {
++/**
++ * Weathered Sentinels attacks, as though it didn't have defender, only players who attacked you
++ * during their last turn: a restriction on the Sentinels alone. Without defender, or when another
++ * effect lets it attack as though it didn't have defender, it may attack anything.
++ */
++class WeatheredSentinelsAttackRestrictionEffect extends RestrictionEffect {
+ 
+-    WeatheredSentinelsAttackerReplacementEffect() {
+-        super(Duration.WhileOnBattlefield, Outcome.Benefit);
++    WeatheredSentinelsAttackRestrictionEffect() {
++        super(Duration.WhileOnBattlefield);
+     }
+ 
+-    private WeatheredSentinelsAttackerReplacementEffect(final WeatheredSentinelsAttackerReplacementEffect effect) {
++    private WeatheredSentinelsAttackRestrictionEffect(final WeatheredSentinelsAttackRestrictionEffect effect) {
+         super(effect);
+     }
+ 
+     @Override
+-    public boolean replaceEvent(GameEvent event, Ability source, Game game) {
+-        return true;
+-    }
+-
+-    @Override
+-    public boolean checksEventType(GameEvent event, Game game) {
+-        return event.getType() == GameEvent.EventType.DECLARE_ATTACKER;
++    public boolean applies(Permanent permanent, Ability source, Game game) {
++        return permanent.getId().equals(source.getSourceId());
+     }
+ 
+     @Override
+-    public boolean applies(GameEvent event, Ability source, Game game) {
+-        Player controller = game.getPlayer(source.getControllerId());
+-        Player attacker = game.getPlayer(event.getPlayerId());
+-        if (controller == null || attacker == null) {
+-            return false;
+-        }
+-
+-        if (!attacker.equals(controller)) {
+-            return false;
++    public boolean canAttack(Permanent attacker, UUID defenderId, Ability source, Game game, boolean canUseChooseDialogs) {
++        if (defenderId == null || !attacker.getAbilities(game).containsKey(DefenderAbility.getInstance().getId())) {
++            return true;
+         }
+-
+-        Player defender;
+-        if (game.getPlayer(event.getTargetId()) != null) {
+-            defender = game.getPlayer(event.getTargetId());
+-        } else {
+-            Permanent planeswalker = game.getPermanent(event.getTargetId());
+-            defender = (planeswalker == null) ? null : game.getPlayer(planeswalker.getControllerId());
++        boolean otherApproval = game.getContinuousEffects()
++                .asThough(attacker.getId(), AsThoughEffectType.ATTACK, null, attacker.getControllerId(), game)
++                .stream()
++                .anyMatch(approving -> !approving.getApprovingAbility().getSourceId().equals(source.getSourceId()));
++        if (otherApproval) {
++            return true;
+         }
+-        if (defender == null) {
++        // Players only: a planeswalker or a battle is no player who attacked you
++        if (game.getPlayer(defenderId) == null) {
+             return false;
+         }
+-
+         WeatheredSentinelsLastTurnAttackersWatcher watcher = game.getState().getWatcher(WeatheredSentinelsLastTurnAttackersWatcher.class);
+-        if (watcher == null) {
+-            return false;
+-        }
+-
+-        // Attacker and defender are supposed to be flipped here
+-        return watcher.checkPlayer(defender.getId(), attacker.getId());
++        return watcher != null && watcher.checkPlayer(attacker.getControllerId(), defenderId);
+     }
+ 
+     @Override
+-    public WeatheredSentinelsAttackerReplacementEffect copy() {
+-        return new WeatheredSentinelsAttackerReplacementEffect(this);
++    public WeatheredSentinelsAttackRestrictionEffect copy() {
++        return new WeatheredSentinelsAttackRestrictionEffect(this);
+     }
+ }
+ 
+@@ -147,24 +135,14 @@ enum WeatheredSentinelsPlayersWhoAttackedYouLastTurn implements Hint {
+             return "";
+         }
+ 
+-        StringBuilder stringBuilder = new StringBuilder("Attacked you on their last turn: ");
+-        Iterator<UUID> opponentIdIterator = game.getOpponents(controller.getId()).iterator();
+-
+-        while (opponentIdIterator.hasNext()) {
+-            UUID opponentId = opponentIdIterator.next();
++        List<String> names = new ArrayList<>();
++        for (UUID opponentId : game.getOpponents(controller.getId())) {
+             Player opponent = game.getPlayer(opponentId);
+-            if (opponent != null && watcher.checkPlayer(opponentId, controller.getId())) {
+-                stringBuilder.append(opponent.getName());
+-                // Add a ", " between names, but exclude adding one at the end
+-                if (opponentIdIterator.hasNext()) {
+-                    stringBuilder.append(", ");
+-                } else {
+-                    stringBuilder.append('.');
+-                }
++            if (opponent != null && watcher.checkPlayer(controller.getId(), opponentId)) {
++                names.add(opponent.getName());
+             }
+         }
+-
+-        return stringBuilder.toString();
++        return "Attacked you on their last turn: " + (names.isEmpty() ? "nobody." : String.join(", ", names) + ".");
+     }
+ 
+     @Override
+@@ -227,17 +205,19 @@ class WeatheredSentinelsLastTurnAttackersWatcher extends Watcher {
+     }
+ 
+     /**
+-     * Checks if on attackerId's last turn they attacked defenderId.
++     * Checks if, during their last turn, otherId attacked youId. (XMage's comment named the two
++     * arguments the other way round, and its attack limit and hint read them so: the limit fell
++     * on every creature attacking a player its controller had attacked; see 0012's header.)
+      *
+-     * @param attackerId    The ID of the player to see if they attacked the given defender on the attacker's last turn
+-     * @param defenderId    The ID of the player to see if they were attacked by the attacker on the attacker's last turn
+-     * @return              Whether the attacker attacked the defender on the attacker's last turn
++     * @param youId   The player who may have been attacked
++     * @param otherId The player who may have attacked youId during otherId's last turn
++     * @return        Whether otherId attacked youId during otherId's last turn
+      */
+-    boolean checkPlayer(UUID attackerId, UUID defenderId) {
+-        if (attackerId == null || defenderId == null) {
++    boolean checkPlayer(UUID youId, UUID otherId) {
++        if (youId == null || otherId == null) {
+             return false;
+         }
+-        Set<UUID> defendersLastTurn = playerMap.get(defenderId);
+-        return defendersLastTurn != null && defendersLastTurn.contains(attackerId);
++        Set<UUID> defendersLastTurn = playerMap.get(otherId);
++        return defendersLastTurn != null && defendersLastTurn.contains(youId);
+     }
+ }

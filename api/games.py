@@ -41,7 +41,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from itertools import combinations
-from typing import Annotated, Any, Literal, cast
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 from uuid import UUID, uuid4
 
 import anyio
@@ -113,6 +113,10 @@ from api.schemas import (
     TableRules,
 )
 from api.schemas import GameSeat as SeatSummary
+
+if TYPE_CHECKING:
+    # Imported for types only: api.campaign imports this module.
+    from api.campaign import Campaign
 from api.stand_ins import stand_ins
 from api.teams import TEAMS, assign_and_check
 from api.validation import DeckContent, DeckEntry, Problem, not_allowed, validate_deck
@@ -1369,7 +1373,16 @@ def passive_switchable(game: Game, rows: list[GameSeat], principal: Principal) -
     )
 
 
-def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
+def campaign_or_none(request: Request) -> "Campaign | None":
+    """The installed campaign, which says whose campaign backs are earned (v0.9.0), or None."""
+    from api.cosmetics import campaign_or_none as installed
+
+    return installed(request)
+
+
+def summary_of(
+    db: Session, game: Game, principal: Principal, campaign: "Campaign | None"
+) -> GameSummary:
     # A match's game (v0.5.0) shows its match. Imported here: api.matches imports this module.
     from api.matches import match_ref
 
@@ -1388,7 +1401,9 @@ def summary_of(db: Session, game: Game, principal: Principal) -> GameSummary:
     # Each human seat's card sleeve (v0.8.9), shown to everyone at the table.
     from api.sleeves import seat_sleeves
 
-    sleeves = seat_sleeves(db, [(row.seat, row.user_id, row.deck_revision_id) for row in rows])
+    sleeves = seat_sleeves(
+        db, [(row.seat, row.user_id, row.deck_revision_id) for row in rows], campaign
+    )
     your_seat = next((row.seat for row in rows if row.user_id == principal.user.id), None)
     # A campaign duel (v0.8.0): the bot is the encounter's opponent, by name and portrait.
     link = db.get(CampaignGame, game.id)
@@ -2176,12 +2191,15 @@ async def create_practice_game(
                 )
         finally:
             hub.starting -= 1
-        return await run_in_threadpool(summary_of, db, game, principal)
+        return await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
 
 
 @router.get("/games", response_model=list[GameSummary])
 def list_games(
-    principal: Player, db: Db, scope: Annotated[Literal["mine", "all"], Query()] = "mine"
+    request: Request,
+    principal: Player,
+    db: Db,
+    scope: Annotated[Literal["mine", "all"], Query()] = "mine",
 ) -> list[GameSummary]:
     """Your recent games, newest first; SysOp may list everyone's (scope=all)."""
     statement = select(Game).order_by(Game.created_at.desc()).limit(50)
@@ -2192,7 +2210,8 @@ def list_games(
         statement = statement.where(
             Game.id.in_(select(GameSeat.game_id).where(GameSeat.user_id == principal.user.id))
         )
-    return [summary_of(db, game, principal) for game in db.scalars(statement)]
+    campaign = campaign_or_none(request)
+    return [summary_of(db, game, principal, campaign) for game in db.scalars(statement)]
 
 
 @router.get("/games/{game_id}", response_model=GameState)
@@ -2212,7 +2231,7 @@ async def get_game(game_id: UUID, request: Request, principal: Player, db: Db) -
             snapshot = await hub.page(live, live.seat_of(principal.user.id) or live.watched)
         except EngineUnavailable as error:
             raise unavailable() from error
-    summary = await run_in_threadpool(summary_of, db, game, principal)
+    summary = await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
     return GameState(game=summary, snapshot=snapshot)
 
 
@@ -2268,7 +2287,7 @@ async def close_game(game_id: UUID, request: Request, principal: Player, db: Db)
             # reached the database yet; once it does, that check no longer sees the game.
             await hub.close_orphans([game_id])
     await run_in_threadpool(db.refresh, game)
-    return await run_in_threadpool(summary_of, db, game, principal)
+    return await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
 
 
 @router.get(
@@ -2359,7 +2378,7 @@ async def set_bots(
 
     await run_in_threadpool(record)
     await run_in_threadpool(db.refresh, game)
-    return await run_in_threadpool(summary_of, db, game, principal)
+    return await run_in_threadpool(summary_of, db, game, principal, campaign_or_none(request))
 
 
 @router.get("/engine/cards", response_model=CardNames)

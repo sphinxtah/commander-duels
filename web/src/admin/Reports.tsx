@@ -124,7 +124,8 @@ function ReportedMessage({ chat }: { chat: ReportedChat }) {
 type SleeveReported = NonNullable<ReportDetail["sleeve"]>;
 
 /** A reported card sleeve (v0.8.9): its picture, and the moderator's button to remove it from
- * every table, with a reason, audited. */
+ * every table, with a reason, audited; and since v0.9.0 to restore a removed one, which puts it
+ * back on the decks that wore it. */
 function ReportedSleeve({
   sleeve,
   owner,
@@ -150,6 +151,17 @@ function ReportedSleeve({
     if (!data) return setError(describe(refused));
     setRemoved(true);
   }
+  async function restore() {
+    setBusy(true);
+    setError("");
+    const { data, error: refused } = await client.POST(
+      "/api/v1/admin/sleeves/{sleeve_id}/restore",
+      { params: { path: { sleeve_id: sleeve.id } } },
+    );
+    setBusy(false);
+    if (!data) return setError(describe(refused));
+    setRemoved(false);
+  }
   return (
     <>
       <h3 className={admin.reportHeading}>The reported card sleeve</h3>
@@ -157,7 +169,9 @@ function ReportedSleeve({
         {sleeve.name}
         {owner ? `, ${owner}'s` : ""}.{" "}
         {removed
-          ? "Removed: it shows on no table."
+          ? sleeve.deleted
+            ? "Removed, and since deleted by its owner."
+            : "Removed: it shows on no table."
           : sleeve.deleted
             ? "Its owner has deleted it."
             : "It shows at every table its deck plays."}
@@ -190,6 +204,19 @@ function ReportedSleeve({
           >
             Remove from every table
           </button>
+        </p>
+      )}
+      {removed && !sleeve.deleted && (
+        <p className={styles.fine}>
+          <button
+            type="button"
+            className={shell.secondary}
+            disabled={busy}
+            onClick={() => void restore()}
+          >
+            Restore to every table
+          </button>{" "}
+          It shows again on every deck that wore it.
         </p>
       )}
       {error && (

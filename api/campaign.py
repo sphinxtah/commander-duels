@@ -951,7 +951,7 @@ async def start_encounter(
                 hub.register(LiveGame(id=game.id, seats={0: LiveSeat(0, user_id, token)}))
         finally:
             hub.starting -= 1
-        return await run_in_threadpool(summary_of, db, game, principal)
+        return await run_in_threadpool(summary_of, db, game, principal, campaign)
 
 
 @router.post("/campaign/scenes", response_model=CampaignState)

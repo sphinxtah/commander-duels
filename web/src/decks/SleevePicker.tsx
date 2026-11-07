@@ -123,6 +123,19 @@ export function SleevePicker({
   const held = sleeves?.sleeves.filter((sleeve) => !sleeve.removed) ?? [];
   const removed = sleeves?.sleeves.filter((sleeve) => sleeve.removed) ?? [];
   const full = sleeves ? held.length >= sleeves.limit : false;
+  // This deck's choice when it doesn't show (v0.9.0): the deck keeps it, and tables show the
+  // default until the sleeve is restored or the back is earned again.
+  const chosenRemoved = removed.find(
+    (sleeve) => current === `sleeve:${sleeve.id}`,
+  );
+  const chosenBack = current?.startsWith("back:")
+    ? current.slice("back:".length)
+    : null;
+  const waiting = chosenRemoved
+    ? `This deck wears ${chosenRemoved.name}, which a moderator removed: its tables show the default until it is restored.`
+    : chosenBack && sleeves && !sleeves.backs.includes(chosenBack)
+      ? `This deck wears ${backNames[chosenBack] ?? chosenBack.replace(/-/g, " ")}, a campaign card back you haven't earned in your current campaign: its tables show the default until you earn it again.`
+      : null;
 
   const option = (
     value: string | null,
@@ -188,6 +201,11 @@ export function SleevePicker({
           A moderator removed {removed.map((sleeve) => sleeve.name).join(", ")}{" "}
           after a report: {removed.length === 1 ? "it shows" : "they show"} on
           no table.
+        </p>
+      )}
+      {sleeves && waiting && (
+        <p className={styles.fine} role="status">
+          {waiting}
         </p>
       )}
       {sleeves && (

@@ -151,6 +151,8 @@ export function card(
     type_line: "Creature — Elf",
     rarity: "common",
     set_code: "ZNR",
+    set_name: "Zendikar Rising",
+    released_at: "2020-09-25",
     collector_number: String(100 + position),
     finish: "nonfoil",
     sheet: "common",

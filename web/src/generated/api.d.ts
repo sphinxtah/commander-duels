@@ -472,9 +472,31 @@ export interface paths {
         /**
          * Remove Sleeve
          * @description A moderator takes a reported sleeve off every table: it shows to nobody but staff, and
-         *     the decks wearing it go back to the default. Audited.
+         *     the decks wearing it show the default. They keep their choice (v0.9.0), so a restore puts it
+         *     back on them. Audited.
          */
         post: operations["remove_sleeve_api_v1_admin_sleeves__sleeve_id__remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/sleeves/{sleeve_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Sleeve
+         * @description Undoes a removal (v0.9.0): the sleeve shows again, on every deck that wore it, even past
+         *     its owner's 20 sleeves. One its owner has deleted since is gone for good. Audited.
+         */
+        post: operations["restore_sleeve_api_v1_admin_sleeves__sleeve_id__restore_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -931,10 +953,16 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /**
+         * Reprice
+         * @description The seller changes an unlimited listing's Buy Now price (v0.9.0), up or down, without
+         *     withdrawing it. Audited as auction.repriced.
+         */
+        put: operations["reprice_api_v1_auctions__auction_id__buy_now_put"];
         /**
          * Buy Now
-         * @description Buys at the Buy Now price: the auction ends at once, the leading bid returned.
+         * @description Buys at the Buy Now price: the auction ends at once, the leading bid returned. With the
+         *     price the buyer saw, a price the seller has changed since buys nothing (v0.9.0).
          */
         post: operations["buy_now_api_v1_auctions__auction_id__buy_now_post"];
         delete?: never;
@@ -3944,7 +3972,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.8.9
+             * @default 0.9.0
              */
             version: string;
         };
@@ -3960,6 +3988,11 @@ export interface components {
         BuyNowRequest: {
             /** Key */
             key: string;
+            /**
+             * Price
+             * @description The Buy Now price the buyer saw (v0.9.0): if the seller has changed it since, nothing is bought (409 price_changed).
+             */
+            price?: number | null;
         };
         /** CampaignChapter */
         CampaignChapter: {
@@ -5744,7 +5777,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.8.9
+             * @default 0.9.0
              */
             version: string;
         };
@@ -7078,8 +7111,19 @@ export interface components {
             printing_id: string;
             /** Rarity */
             rarity: string;
+            /**
+             * Released At
+             * @description When its edition was released (v0.9.0).
+             */
+            released_at?: string | null;
             /** Set Code */
             set_code: string;
+            /**
+             * Set Name
+             * @description Its edition's name (v0.9.0).
+             * @default
+             */
+            set_name: string;
             /** Sheet */
             sheet: string;
             /**
@@ -7796,6 +7840,27 @@ export interface components {
              * @description Null for SysOp's own reports, to anyone but SysOp.
              */
             id: string | null;
+        };
+        /** Repricing */
+        Repricing: {
+            /**
+             * Buy Now
+             * @description The unlimited listing's new Buy Now price (v0.9.0).
+             */
+            buy_now: number;
+        };
+        /** RestoredSleeve */
+        RestoredSleeve: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Restored At
+             * Format: date-time
+             */
+            restored_at: string;
         };
         /** ResultsGrant */
         ResultsGrant: {
@@ -11585,6 +11650,100 @@ export interface operations {
             };
         };
     };
+    restore_sleeve_api_v1_admin_sleeves__sleeve_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sleeve_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoredSleeve"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     list_users_api_v1_admin_users_get: {
         parameters: {
             query?: {
@@ -14002,6 +14161,104 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["BidRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuctionItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reprice_api_v1_auctions__auction_id__buy_now_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                auction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Repricing"];
             };
         };
         responses: {

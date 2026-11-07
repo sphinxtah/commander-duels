@@ -122,8 +122,16 @@ export const auctionApi = {
     call<AuctionItem>("POST", `/auctions/${id}/bids`, {
       body: { amount, key },
     }),
-  buyNow: (id: string, key: string) =>
-    call<AuctionItem>("POST", `/auctions/${id}/buy-now`, { body: { key } }),
+  /** With the price the buyer saw (v0.9.0): a price the seller changed since buys nothing. */
+  buyNow: (id: string, key: string, price: number | null = null) =>
+    call<AuctionItem>("POST", `/auctions/${id}/buy-now`, {
+      body: { key, price },
+    }),
+  /** An unlimited listing's new Buy Now price (v0.9.0), the seller's. */
+  reprice: (id: string, buyNow: number) =>
+    call<AuctionItem>("PUT", `/auctions/${id}/buy-now`, {
+      body: { buy_now: buyNow },
+    }),
   withdraw: (id: string) => call<AuctionItem>("DELETE", `/auctions/${id}`),
   watch: (id: string, on: boolean) =>
     call<void>(on ? "PUT" : "DELETE", `/auctions/${id}/watch`),

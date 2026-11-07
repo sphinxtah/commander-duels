@@ -11,7 +11,7 @@ The owner, 2026-11-06: "the ability for players to upload an image for their vir
 
 ## Choosing
 
-Each deck wears one sleeve, chosen in the deck editor's "Card sleeve" section (This deck), where sleeves are uploaded and deleted too. `Deck.sleeve` is `sleeve:<id>`, `default:<slug>`, `back:<slug>`, or null. A deck with none shows the account's campaign back if it chose one on the Campaign page (v0.8.8), else the official back. Deleting a sleeve, or a moderator's removing it, puts every deck wearing it back to the default.
+Each deck wears one sleeve, chosen in the deck editor's "Card sleeve" section (This deck), where sleeves are uploaded and deleted too. `Deck.sleeve` is `sleeve:<id>`, `default:<slug>`, `back:<slug>`, or null. A deck with none shows the account's campaign back if it chose one on the Campaign page (v0.8.8), else the official back. Deleting a sleeve puts every deck wearing it back to the default. Since v0.9.0 a campaign back is checked on every read: a deck wearing one its owner no longer has (after a campaign reset), and an account's chosen back, show the default at the table, and the deck keeps its choice, wearing the back again once it is earned; the deck editor says so. A removed sleeve likewise shows the default while it is removed, and the deck keeps it.
 
 ## At a table
 
@@ -22,7 +22,8 @@ Every human seat's sleeve shows to everyone at the table, players and spectators
 The owner chose "live at once, reportable".
 
 - **At the table**, a click on another person's name opens their profile, small, over the game: their handle, title, wins, the sleeve they show here, a link to their full profile, and **Report this sleeve**. A report goes to Administration › Reports as any report does, naming the sleeve (`ReportCreate.sleeve`) and its owner; one's own sleeve can't be reported (`409 own_sleeve`).
-- **In Administration › Reports**, the report shows the picture and **Remove from every table**, with a reason (`POST /api/v1/admin/sleeves/{id}/remove`, `reports.manage`, audited as `sleeves.removed`). A removed sleeve shows to nobody but staff, the decks wearing it go back to the default, and its owner sees it marked removed.
+- **In Administration › Reports**, the report shows the picture and **Remove from every table**, with a reason (`POST /api/v1/admin/sleeves/{id}/remove`, `reports.manage`, audited as `sleeves.removed`). A removed sleeve shows to nobody but staff, the decks wearing it show the default, and its owner sees it marked removed.
+- **Restoring** (v0.9.0): a removed sleeve's report shows **Restore to every table** (`POST /api/v1/admin/sleeves/{id}/restore`, `reports.manage`, audited as `sleeves.restored`, with the reason it was removed for). It shows again on every deck that wore it, even past its owner's 20 sleeves. One its owner deleted since stays gone (`409 sleeve_deleted`). Decks from removals made before v0.9.0 were cleared then and need choosing again.
 
 ## Routes
 
@@ -34,5 +35,6 @@ The owner chose "live at once, reportable".
 | `GET /api/v1/sleeves/{id}/image` | anyone signed in | the picture, WebP; a removed one only to staff |
 | `PUT /api/v1/decks/{id}/sleeve` | the deck's owner | `{sleeve}` |
 | `POST /api/v1/admin/sleeves/{id}/remove` | `reports.manage` | `{reason}` |
+| `POST /api/v1/admin/sleeves/{id}/restore` | `reports.manage` | puts a removed sleeve back (v0.9.0) |
 
 Deleting an account deletes its sleeves' pictures (`api/accounts.py` CLEANUPS). Checked by `tests/test_sleeves.py`.

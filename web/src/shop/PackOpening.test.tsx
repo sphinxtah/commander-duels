@@ -225,6 +225,80 @@ describe("opening a pack", () => {
     );
     expect(items[2]).not.toHaveTextContent("Stand-in");
     expect(items[2]).not.toHaveTextContent("Extra");
-    expect(screen.queryByText(/In place of a card the game cannot play/)).toBeNull();
+    expect(
+      screen.queryByText(/In place of a card the game cannot play/),
+    ).toBeNull();
+  });
+
+  it("sums a basic land pack up by land and edition, and every card a press away (v0.9.0)", () => {
+    const land = (
+      position: number,
+      name: string,
+      set_code: string,
+      set_name: string,
+      released_at: string,
+      finish: "nonfoil" | "foil" = "nonfoil",
+    ) =>
+      card(position, {
+        name,
+        type_line: `Basic Land — ${name}`,
+        mana_cost: null,
+        set_code,
+        set_name,
+        released_at,
+        finish,
+      });
+    const lands = {
+      ...opening,
+      product: {
+        ...opening.product,
+        kind: "lands" as const,
+        name: "Basic Land Pack",
+      },
+      cards: [
+        land(0, "Mountain", "blb", "Bloomburrow", "2024-08-02"),
+        land(1, "Plains", "blb", "Bloomburrow", "2024-08-02", "foil"),
+        land(2, "Mountain", "lea", "Limited Edition Alpha", "1993-08-05"),
+        land(3, "Mountain", "blb", "Bloomburrow", "2024-08-02"),
+        land(4, "Plains", "m10", "Magic 2010", "2009-07-17"),
+      ],
+    };
+    render(<PackOpening opening={lands} onDone={() => {}} startOpen />);
+    const oldest = screen.getByRole("heading", {
+      name: "Oldest pulls",
+    }).parentElement!;
+    expect(within(oldest).getAllByRole("listitem")[0]).toHaveTextContent(
+      "Mountain · Limited Edition Alpha (1993)",
+    );
+    const byLand = screen.getByRole("list", { name: "Lands by edition" });
+    const [plains, mountain] = within(byLand).getAllByRole("listitem");
+    // WUBRG order: Plains before Mountain.
+    expect(plains).toHaveTextContent("Plains · 2 · 1 foil");
+    expect(mountain).toHaveTextContent("Mountain · 3");
+    const rows = within(within(mountain).getByRole("table")).getAllByRole(
+      "row",
+    );
+    // Newest first: Bloomburrow ×2, then Alpha ×1.
+    expect(rows[1]).toHaveTextContent("Bloomburrow BLB20242");
+    expect(rows[2]).toHaveTextContent("Limited Edition Alpha LEA19931");
+    expect(
+      screen.queryByRole("list", { name: "Cards in the pack" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Every card" }));
+    expect(
+      within(
+        screen.getByRole("list", { name: "Cards in the pack" }),
+      ).getAllByRole("listitem"),
+    ).toHaveLength(5);
+  });
+
+  it("keeps an ordinary pack's summary as its cards", () => {
+    render(<PackOpening opening={opening} onDone={() => {}} startOpen />);
+    expect(
+      screen.queryByRole("button", { name: "By land and edition" }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("list", { name: "Cards in the pack" }),
+    ).toBeInTheDocument();
   });
 });

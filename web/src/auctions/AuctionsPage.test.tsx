@@ -298,7 +298,77 @@ describe("Tivit's Auction House", () => {
         "You bought Lightning Bolt for 900 tokens. It is in your library.",
       ),
     ).toBeInTheDocument();
-    expect(buy).toHaveBeenCalledWith(boltFoil.id, expect.any(String));
+    // With the price the buyer saw (v0.9.0).
+    expect(buy).toHaveBeenCalledWith(boltFoil.id, expect.any(String), 900);
+  });
+
+  it("lets the seller change an unlimited listing's price in place (v0.9.0)", async () => {
+    const endless = auction({
+      seller: "ada",
+      mine: true,
+      duration: "unlimited",
+      ends_at: null,
+      starting_bid: 400,
+      next_bid: 400,
+      buy_now: 400,
+    });
+    vi.spyOn(auctionApi, "search").mockImplementation(
+      () => ok(market([endless])) as never,
+    );
+    const reprice = vi
+      .spyOn(auctionApi, "reprice")
+      .mockImplementation(
+        () => ok({ ...endless, buy_now: 250, starting_bid: 250 }) as never,
+      );
+    show();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lightning Bolt/ }),
+    );
+    const panel = await screen.findByRole("dialog", { name: "Lightning Bolt" });
+    const box = within(panel).getByRole("spinbutton", {
+      name: "New Buy Now price in tokens",
+    });
+    expect(box).toHaveValue(400);
+    const change = within(panel).getByRole("button", { name: "Change price" });
+    expect(change).toBeDisabled();
+    fireEvent.change(box, { target: { value: "250" } });
+    fireEvent.click(change);
+    expect(
+      await within(panel).findByText(
+        "Lightning Bolt is now 250 tokens to Buy Now.",
+      ),
+    ).toBeInTheDocument();
+    expect(reprice).toHaveBeenCalledWith(endless.id, 250);
+  });
+
+  it("shows the new price when the seller changed it before Buy Now (v0.9.0)", async () => {
+    vi.spyOn(auctionApi, "buyNow").mockImplementation(
+      () =>
+        refused(
+          "price_changed",
+          "The seller changed the Buy Now price to 950 tokens.",
+        ) as never,
+    );
+    const fresh = vi
+      .spyOn(auctionApi, "item")
+      .mockImplementation(() => ok({ ...boltFoil, buy_now: 950 }) as never);
+    show();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }),
+    );
+    const panel = await screen.findByRole("dialog", { name: "Lightning Bolt" });
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Buy Now · 900" }),
+    );
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Buy for 900 tokens" }),
+    );
+    expect(
+      await within(panel).findByText(
+        "The seller changed the Buy Now price to 950 tokens.",
+      ),
+    ).toBeInTheDocument();
+    expect(fresh).toHaveBeenCalledWith(boltFoil.id, true);
   });
 
   it("compares the price with the same edition and finish's listings and recent sales", async () => {
