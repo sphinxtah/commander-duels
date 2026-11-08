@@ -49,7 +49,7 @@ from api.identity import (
     settings_of,
     utcnow,
 )
-from api.library import default_printings, library_of
+from api.library import ONE_OF_A_KIND, default_printings, library_of
 from api.models import (
     CampaignProgress,
     CardConcept,
@@ -243,6 +243,12 @@ def give_cards(
     printing = db.get(CardPrinting, printing_id) if printing_id else None
     if printing is None or printing.concept_id != concept.id:
         raise ApiError(422, "invalid_printing", "That edition is not one of this card's.")
+    # A one-of-a-kind printing (The One Ring 001/001) is never granted, not even to SysOp: its one
+    # copy is its owner's (v0.9.1; api/library.py ONE_OF_A_KIND).
+    if printing.scryfall_id in ONE_OF_A_KIND:
+        raise ApiError(
+            409, "one_of_a_kind", "This edition is one of a kind: its only copy is already owned."
+        )
     finishes = list(printing.finishes or ["nonfoil"])
     if body.finish not in finishes:
         raise ApiError(

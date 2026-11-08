@@ -12,7 +12,7 @@ The host picks them before the game. All twelve combinations play. The table sho
 | --- | --- | --- |
 | Deck format, for all six players | Legacy or Commander | Commander |
 | Starting life | Everyone 20, everyone 40, or Generals 20 and Kings 40 | Everyone 40 |
-| House rule: "King can attack anyone" | Off or on | Off |
+| House rule: "King can attack anyone" | Off or on | Off at a table; on in a practice game (v0.9.1) |
 
 - **Legacy decks.** They use the format's own legality and banned list: at least 60 cards and four copies at most. There are no commanders, no commander tax and no commander damage. Single games have no sideboard.
 - **Commander decks.** They use the format's own legality and banned list: 100 cards with a commander or a legal pair, singleton and colour identity. Every player has their own commander, Generals included, with the command zone, commander tax and 21 combat damage from one commander (903.10a). That 21 holds at any starting life and counts across control and zone changes. Noncombat damage doesn't count.
@@ -50,6 +50,8 @@ A General reaches one seat each way and a King two (809.4a). A player is always 
 - **What the screen shows.** It shows the whole table: what a player may see is the same as anywhere else. The game marks which players are in your range and which you may attack.
 
 ## Attacking
+
+**Practice games default it on (v0.9.1).** With it off a King has no one to attack while both of its Generals stand, and a practice table of bots could stall for dozens of turns (v0.9.0's 37 turns at 40 life). The practice options and a practice request without settings take it on; a table's host still chooses, off by default.
 
 **With the house rule off (809.4b).** A player may attack only an opponent beside them who is also in their range, and that player's planeswalkers and the battles they protect.
 

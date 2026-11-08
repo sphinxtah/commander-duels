@@ -31,7 +31,7 @@ import { signalTutorial } from "../tutorial/tutorial";
 // Opening a pack card by card (v0.4.0): the pack tears open, its cards are dealt face
 // down and turn over one at a time (a click, or Space), rares and mythic rares glow in their
 // rarity's color and foils shimmer, each with its generated sound; "Reveal all" turns the rest.
-// A summary follows, with new cards marked and each card's details a click away. The server drew
+// A summary follows, with new cards marked; clicking a card opens its details (v0.9.1). The server drew
 // the pack before any of this: the show only reveals it. With reduced motion every step is
 // immediate and nothing moves. Since v0.4.3 the pack is the product's own picture (PackArt), whose
 // top strip tears off, and Leng's counter shows dimly behind it all.
@@ -301,7 +301,15 @@ export function PackOpening({
                 data-glow={glowOf(card) ?? undefined}
                 data-finish={card.finish}
               >
-                <CardFace card={card} glow />
+                {/* The card itself opens its details (v0.9.1, the owner's request). */}
+                <button
+                  type="button"
+                  className={styles.faceButton}
+                  aria-label={`Details of ${card.name}`}
+                  onClick={() => setDetails(card)}
+                >
+                  <CardFace card={card} glow />
+                </button>
                 <div className={styles.summaryText}>
                   <strong>{card.name}</strong>
                   <span>
@@ -328,14 +336,6 @@ export function PackOpening({
                   )}
                   {/* New: the library held no copy of this edition before (v0.5.0). */}
                   {card.new && <span className={styles.newMark}>New</span>}
-                  <button
-                    type="button"
-                    className={styles.linkButton}
-                    aria-label={`Details of ${card.name}`}
-                    onClick={() => setDetails(card)}
-                  >
-                    Details
-                  </button>
                 </div>
               </li>
             ))}

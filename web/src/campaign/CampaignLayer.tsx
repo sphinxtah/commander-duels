@@ -57,6 +57,8 @@ export function CampaignLayer({
   const [arrival, setArrival] = useState(0);
   const [tip, setTip] = useState<string | null>(null);
   const before = useRef<Observation | null>(null);
+  /** The board at the lessons' last look (v0.9.1). */
+  const lessonBefore = useRef<Observation | null>(null);
   const memory = useRef<Memory>(FRESH_MEMORY);
   const said = useRef(new Set<string>());
   const taught = useRef(new Set<string>());
@@ -141,19 +143,28 @@ export function CampaignLayer({
     before.current = now;
     if (lines.length > 0)
       setQueue((current) => [...current, ...lines].slice(-6));
-    // Lessons: one at a time, each once.
-    if (campaign.encounter === 1 && hints && !hint) {
-      for (const entry of STORY.tutorial) {
-        if (entry.id === "T12" || taught.current.has(entry.id)) continue;
-        if (lesson(entry.id, was, now, prompt, view)) {
-          taught.current.add(entry.id);
-          setHint({ id: entry.id, text: entry.text });
-          void changeTutorial({ lessons: [entry.id] });
-          break;
-        }
+  }, [view, prompt, log, over]);
+
+  // Lessons: one at a time, each once. Looked at again when a lesson closes (v0.9.1), so a
+  // moment that came while another lesson showed (the mulligan, behind the welcome) isn't lost;
+  // the board they compare with is the one of the last look, so a creature that entered meanwhile
+  // still counts.
+  useEffect(() => {
+    if (campaign.encounter !== 1 || !hints || hint || over || !view) return;
+    const now = before.current;
+    if (!now) return;
+    const was = lessonBefore.current;
+    lessonBefore.current = now;
+    for (const entry of STORY.tutorial) {
+      if (entry.id === "T12" || taught.current.has(entry.id)) continue;
+      if (lesson(entry.id, was, now, prompt, view)) {
+        taught.current.add(entry.id);
+        setHint({ id: entry.id, text: entry.text });
+        void changeTutorial({ lessons: [entry.id] });
+        break;
       }
     }
-  }, [view, prompt, log, over]);
+  }, [view, prompt, hint, hints, over, campaign.encounter]);
 
   // The queue speaks one line at a time.
   useEffect(() => {

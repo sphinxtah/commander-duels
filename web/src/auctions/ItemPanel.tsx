@@ -8,7 +8,6 @@ import { auctionApi } from "./api";
 import {
   amount,
   bidOutcome,
-  cardImage,
   durationNames,
   editionLine,
   finishNames,
@@ -274,16 +273,8 @@ export function ItemPanel({
               <button
                 type="button"
                 className={styles.heroArt}
-                aria-label={`Show ${item.card.name} bigger`}
-                onClick={() =>
-                  setZoom({
-                    name: item.card.name,
-                    src: () => cardImage(item.card, "png"),
-                    faces: 0,
-                    details: () => setShownDetails(true),
-                    finish: item.finish,
-                  })
-                }
+                aria-label={`Details of ${item.card.name}`}
+                onClick={() => setShownDetails(true)}
               >
                 <CardArt card={item.card} finish={item.finish} size="large" />
               </button>
@@ -578,13 +569,6 @@ export function ItemPanel({
                 onClick={() => void comparePrices()}
               >
                 Compare price
-              </button>
-              <button
-                type="button"
-                className={styles.secondary}
-                onClick={() => setShownDetails(true)}
-              >
-                Card details
               </button>
             </div>
             {compare !== null && (

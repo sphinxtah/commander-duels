@@ -215,6 +215,51 @@ def one_of_a_kind(db: Session) -> frozenset[UUID]:
     )
 
 
+def ensure_one_of_a_kind(db: Session) -> list[str]:
+    """Each one-of-a-kind printing in its owner's library (v0.9.1, the owner: "be sure ... that
+    user Sphinx has it"). Migration 0027 granted it once, at that deploy: an owner whose account or
+    catalog printing came later, or whose account a reset emptied since, holds no copy. On each of
+    the worker's starts this grants the owner the one copy when they hold none and no other
+    account but SysOp's does; never a second. Returns the handles granted to."""
+    granted: list[str] = []
+    for scryfall_id, handle in ONE_OF_A_KIND.items():
+        printing = db.scalar(select(CardPrinting).where(CardPrinting.scryfall_id == scryfall_id))
+        owner = db.scalar(
+            select(User).where(
+                User.normalized_handle == handle, User.kind == "player", User.status == "active"
+            )
+        )
+        if printing is None or owner is None:
+            continue
+        holders = db.scalars(
+            select(LibraryGrant.user_id)
+            .join(User, User.id == LibraryGrant.user_id)
+            .where(
+                LibraryGrant.printing_id == printing.id,
+                User.kind != "sysop",
+                (User.reset_at.is_(None)) | (LibraryGrant.created_at > User.reset_at),
+            )
+        ).all()
+        if holders:
+            continue
+        finishes = list(printing.finishes or ["nonfoil"])
+        db.add(
+            LibraryGrant(
+                user_id=owner.id,
+                concept_id=printing.concept_id,
+                printing_id=printing.id,
+                finish="nonfoil" if "nonfoil" in finishes else finishes[0],
+                quantity=1,
+                source="unique",
+                grant_key=reset_key(owner, f"unique:{scryfall_id}"),
+                created_at=utcnow(),
+            )
+        )
+        db.flush()
+        granted.append(handle)
+    return granted
+
+
 def withheld_from(db: Session, user: User) -> frozenset[UUID]:
     """The one-of-a-kind printings the account may not put in a deck: those it holds no copy of.
     SysOp builds with anything."""

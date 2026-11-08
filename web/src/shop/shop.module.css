@@ -636,14 +636,25 @@
 .summaryText span {
   color: #a5b0a3;
 }
-.linkButton {
-  align-self: flex-start;
-  background: none;
-  border: 0;
+/* The card is its own details button (v0.9.1). */
+.faceButton {
+  display: block;
   padding: 0;
-  color: #efcc8d;
-  font-size: 0.74rem;
-  text-decoration: underline;
+  border: 0;
+  background: none;
+  border-radius: 10px;
+  cursor: zoom-in;
+  transition: transform 120ms ease;
+}
+.faceButton:hover {
+  transform: translateY(-3px);
+}
+.faceButton:focus-visible {
+  outline: 3px solid #efcc8d;
+  outline-offset: 3px;
+}
+:global(:root[data-reduced-motion="true"]) .faceButton:hover {
+  transform: none;
 }
 
 /* Administration. */

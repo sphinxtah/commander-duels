@@ -294,6 +294,11 @@ final class HumanGame {
                 // both main phases, at declare attackers and blockers, and whenever something new is on
                 // the stack).
                 human.setUserData(UserData.getDefaultUserDataView());
+                // Learn Commander's training hand (v0.9.1): the deck list's opening, on top after the
+                // game's first shuffle.
+                if (seat.custom() != null) {
+                    human.stackOpening(seat.custom().opening());
+                }
                 seated.add(human);
                 bySeat.add(new Seat(index, human));
             } else {

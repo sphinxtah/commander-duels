@@ -14,7 +14,7 @@ import {
 import { readTableSettings } from "../app/tableSettings";
 import { RunningMatches } from "../matches/RunningMatches";
 import {
-  DEFAULT_KINGS_TABLE,
+  PRACTICE_KINGS_TABLE,
   KINGS_SEATS,
   KINGS_TABLE,
   seatTitle,
@@ -276,7 +276,7 @@ function Table({ me }: { me: Me }) {
   // One game, or (v0.5.0, Legacy only) a best-of-three match with sideboards.
   const [bestOf, setBestOf] = useState<BestOf>(1);
   // King's Table (v0.8.7): its settings and your seat, team A's King unless you choose another.
-  const [kings, setKings] = useState<KingsTableSettings>(DEFAULT_KINGS_TABLE);
+  const [kings, setKings] = useState<KingsTableSettings>(PRACTICE_KINGS_TABLE);
   const [seat, setSeat] = useState(1);
   const [useList, setUseList] = useState(false);
   const [deckList, setDeckList] = useState("");

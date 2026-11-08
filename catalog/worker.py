@@ -15,6 +15,7 @@ from api import accounts, auctions, decks, roster
 from api.config import Settings
 from api.database import build_engine
 from api.identity import permissions_for, roles_of
+from api.library import ensure_one_of_a_kind as unique_cards
 from api.library import library_of
 from api.models import RoleGrant, ScheduledJob, User
 from catalog import boosters, sync
@@ -133,6 +134,16 @@ def start(engine: Engine, config: Settings) -> None:
         withdraw_unplayable(engine, config)
     switch_editions(engine, config)
     refresh_staff_decks(engine, config)
+    ensure_one_of_a_kind(engine)
+
+
+def ensure_one_of_a_kind(engine: Engine) -> None:
+    """Since v0.9.1 each start makes sure each one-of-a-kind card is in its owner's library
+    (api/library.py ensure_one_of_a_kind): never a second copy."""
+    with Session(engine) as session, session.begin():
+        granted = unique_cards(session)
+    if granted:
+        logger.info("One-of-a-kind cards granted to their owners: %s", ", ".join(granted))
 
 
 def work(engine: Engine, config: Settings, client: httpx.Client) -> None:

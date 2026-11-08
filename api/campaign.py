@@ -160,6 +160,8 @@ class Campaign:
     title: str
     turn_cap: int
     training_seed: int
+    # Learn Commander's training seven (v0.9.1): the loaner's opening hand, stacked by the engine.
+    training_hand: tuple[str, ...]
     loaner_title: str
     loaner_commander: str
     loaner_cards: tuple[tuple[str, int], ...]
@@ -176,11 +178,15 @@ class Campaign:
     def last(self) -> int:
         return max(encounter.number for encounter in self.encounters)
 
-    def loaner_list(self) -> dict[str, object]:
-        return {
+    def loaner_list(self, learn: bool = False) -> dict[str, object]:
+        """The loaner as a deck list; with learn, its opening hand stacked: the training seven."""
+        listed: dict[str, object] = {
             "cards": [{"name": name, "count": count} for name, count in self.loaner_cards],
             "commanders": [self.loaner_commander],
         }
+        if learn and self.training_hand:
+            listed["opening"] = list(self.training_hand)
+        return listed
 
 
 def cards_of(entries: list[dict[str, Any]]) -> tuple[tuple[str, int], ...]:
@@ -199,6 +205,7 @@ def campaign_in(folder: str) -> Campaign | None:
         title=data["title"],
         turn_cap=int(data["turn_cap"]),
         training_seed=int(data["training_seed"]),
+        training_hand=tuple(str(name) for name in data.get("training_hand", [])),
         loaner_title=data["loaner"]["title"],
         loaner_commander=data["loaner"]["commander"],
         loaner_cards=cards_of(data["loaner"]["cards"]),
@@ -870,7 +877,7 @@ async def start_encounter(
             planned.custom = held.get(0, [])
         else:
             planned = SeatPlan(
-                {"player": "human", "deck_list": campaign.loaner_list()},
+                {"player": "human", "deck_list": campaign.loaner_list(learn=body.learn)},
                 title=campaign.loaner_title,
                 starter=True,
             )

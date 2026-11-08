@@ -5,6 +5,7 @@
  "source": "The owner's campaign handoff (version 1, 2026-10-31) and its fourteen deck builds; the loaner deck was completed for v0.8.0 as the handoff asks.",
  "turn_cap": 60,
  "training_seed": 20261031,
+ "training_hand": ["Plains", "Plains", "Plains", "Sol Ring", "Arcane Signet", "Raise the Alarm", "Pacifism"],
  "loaner": {
   "title": "Adeline's Vanguard",
   "commander": "Adeline, Resplendent Cathar",

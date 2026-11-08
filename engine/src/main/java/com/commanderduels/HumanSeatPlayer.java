@@ -1,5 +1,13 @@
 package com.commanderduels;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+import mage.abilities.Ability;
+import mage.cards.Card;
 import mage.cards.Cards;
 import mage.constants.RangeOfInfluence;
 import mage.game.Game;
@@ -50,6 +58,11 @@ final class HumanSeatPlayer extends HumanPlayer implements OpensResponse {
     /** Shared by every copy: XMage replaces the seat's player with copies when it restores a state. */
     private final transient Listening listening;
 
+    /** The cards to put on top after the game's first shuffle, in draw order (v0.9.1); empty for none. */
+    private String[] opening = {};
+    /** Whether the first shuffle has come: the opening is stacked once, never after a mulligan. */
+    private boolean shuffled;
+
     HumanSeatPlayer(String name, RangeOfInfluence range, Listening listening) {
         super(name, range, 0);
         this.listening = listening;
@@ -58,6 +71,48 @@ final class HumanSeatPlayer extends HumanPlayer implements OpensResponse {
     private HumanSeatPlayer(HumanSeatPlayer player) {
         super(player);
         this.listening = player.listening;
+        this.opening = player.opening;
+        this.shuffled = player.shuffled;
+    }
+
+    /** Learn Commander's training hand (v0.9.1): these cards top the library after the first shuffle. */
+    void stackOpening(List<String> names) {
+        opening = names.toArray(String[]::new);
+    }
+
+    @Override
+    public void shuffleLibrary(Ability source, Game game) {
+        super.shuffleLibrary(source, game);
+        if (!shuffled) {
+            shuffled = true;
+            stack(getLibrary(), List.of(opening), game);
+        }
+    }
+
+    /**
+     * Puts the named cards on top of the library, the first named on the very top. A name the library
+     * no longer holds is passed over. The rest of the library keeps its shuffled order.
+     */
+    static void stack(Library library, List<String> names, Game game) {
+        if (names.isEmpty()) {
+            return;
+        }
+        Set<UUID> taken = new HashSet<>();
+        List<Card> chosen = new ArrayList<>();
+        for (String name : names) {
+            String wanted = name.toLowerCase(Locale.ROOT);
+            for (Card card : library.getCards(game)) {
+                if (!taken.contains(card.getId()) && card.getName().toLowerCase(Locale.ROOT).equals(wanted)) {
+                    taken.add(card.getId());
+                    chosen.add(card);
+                    break;
+                }
+            }
+        }
+        for (int index = chosen.size() - 1; index >= 0; index--) {
+            Card card = chosen.get(index);
+            library.putOnTop(card, game);
+        }
     }
 
     @Override

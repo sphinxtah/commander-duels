@@ -311,6 +311,10 @@ def test_the_settings_and_the_seats() -> None:
         "life": "all_40",
         "king_attacks_anyone": False,
     }
+    # A practice game asked for without settings takes the practice defaults (v0.9.1); tables
+    # keep the plain defaults.
+    assert kings_table.practice_config(None).king_attacks_anyone is True
+    assert kings_table.practice_config({"life": "all_20"}).king_attacks_anyone is False
     split = kings_table.config_of({"life": "generals_20_kings_40"})
     assert [kings_table.starting_life(split, s) for s in range(6)] == [20, 40, 20, 20, 40, 20]
     # The engine's winners leave an eliminated General out; the team is every seat of it.
@@ -339,10 +343,11 @@ def test_the_play_page_and_the_practice_options_list_it(client):
         found["id"]: found for found in ada.get("/api/v1/practice-games/options").json()["formats"]
     }
     assert options[KINGS]["bots"] == [5] and options[KINGS]["best_of"] == [1]
+    # Practice defaults the house rule on (v0.9.1), so a table of bots doesn't stall.
     assert options[KINGS]["kings_table"] == {
         "deck_format": "commander",
         "life": "all_40",
-        "king_attacks_anyone": False,
+        "king_attacks_anyone": True,
     }
     assert options["legacy"]["kings_table"] is None
     # Its fixture decks by deck format (v0.8.8), each list of its own format; others have none.
@@ -683,10 +688,11 @@ def test_practice_from_every_seat(client, engine, seat):
     started = practice(ada, mine, seat=seat, bot_skill=2, bots=bots)
     assert started.status_code == 201, started.text
     body = engine.created[-1]
+    # No settings asked for: the practice defaults, the house rule on (v0.9.1).
     assert body["kings_table"] == {
         "deck_format": "commander",
         "life": "all_40",
-        "king_attacks_anyone": False,
+        "king_attacks_anyone": True,
     }
     assert body["skill"] == 2 and len(body["seats"]) == 6
     assert [index for index, s in enumerate(body["seats"]) if s["player"] == "human"] == [seat]

@@ -105,7 +105,6 @@ from api.schemas import (
     GameResult,
     GameState,
     GameSummary,
-    KingsTableSettings,
     PracticeFormat,
     PracticeGameRequest,
     PracticeOptions,
@@ -1516,7 +1515,7 @@ def practice_options(principal: Player) -> PracticeOptions:
                 default_bots=DEFAULT_BOTS[fmt],
                 decks=decks if fixtures else [],
                 best_of=BEST_OF[fmt],
-                kings_table=KingsTableSettings() if fmt == kings_table.FORMAT else None,
+                kings_table=kings_table.PRACTICE_DEFAULTS if fmt == kings_table.FORMAT else None,
                 decks_by_format=(
                     {
                         "legacy": FIXTURE_DECKS["two_headed_giant"] if fixtures else [],
@@ -2135,7 +2134,7 @@ async def create_practice_game(
         body = body.model_copy(
             update={
                 "seat": practice_seat(body),
-                "kings_table": kings_table.config_of(body.kings_table),
+                "kings_table": kings_table.practice_config(body.kings_table),
             }
         )
     bots: list[SeatChoice | None] = (

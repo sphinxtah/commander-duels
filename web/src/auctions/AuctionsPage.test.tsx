@@ -400,6 +400,26 @@ describe("Tivit's Auction House", () => {
     expect(within(section).getByText("675")).toBeInTheDocument();
   });
 
+  it("opens the card's details from the card itself (v0.9.1)", async () => {
+    show();
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Lightning Bolt.*Outbid/ }),
+    );
+    const panel = await screen.findByRole("dialog", { name: "Lightning Bolt" });
+    expect(
+      within(panel).queryByRole("button", { name: "Card details" }),
+    ).toBeNull();
+    fireEvent.click(
+      within(panel).getByRole("button", { name: "Details of Lightning Bolt" }),
+    );
+    expect(
+      screen.getByRole("dialog", {
+        name: "Lightning Bolt, card details",
+        hidden: true,
+      }),
+    ).toHaveAttribute("open");
+  });
+
   it("the transfer list: withdraw before bids, relist prefilled, clear sold", async () => {
     const withdraw = vi
       .spyOn(auctionApi, "withdraw")

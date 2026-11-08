@@ -9,6 +9,7 @@ import dataclasses
 import json
 import time
 import uuid
+from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -329,8 +330,35 @@ def test_learn_commander_uses_the_training_seed(client: TestClient, engine: Fake
     assert started.json()["campaign"]["deck"] == "learn"
     assert started.json()["campaign"]["hints"] is True
     assert engine.created[-1]["seed"] == 20261031
+    # The training seven, stacked by the engine on top of the loaner's library (v0.9.1).
+    learner = engine.created[-1]["seats"][0]["deck_list"]
+    assert learner["opening"] == [
+        "Plains",
+        "Plains",
+        "Plains",
+        "Sol Ring",
+        "Arcane Signet",
+        "Raise the Alarm",
+        "Pacifism",
+    ]
     refused = ada.post("/api/v1/campaign/encounters/1/start", {})
     assert refused.status_code == 422
+    # The loaner without Learn Commander keeps its shuffled hand.
+    bob = Account(client, "bob")
+    assert start(bob, 1, loaner=True).status_code == 201
+    assert "opening" not in engine.created[-1]["seats"][0]["deck_list"]
+    assert "seed" not in engine.created[-1]
+
+
+def test_the_training_hand_comes_from_the_loaner() -> None:
+    """Every card of the training seven is in the loaner as often as it is named (v0.9.1): the
+    engine refuses an opening its deck can't hold."""
+    content = campaign.campaign_in(str(Path(__file__).resolve().parents[1] / "content"))
+    assert content is not None
+    held = dict(content.loaner_cards)
+    assert len(content.training_hand) == 7
+    for name, count in Counter(content.training_hand).items():
+        assert held.get(name, 0) >= count, name
 
 
 def test_learn_commander_is_refused_after_the_first_ward(

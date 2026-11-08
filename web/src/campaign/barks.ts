@@ -340,6 +340,24 @@ export function incarnation(
   return null;
 }
 
+/** The total power of the creatures a declare-attackers prompt offers (v0.9.1). */
+function attackPower(view: GameView, options: Prompt["options"]): number {
+  const offered = new Set(
+    options
+      .filter((option) => option.action === "toggle_attacker")
+      .map((option) => option.object_id),
+  );
+  let power = 0;
+  for (const permanent of view.battlefield) {
+    if (offered.has(permanent.id))
+      power += Math.max(
+        0,
+        Number.parseInt(permanent.card.power ?? "0", 10) || 0,
+      );
+  }
+  return power;
+}
+
 /** A tutorial lesson whose moment has come (the handoff's T01 to T11; T12 is the victory's). */
 export function lesson(
   id: string,
@@ -352,7 +370,9 @@ export function lesson(
   const yourTurn = view.active_seat === now.youSeat;
   switch (id) {
     case "T01":
-      return true;
+      // During the mulligan the mulligan's lesson comes first: its moment passes with the keep,
+      // the welcome's doesn't (v0.9.1).
+      return prompt?.kind !== "mulligan";
     case "T02":
       return prompt?.kind === "mulligan";
     case "T03":
@@ -392,7 +412,13 @@ export function lesson(
         (prompt?.kind === "yes_no" || prompt?.kind === "choose_choice")
       );
     case "T11":
-      return now.boss.life > 0 && now.boss.life <= 10;
+      // The opponent low, or (v0.9.1) attackers enough to deal lethal damage unblocked.
+      return (
+        (now.boss.life > 0 && now.boss.life <= 10) ||
+        (prompt?.kind === "declare_attackers" &&
+          now.boss.life > 0 &&
+          attackPower(view, options) >= now.boss.life)
+      );
     default:
       return false;
   }

@@ -405,6 +405,65 @@ describe("lessons", () => {
     );
     expect(lesson("T11", null, now, null, shown)).toBe(false);
   });
+
+  it("let the mulligan's lesson come before the welcome (v0.9.1)", () => {
+    const shown = view([], player(0, 40), player(1, 40));
+    const now = observe(shown, [], 0);
+    const asked = (kind: "mulligan" | "priority") => ({
+      id: "p",
+      kind,
+      message: "",
+      detail: null,
+      options: [],
+      amounts: null,
+      piles: null,
+      xmage_query: null,
+    });
+    expect(lesson("T01", null, now, asked("mulligan"), shown)).toBe(false);
+    expect(lesson("T01", null, now, asked("priority"), shown)).toBe(true);
+  });
+
+  it("see a lethal attack at 40 life as well as a low opponent (v0.9.1)", () => {
+    const big = (id: string, power: string) =>
+      permanent(id, 0, "Creature", {
+        card: {
+          id: `c-${id}`,
+          hidden: false,
+          name: id,
+          mana_cost: null,
+          type_line: "Creature",
+          power,
+          toughness: "1",
+          rules: [],
+        },
+      });
+    const shown = view(
+      [big("a", "20"), big("b", "20"), big("sick", "50")],
+      player(0, 40),
+      player(1, 40),
+    );
+    const now = observe(shown, [], 0);
+    const attack = (ids: string[]) => ({
+      id: "p",
+      kind: "declare_attackers" as const,
+      message: "",
+      detail: null,
+      options: ids.map((id) => ({
+        id: `o-${id}`,
+        action: "toggle_attacker" as const,
+        label: null,
+        object_id: id,
+        seat: null,
+        selected: false,
+      })),
+      amounts: null,
+      piles: null,
+      xmage_query: null,
+    });
+    // The two that may attack reach 40; the summoning-sick one isn't offered.
+    expect(lesson("T11", null, now, attack(["a", "b"]), shown)).toBe(true);
+    expect(lesson("T11", null, now, attack(["a"]), shown)).toBe(false);
+  });
 });
 
 describe("the story settings", () => {

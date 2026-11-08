@@ -180,6 +180,9 @@ public record HumanGameRequest(long seed, GameFormat format, List<Seat> seats, i
                 players.add(player);
                 DeckLists.CustomDeck custom = seat.has("deck_list") ? DeckLists.parse(seat.get("deck_list"), format)
                     : null;
+                if (custom != null && !custom.opening().isEmpty() && !player.equals(HUMAN)) {
+                    throw new JsonRequest.Invalid("only a human seat's deck_list has an opening");
+                }
                 decks.add(seat.has("deck") ? deck(seat, format) : custom != null ? CUSTOM_DECK : null);
                 customs.add(custom);
             }

@@ -125,11 +125,11 @@ The web side of the auction house. It looks and moves like Madden Ultimate Team'
 
 #### The item panel
 
-An auction opens in a drawer at the right of a wide window, or a sheet from the bottom of a phone's. It holds the big picture (a click shows it full size, with Card details a button away), the name, edition, rarity, finish and where the viewer stands; the seller; the current or starting bid, Buy Now, the time left, the bids and the highest bidder, the viewer's own bid and the length. It asks for the auction again every 5 seconds.
+An auction opens in a drawer at the right of a wide window, or a sheet from the bottom of a phone's. It holds the big picture (since v0.9.1 a click on it opens the card's details, the owner's request; until then it showed the picture full size, with Card details a button away), the name, edition, rarity, finish and where the viewer stands; the seller; the current or starting bid, Buy Now, the time left, the bids and the highest bidder, the viewer's own bid and the length. It asks for the auction again every 5 seconds.
 
 - **The bid stepper** starts at the least bid the auction takes (`next_bid`); + and − move by the 5% step, never under the least bid, and the box takes any amount typed. It says what the bid does: too low, a bid whose tokens are held, or a bid that reaches Buy Now. **Make bid** keeps one client key until it succeeds, so Try again bids once. Holding the high bid, the viewer cannot bid against themself.
 - **Buy Now** asks first, with the price and what the viewer will have left (their held bid, if they lead, comes back).
-- **Watch**, **Compare price** (the same edition and finish's live listings, lowest first, each opening in the panel, and its recent sales with their average) and **Card details** (the catalog's details of that printing).
+- **Watch** and **Compare price** (the same edition and finish's live listings, lowest first, each opening in the panel, and its recent sales with their average). Until v0.9.1 a **Card details** button too; the card's picture opens them now.
 - **Withdraw**, on the viewer's own listing while it has no bid.
 - A live region speaks the countdown only at its milestones: under an hour, ten minutes, a minute, ended.
 

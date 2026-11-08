@@ -37,6 +37,17 @@ def role_of(seat: int) -> Role:
     return "king" if seat in KINGS else "general"
 
 
+# Practice games default the house rule on (v0.9.1): with it off, a King has no one to attack while
+# both of its Generals stand (809.4b), and a practice table of bots could stall for dozens of
+# turns. Tables keep the rule off by default; their host chooses.
+PRACTICE_DEFAULTS = KingsTableSettings(king_attacks_anyone=True)
+
+
+def practice_config(raw: object) -> KingsTableSettings:
+    """A practice game's settings: those asked for, or the practice defaults when none were."""
+    return PRACTICE_DEFAULTS if raw is None else config_of(raw)
+
+
 def config_of(raw: object) -> KingsTableSettings:
     """The settings a table or a game keeps (JSON), or the defaults for a row without them."""
     if isinstance(raw, KingsTableSettings):

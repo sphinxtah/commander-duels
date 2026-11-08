@@ -11,7 +11,7 @@
 ## A duel
 
 1. **The scene before it.** Choosing a ward plays its scene (FC.E01.PRE and so on): the title card (the encounter, its title, tier, place and seal), the place as the player arrives, then the dialogue. Before the first ward whose opponent is the account's ally, the handoff's alliance scene plays first; before the finale, an ally of The Sphinx gets The Sphinx's own.
-2. **The deck.** Learn Commander (the first ward only: the loaner deck, the disclosed training seed `20261031` for the shuffles, and Kaya's hints; since v0.8.3 the API refuses it on any other ward with `422 invalid_seat`, since a disclosed seed there would show a player who lost once both decks' order for the replay), the campaign's loaner (Adeline's Vanguard, mono-white, led by Adeline, Resplendent Cathar; it never touches the collection and stays offered for every ward), or one of the player's own playable Commander decks. "I know how to play" skips the teaching, never the duel. After a duel lost, Kaya's advice for that ward (the handoff's counterplay) heads the choice.
+2. **The deck.** Learn Commander (the first ward only: the loaner deck, the disclosed training seed `20261031` for the shuffles, the handoff's training seven as the opening hand (since v0.9.1: three Plains, Sol Ring, Arcane Signet, Raise the Alarm and Pacifism, which the engine puts on top of the library after the first shuffle; `content/campaign.json` `training_hand`, the deck list's `opening`), and Kaya's hints; since v0.8.3 the API refuses it on any other ward with `422 invalid_seat`, since a disclosed seed there would show a player who lost once both decks' order for the replay), the campaign's loaner (Adeline's Vanguard, mono-white, led by Adeline, Resplendent Cathar; it never touches the collection and stays offered for every ward), or one of the player's own playable Commander decks. "I know how to play" skips the teaching, never the duel. After a duel lost, Kaya's advice for that ward (the handoff's counterplay) heads the choice.
 3. **The duel** is a practice game against one bot, `POST /api/v1/campaign/encounters/{n}/start`: the player in seat 0, the encounter's opponent in seat 1 with its commander and 99-card deck from `content/campaign.json`, the bots' skill rising with the tiers (1 for Tibalt, 2 to 3 in Bronze, 3 to 4 in Silver, 4 to 5 in Gold, 5 in Platinum, 6 for Liliana and The Sphinx; [fair bots](engine/fair-bots.md#skill-and-habits-v071)), Commander's two-player rules, a 60-turn cap. At the table the opponent is named and drawn by their own portrait ("Tibalt, Warden of the Archive"), and the table's way out says "Back to the campaign". Campaign duels are not offered a rematch: they are played again from the map.
 4. **The voices at the table** ([below](#at-the-table)): the opponent's barks and Kaya's, by their portraits; in the first duel with hints on, Kaya's lessons; in the finale, The Sphinx's crossing.
 5. **After it** (`#campaign/game/<id>`): a win plays the ward's victory scene, and on the first win its seal claimed (the seal cracks into light) then the warden's spoils (their deck and tokens, below) and, when the win completes a chapter, the chapter's card (its badge giving way to the next tier's) with its rewards. What the seal revealed goes to the journal. A loss plays the opponent's line, then the retreat: Retry, Edit a deck, the defeat's review (Kaya's advice and the game's board and log) and Return to the campaign. A draw holds the ward; a closed, timed-out or turn-limited duel ends without a result and changes nothing.
@@ -43,7 +43,7 @@ The script (`web/src/campaign/script.ts`) holds every line of the handoff under 
 `web/src/campaign/CampaignLayer.tsx`, over the table in the stage's units, never taking a click but on a lesson's buttons, never over the stack:
 - **Barks** (`barks.ts`): the handoff's two per ward, from the opponent beside their portrait at the top right, or from Kaya at the upper left, each once a duel, one at a time, for a few seconds by its length. Their triggers are read from what changed between the seat's views and the public log, as the table's effects are: a first creature, the boss's life at 10 or 5, a haste or large attack, a block, a counterspell, a second spell in a turn, a theft and its undoing, a commander cast a second time, a recursion, a graveyard exiled, a five-colour permanent, a land lost, exile or milling, a low library, a drain or sacrifice, a sweep rebuilt from, a protected attempt, a combination stopped. A moment the views cannot show plays at its nearest sign or not at all, as the handoff allows. Settings can silence them.
 - **The finale**: the boss's commander cast and your commander's return bring the first phase's lines. When the owner's finale runs, a planeswalker of The Sphinx's entering at 15 life or less is his crossing: a fracture of gold over the table, the arrival's lines, and the handoff's tooltip ("The Sphinx is now a planeswalker on the battlefield. Removing this form buys time. Win the duel to end his claim."); its first removal plays the removal's lines, its first return the recast's, and later returns a single line at most each two turns. The escalation's barks follow his tutor (+2), a counter, a regeneration, an army, loyalty at ten and his life at five. The table remembers the crossing for the ending (sessionStorage): a win before it plays the early ending.
-- **Kaya's lessons** (the first ward, hints on): the handoff's T01 to T11, each once, as the board calls for it: the command zone at the start, the mulligan, a land to play, a payment, the commander castable, a creature entering, attackers, blockers, a spell to answer, the commander's return, the opponent low. Got it closes one; Turn off hints ends them (and the account's setting). Each lesson seen is recorded for the journal. Kaya's help lines come as barks.
+- **Kaya's lessons** (the first ward, hints on): the handoff's T01 to T11, each once, as the board calls for it: the command zone at the start, the mulligan, a land to play, a payment, the commander castable, a creature entering, attackers, blockers, a spell to answer, the commander's return, the opponent low. Got it closes one; Turn off hints ends them (and the account's setting). Each lesson seen is recorded for the journal. Kaya's help lines come as barks. Since v0.9.1 a lesson whose moment came while another showed is looked at again when that one closes, comparing the board with the last look, so a creature that entered meanwhile still counts; during the mulligan T02 comes before T01, whose moment doesn't pass with the keep; and T11 also comes at a declare-attackers step whose offered attackers' power would be lethal unblocked.
 
 ## The finale's incarnation
 
@@ -88,6 +88,39 @@ An engine without the owner's content (the public images, a local stack) plays t
 
 A game's summary (`GET /api/v1/games/{id}`) names its encounter (`campaign`: encounter, opponent, name, title, hints, deck, finale, outcome), and its bot seat carries the opponent's name and portrait. `POST /api/v1/games/{id}/rematch` answers 409 `campaign_game`.
 
+## Difficulty, measured (v0.9.1)
+
+The handoff's difficulty contract is a target to measure. `CampaignDifficulty` (engine tests, run only with `-Dcampaign.measure=<games per pairing>`) plays a reference deck suite, each deck a fair bot at a fixed skill, against every ward's deck at that ward's skill, on the real engine, and writes a JSON report; `scripts/campaign_difficulty.py` sums it up by ward. The finale plays its public stand-in.
+
+```sh
+cd engine && mvn -Dmaven.repo.local.tail=/xmage/m2 -Dtest=CampaignDifficulty -Dsurefire.failIfNoSpecifiedTests=false \
+  -Dcampaign.measure=3 -Dcampaign.references=loaner -Dcampaign.out=/tmp/difficulty.json test
+python scripts/campaign_difficulty.py /tmp/difficulty.json
+```
+
+Options: `campaign.reference.skill` (default 3), `campaign.references` (`loaner` and starter deck IDs, default the loaner, `starter_rg_v1` and `starter_wu_v1`), `campaign.wards`, `campaign.budget` (seconds a game, default 300). "Hit" is the reference player's own turn when it first lost life; "lethal" is its own turn when the warden's creatures first had power enough on the battlefield to kill it.
+
+**The first run (2026-11-07):** the loaner, Adeline's Vanguard, at skill 3, three games a ward.
+
+| Ward | Skill | Reference won | Warden won | Other | Median turns | First hit | First lethal |
+|---|---|---|---|---|---|---|---|
+| 1 Tibalt | 1 | 2 | 1 | 0 | 20 | 2 | 7 |
+| 2 Daretti | 2 | 3 | 0 | 0 | 24 | 4 | – |
+| 3 Domri | 2 | 2 | 1 | 0 | 24 | 3 | 6 |
+| 4 Dovin | 3 | 2 | 1 | 0 | 14 | 3 | 6 |
+| 5 Oko | 3 | 3 | 0 | 0 | 21 | 2 | – |
+| 6 Xenagos | 3 | 2 | 1 | 0 | 19 | 3 | 8 |
+| 7 Tezzeret | 4 | 3 | 0 | 0 | 11 | – | – |
+| 8 Arzakon | 4 | 3 | 0 | 0 | 13 | 4 | – |
+| 9 Ashiok | 4 | 3 | 0 | 0 | 15 | 3 | 11 |
+| 10 Ob Nixilis | 5 | 3 | 0 | 0 | 14 | 3 | 7 |
+| 11 Geyadrone Dihada | 5 | 3 | 0 | 0 | 17 | 3 | – |
+| 12 Nicol Bolas | 5 | 3 | 0 | 0 | 17 | 1 | – |
+| 13 Liliana | 6 | 3 | 0 | 0 | 16 | 3 | – |
+| 14 The Sphinx (stand-in) | 6 | 2 | 0 | 1 | 8 | – | – |
+
+**What it says.** The curve runs backwards: the bronze and silver wardens (skill 1 to 3) won 4 of 18, and the wardens from ward 7 on (skill 4 to 6) won none of 24, most losing by turn 17 without ever threatening lethal. Skill isn't the lever that's missing: Liliana is already at 6. The later decks (artifact, five-colour, value and combo plans) are ones XMage's AI pilots poorly against a fast white weenie deck. Tibalt's first lethal threat came no earlier than the reference player's seventh turn, inside T04's "not before the sixth". The finale's first game ran out of the engine's 2 GB heap, and one of its games ended on turn 2 with both players at 40, which wants a look. Three games a pairing is a small sample. The skills were left unchanged: the decks are the lever, and they are the owner's content ([v0.9.2's plan](plans/0.9.2.md)).
+
 ## Content
 
-`content/campaign.json`: the campaign's ID and content version (`final_concordance_v1`, 1), the turn cap, the training seed, the loaner deck, the six chapters with their rewards, and the fourteen encounters (number, opponent's roster ID, name, title, tier, place, seal, the bots' skill, commander and 99 cards; the finale's commander null, its stand-in and its private content's name). Every card of the thirteen decks and the loaner was checked against XMage's card classes at the pinned commit (`eb69d05b`) when they were written; the engine refuses a game naming a card it lacks (`unknown_cards`). `tests/test_campaign.py` checks the decks' counts, singletons and commanders, and that neither custom card is named.
+`content/campaign.json`: the campaign's ID and content version (`final_concordance_v1`, 1), the turn cap, the training seed, the training hand (v0.9.1), the loaner deck, the six chapters with their rewards, and the fourteen encounters (number, opponent's roster ID, name, title, tier, place, seal, the bots' skill, commander and 99 cards; the finale's commander null, its stand-in and its private content's name). Every card of the thirteen decks and the loaner was checked against XMage's card classes at the pinned commit (`eb69d05b`) when they were written; the engine refuses a game naming a card it lacks (`unknown_cards`). `tests/test_campaign.py` checks the decks' counts, singletons and commanders, and that neither custom card is named.

@@ -123,6 +123,62 @@ def test_only_its_owner_and_sysop_may_hold_a_one_of_a_kind_edition(client, monke
     assert check(ada, (1, ring))["playable"] is False
 
 
+def test_each_start_puts_the_one_copy_in_its_owners_library(client, monkeypatch):  # noqa: F811
+    """v0.9.1: the worker's start grants the owner the copy when they hold none (an account made
+    after migration 0027, or emptied by a reset), and never a second."""
+    _, ring, _ = bolts(client)
+    monkeypatch.setattr(library, "ONE_OF_A_KIND", {ring.scryfall_id: "sphinx"})
+    sphinx = Account(client, "Sphinx")
+    ada = Account(client, "ada")
+    Account(client, "sysop", kind="sysop")
+
+    def held() -> dict[UUID, int]:
+        with database(client) as db:
+            counted: dict[UUID, int] = {}
+            for grant in db.scalars(
+                select(LibraryGrant).where(LibraryGrant.printing_id == ring.id)
+            ).all():
+                counted[grant.user_id] = counted.get(grant.user_id, 0) + grant.quantity
+            return counted
+
+    def ensure() -> list[str]:
+        with database(client) as db:
+            granted = library.ensure_one_of_a_kind(db)
+            db.commit()
+            return granted
+
+    assert ensure() == ["sphinx"]
+    assert held() == {sphinx.id: 1}
+    grant = held()
+    assert ensure() == [] and held() == grant
+    # After a reset the copy no longer counts: the next start gives it back, with a new key.
+    with database(client) as db:
+        db.execute(update(User).where(User.id == sphinx.id).values(reset_at=utcnow()))
+        db.commit()
+    assert ensure() == ["sphinx"]
+    with database(client) as db:
+        keys = db.scalars(
+            select(LibraryGrant.grant_key).where(LibraryGrant.printing_id == ring.id)
+        ).all()
+        assert len(set(keys)) == 2
+    # Another player holding it (never by the rules, but by hand) stops any grant.
+    with database(client) as db:
+        db.execute(update(User).where(User.id == sphinx.id).values(reset_at=utcnow()))
+        db.add(
+            LibraryGrant(
+                user_id=ada.id,
+                concept_id=ring.concept_id,
+                printing_id=ring.id,
+                quantity=1,
+                source="grant",
+                grant_key="grant:by-hand",
+                created_at=utcnow(),
+            )
+        )
+        db.commit()
+    assert ensure() == []
+
+
 def round_trip(database_url: str, folder: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Migration 0027 on a catalog whose printing is the One Ring: Sphinx gets the one copy,
     once; a second run gives nothing more; the downgrade takes it back."""

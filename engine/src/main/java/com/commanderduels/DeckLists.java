@@ -48,7 +48,10 @@ final class DeckLists {
     static final int MAX_SEARCH = 50;
     /** XMage refuses a deck entry above 99 copies; larger counts become several entries. */
     private static final int XMAGE_MAX_PER_ENTRY = 99;
-    private static final Set<String> FIELDS = Set.of("cards", "commanders", "sideboard", "stand_ins", "reserve");
+    private static final Set<String> FIELDS = Set.of("cards", "commanders", "sideboard", "stand_ins", "reserve",
+        "opening");
+    /** At most an opening hand's worth of cards on top of a stacked library (v0.9.1). */
+    static final int MAX_OPENING = 7;
     private static final Set<String> RESERVE_FIELDS = Set.of("name", "threshold");
     /** A reserve card's threshold: the life at or below which it first crosses (v0.8.0). */
     static final int MAX_THRESHOLD = 999;
@@ -70,13 +73,19 @@ final class DeckLists {
      * the stand-ins it describes, by name.
      */
     record CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard,
-                      Map<String, StandInCard.Description> standIns, List<Reserve> reserve) {
+                      Map<String, StandInCard.Description> standIns, List<Reserve> reserve, List<String> opening) {
         CustomDeck {
             cards = List.copyOf(cards);
             commanders = List.copyOf(commanders);
             sideboard = List.copyOf(sideboard);
             standIns = Map.copyOf(standIns);
             reserve = List.copyOf(reserve);
+            opening = List.copyOf(opening);
+        }
+
+        CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard,
+                   Map<String, StandInCard.Description> standIns, List<Reserve> reserve) {
+            this(cards, commanders, sideboard, standIns, reserve, List.of());
         }
 
         CustomDeck(List<Entry> cards, List<String> commanders, List<Entry> sideboard,
@@ -167,7 +176,38 @@ final class DeckLists {
             }
             reserve = reserve(json.get("reserve"));
         }
-        return new CustomDeck(entries, commanders, sideboard, standIns, reserve);
+        List<String> opening = json.has("opening") ? opening(json.get("opening"), entries) : List.of();
+        return new CustomDeck(entries, commanders, sideboard, standIns, reserve, opening);
+    }
+
+    /**
+     * The {@code opening} (v0.9.1): the cards a stacked library holds on top after the game's first
+     * shuffle, in draw order, at most an opening hand's worth. Each must be in the deck's {@code cards}
+     * as often as it is named. Learn Commander's training hand.
+     */
+    private static List<String> opening(JsonElement list, List<Entry> entries) throws JsonRequest.Invalid {
+        if (list == null || !list.isJsonArray() || list.getAsJsonArray().size() > MAX_OPENING) {
+            throw new JsonRequest.Invalid("seats[].deck_list.opening must list at most " + MAX_OPENING + " cards");
+        }
+        Map<String, Integer> left = new HashMap<>();
+        for (Entry entry : entries) {
+            left.merge(entry.name().toLowerCase(Locale.ROOT), entry.count(), Integer::sum);
+        }
+        List<String> names = new ArrayList<>();
+        for (JsonElement item : list.getAsJsonArray()) {
+            JsonObject holder = new JsonObject();
+            holder.add("opening", item);
+            String name = JsonRequest.string(holder, "opening", MAX_NAME).strip();
+            String key = name.toLowerCase(Locale.ROOT);
+            int count = left.getOrDefault(key, 0);
+            if (count <= 0) {
+                throw new JsonRequest.Invalid("seats[].deck_list.opening names " + name
+                    + " more often than the deck's cards hold it");
+            }
+            left.put(key, count - 1);
+            names.add(name);
+        }
+        return List.copyOf(names);
     }
 
     /** The {@code reserve}: at most one card, with its threshold (v0.8.0). */

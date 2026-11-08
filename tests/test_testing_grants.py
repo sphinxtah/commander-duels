@@ -21,6 +21,7 @@ from api.models import (
     AuditEvent,
     CampaignReward,
     CardConcept,
+    CardPrinting,
     LibraryGrant,
     PlayerResult,
     RoleGrant,
@@ -166,6 +167,33 @@ def test_sysop_grants_cards_to_a_library(
     assert etched.status_code == 422
     [details] = audited(app, "testing.cards_granted")
     assert (details["name"], details["quantity"]) == ("Lightning Bolt", 4)
+
+
+def test_a_one_of_a_kind_edition_is_never_granted(
+    client: TestClient, app: FastAPI, database: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.9.1: The One Ring 001/001's one copy is its owner's; not even SysOp grants another."""
+    from api import testing
+
+    import_bulk(create_engine(database), tmp_path / "files", bulk(), engine_list())
+    root = Account(client, "sysop", kind="sysop")
+    ada = Account(client, "ada")
+    with Session(app.state.database) as db:
+        bolt = db.scalars(select(CardConcept).where(CardConcept.name == "Lightning Bolt")).one()
+        ring = db.scalars(select(CardPrinting).where(CardPrinting.concept_id == bolt.id)).first()
+        assert ring is not None
+    monkeypatch.setattr(testing, "ONE_OF_A_KIND", {ring.scryfall_id: "sphinx"})
+    body = {
+        "card_id": str(bolt.id),
+        "printing_id": str(ring.id),
+        "quantity": 1,
+        "reason": "One more ring",
+    }
+    for account in (ada, root):
+        refused = root.post(f"/api/v1/admin/users/{account.id}/cards", body)
+        assert (refused.status_code, refused.json()["code"]) == (409, "one_of_a_kind")
+    with Session(app.state.database) as db:
+        assert db.scalar(select(func.count()).select_from(LibraryGrant)) == 0
 
 
 def test_sysop_sets_campaign_progress_without_spoils(client: TestClient, app: FastAPI) -> None:

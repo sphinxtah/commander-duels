@@ -161,9 +161,13 @@ describe("opening a pack", () => {
     expect(
       screen.getByText(/6 cards · 3 new to your library · 1 foil/),
     ).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Details of Mythic Card" }),
-    );
+    // The card itself is the details button (v0.9.1): no separate Details link.
+    expect(within(summary).queryByText("Details")).toBeNull();
+    const mythic = screen.getByRole("button", {
+      name: "Details of Mythic Card",
+    });
+    expect(mythic.querySelector("img")).not.toBeNull();
+    fireEvent.click(mythic);
     expect(
       screen.getByText("Details of card-4 at printing-4, chosen"),
     ).toBeInTheDocument();

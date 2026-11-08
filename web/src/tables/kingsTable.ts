@@ -26,6 +26,13 @@ export const DEFAULT_KINGS_TABLE: KingsTableSettings = {
   king_attacks_anyone: false,
 };
 
+/** Practice games' defaults (v0.9.1): the house rule on, so a table of bots doesn't stall. The
+ * API sends the same with the practice options. */
+export const PRACTICE_KINGS_TABLE: KingsTableSettings = {
+  ...DEFAULT_KINGS_TABLE,
+  king_attacks_anyone: true,
+};
+
 export function kingsTeam(seat: number): 0 | 1 {
   return seat < 3 ? 0 : 1;
 }
