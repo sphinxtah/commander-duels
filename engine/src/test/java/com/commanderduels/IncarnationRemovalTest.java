@@ -104,4 +104,29 @@ class IncarnationRemovalTest {
         // It can cross again after all of them: the reserve is never spent.
         assertNotNull(cross(table));
     }
+
+    @Test
+    void aCounteredCastGoesBackToTheReserve() throws Exception {
+        // v0.9.4: the free first cast, or a paid recast, countered on the stack: the spell's card goes
+        // back to its reserve, not to the graveyard, with one copy in the game and no life changed.
+        Table table = table();
+        for (String how : List.of("countered on its first cast", "countered on a recast")) {
+            Game game = table.game();
+            Card card = table.incarnation();
+            int life = table.owner().getLife();
+            mage.game.stack.Spell spell = new mage.game.stack.Spell(card, card.getSpellAbility().copy(),
+                table.owner().getId(), Zone.COMMAND, game);
+            game.getStack().push(game, spell);
+            game.getState().setZone(card.getId(), Zone.STACK);
+            assertTrue(game.getStack().counter(spell.getId(), table.source(), game), how + ": countered");
+            assertReserved(table, how, life);
+            // The reserve keeps it castable for its mana cost: XMage offers a card's spell from the
+            // command zone through the Commander object that holds it, as for any commander.
+            assertTrue(game.getState().getCommand().stream().anyMatch(object ->
+                    object instanceof mage.game.command.Commander && object.getSourceId().equals(card.getId())),
+                how + ": castable from the reserve again");
+        }
+        // Countered twice, it can still cross.
+        assertNotNull(cross(table));
+    }
 }

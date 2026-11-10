@@ -284,6 +284,12 @@ class ChatHub:
         for connection in list(self.connections.get(user_id, {}).values()):
             connection.send(message)
 
+    def send_all(self, message: dict[str, Any]) -> None:
+        """Sends to every open tab of every account, on the loop (the live lobby, v0.9.4)."""
+        for tabs in list(self.connections.values()):
+            for connection in list(tabs.values()):
+                connection.send(message)
+
 
 def chat_hub_of(request: Request | WebSocket) -> ChatHub:
     state = request.app.state

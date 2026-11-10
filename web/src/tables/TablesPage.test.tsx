@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Me } from "../api";
 import { mockApi, openDialogs, reply } from "../decks/fixtures";
 import type { OwnDeck, TablePlayer, TableView } from "./tables";
+import { lobbyChanged, setLobbyLive } from "./lobby";
 import { TablesPage } from "./TablesPage";
 
 // The public queues are in the lobby since v0.8.7, from the Play page, and since v0.9.2 in its
@@ -284,6 +285,32 @@ describe("the lobby", () => {
     expect(
       form().getByRole("checkbox", { name: /^Cards not legal in Legacy/ }),
     ).toBeChecked();
+  });
+
+  it("asks again as soon as the live lobby says the tables changed (v0.9.4)", async () => {
+    const api = mockApi();
+    let tables = [table()];
+    serveLobby(api, () => reply(200, tables));
+    api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+    render(<TablesPage me={ada} heading={createRef()} />);
+    await settle();
+    const asked = () =>
+      api.calls.filter((c) => c.route === "GET /api/v1/tables/browse").length;
+    const before = asked();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    tables = [table(), table({ code: "Tb2e-code_654321", host: "cara" })];
+    await act(async () => {
+      setLobbyLive(true);
+      lobbyChanged();
+    });
+    await settle();
+    expect(asked()).toBeGreaterThan(before);
+    expect(
+      within(screen.getByRole("region", { name: "Find a game" })).getAllByRole(
+        "listitem",
+      ),
+    ).toHaveLength(2);
+    await act(async () => setLobbyLive(false));
   });
 
   it("points to the table you sit at, and says why a table could not open", async () => {

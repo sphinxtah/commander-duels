@@ -39,10 +39,12 @@ import {
   unfit,
   useOwnDecks,
   usePolled,
+  POLL_MS,
   type TableFormat as Format,
   type TableRules,
   type TableView,
 } from "./tables";
+import { LIVE_POLL_MS, useLobby } from "./lobby";
 import styles from "./tables.module.css";
 
 // Human tables (v0.4.0, docs/tables.md): the lobby lists the open tables and opens new ones; a
@@ -198,6 +200,7 @@ function Lobby({
     return () => window.removeEventListener("hashchange", follow);
   }, []);
 
+  const lobby = useLobby();
   const nothing = filters.formats.length === 0 || filters.rules.length === 0;
   const load = useCallback(async () => {
     if (nothing) return null;
@@ -220,8 +223,10 @@ function Lobby({
       },
     });
     return data;
-  }, [filters, nothing, page, perPage]);
-  const [found, refresh] = usePolled(load);
+    // The live lobby's revision asks again as soon as the tables change (v0.9.4).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, nothing, page, perPage, lobby.revision]);
+  const [found, refresh] = usePolled(load, lobby.live ? LIVE_POLL_MS : POLL_MS);
   // The answer for these filters: an older one, still shown while the new one comes, is marked.
   const current = nothing ? null : found;
 

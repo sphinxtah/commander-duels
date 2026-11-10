@@ -846,8 +846,17 @@ export function GameScreen({
                     <div className={screen.alert} role="alert">
                       <p>
                         The rules engine lost this game (a restart), so it
-                        cannot continue. Recovery arrives in a later version.
+                        cannot continue.
+                        {campaign &&
+                          " The duel counts for nothing: start it again from the campaign."}
                       </p>
+                      <a
+                        href={back.href}
+                        className={styles.secondaryButton}
+                        onClick={leave}
+                      >
+                        {back.text}
+                      </a>
                     </div>
                   )}
                   {!view && !state.ended && (

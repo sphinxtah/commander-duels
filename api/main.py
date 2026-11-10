@@ -28,6 +28,7 @@ from api import (
     engine_cards,
     games,
     how_to_play,
+    lobby,
     matches,
     progression,
     quests,
@@ -134,6 +135,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.database = build_engine(config.database_url)
         # Friends' messages reach open tabs from the routes' threads through this loop (v0.4.4).
         app.state.chat = chat.ChatHub(asyncio.get_running_loop())
+        # The live lobby (v0.9.4): a commit that changes the tables tells every open tab.
+        notices = lobby.LobbyNotices(asyncio.get_running_loop(), app.state.chat.send_all)
+        stop_lobby = lobby.subscribe(app.state.database, notices.changed)
         token = config.engine_service_token.get_secret_value()
         with httpx.Client(timeout=5.0) as google:
             if config.google_client_id:
@@ -181,6 +185,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 try:
                     yield
                 finally:
+                    stop_lobby()
                     await app.state.games.stop()
         app.state.database.dispose()
 

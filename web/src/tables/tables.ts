@@ -137,6 +137,7 @@ export function unfit(deck: OwnDeck, rules: TableRules): string | null {
  * The second value asks again now. */
 export function usePolled<T>(
   load: () => Promise<T | undefined>,
+  every: number = POLL_MS,
 ): [T | undefined, () => void] {
   const [value, setValue] = useState<T>();
   const [tick, setTick] = useState(0);
@@ -145,12 +146,12 @@ export function usePolled<T>(
     void load().then((found) => {
       if (active && found !== undefined) setValue(found);
     });
-    const timer = window.setTimeout(() => setTick((n) => n + 1), POLL_MS);
+    const timer = window.setTimeout(() => setTick((n) => n + 1), every);
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [load, tick]);
+  }, [load, tick, every]);
   return [value, () => setTick((n) => n + 1)];
 }
 

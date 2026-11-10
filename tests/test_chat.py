@@ -402,3 +402,36 @@ def test_chat_on_postgresql(monkeypatch):
         with admin_engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         admin_engine.dispose()
+
+
+def test_the_lobby_rides_on_the_chat_socket(client, monkeypatch):
+    """v0.9.4: a commit that changes the tables tells every open tab, with nothing about any table;
+    a commit that changes none tells nothing."""
+    from api import lobby
+    from api.models import GameTable
+
+    monkeypatch.setattr(lobby, "COALESCE_SECONDS", 0.01)
+    ada, bob = player(client, "ada"), player(client, "bob")
+    database = client.app.state.database
+    with socket(ada) as first, socket(bob) as second:
+        opened(ada, first)
+        opened(bob, second)
+        with Session(database) as db:
+            db.execute(update(User).where(User.id == ada.id).values(status="active"))
+            db.commit()
+        with Session(database) as db:
+            db.execute(update(GameTable).where(GameTable.code == "none").values(status="closed"))
+            db.commit()
+        for connection in (first, second):
+            notice = connection.receive_json()
+            assert notice["type"] == "lobby", notice
+            assert set(notice) == {"type", "revision"} and notice["revision"] >= 1
+        # The tab still answers its pings: the lobby's notice came alone, not the user change's.
+        first.send_json({"type": "ping"})
+        assert first.receive_json() == {"type": "pong"}
+        # A change rolled back tells nothing.
+        with Session(database) as db:
+            db.execute(update(GameTable).where(GameTable.code == "none").values(status="closed"))
+            db.rollback()
+        second.send_json({"type": "ping"})
+        assert second.receive_json() == {"type": "pong"}

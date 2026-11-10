@@ -11,6 +11,7 @@ import {
 import { client, currentCsrfToken, loadMe, type Me } from "../api";
 import type { components } from "../generated/api";
 import type { PlayerRef } from "../social/social";
+import { lobbyChanged, setLobbyLive } from "../tables/lobby";
 
 // Chat between friends (v0.4.4): the account's live connection, the unread count, the windows
 // docked on the chat bar and its friends list (v0.5.1), and the messages that pop up beside the
@@ -287,6 +288,7 @@ export class ChatSocket {
 
   stop(): void {
     this.stopped = true;
+    setLobbyLive(false);
     window.clearTimeout(this.timer);
     window.clearInterval(this.pinger);
     this.socket?.close(1000);
@@ -321,6 +323,7 @@ export class ChatSocket {
         this.attempts = 0;
         this.refreshed = false;
         this.onLive(true, message.unread);
+        setLobbyLive(true);
         window.clearInterval(this.pinger);
         this.pinger = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN)
@@ -328,6 +331,9 @@ export class ChatSocket {
         }, PING_MS);
       } else if (message.type === "message" || message.type === "read") {
         this.onEvent(message as ChatEvent);
+      } else if (message.type === "lobby") {
+        // The live lobby (v0.9.4): the tables changed; Find a game asks again.
+        lobbyChanged();
       } else if (message.type === "error" && message.code) {
         this.lastError = message.code;
       }
@@ -337,6 +343,7 @@ export class ChatSocket {
       this.socket = null;
       window.clearInterval(this.pinger);
       this.onLive(false);
+      setLobbyLive(false);
       void this.closed(event.code);
     };
   }
