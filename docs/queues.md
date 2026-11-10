@@ -1,6 +1,6 @@
 # Public queues and rematches (v0.5.0)
 
-Since v0.5.0 players find a game without an invite: they join a public queue with a deck, and the queue seats them with other players, or with bots after a minute. At the end of a game, Rematch plays it again. The owner's decisions are in [the v0.5.0 plan](plans/0.5.0.md#decisions-at-the-start-of-v050). The API is `api/queues.py` and `api/rematches.py`; the web app's part is `web/src/queues/`. A queue's game of two players or more is a [human table's](tables.md) game.
+Since v0.5.0 players find a game without an invite: they join a public queue with a deck, and the queue seats them with other players, or with bots after a minute. At the end of a game, Rematch plays it again. The owner's decisions are in [the v0.5.0 plan](plans/0.5.0.md#decisions-at-the-start-of-v050). The API is `api/queues.py` and `api/rematches.py`; the web app's part is `web/src/queues/`. A queue's game of two players or more is a [human table's](tables.md) game. Since v0.8.7 the queues are on the Tables page, and since v0.9.2 in its "Quick match" pop-up, beside "Open a table", which `#find` opens ([finding a game](tables.md#finding-a-game-and-inviting-friends-v092)). The pop-up's heading is "Quick match"; the form inside is unchanged.
 
 ## Decisions taken while building
 

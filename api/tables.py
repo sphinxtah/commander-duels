@@ -41,6 +41,13 @@
   format and the table's rules, when it is chosen, when its player gets ready and at the start;
   teammates may share cards. Bots play the engine's fixture decks of that format. The settings
   are the game's once it starts.
+- **Finding a table** (v0.9.2). The lobby's cards come a page at a time (20, 50 or 100), newest
+  first with your own table leading, filtered by format, rules (casual or tournament), open seats,
+  no bots, best of three, and friends' tables: those a friend sits at or you were invited to.
+- **Invitations** (v0.9.2). The host invites friends when opening a table, and any of its players
+  invites more from its page: each friend gets a notice in the bell that leads to the table, and
+  sees it in the lobby even when it is private. No seat is held; inviting a friend again sends
+  nothing new.
 """
 
 import random
@@ -50,9 +57,9 @@ from datetime import datetime, timedelta
 from typing import Annotated, Literal, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Path, Request
+from fastapi import APIRouter, Path, Query, Request
 from pydantic import Field
-from sqlalchemy import delete, func, select
+from sqlalchemy import Select, delete, func, not_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -100,6 +107,7 @@ from api.models import (
     Game,
     GameSeat,
     GameTable,
+    TableInvite,
     TableSeat,
     User,
 )
@@ -124,6 +132,11 @@ router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 # A table nobody started is closed after this long, so the lobby holds no forgotten tables.
 OPEN_HOURS = 3
 LISTED = 50
+# The lobby's pages of tables (v0.9.2).
+PAGE_SIZES = (20, 50, 100)
+# Friends invited at once, and to one table in all (v0.9.2).
+INVITES_AT_ONCE = 20
+INVITES_PER_TABLE = 50
 TEAM_FORMAT = teams.FORMAT
 KINGS = kings_table.FORMAT
 SEATS = {
@@ -192,6 +205,25 @@ class TableRequest(Contract):
         default=None,
         description="King's Table (v0.8.7): its settings, the defaults when left out. Refused at "
         "other tables.",
+    )
+    invite: list[UUID] = Field(
+        default_factory=list,
+        max_length=INVITES_AT_ONCE,
+        description="Since v0.9.2: friends to invite, each told in the bell. Every one must be "
+        "your friend.",
+    )
+
+
+class TableInviting(Contract):
+    """Friends a table's player invites (v0.9.2)."""
+
+    players: list[UUID] = Field(min_length=1, max_length=INVITES_AT_ONCE)
+
+
+class InvitesSent(Contract):
+    invited: list[str] = Field(description="The friends invited now, each told in the bell.")
+    already: list[str] = Field(
+        description="Friends invited before or seated at the table already: told nothing new."
     )
 
 
@@ -296,6 +328,32 @@ class TableView(Contract):
     can_start: bool = Field(description="You host it, every player's seat is taken and ready.")
     game_id: UUID | None = Field(description="Its game, once started; for its players and SysOp.")
     created_at: datetime
+    open_seats: int = Field(
+        default=0, description="Since v0.9.2: players' seats nobody has taken yet."
+    )
+    friends: list[str] = Field(
+        default_factory=list,
+        description="Since v0.9.2, in the lobby's pages: your friends seated at the table.",
+    )
+    invited_by: str | None = Field(
+        default=None,
+        description="Since v0.9.2, in the lobby's pages: who invited you to the table, if anyone.",
+    )
+
+
+RulesFilter = Literal["casual", "tournament"]
+
+
+class TablePage(Contract):
+    """A page of the lobby's open tables (v0.9.2)."""
+
+    tables: list[TableView]
+    total: int = Field(description="Every table the filters find, on every page.")
+    page: int = Field(description="This page, from 1; the last one when asked for past it.")
+    per_page: int
+    yours: TableView | None = Field(
+        default=None, description="The open table you sit at, whatever the filters."
+    )
 
 
 def cutoff() -> datetime:
@@ -546,6 +604,7 @@ def view_of(db: Session, table: GameTable, principal: Principal) -> TableView:
         can_start=status == "open" and table.host_id == you and ready,
         game_id=table.game_id if mine is not None or full_access(principal) else None,
         created_at=table.created_at,
+        open_seats=sum(1 for player in players if player.player == "human" and not player.taken),
     )
 
 
@@ -596,6 +655,138 @@ def may_sit(db: Session, request: Request, principal: Principal) -> None:
 
 
 # Routes.
+
+
+def friends_of(db: Session, user_id: UUID) -> set[UUID]:
+    # Imported here: api.social imports this module's cutoff.
+    from api.social import friendships_of
+
+    return {other for other, row in friendships_of(db, user_id).items() if row.status == "accepted"}
+
+
+def invited_to(user_id: UUID) -> Select[UUID]:
+    """The tables the account was invited to (v0.9.2), as a subquery of their ids."""
+    return select(TableInvite.table_id).where(TableInvite.user_id == user_id)
+
+
+@router.get(
+    "/tables/browse",
+    response_model=TablePage,
+    responses={422: {"model": Error}},
+)
+def browse_tables(
+    principal: Player,
+    db: Db,
+    format: Annotated[
+        list[TableFormatId] | None, Query(description="Formats to show; all when left out.")
+    ] = None,
+    rules: Annotated[
+        list[RulesFilter] | None,
+        Query(
+            description="casual (any of banned, not legal or stand-in cards allowed) or "
+            "tournament (none); both when left out."
+        ),
+    ] = None,
+    open_seats: Annotated[
+        bool, Query(description="Only tables with a player's seat free.")
+    ] = False,
+    no_bots: Annotated[bool, Query(description="Only tables without bots.")] = False,
+    best_of_three: Annotated[bool, Query(description="Only best-of-three matches.")] = False,
+    friends: Annotated[
+        bool, Query(description="Only tables a friend sits at or you were invited to.")
+    ] = False,
+    page: Annotated[int, Query(ge=1, le=10_000)] = 1,
+    per_page: Annotated[int, Query(description="20, 50 or 100.")] = PAGE_SIZES[0],
+) -> TablePage:
+    """The lobby's open tables a page at a time (v0.9.2): the public ones, your own, those you were
+    invited to (SysOp and administrators see every one), newest first with your own leading."""
+    if per_page not in PAGE_SIZES:
+        raise ApiError(422, "invalid_page", "Show 20, 50 or 100 tables a page.")
+    you = principal.user.id
+    mine = select(TableSeat.table_id).where(TableSeat.user_id == you)
+    statement = select(GameTable).where(
+        GameTable.status == "open", GameTable.created_at >= cutoff()
+    )
+    if not full_access(principal):
+        statement = statement.where(
+            (GameTable.visibility == "public")
+            | GameTable.id.in_(mine)
+            | GameTable.id.in_(invited_to(you))
+        )
+    if format:
+        statement = statement.where(GameTable.format.in_(set(format)))
+    casual_rules = or_(GameTable.allow_banned, GameTable.allow_not_legal, GameTable.allow_stand_in)
+    if rules and set(rules) == {"casual"}:
+        statement = statement.where(casual_rules)
+    elif rules and set(rules) == {"tournament"}:
+        statement = statement.where(not_(casual_rules))
+    if open_seats:
+        taken = (
+            select(func.count())
+            .select_from(TableSeat)
+            .where(TableSeat.table_id == GameTable.id)
+            .scalar_subquery()
+        )
+        statement = statement.where(GameTable.seats - GameTable.bots > taken)
+    if no_bots:
+        statement = statement.where(GameTable.bots == 0)
+    if best_of_three:
+        statement = statement.where(GameTable.best_of == 3)
+    known = friends_of(db, you)
+    if friends:
+        theirs = select(TableSeat.table_id).where(TableSeat.user_id.in_(known))
+        statement = statement.where(
+            or_(GameTable.id.in_(theirs), GameTable.id.in_(invited_to(you)))
+        )
+    total = db.scalar(select(func.count()).select_from(statement.subquery())) or 0
+    last = max(1, -(-total // per_page))
+    page = min(page, last)
+    found = list(
+        db.scalars(
+            statement.order_by(GameTable.id.in_(mine).desc(), GameTable.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+        )
+    )
+    ids = [table.id for table in found]
+    seated: dict[UUID, list[UUID]] = {}
+    for table_id, user_id in db.execute(
+        select(TableSeat.table_id, TableSeat.user_id)
+        .where(TableSeat.table_id.in_(ids))
+        .order_by(TableSeat.seat)
+    ):
+        seated.setdefault(table_id, []).append(user_id)
+    inviters = dict(
+        db.execute(
+            select(TableInvite.table_id, TableInvite.invited_by).where(
+                TableInvite.user_id == you, TableInvite.table_id.in_(ids)
+            )
+        ).all()
+    )
+    wanted = {user for users in seated.values() for user in users if user in known} | set(
+        inviters.values()
+    )
+    handles = (
+        dict(db.execute(select(User.id, User.handle).where(User.id.in_(wanted))).all())
+        if wanted
+        else {}
+    )
+    views = []
+    for table in found:
+        view = view_of(db, table, principal)
+        view.friends = [
+            handle
+            for user in seated.get(table.id, [])
+            if user in known and (handle := handles.get(user))
+        ]
+        inviter = inviters.get(table.id)
+        view.invited_by = handles.get(inviter) if inviter else None
+        views.append(view)
+    seat_table = open_table_of(db, you)
+    yours = next((view for view in views if view.code == getattr(seat_table, "code", None)), None)
+    if seat_table is not None and yours is None:
+        yours = view_of(db, seat_table, principal)
+    return TablePage(tables=views, total=total, page=page, per_page=per_page, yours=yours)
 
 
 @router.get("/tables", response_model=list[TableView])
@@ -654,6 +845,7 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
         )
     if fmt == TEAM_FORMAT:
         bot_seats = team_bot_seats(body.bots, body.bot_teammate)
+    invitees = friends_to_invite(db, principal.user, body.invite)
     revision = check_deck(
         db, request, principal.user, principal.permissions, body.deck_id, fmt, body.rules, kings
     )
@@ -690,8 +882,97 @@ def create_table(body: TableRequest, request: Request, principal: Player, db: Db
             joined_at=now,
         )
     )
+    invite(db, table, principal.user, invitees, now)
     db.commit()
     return view_of(db, table, principal)
+
+
+def friends_to_invite(db: Session, user: User, ids: list[UUID]) -> list[User]:
+    """The friends a player invites to a table (v0.9.2), in the order given, each once; refuses
+    anyone who is not their friend, as an account still active and named."""
+    if not ids:
+        return []
+    known = friends_of(db, user.id)
+    found: list[User] = []
+    for user_id in dict.fromkeys(ids):
+        friend = db.get(User, user_id) if user_id in known else None
+        if friend is None or friend.status != "active" or not friend.normalized_handle:
+            raise ApiError(422, "not_friend", "You may invite only your friends to a table.")
+        found.append(friend)
+    return found
+
+
+def invite(
+    db: Session, table: GameTable, inviter: User, friends: list[User], now: datetime
+) -> InvitesSent:
+    """Invites friends to an open table (v0.9.2): each not seated there nor invited before is told
+    in the bell, the notice naming the table's code."""
+    # Imported here: api.social imports this module's cutoff.
+    from api.social import notify
+
+    if not friends:
+        return InvitesSent(invited=[], already=[])
+    ids = [friend.id for friend in friends]
+    seated = set(
+        db.scalars(
+            select(TableSeat.user_id).where(
+                TableSeat.table_id == table.id, TableSeat.user_id.in_(ids)
+            )
+        )
+    )
+    invited = set(
+        db.scalars(
+            select(TableInvite.user_id).where(
+                TableInvite.table_id == table.id, TableInvite.user_id.in_(ids)
+            )
+        )
+    )
+    new = [friend for friend in friends if friend.id not in seated | invited]
+    count = (
+        db.scalar(
+            select(func.count()).select_from(TableInvite).where(TableInvite.table_id == table.id)
+        )
+        or 0
+    )
+    if count + len(new) > INVITES_PER_TABLE:
+        raise ApiError(
+            409,
+            "too_many_invites",
+            f"A table may invite {INVITES_PER_TABLE} players in all; {count} are invited already.",
+        )
+    for friend in new:
+        db.add(
+            TableInvite(table_id=table.id, user_id=friend.id, invited_by=inviter.id, created_at=now)
+        )
+        notify(db, friend.id, "table_invite", inviter.id, now, subject=table.code)
+    db.flush()
+    return InvitesSent(
+        invited=[friend.handle or "" for friend in new],
+        already=[friend.handle or "" for friend in friends if friend.id in seated | invited],
+    )
+
+
+@router.post(
+    "/tables/{code}/invites",
+    response_model=InvitesSent,
+    responses={409: {"model": Error}, 422: {"model": Error}},
+)
+def invite_friends(code: Code, body: TableInviting, principal: Player, db: Db) -> InvitesSent:
+    """A table's player invites friends to it (v0.9.2), while it waits for players."""
+    table = find(db, code, lock=True)
+    if status_of(table) != "open":
+        raise ApiError(409, "table_closed", "This table is no longer open.")
+    seated = db.scalar(
+        select(TableSeat.id).where(
+            TableSeat.table_id == table.id, TableSeat.user_id == principal.user.id
+        )
+    )
+    if seated is None:
+        raise ApiError(409, "not_seated", "Only a table's players invite friends to it.")
+    friends = friends_to_invite(db, principal.user, body.players)
+    sent = invite(db, table, principal.user, friends, utcnow())
+    db.commit()
+    return sent
 
 
 @router.get("/tables/{code}", response_model=TableView)

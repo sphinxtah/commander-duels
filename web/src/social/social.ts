@@ -68,13 +68,23 @@ export function presenceRank(presence: Presence | null | undefined): number {
 
 /** Where a notification leads: a message to its conversation, a rematch (v0.5.0) to its
  * game's result screen, an invitation to the Two-Headed Giant queue (v0.5.1) to Find a game on
- * the Play page, anything else to the player's profile. Null without a player. */
+ * the Play page, an invitation to a table (v0.9.2) to the table, anything else to the player's
+ * profile. Null without a player. */
 export function notificationLink(item: NotificationItem): string | null {
   if (item.kind === "rematch" && item.game_id) return `#game/${item.game_id}`;
   if (item.kind === "team_invite") return "#find";
+  if (item.kind === "table_invite")
+    return item.table ? `#tables/${item.table.code}` : "#tables";
   if (!item.actor) return null;
   return playerLink(item.actor.id);
 }
+
+const TABLE_FORMATS: Record<string, string> = {
+  legacy: "Legacy",
+  commander: "Commander",
+  two_headed_giant: "Two-Headed Giant",
+  kings_table: "King's Table",
+};
 
 export function notificationWords(item: NotificationItem): string {
   // The auction house's five kinds (v0.6.0).
@@ -110,6 +120,15 @@ export function notificationWords(item: NotificationItem): string {
       return item.request_pending
         ? `${who} invites you to play Two-Headed Giant as their teammate.`
         : `${who} invited you to play Two-Headed Giant as their teammate.`;
+    case "table_invite": {
+      // An invitation to a table (v0.9.2): its format, and whether it still waits for players.
+      const format = item.table ? (TABLE_FORMATS[item.table.format] ?? "") : "";
+      const table = format ? `their ${format} table` : "their table";
+      if (item.request_pending) return `${who} invites you to ${table}.`;
+      if (item.table && !item.table.open)
+        return `${who} invited you to ${table}, which is no longer open.`;
+      return `${who} invited you to ${table}.`;
+    }
     case "auction_outbid":
     case "auction_won":
     case "auction_sold":

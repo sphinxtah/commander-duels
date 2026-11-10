@@ -72,9 +72,10 @@ test.describe("the public queues", () => {
     await importer.getByRole("button", { name: "Create the deck" }).click();
     await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
 
-    // Tables' "Find a game" (Play's first section until v0.8.7): the format, the deck, players only.
+    // Tables' "Quick match" (Play's "Find a game" until v0.8.7, a pop-up since v0.9.2, which #find
+    // opens): the format, the deck, players only.
     await page.goto("/#find");
-    const finder = page.getByRole("region", { name: "Find a game" });
+    const finder = page.getByRole("region", { name: "Quick match" });
     await finder.getByRole("radio", { name: /^Legacy/ }).check();
     await finder.getByLabel("Your deck").selectOption({ label: title });
     await finder.getByRole("checkbox", { name: /Players only/ }).check();
@@ -128,8 +129,11 @@ test.describe("the public queues", () => {
     await expect(page).toHaveURL(/#deck\/[0-9a-f-]{36}$/);
 
     // A table with a bot teammate, and a player and a bot in the other team.
-    // Since v0.8.7 "Find a game" shares the page, with choices of its own.
+    // Since v0.9.2 "Open a table" is a button at the top, its choices in a pop-up.
     await page.goto("/#tables");
+    await page
+      .getByRole("button", { name: "Open a table", exact: true })
+      .click();
     const opening = page.getByRole("region", { name: "Open a table" });
     await opening.getByRole("radio", { name: /^Two-Headed Giant/ }).check();
     await opening.getByRole("radio", { name: /^A bot/ }).check();
@@ -157,7 +161,7 @@ test.describe("the public queues", () => {
 
     // The queue of two teams, alone with players only.
     await page.goto("/#find");
-    const finder = page.getByRole("region", { name: "Find a game" });
+    const finder = page.getByRole("region", { name: "Quick match" });
     await finder.getByRole("radio", { name: /^Two-Headed Giant/ }).check();
     await expect(
       finder.getByRole("radio", { name: /Another player/ }),

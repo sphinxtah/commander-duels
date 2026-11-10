@@ -380,6 +380,20 @@ class TableSeat(Base):
     joined_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
 
+class TableInvite(Base):
+    """A friend invited to an open table by one of its players (v0.9.2). The invited player sees
+    the table in the lobby, private or not, and among their friends' tables; no seat is held.
+    One per player and table: inviting again sends no second notice."""
+
+    __tablename__ = "table_invites"
+    __table_args__ = (UniqueConstraint("table_id", "user_id"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    table_id: Mapped[UUID] = mapped_column(ForeignKey("game_tables.id"), index=True)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    invited_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime())
+
+
 class Match(Base):
     """A best-of-three Legacy match (v0.5.0, api/matches.py): games of its own, each an engine game
     linked here with its number, until a player has two game wins. Between games its players
@@ -1518,8 +1532,9 @@ class Notification(Base):
     come online, since v0.4.4 new messages from a friend (one while unread, renewed by each
     message), and since v0.5.0 a rematch offered (the game it would replay), since v0.5.1 an
     invitation to the Two-Headed Giant queue as a friend's teammate, and since v0.6.0 the auction
-    house's news (outbid, won, sold, unsold, cancelled; the subject is the auction's ID). The
-    actor is the other player.
+    house's news (outbid, won, sold, unsold, cancelled; the subject is the auction's ID), and since
+    v0.9.2 an invitation to a table (the subject is the table's code). The actor is the other
+    player.
     Since v0.5.0 also a daily quest completed and an achievement earned, which no player caused:
     the subject names which. Kept NOTIFICATION_DAYS, at most a few hundred per account
     (api/social.py)."""
@@ -1530,7 +1545,7 @@ class Notification(Base):
             "kind IN ('friend_request', 'friend_accepted', 'friend_online', 'message', "
             "'quest_completed', 'achievement_earned', 'rematch', 'team_invite', "
             "'auction_outbid', 'auction_won', 'auction_sold', 'auction_unsold', "
-            "'auction_cancelled')",
+            "'auction_cancelled', 'table_invite')",
             name="ck_notifications_kind",
         ),
         # The bell's list, newest first, and its unread count.

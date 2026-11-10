@@ -11,6 +11,7 @@ import { PrivacySettings } from "./PrivacySettings";
 import { CHECK_IN_MS, IDLE_MS, useSocial, type Social } from "./presence";
 import {
   looksLikeEmail,
+  notificationLink,
   notificationWords,
   presenceRank,
   presenceWords,
@@ -166,6 +167,27 @@ describe("the words (v0.4.3)", () => {
     expect(timeAgo("2026-09-01T10:00:00Z", now)).toBe("Sep 1, 2026");
     expect(looksLikeEmail("ada@example.com")).toBe(true);
     expect(looksLikeEmail("ada")).toBe(false);
+  });
+
+  it("lead an invitation to a table to the table (v0.9.2)", () => {
+    const invite = note({
+      kind: "table_invite",
+      request_pending: true,
+      table: { code: "Table-code-0001", format: "commander", open: true },
+    });
+    expect(notificationWords(invite)).toBe(
+      "bob invites you to their Commander table.",
+    );
+    expect(notificationLink(invite)).toBe("#tables/Table-code-0001");
+    expect(
+      notificationWords({
+        ...invite,
+        request_pending: false,
+        table: { ...invite.table!, open: false },
+      }),
+    ).toBe(
+      "bob invited you to their Commander table, which is no longer open.",
+    );
   });
 });
 

@@ -216,6 +216,9 @@ test.describe("a human table in two browsers", () => {
       await expect(
         host.getByRole("heading", { name: "Sit down with other players." }),
       ).toBeVisible();
+      await host
+        .getByRole("button", { name: "Open a table", exact: true })
+        .click();
       const form = host.getByRole("region", { name: "Open a table" });
       await form.getByRole("radio", { name: /^Legacy/ }).check();
       await form.getByLabel("Your deck").selectOption({
@@ -230,7 +233,7 @@ test.describe("a human table in two browsers", () => {
       await guest.goto("/#tables");
       await expect(
         guest
-          .getByRole("region", { name: "Open tables" })
+          .getByRole("region", { name: "Find a game", exact: true })
           .getByRole("link", { name: "Join sysop's Legacy table" }),
       ).toBeVisible({ timeout: 15_000 });
       await guest.goto(invite);

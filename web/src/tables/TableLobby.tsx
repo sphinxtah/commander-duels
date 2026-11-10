@@ -9,6 +9,7 @@ import { client, describe } from "../api";
 import { exitTableFullscreen } from "../app/fullscreen";
 import { tableFullscreen } from "../game/PracticeTable";
 import { getSoundEngine } from "../game/sound/engine";
+import { InviteFriendsButton } from "./InviteFriends";
 import game from "../game/game.module.css";
 import {
   CIRCLE_ROWS,
@@ -51,7 +52,8 @@ import styles from "./tables.module.css";
 // A King's Table table (v0.8.7) draws its six seats as the circle's two sides facing each other,
 // each King between their Generals, and shows its settings before anyone readies. A player takes
 // any open seat or moves to one; the host changes the settings, which seats bots take, and moves a
-// player to an open seat. Every such change makes every player not ready again.
+// player to an open seat. Every such change makes every player not ready again. Since v0.9.2 its
+// players invite friends from here (InviteFriends.tsx).
 
 /** The table's own address: its invite link. */
 export function inviteLink(code: string): string {
@@ -293,8 +295,8 @@ export function TableLobby({
             : CIRCLE_ROWS
           ).map((row, i) => {
             const team = kingsTeam(row[0]);
-            const players = row.map(
-              (seat) => table.players.find((player) => player.seat === seat)!,
+            const players = row.map((seat) =>
+              table.players.find((player) => player.seat === seat)!,
             );
             const yours = players.some((player) => player?.you);
             return (
@@ -447,6 +449,12 @@ export function TableLobby({
               Copied
             </span>
           )}
+          <InviteFriendsButton
+            code={code}
+            seated={table.players.flatMap((player) =>
+              player.taken && player.handle ? [player.handle] : [],
+            )}
+          />
         </div>
       )}
 

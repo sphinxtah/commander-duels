@@ -34,7 +34,17 @@ from api.main import create_app
 from api.models import AuditEvent, CardConcept, GameSeat, GameTable, TokenEntry
 
 content = test_progression.content
-TABLES = ("table_seats", "game_tables", "token_ledger", "progress_ledger", "game_seats", "games")
+TABLES = (
+    "table_invites",
+    "notifications",
+    "friendships",
+    "table_seats",
+    "game_tables",
+    "token_ledger",
+    "progress_ledger",
+    "game_seats",
+    "games",
+)
 
 
 class Account(test_progression.Account):
@@ -856,3 +866,147 @@ def test_the_migration_keeps_table_games_when_it_goes_back(tmp_path, monkeypatch
         assert connection.execute(text("SELECT kind FROM games")).scalar() == "practice"
     command.upgrade(config, "head")
     engine.dispose()
+
+
+def befriend(one: Account, other: Account) -> None:
+    assert one.send("PUT", f"/api/v1/friends/{other.id}").status_code == 200
+    assert other.send("PUT", f"/api/v1/friends/{one.id}").json()["friendship"] == "friends"
+
+
+def browse(account: Account, **query: Any) -> dict[str, Any]:
+    found = account.get("/api/v1/tables/browse", **query)
+    assert found.status_code == 200, found.text
+    return dict(found.json())
+
+
+def codes(page: dict[str, Any]) -> list[str]:
+    return [table["code"] for table in page["tables"]]
+
+
+def test_the_lobby_pages_and_filters_its_tables(client, engine):
+    # Administrators build Commander decks from the whole catalog in tests (conftest.py).
+    ada, cara = Account(client, "ada"), Account(client, "cara")
+    bob, dan = Account(client, "bob", admin=True), Account(client, "dan", admin=True)
+    root = Account(client, "sysop", kind="sysop")
+    befriend(dan, bob)
+    legacy = ada.send(
+        "POST", "/api/v1/tables", {"format": "legacy", "best_of": 3, "deck_id": deck(ada, client)}
+    ).json()["code"]
+    commander = commander_table(client, bob, [], free=1, bots=1)
+    tournament = cara.send(
+        "POST",
+        "/api/v1/tables",
+        {
+            "format": "legacy",
+            "rules": {"banned": False, "not_legal": False, "stand_in": False},
+            "deck_id": deck(cara, client),
+        },
+    ).json()["code"]
+
+    # Every public table, newest first, with its open seats.
+    everything = browse(dan)
+    assert codes(everything) == [tournament, commander, legacy]
+    assert (everything["total"], everything["page"], everything["per_page"]) == (3, 1, 20)
+    assert [table["open_seats"] for table in everything["tables"]] == [1, 1, 1]
+    assert everything["yours"] is None
+    # Filters: format, rules, bots, best of three, friends.
+    assert codes(browse(dan, format="commander")) == [commander]
+    assert codes(browse(dan, format=["legacy", "kings_table"])) == [tournament, legacy]
+    assert codes(browse(dan, rules="tournament")) == [tournament]
+    assert codes(browse(dan, rules="casual")) == [commander, legacy]
+    assert codes(browse(dan, no_bots=True)) == [tournament, legacy]
+    assert codes(browse(dan, best_of_three=True)) == [legacy]
+    friends = browse(dan, friends=True)
+    assert codes(friends) == [commander] and friends["tables"][0]["friends"] == ["bob"]
+    # A full table leaves "Seats open"; your own table leads the list.
+    joined = dan.send(
+        "POST", f"/api/v1/tables/{commander}/join", {"deck_id": deck(dan, client, "commander", "D")}
+    )
+    assert joined.status_code == 200, joined.text
+    mine = browse(dan)
+    assert codes(mine) == [commander, tournament, legacy]
+    assert mine["yours"]["code"] == commander
+    assert codes(browse(dan, open_seats=True)) == [tournament, legacy]
+    assert browse(dan, format="legacy")["yours"]["code"] == commander
+    # Pages: 20, 50 or 100 a page; a page past the last answers the last.
+    assert (browse(dan, page=9)["page"], codes(browse(dan, page=9))) == (1, codes(mine))
+    refused = dan.get("/api/v1/tables/browse", per_page=30)
+    assert (refused.status_code, refused.json()["code"]) == (422, "invalid_page")
+    assert browse(root, per_page=50)["total"] == 3
+
+
+def test_friends_are_invited_to_a_table(client, engine):
+    ada, bob = Account(client, "ada", admin=True), Account(client, "bob", admin=True)
+    cara, eve = Account(client, "cara"), Account(client, "eve")
+    befriend(ada, bob)
+    befriend(ada, cara)
+    # Only friends: nothing is opened when anyone else is named.
+    refused = ada.send(
+        "POST",
+        "/api/v1/tables",
+        {"format": "legacy", "deck_id": deck(ada, client), "invite": [str(eve.id)]},
+    )
+    assert (refused.status_code, refused.json()["code"]) == (422, "not_friend")
+    made = ada.send(
+        "POST",
+        "/api/v1/tables",
+        {
+            "format": "commander",
+            "seats": 4,
+            "visibility": "private",
+            "deck_id": deck(ada, client, "commander", "K"),
+            "invite": [str(bob.id), str(bob.id)],
+        },
+    )
+    assert made.status_code == 201, made.text
+    code = made.json()["code"]
+
+    # The invited friend sees the private table, with who invited them, and a notice in the bell.
+    seen = browse(bob)
+    assert codes(seen) == [code] and seen["tables"][0]["invited_by"] == "ada"
+    assert codes(browse(bob, friends=True)) == [code]
+    assert codes(browse(cara)) == [] and codes(browse(eve)) == []
+    notices = bob.get("/api/v1/notifications").json()["items"]
+    invite = next(item for item in notices if item["kind"] == "table_invite")
+    assert invite["actor"]["handle"] == "ada" and invite["request_pending"] is True
+    assert invite["table"] == {"code": code, "format": "commander", "open": True}
+
+    # Any seated player invites more; inviting again tells nobody anything new.
+    sent = ada.send(
+        "POST", f"/api/v1/tables/{code}/invites", {"players": [str(bob.id), str(cara.id)]}
+    )
+    assert sent.json() == {"invited": ["cara"], "already": ["bob"]}
+    assert (
+        len(
+            [
+                n
+                for n in bob.get("/api/v1/notifications").json()["items"]
+                if n["kind"] == "table_invite"
+            ]
+        )
+        == 1
+    )
+    outsider = eve.send("POST", f"/api/v1/tables/{code}/invites", {"players": [str(bob.id)]})
+    assert (outsider.status_code, outsider.json()["code"]) == (409, "not_seated")
+    stranger = ada.send("POST", f"/api/v1/tables/{code}/invites", {"players": [str(eve.id)]})
+    assert (stranger.status_code, stranger.json()["code"]) == (422, "not_friend")
+
+    # Once bob sits down the invitation no longer waits; once the table closes, it says so.
+    bob.send(
+        "POST", f"/api/v1/tables/{code}/join", {"deck_id": deck(bob, client, "commander", "B")}
+    )
+    invite = next(
+        item
+        for item in bob.get("/api/v1/notifications").json()["items"]
+        if item["kind"] == "table_invite"
+    )
+    assert invite["request_pending"] is False
+    ada.send("POST", f"/api/v1/tables/{code}/leave")
+    invite = next(
+        item
+        for item in cara.get("/api/v1/notifications").json()["items"]
+        if item["kind"] == "table_invite"
+    )
+    assert (invite["request_pending"], invite["table"]["open"]) == (False, False)
+    closed_now = bob.send("POST", f"/api/v1/tables/{code}/invites", {"players": [str(ada.id)]})
+    assert (closed_now.status_code, closed_now.json()["code"]) == (409, "table_closed")

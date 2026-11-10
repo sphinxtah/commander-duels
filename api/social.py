@@ -63,17 +63,19 @@ from api.models import (
     Friendship,
     Game,
     GameSeat,
+    GameTable,
     Notification,
     PlayerBlock,
     ProgressEntry,
     QueueEntry,
     Rematch,
     RematchPlayer,
+    TableSeat,
     User,
 )
 from api.progression import TierInfo, tier_info
 from api.roster import tier_of
-from api.schemas import Avatar, Contract, GameFormatId, without_nul
+from api.schemas import Avatar, Contract, GameFormatId, TableFormatId, without_nul
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
 
@@ -111,6 +113,7 @@ NotificationKind = Literal[
     "auction_sold",
     "auction_unsold",
     "auction_cancelled",
+    "table_invite",
 ]
 AuctionKind = Literal[
     "auction_outbid", "auction_won", "auction_sold", "auction_unsold", "auction_cancelled"
@@ -269,6 +272,17 @@ class AuctionNotice(Contract):
     )
 
 
+class TableNotice(Contract):
+    """The table an invitation names (v0.9.2), which the bell links to (#tables/<code>)."""
+
+    code: str
+    format: TableFormatId
+    open: bool = Field(
+        description="Whether the table still waits for players: not started, "
+        "closed or left open too long."
+    )
+
+
 class NotificationItem(Contract):
     id: UUID
     kind: NotificationKind
@@ -282,9 +296,10 @@ class NotificationItem(Contract):
     )
     request_pending: bool = Field(
         default=False,
-        description="For a friend request, since v0.5.0 a rematch, or since v0.5.1 an invitation "
-        "to the Two-Headed Giant queue as a friend's teammate: whether it still waits for your "
-        "answer.",
+        description="For a friend request, since v0.5.0 a rematch, since v0.5.1 an invitation "
+        "to the Two-Headed Giant queue as a friend's teammate, or since v0.9.2 an invitation to a "
+        "table: whether it still waits for your answer (a table: open, with a free seat, and you "
+        "not seated there).",
     )
     messages: int = Field(
         default=0,
@@ -299,6 +314,10 @@ class NotificationItem(Contract):
         default=None,
         description="For the auction house's news (v0.6.0): the auction, which the bell links to "
         "(/auctions).",
+    )
+    table: TableNotice | None = Field(
+        default=None,
+        description="For an invitation to a table (v0.9.2): the table, which the bell links to.",
     )
 
 
@@ -658,9 +677,17 @@ def notify(
     actor_id: UUID,
     now: datetime,
     game_id: UUID | None = None,
+    subject: str | None = None,
 ) -> None:
     db.add(
-        Notification(user_id=user_id, kind=kind, actor_id=actor_id, created_at=now, game_id=game_id)
+        Notification(
+            user_id=user_id,
+            kind=kind,
+            actor_id=actor_id,
+            created_at=now,
+            game_id=game_id,
+            subject=subject,
+        )
     )
     db.flush()
     prune(db, user_id, now)
@@ -821,6 +848,9 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
     auctions = auction_notices(
         db, [row for row in rows if row.kind in AUCTION_KINDS and row.subject]
     )
+    tables = table_notices(
+        db, viewer.id, [row.subject for row in rows if row.kind == "table_invite" and row.subject]
+    )
     items = []
     for row in rows:
         actor = actors.get(row.actor_id) if row.actor_id else None
@@ -837,16 +867,52 @@ def items_of(db: Session, viewer: Viewer, rows: list[Notification]) -> list[Noti
                     and viewer.state_with(actor.id) == "requested_you"
                 )
                 or (row.kind == "rematch" and row.game_id in waiting)
-                or (row.kind == "team_invite" and row.actor_id in inviting),
+                or (row.kind == "team_invite" and row.actor_id in inviting)
+                or (
+                    row.kind == "table_invite" and row.subject in tables and tables[row.subject][1]
+                ),
                 messages=unread.get(row.actor_id, 0)
                 if row.kind == "message" and row.actor_id
                 else 0,
                 award=award_of(row.kind, row.subject),
                 game_id=row.game_id if row.kind == "rematch" else None,
                 auction=auctions.get(row.id),
+                table=tables[row.subject][0]
+                if row.kind == "table_invite" and row.subject in tables
+                else None,
             )
         )
     return items
+
+
+def table_notices(
+    db: Session, user_id: UUID, codes: list[str]
+) -> dict[str, tuple[TableNotice, bool]]:
+    """The tables invitations name (v0.9.2), by code, each with whether the invitation still
+    waits for the account: the table open, a player's seat free, and the account not seated."""
+    if not codes:
+        return {}
+    # Imported here: api.tables imports this module.
+    from api.tables import cutoff
+
+    found = list(db.scalars(select(GameTable).where(GameTable.code.in_(set(codes)))))
+    seated: dict[UUID, set[UUID]] = {}
+    for table_id, seat_user in db.execute(
+        select(TableSeat.table_id, TableSeat.user_id).where(
+            TableSeat.table_id.in_([table.id for table in found])
+        )
+    ):
+        seated.setdefault(table_id, set()).add(seat_user)
+    notices: dict[str, tuple[TableNotice, bool]] = {}
+    for table in found:
+        open_now = table.status == "open" and table.created_at >= cutoff()
+        players = seated.get(table.id, set())
+        free = table.seats - table.bots > len(players)
+        notices[table.code] = (
+            TableNotice(code=table.code, format=table.format, open=open_now),  # type: ignore[arg-type]
+            open_now and free and user_id not in players,
+        )
+    return notices
 
 
 def auction_notices(db: Session, rows: list[Notification]) -> dict[UUID, AuctionNotice]:

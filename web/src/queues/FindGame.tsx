@@ -35,7 +35,8 @@ import styles from "./queues.module.css";
 // with a way out. The game the queue finds opens by itself (queue.ts), on any page of the app.
 // Since v0.5.1 Two-Headed Giant's queue too, whose teams form alone or with a friend: a player
 // invites a friend, who accepts here with a deck of their own, and the two wait as one team.
-// King's Table (v0.8.7) has no queue: it is played at tables and at the practice table.
+// King's Table (v0.8.7) has no queue: it is played at tables and at the practice table. Since
+// v0.9.2 the Tables page shows it as "Quick match", in a pop-up beside "Open a table".
 
 /** The formats with a public queue: every format but King's Table. */
 type QueueFormat = Exclude<AnyQueueFormat, "kings_table">;
@@ -97,16 +98,23 @@ function useFriends(wanted: boolean): {
   return { friends, error, again };
 }
 
-export function FindGame({ me }: { me: Me }) {
+export function FindGame({
+  me,
+  title = "Find a game",
+}: {
+  me: Me;
+  /** The section's heading: "Quick match" in the Tables page's pop-up (v0.9.2). */
+  title?: string;
+}) {
   if (
     !me.permissions.includes("games.play") ||
     !me.permissions.includes("decks.edit")
   )
     return null;
-  return <Finder />;
+  return <Finder title={title} />;
 }
 
-function Finder() {
+function Finder({ title }: { title: string }) {
   const { status, answeredAt } = useQueue();
   // Asked for again while shown (v0.5.1): the shell's follower asked once, before any invitation.
   useEffect(watchQueue, []);
@@ -119,14 +127,14 @@ function Finder() {
     return (
       <section className={game.table} aria-labelledby="find-title">
         <span className={game.eyebrow}>PUBLIC QUEUE</span>
-        <h2 id="find-title">Find a game</h2>
+        <h2 id="find-title">{title}</h2>
         <p role="status">Looking for your place…</p>
       </section>
     );
   return (
     <section className={game.table} aria-labelledby="find-title">
       <span className={game.eyebrow}>PUBLIC QUEUE</span>
-      <h2 id="find-title">Find a game</h2>
+      <h2 id="find-title">{title}</h2>
       {status.status === "waiting" ? (
         <Waiting status={status} answeredAt={answeredAt} />
       ) : status.status === "inviting" ? (

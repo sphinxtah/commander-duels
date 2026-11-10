@@ -3238,6 +3238,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tables/browse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Browse Tables
+         * @description The lobby's open tables a page at a time (v0.9.2): the public ones, your own, those you were
+         *     invited to (SysOp and administrators see every one), newest first with your own leading.
+         */
+        get: operations["browse_tables_api_v1_tables_browse_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tables/{code}": {
         parameters: {
             query?: never;
@@ -3262,6 +3283,26 @@ export interface paths {
          *     not ready again.
          */
         patch: operations["change_table_api_v1_tables__code__patch"];
+        trace?: never;
+    };
+    "/api/v1/tables/{code}/invites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite Friends
+         * @description A table's player invites friends to it (v0.9.2), while it waits for players.
+         */
+        post: operations["invite_friends_api_v1_tables__code__invites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tables/{code}/join": {
@@ -3972,7 +4013,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.9.1
+             * @default 0.9.2
              */
             version: string;
         };
@@ -5777,7 +5818,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.9.1
+             * @default 0.9.2
              */
             version: string;
         };
@@ -5957,6 +5998,19 @@ export interface components {
              */
             openable: boolean;
             product: components["schemas"]["ProductRef"];
+        };
+        /** InvitesSent */
+        InvitesSent: {
+            /**
+             * Already
+             * @description Friends invited before or seated at the table already: told nothing new.
+             */
+            already: string[];
+            /**
+             * Invited
+             * @description The friends invited now, each told in the bell.
+             */
+            invited: string[];
         };
         /**
          * KingsTableChange
@@ -6352,7 +6406,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled";
+            kind: "friend_request" | "friend_accepted" | "friend_online" | "message" | "quest_completed" | "achievement_earned" | "rematch" | "team_invite" | "auction_outbid" | "auction_won" | "auction_sold" | "auction_unsold" | "auction_cancelled" | "table_invite";
             /**
              * Messages
              * @description For new messages (v0.4.4): how many from this friend are still unread.
@@ -6363,10 +6417,12 @@ export interface components {
             read: boolean;
             /**
              * Request Pending
-             * @description For a friend request, since v0.5.0 a rematch, or since v0.5.1 an invitation to the Two-Headed Giant queue as a friend's teammate: whether it still waits for your answer.
+             * @description For a friend request, since v0.5.0 a rematch, since v0.5.1 an invitation to the Two-Headed Giant queue as a friend's teammate, or since v0.9.2 an invitation to a table: whether it still waits for your answer (a table: open, with a free seat, and you not seated there).
              * @default false
              */
             request_pending: boolean;
+            /** @description For an invitation to a table (v0.9.2): the table, which the bell links to. */
+            table?: components["schemas"]["TableNotice"] | null;
         };
         /** NotificationPage */
         NotificationPage: {
@@ -8629,6 +8685,54 @@ export interface components {
             /** @description Moves a player to an open seat. */
             move?: components["schemas"]["SeatMove"] | null;
         };
+        /**
+         * TableInviting
+         * @description Friends a table's player invites (v0.9.2).
+         */
+        TableInviting: {
+            /** Players */
+            players: string[];
+        };
+        /**
+         * TableNotice
+         * @description The table an invitation names (v0.9.2), which the bell links to (#tables/<code>).
+         */
+        TableNotice: {
+            /** Code */
+            code: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /**
+             * Open
+             * @description Whether the table still waits for players: not started, closed or left open too long.
+             */
+            open: boolean;
+        };
+        /**
+         * TablePage
+         * @description A page of the lobby's open tables (v0.9.2).
+         */
+        TablePage: {
+            /**
+             * Page
+             * @description This page, from 1; the last one when asked for past it.
+             */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Tables */
+            tables: components["schemas"]["TableView"][];
+            /**
+             * Total
+             * @description Every table the filters find, on every page.
+             */
+            total: number;
+            /** @description The open table you sit at, whatever the filters. */
+            yours?: components["schemas"]["TableView"] | null;
+        };
         /** TablePlayer */
         TablePlayer: {
             /**
@@ -8731,6 +8835,11 @@ export interface components {
              * @enum {string}
              */
             format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
+            /**
+             * Invite
+             * @description Since v0.9.2: friends to invite, each told in the bell. Every one must be your friend.
+             */
+            invite?: string[];
             /** @description King's Table (v0.8.7): its settings, the defaults when left out. Refused at other tables. */
             kings_table?: components["schemas"]["KingsTableSettings"] | null;
             /** @description Which cards its decks may hold by their legality; casual unless told otherwise. */
@@ -8815,6 +8924,11 @@ export interface components {
              */
             format: "legacy" | "commander" | "two_headed_giant" | "kings_table";
             /**
+             * Friends
+             * @description Since v0.9.2, in the lobby's pages: your friends seated at the table.
+             */
+            friends?: string[];
+            /**
              * Game Id
              * @description Its game, once started; for its players and SysOp.
              */
@@ -8824,8 +8938,19 @@ export interface components {
              * @description The host's handle.
              */
             host: string | null;
+            /**
+             * Invited By
+             * @description Since v0.9.2, in the lobby's pages: who invited you to the table, if anyone.
+             */
+            invited_by?: string | null;
             /** @description King's Table (v0.8.7): the host's settings, which its game starts with; null at other tables. */
             kings_table?: components["schemas"]["KingsTableSettings"] | null;
+            /**
+             * Open Seats
+             * @description Since v0.9.2: players' seats nobody has taken yet.
+             * @default 0
+             */
+            open_seats: number;
             /**
              * Players
              * @description Every seat in turn order, bots last (at Two-Headed Giant and King's Table tables, in their own seats).
@@ -26263,6 +26388,114 @@ export interface operations {
             };
         };
     };
+    browse_tables_api_v1_tables_browse_get: {
+        parameters: {
+            query?: {
+                /** @description Formats to show; all when left out. */
+                format?: ("legacy" | "commander" | "two_headed_giant" | "kings_table")[] | null;
+                /** @description casual (any of banned, not legal or stand-in cards allowed) or tournament (none); both when left out. */
+                rules?: ("casual" | "tournament")[] | null;
+                /** @description Only tables with a player's seat free. */
+                open_seats?: boolean;
+                /** @description Only tables without bots. */
+                no_bots?: boolean;
+                /** @description Only best-of-three matches. */
+                best_of_three?: boolean;
+                /** @description Only tables a friend sits at or you were invited to. */
+                friends?: boolean;
+                page?: number;
+                /** @description 20, 50 or 100. */
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TablePage"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_table_api_v1_tables__code__get: {
         parameters: {
             query?: never;
@@ -26379,6 +26612,104 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TableView"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    invite_friends_api_v1_tables__code__invites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableInviting"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitesSent"];
                 };
             };
             /** @description Bad Request */
