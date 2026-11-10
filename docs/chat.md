@@ -61,6 +61,7 @@ Refusals: 401 signed out, 403 not active or without the CSRF token, `409 handle_
 | `{"type": "welcome", "unread": 3}` | After the hello: unread messages in all conversations |
 | `{"type": "message", "player_id": "...", "player": {...}, "message": {...}, "unread": 4}` | A message stored, to the recipient's tabs and the sender's: `player_id` and `player` (handle, avatar, alliance) are the other player of the conversation, as the tab's account sees it, and `unread` that account's new total |
 | `{"type": "read", "player_id": "...", "unread": 0}` | The account read a conversation, in any of its tabs |
+| `{"type": "lobby", "revision": 12}` | Since v0.9.4, to every open tab of every account: the human tables changed (a table, its seats or its invitations), so Find a game asks for its page again ([tables](tables.md#the-live-lobby-v094)). It names no table; notices within a quarter of a second come as one |
 | `{"type": "error", "code": "..."}` | Before a close: as for a game's socket (`authentication_required`, `session_refresh`, `csrf_failed`, `origin_refused`, `too_many_connections`, `hello_required`) |
 
 The connection closes when the session ends, is revoked or expires, as a game's does. The page reconnects with backoff and, each time it connects, reloads the conversations it shows, since nothing is resent. The presence check-in also carries `messages_unread` ([presence](social.md#presence)), so the count stays right while the socket is down.

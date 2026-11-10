@@ -56,7 +56,7 @@ The engine's `CampaignReserve` (engine/src/main/java/com/commanderduels/Campaign
 
 The reserve is the command zone, where XMage keeps commander cards and casts them from by the same rules; the card is not a commander (no tax, no commander damage, none of the commander's replacements), and only one copy ever exists. Its loyalty, its abilities and its −10 ("You win the game", the owner's emblem) are the card's own, and every result the game reaches stands: a lethal hit before the crossing ends the duel. `CampaignReserveTest` plays it with a public planeswalker standing in.
 
-Since v0.9.3 `IncarnationRemovalTest` checks the replacement against each way off the battlefield, on a seated table with a public planeswalker in reserve: destroyed, sacrificed, exiled by the opponent, bounced, tucked into the library and put into the graveyard, each sends it back to the reserve, with one copy in the game, no life changed, and the reserve never spent. A countered first cast, the paid recast and the incarnation's own abilities stay the rules', untested in a scripted game.
+Since v0.9.3 `IncarnationRemovalTest` checks the replacement against each way off the battlefield, on a seated table with a public planeswalker in reserve: destroyed, sacrificed, exiled by the opponent, bounced, tucked into the library and put into the graveyard, each sends it back to the reserve, with one copy in the game, no life changed, and the reserve never spent. Since v0.9.4 it also counters the spell on the stack, on its first cast and on a recast: the card goes back to the reserve, not the graveyard, and the Commander object that lets it be cast from the command zone for its mana cost stays. The incarnation's own abilities, its ultimate and the bot's choice to recast it stay the rules' and XMage's, untested in a scripted game.
 
 An engine without the owner's content (the public images, a local stack) plays the finale with the same 99 cards, Morophon, the Boundless as the stand-in commander, and no incarnation; the campaign can still be finished there, and the game's summary says which finale ran (`campaign.finale`: `private` or `public`).
 
@@ -172,6 +172,10 @@ The owner chose the lever at v0.9.3's start: rework the late wardens' decks towa
 | 14 The Sphinx (stand-in) | 6 | 38% (8 games) | 10% |
 
 v0.9.1's run had the late wardens winning none of 24 games; now every ward from 7 on wins most of its games against the references, and the curve falls by tier. Nine games a ward leave about ±16 points of noise, so within a tier the order is not settled (Oko measures harder than Xenagos). The finale's stand-in plays without the incarnation; the live finale adds the High Priest and The Sphinx crossing at 15 life. Tibalt's 67% is a skill-3 bot's, not an assisted novice's; his deck and skill (1) stay the handoff's.
+
+## Difficulty on GitHub's runners (v0.9.4)
+
+A run of 30 games a ward takes hours on one machine, so `.github/workflows/campaign-difficulty.yml` runs it on GitHub's: one job a ward, in parallel, each building the engine's card database stage from the engine job's cache and playing `CampaignDifficulty` for its ward (`-Dcampaign.wards`, a budget of 900 seconds a game), then one job that merges the fourteen reports and writes `scripts/campaign_difficulty.py`'s table into the run's summary; the merged report is the run's `campaign-difficulty` artifact. It runs on demand (Actions › Campaign difficulty › Run workflow, with the games per reference and the wards) or when a branch named `difficulty/<anything>` is pushed (10 games per reference, all wards).
 
 ## Content
 

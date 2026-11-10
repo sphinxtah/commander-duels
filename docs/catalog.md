@@ -74,6 +74,22 @@ The owner's decision of v0.6.2, after a pack summary showed Farmstead (Alpha) "I
 - **How they play** ([games](games.md#stand-ins-v062)): with their printed cost, card types, subtypes, supertypes, power and toughness, loyalty and defense, and their own picture; their rules text has no effect. Casual tables, practice games and the queues take them; tournament rules refuse them ([the table's rules](tables.md#the-tables-rules-v045)), as they refuse banned cards.
 - **A card the engine learns** becomes certified at the next sync and plays as written; nothing else changes for the decks and libraries that hold it.
 
+#### Toward no stand-ins (v0.9.4)
+
+The owner asked on 2026-11-10 whether the game can have no stand-ins, and left the decision to Claude with his rule: packs are genuine (the card drawn is the card given, at the real print runs), and "the players want the cards to play the game, so the goal is purity and fun." The decision:
+
+- **Packs stay as they are.** A pack still gives the card it draws, whether or not the engine plays it.
+- **The goal is that every card a pack can deal plays as printed.** The work goes into the engine, not into hiding cards: a stand-in plays a card wrong, and a card kept out of play is no fun, so the only pure answer is the engine playing it.
+- **Stand-ins stay as the casual fallback** for a card not yet taught, so no one loses what they pulled; when the engine learns a card, the next sync certifies it and it plays as written.
+- **What can reach a player** is what Leng's packs deal, starters, auctions and the campaign's spoils: on 2026-11-10 the packs could deal 566 cards XMage lacked, 481 of them from the Un-sets and 85 others (Conspiracy's, about 35 classic and odd cards, five ante cards, Shahrazad and Falling Star).
+
+What v0.9.4 did toward it:
+- **XMage 1.4.63** ([the pin](../engine/xmage/pin.properties)): about 280 more Commander-legal cards play as written, most of Star Trek's among them before its packs arrive (its release is 2026-11-13, and the booster data job adds an expansion's packs by itself).
+- **Patches 0013 and 0014** ([the patches](../engine/xmage/patches/README.md)): Conspiracy's draft-matters cards played as printed outside a draft (there is no draft here, so nothing is noted: a noted number is 0, no color or name was chosen; the draft text still shows), Grenzo's Rebuttal, and the first classic cards (Undergrowth, Taste of Paradise, Chromatic Armor, Barbarian Guides, Whippoorwill).
+- **Names XMage spells otherwise** (`catalog/statuses.py` `loose()`): the modifier-letter colon and a spaced ellipsis no longer keep a card from matching its implementation, so Ratonhnhaké꞉ton, "Set Phasers to . . .", "I'm a Doctor, Not a . . ." and "With Great Power . . ." play as written.
+
+Measured against Scryfall's catalog of 2026-11-10, the Commander-legal cards the engine lacks fell from 743 (the live site's coverage on 1.4.62) to about 460, and the Legacy-legal from 593 to about 315. Left for later: the other classic cards (about 30; ten of them change a card's text, Sleight of Mind's kind, which needs a text-changing effect the engine lacks), Spy Kit, Cryptic Spires, Unfinity's Attractions and stickers, and the owner's decisions on ante and on Conspiracy's own card type.
+
 ### Prepare cards (v0.4.5)
 
 Scryfall's `prepare` layout (Secrets of Strixhaven, Reality Fracture and their Alchemy cards; 72 cards on 2026-10-22) is a creature with a spell on its second face, which it may cast a copy of while it is prepared. Until v0.4.5 the catalog quarantined them (`unknown_layout`). It now reads them as it reads an adventure, which is how XMage implements them (its kind `adventure`): the front face names the card in a game and decides whether it may be a commander, both faces' names resolve in imports, and the wording check counts the spell's cost, which the engine prints among the card's rules. XMage 1.4.62 implements 66 of the 72. The six it lacks are not implemented: Whiplash Wordsmith // Vicious Verse (Reality Fracture), and five digital-only Alchemy cards, Crescendo Conductor // Boltwave, Galathul Galecaller // Corvid Squall and Ursine Guide // Ranger's Merit (Alchemy: Secrets of Strixhaven), Rootha, Ardent Artisan // Next Iteration and Zimone the Calculating // Simple Subtraction (Alchemy: Reality Fracture).

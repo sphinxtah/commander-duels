@@ -530,10 +530,18 @@ class TwoHeadedGiantTest {
             Player controller = game.getPlayer(object.getControllerId());
             for (UUID modeId : object.getStackAbility().getModes().getSelectedModes()) {
                 for (Target target : object.getStackAbility().getModes().get(modeId).getTargets()) {
+                    // A mandatory target with no opponent's object to choose (v0.9.4: a bounce
+                    // trigger when only the team has creatures) is the rules', not the bot's.
+                    boolean forced = target.isRequired() && target.possibleTargets(controller.getId(),
+                        object.getStackAbility(), game).stream().noneMatch(possible -> {
+                            Permanent other = game.getPermanent(possible);
+                            return game.isOpponent(controller, other != null ? other.getControllerId() : possible);
+                        });
                     for (UUID targetId : target.getTargets()) {
                         Permanent permanent = game.getPermanent(targetId);
                         UUID owner = permanent != null ? permanent.getControllerId() : targetId;
-                        if (targets.add(object.getId() + ":" + targetId) && !game.isOpponent(controller, owner)) {
+                        if (targets.add(object.getId() + ":" + targetId) && !forced
+                            && !game.isOpponent(controller, owner)) {
                             Player hit = game.getPlayer(owner);
                             violations.add("turn " + game.getTurnNum() + " " + game.getTurnStepType() + ": "
                                 + controller.getName() + "'s " + object.getName() + " aimed at "
