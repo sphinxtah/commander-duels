@@ -177,7 +177,7 @@ v0.9.1's run had the late wardens winning none of 24 games; now every ward from 
 
 A run of 30 games a ward takes hours on one machine, so `.github/workflows/campaign-difficulty.yml` runs it on GitHub's: one job a ward, in parallel, each building the engine's card database stage from the engine job's cache and playing `CampaignDifficulty` for its ward (`-Dcampaign.wards`, a budget of 900 seconds a game), then one job that merges the fourteen reports and writes `scripts/campaign_difficulty.py`'s table into the run's summary; the merged report is the run's `campaign-difficulty` artifact. It runs on demand (Actions › Campaign difficulty › Run workflow, with the games per reference and the wards) or when a branch named `difficulty/<anything>` is pushed (10 games per reference, all wards).
 
-**The first run** (2026-11-10, v0.9.4 on XMage 1.4.63, [Actions run 42863855360](https://github.com/sphinxtah/commander-duels/actions/runs/42863855360); 30 games a ward, ten per reference deck, the same three as v0.9.3, at skill 3; noise about ±9 points). Ward 13 at skill 6 was still playing at v0.9.4's close; its row is the run's to fill in.
+**The first run** (2026-11-10, v0.9.4 on XMage 1.4.63, [Actions run 42863855360](https://github.com/sphinxtah/commander-duels/actions/runs/42863855360); 30 games a ward, ten per reference deck, the same three as v0.9.3, at skill 3; noise about ±9 points). Ward 13 at skill 6 finished after v0.9.4's close (three hours); its row is from the run's report.
 
 | Ward | Reference won (v0.9.4, 30 games) | v0.9.3 (9 games) | Target |
 |---|---|---|---|
@@ -193,10 +193,20 @@ A run of 30 games a ward takes hours on one machine, so `.github/workflows/campa
 | 10 Ob Nixilis | 23% | 22% | 35% |
 | 11 Geyadrone Dihada | 43% | 33% | 30% |
 | 12 Nicol Bolas | 23% | 22% | 25% |
-| 13 Liliana | (running) | 20% | 20% |
+| 13 Liliana | 33% (4 games to the turn cap) | 20% | 20% |
 | 14 The Sphinx (stand-in) | 30% | 38% | 10% |
 
 With thirty games a ward the curve holds by tier, and most wards sit within the noise of their targets. Out of line: Daretti (100%) and Oko (73%) are easier than their places, Dovin (53%) and Ob Nixilis (23%) a little harder, Geyadrone Dihada (43%) easier than Platinum's 30%, and the finale's public stand-in (30%) far easier than 10%, though the live finale adds the High Priest and the incarnation at 15 life. Tuning them is for v0.9.5 ([the plan](plans/0.9.5.md#the-campaign)).
+
+**Tuned in v0.9.5.** The decks are the lever, skills staying with their tiers (players who already won a ward keep the deck they won):
+- **Daretti** (Bronze, stronger): Ornithopter, Memnite, Manakin, Hedron Crawler and Shredded Sails give way to Wurmcoil Engine, Goblin Welder, Sol Ring, Thought Vessel and Vandalblast.
+- **Oko** (Silver, stronger): Scryb Sprites, Flying Men and Slither Blade to Mystic Snake, Rhystic Study and Hullbreaker Horror.
+- **Geyadrone Dihada** (Platinum, stronger): Fain, the Broker and Walking Ballista to Dockside Extortionist and Mana Drain.
+- **Dovin** (Bronze, weaker): Sun Titan, Sphinx's Revelation and Swords to Plowshares to Kor Skyfisher, Divination and Arrest.
+- **Ob Nixilis** (Gold, weaker): Sheoldred, the Apocalypse, Inferno Titan, Grave Pact and Skullclamp to Vampire Nighthawk, Charging Monstrosaur, Butcher of Malakir and Bonesplitter.
+- **Liliana** (33%) and **the finale's public stand-in** (30%) are left as they are: Liliana is within reach of its 20% at this sample's noise once the turn-cap games are counted out, and the live finale plays with the High Priest and the incarnation at 15 life, which the public run cannot measure.
+
+The workflow ran again on the tuned decks from the branch `difficulty/v0.9.5` (10 games a reference); its table goes here when it finishes.
 
 ## Content
 
