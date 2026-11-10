@@ -177,6 +177,27 @@ v0.9.1's run had the late wardens winning none of 24 games; now every ward from 
 
 A run of 30 games a ward takes hours on one machine, so `.github/workflows/campaign-difficulty.yml` runs it on GitHub's: one job a ward, in parallel, each building the engine's card database stage from the engine job's cache and playing `CampaignDifficulty` for its ward (`-Dcampaign.wards`, a budget of 900 seconds a game), then one job that merges the fourteen reports and writes `scripts/campaign_difficulty.py`'s table into the run's summary; the merged report is the run's `campaign-difficulty` artifact. It runs on demand (Actions › Campaign difficulty › Run workflow, with the games per reference and the wards) or when a branch named `difficulty/<anything>` is pushed (10 games per reference, all wards).
 
+**The first run** (2026-11-10, v0.9.4 on XMage 1.4.63, [Actions run 42863855360](https://github.com/sphinxtah/commander-duels/actions/runs/42863855360); 30 games a ward, ten per reference deck, the same three as v0.9.3, at skill 3; noise about ±9 points). Ward 13 at skill 6 was still playing at v0.9.4's close; its row is the run's to fill in.
+
+| Ward | Reference won (v0.9.4, 30 games) | v0.9.3 (9 games) | Target |
+|---|---|---|---|
+| 1 Tibalt | 90% | 67% | 85% |
+| 2 Daretti | 100% | 89% | 80% |
+| 3 Domri | 67% | 56% | 75% |
+| 4 Dovin | 53% | 56% | 65% |
+| 5 Oko | 73% | 44% | 60% |
+| 6 Xenagos | 47% | 67% | 55% |
+| 7 Tezzeret | 40% | 44% | 50% |
+| 8 Arzakon | 43% (3 games to the turn cap) | 33% | 45% |
+| 9 Ashiok | 40% | 44% | 40% |
+| 10 Ob Nixilis | 23% | 22% | 35% |
+| 11 Geyadrone Dihada | 43% | 33% | 30% |
+| 12 Nicol Bolas | 23% | 22% | 25% |
+| 13 Liliana | (running) | 20% | 20% |
+| 14 The Sphinx (stand-in) | 30% | 38% | 10% |
+
+With thirty games a ward the curve holds by tier, and most wards sit within the noise of their targets. Out of line: Daretti (100%) and Oko (73%) are easier than their places, Dovin (53%) and Ob Nixilis (23%) a little harder, Geyadrone Dihada (43%) easier than Platinum's 30%, and the finale's public stand-in (30%) far easier than 10%, though the live finale adds the High Priest and the incarnation at 15 life. Tuning them is for v0.9.5 ([the plan](plans/0.9.5.md#the-campaign)).
+
 ## Content
 
 `content/campaign.json`: the campaign's ID and content version (`final_concordance_v1`, 1), the turn cap, the training seed, the training hand (v0.9.1), the loaner deck, the six chapters with their rewards, and the fourteen encounters (number, opponent's roster ID, name, title, tier, place, seal, the bots' skill, commander and 99 cards; the finale's commander null, its stand-in and its private content's name). Every card of the thirteen decks and the loaner was checked against XMage's card classes at the pinned commit (`eb69d05b`) when they were written, and the decks rebuilt in v0.9.3 against XMage's card database and their commanders' colour identities, and on the live site's catalog; the engine refuses a game naming a card it lacks (`unknown_cards`). `tests/test_campaign.py` checks the decks' counts, singletons and commanders, and that neither custom card is named.
