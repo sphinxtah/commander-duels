@@ -13,7 +13,7 @@ import type { Snapshot } from "../src/game/types";
 // and sees what its seat may: a teammate's hand, a shared life total, the Kings and Generals; one
 // side concedes and the other wins as a team. Every game frame is checked for the hands no seat may
 // see. SysOp hosts; the others are made by scripts/e2e_player.py, whose session tokens come in
-// CD_E2E_PLAYER_SESSION (rival) and CD_E2E_TEAM_SESSIONS (two more, comma-separated).
+// CD_E2E_PLAYER_SESSION (rival) and CD_E2E_TEAM_SESSIONS (two more, comma-separated, CI's ogre and troll).
 const sysopPassword = process.env.CD_E2E_SYSOP_PASSWORD;
 const playerSession = process.env.CD_E2E_PLAYER_SESSION;
 const teamSessions = (process.env.CD_E2E_TEAM_SESSIONS ?? "")
@@ -438,7 +438,8 @@ test.describe("team tables in several browsers", () => {
         timeout: 120_000,
       });
       const result = seats[0].latest?.result as
-        { winner_team?: number | null } | undefined;
+        | { winner_team?: number | null }
+        | undefined;
       expect(result?.winner_team).toBe(0);
       console.log(
         `[kings] game ${gameId}: ${seats.map((s) => `${s.name} ${s.frames}`).join(", ")} frames, ` +

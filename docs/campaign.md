@@ -150,7 +150,7 @@ The owner chose the lever at v0.9.3's start: rework the late wardens' decks towa
 - **Wards 7 to 13** were rebuilt around their commanders, colours and themes as decks the AI pilots: dense creature curves, ETB removal, evasive threats, few loops, a few tutors for bombs rather than combo pieces, the power rising by tier. Each still produces its ward's two bark triggers (the audit of `web/src/campaign/barks.ts` against the new lists put Tezzeret's artifact recursion, Ashiok's library pressure and Ob Nixilis's sweep back).
 - **The finale's 99** kept its unrestricted power and lost the combo lines (the owner's go-ahead).
 - **Skills.** Daretti 2 → 3 and Dovin 3 → 2. Bronze's decks are as the handoff wrote them.
-- **Along the way**, the bots stopped losing on their own (Demonic Consultation and the Pacts) and heavy games search shallower ([fair bots](engine/fair-bots.md)). Wards 7, 10 and 13 needed second passes: Tezzeret's first rebuild was too weak, then too strong; Ob Nixilis's Blasphemous Act beside Blood Artist and Zulaport Cutthroat was a one-card kill (0 of 9 for the references); Liliana's loop fodder made her turns crawl past the harness's five minutes.
+- **Along the way**, the bots stopped losing on their own (Demonic Consultation and the Pacts) and heavy games search shallower ([fair bots](engine/fair-bots.md)). Wards 7, 10 and 13 needed second passes: Tezzeret's first rebuild was too weak, then too strong; Ob Nixilis's Blasphemous Act beside Blood Artist and Zulaport Cutthroat was a one-card kill (0 of 9 for the references); Liliana's loop fodder made her turns crawl past the harness's five minutes, and with it gone she measured too easy (50% in 6 games), so four of her weakest cards became threats and removal.
 
 **The results** (2026-11-09; 9 games a ward, three per reference deck: the loaner, `starter_rg_v1`, `starter_wu_v1`; reference skill 3; each ward's final list; ward 13 with a 15-minute budget):
 
@@ -168,7 +168,7 @@ The owner chose the lever at v0.9.3's start: rework the late wardens' decks towa
 | 10 Ob Nixilis | 5 | 22% | 35% |
 | 11 Geyadrone Dihada | 5 | 33% | 30% |
 | 12 Nicol Bolas | 5 | 22% | 25% |
-| 13 Liliana | 6 | WARD13 | 20% |
+| 13 Liliana | 6 | 20% (1 of 5 decided; a sixth game passed 15 minutes) | 20% |
 | 14 The Sphinx (stand-in) | 6 | 38% (8 games) | 10% |
 
 v0.9.1's run had the late wardens winning none of 24 games; now every ward from 7 on wins most of its games against the references, and the curve falls by tier. Nine games a ward leave about ±16 points of noise, so within a tier the order is not settled (Oko measures harder than Xenagos). The finale's stand-in plays without the incarnation; the live finale adds the High Priest and The Sphinx crossing at 15 life. Tibalt's 67% is a skill-3 bot's, not an assisted novice's; his deck and skill (1) stay the handoff's.

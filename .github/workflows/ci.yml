@@ -157,7 +157,8 @@ jobs:
           echo "::add-mask::$player"
           # Two more for the four people at a Two-Headed Giant table (v0.9.3).
           team=""
-          for handle in rival2 rival3; do
+          # Named apart from "rival", which the friends journey searches for.
+          for handle in ogre troll; do
             made="$(docker compose run --rm --no-deps -v "$PWD/scripts:/scripts:ro" api \
               python /scripts/e2e_player.py "$handle" | tail -n 1)"
             echo "::add-mask::$made"

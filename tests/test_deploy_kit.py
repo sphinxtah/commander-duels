@@ -101,13 +101,16 @@ def test_public_pages_need_nothing_the_content_security_policy_refuses():
 
 
 def test_both_proxies_take_a_report_with_its_screenshot():
-    # A 5 MB screenshot is about 7 MB in base64; every other request stays within nginx's 1 MB.
+    # A 5 MB screenshot is about 7 MB in base64; every other request stays within nginx's 1 MB,
+    # but for a sleeve's picture (v0.9.3), which may be as large.
     for path, forwarded in (
         (ROOT / "web" / "nginx.conf", "$proxy_add_x_forwarded_for"),
         (ROOT / "deploy" / "nginx" / "duels.thesphinx.co", "$remote_addr"),
     ):
         conf = path.read_text()
-        assert len(re.findall(r"client_max_body_size", conf)) == 1, path
+        assert len(re.findall(r"client_max_body_size", conf)) == 2, path
+        bodies = re.findall(r"location = (\S+) \{[^}]*client_max_body_size", conf)
+        assert sorted(bodies) == ["/api/v1/me/sleeves", "/api/v1/reports"], path
         location = re.search(r"location = /api/v1/reports \{(.*?)\n\s*\}", conf, re.S)
         assert location, path
         size = re.search(r"client_max_body_size (\d+)m;", location[1])
