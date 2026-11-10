@@ -928,6 +928,15 @@ def test_the_lobby_pages_and_filters_its_tables(client, engine):
     assert mine["yours"]["code"] == commander
     assert codes(browse(dan, open_seats=True)) == [tournament, legacy]
     assert browse(dan, format="legacy")["yours"]["code"] == commander
+    # v0.9.3: the most players or the fewest open seats first, and a search by host.
+    assert codes(browse(root, sort="players")) == [commander, tournament, legacy]
+    assert codes(browse(root, sort="fewest_open")) == [commander, tournament, legacy]
+    assert codes(browse(root, sort="newest")) == [tournament, commander, legacy]
+    assert codes(browse(root, host="CAR")) == [tournament]
+    assert codes(browse(root, host="bo", sort="players")) == [commander]
+    assert codes(browse(root, host="nobody")) == []
+    wrong = root.get("/api/v1/tables/browse", sort="oldest")
+    assert wrong.status_code == 422
     # Pages: 20, 50 or 100 a page; a page past the last answers the last.
     assert (browse(dan, page=9)["page"], codes(browse(dan, page=9))) == (1, codes(mine))
     refused = dan.get("/api/v1/tables/browse", per_page=30)

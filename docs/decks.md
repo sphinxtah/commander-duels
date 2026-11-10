@@ -11,11 +11,11 @@ Since v0.3.1 players build from their own **card library**: two starter decks ch
 - **Versions.** "Save a version" stores the draft as an immutable revision, numbered, with its validation, the catalog revision and the format version it was checked against. A trigger refuses any change to a stored revision or its entries in PostgreSQL. Saving an unchanged draft again returns the same revision. The save locks the deck's row first (v0.8.5), so two at once (a double click, a save racing a table's start) are numbered one after the other, and the second of an unchanged draft returns the first's revision.
 - **Games keep their version.** Starting a game with a deck stores a revision first (or reuses the latest, if unchanged), and the game records it, so later edits never change a game in progress or its record.
 - **Locations.** Main deck, sideboard, companion and maybeboard in Legacy; commander, companion, main deck and maybeboard in Commander. The maybeboard is never validated or played.
-- **Limits.** 250 decks an account (the trash included), 400 entries a deck, 1–250 copies an entry, notes up to 10,000 characters. A draft naming a card or edition that is neither in the catalog nor a custom card is refused (`422 unknown_card`), except one the draft already held (a custom card SysOp removed since, which validation names); saving a version of such a draft is refused the same way.
+- **Limits.** 250 decks an account (the trash included; since v0.9.3 the trash can be emptied), 400 entries a deck, 1–250 copies an entry, notes up to 10,000 characters. A draft naming a card or edition that is neither in the catalog nor a custom card is refused (`422 unknown_card`), except one the draft already held (a custom card SysOp removed since, which validation names); saving a version of such a draft is refused the same way.
 
 ## The list (DECK01)
 
-Your decks show their format, color identity, card count, commanders and state: "Ready to play", "Legal, not playable yet" (since v0.4.5 only a Godlike card the running engine has not loaded) or "Draft" (problems to fix), and since v0.4.5 how many cards left the game ([below](#cards-that-leave-the-game-v045)). A deck that holds banned cards, or cards not legal in its format, is tagged "Casual tables only" with "Banned cards" or "Not legal in Commander" (or Legacy); since v0.6.2 one holding stand-ins ([below](#validation-deck08-t03t05)) with "Plays stand-ins", whose title says why: the game has no rules for those cards yet, and casual games play them with their cost, types, power and toughness. From the list a deck can be opened, duplicated, archived (and brought back) or moved to the trash, from where it can be restored. Since v0.6.1 Delete asks first ("Delete <deck>? It goes to the trash, where you can restore it.", Keep it or Delete), at the owner's report, as conceding a match does. Nothing is deleted for good in v0.2.0.
+Your decks show their format, color identity, card count, commanders and state: "Ready to play", "Legal, not playable yet" (since v0.4.5 only a Godlike card the running engine has not loaded) or "Draft" (problems to fix), and since v0.4.5 how many cards left the game ([below](#cards-that-leave-the-game-v045)). A deck that holds banned cards, or cards not legal in its format, is tagged "Casual tables only" with "Banned cards" or "Not legal in Commander" (or Legacy); since v0.6.2 one holding stand-ins ([below](#validation-deck08-t03t05)) with "Plays stand-ins", whose title says why: the game has no rules for those cards yet, and casual games play them with their cost, types, power and toughness. From the list a deck can be opened, duplicated, archived (and brought back) or moved to the trash, from where it can be restored. Since v0.6.1 Delete asks first ("Delete <deck>? It goes to the trash, where you can restore it.", Keep it or Delete), at the owner's report, as conceding a match does. Nothing is deleted for good in v0.2.0. Since v0.9.3 the trash deletes for good ([below](#deleting-for-good-v093)).
 
 **Starter decks.** The practice table's six fixture decks can be copied to make them yours.
 
@@ -100,6 +100,15 @@ SysOp's own decks may hold any card in the game (until v0.4.5, any card the engi
 
 Every card in My library offers "Add to deck" on its tile and in its row (the owner's request of 2026-10-24). The pop-up chooses one of the player's decks (Commander or Legacy, not archived or trashed), the copies and where they go: the main deck, the sideboard (Legacy) or the maybeboard, and the command zone for a card that can lead a Commander deck. The copies join the draft's entry for that card, edition and place, or a new one, through the editor's own `GET /api/v1/decks/{id}` and `PUT /api/v1/decks/{id}/draft` with the version read; a draft another tab saved meanwhile is read again once. The page then says whether the deck is ready to play.
 
+## Deleting for good (v0.9.3)
+
+The deck limit counts the trash, and until v0.9.3 nothing left it: an account that reached 250 decks could make no more. The Trash tab now offers **Delete for good** on each deck and **Empty trash** above them, each asking first ("Delete <deck> for good? It can't be restored afterwards. Games already played keep their copy, and the cards stay in your library.").
+
+- **What goes.** Every version of the deck that no game, match or table used, with its cards. If none was used, the deck goes too.
+- **What stays.** A version a game, a match or a table used stays with its cards: games keep the copy they played (DECK01). The deck it names stays too, *purged* (`decks.purged_at`, migration 0040): its draft is emptied, its link ends, and it leaves every list, the trash included, and the deck limit.
+- **Refused.** A deck chosen at a table or in a queue (`409 deck_in_use`, "Leave it there first."); Empty trash skips those and says how many it deleted.
+- **Only the trash.** A deck outside the trash, or another account's, answers 404, as does a purged deck.
+
 ## The Godlike tier's custom cards (v0.4.0)
 
 An account at the Godlike tier (100,000 wins, SysOp included) may put the owner's custom cards in its decks ([the Planeswalker Alliance](progression.md#playing-them-v040)). Nothing about the cards themselves is in this repository.
@@ -123,6 +132,8 @@ All under `/api/v1`, for the signed-in owner only; another account's deck answer
 | `POST /decks` | Create: empty, from a starter, a duplicate, an import or a guided proposal |
 | `GET /decks/{id}`, `PATCH /decks/{id}` | The deck with its draft, validation, versions and cards; change its title, notes or sharing |
 | `PUT /decks/{id}/draft` | Save the draft (`version` must match, else 409) |
+| `DELETE /decks/{id}/forever` | v0.9.3: delete a deck in the trash for good (204); 409 `deck_in_use` |
+| `POST /decks/trash/empty` | v0.9.3: delete every deck in the trash for good, but those a table or queue holds: `{"purged"}` |
 | `POST /decks/{id}/revisions`, `GET /decks/{id}/revisions/{n}` | Save a version; read one |
 | `POST /decks/{id}/archive`, `/unarchive`, `DELETE /decks/{id}`, `POST /decks/{id}/restore` | Archive, trash and restore |
 | `DELETE /decks/{id}/removed-cards` | Dismiss the note of cards that left the game (v0.4.5) |

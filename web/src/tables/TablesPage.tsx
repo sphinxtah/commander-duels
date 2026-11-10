@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -68,6 +69,13 @@ const OTHER_TEAM = ["Two players", "A player and a bot", "Two bots"];
 export const PAGE_SIZES = [20, 50, 100] as const;
 type PageSize = (typeof PAGE_SIZES)[number];
 type RulesKind = "casual" | "tournament";
+/** The lobby's orders (v0.9.3). */
+export type TableSort = "newest" | "players" | "fewest_open";
+const SORTS: [TableSort, string][] = [
+  ["newest", "Newest"],
+  ["players", "Most players"],
+  ["fewest_open", "Fewest open seats"],
+];
 
 /** The lobby's filters (v0.9.2): every box ticks a kind of table in or narrows the list. */
 export type Filters = {
@@ -77,6 +85,9 @@ export type Filters = {
   noBots: boolean;
   bestOfThree: boolean;
   friends: boolean;
+  /** v0.9.3: the order, kept with the filters, and a search by host, which isn't kept. */
+  sort: TableSort;
+  host: string;
 };
 export const DEFAULT_FILTERS: Filters = {
   formats: [...FORMATS],
@@ -85,6 +96,8 @@ export const DEFAULT_FILTERS: Filters = {
   noBots: false,
   bestOfThree: false,
   friends: false,
+  sort: "newest",
+  host: "",
 };
 const FILTERS_KEY = "cd.tables.filters";
 
@@ -109,6 +122,8 @@ function keptFilters(): { filters: Filters; perPage: PageSize } {
         noBots: Boolean(kept.noBots),
         bestOfThree: Boolean(kept.bestOfThree),
         friends: Boolean(kept.friends),
+        sort: SORTS.find(([sort]) => sort === kept.sort)?.[0] ?? "newest",
+        host: "",
       },
       perPage,
     };
@@ -121,7 +136,7 @@ function keepFilters(filters: Filters, perPage: PageSize) {
   try {
     window.localStorage.setItem(
       FILTERS_KEY,
-      JSON.stringify({ ...filters, perPage }),
+      JSON.stringify({ ...filters, host: undefined, perPage }),
     );
   } catch {
     // A browser that keeps nothing starts from the defaults next time.
@@ -197,6 +212,8 @@ function Lobby({
           no_bots: filters.noBots,
           best_of_three: filters.bestOfThree,
           friends: filters.friends,
+          ...(filters.sort !== "newest" ? { sort: filters.sort } : {}),
+          ...(filters.host.trim() ? { host: filters.host.trim() } : {}),
           page,
           per_page: perPage,
         },
@@ -304,6 +321,21 @@ function Lobby({
                     }`}
           </p>
           <label className={styles.perPage}>
+            <span>Order</span>
+            <select
+              value={filters.sort}
+              onChange={(event) =>
+                filter({ sort: event.target.value as TableSort })
+              }
+            >
+              {SORTS.map(([sort, words]) => (
+                <option key={sort} value={sort}>
+                  {words}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.perPage}>
             <span>Tables a page</span>
             <select
               value={perPage}
@@ -322,6 +354,7 @@ function Lobby({
         {current && current.total === 0 && (
           <p className={game.hint}>
             {Object.values(filters).some((value) => value === true) ||
+            filters.host.trim() !== "" ||
             filters.formats.length < FORMATS.length ||
             filters.rules.length < 2
               ? "No table waiting for players matches these filters. Untick some, or open a table of your own."
@@ -506,7 +539,45 @@ function FilterBar({
           </label>
         ))}
       </fieldset>
+      <HostSearch
+        value={filters.host}
+        onChange={(host) => onChange({ host })}
+      />
     </div>
+  );
+}
+
+/** A search by host (v0.9.3): the list follows a moment after typing stops. */
+function HostSearch({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (host: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const latest = useRef(onChange);
+  useLayoutEffect(() => {
+    latest.current = onChange;
+  });
+  useEffect(() => {
+    if (draft === value) return;
+    const timer = window.setTimeout(() => latest.current(draft), 300);
+    return () => window.clearTimeout(timer);
+  }, [draft, value]);
+  return (
+    <fieldset>
+      <legend>Host</legend>
+      <input
+        type="search"
+        className={styles.hostSearch}
+        aria-label="Host's name"
+        placeholder="Any host"
+        maxLength={40}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+    </fieldset>
   );
 }
 

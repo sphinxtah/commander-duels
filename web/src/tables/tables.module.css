@@ -619,3 +619,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* v0.9.3: the order beside the page size, and the search by host. */
+.listHead .count {
+  margin-right: auto;
+}
+.hostSearch {
+  min-height: 32px;
+  width: 100%;
+  max-width: 220px;
+}

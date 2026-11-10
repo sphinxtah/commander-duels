@@ -160,6 +160,7 @@ def test_a_won_duel_opens_the_next_encounter_once(
         "deck": "loaner",
         "finale": None,
         "outcome": None,
+        "challenge": False,
     }
     # The bot is the encounter's opponent, by name and portrait, playing its own deck.
     bot = summary["seats"][1]
@@ -319,8 +320,10 @@ def test_a_chapter_completes_with_its_rewards(
     ]
     assert after["chapters"][1]["complete"] is False
     assert after["progress"]["highest_unlocked"] == 5
-    # The bots grow stronger with the tiers.
-    assert [body["skill"] for body in engine.created] == [1, 2, 2, 3]
+    # Bronze's bots are its weakest (skill 3 at most), Tibalt's the weakest of all; within a tier
+    # the skills follow the measured difficulty (v0.9.3, docs/campaign.md), not the order.
+    skills = [body["skill"] for body in engine.created]
+    assert skills[0] == 1 and max(skills) <= 3, skills
 
 
 def test_learn_commander_uses_the_training_seed(client: TestClient, engine: FakeEngine) -> None:
@@ -666,3 +669,62 @@ def test_a_duel_won_with_passive_bots_moves_on_without_spoils(
         assert db.scalar(select(TokenEntry).where(TokenEntry.user_id == ada.id)) is None
     play(ada, engine, 1, won())
     assert state(ada)["encounters"][0]["spoils"]["earned"] is True
+
+
+def test_apex_unbound_is_the_finale_again_for_its_badge_alone(
+    client: TestClient, app: FastAPI, engine: FakeEngine
+) -> None:
+    """The handoff's post-campaign challenge (v0.9.3): once the finale is won, it may be played
+    again as Apex Unbound, without hints, for a badge of its own, once; its win gives no seal,
+    spoils, tokens or chapter rewards a second time, and the badge shows on the profile."""
+    ada = Account(client, "ada")
+    eve = Account(client, "eve")
+    assert state(ada)["challenge"] == {"name": "Apex Unbound", "open": False, "earned": False}
+    unlock(app, ada, 14)
+    locked = start(ada, 14, loaner=True, challenge=True)
+    assert (locked.status_code, locked.json()["code"]) == (409, "challenge_locked")
+    elsewhere = start(ada, 13, loaner=True, challenge=True)
+    assert (elsewhere.status_code, elsewhere.json()["code"]) == (422, "invalid_seat")
+    play(ada, engine, 14, won())
+    opened = state(ada)
+    assert opened["challenge"] == {"name": "Apex Unbound", "open": True, "earned": False}
+    with Session(app.state.database) as db:
+        before = sorted(
+            db.scalars(select(CampaignReward.reward).where(CampaignReward.user_id == ada.id))
+        )
+        tokens = db.scalar(
+            select(func.coalesce(func.sum(TokenEntry.amount), 0)).where(
+                TokenEntry.user_id == ada.id
+            )
+        )
+
+    # A loss gives nothing; a win gives the badge, and nothing else.
+    lost = start(ada, 14, loaner=True, challenge=True)
+    assert lost.status_code == 201, lost.text
+    duel = until_status(ada, lost.json()["id"], "active")["game"]["campaign"]
+    assert (duel["challenge"], duel["hints"], duel["encounter"]) == (True, False, 14)
+    end(engine, lost.json()["id"], won(seat=1))
+    until_status(ada, lost.json()["id"], "finished")
+    assert state(ada)["challenge"]["earned"] is False
+    for _ in range(2):
+        game_id = start(ada, 14, loaner=True, challenge=True).json()["id"]
+        end(engine, game_id, won())
+        until_status(ada, game_id, "finished")
+    assert state(ada)["challenge"]["earned"] is True
+    with Session(app.state.database) as db:
+        after = sorted(
+            db.scalars(select(CampaignReward.reward).where(CampaignReward.user_id == ada.id))
+        )
+        assert after == sorted([*before, "badge:apex-unbound"])
+        assert (
+            db.scalar(
+                select(func.coalesce(func.sum(TokenEntry.amount), 0)).where(
+                    TokenEntry.user_id == ada.id
+                )
+            )
+            == tokens
+        )
+    profile = eve.get(f"/api/v1/players/{ada.id}")
+    if profile.status_code == 200:
+        assert profile.json()["badges"] == ["Apex Unbound"]
+    assert ada.get(f"/api/v1/players/{ada.id}").json()["badges"] == ["Apex Unbound"]

@@ -16,7 +16,13 @@ import styles from "./social.module.css";
 // v0.5.0 the page shows the player's badges and record too (records/PlayerRecord.tsx).
 
 type Action =
-  "add" | "accept" | "withdraw" | "decline" | "remove" | "block" | "unblock";
+  | "add"
+  | "accept"
+  | "withdraw"
+  | "decline"
+  | "remove"
+  | "block"
+  | "unblock";
 
 const done: Record<Action, (handle: string) => string> = {
   add: (handle) => `Friend request sent to ${handle}.`,
@@ -123,6 +129,13 @@ export function PlayerPage({
           {/* A campaign title the player chose to show (v0.8.8). */}
           {profile.title && (
             <p className={styles.playerTitle}>{profile.title}</p>
+          )}
+          {(profile.badges ?? []).length > 0 && (
+            <ul className={styles.badges} aria-label="Campaign badges">
+              {(profile.badges ?? []).map((badge) => (
+                <li key={badge}>{badge}</li>
+              ))}
+            </ul>
           )}
           <p className={styles.tierLine}>
             <TierBadge tier={profile.tier.id} size={28} decorative />

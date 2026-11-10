@@ -1568,7 +1568,7 @@
             "type": "integer"
           },
           "version": {
-            "default": "0.9.2",
+            "default": "0.9.3",
             "title": "Version",
             "type": "string"
           }
@@ -1622,6 +1622,33 @@
           "key"
         ],
         "title": "BuyNowRequest",
+        "type": "object"
+      },
+      "CampaignChallenge": {
+        "additionalProperties": false,
+        "description": "The Apex Unbound challenge (v0.9.3).",
+        "properties": {
+          "earned": {
+            "description": "Its badge is yours.",
+            "title": "Earned",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "open": {
+            "description": "The finale is won: the challenge may be taken.",
+            "title": "Open",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "open",
+          "earned"
+        ],
+        "title": "CampaignChallenge",
         "type": "object"
       },
       "CampaignChapter": {
@@ -1869,6 +1896,12 @@
         "additionalProperties": false,
         "description": "The campaign encounter a game was played for (v0.8.0, api/campaign.py).",
         "properties": {
+          "challenge": {
+            "default": false,
+            "description": "The Apex Unbound challenge (v0.9.3): the finale again, for its badge alone.",
+            "title": "Challenge",
+            "type": "boolean"
+          },
           "deck": {
             "enum": [
               "own",
@@ -1953,6 +1986,9 @@
       "CampaignState": {
         "additionalProperties": false,
         "properties": {
+          "challenge": {
+            "$ref": "#/components/schemas/CampaignChallenge"
+          },
           "chapters": {
             "items": {
               "$ref": "#/components/schemas/CampaignChapter"
@@ -2014,7 +2050,8 @@
           "encounters",
           "chapters",
           "progress",
-          "running"
+          "running",
+          "challenge"
         ],
         "title": "CampaignState",
         "type": "object"
@@ -6257,7 +6294,7 @@
             "type": "string"
           },
           "version": {
-            "default": "0.9.2",
+            "default": "0.9.3",
             "title": "Version",
             "type": "string"
           }
@@ -8250,6 +8287,14 @@
             "title": "Avatar",
             "type": "string"
           },
+          "badges": {
+            "description": "The campaign's badges the player holds (v0.9.3): Apex Unbound.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Badges",
+            "type": "array"
+          },
           "blocked": {
             "description": "Whether you have blocked this player.",
             "title": "Blocked",
@@ -9726,6 +9771,21 @@
           "key"
         ],
         "title": "PurchaseRequest",
+        "type": "object"
+      },
+      "Purged": {
+        "additionalProperties": false,
+        "properties": {
+          "purged": {
+            "description": "How many decks left the trash for good.",
+            "title": "Purged",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "purged"
+        ],
+        "title": "Purged",
         "type": "object"
       },
       "QuestView": {
@@ -12705,6 +12765,12 @@
       "StartEncounter": {
         "additionalProperties": false,
         "properties": {
+          "challenge": {
+            "default": false,
+            "description": "The Apex Unbound challenge (v0.9.3): the finale again, once it is won, for its badge alone.",
+            "title": "Challenge",
+            "type": "boolean"
+          },
           "deck_id": {
             "anyOf": [
               {
@@ -14609,7 +14675,7 @@
   },
   "info": {
     "title": "Commander Duels",
-    "version": "0.9.2"
+    "version": "0.9.3"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -25150,6 +25216,105 @@
         "summary": "Starters"
       }
     },
+    "/api/v1/decks/trash/empty": {
+      "post": {
+        "description": "Deletes every deck in the trash for good (v0.9.3), but those a table or queue holds.",
+        "operationId": "empty_trash_api_v1_decks_trash_empty_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Purged"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Empty Trash"
+      }
+    },
     "/api/v1/decks/validate": {
       "post": {
         "operationId": "validate_entries_api_v1_decks_validate_post",
@@ -25942,6 +26107,110 @@
           }
         },
         "summary": "Export Deck"
+      }
+    },
+    "/api/v1/decks/{deck_id}/forever": {
+      "delete": {
+        "description": "Deletes a deck in the trash for good (v0.9.3). Games that played it keep their copy.",
+        "operationId": "delete_forever_api_v1_decks__deck_id__forever_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "deck_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Deck Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Delete Forever"
       }
     },
     "/api/v1/decks/{deck_id}/removed-cards": {
@@ -35336,7 +35605,7 @@
     },
     "/api/v1/tables/browse": {
       "get": {
-        "description": "The lobby's open tables a page at a time (v0.9.2): the public ones, your own, those you were\ninvited to (SysOp and administrators see every one), newest first with your own leading.",
+        "description": "The lobby's open tables a page at a time (v0.9.2): the public ones, your own, those you were\ninvited to (SysOp and administrators see every one), your own leading, then newest first, or\nsince v0.9.3 the most players or the fewest open seats first, optionally by host.",
         "operationId": "browse_tables_api_v1_tables_browse_get",
         "parameters": [
           {
@@ -35437,6 +35706,42 @@
               "description": "Only tables a friend sits at or you were invited to.",
               "title": "Friends",
               "type": "boolean"
+            }
+          },
+          {
+            "description": "Only tables whose host's handle or name holds this.",
+            "in": "query",
+            "name": "host",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 40,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only tables whose host's handle or name holds this.",
+              "title": "Host"
+            }
+          },
+          {
+            "description": "newest (default), players (most seated) or fewest_open (seats).",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "newest",
+              "description": "newest (default), players (most seated) or fewest_open (seats).",
+              "enum": [
+                "newest",
+                "players",
+                "fewest_open"
+              ],
+              "title": "Sort",
+              "type": "string"
             }
           },
           {

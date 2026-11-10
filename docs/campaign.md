@@ -20,7 +20,7 @@
 
 The owner, 2026-10-31: "As you advance in the campaign, beating a planeswalker also means the player wins the planeswalker's deck. It will show up in the players deck inventory. Each planeswalker defeated also grants tokens, starting with 1,000 tokens for beating the first, 2,000 for the second, and keep doubling it each time."
 
-- **The deck.** A warden's first defeat gives the player that warden's deck: a Commander deck of their own named for the warden ("Tibalt's Deck"), its notes naming the ward, the 99 cards and commander the duel served the warden (the bot seat's deck list, `game_seats.deck_list`; for the private finale the owner's own list when its content gives one), with every copy of its 100 cards granted to the library for good (source `campaign`, "Won in the campaign" on My library, sellable at the auction house like a starter deck's). Each card is in its default edition; a card the catalog lacks is left out. The deck limit never refuses a prize. The Sphinx's deck comes with the commander he played (the owner, 2026-10-31: "The Sphinx is the final boss and he needs that High Priest custom card as the Commander. ... The High Priest will be awarded with the deck to the player if they win."): with the owner's engine content, the High Priest, the Godlike tier's custom card, recorded on the duel when it starts (`campaign_games.prize_card`, the custom card by the name the engine served) and granted to the winner for good (`custom_card_grants`, one copy, under the deck's key). Its winner sees it by name and image in the deck builder, and plays it in their decks, whatever their tier: the library counts it as theirs, validation opens it to them, the engine gets its name, and its image is served to them. Without the owner's content the finale's deck comes with the public stand-in (Morophon, the Boundless). If no custom card carries the name the engine served when a private finale is won, the win counts (the ward, its seal, its chapter) but the spoils wait, and the server logs it: the first win of the finale after SysOp uploads the card under that name gives them, the High Priest included. Refusing to start the duel instead would block the campaign's last ward on an upload; recording the spoils without the card would give the stand-in for good. The spoils call the High Priest by the story's word ("The High Priest", `private_commander_title`), as this repository never holds its name.
+- **The deck.** A warden's first defeat gives the player that warden's deck: a Commander deck of their own named for the warden ("Tibalt's Deck"), its notes naming the ward, the 99 cards and commander the duel served the warden (the bot seat's deck list, `game_seats.deck_list`; for the private finale the owner's own list when its content gives one), with every copy of its 100 cards granted to the library for good (source `campaign`, "Won in the campaign" on My library, sellable at the auction house like a starter deck's). Each card is in its default edition; a card the catalog lacks is left out, and since v0.9.3 the server logs each such card by name, as every warden's deck is won whole (the owner, 2026-11-09: "By the end, the player wins all of the decks they had to face"). On 2026-11-09 all fourteen decks and the loaner resolved card for card in the live catalog. The deck limit never refuses a prize. The Sphinx's deck comes with the commander he played (the owner, 2026-10-31: "The Sphinx is the final boss and he needs that High Priest custom card as the Commander. ... The High Priest will be awarded with the deck to the player if they win."): with the owner's engine content, the High Priest, the Godlike tier's custom card, recorded on the duel when it starts (`campaign_games.prize_card`, the custom card by the name the engine served) and granted to the winner for good (`custom_card_grants`, one copy, under the deck's key). Its winner sees it by name and image in the deck builder, and plays it in their decks, whatever their tier: the library counts it as theirs, validation opens it to them, the engine gets its name, and its image is served to them. Without the owner's content the finale's deck comes with the public stand-in (Morophon, the Boundless). If no custom card carries the name the engine served when a private finale is won, the win counts (the ward, its seal, its chapter) but the spoils wait, and the server logs it: the first win of the finale after SysOp uploads the card under that name gives them, the High Priest included. Refusing to start the duel instead would block the campaign's last ward on an upload; recording the spoils without the card would give the stand-in for good. The spoils call the High Priest by the story's word ("The High Priest", `private_commander_title`), as this repository never holds its name.
 - **The tokens**: 1,000 for the first warden, doubling with each: 1,000, 2,000, 4,000, 8,000 (the bronze wards), 16,000 to 128,000 (silver), 256,000 to 2,048,000 (gold to mythic), 4,096,000 for Liliana and 8,192,000 for The Sphinx: 16,383,000 in all. `content/campaign.json` names each ward's `tokens`. They are a `campaign` entry in the token ledger (keyed `campaign:<account>:<campaign>:<progress>:tokens:<ward>`, the rule `campaign-v1`, the reason naming the warden and the ward), counted with tokens won on the profile.
 - **Once.** The spoils are recorded with the seal in the transaction that records the win (the reward `spoils:<ward>`), so a replayed result, a second win or a retry gives nothing again; after an account reset the campaign starts over and its spoils can be won again, as a starter deck's cards are granted again.
 - **Where they show**: each ward on the map and the duel's setup ("Win it for Tibalt's Deck (led by Judith, the Scourge Diva) and 1,000 tokens, once"); after the first win, the spoils card (the warden's portrait over their fanned deck, the deck's name and commander, the tokens); the campaign's rules; the deck in Decks, the cards in My library, the tokens on the profile.
@@ -56,6 +56,8 @@ The engine's `CampaignReserve` (engine/src/main/java/com/commanderduels/Campaign
 
 The reserve is the command zone, where XMage keeps commander cards and casts them from by the same rules; the card is not a commander (no tax, no commander damage, none of the commander's replacements), and only one copy ever exists. Its loyalty, its abilities and its −10 ("You win the game", the owner's emblem) are the card's own, and every result the game reaches stands: a lethal hit before the crossing ends the duel. `CampaignReserveTest` plays it with a public planeswalker standing in.
 
+Since v0.9.3 `IncarnationRemovalTest` checks the replacement against each way off the battlefield, on a seated table with a public planeswalker in reserve: destroyed, sacrificed, exiled by the opponent, bounced, tucked into the library and put into the graveyard, each sends it back to the reserve, with one copy in the game, no life changed, and the reserve never spent. A countered first cast, the paid recast and the incarnation's own abilities stay the rules', untested in a scripted game.
+
 An engine without the owner's content (the public images, a local stack) plays the finale with the same 99 cards, Morophon, the Boundless as the stand-in commander, and no incarnation; the campaign can still be finished there, and the game's summary says which finale ran (`campaign.finale`: `private` or `public`).
 
 ## Progress and rewards
@@ -77,12 +79,22 @@ An engine without the owner's content (the public images, a local stack) plays t
 | `GET /api/v1/me/cosmetics` | signed in | The card back and title in use, and every card back and title the campaign rewards with whether it is earned |
 | `PUT /api/v1/me/cosmetics` | signed in | `{"card_back", "title"}`: each an earned slug or null |
 
+### Apex Unbound (v0.9.3)
+
+The handoff's optional post-campaign challenge: "An optional Apex Unbound challenge can reuse the unrestricted AI with tutorial aids off. It awards a separate cosmetic badge and does not replace the campaign's completed ending."
+
+- **When.** Once the finale is won, the Campaign page offers *Apex Unbound* beside its rewards: "Take the challenge" (or "Take the challenge again" once its badge is earned). It opens the finale's setup as the post-campaign challenge, with the loaner or one of the player's own decks.
+- **The duel** is the finale as it stands (the owner's own finale where the engine serves it, else the stand-in), with Kaya's hints off. It tells no story: its end shows a line on the map, never the endings again.
+- **The badge.** A win earns the reward `badge:apex-unbound`, once (campaign_rewards, keyed by progress like every reward). It never gives a seal, spoils, tokens or chapter rewards again, and a duel with passive bots gives nothing. The badge shows under Rewards and on the player's profile (`badges` on `GET /api/v1/players/{id}`, read without making anyone's campaign progress). An account reset takes it away with the rest.
+- **Refused.** On any encounter but the finale (`422 invalid_seat`), and before the finale is won (`409 challenge_locked`).
+- **Data.** `campaign_games.challenge` (migration 0040); `challenge` on the game summary's `campaign` and in the campaign's state (`name`, `open`, `earned`).
+
 ### Routes
 
 | Route | Who | What |
 | --- | --- | --- |
 | `GET /api/v1/campaign` | `games.play` | The campaign: its encounters (status locked, open or won; the finale's commander null), chapters with their rewards earned, the progress and the tutorial, and the account's campaign duel still running |
-| `POST /api/v1/campaign/encounters/{n}/start` | `games.play` (own decks: `decks.edit`) | `{"deck_id"}`, `{"loaner": true}` or `{"learn": true}`: the duel, as a game summary (201). 409 `encounter_locked`, `game_limit`; 422 `invalid_seat` (no deck or two), `invalid_deck`, `deck_not_playable`, `custom_not_loaded`; 429 `games_busy`; 503 as practice games |
+| `POST /api/v1/campaign/encounters/{n}/start` | `games.play` (own decks: `decks.edit`) | `{"deck_id"}`, `{"loaner": true}` or `{"learn": true}`, and since v0.9.3 `"challenge": true` on the finale (Apex Unbound): the duel, as a game summary (201). 409 `encounter_locked`, `challenge_locked`, `game_limit`; 422 `invalid_seat` (no deck or two), `invalid_deck`, `deck_not_playable`, `custom_not_loaded`; 429 `games_busy`; 503 as practice games |
 | `POST /api/v1/campaign/scenes` | `games.play` | `{"scene": "FC.E01.POST"}`: a scene seen (to its end or skipped); FC.END.WIN or FC.END.EARLY after the finale's win records the ending |
 | `PUT /api/v1/campaign/tutorial` | `games.play` | `{"hints", "skip", "lessons"}`: the hints, the teaching skipped (never the duel), lessons seen added |
 
@@ -121,6 +133,46 @@ Options: `campaign.reference.skill` (default 3), `campaign.references` (`loaner`
 
 **What it says.** The curve runs backwards: the bronze and silver wardens (skill 1 to 3) won 4 of 18, and the wardens from ward 7 on (skill 4 to 6) won none of 24, most losing by turn 17 without ever threatening lethal. Skill isn't the lever that's missing: Liliana is already at 6. The later decks (artifact, five-colour, value and combo plans) are ones XMage's AI pilots poorly against a fast white weenie deck. Tibalt's first lethal threat came no earlier than the reference player's seventh turn, inside T04's "not before the sixth". The finale's first game ran out of the engine's 2 GB heap, and one of its games ended on turn 2 with both players at 40, which wants a look. Three games a pairing is a small sample. The skills were left unchanged: the decks are the lever, and they are the owner's content ([v0.9.2's plan](plans/0.9.2.md)).
 
+## Difficulty, measured again (v0.9.3)
+
+The owner chose the lever at v0.9.3's start: rework the late wardens' decks toward plans XMage's AI plays well. The handoff gives no rates, only a forgiving first ward (at least 95% of assisted novices beat Tibalt the first time), a clear rise within every chapter, and a finale beaten only rarely by strong prepared decks. Measured with fair bots against three reference decks at skill 3, those became these targets for the reference decks' wins:
+
+| Tier | Wards | Target |
+|---|---|---|
+| Bronze | 1–4 | 85% falling to 65% |
+| Silver | 5–8 | 60% falling to 45% |
+| Gold | 9–10 | 40% to 35% |
+| Platinum | 11–12 | 30% to 25% |
+| Mythic | 13 | about 20% |
+| Godlike | 14 | about 10% |
+
+**What changed.**
+- **Wards 7 to 13** were rebuilt around their commanders, colours and themes as decks the AI pilots: dense creature curves, ETB removal, evasive threats, few loops, a few tutors for bombs rather than combo pieces, the power rising by tier. Each still produces its ward's two bark triggers (the audit of `web/src/campaign/barks.ts` against the new lists put Tezzeret's artifact recursion, Ashiok's library pressure and Ob Nixilis's sweep back).
+- **The finale's 99** kept its unrestricted power and lost the combo lines (the owner's go-ahead).
+- **Skills.** Daretti 2 → 3 and Dovin 3 → 2. Bronze's decks are as the handoff wrote them.
+- **Along the way**, the bots stopped losing on their own (Demonic Consultation and the Pacts) and heavy games search shallower ([fair bots](engine/fair-bots.md)). Wards 7, 10 and 13 needed second passes: Tezzeret's first rebuild was too weak, then too strong; Ob Nixilis's Blasphemous Act beside Blood Artist and Zulaport Cutthroat was a one-card kill (0 of 9 for the references); Liliana's loop fodder made her turns crawl past the harness's five minutes.
+
+**The results** (2026-11-09; 9 games a ward, three per reference deck: the loaner, `starter_rg_v1`, `starter_wu_v1`; reference skill 3; each ward's final list; ward 13 with a 15-minute budget):
+
+| Ward | Skill | Reference won | Target |
+|---|---|---|---|
+| 1 Tibalt | 1 | 67% | 85% |
+| 2 Daretti | 3 | 89% | 80% |
+| 3 Domri | 2 | 56% | 75% |
+| 4 Dovin | 2 | 56% | 65% |
+| 5 Oko | 3 | 44% | 60% |
+| 6 Xenagos | 3 | 67% | 55% |
+| 7 Tezzeret | 4 | 44% | 50% |
+| 8 Arzakon | 4 | 33% | 45% |
+| 9 Ashiok | 4 | 44% | 40% |
+| 10 Ob Nixilis | 5 | 22% | 35% |
+| 11 Geyadrone Dihada | 5 | 33% | 30% |
+| 12 Nicol Bolas | 5 | 22% | 25% |
+| 13 Liliana | 6 | WARD13 | 20% |
+| 14 The Sphinx (stand-in) | 6 | 38% (8 games) | 10% |
+
+v0.9.1's run had the late wardens winning none of 24 games; now every ward from 7 on wins most of its games against the references, and the curve falls by tier. Nine games a ward leave about ±16 points of noise, so within a tier the order is not settled (Oko measures harder than Xenagos). The finale's stand-in plays without the incarnation; the live finale adds the High Priest and The Sphinx crossing at 15 life. Tibalt's 67% is a skill-3 bot's, not an assisted novice's; his deck and skill (1) stay the handoff's.
+
 ## Content
 
-`content/campaign.json`: the campaign's ID and content version (`final_concordance_v1`, 1), the turn cap, the training seed, the training hand (v0.9.1), the loaner deck, the six chapters with their rewards, and the fourteen encounters (number, opponent's roster ID, name, title, tier, place, seal, the bots' skill, commander and 99 cards; the finale's commander null, its stand-in and its private content's name). Every card of the thirteen decks and the loaner was checked against XMage's card classes at the pinned commit (`eb69d05b`) when they were written; the engine refuses a game naming a card it lacks (`unknown_cards`). `tests/test_campaign.py` checks the decks' counts, singletons and commanders, and that neither custom card is named.
+`content/campaign.json`: the campaign's ID and content version (`final_concordance_v1`, 1), the turn cap, the training seed, the training hand (v0.9.1), the loaner deck, the six chapters with their rewards, and the fourteen encounters (number, opponent's roster ID, name, title, tier, place, seal, the bots' skill, commander and 99 cards; the finale's commander null, its stand-in and its private content's name). Every card of the thirteen decks and the loaner was checked against XMage's card classes at the pinned commit (`eb69d05b`) when they were written, and the decks rebuilt in v0.9.3 against XMage's card database and their commanders' colour identities, and on the live site's catalog; the engine refuses a game naming a card it lacks (`unknown_cards`). `tests/test_campaign.py` checks the decks' counts, singletons and commanders, and that neither custom card is named.

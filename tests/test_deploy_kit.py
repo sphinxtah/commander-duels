@@ -50,6 +50,19 @@ def test_web_proxy_limits_google_sign_in_challenges():
     assert "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;" in location[1]
 
 
+def test_both_proxies_take_a_full_sleeve_picture():
+    # v0.9.3, the owner's report: a 3.4 MB sleeve picture never reached the API. Both proxies kept
+    # nginx's 1 MB for it, and the page could only say the service was unavailable. A sleeve may be
+    # 5 MB, about 7 MB in base64, as a report's screenshot may.
+    for path in (ROOT / "web" / "nginx.conf", ROOT / "deploy" / "nginx" / "duels.thesphinx.co"):
+        conf = path.read_text()
+        location = re.search(r"location = /api/v1/me/sleeves \{(.*?)\}", conf, re.S)
+        assert location, path
+        assert "client_max_body_size 8m;" in location[1], path
+    web = (ROOT / "web" / "nginx.conf").read_text()
+    assert re.search(r"location @sleeve_too_large \{[^}]*return 413 '\{\"code\"", web)
+
+
 def test_web_proxy_serves_the_public_pages():
     # About, Privacy and Terms (v0.4.1): files at addresses of their own, for anyone, with
     # JavaScript or without. Google's consent screen names them.

@@ -6,6 +6,7 @@
   (web/public/brand/backs/<slug>.svg). Showing each player's back to the others at a shared table
   is not built yet.
 - **A title** stands under the player's name on their profile, for everyone who may open it.
+- **A badge** (v0.9.3), Apex Unbound's, shows on the profile once earned; nothing to choose.
 
 Only what the account has earned in its current campaign progress may be chosen, and what it
 shows is checked again on every read, so a reset of the account or of its campaign takes the
@@ -17,12 +18,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Request
 from pydantic import Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from api import campaign as campaigns
 from api.auth import INPUT_ERRORS
 from api.identity import Active, ApiError, Db
-from api.models import User
+from api.models import CampaignProgress, User
 from api.schemas import Contract
 
 router = APIRouter(prefix="/api/v1", responses=INPUT_ERRORS)
@@ -142,3 +144,21 @@ def title_of(db: Session, request: Request, user_id: UUID) -> str | None:
     if user is None or user.title is None:
         return None
     return in_use(db, user, campaign_or_none(request))[1]
+
+
+def badges_of(db: Session, request: Request, user_id: UUID) -> list[str]:
+    """The campaign's badges a player holds in their current progress (v0.9.3), in words."""
+    campaign = campaign_or_none(request)
+    user = db.get(User, user_id)
+    if campaign is None or user is None:
+        return []
+    # Read only: a profile's viewer never makes another player's campaign progress.
+    progress = db.scalar(
+        select(CampaignProgress).where(
+            CampaignProgress.user_id == user.id, CampaignProgress.campaign_id == campaign.id
+        )
+    )
+    if progress is None or (user.reset_at is not None and progress.started_at < user.reset_at):
+        return []
+    held = campaigns.earned(db, user.id, campaign, progress)
+    return [campaigns.CHALLENGE_NAME] if campaigns.CHALLENGE_REWARD in held else []

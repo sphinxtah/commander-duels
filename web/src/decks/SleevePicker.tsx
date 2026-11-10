@@ -9,13 +9,15 @@ import {
 import { client, describe } from "../api";
 import type { components } from "../generated/api";
 import { OFFICIAL_BACK, backUrl } from "../game/cardBack";
+import { shrinkPicture } from "./shrinkPicture";
 import styles from "./sleeves.module.css";
 
 type Sleeves = components["schemas"]["Sleeves"];
 type Sleeve = components["schemas"]["Sleeve"];
 
-/** Five MB, as the server counts it. */
-const MAX_BYTES = 5 * 1024 * 1024;
+/** The largest picture taken from the player (v0.9.3): anything above SEND_BYTES is shrunk
+ * before it is sent, so this only keeps a browser from decoding something enormous. */
+const MAX_BYTES = 40 * 1024 * 1024;
 const ACCEPTED = "image/png,image/jpeg,image/bmp";
 
 /** The file as base64, without the data URL's prefix: what the API's JSON carries. */
@@ -88,13 +90,31 @@ export function SleevePicker({
     setMessage("");
     if (!file) return setError("Choose a picture first.");
     if (file.size > MAX_BYTES)
-      return setError("The picture is larger than 5 MB. Choose a smaller one.");
+      return setError(
+        "The picture is larger than 40 MB. Choose a smaller one.",
+      );
     setBusy(true);
     try {
-      const image = await base64Of(file);
-      const { data, error: refused } = await client.POST("/api/v1/me/sleeves", {
+      let sent: Blob;
+      try {
+        sent = await shrinkPicture(file);
+      } catch {
+        return setError(
+          "This browser could not read the picture. Choose a PNG, BMP or JPG.",
+        );
+      }
+      const image = await base64Of(sent);
+      const {
+        data,
+        error: refused,
+        response,
+      } = await client.POST("/api/v1/me/sleeves", {
         body: { name: name.trim() || file.name.slice(0, 40), image },
       });
+      if (response.status === 413)
+        return setError(
+          "The picture is too large to send. Choose a smaller one.",
+        );
       if (!data) return setError(describe(refused));
       setName("");
       setFile(null);
@@ -223,7 +243,9 @@ export function SleevePicker({
             />
           </label>
           <label>
-            <span>Picture (PNG, BMP or JPG, up to 5 MB)</span>
+            <span>
+              Picture (PNG, BMP or JPG; a large one is made smaller first)
+            </span>
             <input
               type="file"
               accept={ACCEPTED}

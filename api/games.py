@@ -1472,6 +1472,7 @@ def summary_of(
                 deck=link.deck,  # type: ignore[arg-type]
                 finale=link.finale,  # type: ignore[arg-type]
                 outcome=link.outcome,  # type: ignore[arg-type]
+                challenge=link.challenge,
             )
             if link is not None
             else None

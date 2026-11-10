@@ -342,6 +342,8 @@ class TableView(Contract):
 
 
 RulesFilter = Literal["casual", "tournament"]
+# Find a game's orders (v0.9.3): newest first, the most players seated, the fewest seats open.
+TableSort = Literal["newest", "players", "fewest_open"]
 
 
 class TablePage(Contract):
@@ -695,11 +697,20 @@ def browse_tables(
     friends: Annotated[
         bool, Query(description="Only tables a friend sits at or you were invited to.")
     ] = False,
+    host: Annotated[
+        str | None,
+        Query(max_length=40, description="Only tables whose host's handle or name holds this."),
+    ] = None,
+    sort: Annotated[
+        TableSort,
+        Query(description="newest (default), players (most seated) or fewest_open (seats)."),
+    ] = "newest",
     page: Annotated[int, Query(ge=1, le=10_000)] = 1,
     per_page: Annotated[int, Query(description="20, 50 or 100.")] = PAGE_SIZES[0],
 ) -> TablePage:
     """The lobby's open tables a page at a time (v0.9.2): the public ones, your own, those you were
-    invited to (SysOp and administrators see every one), newest first with your own leading."""
+    invited to (SysOp and administrators see every one), your own leading, then newest first, or
+    since v0.9.3 the most players or the fewest open seats first, optionally by host."""
     if per_page not in PAGE_SIZES:
         raise ApiError(422, "invalid_page", "Show 20, 50 or 100 tables a page.")
     you = principal.user.id
@@ -720,14 +731,23 @@ def browse_tables(
         statement = statement.where(casual_rules)
     elif rules and set(rules) == {"tournament"}:
         statement = statement.where(not_(casual_rules))
+    taken = (
+        select(func.count())
+        .select_from(TableSeat)
+        .where(TableSeat.table_id == GameTable.id)
+        .scalar_subquery()
+    )
     if open_seats:
-        taken = (
-            select(func.count())
-            .select_from(TableSeat)
-            .where(TableSeat.table_id == GameTable.id)
-            .scalar_subquery()
-        )
         statement = statement.where(GameTable.seats - GameTable.bots > taken)
+    term = (host or "").strip()
+    if term:
+        hosts = select(User.id).where(
+            or_(
+                User.normalized_handle.contains(term.casefold(), autoescape=True),
+                User.display_name.icontains(term, autoescape=True),
+            )
+        )
+        statement = statement.where(GameTable.host_id.in_(hosts))
     if no_bots:
         statement = statement.where(GameTable.bots == 0)
     if best_of_three:
@@ -743,7 +763,15 @@ def browse_tables(
     page = min(page, last)
     found = list(
         db.scalars(
-            statement.order_by(GameTable.id.in_(mine).desc(), GameTable.created_at.desc())
+            statement.order_by(
+                GameTable.id.in_(mine).desc(),
+                *{
+                    "newest": (),
+                    "players": (taken.desc(),),
+                    "fewest_open": ((GameTable.seats - GameTable.bots - taken).asc(),),
+                }[sort],
+                GameTable.created_at.desc(),
+            )
             .offset((page - 1) * per_page)
             .limit(per_page)
         )

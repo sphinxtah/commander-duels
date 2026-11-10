@@ -41,13 +41,15 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  *
  * <p>Options: {@code -Dcampaign.reference.skill} (default 3), {@code -Dcampaign.references} (a comma
  * list of "loaner" and starter deck ids; default the loaner and two starters),
- * {@code -Dcampaign.wards} (a comma list of numbers; default all), {@code -Dcampaign.budget} (seconds a
+ * {@code -Dcampaign.trace} (v0.9.3: print every game's log), {@code -Dcampaign.wards} (a comma list of
+ * numbers; default all), {@code -Dcampaign.budget} (seconds a
  * game, default 300), {@code -Dcampaign.out} (the report's path). The finale plays its public
  * stand-in. Needs ./db.
  */
 @EnabledIfSystemProperty(named = "campaign.measure", matches = "\\d+")
 class CampaignDifficulty {
     private static final Path CONTENT = Path.of("..", "content");
+    private static final boolean TRACE = Boolean.getBoolean("campaign.trace");
     private static final String[] NAMES = {"Reference", "Warden"};
 
     record Contender(String id, DeckLists.CustomDeck deck) {}
@@ -167,6 +169,11 @@ class CampaignDifficulty {
                 List<UUID> ids = players.stream().map(Player::getId).toList();
                 format.seatTeams(game, ids);
                 game.addTableEventListener(event -> {
+                    if (TRACE && event.getMessage() != null && !event.getMessage().isBlank()) {
+                        // -Dcampaign.trace (v0.9.3): the game's log, to see how a game ended.
+                        System.out.println("TRACE " + ward + " T" + game.getTurnNum() + " " + event.getMessage()
+                            .replaceAll("<[^>]+>", ""));
+                    }
                     if (game.getTurnNum() != lastTurn[0]) {
                         lastTurn[0] = game.getTurnNum();
                         if (ids.get(0).equals(game.getActivePlayerId())) {

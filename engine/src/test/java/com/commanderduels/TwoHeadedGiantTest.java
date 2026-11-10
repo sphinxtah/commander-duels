@@ -253,6 +253,52 @@ class TwoHeadedGiantTest {
         return new HumanGameRequest(seed, GameFormat.TWO_HEADED_GIANT, seats, 1, turnCap, 900);
     }
 
+    /**
+     * A player who concedes while a winner holds an open prompt loses at once for their team
+     * (810.8b, v0.9.3): the engine woke the waiting player only when one player was left standing,
+     * so the game waited for a winner's next answer whenever a whole team of two was still in.
+     */
+    @Test
+    void aTeamThatConcedesLosesWhileTheWinnersPromptIsOpen() throws Exception {
+        HumanGame game = Tables.start(fourHumans(5150L, 30), HumanGame.Hooks.NONE);
+        long deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(3);
+        HumanGame.Snapshot waiting = null;
+        while (waiting == null) {
+            assertTrue(System.nanoTime() < deadline, "the game never reached turn 2 with a winner asked");
+            int seat = game.awaitPromptSeat(10_000);
+            assertTrue(seat != -2, "the game ended before anyone conceded");
+            if (seat < 0) {
+                continue;
+            }
+            HumanGame.Snapshot snapshot = game.snapshot(seat, -1, 0, 0);
+            var prompt = snapshot.prompt();
+            if (prompt == null) {
+                continue;
+            }
+            if (seat < 2 && snapshot.view() != null && snapshot.view().turn() >= 2) {
+                waiting = snapshot; // left open: Team 1 is asked when Team 2 concedes
+                break;
+            }
+            var pick = ScriptedPlayer.byAction(prompt.options(), "keep");
+            if (pick.isEmpty()) {
+                pick = ScriptedPlayer.byAction(prompt.options(), "pass");
+            }
+            if (pick.isEmpty()) {
+                pick = ScriptedPlayer.byAction(prompt.options(), "done");
+            }
+            String option = pick.isEmpty() ? prompt.options().get(0).id() : pick.get(0).id();
+            game.submit(seat, Tables.answer(game, UUID.randomUUID().toString(), snapshot.revision(), prompt.id(),
+                option));
+        }
+        HumanGame.Snapshot theirs = game.snapshot(2, -1, 0, 0);
+        assertEquals(200, game.concede(2, Tables.concede(game, theirs.revision())).status());
+        HumanGame.Snapshot last = Tables.finalSnapshot(game, waiting.view().seat());
+        assertEquals("completed", last.result().kind(), last.result().toString());
+        assertEquals(Set.of(0, 1), Set.copyOf(last.result().winnerSeats()), last.result().toString());
+        assertEquals(List.of(2), last.result().concededSeats());
+        assertTrue(BotMatchRunner.join(game.thread(), 10_000));
+    }
+
     @Test
     void teamsShareTurnsAndLifeAndWinTogether() throws Exception {
         var request = fourHumans(5005L, 30);

@@ -174,6 +174,10 @@ class PlayerProfile(PlayerSummary):
         default=None,
         description="The campaign title the player shows (v0.8.8, api/cosmetics.py); null: none.",
     )
+    badges: list[str] = Field(
+        default_factory=list,
+        description="The campaign's badges the player holds (v0.9.3): Apex Unbound.",
+    )
 
 
 class UnnamedPlayer(Contract):
@@ -1039,11 +1043,13 @@ def search_players(
 
 @router.get("/players/{player_id}", response_model=PlayerProfile)
 def player_profile(player_id: UUID, request: Request, principal: Active, db: Db) -> PlayerProfile:
-    from api.cosmetics import title_of
+    from api.cosmetics import badges_of, title_of
 
     user = visible_player(db, player_id)
     profile = profile_of(db, viewer_of(db, principal), user)
-    return profile.model_copy(update={"title": title_of(db, request, user.id)})
+    return profile.model_copy(
+        update={"title": title_of(db, request, user.id), "badges": badges_of(db, request, user.id)}
+    )
 
 
 # Friends.

@@ -26,6 +26,7 @@ export function DuelSetup({
   encounter,
   lostBefore,
   canUseOwnDecks,
+  challenge = false,
   onClose,
   onState,
 }: {
@@ -33,6 +34,8 @@ export function DuelSetup({
   encounter: CampaignEncounter;
   lostBefore: boolean;
   canUseOwnDecks: boolean;
+  /** Apex Unbound (v0.9.3): the finale again, for its badge alone. */
+  challenge?: boolean;
   onClose: () => void;
   onState: (state: CampaignState) => void;
 }) {
@@ -41,7 +44,7 @@ export function DuelSetup({
   const [chosen, setChosen] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const first = encounter.number === 1;
+  const first = encounter.number === 1 && !challenge;
   const tutorial = state.progress.tutorial;
   const story = STORY.encounters[encounter.number];
 
@@ -85,7 +88,7 @@ export function DuelSetup({
     setBusy(true);
     setError("");
     selectSound();
-    const started = await startEncounter(encounter.number, choice);
+    const started = await startEncounter(encounter.number, choice, challenge);
     if (started.gameId) {
       window.location.hash = `#game/${started.gameId}`;
       return;
@@ -126,12 +129,14 @@ export function DuelSetup({
         )}
         <div>
           <span className={styles.kicker}>
-            {encounter.number === 14
-              ? "The final duel"
-              : `Encounter ${String(encounter.number).padStart(2, "0")} · ${TIER_NAMES[encounter.tier]}`}
+            {challenge
+              ? "The post-campaign challenge"
+              : encounter.number === 14
+                ? "The final duel"
+                : `Encounter ${String(encounter.number).padStart(2, "0")} · ${TIER_NAMES[encounter.tier]}`}
           </span>
           <h2 id="duel-setup-title" className={styles.setupTitle}>
-            {encounter.title}
+            {challenge ? state.challenge.name : encounter.title}
           </h2>
           <p className={styles.quiet}>
             {encounter.name}
@@ -139,19 +144,27 @@ export function DuelSetup({
               ? `, commanding ${encounter.commander}`
               : ""}. {encounter.location}.
           </p>
-          <p className={styles.spoilsLine}>
-            {encounter.spoils.earned ? "Won: " : "Win it for "}
-            <strong>{encounter.spoils.deck}</strong> (led by{" "}
-            {encounter.spoils.commander}) and{" "}
-            <strong>
-              {encounter.spoils.tokens.toLocaleString("en-US")} tokens
-            </strong>
-            {encounter.spoils.earned ? "." : ", once."}
-          </p>
+          {challenge ? (
+            <p className={styles.spoilsLine}>
+              {state.challenge.earned
+                ? "Its badge is yours already; play it again for the challenge alone."
+                : "Win it for the Apex Unbound badge, once. Kaya's aids stay off, and the ending you won stays yours."}
+            </p>
+          ) : (
+            <p className={styles.spoilsLine}>
+              {encounter.spoils.earned ? "Won: " : "Win it for "}
+              <strong>{encounter.spoils.deck}</strong> (led by{" "}
+              {encounter.spoils.commander}) and{" "}
+              <strong>
+                {encounter.spoils.tokens.toLocaleString("en-US")} tokens
+              </strong>
+              {encounter.spoils.earned ? "." : ", once."}
+            </p>
+          )}
         </div>
       </header>
 
-      {lostBefore && story?.counterplay && (
+      {lostBefore && !challenge && story?.counterplay && (
         <p className={styles.advice}>
           <strong>Kaya:</strong> {story.counterplay}
         </p>

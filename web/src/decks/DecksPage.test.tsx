@@ -137,6 +137,61 @@ describe("the decks page", () => {
     expect(deletes()).toHaveLength(1);
   });
 
+  it("deletes a deck from the trash for good, or empties it, after asking (v0.9.3)", async () => {
+    openDialogs();
+    const api = mockApi();
+    const trashed = { ...summary, deleted_at: "2026-11-09T00:00:00Z" };
+    const other = { ...trashed, id: "other-deck", title: "Elves" };
+    api.on(
+      "GET /api/v1/decks",
+      () => reply(200, []),
+      () => reply(200, [trashed, other]),
+      () => reply(200, [other]),
+      () => reply(200, []),
+    );
+    api.on("GET /api/v1/decks/starters", () => reply(200, []));
+    api.on("DELETE /api/v1/decks/{deck_id}/forever", () => reply(204));
+    api.on("POST /api/v1/decks/trash/empty", () => reply(200, { purged: 1 }));
+    render(<DecksPage me={player} heading={createRef()} />);
+    await screen.findByText(/No decks yet/);
+    fireEvent.click(screen.getByRole("tab", { name: "Trash" }));
+    const row = (await screen.findByText("Mono-Red Burn")).closest("li")!;
+    fireEvent.click(
+      within(row).getByRole("button", { name: "Delete for good" }),
+    );
+    const dialog = screen
+      .getByRole("heading", { name: "Delete Mono-Red Burn for good?" })
+      .closest("dialog")!;
+    expect(dialog).toHaveAttribute("open");
+    expect(
+      within(dialog).getByText(/Games already played keep their copy/),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete for good" }),
+    );
+    expect(
+      await screen.findByText("Mono-Red Burn is deleted for good."),
+    ).toBeInTheDocument();
+    expect(
+      api.calls.filter(
+        (call) => call.route === "DELETE /api/v1/decks/{deck_id}/forever",
+      ),
+    ).toHaveLength(1);
+    await screen.findByText("Elves");
+    fireEvent.click(screen.getByRole("button", { name: "Empty trash" }));
+    expect(
+      screen.getByRole("heading", { name: "Empty the trash?" }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Delete for good" }),
+    );
+    expect(
+      await screen.findByText("The trash is empty.", {
+        selector: "[role=status]",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the Archived tab's list when the list asked for after an archive answers last", async () => {
     const api = mockApi();
     let release!: () => void;

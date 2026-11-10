@@ -66,6 +66,8 @@ export function CampaignPage({
   const [state, setState] = useState<CampaignState | null>();
   const [playing, setPlaying] = useState<Playing | null>(null);
   const [setup, setSetup] = useState<number | null>(null);
+  // Apex Unbound's setup (v0.9.3): the finale's, for the challenge.
+  const [challenging, setChallenging] = useState(false);
   const [journal, setJournal] = useState(false);
   const [aftermath, setAftermath] = useState<Aftermath | null>(null);
   const [notice, setNotice] = useState("");
@@ -133,6 +135,17 @@ export function CampaignPage({
     const fresh = (await loadCampaign()) ?? state ?? null;
     if (fresh) setState(fresh);
     const number = ref.encounter;
+    if (ref.challenge) {
+      // Apex Unbound tells no story: the ending stays the one already won.
+      setNotice(
+        ref.outcome === "won"
+          ? `${fresh?.challenge.name ?? "Apex Unbound"} is beaten. Its badge is on your profile.`
+          : ref.outcome === "lost" || ref.outcome === "draw"
+            ? "The throne held. Take the challenge again from the map."
+            : "The challenge did not finish. Take it again from the map.",
+      );
+      return;
+    }
     const story = STORY.encounters[number];
     const encounter = fresh?.encounters.find((e) => e.number === number);
     if (!story || !encounter || !fresh) return;
@@ -229,9 +242,15 @@ export function CampaignPage({
   const next = state.encounters.find((e) => e.status === "open");
   const current = playing?.scenes[0];
   const setupEncounter = state.encounters.find((e) => e.number === setup);
-  const rewards = state.chapters.flatMap((chapter) =>
-    chapter.rewards.filter((reward) => reward.earned),
-  );
+  const rewards = [
+    ...state.chapters.flatMap((chapter) =>
+      chapter.rewards.filter((reward) => reward.earned),
+    ),
+    ...(state.challenge.earned
+      ? [{ id: "badge:apex-unbound", name: `${state.challenge.name} badge` }]
+      : []),
+  ];
+  const finale = state.encounters.find((e) => e.number === 14);
 
   return (
     <section className={styles.page} aria-labelledby="campaign-title">
@@ -471,6 +490,30 @@ export function CampaignPage({
             <span>Kaya&rsquo;s hints in the first duel</span>
           </label>
 
+          {state.challenge.open && finale && (
+            <div className={styles.challenge}>
+              <h3>{state.challenge.name}</h3>
+              <p>
+                The throne again, as the Archive kept it, with Kaya&rsquo;s aids
+                off. Win it for a badge of its own; the ending you won stays
+                yours, and nothing else is won twice.
+              </p>
+              <button
+                type="button"
+                className={styles.gold}
+                onClick={() => {
+                  selectSound();
+                  setAftermath(null);
+                  setChallenging(true);
+                }}
+              >
+                {state.challenge.earned
+                  ? "Take the challenge again"
+                  : "Take the challenge"}
+              </button>
+            </div>
+          )}
+
           {rewards.length > 0 && (
             <>
               <h3>Rewards</h3>
@@ -519,6 +562,17 @@ export function CampaignPage({
           lostBefore={lost.has(setupEncounter.number)}
           canUseOwnDecks={me.permissions.includes("decks.edit")}
           onClose={() => setSetup(null)}
+          onState={setState}
+        />
+      )}
+      {challenging && finale && (
+        <DuelSetup
+          state={state}
+          encounter={finale}
+          lostBefore={false}
+          canUseOwnDecks={me.permissions.includes("decks.edit")}
+          challenge
+          onClose={() => setChallenging(false)}
           onState={setState}
         />
       )}

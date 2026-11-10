@@ -709,3 +709,20 @@ a.noteLink:hover {
   font-size: 0.95rem;
   letter-spacing: 0.06em;
 }
+/* v0.9.3: the campaign's badges, Apex Unbound's. */
+.badges {
+  list-style: none;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.badges li {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--cd-gold, #c9a45c);
+  border-radius: 999px;
+  color: var(--cd-gold-hi, #e6c68c);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}

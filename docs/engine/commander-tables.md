@@ -11,7 +11,7 @@ What it proves:
 
 What it does not prove:
 - Anything about a browser client, sign-in, seat ownership or lobbies.
-- Recovery, timers, Two-Headed Giant ([the feasibility note](two-headed-giant.md)), or choices too long to offer (naming a card).
+- Recovery, timers, Two-Headed Giant ([the feasibility note](two-headed-giant.md)), or choices too long to offer (naming a card; typed since v0.4.0 as `choose_name`, below).
 - That the bots play fairly: they still searched a full copy of the game, including every human's hand (AI02). Fixed in v0.3.1: each search re-deals what the bot's seat cannot see ([fair bots](fair-bots.md)).
 
 ## Tables
@@ -110,7 +110,7 @@ Eight kinds are new; everything else is as in v0.0.3.
 | `choose_pile` | `CHOOSE_PILE`: Fact or Fiction's two piles | `choose_pile` for each, with the visible card names; the prompt's `piles` lists each pile's object ids | boolean |
 | `yes_no` | (unchanged) also covers Commander's "move it to the command zone?": the state-based choice for a graveyard or exile, and the replacement for a hand or library | `yes` moves it, using XMage's button labels | boolean |
 
-Multiplayer targets need nothing new: `choose_target` already lists players by seat. A choice longer than 64 entries, such as naming a card, stays `unsupported`. So does `PLAY_X_MANA`, which XMage's human player never sends at the pinned commit (X costs arrive as `AMOUNT`).
+Multiplayer targets need nothing new: `choose_target` already lists players by seat. A choice longer than 64 entries, such as naming a card, was `unsupported` until v0.4.0, which made it `choose_name` (above). So does `PLAY_X_MANA`, which XMage's human player never sends at the pinned commit (X costs arrive as `AMOUNT`).
 
 ## Verification
 
@@ -154,6 +154,6 @@ Results are in [the release notes](../releases/0.0.4.md) and [verification](../v
 - **Two-Headed Giant (FMT08–FMT10).** See [the feasibility note](two-headed-giant.md). Since v0.5.0 an early practice game, on a patched XMage.
 - **AI hidden information (AI02).** Unchanged here; fixed in v0.3.1 ([fair bots](fair-bots.md)).
 - **Lobbies and settings.** Readiness (NET02–NET03) and Rule Zero settings (FMT03–FMT04) are not built.
-- **Prompt families.** Only choices longer than 64 entries (naming a card) are still `unsupported`.
+- **Prompt families.** Choices longer than 64 entries (naming a card) were the last `unsupported` family, typed as `choose_name` since v0.4.0.
 - **Spectator delay.** Delay is in seconds. Delays counted in turns, and replays (NET14), are later work.
 - **Recovery.** Games live in memory only.

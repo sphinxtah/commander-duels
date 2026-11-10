@@ -1,5 +1,9 @@
 package com.commanderduels;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
+import java.lang.management.MemoryType;
+import java.lang.management.MemoryUsage;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -17,6 +21,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Map;
+import mage.MageObject;
 import mage.abilities.Ability;
 import mage.abilities.ActivatedAbility;
 import mage.abilities.PlayLandAbility;
@@ -27,6 +33,7 @@ import mage.constants.CardType;
 import mage.constants.Outcome;
 import mage.constants.PhaseStep;
 import mage.constants.RangeOfInfluence;
+import mage.constants.Zone;
 import mage.game.Game;
 import mage.game.combat.CombatGroup;
 import mage.game.permanent.Permanent;
@@ -88,6 +95,16 @@ class FairBot extends ComputerPlayerControllableProxy {
     private static final Logger LOG = Logger.getLogger(FairBot.class);
     /** How long a cancelled search may take to stop before the bot gives up on its result. */
     static final long STOP_GRACE_MILLIS = 2_000;
+    /**
+     * A search whose root copy took this long, or that starts while the heap's old generation is
+     * this full after its last collection, looks only {@link #LIGHT_DEPTH} plies ahead (v0.9.3).
+     * XMage copies the whole game, watchers' lists of every spell cast included, into each node: in
+     * a combo turn of the campaign finale one copy took seconds, the search could not stop between
+     * nodes, and the engine's heap ran out.
+     */
+    static final long HEAVY_COPY_MILLIS = 200;
+    static final double HEAP_PRESSURE = 0.70;
+    static final int LIGHT_DEPTH = 2;
     /** How long a decision waits for a free search thread before the bot passes instead. */
     static final long QUEUE_WAIT_MILLIS = 60_000;
     /** XMage's own pool for its AI has five threads; a busy engine needs one per processor. */
@@ -166,6 +183,10 @@ class FairBot extends ComputerPlayerControllableProxy {
         private final AtomicLong passive = new AtomicLong();
         // A King's Table General's pressed attacks (v0.9.0).
         private final AtomicLong pressed = new AtomicLong();
+        // Searches kept shallow for a heavy game or a full heap (v0.9.3).
+        private final AtomicLong light = new AtomicLong();
+        // Pacts not cast because their upkeep cost could not be paid (v0.9.3).
+        private final AtomicLong pacts = new AtomicLong();
 
         /** Determinized copies made: one per search. */
         long samples() {
@@ -246,6 +267,16 @@ class FairBot extends ComputerPlayerControllableProxy {
             return pressed.get();
         }
 
+        /** Searches that looked only {@link #LIGHT_DEPTH} plies ahead (v0.9.3). */
+        long light() {
+            return light.get();
+        }
+
+        /** Plans dropped because they cast a Pact the bot could not pay for (v0.9.3). */
+        long pacts() {
+            return pacts.get();
+        }
+
         @Override
         public String toString() {
             return searches() + " searches, " + completed() + " completed, " + timedOut() + " cut off by the budget, "
@@ -253,7 +284,7 @@ class FairBot extends ComputerPlayerControllableProxy {
                 + longestMillis() + " ms, longest wait " + longestWaitMillis() + " ms; habits: " + slips()
                 + " slips, " + naivePlays() + " naive plays, " + heldBack() + " held back, " + recklessAttacks()
                 + " reckless attacks, " + unblocked() + " unblocked; " + passive() + " passive decisions; "
-                + pressed() + " pressed attacks";
+                + pressed() + " pressed attacks; " + light() + " light searches, " + pacts() + " unpayable Pacts held";
         }
 
         /** Decisions that continued a planned chain of actions instead of searching again. */
@@ -381,6 +412,41 @@ class FairBot extends ComputerPlayerControllableProxy {
             }
         }
         return super.priority(game);
+    }
+
+    /**
+     * The Pacts (v0.9.3): free now, their cost due at the caster's next upkeep or the game is lost,
+     * by the mana value of that cost. XMage's AI casts them without counting it: the campaign
+     * finale's stand-in countered a Bonesplitter with Pact of Negation on turn one and lost on turn
+     * two at 40 life.
+     */
+    static final Map<String, Integer> PACTS = Map.of("Pact of Negation", 5, "Pact of the Titan", 5,
+        "Slaughter Pact", 3, "Summoner's Pact", 3, "Intervention Pact", 3);
+
+    /** XMage's action, unless its plan casts a Pact whose upkeep cost this bot could not pay. */
+    @Override
+    protected void act(Game game) {
+        if (actions != null && actions.stream().anyMatch(ability -> unpayablePact(ability, game))) {
+            actions.clear();
+            stats.pacts.incrementAndGet();
+        }
+        super.act(game);
+    }
+
+    /** A Pact cast whose upkeep cost is more than the mana sources this bot controls. */
+    boolean unpayablePact(Ability ability, Game game) {
+        if (!(ability instanceof SpellAbility)) {
+            return false;
+        }
+        MageObject source = game.getObject(ability.getSourceId());
+        Integer cost = source == null ? null : PACTS.get(source.getName());
+        if (cost == null) {
+            return false;
+        }
+        long sources = game.getBattlefield().getAllActivePermanents(playerId).stream()
+            .filter(permanent -> !permanent.getAbilities().getActivatedManaAbilities(Zone.BATTLEFIELD).isEmpty())
+            .count();
+        return sources < cost;
     }
 
     private static boolean isMainPhase(Game game) {
@@ -658,7 +724,9 @@ class FairBot extends ComputerPlayerControllableProxy {
     /** The search's root copy, with the concealed zones dealt again from what this seat may know. */
     @Override
     protected Game createSimulation(Game game) {
+        long copying = System.nanoTime();
         Game sim = super.createSimulation(game);
+        lastCopyMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - copying);
         Determinizer.redeal(sim, getId(), random);
         stats.samples.incrementAndGet();
         return sim;
@@ -693,6 +761,30 @@ class FairBot extends ComputerPlayerControllableProxy {
         return false;
     }
 
+    /** How long the last search's root copy took, in milliseconds (v0.9.3). */
+    private volatile long lastCopyMillis;
+
+    /**
+     * The heap's fullness after its last collection (v0.9.3): the old generation's (or every heap
+     * pool's) collection usage against its maximum, 0 when the JVM reports none.
+     */
+    static double heapPressure() {
+        long used = 0;
+        long max = 0;
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            if (pool.getType() != MemoryType.HEAP || !pool.isCollectionUsageThresholdSupported()) {
+                continue;
+            }
+            MemoryUsage usage = pool.getCollectionUsage();
+            if (usage == null || usage.getMax() <= 0) {
+                continue;
+            }
+            used += usage.getUsed();
+            max += usage.getMax();
+        }
+        return max <= 0 ? 0 : (double) used / max;
+    }
+
     /** XMage's state fingerprint with hands as counts, plus this bot's own hand. */
     private int seatFingerprint(Game game) {
         Player self = game.getPlayer(playerId);
@@ -706,6 +798,12 @@ class FairBot extends ComputerPlayerControllableProxy {
     @Override
     protected Integer addActionsTimed() {
         SimulationNode2 searched = root;
+        int depth = maxDepth;
+        if (lastCopyMillis > HEAVY_COPY_MILLIS || heapPressure() > HEAP_PRESSURE) {
+            depth = Math.min(depth, LIGHT_DEPTH);
+            stats.light.incrementAndGet();
+        }
+        int searchDepth = depth;
         AtomicBoolean claimed = new AtomicBoolean();
         CountDownLatch began = new CountDownLatch(1);
         AtomicLong startedAt = new AtomicLong();
@@ -717,7 +815,7 @@ class FairBot extends ComputerPlayerControllableProxy {
             startedAt.set(System.nanoTime());
             began.countDown();
             try {
-                return addActions(searched, maxDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
+                return addActions(searched, searchDepth, Integer.MIN_VALUE, Integer.MAX_VALUE);
             } finally {
                 stopped.countDown();
             }
@@ -776,6 +874,61 @@ class FairBot extends ComputerPlayerControllableProxy {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    /**
+     * The spells that name a card to fetch it from their caster's own library (v0.9.3). XMage asks
+     * every card-name choice with {@code Outcome.Detriment} and its AI answers at random from every
+     * card name there is, so Demonic Consultation exiled the bot's whole library and lost it the
+     * game at its next draw (the campaign finale's turn-two losses at 40 life).
+     */
+    static final Set<String> NAMES_OWN_LIBRARY = Set.of("Demonic Consultation", "Spoils of the Vault");
+
+    /** The cards a bot names first for those spells: the finale's win with an empty library. */
+    private static final List<String> PREFERRED_NAMES = List.of("Thassa's Oracle", "Laboratory Maniac",
+        "Jace, Wielder of Mysteries");
+
+    @Override
+    public boolean choose(Outcome outcome, Choice choice, Game game) {
+        String named = isGameUnderControl() ? ownLibraryName(choice, game) : null;
+        if (named != null) {
+            choice.setChoice(named);
+            return true;
+        }
+        return super.choose(outcome, choice, game);
+    }
+
+    /**
+     * A card name for a spell of this bot's that fetches the named card from its own library: one
+     * the library holds (the bot knows its own deck list, never its order), the preferred names
+     * first, then its costliest nonland card. Null for any other choice.
+     */
+    String ownLibraryName(Choice choice, Game game) {
+        if (choice == null || choice.getChoices() == null || choice.getChoices().size() < 100
+            || game.getStack().isEmpty()) {
+            return null;
+        }
+        var resolving = game.getStack().getFirstOrNull();
+        if (resolving == null || !playerId.equals(resolving.getControllerId())
+            || !NAMES_OWN_LIBRARY.contains(resolving.getName())) {
+            return null;
+        }
+        List<Card> library = new ArrayList<>(getLibrary().getCards(game));
+        if (library.isEmpty()) {
+            return null;
+        }
+        for (String name : PREFERRED_NAMES) {
+            if (library.stream().anyMatch(card -> card.getName().equals(name)) && choice.getChoices().contains(name)) {
+                return name;
+            }
+        }
+        return library.stream()
+            .filter(card -> !card.isLand(game) && choice.getChoices().contains(card.getName()))
+            .max(Comparator.comparingInt(Card::getManaValue).thenComparing(Card::getName, Comparator.reverseOrder()))
+            .or(() -> library.stream().filter(card -> choice.getChoices().contains(card.getName()))
+                .min(Comparator.comparing(Card::getName)))
+            .map(Card::getName)
+            .orElse(null);
     }
 
     /**

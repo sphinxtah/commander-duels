@@ -1098,6 +1098,43 @@ describe("finding a game (v0.9.2)", () => {
     expect(within(browser).queryAllByRole("listitem")).toHaveLength(0);
   });
 
+  it("orders the cards and searches by host (v0.9.3)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const api = mockApi();
+      serveLobby(api, () => reply(200, [table()]));
+      api.on("GET /api/v1/decks", () => reply(200, [deck()]));
+      render(<TablesPage me={ada} heading={createRef()} />);
+      await settle();
+      expect(query(api)).not.toHaveProperty("sort");
+      const order = screen.getByLabelText("Order");
+      await act(async () => {
+        (order as HTMLSelectElement).value = "players";
+        order.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await settle();
+      expect(query(api)).toMatchObject({ sort: "players", page: 1 });
+      const host = screen.getByRole("searchbox", { name: "Host's name" });
+      await act(async () => {
+        fireEvent.change(host, { target: { value: "bob" } });
+      });
+      expect(query(api)).not.toHaveProperty("host");
+      await act(async () => {
+        vi.advanceTimersByTime(350);
+      });
+      await settle();
+      expect(query(api)).toMatchObject({ host: "bob", sort: "players" });
+      // The order is kept for next time; the search is not.
+      const kept = JSON.parse(
+        window.localStorage.getItem("cd.tables.filters")!,
+      );
+      expect(kept).toMatchObject({ sort: "players" });
+      expect(kept).not.toHaveProperty("host");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says who invited you and which friends sit at a table", async () => {
     const api = mockApi();
     serveLobby(api, () =>

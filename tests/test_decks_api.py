@@ -24,7 +24,19 @@ from api.cards import artist_of, image_of
 from api.config import Settings
 from api.identity import hash_token, utcnow
 from api.main import create_app
-from api.models import AuditEvent, CardConcept, CardPrinting, Deck, RoleGrant, User, UserSession
+from api.models import (
+    AuditEvent,
+    CardConcept,
+    CardPrinting,
+    Deck,
+    DeckEntryRow,
+    DeckRevision,
+    Game,
+    GameSeat,
+    RoleGrant,
+    User,
+    UserSession,
+)
 
 # Tables a test empties after itself, children first; the catalog stays.
 ACCOUNT_TABLES = (
@@ -377,6 +389,76 @@ def test_deck_lifecycle_drafts_and_revisions(client):
     assert [d["title"] for d in ada.get("/api/v1/decks", view="trash").json()] == ["Red Deck Wins"]
     assert ada.send("POST", f"{path}/restore").json()["deleted_at"] is None
     assert len(ada.get("/api/v1/decks").json()) == 2
+
+
+def test_decks_leave_the_trash_for_good(client):
+    """v0.9.3: a deck in the trash is deleted for good, alone or with the whole trash. One whose
+    revision a game played keeps its row for that game, purged: out of every list and the deck
+    limit. A deck outside the trash is refused, as another account's is."""
+    ada = Account(client, "ada", admin=True)
+    eve = Account(client, "eve")
+
+    def made(title: str) -> str:
+        deck = ada.send(
+            "POST", "/api/v1/decks", {"title": title, "format": "legacy", "entries": burn(client)}
+        ).json()
+        assert ada.send("POST", f"/api/v1/decks/{deck['id']}/revisions").status_code == 201
+        return cast(str, deck["id"])
+
+    lone, played, other, third = made("Lone"), made("Played"), made("Other"), made("Third")
+    # Outside the trash, or someone else's: as if it did not exist.
+    assert ada.send("DELETE", f"/api/v1/decks/{lone}/forever").status_code == 404
+    for deck in (lone, played, other, third):
+        ada.send("DELETE", f"/api/v1/decks/{deck}")
+    assert eve.send("DELETE", f"/api/v1/decks/{lone}/forever").status_code == 404
+    with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+        revision = db.scalar(select(DeckRevision.id).where(DeckRevision.deck_id == UUID(played)))
+        game = Game(
+            id=uuid4(),
+            format="legacy",
+            status="finished",
+            created_by=ada.id,
+            created_at=utcnow(),
+            bot_skill=1,
+            turn_cap=30,
+        )
+        db.add(game)
+        db.flush()
+        db.add(
+            GameSeat(
+                game_id=game.id,
+                seat=0,
+                player="human",
+                user_id=ada.id,
+                deck="custom",
+                deck_revision_id=revision,
+            )
+        )
+        db.commit()
+    try:
+        assert ada.send("DELETE", f"/api/v1/decks/{lone}/forever").status_code == 204
+        assert ada.send("DELETE", f"/api/v1/decks/{played}/forever").status_code == 204
+        trash = [d["title"] for d in ada.get("/api/v1/decks", view="trash").json()]
+        assert sorted(trash) == ["Other", "Third"]
+        assert ada.send("DELETE", f"/api/v1/decks/{played}/forever").status_code == 404
+        assert ada.send("POST", f"/api/v1/decks/{played}/restore").status_code == 404
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            assert db.get(Deck, UUID(lone)) is None
+            kept = db.get(Deck, UUID(played))
+            assert kept is not None and kept.purged_at is not None
+            assert kept.draft == {"entries": []} and kept.card_count == 0
+            # The played revision stays with its cards; the game keeps its copy.
+            assert db.scalars(
+                select(DeckEntryRow).where(DeckEntryRow.revision_id == revision)
+            ).first()
+        assert ada.send("POST", "/api/v1/decks/trash/empty").json() == {"purged": 2}
+        assert ada.get("/api/v1/decks", view="trash").json() == []
+        assert eve.send("POST", "/api/v1/decks/trash/empty").json() == {"purged": 0}
+    finally:
+        with Session(client.app.state.database) as db:  # type: ignore[attr-defined]
+            db.execute(text("DELETE FROM game_seats"))
+            db.execute(text("DELETE FROM games"))
+            db.commit()
 
 
 def test_a_draft_naming_an_unknown_card_or_edition_is_refused(client):

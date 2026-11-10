@@ -1575,6 +1575,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/decks/trash/empty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Empty Trash
+         * @description Deletes every deck in the trash for good (v0.9.3), but those a table or queue holds.
+         */
+        post: operations["empty_trash_api_v1_decks_trash_empty_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decks/validate": {
         parameters: {
             query?: never;
@@ -1667,6 +1687,26 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/decks/{deck_id}/forever": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Forever
+         * @description Deletes a deck in the trash for good (v0.9.3). Games that played it keep their copy.
+         */
+        delete: operations["delete_forever_api_v1_decks__deck_id__forever_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3248,7 +3288,8 @@ export interface paths {
         /**
          * Browse Tables
          * @description The lobby's open tables a page at a time (v0.9.2): the public ones, your own, those you were
-         *     invited to (SysOp and administrators see every one), newest first with your own leading.
+         *     invited to (SysOp and administrators see every one), your own leading, then newest first, or
+         *     since v0.9.3 the most players or the fewest open seats first, optionally by host.
          */
         get: operations["browse_tables_api_v1_tables_browse_get"];
         put?: never;
@@ -4013,7 +4054,7 @@ export interface components {
             protocol_version: 1;
             /**
              * Version
-             * @default 0.9.2
+             * @default 0.9.3
              */
             version: string;
         };
@@ -4034,6 +4075,24 @@ export interface components {
              * @description The Buy Now price the buyer saw (v0.9.0): if the seller has changed it since, nothing is bought (409 price_changed).
              */
             price?: number | null;
+        };
+        /**
+         * CampaignChallenge
+         * @description The Apex Unbound challenge (v0.9.3).
+         */
+        CampaignChallenge: {
+            /**
+             * Earned
+             * @description Its badge is yours.
+             */
+            earned: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Open
+             * @description The finale is won: the challenge may be taken.
+             */
+            open: boolean;
         };
         /** CampaignChapter */
         CampaignChapter: {
@@ -4134,6 +4193,12 @@ export interface components {
          */
         CampaignRef: {
             /**
+             * Challenge
+             * @description The Apex Unbound challenge (v0.9.3): the finale again, for its badge alone.
+             * @default false
+             */
+            challenge: boolean;
+            /**
              * Deck
              * @enum {string}
              */
@@ -4173,6 +4238,7 @@ export interface components {
         };
         /** CampaignState */
         CampaignState: {
+            challenge: components["schemas"]["CampaignChallenge"];
             /** Chapters */
             chapters: components["schemas"]["CampaignChapter"][];
             /** Content Version */
@@ -5818,7 +5884,7 @@ export interface components {
             status: "ok";
             /**
              * Version
-             * @default 0.9.2
+             * @default 0.9.3
              */
             version: string;
         };
@@ -6650,6 +6716,11 @@ export interface components {
              */
             avatar: "sigil" | "sun" | "moon" | "flame" | "wave" | "leaf" | "crown" | "tower";
             /**
+             * Badges
+             * @description The campaign's badges the player holds (v0.9.3): Apex Unbound.
+             */
+            badges?: string[];
+            /**
              * Blocked
              * @description Whether you have blocked this player.
              */
@@ -7224,6 +7295,14 @@ export interface components {
              * Format: uuid
              */
             product: string;
+        };
+        /** Purged */
+        Purged: {
+            /**
+             * Purged
+             * @description How many decks left the trash for good.
+             */
+            purged: number;
         };
         /** QuestView */
         QuestView: {
@@ -8475,6 +8554,12 @@ export interface components {
         };
         /** StartEncounter */
         StartEncounter: {
+            /**
+             * Challenge
+             * @description The Apex Unbound challenge (v0.9.3): the finale again, once it is won, for its badge alone.
+             * @default false
+             */
+            challenge: boolean;
             /**
              * Deck Id
              * @description One of your Commander decks.
@@ -17618,6 +17703,98 @@ export interface operations {
             };
         };
     };
+    empty_trash_api_v1_decks_trash_empty_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Purged"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     validate_entries_api_v1_decks_validate_post: {
         parameters: {
             query?: never;
@@ -18207,6 +18384,98 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_forever_api_v1_decks__deck_id__forever_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deck_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -26403,6 +26672,10 @@ export interface operations {
                 best_of_three?: boolean;
                 /** @description Only tables a friend sits at or you were invited to. */
                 friends?: boolean;
+                /** @description Only tables whose host's handle or name holds this. */
+                host?: string | null;
+                /** @description newest (default), players (most seated) or fewest_open (seats). */
+                sort?: "newest" | "players" | "fewest_open";
                 page?: number;
                 /** @description 20, 50 or 100. */
                 per_page?: number;

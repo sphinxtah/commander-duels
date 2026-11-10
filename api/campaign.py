@@ -103,6 +103,10 @@ SCENE_KEY = r"^FC\.[A-Z0-9]+(\.[A-Z0-9]+){0,3}$"
 LESSON_KEY = r"^T(0[1-9]|1[0-2])$"
 # The rule a warden's tokens are paid under, recorded with each payment.
 SPOILS_POLICY = "campaign-v1"
+# The handoff's optional post-campaign challenge (v0.9.3): the finale played again once it is won,
+# with the tutorial's aids off, for a cosmetic badge of its own. It never replaces the ending.
+CHALLENGE_NAME = "Apex Unbound"
+CHALLENGE_REWARD = "badge:apex-unbound"
 Tier = Literal["bronze", "silver", "gold", "platinum", "mythic", "godlike"]
 Outcome = Literal["won", "lost", "draw", "unfinished"]
 
@@ -306,6 +310,14 @@ class CampaignProgressView(Contract):
     tutorial: CampaignTutorial
 
 
+class CampaignChallenge(Contract):
+    """The Apex Unbound challenge (v0.9.3)."""
+
+    name: str
+    open: bool = Field(description="The finale is won: the challenge may be taken.")
+    earned: bool = Field(description="Its badge is yours.")
+
+
 class CampaignState(Contract):
     id: str
     title: str
@@ -316,6 +328,7 @@ class CampaignState(Contract):
     chapters: list[CampaignChapter]
     progress: CampaignProgressView
     running: UUID | None = Field(description="Your campaign duel still running, to go back to.")
+    challenge: CampaignChallenge
 
 
 class StartEncounter(Contract):
@@ -324,6 +337,11 @@ class StartEncounter(Contract):
     learn: bool = Field(
         default=False,
         description="Learn Commander: the loaner deck with the training seed and the hints.",
+    )
+    challenge: bool = Field(
+        default=False,
+        description="The Apex Unbound challenge (v0.9.3): the finale again, once it is won, for "
+        "its badge alone.",
     )
 
 
@@ -519,6 +537,11 @@ def state_of(
             ),
         ),
         running=running_of(db, user.id),
+        challenge=CampaignChallenge(
+            name=CHALLENGE_NAME,
+            open=campaign.last in done,
+            earned=CHALLENGE_REWARD in rewards,
+        ),
     )
 
 
@@ -560,6 +583,11 @@ def game_ended(
     progress = progress_of(db, user, campaign, lock=True)
     if progress.started_at > link.created_at:
         # The account was reset after the duel began: it belongs to the old progress.
+        return
+    if link.challenge:
+        # Apex Unbound (v0.9.3): its badge, once, and nothing else; never with passive bots.
+        if payouts:
+            reward(db, user.id, campaign, progress, CHALLENGE_REWARD, game.id)
         return
     number = link.encounter
     if number not in progress.completed:
@@ -678,6 +706,7 @@ def prize_entries(
             )
         )
     }
+    missing: list[str] = []
     for name, count, location in wanted:
         concept = concepts.get(normalize(name))
         if concept is not None:
@@ -689,6 +718,17 @@ def prize_entries(
                     location=location,  # type: ignore[arg-type]
                 )
             )
+        else:
+            missing.append(name)
+    if missing:
+        # Every warden's deck is won whole (the owner, 2026-11-09): a card the catalog no longer
+        # resolves is the one thing that can shorten it, so it is named, never dropped quietly.
+        log.warning(
+            "Campaign spoils for encounter %d: %d card(s) not in the catalog: %s",
+            encounter.number,
+            len(missing),
+            ", ".join(sorted(missing)),
+        )
     return entries
 
 
@@ -859,12 +899,19 @@ async def start_encounter(
         # Learn Commander's seed is disclosed and fixes the shuffles (v0.8.3): on any other ward it
         # would let a player learn both decks' order and replay the same game for its spoils.
         raise ApiError(422, "invalid_seat", "Learn Commander is for the first ward only.")
+    if body.challenge and number != campaign.last:
+        raise ApiError(422, "invalid_seat", f"{CHALLENGE_NAME} is the final encounter's challenge.")
 
     def plan() -> tuple[SeatPlan, CampaignProgress]:
         progress = progress_of(db, user, campaign)
         if number > progress.highest_unlocked:
             db.commit()
             raise ApiError(409, "encounter_locked", "Win the encounter before this one to open it.")
+        if body.challenge and number not in progress.completed:
+            db.commit()
+            raise ApiError(
+                409, "challenge_locked", f"Win the finale before you take on {CHALLENGE_NAME}."
+            )
         if body.deck_id is not None:
             if not principal.can("decks.edit"):
                 raise ApiError(403, "forbidden", "Your account cannot play its own decks.")
@@ -901,7 +948,11 @@ async def start_encounter(
         title=f"{encounter.name}'s deck",
         starter=True,
     )
-    hints = (body.learn or (number == 1 and progress.hints)) and not progress.tutorial_skipped
+    hints = (
+        (body.learn or (number == 1 and progress.hints))
+        and not progress.tutorial_skipped
+        and not body.challenge
+    )
     request_body = PracticeGameRequest(
         format="commander",
         deck_id=body.deck_id,
@@ -946,6 +997,7 @@ async def start_encounter(
                         hints=hints,
                         finale=finale,
                         prize_card=prize_card,
+                        challenge=body.challenge,
                         created_at=utcnow(),
                     )
                 )

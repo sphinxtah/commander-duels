@@ -843,3 +843,21 @@ button.choice:focus-visible {
   font-size: 0.82rem;
   color: #a5b0a3;
 }
+
+/* Apex Unbound (v0.9.3): the post-campaign challenge, once the finale is won. */
+.challenge {
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--cd-gold, #c9a45c);
+  border-radius: 12px;
+  background: rgba(201, 164, 92, 0.08);
+}
+.challenge h3 {
+  margin-top: 0;
+}
+.challenge p {
+  margin: 0 0 0.6rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #d4d9d3;
+}

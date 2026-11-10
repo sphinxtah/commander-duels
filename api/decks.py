@@ -49,7 +49,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi import Path as PathParam
 from fastapi.responses import PlainTextResponse, Response
 from pydantic import Field
-from sqlalchemy import func, not_, select
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import func, not_, or_, select
 from sqlalchemy.orm import Session
 
 from api import deckio, guided
@@ -88,7 +89,11 @@ from api.models import (
     Deck,
     DeckEntryRow,
     DeckRevision,
+    GameSeat,
+    MatchPlayer,
+    QueueEntry,
     SiteSetting,
+    TableSeat,
     User,
 )
 from api.roster import Planeswalker, roster_of
@@ -536,7 +541,7 @@ def store_draft(
 
 def owned(db: Session, principal: Principal, deck_id: UUID, *, trashed: bool = False) -> Deck:
     deck = db.get(Deck, deck_id)
-    if deck is None or deck.owner_id != principal.user.id:
+    if deck is None or deck.owner_id != principal.user.id or deck.purged_at is not None:
         raise not_found()
     if (deck.deleted_at is not None) != trashed:
         raise not_found()
@@ -617,7 +622,80 @@ def deck_detail(
 
 
 def count_decks(db: Session, user_id: UUID) -> int:
-    return db.scalar(select(func.count()).select_from(Deck).where(Deck.owner_id == user_id)) or 0
+    """The decks counted toward MAX_DECKS: the trash's too, but not those deleted from it for
+    good (v0.9.3)."""
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(Deck)
+            .where(Deck.owner_id == user_id, Deck.purged_at.is_(None))
+        )
+        or 0
+    )
+
+
+def purge(db: Session, deck: Deck) -> None:
+    """Deletes a deck from the trash for good (v0.9.3). Its revisions that no game, match or
+    table used go, entries and all; if none was used, the deck goes too. A used revision stays,
+    since games keep the copy they played (DECK01), and so does the deck it names: purged, out of
+    every list and the deck limit, its draft emptied. A deck a table seat or a queue still holds is
+    refused."""
+    if db.scalar(
+        select(func.count()).select_from(TableSeat).where(TableSeat.deck_id == deck.id)
+    ) or db.scalar(
+        select(func.count()).select_from(QueueEntry).where(QueueEntry.deck_id == deck.id)
+    ):
+        raise ApiError(
+            409,
+            "deck_in_use",
+            f"{deck.title} is chosen at a table or in a queue. Leave it there first.",
+        )
+    used = (
+        select(DeckRevision.id)
+        .where(DeckRevision.deck_id == deck.id)
+        .where(
+            or_(
+                DeckRevision.id.in_(
+                    select(GameSeat.deck_revision_id).where(GameSeat.deck_revision_id.is_not(None))
+                ),
+                DeckRevision.id.in_(
+                    select(MatchPlayer.deck_revision_id).where(
+                        MatchPlayer.deck_revision_id.is_not(None)
+                    )
+                ),
+                DeckRevision.id.in_(
+                    select(TableSeat.deck_revision_id).where(
+                        TableSeat.deck_revision_id.is_not(None)
+                    )
+                ),
+            )
+        )
+    )
+    kept = set(db.scalars(used))
+    unused = [
+        revision
+        for revision in db.scalars(select(DeckRevision.id).where(DeckRevision.deck_id == deck.id))
+        if revision not in kept
+    ]
+    quiet = {"synchronize_session": False}
+    if unused:
+        db.execute(
+            sql_delete(DeckEntryRow).where(DeckEntryRow.revision_id.in_(unused)),
+            execution_options=quiet,
+        )
+        db.execute(
+            sql_delete(DeckRevision).where(DeckRevision.id.in_(unused)), execution_options=quiet
+        )
+    if kept:
+        stamp = now()
+        deck.purged_at = stamp
+        deck.visibility, deck.share_code = "private", None
+        deck.draft, deck.draft_hash, deck.card_count = {"entries": []}, "", 0
+        deck.legal = deck.playable = deck.collection_locked = False
+        deck.updated_at = stamp
+    else:
+        db.delete(deck)
+    db.flush()
 
 
 def create_deck(
@@ -633,7 +711,10 @@ def create_deck(
 ) -> tuple[Deck, Validation]:
     if count_decks(db, principal.user.id) >= MAX_DECKS:
         raise ApiError(
-            409, "deck_limit", f"An account keeps at most {MAX_DECKS} decks, the trash included."
+            409,
+            "deck_limit",
+            f"An account keeps at most {MAX_DECKS} decks, the trash included: delete some from "
+            "the trash for good to make room.",
         )
     stamp = now()
     deck = Deck(
@@ -881,7 +962,7 @@ def list_decks(
     db: Db,
     view: Literal["active", "archived", "trash"] = "active",
 ) -> list[DeckSummary]:
-    query = select(Deck).where(Deck.owner_id == principal.user.id)
+    query = select(Deck).where(Deck.owner_id == principal.user.id, Deck.purged_at.is_(None))
     if view == "trash":
         query = query.where(Deck.deleted_at.is_not(None))
     else:
@@ -1052,6 +1133,42 @@ def restore(deck_id: UUID, principal: Builder, db: Db) -> DeckSummary:
     deck.deleted_at = None
     db.commit()
     return deck_summary(db, deck)
+
+
+class Purged(Contract):
+    purged: int = Field(description="How many decks left the trash for good.")
+
+
+@router.delete("/decks/{deck_id}/forever", status_code=204)
+def delete_forever(deck_id: UUID, principal: Builder, db: Db) -> Response:
+    """Deletes a deck in the trash for good (v0.9.3). Games that played it keep their copy."""
+    purge(db, owned(db, principal, deck_id, trashed=True))
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/decks/trash/empty", response_model=Purged)
+def empty_trash(principal: Builder, db: Db) -> Purged:
+    """Deletes every deck in the trash for good (v0.9.3), but those a table or queue holds."""
+    trashed = list(
+        db.scalars(
+            select(Deck).where(
+                Deck.owner_id == principal.user.id,
+                Deck.deleted_at.is_not(None),
+                Deck.purged_at.is_(None),
+            )
+        )
+    )
+    purged = 0
+    for deck in trashed:
+        try:
+            with db.begin_nested():
+                purge(db, deck)
+            purged += 1
+        except ApiError:
+            continue
+    db.commit()
+    return Purged(purged=purged)
 
 
 @router.delete("/decks/{deck_id}/removed-cards", response_model=DeckSummary)

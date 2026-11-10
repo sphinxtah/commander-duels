@@ -148,6 +148,9 @@ function Decks({
   const [guiding, setGuiding] = useState(false);
   const deleting = useRef<HTMLDialogElement>(null);
   const [doomed, setDoomed] = useState<DeckSummary | null>(null);
+  // Deleting from the trash for good (v0.9.3): one deck, or the whole trash.
+  const purging = useRef<HTMLDialogElement>(null);
+  const [purged, setPurged] = useState<DeckSummary | "all" | null>(null);
   const lists = useRef(0);
 
   const refresh = useCallback(async () => {
@@ -207,6 +210,27 @@ function Decks({
           restore: `${deck.title} is restored.`,
         }[action],
       );
+    void latestRefresh.current();
+  }
+
+  async function purge(target: DeckSummary | "all") {
+    setMessage("");
+    if (target === "all") {
+      const { data, error } = await client.POST("/api/v1/decks/trash/empty");
+      if (error) setMessage(describe(error));
+      else if (data && decks && data.purged < decks.length)
+        setMessage(
+          `${data.purged} ${data.purged === 1 ? "deck was" : "decks were"} deleted for good. The rest are chosen at a table or in a queue.`,
+        );
+      else setMessage("The trash is empty.");
+    } else {
+      const { error } = await client.DELETE("/api/v1/decks/{deck_id}/forever", {
+        params: { path: { deck_id: target.id } },
+      });
+      setMessage(
+        error ? describe(error) : `${target.title} is deleted for good.`,
+      );
+    }
     void latestRefresh.current();
   }
 
@@ -292,91 +316,119 @@ function Decks({
               : "The trash is empty."}
         </p>
       ) : (
-        <ul className={styles.deckList}>
-          {decks.map((deck) => (
-            <li key={deck.id}>
-              <div>
-                <a
-                  href={view === "trash" ? undefined : `#deck/${deck.id}`}
-                  className={styles.deckTitle}
-                >
-                  {deck.title}
-                </a>
-                <span className={styles.deckMeta}>
-                  {formatLabels[deck.format]} ·{" "}
-                  <IdentityPips identity={deck.identity} /> · {deck.card_count}{" "}
-                  cards
-                  {deck.commanders.length > 0 &&
-                    ` · ${deck.commanders.join(" & ")}`}
-                  {/* v0.4.5: the editor's note says which, and why. */}
-                  {deck.removed_cards.length > 0 &&
-                    ` · ${deck.removed_cards.length} ${deck.removed_cards.length === 1 ? "card" : "cards"} left the game`}
-                  {/* v0.5.0: copies switched to the editions the library holds. */}
-                  {(deck.switched_editions?.length ?? 0) > 0 &&
-                    ` · ${switchedWords(deck.switched_editions ?? [])}`}
-                </span>
-                <NeedsTags needs={deck.needs} format={deck.format} />
-              </div>
-              <StateBadge
-                state={
-                  deck.playable
-                    ? "playable"
-                    : deck.collection_locked
-                      ? "locked"
-                      : deck.legal
-                        ? "legal"
-                        : "draft"
-                }
-              />
-              <div className={styles.rowActions}>
-                {view === "trash" ? (
-                  <button
-                    type="button"
-                    className={styles.secondary}
-                    onClick={() => void act(deck, "restore")}
+        <>
+          {view === "trash" && (
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => {
+                  setPurged("all");
+                  purging.current?.showModal();
+                }}
+              >
+                Empty trash
+              </button>
+            </div>
+          )}
+          <ul className={styles.deckList}>
+            {decks.map((deck) => (
+              <li key={deck.id}>
+                <div>
+                  <a
+                    href={view === "trash" ? undefined : `#deck/${deck.id}`}
+                    className={styles.deckTitle}
                   >
-                    Restore
-                  </button>
-                ) : (
-                  <>
-                    <a className={styles.secondary} href={`#deck/${deck.id}`}>
-                      Open
-                    </a>
-                    <button
-                      type="button"
-                      className={styles.secondary}
-                      onClick={() => void act(deck, "duplicate")}
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.secondary}
-                      onClick={() =>
-                        void act(
-                          deck,
-                          view === "archived" ? "unarchive" : "archive",
-                        )
-                      }
-                    >
-                      {view === "archived" ? "Unarchive" : "Archive"}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.secondary}
-                      onClick={() => {
-                        setDoomed(deck);
-                        deleting.current?.showModal();
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+                    {deck.title}
+                  </a>
+                  <span className={styles.deckMeta}>
+                    {formatLabels[deck.format]} ·{" "}
+                    <IdentityPips identity={deck.identity} /> ·{" "}
+                    {deck.card_count} cards
+                    {deck.commanders.length > 0 &&
+                      ` · ${deck.commanders.join(" & ")}`}
+                    {/* v0.4.5: the editor's note says which, and why. */}
+                    {deck.removed_cards.length > 0 &&
+                      ` · ${deck.removed_cards.length} ${deck.removed_cards.length === 1 ? "card" : "cards"} left the game`}
+                    {/* v0.5.0: copies switched to the editions the library holds. */}
+                    {(deck.switched_editions?.length ?? 0) > 0 &&
+                      ` · ${switchedWords(deck.switched_editions ?? [])}`}
+                  </span>
+                  <NeedsTags needs={deck.needs} format={deck.format} />
+                </div>
+                <StateBadge
+                  state={
+                    deck.playable
+                      ? "playable"
+                      : deck.collection_locked
+                        ? "locked"
+                        : deck.legal
+                          ? "legal"
+                          : "draft"
+                  }
+                />
+                <div className={styles.rowActions}>
+                  {view === "trash" ? (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() => void act(deck, "restore")}
+                      >
+                        Restore
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() => {
+                          setPurged(deck);
+                          purging.current?.showModal();
+                        }}
+                      >
+                        Delete for good
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <a className={styles.secondary} href={`#deck/${deck.id}`}>
+                        Open
+                      </a>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() => void act(deck, "duplicate")}
+                      >
+                        Duplicate
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() =>
+                          void act(
+                            deck,
+                            view === "archived" ? "unarchive" : "archive",
+                          )
+                        }
+                      >
+                        {view === "archived" ? "Unarchive" : "Archive"}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        onClick={() => {
+                          setDoomed(deck);
+                          deleting.current?.showModal();
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {starters.length > 0 && view === "active" && (
         <section className={styles.starters} aria-labelledby="starters-title">
@@ -512,6 +564,40 @@ function Decks({
               onClick={() => doomed && void act(doomed, "delete")}
             >
               Delete
+            </button>
+          </div>
+        </form>
+      </dialog>
+      {/* Deleting for good asks too (v0.9.3): it cannot be undone. */}
+      <dialog
+        ref={purging}
+        className={styles.dialog}
+        aria-labelledby="purge-deck-title"
+        onClose={() => setPurged(null)}
+      >
+        <form method="dialog">
+          <h2 id="purge-deck-title">
+            {purged === "all"
+              ? "Empty the trash?"
+              : `Delete ${purged?.title ?? "this deck"} for good?`}
+          </h2>
+          <p className={styles.hint}>
+            {purged === "all"
+              ? "Every deck in the trash is deleted for good. This can't be undone."
+              : "It can't be restored afterwards."}{" "}
+            Games already played keep their copy, and the cards stay in your
+            library.
+          </p>
+          <div className={styles.actions}>
+            <button type="submit" className={styles.secondary} autoFocus>
+              Keep {purged === "all" ? "them" : "it"}
+            </button>
+            <button
+              type="submit"
+              className={styles.primary}
+              onClick={() => purged && void purge(purged)}
+            >
+              Delete for good
             </button>
           </div>
         </form>

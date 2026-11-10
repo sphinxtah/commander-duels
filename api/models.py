@@ -1015,6 +1015,9 @@ class Deck(Base):
     # campaign back if it chose one, else the official card back.
     sleeve: Mapped[str | None] = mapped_column(String(64))
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
+    # Deleted from the trash for good (v0.9.3) while a revision a game, match or table used still
+    # refers to it: in no list, and not counted toward the deck limit. Its deleted_at stays set.
+    purged_at: Mapped[datetime | None] = mapped_column(UtcDateTime())
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime())
 
@@ -1905,6 +1908,9 @@ class CampaignGame(Base):
     # The private finale's commander as a custom card (the owner's word): the deck its win gives
     # comes with it. No foreign key, as for a deck's custom cards: SysOp may remove the card.
     prize_card: Mapped[UUID | None]
+    # The Apex Unbound challenge (v0.9.3): the finale played again once the campaign is complete,
+    # without hints, for its badge alone.
+    challenge: Mapped[bool] = mapped_column(default=False, server_default=false())
     outcome: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime())
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime())

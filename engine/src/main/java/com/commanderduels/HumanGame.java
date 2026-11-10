@@ -5,9 +5,11 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1142,12 +1144,13 @@ final class HumanGame {
             if (promptOpen && player != null) {
                 // Wakes the waiting choice even when XMage has no priority player yet (mulligans).
                 player.signalPlayerConcede(true);
-            } else if (lastStanding(current, playerId)) {
+            } else if (endsGame(current, playerId)) {
                 // XMage applies another player's concession at the next answer of the player who
-                // holds priority or a choice. When the concession leaves that player alone (two
-                // players at a human table, v0.4.0), the game would wait for the winner to act, so
-                // the waiting player is woken: XMage applies the concession, the game ends, and
-                // otherwise it goes on waiting for the same answer.
+                // holds priority or a choice. When the concession ends the game (two players at a
+                // human table, v0.4.0; since v0.9.3 the last team at Two-Headed Giant or King's
+                // Table, or a King out), the game would wait for a winner to act, so the waiting
+                // player is woken: XMage applies the concession, the game ends, and otherwise it
+                // goes on waiting for the same answer.
                 Player waiting = waitingPlayer(current);
                 if (waiting != null && !waiting.getId().equals(playerId)) {
                     synchronized (this) {
@@ -1162,9 +1165,14 @@ final class HumanGame {
         }
     }
 
-    /** Whether at most one player stays in the game once this concession and earlier ones apply. */
-    private boolean lastStanding(Game current, UUID conceding) {
-        List<UUID> leaving = new ArrayList<>();
+    /**
+     * Whether the game ends once this concession and earlier ones apply: at most one player stays,
+     * or in a team format (v0.9.3) one team, or at King's Table a King is out (its team loses). At
+     * Two-Headed Giant one player's concession takes their teammate with them (810.8b).
+     */
+    private boolean endsGame(Game current, UUID conceding) {
+        Set<UUID> leaving = new HashSet<>();
+        leaving.add(conceding);
         synchronized (this) {
             for (Seat seat : humans) {
                 if (seat.concedeRequested) {
@@ -1172,11 +1180,34 @@ final class HumanGame {
                 }
             }
         }
-        long standing = current.getPlayers().values().stream()
-            .filter(player -> !player.hasLost() && !player.hasLeft())
-            .filter(player -> !player.getId().equals(conceding) && !leaving.contains(player.getId()))
-            .count();
-        return standing <= 1;
+        GameFormat format = request.format();
+        if (format == GameFormat.TWO_HEADED_GIANT) {
+            // A player's concession takes their whole team out of the game (810.8b).
+            for (int index = 0; index < seatIds.size(); index++) {
+                if (leaving.contains(seatIds.get(index))) {
+                    leaving.add(seatIds.get(index ^ 1));
+                }
+            }
+        }
+        List<Integer> standing = new ArrayList<>();
+        for (int index = 0; index < seatIds.size(); index++) {
+            UUID id = seatIds.get(index);
+            Player player = current.getPlayer(id);
+            if (player != null && !player.hasLost() && !player.hasLeft() && !leaving.contains(id)) {
+                standing.add(index);
+            }
+        }
+        if (standing.size() <= 1 || !format.teams()) {
+            return standing.size() <= 1;
+        }
+        if (format.kingsTable()) {
+            for (int index = 0; index < seatIds.size(); index++) {
+                if (KingsTableRules.king(index) && !standing.contains(index)) {
+                    return true;
+                }
+            }
+        }
+        return standing.stream().map(format::teamOf).distinct().count() <= 1;
     }
 
     /** The player XMage waits for: who holds priority, or else who makes a choice. */

@@ -43,11 +43,14 @@ export async function changeTutorial(
 }
 
 export type StartChoice =
-  { kind: "learn" } | { kind: "loaner" } | { kind: "own"; deckId: string };
+  | { kind: "learn" }
+  | { kind: "loaner" }
+  | { kind: "own"; deckId: string };
 
 export async function startEncounter(
   number: number,
   choice: StartChoice,
+  challenge = false,
 ): Promise<{ gameId?: string; error?: string }> {
   const { data, error } = await client.POST(
     "/api/v1/campaign/encounters/{number}/start",
@@ -57,6 +60,7 @@ export async function startEncounter(
         deck_id: choice.kind === "own" ? choice.deckId : null,
         learn: choice.kind === "learn",
         loaner: choice.kind === "loaner",
+        challenge,
       },
     },
   );

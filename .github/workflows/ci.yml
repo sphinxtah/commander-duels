@@ -134,6 +134,7 @@ jobs:
       # at 1280 x 720 to 4K, with the response timer and full screen, and the installable app
       # (manifest, icons, service worker, install banner) on the built image. Since v0.4.0 also a
       # human table: SysOp and a second, generated player play a Legacy game against each other.
+      # Since v0.9.3 also the team tables: Two-Headed Giant with four people, and King's Table.
       # Since v0.4.1 also the public pages as nginx serves them, and the worker leaving them alone.
       - name: Practice games in the browser
         run: |
@@ -154,15 +155,24 @@ jobs:
           player="$(docker compose run --rm --no-deps -v "$PWD/scripts:/scripts:ro" api \
             python /scripts/e2e_player.py rival | tail -n 1)"
           echo "::add-mask::$player"
+          # Two more for the four people at a Two-Headed Giant table (v0.9.3).
+          team=""
+          for handle in rival2 rival3; do
+            made="$(docker compose run --rm --no-deps -v "$PWD/scripts:/scripts:ro" api \
+              python /scripts/e2e_player.py "$handle" | tail -n 1)"
+            echo "::add-mask::$made"
+            team="${team:+$team,}$made"
+          done
           # pnpm comes from npm, at the version package.json names: since 2026-11 the Playwright image's
           # Node has no corepack (v0.8.3).
           # Host networking: the browser reaches the web proxy's published port from this machine,
           # which the API sees as the Compose gateway, SysOp's network.
           docker run --rm --network host --ipc=host -e CI=1 -e CD_BROWSER_URL=http://localhost:8080 \
             -e CD_E2E_GAMES=1 -e CD_E2E_SYSOP_PASSWORD="$password" -e CD_E2E_PLAYER_SESSION="$player" \
+            -e CD_E2E_TEAM_SESSIONS="$team" \
             -v "$PWD:/w" -w /w mcr.microsoft.com/playwright:v1.64.1-noble sh -c "npm install --global --silent pnpm@11.25.0 \
               && pnpm install --frozen-lockfile --reporter=silent \
-              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/matches.spec.ts e2e/social.spec.ts e2e/auctions.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
+              && pnpm --dir web exec playwright test e2e/game.spec.ts e2e/tables.spec.ts e2e/team-tables.spec.ts e2e/matches.spec.ts e2e/social.spec.ts e2e/auctions.spec.ts e2e/pwa.spec.ts e2e/pages.spec.ts \
                 --reporter=line"
           docker compose down
       # As in verify; a failed game's error also lists the test player's last answers.

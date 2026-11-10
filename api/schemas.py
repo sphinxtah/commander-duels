@@ -600,6 +600,10 @@ class CampaignRef(Contract):
     outcome: Literal["won", "lost", "draw", "unfinished"] | None = Field(
         description="How the duel ended for you, once its end is recorded."
     )
+    challenge: bool = Field(
+        default=False,
+        description="The Apex Unbound challenge (v0.9.3): the finale again, for its badge alone.",
+    )
 
 
 class GameMatch(Contract):

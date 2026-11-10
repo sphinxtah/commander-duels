@@ -174,20 +174,9 @@ final class CampaignReserve {
             if (controller == null) {
                 return false;
             }
-            Card card = card(game, source.getSourceId());
+            Card card = bringIn(game, source.getSourceId(), controller, cardName);
             if (card == null) {
-                CardInfo info = DeckLists.find(cardName);
-                card = info == null ? null : info.createCard();
-                if (card == null) {
-                    return false;
-                }
-                Set<Card> cards = new HashSet<>();
-                cards.add(card);
-                game.loadCards(cards, controller.getId());
-                game.getState().setValue(CARD + source.getSourceId(), card.getId());
-                game.addCommander(new Commander(card));
-                game.informPlayers(controller.getLogName() + "'s incarnation waits in reserve: "
-                    + card.getLogName() + ".");
+                return false;
             }
             if (game.getState().getZone(card.getId()) != Zone.COMMAND) {
                 // Already out of the reserve: nothing more to cast.
@@ -195,6 +184,30 @@ final class CampaignReserve {
             }
             return CardUtil.castSpellWithAttributesForFree(controller, source, game, card);
         }
+    }
+
+    /**
+     * The reserve card, brought into the game in the controller's reserve the first time (the
+     * command zone, as XMage keeps a commander card); the same card every time after. Null when the
+     * engine does not know the card.
+     */
+    static Card bringIn(Game game, UUID emblemId, Player controller, String cardName) {
+        Card card = card(game, emblemId);
+        if (card != null) {
+            return card;
+        }
+        CardInfo info = DeckLists.find(cardName);
+        card = info == null ? null : info.createCard();
+        if (card == null) {
+            return null;
+        }
+        Set<Card> cards = new HashSet<>();
+        cards.add(card);
+        game.loadCards(cards, controller.getId());
+        game.getState().setValue(CARD + emblemId, card.getId());
+        game.addCommander(new Commander(card));
+        game.informPlayers(controller.getLogName() + "'s incarnation waits in reserve: " + card.getLogName() + ".");
+        return card;
     }
 
     /** Back to the reserve, from the battlefield or the stack, instead of any other zone. */
